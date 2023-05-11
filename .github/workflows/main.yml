@@ -1,0 +1,37 @@
+name: Pull and clean data
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'LICENSE'
+      - 'NOTES.txt'
+      - 'README.md'
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 11,23 * * *'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.8
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas geopandas stravalib requests datetime
+    - name: Pull data
+      run: |
+        python endur/get_data_again.py
+      env:
+        STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+        STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
