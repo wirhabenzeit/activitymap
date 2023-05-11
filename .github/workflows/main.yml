@@ -31,7 +31,7 @@ jobs:
         pip install pandas geopandas stravalib requests datetime
     - name: Pull data
       run: |
-        python endur/get_data_again.py
+        python get_data.py
       env:
         STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
         STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
