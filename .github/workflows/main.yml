@@ -30,7 +30,7 @@ jobs:
         git config --global user.name "wirhabenzeit"
         git config --global user.email "dschroeder@ethz.ch"
         git add activities_geo.json
-        git commit -m "Updating activities_geo.json"
+        git commit -m "Updating activities_geo.json" || echo "No changes to commit"
         git push
     - name: Update Github pages
       run: |
