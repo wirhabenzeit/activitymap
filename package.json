@@ -4,8 +4,8 @@
   "homepage": "https://wirhabenzeit.github.io/stravamap",
   "scripts": {
     "start": "vite",
-    "predeploy" : "npm run build",
-    "deploy" : "gh-pages -d build",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build",
     "build": "vite build",
     "serve": "vite preview"
   },
