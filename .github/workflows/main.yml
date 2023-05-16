@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
     - name: Pull data
       run: |
         curl https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson --output activities_geo.json
