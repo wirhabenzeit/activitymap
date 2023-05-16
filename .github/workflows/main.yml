@@ -6,7 +6,6 @@ on:
       - main
     paths-ignore:
       - 'LICENSE'
-      - 'NOTES.txt'
       - 'README.md'
   pull_request:
     branches:
