@@ -1,0 +1,216 @@
+@charset "UTF-8";
+@import "node_modules/ol/ol.css";
+@import "node_modules/ol-layerswitcher/dist/ol-layerswitcher.css";
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+#map {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+}
+#floater {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  max-height: 60%;
+  overflow-y: scroll;
+}
+#layer-switcher {
+  position: fixed;
+  top: 3.5em;
+  left: .5em;
+  border-radius: 2px;
+}
+#activity-switcher {
+  top: 5.1em;
+  left: .5em;
+}
+#BackcountrySki {
+  border-radius: 2px 2px 0 0;
+}
+#BackcountrySki.active {
+  color: var(--ski-color);
+}
+#Hike {
+  border-radius: 0 0 0 0;
+}
+#Hike.active {
+  color: var(--hike-color);
+}
+#Ride {
+  border-radius: 0 0 2px 2px;
+}
+#Ride.active {
+  color: var(--bike-color);
+}
+#layer-switcher-content {
+  position: fixed;
+  top: .5em;
+  left: 2.5em;
+  padding: .5em;
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 1px solid var(--ol-subtle-foreground-color);
+}
+.layer-preview {
+  width: 80px;
+  height: 80px;
+  background-position: center;
+  background-size: cover;
+  border-radius: 10px;
+  border: 1px solid #ffffff;
+}
+
+#layer-switcher-content li {
+  display: inline-block;
+}
+#layer-switcher-content ul {
+  padding: 0;
+  margin: 0;
+}
+#layer-switcher-content button {
+  margin: 1px;
+  padding: 0px;
+  color: var(--ol-subtle-foreground-color);
+  text-decoration: none;
+  font-size: inherit;
+  background-color: var(--ol-background-color);
+  border: 0;
+}
+#layer-switcher-content button:hover label {
+  font-weight: bold;
+}
+#layer-switcher-content .selected-true label {
+  font-weight: bold;
+}
+#layer-switcher-content button .layer-preview {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+#layer-switcher-content button:hover .layer-preview {
+  border: 1px solid var(--ol-subtle-foreground-color);
+}
+#layer-switcher-content .selected-true .layer-preview {
+  border: 1px solid var(--ol-foreground-color);
+}
+#layer-switcher-content label {
+  padding: 10px;
+  font-size: smaller;
+}
+#layer-switcher-content {
+  opacity: .0;
+  -webkit-transition: all 500ms ease-in-out;
+  -moz-transition: all 500ms ease-in-out;
+  -ms-transition: all 500ms ease-in-out;
+  -o-transition: all 500ms ease-in-out;
+  transition: all 500ms ease-in-out;
+}
+#layer-switcher:hover + #layer-switcher-content, #layer-switcher-content:hover {
+  opacity: 1.0;
+}
+
+.sr-only {
+  position: absolute;
+  top: -30em;
+}
+.ol-scale-line {
+  right: 10px;
+  left: initial;
+  bottom: initial;
+  top: 10px;
+}
+.sortable {
+  border-collapse: collapse;
+  margin: 0;
+  font-size: 0.9em;
+  font-family: sans-serif;
+  min-width: 400px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+}
+.sortable thead tr {
+  background-color: #FAC05E;
+  color: #ffffff;
+  text-align: left;
+}
+.sortable th,
+.sortable td {
+    padding: 8px 11px;
+}
+.sortable tbody tr {
+  border-bottom: 1px solid #dddddd;
+}
+
+.sortable tbody tr:nth-of-type(even) {
+  background-color: #f3f3f3;
+}
+.sortable tbody tr:nth-of-type(odd) {
+  background-color: #ffffff;
+}
+.sortable td:nth-child(2),td:nth-child(3) { text-align: end; }
+
+
+.sortable tbody tr:last-of-type {
+  border-bottom: 2px solid #FAC05E;
+}
+.sortable tbody tr:hover {
+  color: #FAC05E;
+}
+.sortable th {
+  cursor: pointer;
+}
+.sortable th.no-sort {
+  pointer-events: none;
+}
+.sortable th::after, .sortable th::before {
+  transition: color 0.1s ease-in-out;
+  font-size: 1.2em;
+  color: transparent;
+}
+.sortable th::after {
+  margin-left: 3px;
+  content: "\f0dc";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th:hover::after {
+  color: inherit;
+}
+.sortable th.dir-d::after {
+  color: inherit;
+  content: "\f0dd";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th.dir-u::after {
+  color: inherit;
+  content: "\f0de";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th.indicator-left::after {
+  content: "";
+}
+.sortable th.indicator-left::before {
+  margin-right: 3px;
+  content: "\f0dc";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th.indicator-left:hover::before {
+  color: inherit;
+}
+.sortable th.indicator-left.dir-d::before {
+  color: inherit;
+  content: "\f0dd";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th.indicator-left.dir-u::before {
+  color: inherit;
+  content: "\f0de";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
