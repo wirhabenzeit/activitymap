@@ -34,4 +34,5 @@ jobs:
         git push
     - name: Update Github pages
       run: |
+        npm install
         npm run deploy
