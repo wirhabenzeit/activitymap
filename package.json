@@ -1,6 +1,7 @@
 {
   "name": "strava_map",
   "version": "0.0.1",
+  "homepage": "https://wirhabenzeit.github.io/stravamap",
   "scripts": {
     "start": "vite",
     "build": "vite build",
