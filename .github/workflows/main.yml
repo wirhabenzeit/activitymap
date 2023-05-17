@@ -34,17 +34,18 @@ jobs:
         head -10 activities_geo.json.old
         head -10 activities_geo.json
         diff activities_geo.json activities_geo.json.old || echo "No changes"
-    - name: Commit new json file
-      run: |
-        git config --global user.name "wirhabenzeit"
-        git config --global user.email "dschroeder@ethz.ch"
-        git add activities_geo.json
-        git commit -m "Updating activities_geo.json" || echo "No changes to commit"
-        git push
     - name: Update Github pages
       run: |
         npm install
         npm run build
+    - name: Commit new json file
+      run: |
+        git config --global user.name "wirhabenzeit"
+        git config --global user.email "dschroeder@ethz.ch"
+        git add activities_geo.json 
+        git add dist*
+        git commit -m "Updating activities_geo.json" || echo "No changes to commit"
+        git push
     - name: Deploy 🚀
       uses: JamesIves/github-pages-deploy-action@v4
       with:
