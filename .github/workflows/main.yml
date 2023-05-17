@@ -23,7 +23,9 @@ jobs:
         fetch-depth: 0
     - name: Pull data
       run: |
+        mv activities_geo.json activities_geo.json.old
         curl https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson --output activities_geo.json
+        diff activities_geo.json activities_geo.json.old || echo "No changes"
     - name: Commit new json file
       run: |
         git config --global user.name "wirhabenzeit"
