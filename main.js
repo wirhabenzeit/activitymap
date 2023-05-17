@@ -7,13 +7,11 @@ import 'sortable-tablesort/sortable.min.js'
 import {Map, View} from 'ol';
 import { Group as LayerGroup, Tile as TileLayer, Vector as VectorLayer } from "ol/layer";
 import { defaults as defaultControls, ScaleLine } from "ol/control";
-import { GPX } from "ol/format";
 import { Style, Stroke } from "ol/style";
 import GeoJSON from 'ol/format/GeoJSON.js';
 import {DragBox, Select} from 'ol/interaction.js';
 import { OSM,XYZ, Vector as VectorSource } from "ol/source";
 import {platformModifierKeyOnly} from 'ol/events/condition.js';
-import Collection from 'ol/Collection.js';
 
 import activityGeoJSON from '/activities_geo.json';
 
