@@ -21,10 +21,14 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
+    - name: Setup jq
+      run: |
+        sudo apt-get install -y jq
     - name: Pull data
       run: |
         mv activities_geo.json activities_geo.json.old
-        curl https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson --output activities_geo.json
+        curl https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson --output activities_geo_ugly.json
+        jq . activities_geo_ugly.json > activities_geo.json
     - name: Check for changes
       run: |
         head -10 activities_geo.json.old
