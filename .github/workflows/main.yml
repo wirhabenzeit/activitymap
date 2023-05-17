@@ -12,6 +12,11 @@ on:
   schedule:
     - cron: '0 */3 * * *'
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
   build:
 
