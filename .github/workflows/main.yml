@@ -25,6 +25,10 @@ jobs:
       run: |
         mv activities_geo.json activities_geo.json.old
         curl https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson --output activities_geo.json
+    - name: Check for changes
+      run: |
+        head -10 activities_geo.json.old
+        head -10 activities_geo.json
         diff activities_geo.json activities_geo.json.old || echo "No changes"
     - name: Commit new json file
       run: |
