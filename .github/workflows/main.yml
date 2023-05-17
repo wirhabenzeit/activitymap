@@ -31,8 +31,6 @@ jobs:
         jq . activities_geo_ugly.json > activities_geo.json
     - name: Check for changes
       run: |
-        head -10 activities_geo.json.old
-        head -10 activities_geo.json
         diff activities_geo.json activities_geo.json.old || echo "No changes"
     - name: Update Github pages
       run: |
@@ -46,7 +44,12 @@ jobs:
         git add dist*
         git commit -m "Updating activities_geo.json" || echo "No changes to commit"
         git push
-    - name: Deploy 🚀
-      uses: JamesIves/github-pages-deploy-action@v4
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v1
       with:
-        folder: dist
+        path: './dist'
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v1
