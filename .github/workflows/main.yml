@@ -32,7 +32,8 @@ jobs:
     - name: Pull data
       run: |
         mv public/activities_geo.json activities_geo.json.old
-        curl https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson --output activities_geo_ugly.json
+        columns=`node -e "const ac = require('./activityConfig.json');console.log([...new Set([...Object.keys(ac.tableColumns), ...Object.keys(ac.activityFilters), 'geometry', 'type'])].join(','));"`
+        curl "https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson?columns=$columns" --output activities_geo_ugly.json
         jq . activities_geo_ugly.json > public/activities_geo.json
     - name: Check for changes
       run: |

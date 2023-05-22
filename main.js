@@ -13,35 +13,14 @@ import { Style, Stroke } from "ol/style";
 import { asArray } from 'ol/color';
 import GeoJSON from 'ol/format/GeoJSON.js';
 import {DragBox, Select} from 'ol/interaction.js';
-import { OSM,XYZ, Vector as VectorSource } from "ol/source";
+import {  Vector as VectorSource } from "ol/source";
 import {platformModifierKeyOnly} from 'ol/events/condition.js';
 
-const sportsCategories = {
-  "BackcountryNordicSki": {"color": "#1982C4", "icon": "fa-solid fa-person-skiing-nordic", "alias": ["BackcountrySki","NordicSki"]},
-  "WalkRun": {"color": "#FF595E", "icon": "fa-solid fa-walking", "alias": ["Walk","Run","Hike","RockClimbing","Snowshoe"]},
-  "Ride": {"color": "#8AC926", "icon": "fa-solid fa-biking", "alias": ["Ride","VirtualRide"]},
-  "AlpineSki": {"color": "#3FA7D6", "icon": "fa-solid fa-person-skiing", "alias": ["AlpineSki"]},
-  "Misc": {"color": "#6A4C93", "icon": "fa-solid fa-person-circle-question", "alias": []},
-}
-//var aliasMap = {};
-//var colorMap = {};
-var colorMap = new Proxy({}, {
-  get: (target, name) => name in target ? target[name] : sportsCategories["Misc"].color
-})
-var aliasMap = new Proxy({}, {
-  get: (target, name) => name in target ? target[name] : "Misc"
-})
-var shownTracks = {};
-Object.entries(sportsCategories).forEach(function([key, value]) {
-  document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><i class="${value.icon}"></i></button>`;
-  shownTracks[key] = true;
-  value.alias.forEach(function(alias) {
-    aliasMap[alias] = key;
-    colorMap[alias] = value.color;
-  });
-});
-const highlightColor = "#FFC107";
-document.body.style.setProperty('--highlight-color', highlightColor);
+import {backgroundMaps, overlayMaps} from './mapConfig.js';
+import ac from './activityConfig.json' assert {type: 'json'};
+var activityFilters = ac.activityFilters;
+const sportsCategories = ac.sportsCategories;
+const tableColumns = ac.tableColumns;
 
 function secondsToHours(secs,returnSeconds) {
   var sec_num = parseInt(secs, 10); 
@@ -54,18 +33,24 @@ function secondsToHours(secs,returnSeconds) {
   return hours+'h'+minutes+(returnSeconds?(':'+seconds):'');
 }
 
-var backgroundMaps = {
-  "CH": {source: new XYZ({url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg`}), visible: true, preview: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/15/17174/11536.jpeg"},
-  "CH(b/w)": {source: new XYZ({url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg`}), visible: false, preview: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/15/17174/11536.jpeg"},
-  "CH(ski)": {source: new XYZ({url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe-winter/default/current/3857/{z}/{x}/{y}.jpeg`}), visible: false, preview: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe-winter/default/current/3857/15/17174/11536.jpeg"},
-  "OSM": {source: new OSM(), visible: false, preview: "https://tile.openstreetmap.org/15/17174/11536.png"},
-  "OTM": {source: new OSM({url: 'https://{a-c}.tile.opentopomap.org/{z}/{x}/{y}.png', attributions: `Kartendaten: © <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende, SRTM | Kartendarstellung: © <a href="http://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)`}), visible: false, preview: 'https://c.tile.opentopomap.org/15/17174/11536.png'},
-}
 
-var overlayMaps = {
-  "slope": {source: new XYZ({url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/{z}/{x}/{y}.png`}), visible: false, preview: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/15/17174/11536.png", opacity: 0.5},
-  "ski": {source: new XYZ({url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/{z}/{x}/{y}.png`}), visible: false, preview: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/15/17174/11536.png", opacity: 1.0}
-}
+var shownTracks = {};
+const colorMap = new Proxy({}, {
+  get: (target, name) => name in target ? target[name] : sportsCategories["Misc"].color
+})
+const aliasMap = new Proxy({}, {
+  get: (target, name) => name in target ? target[name] : "Misc"
+})
+Object.entries(sportsCategories).forEach(function([key, value]) {
+  document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><i class="${value.icon}"></i></button>`;
+  shownTracks[key] = true;
+  value.alias.forEach(function(alias) {
+    aliasMap[alias] = key;
+    colorMap[alias] = value.color;
+});
+});
+const highlightColor = "#FFC107";
+document.body.style.setProperty('--highlight-color', highlightColor);
 
 document.getElementById('layer-switcher-content').getElementsByTagName('ul')[0].innerHTML = Object.entries(backgroundMaps).map(function([id, map]) {
   return `<button id=${id} class="${map.visible?'selected-true':''}"><div class="layer-preview" style="background-image: url(${map.preview});"></div><label>${id}</label></button>`;
@@ -142,8 +127,10 @@ const trackSource = new VectorSource({
 trackSource.on('featuresloadend', function(e) {
     var prev_legend_element = "activity-switcher";
 Object.entries(activityFilters).forEach(function([id, filter]) {
-  const activity_values = trackSource.getFeatures().map(function(feature) {return filter.transform(feature.values_[id])});
-  //console.log(activity_values);
+  const activity_values = trackSource.getFeatures().map(function(feature) {
+    const value = feature.values_[id];
+    return eval(filter.transform);
+  });
   noUiSlider.create(document.getElementById(`${id}-slider`), {
     range: {min: Math.min(...activity_values), max:  Math.max(...activity_values)},
     step: filter.step,
@@ -152,10 +139,12 @@ Object.entries(activityFilters).forEach(function([id, filter]) {
       decimals: filter.decimals,
     }),
     connect: true,
-    tooltips: {to: filter.tooltip},
+    tooltips: {to: function(value) { return eval(filter.tooltip); } },
   });
   filter["limits"] = [Math.min(...activity_values), Math.max(...activity_values)];
   document.getElementById(`${id}-slider`).noUiSlider.on('change', function (values, handle) {  
+    //console.log(values.map(eval));
+    //console.log(document.getElementById(`${id}-slider`).noUiSlider.get());
     filter["limits"] = values;
     trackLayer.setStyle(trackStyleUnselected);
   });
@@ -199,19 +188,14 @@ function trackStyle(color, selected) {
 }
 
 
-var activityFilters = {
-  "start_date_local": { "icon": "fa-solid fa-calendar-days", "transform": function(value) {return new Date(value).getTime();}, "tooltip": function(value) { return new Date(value).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"})}, "step": 7 * 24 * 60 * 60 * 1000, "decimals":0},
-  "distance": { "icon": "fa-solid fa-ruler-horizontal", "transform": function(value) {return value;}, "tooltip": function(value) { return Math.round(value/1000)+"km"}, "step": 100, "decimals":0},
-  "total_elevation_gain": { "icon": "fa-solid fa-ruler-vertical", "transform": function(value) {return value;}, "tooltip": function(value) { return Math.round(value)+"m"}, "step": 10, "decimals":0}
-};
-
 function featureVisible(feature) {
   if (!shownTracks[aliasMap[feature.get("type")]]) {
     return -1;
   }
   for (let [id, filter] of Object.entries(activityFilters)) {
       var limits = filter.limits;
-      if (limits[0] > filter.transform(feature.get(id)) || limits[1] < filter.transform(feature.get(id))) {
+      var value = feature.get(id);
+      if (limits[0] > eval(filter.transform) || limits[1] < eval(filter.transform)) {
         return -1;
       }
   }
@@ -227,7 +211,6 @@ function trackStyleSelected(feature) {
 
 document.getElementById("layer-switcher").style.top = document.getElementsByClassName("ol-zoom")[0].getBoundingClientRect().bottom + 8 + "px";
 document.getElementById("activity-switcher").style.top = document.getElementById("layer-switcher").getBoundingClientRect().bottom + 8 + "px";
-
 
 
 Object.entries(activityFilters).forEach(function([id, filter]) {
@@ -304,26 +287,23 @@ map.on("pointermove", function (evt) {
 
 const infoBox = document.getElementById('info');
 
+function tableRow(feature) {
+  return `<tr id=${feature.id_} class="${feature.values_['type']}">`+
+  Object.entries(tableColumns).map(function([id, column]) { 
+    if ("sort" in column) {
+      return `<td data-sort='${eval(column.sort)}'>${eval(column.body)}</td>`;
+    }
+    else {
+      return `<td>${eval(column.body)}</td>`;
+    }
+  }).join("") + "</tr>";
+}
+
 selectedFeatures.on(['add', 'remove'], function () {
-  const tourData = selectedFeatures.getArray().map(function (feature) {
-    const date = new Date(feature.values_['start_date_local']);
-    return `<tr id=${feature.id_}>`+
-    `<td>${feature.values_['name']} <a href='https://www.strava.com/activities/${feature.id_}'><i class='fa-brands fa-strava' style='color: ${colorMap[feature.values_['type']]}'></i></a></td>`+
-    "<td>"+feature.values_['total_elevation_gain'].toFixed(0)+"</td>"+
-    "<td>"+(feature.values_['distance']/1000).toFixed(1)+"</td>"+
-    "<td>"+secondsToHours(feature.values_['elapsed_time'],false)+"</td>"+
-    "<td data-sort='"+date.valueOf()+"'>"+date.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"})+"</td>"+
-    "</tr>";
-  });
+  const tourData = selectedFeatures.getArray().map(tableRow);
   if (tourData.length > 0) {
     infoBox.innerHTML = `<thead>
-    <tr>
-    <th>TOUR</th>
-    <th>ELEV</th>
-    <th>DIST</th>
-    <th>TIME</th>
-    <th>DATE</th>
-    </tr>
+    <tr>${Object.entries(tableColumns).map(function([id, column]) { return `<th>${column.title}</th>`; }).join("")}</tr>
     </thead><tbody>`+
     tourData.join('\n') + "</tbody>";
   } else {
@@ -338,7 +318,3 @@ selectedFeatures.on(['add', 'remove'], function () {
     });
   });
 });
-
-
-//document.getElementById("distance-selector").style.top = document.getElementById("date-selector").getBoundingClientRect().bottom + 8 + "px";
-//console.log(console.log(rect.top, rect.right, rect.bottom, rect.left);)

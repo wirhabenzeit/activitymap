@@ -34,7 +34,6 @@ def strava_geojson(request):
             "payload": {"data": newcred["refresh_token"].encode("UTF-8") },
         }
     )
-    print(response, response2)
     try:
         default_app = get_app()
     except ValueError:
@@ -45,6 +44,8 @@ def strava_geojson(request):
     gdf = gpd.GeoDataFrame(df[df.geometry.notnull()], geometry="geometry")
     gdf["geometry"] = gdf.geometry.apply(lambda x: x.simplify(0.0001, preserve_topology=False))
     request_args = request.args
+    if request_args and 'columns' in request_args:
+        gdf = gdf[request_args["columns"].split(",")]
     if request_args and 'type' in request_args:
         gdf = gdf[gdf["type"]==request_args["type"]]
     #else:

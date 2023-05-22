@@ -1,1 +1,0 @@
-const ac = require('./activityConfig.json');console.log([...new Set([...Object.keys(ac.tableColumns), ...Object.keys(ac.activityFilters), "geometry"])].join(","));
