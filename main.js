@@ -132,8 +132,7 @@ const trackSource = new VectorSource({
   url: './activities_geo.json',
 });
 
-var sourceEventListener = trackSource.on('change', function(e) {
-  if (trackSource.getState() == 'ready') {
+trackSource.on('featuresloadend', function(e) {
     var prev_legend_element = "activity-switcher";
 Object.entries(activityFilters).forEach(function([id, filter]) {
   const activity_values = trackSource.getFeatures().map(function(feature) {return filter.transform(feature.values_[id])});
@@ -157,8 +156,6 @@ Object.entries(activityFilters).forEach(function([id, filter]) {
   document.getElementById(`${id}-label`).nextSibling.style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 14 + "px";
   prev_legend_element = `${id}-label`;
 });
-    trackSource.un('change', sourceEventListener);
-  }
 });
 
 const trackLayer = new VectorLayer({
@@ -220,7 +217,7 @@ function trackStyleUnselected(feature) {
     return trackStyle(colorMap[feature.get("type")], featureVisible(feature));
   }
   else {
-    console.log(feature.get("type"));
+    console.log(`Undefined feature type ${feature.get("type")}`);
     return trackStyle("black", 0);
   }
 }
@@ -252,7 +249,7 @@ const select = new Select({
 });
 map.addInteraction(select);
 
-const selectedFeatures = select.getFeatures();
+var selectedFeatures = select.getFeatures();
 
 const dragBox = new DragBox({
   condition: platformModifierKeyOnly,
@@ -309,12 +306,12 @@ const infoBox = document.getElementById('info');
 
 selectedFeatures.on(['add', 'remove'], function () {
   const tourData = selectedFeatures.getArray().map(function (feature) {
-    const date = new Date(feature.properties_['start_date_local']);
+    const date = new Date(feature.values_['start_date_local']);
     return `<tr id=${feature._id}>`+
-    `<td>${feature.properties_['name']} <a href='https://www.strava.com/activities/${feature.id_}'><i class='fa-brands fa-strava' style='color: ${colorMap[feature.properties_['type']]}'></i></a></td>`+
-    "<td>"+feature.properties_['total_elevation_gain'].toFixed(0)+"</td>"+
-    "<td>"+(feature.properties_['distance']/1000).toFixed(1)+"</td>"+
-    "<td>"+secondsToHours(feature.properties_['elapsed_time'],false)+"</td>"+
+    `<td>${feature.values_['name']} <a href='https://www.strava.com/activities/${feature.id_}'><i class='fa-brands fa-strava' style='color: ${colorMap[feature.values_['type']]}'></i></a></td>`+
+    "<td>"+feature.values_['total_elevation_gain'].toFixed(0)+"</td>"+
+    "<td>"+(feature.values_['distance']/1000).toFixed(1)+"</td>"+
+    "<td>"+secondsToHours(feature.values_['elapsed_time'],false)+"</td>"+
     "<td data-sort='"+date.valueOf()+"'>"+date.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"})+"</td>"+
     "</tr>";
   });
