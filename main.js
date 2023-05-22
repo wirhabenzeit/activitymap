@@ -131,6 +131,36 @@ const trackSource = new VectorSource({
   format: new GeoJSON(),
   url: './activities_geo.json',
 });
+
+var sourceEventListener = trackSource.on('change', function(e) {
+  if (trackSource.getState() == 'ready') {
+    var prev_legend_element = "activity-switcher";
+Object.entries(activityFilters).forEach(function([id, filter]) {
+  const activity_values = trackSource.getFeatures().map(function(feature) {return filter.transform(feature.values_[id])});
+  //console.log(activity_values);
+  noUiSlider.create(document.getElementById(`${id}-slider`), {
+    range: {min: Math.min(...activity_values), max:  Math.max(...activity_values)},
+    step: filter.step,
+    start: [Math.min(...activity_values), Math.max(...activity_values)],
+    format: wNumb({
+      decimals: filter.decimals,
+    }),
+    connect: true,
+    tooltips: {to: filter.tooltip},
+  });
+  filter["limits"] = [Math.min(...activity_values), Math.max(...activity_values)];
+  document.getElementById(`${id}-slider`).noUiSlider.on('change', function (values, handle) {  
+    filter["limits"] = values;
+    trackLayer.setStyle(trackStyleUnselected);
+  });
+  document.getElementById(`${id}-label`).style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 8 + "px";
+  document.getElementById(`${id}-label`).nextSibling.style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 14 + "px";
+  prev_legend_element = `${id}-label`;
+});
+    trackSource.un('change', sourceEventListener);
+  }
+});
+
 const trackLayer = new VectorLayer({
   source: trackSource,
   style: trackStyleUnselected
@@ -201,32 +231,12 @@ function trackStyleSelected(feature) {
 document.getElementById("layer-switcher").style.top = document.getElementsByClassName("ol-zoom")[0].getBoundingClientRect().bottom + 8 + "px";
 document.getElementById("activity-switcher").style.top = document.getElementById("layer-switcher").getBoundingClientRect().bottom + 8 + "px";
 
-var prev_legend_element = "activity-switcher";
+
 
 Object.entries(activityFilters).forEach(function([id, filter]) {
   document.getElementById('activity-filters').innerHTML += `<div id="${id}-label" class="ol-control filter-label"><button><i class="${filter.icon}"></i></button></div><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div>`;
 });
-Object.entries(activityFilters).forEach(function([id, filter]) {
-  const activity_values = activityGeoJSON.features.map(function(feature) {return filter.transform(feature.properties[id])});
-  noUiSlider.create(document.getElementById(`${id}-slider`), {
-    range: {min: Math.min(...activity_values), max:  Math.max(...activity_values)},
-    step: filter.step,
-    start: [Math.min(...activity_values), Math.max(...activity_values)],
-    format: wNumb({
-      decimals: filter.decimals,
-    }),
-    connect: true,
-    tooltips: {to: filter.tooltip},
-  });
-  filter["limits"] = [Math.min(...activity_values), Math.max(...activity_values)];
-  document.getElementById(`${id}-slider`).noUiSlider.on('change', function (values, handle) {  
-    filter["limits"] = values;
-    trackLayer.setStyle(trackStyleUnselected);
-  });
-  document.getElementById(`${id}-label`).style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 8 + "px";
-  document.getElementById(`${id}-label`).nextSibling.style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 14 + "px";
-  prev_legend_element = `${id}-label`;
-});
+
 
 Array.from(document.getElementById("activity-switcher").getElementsByTagName("button")).forEach(function(button) {
   button.onclick = function() {

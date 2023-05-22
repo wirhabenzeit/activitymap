@@ -33,10 +33,10 @@ jobs:
       run: |
         mv activities_geo.json activities_geo.json.old
         curl https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson --output activities_geo_ugly.json
-        jq . activities_geo_ugly.json > activities_geo.json
+        jq . activities_geo_ugly.json > public/activities_geo.json
     - name: Check for changes
       run: |
-        diff activities_geo.json activities_geo.json.old || echo "No changes"
+        diff public/activities_geo.json activities_geo.json.old || echo "No changes"
     - name: Update Github pages
       run: |
         npm install
@@ -45,7 +45,7 @@ jobs:
       run: |
         git config --global user.name "wirhabenzeit"
         git config --global user.email "dschroeder@ethz.ch"
-        git add activities_geo.json 
+        git add public/activities_geo.json 
         git add dist*
         git commit -m "Updating activities_geo.json" || echo "No changes to commit"
         git push

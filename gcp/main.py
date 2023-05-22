@@ -46,8 +46,8 @@ def strava_geojson(request):
     request_args = request.args
     if request_args and 'type' in request_args:
         gdf = gdf[gdf["type"]==request_args["type"]]
-    else:
-        gdf = gdf[gdf["type"]=="BackcountrySki"]
+    #else:
+    #    gdf = gdf[gdf["type"]=="BackcountrySki"]
     return gdf.to_json()
 
 @functions_framework.http
