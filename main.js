@@ -3,6 +3,8 @@ import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
 import "@fortawesome/fontawesome-free/css/solid.min.css";
 import "@fortawesome/fontawesome-free/css/brands.min.css";
 import 'sortable-tablesort/sortable.min.js'
+import noUiSlider from 'nouislider';
+import wNumb from 'wnumb';
 
 import {Map, View} from 'ol';
 import { Group as LayerGroup, Tile as TileLayer, Vector as VectorLayer } from "ol/layer";
@@ -15,11 +17,25 @@ import {platformModifierKeyOnly} from 'ol/events/condition.js';
 
 import activityGeoJSON from '/activities_geo.json';
 
-const colorMap = {"BackcountrySki": "#3FA7D6", "Hike": "#EE6352", "Ride": "#59CD90", "Run": "#EE6352"}
+const sportsCategories = {
+  "BackcountryNordicSki": {"color": "#3FA7D6", "icon": "fa-solid fa-person-skiing-nordic", "alias": ["BackcountrySki","NordicSki"]},
+  "WalkRun": {"color": "#EE6352", "icon": "fa-solid fa-walking", "alias": ["Walk","Run","Hike","RockClimbing","Snowshoe"]},
+  "Ride": {"color": "#59CD90", "icon": "fa-solid fa-biking", "alias": ["Ride","VirtualRide"]},
+  "AlpineSki": {"color": "#3FA7D6", "icon": "fa-solid fa-person-skiing", "alias": ["AlpineSki"]},
+  "Swim": {"color": "#FAC05E", "icon": "fa-solid fa-person-swimming", "alias": ["Swim"]},
+}
+var aliasMap = {};
+var colorMap = {};
+var shownTracks = {};
+Object.entries(sportsCategories).forEach(function([key, value]) {
+  document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><i class="${value.icon}"></i></button>`;
+  shownTracks[key] = true;
+  value.alias.forEach(function(alias) {
+    aliasMap[alias] = key;
+    colorMap[alias] = value.color;
+  });
+});
 const highlightColor = "#FFC107";
-document.body.style.setProperty('--ski-color', colorMap["BackcountrySki"]);
-document.body.style.setProperty('--hike-color', colorMap["Hike"]);
-document.body.style.setProperty('--bike-color', colorMap["Ride"]);
 document.body.style.setProperty('--highlight-color', highlightColor);
 
 function secondsToHours(secs,returnSeconds) {
@@ -112,76 +128,15 @@ const view = new View({
   zoom: 8
 });
 
-const filteredGeoJSON = {
-  "BackcountrySki": {
-    "type": "FeatureCollection",
-    "features": activityGeoJSON.features.filter(function(feature){
-       return (feature.properties.type == "BackcountrySki");
-    })
-  },
-  "Ride": {
-    "type": "FeatureCollection",
-    "features": activityGeoJSON.features.filter(function(feature){
-       return (feature.properties.type == "Ride");
-    })
-  },
-  "Hike": {
-    "type": "FeatureCollection",
-    "features": activityGeoJSON.features.filter(function(feature){
-       return (feature.properties.type == "Hike" || feature.properties.type == "Run");
-    })
-  }
-}
-const trackSources =  Object.fromEntries(
-  Object.entries(filteredGeoJSON).map(
-    ([k, v], i) => [k, new VectorSource({
-      features: (new GeoJSON({featureProjection:"EPSG:3857",defaultDataProjection:"EPSG:4326"})).readFeatures(v)
-    })]
-  )
-);
 
-function trackStyle(type, selected) {
-  var styles = [];
-  if (selected==-1) {
-    styles.push(new Style({stroke: new Stroke({color: [0,0,0,0], width: 0 })}));
-  }
-  else if (selected>=1) {
-    styles.push(new Style({stroke: new Stroke({color: colorMap[type], width: 3*selected })}));
-    styles.push(new Style({stroke: new Stroke({color: "white", width: selected })}));
-  }
-  else {
-    styles.push(new Style({stroke: new Stroke({color: colorMap[type], width: 3 })}));
-  }
-  return styles;
-}
-
-const trackLayers = Object.fromEntries(
-  Object.entries(trackSources).map(
-    ([k, v], i) => [k, new VectorLayer({
-      source: v,
-      style: trackStyle(k, 0)
-    })]
-  )
-);
-const trackLayerGroup = new LayerGroup({
-  title: 'Tracks',
-  layers: Object.values(trackLayers)
+const trackSource = new VectorSource({
+  format: new GeoJSON(),
+  url: './activities_geo_test.json',
 });
-
-/*const trackLayer = new VectorLayer({
-  source: new VectorSource({
-    format: new GeoJSON(),
-    url: "activities_geo.json"
-  }), 
-  style: trackStyle("Ride", 0)
-});*/
-
-/*const trackLayer2 = new VectorLayer({
-  source: new VectorSource({
-    features: (new GeoJSON({featureProjection:"EPSG:3857",defaultDataProjection:"EPSG:4326"})).readFeatures(activityGeoJSON)
-  }), 
-  style: trackStyle("Hike", 0)
-});*/
+const trackLayer = new VectorLayer({
+  source: trackSource,
+  style: trackStyleUnselected
+});
 
 const map = new Map({
   target: "map",
@@ -190,70 +145,97 @@ const map = new Map({
       units: "metric"
     })
   ]),
-  layers: [baseMaps, overlays, trackLayerGroup],
+  layers: [baseMaps, overlays, trackLayer],
   view: view
 });
 
-
-function trackStyleSelected(feature) {
-  return trackStyle(feature.get("type"), 1);
+function trackStyle(color, selected) {
+  var styles = [];
+  if (selected==-1) {
+    return new Style({});
+  }
+  else if (selected==-.5) {
+    return new Style({stroke: new Stroke({color: color, width: 1.5 })});
+  }
+  else if (selected>=1) {
+    styles.push(new Style({stroke: new Stroke({color: color, width: 3*selected })}));
+    styles.push(new Style({stroke: new Stroke({color: "white", width: selected })}));
+  }
+  else {
+    styles.push(new Style({stroke: new Stroke({color: color, width: 3 })}));
+  }
+  return styles;
 }
 
-//function getGPX(id) {
-//  return new URL(`/assets/activities/${id}.gpx`, import.meta.url).href;
-//}
 
-/*const trackLayers = Object.entries(activityJSON).map(function([id, track]) {
-  var trackSource =  new VectorSource({
-    format: new GPX(),
-    url: getGPX(id)//"/activities/"+id+".gpx"
-  });
-  trackSource.once('change', function(e) {
-    if (trackSource.getState() == 'ready') {
-      trackSource.getFeatures().forEach(function(feature) {
-        feature.set('id', id);
-        feature.set('type', track.type);
-        tracks.push(feature);
-      });
-    }
-  });
-  return new VectorLayer({
-    source: trackSource,
-    style: trackStyle(track.type, 0),
-    type: track.type,
-    id: id
-  });
-});
-console.log(trackLayers);
-const trackLayer = new LayerGroup({
-  layers: trackLayers
-});
-map.addLayer(trackLayer);*/
-/*const trackSource = new VectorSource({
-  format: new GeoJSON(),
-  url: './activities.geojson',
-});*/
+var activityFilters = {
+  "start_date_local": { "icon": "fa-solid fa-calendar-days", "transform": function(value) {return new Date(value).getTime();}, "tooltip": function(value) { return new Date(value).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"})}, "step": 7 * 24 * 60 * 60 * 1000, "decimals":0},
+  "distance": { "icon": "fa-solid fa-ruler-horizontal", "transform": function(value) {return value;}, "tooltip": function(value) { return Math.round(value/1000)+"km"}, "step": 100, "decimals":0},
+  "total_elevation_gain": { "icon": "fa-solid fa-ruler-vertical", "transform": function(value) {return value;}, "tooltip": function(value) { return Math.round(value)+"m"}, "step": 10, "decimals":0}
+};
 
-
-/*var trackLayer = new VectorLayer({
-  source: trackSource,
-  style: function(feature) {
-    return trackStyle(feature.get('type'), 0);
+function featureVisible(feature) {
+  if (!shownTracks[aliasMap[feature.get("type")]]) {
+    return -1;
   }
+  for (let [id, filter] of Object.entries(activityFilters)) {
+      var limits = filter.limits;
+      if (limits[0] > filter.transform(feature.get(id)) || limits[1] < filter.transform(feature.get(id))) {
+        return -1;
+      }
+  }
+  return 0;
+}
+
+function trackStyleUnselected(feature) {
+  if (feature.get("type") in colorMap) {
+    return trackStyle(colorMap[feature.get("type")], featureVisible(feature));
+  }
+  else {
+    console.log(feature.get("type"));
+    return trackStyle("black", 0);
+  }
+}
+function trackStyleSelected(feature) {
+  return trackStyle(colorMap[feature.get("type")], 1);
+}
+
+document.getElementById("layer-switcher").style.top = document.getElementsByClassName("ol-zoom")[0].getBoundingClientRect().bottom + 8 + "px";
+document.getElementById("activity-switcher").style.top = document.getElementById("layer-switcher").getBoundingClientRect().bottom + 8 + "px";
+
+var prev_legend_element = "activity-switcher";
+
+Object.entries(activityFilters).forEach(function([id, filter]) {
+  document.getElementById('activity-filters').innerHTML += `<div id="${id}-label" class="ol-control filter-label"><button><i class="${filter.icon}"></i></button></div><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div>`;
 });
-map.addLayer(trackLayer);*/
-/*map.addLayer(bikeLayer);
-map.addLayer(hikeLayer);
-map.addLayer(skiLayer);
-console.log(bikeLayer);*/
+Object.entries(activityFilters).forEach(function([id, filter]) {
+  const activity_values = activityGeoJSON.features.map(function(feature) {return filter.transform(feature.properties[id])});
+  noUiSlider.create(document.getElementById(`${id}-slider`), {
+    range: {min: Math.min(...activity_values), max:  Math.max(...activity_values)},
+    step: filter.step,
+    start: [Math.min(...activity_values), Math.max(...activity_values)],
+    format: wNumb({
+      decimals: filter.decimals,
+    }),
+    connect: true,
+    tooltips: {to: filter.tooltip},
+  });
+  filter["limits"] = [Math.min(...activity_values), Math.max(...activity_values)];
+  document.getElementById(`${id}-slider`).noUiSlider.on('change', function (values, handle) {  
+    filter["limits"] = values;
+    trackLayer.setStyle(trackStyleUnselected);
+  });
+  document.getElementById(`${id}-label`).style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 8 + "px";
+  document.getElementById(`${id}-label`).nextSibling.style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 14 + "px";
+  prev_legend_element = `${id}-label`;
+});
 
-
-var shownTracks = {"Hike": true, "BackcountrySki": true, "Ride": true};
 Array.from(document.getElementById("activity-switcher").getElementsByTagName("button")).forEach(function(button) {
   button.onclick = function() {
     shownTracks[button.id] = !shownTracks[button.id];
     button.classList.toggle("active");
-    trackLayers[button.id].setVisible(!trackLayers[button.id].getVisible());
+    button.style.color = shownTracks[button.id] ? sportsCategories[button.id].color : "grey";
+    trackLayer.setStyle(trackStyleUnselected);
   };
 });
 
@@ -272,15 +254,14 @@ map.addInteraction(dragBox);
 
 dragBox.on('boxend', function () {
   const extent = dragBox.getGeometry().getExtent();
-  const boxFeatures = Object.entries(trackSources).map(function([typ, srcs]) {
-    if (shownTracks[typ]) {
-      return srcs.getFeatures().filter((feature) => feature.getProperties().geometry.intersectsExtent(extent));
+  const boxFeatures = trackSource.getFeatures().filter((feature) => {
+    if (feature.getProperties().geometry == null) {
+      return false;
     }
     else {
-      return [];
+      return feature.getProperties().geometry.intersectsExtent(extent) && featureVisible(feature) >= 0;
     }
-  }).flat()
-
+  });
   const rotation = map.getView().getRotation();
   const oblique = rotation % (Math.PI / 2) !== 0;
   
@@ -321,8 +302,8 @@ const infoBox = document.getElementById('info');
 selectedFeatures.on(['add', 'remove'], function () {
   const tourData = selectedFeatures.getArray().map(function (feature) {
     const date = new Date(feature.get('start_date_local'));
-    return `<tr id=${feature.get('id')}>`+
-    `<td>${feature.get('name')} <a href='https://www.strava.com/activities/${feature.id_}'><i class='fa-brands fa-strava' style='color: ${colorMap[feature.get('type')]}'></i></a></td>`+
+    return `<tr id=${feature.get('index')}>`+
+    `<td>${feature.get('name')} <a href='https://www.strava.com/activities/${feature.get("index")}'><i class='fa-brands fa-strava' style='color: ${colorMap[feature.get('type')]}'></i></a></td>`+
     "<td>"+feature.get('total_elevation_gain').toFixed(0)+"</td>"+
     "<td>"+(feature.get('distance')/1000).toFixed(1)+"</td>"+
     "<td>"+secondsToHours(feature.get('elapsed_time'),false)+"</td>"+
@@ -344,11 +325,15 @@ selectedFeatures.on(['add', 'remove'], function () {
     infoBox.innerHTML = '';
   }
   selectedFeatures.getArray().forEach(function(feature) {
-    document.getElementById(feature.get('id')).addEventListener('mouseover', function() {
-      feature.setStyle(trackStyle(feature.get('type'), 2));
+    document.getElementById(feature.get('index')).addEventListener('mouseover', function() {
+      feature.setStyle(trackStyle(colorMap[feature.get('type')], 2));
     });
-    document.getElementById(feature.get('id')).addEventListener('mouseout', function() {
-      feature.setStyle(trackStyle(feature.get('type'), 1));
+    document.getElementById(feature.get('index')).addEventListener('mouseout', function() {
+      feature.setStyle(trackStyle(colorMap[feature.get('type')], 1));
     });
   });
 });
+
+
+//document.getElementById("distance-selector").style.top = document.getElementById("date-selector").getBoundingClientRect().bottom + 8 + "px";
+//console.log(console.log(rect.top, rect.right, rect.bottom, rect.left);)
