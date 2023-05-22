@@ -309,12 +309,12 @@ const infoBox = document.getElementById('info');
 
 selectedFeatures.on(['add', 'remove'], function () {
   const tourData = selectedFeatures.getArray().map(function (feature) {
-    const date = new Date(feature.get('start_date_local'));
-    return `<tr id=${feature.get('index')}>`+
-    `<td>${feature.get('name')} <a href='https://www.strava.com/activities/${feature.get("index")}'><i class='fa-brands fa-strava' style='color: ${colorMap[feature.get('type')]}'></i></a></td>`+
-    "<td>"+feature.get('total_elevation_gain').toFixed(0)+"</td>"+
-    "<td>"+(feature.get('distance')/1000).toFixed(1)+"</td>"+
-    "<td>"+secondsToHours(feature.get('elapsed_time'),false)+"</td>"+
+    const date = new Date(feature.properties_['start_date_local']);
+    return `<tr id=${feature._id}>`+
+    `<td>${feature.properties_['name']} <a href='https://www.strava.com/activities/${feature.id_}'><i class='fa-brands fa-strava' style='color: ${colorMap[feature.properties_['type']]}'></i></a></td>`+
+    "<td>"+feature.properties_['total_elevation_gain'].toFixed(0)+"</td>"+
+    "<td>"+(feature.properties_['distance']/1000).toFixed(1)+"</td>"+
+    "<td>"+secondsToHours(feature.properties_['elapsed_time'],false)+"</td>"+
     "<td data-sort='"+date.valueOf()+"'>"+date.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"})+"</td>"+
     "</tr>";
   });
