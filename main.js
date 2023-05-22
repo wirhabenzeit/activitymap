@@ -15,8 +15,6 @@ import {DragBox, Select} from 'ol/interaction.js';
 import { OSM,XYZ, Vector as VectorSource } from "ol/source";
 import {platformModifierKeyOnly} from 'ol/events/condition.js';
 
-import activityGeoJSON from '/activities_geo.json';
-
 const sportsCategories = {
   "BackcountryNordicSki": {"color": "#3FA7D6", "icon": "fa-solid fa-person-skiing-nordic", "alias": ["BackcountrySki","NordicSki"]},
   "WalkRun": {"color": "#EE6352", "icon": "fa-solid fa-walking", "alias": ["Walk","Run","Hike","RockClimbing","Snowshoe"]},
@@ -131,7 +129,7 @@ const view = new View({
 
 const trackSource = new VectorSource({
   format: new GeoJSON(),
-  url: './activities_geo_test.json',
+  url: './activities_geo.json',
 });
 const trackLayer = new VectorLayer({
   source: trackSource,
