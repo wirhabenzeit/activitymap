@@ -10,20 +10,27 @@ import {Map, View} from 'ol';
 import { Group as LayerGroup, Tile as TileLayer, Vector as VectorLayer } from "ol/layer";
 import { defaults as defaultControls, ScaleLine } from "ol/control";
 import { Style, Stroke } from "ol/style";
+import { asArray } from 'ol/color';
 import GeoJSON from 'ol/format/GeoJSON.js';
 import {DragBox, Select} from 'ol/interaction.js';
 import { OSM,XYZ, Vector as VectorSource } from "ol/source";
 import {platformModifierKeyOnly} from 'ol/events/condition.js';
 
 const sportsCategories = {
-  "BackcountryNordicSki": {"color": "#3FA7D6", "icon": "fa-solid fa-person-skiing-nordic", "alias": ["BackcountrySki","NordicSki"]},
-  "WalkRun": {"color": "#EE6352", "icon": "fa-solid fa-walking", "alias": ["Walk","Run","Hike","RockClimbing","Snowshoe"]},
-  "Ride": {"color": "#59CD90", "icon": "fa-solid fa-biking", "alias": ["Ride","VirtualRide"]},
+  "BackcountryNordicSki": {"color": "#1982C4", "icon": "fa-solid fa-person-skiing-nordic", "alias": ["BackcountrySki","NordicSki"]},
+  "WalkRun": {"color": "#FF595E", "icon": "fa-solid fa-walking", "alias": ["Walk","Run","Hike","RockClimbing","Snowshoe"]},
+  "Ride": {"color": "#8AC926", "icon": "fa-solid fa-biking", "alias": ["Ride","VirtualRide"]},
   "AlpineSki": {"color": "#3FA7D6", "icon": "fa-solid fa-person-skiing", "alias": ["AlpineSki"]},
-  "Swim": {"color": "#FAC05E", "icon": "fa-solid fa-person-swimming", "alias": ["Swim"]},
+  "Misc": {"color": "#6A4C93", "icon": "fa-solid fa-person-circle-question", "alias": []},
 }
-var aliasMap = {};
-var colorMap = {};
+//var aliasMap = {};
+//var colorMap = {};
+var colorMap = new Proxy({}, {
+  get: (target, name) => name in target ? target[name] : sportsCategories["Misc"].color
+})
+var aliasMap = new Proxy({}, {
+  get: (target, name) => name in target ? target[name] : "Misc"
+})
 var shownTracks = {};
 Object.entries(sportsCategories).forEach(function([key, value]) {
   document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><i class="${value.icon}"></i></button>`;
@@ -179,15 +186,14 @@ function trackStyle(color, selected) {
   if (selected==-1) {
     return new Style({});
   }
-  else if (selected==-.5) {
-    return new Style({stroke: new Stroke({color: color, width: 1.5 })});
-  }
   else if (selected>=1) {
-    styles.push(new Style({stroke: new Stroke({color: color, width: 3*selected })}));
-    styles.push(new Style({stroke: new Stroke({color: "white", width: selected })}));
+    styles.push(new Style({stroke: new Stroke({color: color, width: 4*selected }), zIndex: 100}));
+    styles.push(new Style({stroke: new Stroke({color: "white", width: selected }), zIndex: 100}));
   }
   else {
-    styles.push(new Style({stroke: new Stroke({color: color, width: 3 })}));
+    var colorArray = asArray(color).slice();
+    colorArray[3] = 0.75;
+    styles.push(new Style({stroke: new Stroke({color: colorArray, width: 4})}));
   }
   return styles;
 }
@@ -213,13 +219,7 @@ function featureVisible(feature) {
 }
 
 function trackStyleUnselected(feature) {
-  if (feature.get("type") in colorMap) {
     return trackStyle(colorMap[feature.get("type")], featureVisible(feature));
-  }
-  else {
-    console.log(`Undefined feature type ${feature.get("type")}`);
-    return trackStyle("black", 0);
-  }
 }
 function trackStyleSelected(feature) {
   return trackStyle(colorMap[feature.get("type")], 1);
@@ -307,7 +307,7 @@ const infoBox = document.getElementById('info');
 selectedFeatures.on(['add', 'remove'], function () {
   const tourData = selectedFeatures.getArray().map(function (feature) {
     const date = new Date(feature.values_['start_date_local']);
-    return `<tr id=${feature._id}>`+
+    return `<tr id=${feature.id_}>`+
     `<td>${feature.values_['name']} <a href='https://www.strava.com/activities/${feature.id_}'><i class='fa-brands fa-strava' style='color: ${colorMap[feature.values_['type']]}'></i></a></td>`+
     "<td>"+feature.values_['total_elevation_gain'].toFixed(0)+"</td>"+
     "<td>"+(feature.values_['distance']/1000).toFixed(1)+"</td>"+
@@ -330,11 +330,11 @@ selectedFeatures.on(['add', 'remove'], function () {
     infoBox.innerHTML = '';
   }
   selectedFeatures.getArray().forEach(function(feature) {
-    document.getElementById(feature.get('index')).addEventListener('mouseover', function() {
-      feature.setStyle(trackStyle(colorMap[feature.get('type')], 2));
+    document.getElementById(feature.id_).addEventListener('mouseover', function() {
+      feature.setStyle(trackStyle(colorMap[feature.values_['type']], 2));
     });
-    document.getElementById(feature.get('index')).addEventListener('mouseout', function() {
-      feature.setStyle(trackStyle(colorMap[feature.get('type')], 1));
+    document.getElementById(feature.id_).addEventListener('mouseout', function() {
+      feature.setStyle(trackStyle(colorMap[feature.values_['type']], 1));
     });
   });
 });

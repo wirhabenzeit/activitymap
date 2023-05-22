@@ -32,8 +32,7 @@ jobs:
     - name: Pull data
       run: |
         mv public/activities_geo.json activities_geo.json.old
-        curl https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson --output activities_geo_ugly.json
-        jq . activities_geo_ugly.json > public/activities_geo.json
+        curl https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson --output public/activities_geo.json
     - name: Check for changes
       run: |
         diff public/activities_geo.json activities_geo.json.old || echo "No changes"

@@ -40,9 +40,10 @@ def strava_geojson(request):
     except ValueError:
         default_app = initialize_app()
     ref = db.reference(url="https://stravamap-386413-default-rtdb.europe-west1.firebasedatabase.app")
-    df=pd.DataFrame.from_dict(ref.get(),orient="index")
+    df = pd.DataFrame.from_dict(ref.get(),orient="index")
     df.loc[df.geometry.notnull(),"geometry"] = df[df.geometry.notnull()].geometry.apply(wkt.loads)
     gdf = gpd.GeoDataFrame(df[df.geometry.notnull()], geometry="geometry")
+    gdf["geometry"] = gdf.geometry.apply(lambda x: x.simplify(0.0001, preserve_topology=False))
     request_args = request.args
     if request_args and 'type' in request_args:
         gdf = gdf[gdf["type"]==request_args["type"]]
