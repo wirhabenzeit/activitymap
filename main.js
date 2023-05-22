@@ -128,8 +128,7 @@ trackSource.on('featuresloadend', function(e) {
     var prev_legend_element = "activity-switcher";
 Object.entries(activityFilters).forEach(function([id, filter]) {
   const activity_values = trackSource.getFeatures().map(function(feature) {
-    const value = feature.values_[id];
-    return eval(filter.transform);
+    return new Function('value', 'return ' + filter.transform)(feature.values_[id]);
   });
   noUiSlider.create(document.getElementById(`${id}-slider`), {
     range: {min: Math.min(...activity_values), max:  Math.max(...activity_values)},
@@ -194,8 +193,8 @@ function featureVisible(feature) {
   }
   for (let [id, filter] of Object.entries(activityFilters)) {
       var limits = filter.limits;
-      var value = feature.get(id);
-      if (limits[0] > eval(filter.transform) || limits[1] < eval(filter.transform)) {
+      //var value = feature.get(id);
+      if (limits[0] > new Function('value', 'return ' + filter.transform)(feature.get(id)) || limits[1] < new Function('value', 'return ' + filter.transform)(feature.get(id))) {
         return -1;
       }
   }
