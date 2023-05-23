@@ -42,7 +42,7 @@ def strava_geojson(request):
     df = pd.DataFrame.from_dict(ref.get(),orient="index")
     df.loc[df.geometry.notnull(),"geometry"] = df[df.geometry.notnull()].geometry.apply(wkt.loads)
     gdf = gpd.GeoDataFrame(df[df.geometry.notnull()], geometry="geometry")
-    gdf["geometry"] = gdf.geometry.apply(lambda x: x.simplify(0.0001, preserve_topology=False))
+    gdf["geometry"] = gdf.geometry.apply(lambda x: x.simplify(0.001, preserve_topology=False))
     request_args = request.args
     if request_args and 'columns' in request_args:
         gdf = gdf[request_args["columns"].split(",")]
