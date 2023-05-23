@@ -1,4 +1,4 @@
-from flask import escape
+from flask import escape, jsonify
 import os
 from shapely.geometry import LineString
 import functions_framework
@@ -38,19 +38,27 @@ def strava_geojson(request):
         default_app = get_app()
     except ValueError:
         default_app = initialize_app()
+    #ref = db.reference(url="https://stravamap-386413-default-rtdb.europe-west1.firebasedatabase.app")
+    #df = pd.DataFrame.from_dict(ref.get(),orient="index")
+    #df.loc[df.geometry.notnull(),"geometry"] = df[df.geometry.notnull()].geometry.apply(wkt.loads)
+    #gdf = gpd.GeoDataFrame(df[df.geometry.notnull()], geometry="geometry")
+    #gdf["geometry"] = gdf.geometry.apply(lambda x: x.simplify(0.001, preserve_topology=False))
     ref = db.reference(url="https://stravamap-386413-default-rtdb.europe-west1.firebasedatabase.app")
-    df = pd.DataFrame.from_dict(ref.get(),orient="index")
+    df=pd.DataFrame.from_dict(ref.get(),orient="index")
     df.loc[df.geometry.notnull(),"geometry"] = df[df.geometry.notnull()].geometry.apply(wkt.loads)
     gdf = gpd.GeoDataFrame(df[df.geometry.notnull()], geometry="geometry")
-    gdf["geometry"] = gdf.geometry.apply(lambda x: x.simplify(0.001, preserve_topology=False))
+    gdf["geometry"] = gdf.geometry.apply(lambda x: x.simplify(0.0002, preserve_topology=False))
+    gdf = gdf[gdf.geometry.apply(lambda x: len(x.coords)) > 0]
     request_args = request.args
     if request_args and 'columns' in request_args:
         gdf = gdf[request_args["columns"].split(",")]
     if request_args and 'type' in request_args:
         gdf = gdf[gdf["type"]==request_args["type"]]
-    #else:
-    #    gdf = gdf[gdf["type"]=="BackcountrySki"]
-    return gdf.to_json()
+    gdf["polyline"] = gdf.geometry.apply(lambda x: polyline.encode(x.coords,5,geojson=True))
+    df=pd.DataFrame.from_dict(gdf.to_dict(orient="index"),orient="index")
+    df.drop(columns=["geometry"],inplace=True)
+    #df.to_json("public/polyline.json",orient="index")
+    return jsonify(df.to_dict(orient="index"))
 
 @functions_framework.http
 def strava_webhook(request):
@@ -93,18 +101,6 @@ def strava_webhook(request):
         id = act.pop("id")
         print(f"{id} updated")
         ref.child(str(id)).update(act)
-        # act = {}
-        # act["name"] = act_in["name"]
-        # act["distance"] = act_in["distance"]
-        # act["total_elevation_gain"] = act_in["total_elevation_gain"]
-        # act["elapsed_time"] = act_in["elapsed_time"]
-        # act["type"] = act_in["type"]
-        # act["sport_type"] = act_in["sport_type"]
-        # act["start_date_local"] = act_in["start_date_local"]
-        # ls=LineString([[y,x] for x,y in client.get_activity_streams(id, types=["latlng"], resolution='medium')["latlng"].data])
-        # ls=ls.simplify(.001,preserve_topology=False)
-        # act["geometry"] = ls.wkt
-        # ref.child(str(id)).update(act)
         return json.dumps(act)
     print(f"Got {request_json} and {request_args} and {request.values} and returned nothing")
     return "Error"

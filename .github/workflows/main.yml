@@ -31,13 +31,8 @@ jobs:
         sudo apt-get install -y jq
     - name: Pull data
       run: |
-        mv public/activities_geo.json activities_geo.json.old
         columns=`node -e "const ac = require('./activityConfig.json');console.log([...new Set([...Object.keys(ac.tableColumns), ...Object.keys(ac.activityFilters), 'geometry', 'type'])].join(','));"`
-        curl "https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson?columns=$columns" --output activities_geo_ugly.json
-        jq . activities_geo_ugly.json > public/activities_geo.json
-    - name: Check for changes
-      run: |
-        diff public/activities_geo.json activities_geo.json.old || echo "No changes"
+        curl "https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson?columns=$columns" --output public/polyline.json
     - name: Update Github pages
       run: |
         npm install

@@ -12,6 +12,7 @@ import { defaults as defaultControls, ScaleLine } from "ol/control";
 import { Style, Stroke } from "ol/style";
 import { asArray } from 'ol/color';
 import GeoJSON from 'ol/format/GeoJSON.js';
+import Polyline from 'ol/format/Polyline.js';
 import {DragBox, Select} from 'ol/interaction.js';
 import {  Vector as VectorSource } from "ol/source";
 import {platformModifierKeyOnly} from 'ol/events/condition.js';
@@ -47,7 +48,7 @@ Object.entries(sportsCategories).forEach(function([key, value]) {
   value.alias.forEach(function(alias) {
     aliasMap[alias] = key;
     colorMap[alias] = value.color;
-});
+  });
 });
 const highlightColor = "#FFC107";
 document.body.style.setProperty('--highlight-color', highlightColor);
@@ -119,45 +120,65 @@ const view = new View({
 });
 
 
-const trackSource = new VectorSource({
-  format: new GeoJSON(),
-  url: './activities_geo.json',
+const vectorSource = new VectorSource({
+  loader: function(extent, resolution, projection, success, failure) {
+    const proj = projection.getCode();
+    const url = './polyline.json';
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url);
+    const onError = function() {
+      vectorSource.removeLoadedExtent(extent);
+      failure();
+    }
+    xhr.onerror = onError;
+    xhr.onload = function() {
+      if (xhr.status == 200) {
+        const features = Object.entries(JSON.parse(xhr.responseText)).map(function([id, dict]) {
+          const feature = new Polyline({"geometryLayout": 'XY', 'factor': 1e5}).readFeature(dict.polyline);
+          feature.getGeometry().transform('EPSG:4326', 'EPSG:3857');
+          feature.setId(id);
+          feature.setProperties(dict);
+          return feature;
+        });
+        vectorSource.addFeatures(features);
+        var prev_legend_element = "activity-switcher";
+        Object.entries(activityFilters).forEach(function([id, filter]) {
+          const activity_values = vectorSource.getFeatures().map(function(feature) {
+            return new Function('value', 'return ' + filter.transform)(feature.values_[id]);
+          });
+          noUiSlider.create(document.getElementById(`${id}-slider`), {
+            range: {min: Math.min(...activity_values), max:  Math.max(...activity_values)},
+            step: filter.step,
+            start: [Math.min(...activity_values), Math.max(...activity_values)],
+            format: wNumb({
+              decimals: filter.decimals,
+            }),
+            connect: true,
+            tooltips: {to: function(value) { return eval(filter.tooltip); } },
+          });
+          filter["limits"] = [Math.min(...activity_values), Math.max(...activity_values)];
+          document.getElementById(`${id}-slider`).noUiSlider.on('change', function (values, handle) {  
+            filter["limits"] = values;
+            trackLayer.setStyle(trackStyleUnselected);
+          });
+          document.getElementById(`${id}-label`).style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 8 + "px";
+          document.getElementById(`${id}-label`).nextSibling.style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 14 + "px";
+          prev_legend_element = `${id}-label`;
+        });
+        success(features);
+      } else {
+        onError();
+      }
+    }
+    xhr.send();
+  },
 });
 
-trackSource.on('featuresloadend', function(e) {
-    var prev_legend_element = "activity-switcher";
-Object.entries(activityFilters).forEach(function([id, filter]) {
-  const activity_values = trackSource.getFeatures().map(function(feature) {
-    return new Function('value', 'return ' + filter.transform)(feature.values_[id]);
-  });
-  noUiSlider.create(document.getElementById(`${id}-slider`), {
-    range: {min: Math.min(...activity_values), max:  Math.max(...activity_values)},
-    step: filter.step,
-    start: [Math.min(...activity_values), Math.max(...activity_values)],
-    format: wNumb({
-      decimals: filter.decimals,
-    }),
-    connect: true,
-    tooltips: {to: function(value) { return eval(filter.tooltip); } },
-  });
-  filter["limits"] = [Math.min(...activity_values), Math.max(...activity_values)];
-  document.getElementById(`${id}-slider`).noUiSlider.on('change', function (values, handle) {  
-    //console.log(values.map(eval));
-    //console.log(document.getElementById(`${id}-slider`).noUiSlider.get());
-    filter["limits"] = values;
-    trackLayer.setStyle(trackStyleUnselected);
-  });
-  document.getElementById(`${id}-label`).style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 8 + "px";
-  document.getElementById(`${id}-label`).nextSibling.style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 14 + "px";
-  prev_legend_element = `${id}-label`;
-});
-});
 
 const trackLayer = new VectorLayer({
-  source: trackSource,
+  source: vectorSource,
   style: trackStyleUnselected
 });
-
 const map = new Map({
   target: "map",
   controls: defaultControls().extend([
@@ -192,17 +213,17 @@ function featureVisible(feature) {
     return -1;
   }
   for (let [id, filter] of Object.entries(activityFilters)) {
-      var limits = filter.limits;
-      //var value = feature.get(id);
-      if (limits[0] > new Function('value', 'return ' + filter.transform)(feature.get(id)) || limits[1] < new Function('value', 'return ' + filter.transform)(feature.get(id))) {
-        return -1;
-      }
+    var limits = filter.limits;
+    //var value = feature.get(id);
+    if (limits[0] > new Function('value', 'return ' + filter.transform)(feature.get(id)) || limits[1] < new Function('value', 'return ' + filter.transform)(feature.get(id))) {
+      return -1;
+    }
   }
   return 0;
 }
 
 function trackStyleUnselected(feature) {
-    return trackStyle(colorMap[feature.get("type")], featureVisible(feature));
+  return trackStyle(colorMap[feature.get("type")], featureVisible(feature));
 }
 function trackStyleSelected(feature) {
   return trackStyle(colorMap[feature.get("type")], 1);
@@ -241,7 +262,7 @@ map.addInteraction(dragBox);
 
 dragBox.on('boxend', function () {
   const extent = dragBox.getGeometry().getExtent();
-  const boxFeatures = trackSource.getFeatures().filter((feature) => {
+  const boxFeatures = vectorSource.getFeatures().filter((feature) => {
     if (feature.getProperties().geometry == null) {
       return false;
     }
