@@ -61,6 +61,13 @@
             "tooltip": "`${Math.round(value)}m`",
             "step": 10,
             "decimals": 0
+        },
+        "elapsed_time": {
+            "icon": "fa-solid fa-stopwatch",
+            "transform": "value",
+            "tooltip": "`${new Date(value*1000).toISOString().substr(11, 8)}`",
+            "step": 1,
+            "decimals": 0
         }
     },
     "tableColumns": {

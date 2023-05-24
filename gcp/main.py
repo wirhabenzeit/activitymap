@@ -6,7 +6,6 @@ from stravalib.client import Client
 import json
 import pandas as pd
 from shapely import wkt
-import geopandas as gpd
 from firebase_admin import db, initialize_app, get_app
 from google.cloud import secretmanager
 import polyline
@@ -38,27 +37,18 @@ def strava_geojson(request):
         default_app = get_app()
     except ValueError:
         default_app = initialize_app()
-    #ref = db.reference(url="https://stravamap-386413-default-rtdb.europe-west1.firebasedatabase.app")
-    #df = pd.DataFrame.from_dict(ref.get(),orient="index")
-    #df.loc[df.geometry.notnull(),"geometry"] = df[df.geometry.notnull()].geometry.apply(wkt.loads)
-    #gdf = gpd.GeoDataFrame(df[df.geometry.notnull()], geometry="geometry")
-    #gdf["geometry"] = gdf.geometry.apply(lambda x: x.simplify(0.001, preserve_topology=False))
     ref = db.reference(url="https://stravamap-386413-default-rtdb.europe-west1.firebasedatabase.app")
     df=pd.DataFrame.from_dict(ref.get(),orient="index")
+    df=df[df.geometry.notnull()]
     df.loc[df.geometry.notnull(),"geometry"] = df[df.geometry.notnull()].geometry.apply(wkt.loads)
-    gdf = gpd.GeoDataFrame(df[df.geometry.notnull()], geometry="geometry")
-    gdf["geometry"] = gdf.geometry.apply(lambda x: x.simplify(0.0002, preserve_topology=False))
-    gdf = gdf[gdf.geometry.apply(lambda x: len(x.coords)) > 0]
+    df["geometry"] = df.geometry.apply(lambda x: x.simplify(0.0001, preserve_topology=False))
+    df = df[df.geometry.apply(lambda x: len(x.coords)) > 0]
+    df["polyline"] = df.geometry.apply(lambda x: polyline.encode(x.coords,5,geojson=True))
+    df.drop("geometry")
     request_args = request.args
     if request_args and 'columns' in request_args:
-        gdf = gdf[request_args["columns"].split(",")]
-    if request_args and 'type' in request_args:
-        gdf = gdf[gdf["type"]==request_args["type"]]
-    gdf["polyline"] = gdf.geometry.apply(lambda x: polyline.encode(x.coords,5,geojson=True))
-    df=pd.DataFrame.from_dict(gdf.to_dict(orient="index"),orient="index")
-    df.drop(columns=["geometry"],inplace=True)
-    #df.to_json("public/polyline.json",orient="index")
-    return jsonify(df.to_dict(orient="index"))
+        df = df[request_args["columns"].split(",")]
+    return json.dumps(df.to_dict(orient="index"), indent=2)
 
 @functions_framework.http
 def strava_webhook(request):

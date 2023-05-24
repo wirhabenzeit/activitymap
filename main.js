@@ -23,17 +23,6 @@ var activityFilters = ac.activityFilters;
 const sportsCategories = ac.sportsCategories;
 const tableColumns = ac.tableColumns;
 
-function secondsToHours(secs,returnSeconds) {
-  var sec_num = parseInt(secs, 10); 
-  var hours   = Math.floor(sec_num / 3600);
-  var minutes = Math.floor((sec_num - (hours * 3600)) / 60);
-  var seconds = sec_num - (hours * 3600) - (minutes * 60);
-  
-  if (minutes < 10) {minutes = "0"+minutes;}
-  if (seconds < 10) {seconds = "0"+seconds;}
-  return hours+'h'+minutes+(returnSeconds?(':'+seconds):'');
-}
-
 
 var shownTracks = {};
 const colorMap = new Proxy({}, {
@@ -122,7 +111,6 @@ const view = new View({
 
 const vectorSource = new VectorSource({
   loader: function(extent, resolution, projection, success, failure) {
-    const proj = projection.getCode();
     const url = './polyline.json';
     const xhr = new XMLHttpRequest();
     xhr.open('GET', url);
@@ -143,6 +131,7 @@ const vectorSource = new VectorSource({
         vectorSource.addFeatures(features);
         var prev_legend_element = "activity-switcher";
         Object.entries(activityFilters).forEach(function([id, filter]) {
+          document.getElementById('activity-filters').innerHTML += `<div id="${id}-label" class="ol-control filter-label"><button><i class="${filter.icon}"></i></button></div><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div>`;
           const activity_values = vectorSource.getFeatures().map(function(feature) {
             return new Function('value', 'return ' + filter.transform)(feature.values_[id]);
           });
@@ -232,10 +221,6 @@ function trackStyleSelected(feature) {
 document.getElementById("layer-switcher").style.top = document.getElementsByClassName("ol-zoom")[0].getBoundingClientRect().bottom + 8 + "px";
 document.getElementById("activity-switcher").style.top = document.getElementById("layer-switcher").getBoundingClientRect().bottom + 8 + "px";
 
-
-Object.entries(activityFilters).forEach(function([id, filter]) {
-  document.getElementById('activity-filters').innerHTML += `<div id="${id}-label" class="ol-control filter-label"><button><i class="${filter.icon}"></i></button></div><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div>`;
-});
 
 
 Array.from(document.getElementById("activity-switcher").getElementsByTagName("button")).forEach(function(button) {
