@@ -141,6 +141,15 @@ html, body {
 #activity-switcher button:last-child {
   border-radius: 0 0 2px 2px;
 }
+#activity-filters div button {
+  border-radius: 0px;
+}
+#activity-filters div:first-child button {
+  border-radius: 2px 2px 0 0;
+}
+#activity-filters div:last-child button {
+  border-radius: 0 0 2px 2px;
+}
 #date-selector {
   left: .5em;
 }
@@ -151,7 +160,7 @@ html, body {
   opacity: 0.0;
   visibility:hidden;
   width: 240px;
-  left: 45px;
+  transform: translate(35px,-20px);
   position: absolute;
   border-radius: 2px;
   background-color: #ffffff;

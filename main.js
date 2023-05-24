@@ -11,7 +11,6 @@ import { Group as LayerGroup, Tile as TileLayer, Vector as VectorLayer } from "o
 import { defaults as defaultControls, ScaleLine } from "ol/control";
 import { Style, Stroke } from "ol/style";
 import { asArray } from 'ol/color';
-import GeoJSON from 'ol/format/GeoJSON.js';
 import Polyline from 'ol/format/Polyline.js';
 import {DragBox, Select} from 'ol/interaction.js';
 import {  Vector as VectorSource } from "ol/source";
@@ -32,22 +31,15 @@ const aliasMap = new Proxy({}, {
   get: (target, name) => name in target ? target[name] : "Misc"
 })
 Object.entries(sportsCategories).forEach(function([key, value]) {
-  document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><i class="${value.icon}"></i></button>`;
   shownTracks[key] = true;
   value.alias.forEach(function(alias) {
     aliasMap[alias] = key;
     colorMap[alias] = value.color;
   });
 });
+
 const highlightColor = "#FFC107";
 document.body.style.setProperty('--highlight-color', highlightColor);
-
-document.getElementById('layer-switcher-content').getElementsByTagName('ul')[0].innerHTML = Object.entries(backgroundMaps).map(function([id, map]) {
-  return `<button id=${id} class="${map.visible?'selected-true':''}"><div class="layer-preview" style="background-image: url(${map.preview});"></div><label>${id}</label></button>`;
-}).join('\n');  
-document.getElementById('layer-switcher-content').getElementsByTagName('ul')[1].innerHTML = Object.entries(overlayMaps).map(function([id, map]) {
-  return `<button id=${id} class="${map.visible?'selected-true':''}"><div class="layer-preview" style="background-image: url(${map.preview});"></div><label>${id}</label></button>`;
-}).join('\n');  
 
 var backgroundLayers = Object.entries(backgroundMaps).map(function([id, map]) {
   const tl = new TileLayer({
@@ -57,9 +49,6 @@ var backgroundLayers = Object.entries(backgroundMaps).map(function([id, map]) {
     visible: map.visible,
     source: map.source
   });
-  document.getElementById(id).onclick = function() {
-    setActiveMap(id);
-  }
   tl.on('change:visible', function(event) {
     map.visible = !map.visible;
     document.getElementById("layer-switcher-content").getElementsByTagName("button")[id].classList.toggle("selected-true");
@@ -76,9 +65,9 @@ var overlayLayers = Object.entries(overlayMaps).map(function([id, map]) {
     source: map.source,
     opacity: map.opacity
   });
-  document.getElementById(id).onclick = function() {
-    tl.setVisible(!tl.getVisible());
-  }
+  //document.getElementById(id).onclick = function() {
+  //  tl.setVisible(!tl.getVisible());
+  //}
   tl.on('change:visible', function(event) {
     map.visible = !map.visible;
     document.getElementById("layer-switcher-content").getElementsByTagName("button")[id].classList.toggle("selected-true");
@@ -86,16 +75,12 @@ var overlayLayers = Object.entries(overlayMaps).map(function([id, map]) {
   return tl;
 });
 
-function setActiveMap(id) {
-  backgroundLayers.forEach(function(layer) {
-    layer.setVisible(layer.get('id') == id);
-  });
-}
 
 const baseMaps = new LayerGroup({
   title: 'Karte',
   layers: backgroundLayers
 });
+
 
 const overlays = new LayerGroup({
   title: 'Overlays',
@@ -108,7 +93,43 @@ const view = new View({
   zoom: 8
 });
 
+const map = new Map({
+  target: "map",
+  controls: defaultControls().extend([
+    new ScaleLine({
+      units: "metric"
+    })
+  ]),
+  layers: [baseMaps, overlays],
+  view: view
+});
 
+map.once('loadend', function () {
+  Object.entries(backgroundMaps).forEach(function([id, map]) {
+    var button = document.createElement("button");
+    button.id = id;
+    if (map.visible) {
+      button.classList.add("selected-true")
+    }
+    button.innerHTML = `<div class="layer-preview" style="background-image: url(${map.preview});"></div><label>${id}</label>`;
+    button.onclick = function () {backgroundLayers.forEach(function(layer) {
+      layer.setVisible(layer.get('id') == id);
+    });};
+    document.getElementById("layer-switcher-content").getElementsByTagName("ul")[0].appendChild(button);
+  });
+  Object.entries(overlayMaps).forEach(function([id, map]) {
+    var button = document.createElement("button");
+    button.id = id;
+    if (map.visible) {
+      button.classList.add("selected-true")
+    }
+    button.innerHTML = `<div class="layer-preview" style="background-image: url(${map.preview});"></div><label>${id}</label>`;
+    button.onclick = function () {overlayLayers.forEach(function (tl) { if (tl.get("id")==id) { tl.setVisible(!tl.getVisible());}});}
+    document.getElementById("layer-switcher-content").getElementsByTagName("ul")[1].appendChild(button);
+  });
+});
+
+function loadVectorSource() {
 const vectorSource = new VectorSource({
   loader: function(extent, resolution, projection, success, failure) {
     const url = './polyline.json';
@@ -129,9 +150,24 @@ const vectorSource = new VectorSource({
           return feature;
         });
         vectorSource.addFeatures(features);
-        var prev_legend_element = "activity-switcher";
+        Object.entries(sportsCategories).forEach(function([key, value]) {
+          document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><i class="${value.icon}"></i></button>`;
+        });
         Object.entries(activityFilters).forEach(function([id, filter]) {
-          document.getElementById('activity-filters').innerHTML += `<div id="${id}-label" class="ol-control filter-label"><button><i class="${filter.icon}"></i></button></div><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div>`;
+          document.getElementById('activity-filters').innerHTML += `<div><button id="${id}" type="button" title="${id}" class="filter-label"><i class="${filter.icon}"></i></button><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div></div>`;
+        });
+        document.getElementById("layer-switcher").style.top = document.getElementsByClassName("ol-zoom")[0].getBoundingClientRect().bottom + 8 + "px";
+        document.getElementById("activity-switcher").style.top = document.getElementById("layer-switcher").getBoundingClientRect().bottom + 8 + "px";
+        document.getElementById("activity-filters").style.top = document.getElementById("activity-switcher").getBoundingClientRect().bottom + 8 + "px";
+        Array.from(document.getElementById("activity-switcher").getElementsByTagName("button")).forEach(function(button) {
+          button.onclick = function() {
+            shownTracks[button.id] = !shownTracks[button.id];
+            button.classList.toggle("active");
+            button.style.color = shownTracks[button.id] ? sportsCategories[button.id].color : "grey";
+            trackLayer.setStyle(trackStyleUnselected);
+          };
+        });
+        Object.entries(activityFilters).forEach(function([id, filter]) {
           const activity_values = vectorSource.getFeatures().map(function(feature) {
             return new Function('value', 'return ' + filter.transform)(feature.values_[id]);
           });
@@ -150,10 +186,8 @@ const vectorSource = new VectorSource({
             filter["limits"] = values;
             trackLayer.setStyle(trackStyleUnselected);
           });
-          document.getElementById(`${id}-label`).style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 8 + "px";
-          document.getElementById(`${id}-label`).nextSibling.style.top = document.getElementById(prev_legend_element).getBoundingClientRect().bottom + 14 + "px";
-          prev_legend_element = `${id}-label`;
         });
+        console.log("Tracks loaded");
         success(features);
       } else {
         onError();
@@ -162,22 +196,17 @@ const vectorSource = new VectorSource({
     xhr.send();
   },
 });
+return vectorSource;
+}
 
+const vectorSource = loadVectorSource();
 
 const trackLayer = new VectorLayer({
   source: vectorSource,
   style: trackStyleUnselected
 });
-const map = new Map({
-  target: "map",
-  controls: defaultControls().extend([
-    new ScaleLine({
-      units: "metric"
-    })
-  ]),
-  layers: [baseMaps, overlays, trackLayer],
-  view: view
-});
+
+map.addLayer(trackLayer);
 
 function trackStyle(color, selected) {
   var styles = [];
@@ -218,19 +247,6 @@ function trackStyleSelected(feature) {
   return trackStyle(colorMap[feature.get("type")], 1);
 }
 
-document.getElementById("layer-switcher").style.top = document.getElementsByClassName("ol-zoom")[0].getBoundingClientRect().bottom + 8 + "px";
-document.getElementById("activity-switcher").style.top = document.getElementById("layer-switcher").getBoundingClientRect().bottom + 8 + "px";
-
-
-
-Array.from(document.getElementById("activity-switcher").getElementsByTagName("button")).forEach(function(button) {
-  button.onclick = function() {
-    shownTracks[button.id] = !shownTracks[button.id];
-    button.classList.toggle("active");
-    button.style.color = shownTracks[button.id] ? sportsCategories[button.id].color : "grey";
-    trackLayer.setStyle(trackStyleUnselected);
-  };
-});
 
 const select = new Select({
   style: trackStyleSelected,
