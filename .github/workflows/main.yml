@@ -31,7 +31,7 @@ jobs:
         sudo apt-get install -y jq
     - name: Pull data
       run: |
-        columns=`node -e "const ac = require('./activityConfig.json');console.log([...new Set([...Object.keys(ac.tableColumns), ...Object.keys(ac.activityFilters), 'geometry', 'type'])].join(','));"`
+        columns=`node -e "const ac = require('./activityConfig.json');console.log([...new Set([...Object.keys(ac.tableColumns), ...Object.keys(ac.activityFilters), 'polyline', 'type'])].join(','));"`
         curl "https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson?athlete=6824046&columns=$columns" --output public/polyline_6824046.json
         curl "https://us-central1-stravamap-386413.cloudfunctions.net/strava_geojson?athlete=11979218&columns=$columns" --output public/polyline_11979218.json
     - name: Update Github pages
