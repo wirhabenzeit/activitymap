@@ -5,6 +5,8 @@ import geopandas as gpd
 import json
 import polyline
 
+athletes = [11979218,6824046]
+
 def download_json():
     try:
         default_app = get_app()
@@ -12,7 +14,6 @@ def download_json():
         default_app = initialize_app()
     ref = db.reference(url="https://stravamap-386413-default-rtdb.europe-west1.firebasedatabase.app")
     df=pd.DataFrame.from_dict(ref.get(),orient="index")
-    df=df[df.athlete == 11979218]
     df=df[df.geometry.notnull()]
     df.loc[df.geometry.notnull(),"geometry"] = df[df.geometry.notnull()].geometry.apply(wkt.loads)
     df["geometry"] = df.geometry.apply(lambda x: x.simplify(0.0001, preserve_topology=False))
@@ -25,9 +26,11 @@ def download_json():
         allkeys=afkeys.union(ac["tableColumns"].keys())
         allkeys.add("polyline")
         allkeys.add("type")
+        allkeys.add("athlete")
         print(allkeys)
     df = df[list(allkeys)]
-    df.to_json("public/polyline.json",orient="index",indent=2)
+    for athlete in athletes:
+        df[df.athlete == athlete].to_json(f"public/polyline_{athlete}.json",orient="index",indent=2)
 
 if __name__ == "__main__":
     download_json()

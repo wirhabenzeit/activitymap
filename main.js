@@ -22,6 +22,12 @@ var activityFilters = ac.activityFilters;
 const sportsCategories = ac.sportsCategories;
 const tableColumns = ac.tableColumns;
 
+var athlete = new URL(window.location.href).searchParams.get("athlete");
+if (athlete === null) {
+  athlete = "6824046";
+}
+const url = `./polyline_${athlete}.json`;
+console.log(url);
 
 var shownTracks = {};
 const colorMap = new Proxy({}, {
@@ -140,7 +146,7 @@ map.once('loadend', function () {
 function loadVectorSource() {
   const vectorSource = new VectorSource({
     loader: function(extent, resolution, projection, success, failure) {
-      const url = './polyline.json';
+      const url = `./polyline_${athlete}.json`;
       const xhr = new XMLHttpRequest();
       xhr.open('GET', url);
       const onError = function() {

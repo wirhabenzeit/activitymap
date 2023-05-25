@@ -42,7 +42,7 @@ jobs:
       run: |
         git config --global user.name "wirhabenzeit"
         git config --global user.email "dschroeder@ethz.ch"
-        git add public/activities_geo.json 
+        git add public/poyline* 
         git add dist*
         git commit -m "Updating activities_geo.json" || echo "No changes to commit"
         git push
