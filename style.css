@@ -207,8 +207,8 @@ html, body {
   border: 1px solid var(--ol-subtle-foreground-color);
 }
 .layer-preview {
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
   background-position: center;
   background-size: cover;
   border-radius: 10px;
@@ -247,7 +247,7 @@ html, body {
 }
 #layer-switcher-content label {
   padding: 10px;
-  font-size: smaller;
+  font-size: x-small;
 }
 #layer-switcher-content {
   visibility:hidden;

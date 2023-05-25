@@ -104,6 +104,14 @@ const map = new Map({
   view: view
 });
 
+const vectorSource = loadVectorSource();
+
+map.addLayer(new VectorLayer({
+  source: vectorSource,
+  style: trackStyleUnselected
+}));
+
+
 map.once('loadend', function () {
   Object.entries(backgroundMaps).forEach(function([id, map]) {
     var button = document.createElement("button");
@@ -130,83 +138,78 @@ map.once('loadend', function () {
 });
 
 function loadVectorSource() {
-const vectorSource = new VectorSource({
-  loader: function(extent, resolution, projection, success, failure) {
-    const url = './polyline.json';
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', url);
-    const onError = function() {
-      vectorSource.removeLoadedExtent(extent);
-      failure();
-    }
-    xhr.onerror = onError;
-    xhr.onload = function() {
-      if (xhr.status == 200) {
-        const features = Object.entries(JSON.parse(xhr.responseText)).map(function([id, dict]) {
-          const feature = new Polyline({"geometryLayout": 'XY', 'factor': 1e5}).readFeature(dict.polyline);
-          feature.getGeometry().transform('EPSG:4326', 'EPSG:3857');
-          feature.setId(id);
-          feature.setProperties(dict);
-          return feature;
-        });
-        vectorSource.addFeatures(features);
-        Object.entries(sportsCategories).forEach(function([key, value]) {
-          document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><i class="${value.icon}"></i></button>`;
-        });
-        Object.entries(activityFilters).forEach(function([id, filter]) {
-          document.getElementById('activity-filters').innerHTML += `<div><button id="${id}" type="button" title="${id}" class="filter-label"><i class="${filter.icon}"></i></button><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div></div>`;
-        });
-        document.getElementById("layer-switcher").style.top = document.getElementsByClassName("ol-zoom")[0].getBoundingClientRect().bottom + 8 + "px";
-        document.getElementById("activity-switcher").style.top = document.getElementById("layer-switcher").getBoundingClientRect().bottom + 8 + "px";
-        document.getElementById("activity-filters").style.top = document.getElementById("activity-switcher").getBoundingClientRect().bottom + 8 + "px";
-        Array.from(document.getElementById("activity-switcher").getElementsByTagName("button")).forEach(function(button) {
-          button.onclick = function() {
-            shownTracks[button.id] = !shownTracks[button.id];
-            button.classList.toggle("active");
-            button.style.color = shownTracks[button.id] ? sportsCategories[button.id].color : "grey";
-            trackLayer.setStyle(trackStyleUnselected);
-          };
-        });
-        Object.entries(activityFilters).forEach(function([id, filter]) {
-          const activity_values = vectorSource.getFeatures().map(function(feature) {
-            return new Function('value', 'return ' + filter.transform)(feature.values_[id]);
-          });
-          noUiSlider.create(document.getElementById(`${id}-slider`), {
-            range: {min: Math.min(...activity_values), max:  Math.max(...activity_values)},
-            step: filter.step,
-            start: [Math.min(...activity_values), Math.max(...activity_values)],
-            format: wNumb({
-              decimals: filter.decimals,
-            }),
-            connect: true,
-            tooltips: {to: function(value) { return eval(filter.tooltip); } },
-          });
-          filter["limits"] = [Math.min(...activity_values), Math.max(...activity_values)];
-          document.getElementById(`${id}-slider`).noUiSlider.on('change', function (values, handle) {  
-            filter["limits"] = values;
-            trackLayer.setStyle(trackStyleUnselected);
-          });
-        });
-        console.log("Tracks loaded");
-        success(features);
-      } else {
-        onError();
+  const vectorSource = new VectorSource({
+    loader: function(extent, resolution, projection, success, failure) {
+      const url = './polyline.json';
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url);
+      const onError = function() {
+        vectorSource.removeLoadedExtent(extent);
+        failure();
       }
-    }
-    xhr.send();
-  },
-});
-return vectorSource;
+      xhr.onerror = onError;
+      xhr.onload = function() {
+        if (xhr.status == 200) {
+          const features = Object.entries(JSON.parse(xhr.responseText)).map(function([id, dict]) {
+            const feature = new Polyline({"geometryLayout": 'XY', 'factor': 1e5}).readFeature(dict.polyline);
+            feature.getGeometry().transform('EPSG:4326', 'EPSG:3857');
+            feature.setId(id);
+            feature.setProperties(dict);
+            return feature;
+          });
+          vectorSource.addFeatures(features);
+          setupFilters(vectorSource);
+          console.log("Tracks loaded");
+          success(features);
+        } else {
+          onError();
+        }
+      }
+      xhr.send();
+    },
+  });
+  return vectorSource;
 }
 
-const vectorSource = loadVectorSource();
-
-const trackLayer = new VectorLayer({
-  source: vectorSource,
-  style: trackStyleUnselected
-});
-
-map.addLayer(trackLayer);
+function setupFilters(vectorSource) {
+  Object.entries(sportsCategories).forEach(function([key, value]) {
+    document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><i class="${value.icon}"></i></button>`;
+  });
+  Object.entries(activityFilters).forEach(function([id, filter]) {
+    document.getElementById('activity-filters').innerHTML += `<div><button id="${id}" type="button" title="${id}" class="filter-label"><i class="${filter.icon}"></i></button><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div></div>`;
+  });
+  document.getElementById("layer-switcher").style.top = document.getElementsByClassName("ol-zoom")[0].getBoundingClientRect().bottom + 8 + "px";
+  document.getElementById("activity-switcher").style.top = document.getElementById("layer-switcher").getBoundingClientRect().bottom + 8 + "px";
+  document.getElementById("activity-filters").style.top = document.getElementById("activity-switcher").getBoundingClientRect().bottom + 8 + "px";
+  Array.from(document.getElementById("activity-switcher").getElementsByTagName("button")).forEach(function(button) {
+    button.onclick = function() {
+      shownTracks[button.id] = !shownTracks[button.id];
+      button.classList.toggle("active");
+      button.style.color = shownTracks[button.id] ? sportsCategories[button.id].color : "grey";
+      vectorSource.forEachFeature(function (feature) { feature.setStyle(trackStyleUnselected); });
+    };
+  });
+  Object.entries(activityFilters).forEach(function([id, filter]) {
+    const activity_values = vectorSource.getFeatures().map(function(feature) {
+      return new Function('value', 'return ' + filter.transform)(feature.values_[id]);
+    });
+    noUiSlider.create(document.getElementById(`${id}-slider`), {
+      range: {min: Math.min(...activity_values), max:  Math.max(...activity_values)},
+      step: filter.step,
+      start: [Math.min(...activity_values), Math.max(...activity_values)],
+      format: wNumb({
+        decimals: filter.decimals,
+      }),
+      connect: true,
+      tooltips: {to: function(value) { return eval(filter.tooltip); } },
+    });
+    filter["limits"] = [Math.min(...activity_values), Math.max(...activity_values)];
+    document.getElementById(`${id}-slider`).noUiSlider.on('change', function (values, handle) {  
+      filter["limits"] = values;
+      vectorSource.forEachFeature(function (feature) { feature.setStyle(trackStyleUnselected); });
+    });
+  });
+}
 
 function trackStyle(color, selected) {
   var styles = [];
