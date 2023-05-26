@@ -27620,6 +27620,15 @@
     "polyline": "cla`Hqxfs@jB{HtC_C\\cAlAm_@lAiHdPcYhQmLhF}KfEeCtAeB`CoHGqP`AoFfImKbGqNtIkH`ByCn@eGWyFcBgF}EeIk@iE~Dy]zBuJbKmMzTmTtQiNjBkC|BeG_CgD|CgQuAyBZmB~IoOxNgJbHsMlAaArD{@zA_C~@kGnA}[lMoa@xDm`@BwC{AwKgD}C_@_DZsDnCgICkNfD`@pHjDlCD~GcAjALdEpElAbD`FzVbHdJzBpKlFdExJ`LlJvIpCd@~WkDrC@rLtKnLnEtDfGnAf]W`BoCbFTfAjDbCzAVVv@sErLfAjEnApAqBdDGdBxCnKvCfGcArCqJpJy@~Aw@~E|BdJgExFkFhCwCzHuCvLmKdKx@~HS|EkM|U{@|DQhGcGlJh@bBqBfCcEtRmNxHyFzF_GxD_GrFwFvA`CdQ_@f@oBJ{A`L_VbG_GnDiEpGcKpImD|AaIt@}LrGmIlBiKlJeJpBiJ~DoVjB{Bt@cIdFkMfOmS|RqA@kErAkKfKuAsA}BrA_G~A{DlCyFyAuOzN",
     "type": "Ride"
   },
+  "9142355773": {
+    "name": "Morning Run",
+    "total_elevation_gain": 94.0,
+    "distance": 4503.2,
+    "elapsed_time": 1597,
+    "start_date_local": "2023-05-26T08:48:42Z",
+    "polyline": "mra`Hmpfs@nB_B|CgI|AiAQi@dI_FnAoCdB{LtFgLAgBp@aD~AsCbCcBfAOvEvG~LsA{@vHsG~KYzBaAjBbB`BkDfDm@`FsAn@eA}DIiCaCiCkB[kBkHUWg@Lu@sB_Bv@[zAiBn@c@nE@pFgCtGkDjCcAN{@m@]dA{@PkFxG",
+    "type": "Run"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
