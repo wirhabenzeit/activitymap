@@ -19440,7 +19440,7 @@
     "type": "Hike"
   },
   "4211162649": {
-    "name": "Morning Hike",
+    "name": "Denti della Vecchia & Monte Boglia",
     "total_elevation_gain": 1537.0,
     "distance": 15874.0,
     "elapsed_time": 15573,
@@ -27609,6 +27609,15 @@
     "elapsed_time": 3409,
     "start_date_local": "2023-05-24T17:28:29Z",
     "polyline": "m}a`H}ufs@w@sEbEuG{AeGvEcIk@kCyBcEnIyIpEgHpCwKX{FO{CkCeB{Ak@aCIsGsBc@kEs@_AOsEpAwIvCj@~Bo@hBeEBaFy@yCZsBWu@LmCs@qIp@eFeAkLb@uG_@gCd@mFi@_ARu@UyARe@f@PdAWlGyFzCa@IsHvDaBvCmCB}ByAkGeBkSvEcDvCoD~@uHEgRr@uD_@cNZiF_BkNcBkFKoBf@mCwImIsBmKsD~He@dE|BjNEhLeApMpD~Dm@vM`BtX{AcB}AsFqAcR_EuPcC?{FvB_HcAkEFcA\\u@jBcAnGk@pK}D~H{@dPoClHxBxBtBtGLbBa@tBjBlOlBjHb@bH}@hDsAfM?hY}D|L~AnD~DlDfBfNu@xDvAlDnAlGdG`Jd@rDN`Fk@lCNvJaCxCIhEhDpJL`BkFrSjFpW",
+    "type": "Ride"
+  },
+  "9139787573": {
+    "name": "Evening Ride",
+    "total_elevation_gain": 304.0,
+    "distance": 24260.9,
+    "elapsed_time": 2719,
+    "start_date_local": "2023-05-25T19:25:56Z",
+    "polyline": "cla`Hqxfs@jB{HtC_C\\cAlAm_@lAiHdPcYhQmLhF}KfEeCtAeB`CoHGqP`AoFfImKbGqNtIkH`ByCn@eGWyFcBgF}EeIk@iE~Dy]zBuJbKmMzTmTtQiNjBkC|BeG_CgD|CgQuAyBZmB~IoOxNgJbHsMlAaArD{@zA_C~@kGnA}[lMoa@xDm`@BwC{AwKgD}C_@_DZsDnCgICkNfD`@pHjDlCD~GcAjALdEpElAbD`FzVbHdJzBpKlFdExJ`LlJvIpCd@~WkDrC@rLtKnLnEtDfGnAf]W`BoCbFTfAjDbCzAVVv@sErLfAjEnApAqBdDGdBxCnKvCfGcArCqJpJy@~Aw@~E|BdJgExFkFhCwCzHuCvLmKdKx@~HS|EkM|U{@|DQhGcGlJh@bBqBfCcEtRmNxHyFzF_GxD_GrFwFvA`CdQ_@f@oBJ{A`L_VbG_GnDiEpGcKpImD|AaIt@}LrGmIlBiKlJeJpBiJ~DoVjB{Bt@cIdFkMfOmS|RqA@kErAkKfKuAsA}BrA_G~A{DlCyFyAuOzN",
     "type": "Ride"
   },
   "407526720": {
