@@ -10996,5 +10996,14 @@
     "start_date_local": "2023-05-26T08:48:42Z",
     "polyline": "wta`Hwhfs@`HkK`BcHrBi@|HoGv@sItBeItF{P~BsCpEcCpAtCjCnBtKgAkAtIiC`FyBbCWbCiApB`BxAw@vAyBnAE`F_Bv@{AoEQ{ByBsCyBq@sBaHw@B{@iBuAj@WzAsBp@YvETzCyB|GwAjBoCzAcBm@sAx@cFpHoClCg@vA",
     "type": "Run"
+  },
+  "9147679146": {
+    "name": "Lauf am Morgen",
+    "total_elevation_gain": 64.0,
+    "distance": 5385.3,
+    "elapsed_time": 2055,
+    "start_date_local": "2023-05-27T08:04:12Z",
+    "polyline": "udxqH_{qcAf@lBqAxToCfJsCpRgDvHuEhGaF`KoBhFaBrJi@rHInNfA~c@nJkD~DcEzBrAn@iBBwDjBoIpAiB`CwAnFj@nCmEjIqF~CeFlB}J`DgHHoGaAqPaHaOkE{NkDmDwCgAeCIsBdAjAiWm@eC",
+    "type": "Run"
   }
 }
