@@ -11005,5 +11005,14 @@
     "start_date_local": "2023-05-27T08:04:12Z",
     "polyline": "udxqH_{qcAf@lBqAxToCfJsCpRgDvHuEhGaF`KoBhFaBrJi@rHInNfA~c@nJkD~DcEzBrAn@iBBwDjBoIpAiB`CwAnFj@nCmEjIqF~CeFlB}J`DgHHoGaAqPaHaOkE{NkDmDwCgAeCIsBdAjAiWm@eC",
     "type": "Run"
+  },
+  "9159174431": {
+    "name": "Fahrt am Nachmittag",
+    "total_elevation_gain": 359.0,
+    "distance": 23627.2,
+    "elapsed_time": 3529,
+    "start_date_local": "2023-05-28T17:44:56Z",
+    "polyline": "}sa`Hcjfs@xBkCpCoG^cCa@yAb@@\\q@^uDv@BtBgBlAcPRqQz@kD`QsZvE}BfIuGhBoClC_HbDcBfCwCrBaGOmPvAoHvHoJ~F}M~JwI~@cCl@iGQiE}AqFqF{Ig@kDfEk_@jBqIhGsInHuHde@wa@nCkHiCcDdDyP{AaCr@mCbIaNrNoJxHiN`Au@rDu@hBwC~@qHLqLv@mLlM}`@bE}b@aBoNiD_Da@sDReCbDgJUcNvCRrIvDrNq@xDbEtAlDpFpW~GbJ|@xGt@lBdFzDjUdVAhD~FvLj@hCQhDsDdIgE^{HbDmHM_DbKuG|B{AzAtAvGw@bIj@lK~B~IfAvJjCdH`CjWY`Zh@zHNd_@{@lHcFpVYxMr@lN`ArAjJpA~Ec@Vb@MnAuMpMcEbMcC`Ce@tB}ElEsCz@{FJuIlF{G~BgNfAwEImJzIwDHiFxBeHj@iM|EgFvFgFzCe@dIoDrDwBbEcCp@_I]{CzFqJhB_UtUiUnSgJ~EoE`EqFvB_FJaBn@{HvHwLtIk@k@wC_Qk@I}CrAOiCgA`CgOtR",
+    "type": "Ride"
   }
 }
