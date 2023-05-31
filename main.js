@@ -16,7 +16,7 @@ import {DragBox, Select} from 'ol/interaction.js';
 import {  Vector as VectorSource } from "ol/source";
 import {platformModifierKeyOnly} from 'ol/events/condition.js';
 
-import {backgroundMaps, overlayMaps} from './mapConfig.js';
+import {maps} from './mapConfig.js';
 import ac from './activityConfig.json' assert {type: 'json'};
 var activityFilters = ac.activityFilters;
 const sportsCategories = ac.sportsCategories;
@@ -27,7 +27,8 @@ if (athlete === null) {
   athlete = "6824046";
 }
 const url = `./polyline_${athlete}.json`;
-console.log(url);
+const urlParams = new URLSearchParams(window.location.search);
+
 
 var shownTracks = {};
 const colorMap = new Proxy({}, {
@@ -47,13 +48,24 @@ Object.entries(sportsCategories).forEach(function([key, value]) {
 const highlightColor = "#FFC107";
 document.body.style.setProperty('--highlight-color', highlightColor);
 
-var backgroundLayers = Object.entries(backgroundMaps).map(function([id, map]) {
+var visibleMaps = []
+if (urlParams.has('maps')) {
+  visibleMaps = urlParams.get('maps').split(',');
+  Object.entries(maps).forEach(function([id, map]) {
+    map.visible = visibleMaps.includes(id);
+  });
+  console.log(visibleMaps);
+}
+
+var backgroundLayers = Object.entries(maps).map(function([id, map]) {
+  console.log(visibleMaps.includes(id));
   const tl = new TileLayer({
     id: id,
     title: id, 
-    type: 'base',
-    visible: map.visible,
-    source: map.source
+    type: map.overlay?'overlay':'base',
+    visible: (urlParams.has('maps'))?(visibleMaps.includes(id)):map.visible,
+    source: map.source,
+    opacity: map.opacity
   });
   tl.on('change:visible', function(event) {
     map.visible = !map.visible;
@@ -62,24 +74,6 @@ var backgroundLayers = Object.entries(backgroundMaps).map(function([id, map]) {
   return tl;
 });
 
-var overlayLayers = Object.entries(overlayMaps).map(function([id, map]) {
-  const tl = new TileLayer({
-    id: id,
-    title: id,
-    type: 'overlay',
-    visible: map.visible,
-    source: map.source,
-    opacity: map.opacity
-  });
-  //document.getElementById(id).onclick = function() {
-  //  tl.setVisible(!tl.getVisible());
-  //}
-  tl.on('change:visible', function(event) {
-    map.visible = !map.visible;
-    document.getElementById("layer-switcher-content").getElementsByTagName("button")[id].classList.toggle("selected-true");
-  });
-  return tl;
-});
 
 
 const baseMaps = new LayerGroup({
@@ -87,16 +81,18 @@ const baseMaps = new LayerGroup({
   layers: backgroundLayers
 });
 
-
-const overlays = new LayerGroup({
-  title: 'Overlays',
-  layers: overlayLayers
-});
-
+var zoom = 8;
+if (urlParams.has('zoom')) {
+  zoom = parseFloat(urlParams.get('zoom'));
+}
+var center = [900000, 5900000];
+if (urlParams.has('center')) {
+  center = urlParams.get('center').split(',').map(function(x) {return parseFloat(x);});
+}
 const view = new View({
   projection: "EPSG:3857",
-  center: [900000, 5900000],
-  zoom: 8
+  center: center,
+  zoom: zoom
 });
 
 const map = new Map({
@@ -106,9 +102,16 @@ const map = new Map({
       units: "metric"
     })
   ]),
-  layers: [baseMaps, overlays],
+  layers: [baseMaps],
   view: view
 });
+
+map.on('moveend', function(e) {
+  urlParams.set('zoom', `${map.getView().getZoom()}`);
+  urlParams.set('center', `${map.getView().getCenter()}`);
+  window.history.replaceState({}, '', `${location.pathname}?${urlParams}`);
+});
+
 
 const vectorSource = loadVectorSource();
 
@@ -119,27 +122,32 @@ map.addLayer(new VectorLayer({
 
 
 map.once('loadend', function () {
-  Object.entries(backgroundMaps).forEach(function([id, map]) {
+  Object.entries(maps).forEach(function([id, map]) {
     var button = document.createElement("button");
     button.id = id;
+    button.classList.add("select-layer-button")
     if (map.visible) {
       button.classList.add("selected-true")
     }
-    button.innerHTML = `<div class="layer-preview" style="background-image: url(${map.preview});"></div><label>${id}</label>`;
-    button.onclick = function () {backgroundLayers.forEach(function(layer) {
-      layer.setVisible(layer.get('id') == id);
-    });};
-    document.getElementById("layer-switcher-content").getElementsByTagName("ul")[0].appendChild(button);
-  });
-  Object.entries(overlayMaps).forEach(function([id, map]) {
-    var button = document.createElement("button");
-    button.id = id;
-    if (map.visible) {
-      button.classList.add("selected-true")
-    }
-    button.innerHTML = `<div class="layer-preview" style="background-image: url(${map.preview});"></div><label>${id}</label>`;
-    button.onclick = function () {overlayLayers.forEach(function (tl) { if (tl.get("id")==id) { tl.setVisible(!tl.getVisible());}});}
-    document.getElementById("layer-switcher-content").getElementsByTagName("ul")[1].appendChild(button);
+    button.style = `background-image: url(${map.preview}); background-size: 100%; background-position: 50% 65%;`;
+    button.innerHTML = `<div>${id}</div>`;
+    button.onclick = function () {
+      var visibleLayers= [];
+      backgroundLayers.forEach(function(layer) {
+      if (!map.overlay && layer.get('type') == 'base') {
+        layer.setVisible(layer.get('id') == id);
+      }
+      if (map.overlay && layer.get("id")==id) {
+        layer.setVisible(!layer.getVisible());
+      }
+      if (layer.getVisible()) {
+        visibleLayers.push(layer.get("id")); 
+      }
+    });
+    urlParams.set('maps', visibleLayers);
+    window.history.replaceState({}, '', `${location.pathname}?${urlParams}`);
+  };
+    document.getElementById("layer-switcher-content").appendChild(button);
   });
 });
 
@@ -165,7 +173,6 @@ function loadVectorSource() {
           });
           vectorSource.addFeatures(features);
           setupFilters(vectorSource);
-          console.log("Tracks loaded");
           success(features);
         } else {
           onError();
@@ -179,10 +186,10 @@ function loadVectorSource() {
 
 function setupFilters(vectorSource) {
   Object.entries(sportsCategories).forEach(function([key, value]) {
-    document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><i class="${value.icon}"></i></button>`;
+    document.getElementById("activity-switcher").innerHTML += `<button id="${key}" type="button" title="${key}" style="color:${value.color}" class="active"><span><i class="${value.icon}"></i></span></button>`;
   });
   Object.entries(activityFilters).forEach(function([id, filter]) {
-    document.getElementById('activity-filters').innerHTML += `<div><button id="${id}" type="button" title="${id}" class="filter-label"><i class="${filter.icon}"></i></button><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div></div>`;
+    document.getElementById('activity-filters').innerHTML += `<div><button id="${id}" type="button" title="${id}" class="filter-label"><span><i class="${filter.icon}"></i></span></button><div class="slider-box"><div id="${id}-slider" class="noUiSlider"></div></div></div>`;
   });
   document.getElementById("layer-switcher").style.top = document.getElementsByClassName("ol-zoom")[0].getBoundingClientRect().bottom + 8 + "px";
   document.getElementById("activity-switcher").style.top = document.getElementById("layer-switcher").getBoundingClientRect().bottom + 8 + "px";

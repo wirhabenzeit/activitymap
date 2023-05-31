@@ -33,10 +33,9 @@ html, body {
 .sortable {
   border-collapse: collapse;
   margin: 0;
-  font-size: 0.9em;
+  font-size: smaller;
   font-family: sans-serif;
   min-width: 400px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
 }
 .sortable thead tr {
   background-color: #FAC05E;
@@ -45,7 +44,7 @@ html, body {
 }
 .sortable th,
 .sortable td {
-    padding: 8px 11px;
+    padding: 6px 6px;
 }
 .sortable tbody tr {
   border-bottom: 1px solid #dddddd;
@@ -141,6 +140,16 @@ html, body {
 #activity-switcher button:last-child {
   border-radius: 0 0 2px 2px;
 }
+#layer-switcher-content button {
+  border-radius: 0px;
+}
+#layer-switcher-content button:first-child {
+  border-radius: 2px 2px 0 0;
+}
+#layer-switcher-content button:last-child {
+  border-radius: 0 0 2px 2px;
+}
+
 #activity-filters div button {
   border-radius: 0px;
 }
@@ -193,36 +202,39 @@ html, body {
   opacity:1;
   transition-delay:0s;
 }
-
+#layer-switcher-content {
+  position: absolute;
+  left: 3em;
+  top: .5em;
+}
+#layer-switcher-content .selected-true {
+  outline: 1.5px solid var(--ol-subtle-foreground-color);
+}
+.select-layer-button div {
+  background-color:rgba(255, 255, 255, 0.5);
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  height:100%;
+  font-size: smaller;
+}
+/*
 #layer-switcher-content {
   position: absolute;
   left: 40px;
   top: 10px;
-  /*position: fixed;
+  position: fixed;
   top: .5em;
-  left: 2.5em;*/
-  padding: .5em;
+  left: 2.5em;
+  width: 186px;
   background-color: #ffffff;
-  border-radius: 10px;
-  border: 1px solid var(--ol-subtle-foreground-color);
-}
-.layer-preview {
-  width: 60px;
-  height: 60px;
-  background-position: center;
-  background-size: cover;
-  border-radius: 10px;
-  border: 1px solid #ffffff;
-}
-#layer-switcher-content li {
-  display: inline-block;
-}
-#layer-switcher-content ul {
-  padding: 0;
-  margin: 0;
-}
+  border-radius: 5px;
+  border: 1px solid #dddddd;
+}*/
+/*
 #layer-switcher-content button {
-  margin: 1px;
+  margin: 5px;
   padding: 0px;
   color: var(--ol-subtle-foreground-color);
   text-decoration: none;
@@ -230,6 +242,7 @@ html, body {
   background-color: var(--ol-background-color);
   border: 0;
 }
+
 #layer-switcher-content button:hover label {
   font-weight: bold;
 }
@@ -246,9 +259,9 @@ html, body {
   border: 1px solid var(--ol-foreground-color);
 }
 #layer-switcher-content label {
-  padding: 10px;
-  font-size: x-small;
-}
+  padding: 0px;
+  font-size: xx-small;
+}*/
 #layer-switcher-content {
   visibility:hidden;
   opacity:0;
@@ -265,6 +278,10 @@ html, body {
   opacity:1;
   transition-delay:0s;
 }
+#layer-switcher-content button {
+  width:4em;
+}
+
 
 .noUiSlider {
   width: 100%;
@@ -301,4 +318,11 @@ html, body {
 }
 .ol-control {
   left: .5em;
+}
+.ol-control button {
+  width: 2em;
+  height: 2em;
+}
+.ol-control button span {
+  font-size: larger;
 }

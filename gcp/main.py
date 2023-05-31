@@ -37,6 +37,15 @@ def strava_geojson(request):
                 "payload": {"data": newcred["refresh_token"].encode("UTF-8") },
             }
         )
+    # Build the resource name of the secret version
+
+    oldrt=list(client.list_secret_versions(request={"parent": f"projects/stravamap-386413/secrets/strava_refresh_token_{athlete}"}))[1].name
+    response3 = client.destroy_secret_version(request={"name": oldrt})
+    oldat=list(client.list_secret_versions(request={"parent": f"projects/stravamap-386413/secrets/strava_access_token_{athlete}"}))[1].name
+    response4 = client.destroy_secret_version(request={"name": oldat})
+    print(response, response2, response3, response4)
+    
+
     try:
         default_app = get_app()
     except ValueError:
@@ -54,6 +63,7 @@ def strava_geojson(request):
         df = df[request_args["columns"].split(",")]
     return json.dumps(df.to_dict(orient="index"), indent=2)
 
+
 @functions_framework.http
 def strava_webhook(request):
     """Responds to Strava Webhook.
@@ -70,6 +80,7 @@ def strava_webhook(request):
     if request_args and 'hub.challenge' in request_args:
         return {"hub.challenge": request_args["hub.challenge"], "rest": str(request_args)}
     if request_json and 'aspect_type' in request_json and request_json["object_type"]=="activity" and request_json["aspect_type"] == "update" or request_json["aspect_type"] == "create":
+        print(f"Received {request_json}")
         id = int(request_json["object_id"])
         athlete = int(request_json["owner_id"])
         try:
@@ -79,7 +90,7 @@ def strava_webhook(request):
         ref = db.reference(url="https://stravamap-386413-default-rtdb.europe-west1.firebasedatabase.app")
         print(f"Updating activity {id}")
         gclient = secretmanager.SecretManagerServiceClient()
-        strava_at = gclient.access_secret_version(request={"name": f"projects/stravamap-386413/secrets/strava_refresh_token_{athlete}/versions/latest"}).payload.data.decode("UTF-8")
+        strava_at = gclient.access_secret_version(request={"name": f"projects/stravamap-386413/secrets/strava_access_token_{athlete}/versions/latest"}).payload.data.decode("UTF-8")
         client = Client(access_token=strava_at)
         act = client.protocol.get(f"/activities/{id}",include_all_efforts=True)
         if "athlete" in act:
