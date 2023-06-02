@@ -11014,5 +11014,14 @@
     "start_date_local": "2023-05-28T17:44:56Z",
     "polyline": "}sa`Hcjfs@xBkCpCoG^cCa@yAb@@\\q@^uDv@BtBgBlAcPRqQz@kD`QsZvE}BfIuGhBoClC_HbDcBfCwCrBaGOmPvAoHvHoJ~F}M~JwI~@cCl@iGQiE}AqFqF{Ig@kDfEk_@jBqIhGsInHuHde@wa@nCkHiCcDdDyP{AaCr@mCbIaNrNoJxHiN`Au@rDu@hBwC~@qHLqLv@mLlM}`@bE}b@aBoNiD_Da@sDReCbDgJUcNvCRrIvDrNq@xDbEtAlDpFpW~GbJ|@xGt@lBdFzDjUdVAhD~FvLj@hCQhDsDdIgE^{HbDmHM_DbKuG|B{AzAtAvGw@bIj@lK~B~IfAvJjCdH`CjWY`Zh@zHNd_@{@lHcFpVYxMr@lN`ArAjJpA~Ec@Vb@MnAuMpMcEbMcC`Ce@tB}ElEsCz@{FJuIlF{G~BgNfAwEImJzIwDHiFxBeHj@iM|EgFvFgFzCe@dIoDrDwBbEcCp@_I]{CzFqJhB_UtUiUnSgJ~EoE`EqFvB_FJaBn@{HvHwLtIk@k@wC_Qk@I}CrAOiCgA`CgOtR",
     "type": "Ride"
+  },
+  "9190370414": {
+    "name": "Parque Nacional Cotopaxi - Isinlivi",
+    "total_elevation_gain": 1126.0,
+    "distance": 70521.8,
+    "elapsed_time": 25426,
+    "start_date_local": "2023-06-02T08:26:34Z",
+    "polyline": "p{zBps_~MzB^tIm@vElOlC~DpLzE|EL~AdFTrGcDfIQlG|@lFhI`GsHdAsCvADdf@rBtFp@hFOvI_BbLnACrFaJrAcHrCa@MvEfRlH~MtOl@`EmChN^hBdRvExL|@bAzGx@nAzBtBdInCnKrMvFN|IpHzo@|{@p^bZbHlObLdxApKz^jFbCnDfEvSxOdOdErErD`PlDJ`AiDtLtGrDmGaEvD}Oi@gCXc@dQhF`BOQzB`GzCtHbAxFg@di@lM~HhFtJ`Djc@x@l@b@VhEdIzBvBjCjFhAvKfA~dB{Bj@za@oBnA}Df|@T|MzHlMtIlKjI|CaKv\\|KnHj@`E~FrLe@|AwBXdJxCq@tFd_A_@~FD^d@hAd\\j@n@dAUm@HLlAn@AsAj@tGd_@nAfNnHttAxAxi@DrCeBfLb@dJg@zDpBlJvAdd@hAhItCtIwItUuKvOuA~Pr@bWoEfJaDjOj@|R}DbHr@zDPbP`EEVjBWp@oDZ`Aje@}CpMuHrRyJtOmG`GqClFwAdQgEpJCfIaBpH`AtWwBvQp@zOf@pA`E`CbAKh@kAn@dE`LlMrAhEiB|JDtInBvH`CvTnDzwB~@fOvEnVrCnYgBxJrAfBG~Mj@l@lH]lHsElBDbJxDzBxE~IbAN~AdBt@?zBjDzBzAfDlARdDeApBnCdBd@ZbBlJdFfDInCjAlImBxL~DdGcAxAXbBdEcDfCz@bJ{GW_GrBdAzAu@`Bb@hB[bCjArB^vDoCbE@~AgBb@}CjDnApAxQj@aGzDgFt@{BrDoGzAuAlBA~Ap@ZhBoB~NnBXd@s@`GtFm@~ApCfDbAnQhM}I{@_EeD{EUcBz@~AzGoArBbE@hD~B`EQ{DhCyDd@a@|LqIlH_@vA`AhF`G|K_AfDTzAxGtJnC~HcBzBqI[cIlApCrJ~IdOvCfHfAzEvH~IqGdI]xEkMvIg@tCVfD|FjE`C`FFhDmEbDwMkDqD|BwGiC_Ez@SxRsGvQkAVwFiBkJzC}CpDsAzI{ClIuK}@|AzCbC|@fDnExFhEeD~CaKtEqAdCtEdLpIxJzAtDwEjEwD~@wBdCE`BtKpAdAfBMdFrFkAtD`@nIk@lE|A\\tBcJu@wD`DgCkA}@~A}Bf@eBtFwBHgAnCwFhEoF{@CiAtAcCm@i@gE|Gp@lAlC`@xExESh@gHmDeFJiD`BcDQyDgEbA{EiE}Cg@L\\xAxBfBmBzBqCHUvA|F`CD`CdApAf@pEgCnEeAvDvBvDc@nDnAPdFiIbHIrClBVfGbGQzCl@}@lA_NhBgF[cIdK",
+    "type": "Ride"
   }
 }
