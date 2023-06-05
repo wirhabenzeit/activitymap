@@ -27719,6 +27719,15 @@
     "polyline": "r|hD~_q`Na@g@e@mFmAkCaCw@w@mBmCuCwCqGqB{Ag@mAqAm@eAwHuAu@_C@aAa@wQv@wBe@cF`F}E~A}FqAgCd@s@n@qHl@cAt@eCm@m@^cC]mDxCIrAqBhCsBpAHV}E`EqCfAu@zEuAvBMvBwDjIsApFP|HlBbHNnJ_@`Cp@bAl@`Gh@n@PO\\`ChChCXnEpBvBrEpC`AKZy@Uv@Vx@zBnAv@hDdAjAlCKT[pGxAlAlErFtFa@vANp@dHlAdBKtChA|GE`F}@jHkFxIUlJwD`BEQk@bB[YBV_@Mu@bKwPH_ClB_E|@yE~@kBxAoQjBuEIyF`@g@e@\\Go@qA{@m@uI",
     "type": "Hike"
   },
+  "9206515365": {
+    "name": "Morning Ride",
+    "total_elevation_gain": 2035.0,
+    "distance": 66699.6,
+    "elapsed_time": 38168,
+    "start_date_local": "2023-06-04T07:10:54Z",
+    "polyline": "bqiDb|p`NpA_GArGyCnXoDrEyAaAHnHwAb@kBhF}AfReG`TqGdM~AdBoFjB~GkBfDzDvIxAlOiEnEChl@dHlk@wLyFvGbOUf@r@mC`B|El@pGm@tBfCpYuAtNlA~BnArP{I`C{FhEyEbHrDMpBgB`BlV{BvKOzp@nFbHkC{DiC_AwCd@cC_AoAbDp@xApCtLuCjHpAxEo@hJpH|KGjAgB~ClGhLnDhn@sKdQh@ReBbBbC`HtAdDjCvDbRqHnE^nBzK_FCoGfCeHjJs@bE|OjAvAvGbAnFg@zUxHlKkAnMjGhFdPrBtAdHK`D{EhJt@rDoFfBbA~AbEnKwAtLHzDvEfHNjGaBva@iA~FyDjJpApR{AzIr@xFdC|^e@pKjEa@jExAnEdLjDbFQnTgGpCxBtAnFfGp@`NgJ|AfAjDbOvBdAhAxCwArItB|NxCVnLoG|A}FzPyD`AfAeAvIhB`LhKhN~LpDdF?nBaAa@qItAmBrG|CpHyBjOzBj^mPrKb@lBqC{ByBHeB~@bBlPlD?y@_NyKfIiMb@_DFoJ_CqB{BeHvGsBf@}HzBqGbBRtC`NrJ~KdPPzEzC|ImD`MhAxLuETgI`HmCn@kFxIfC`DUdByH_HaKnTfCtG{QnBgIxD~G`@hLlELjKaCpE^_BnCIzDoHvGHpA|Gx@lFyClKlEjNnBdJeFtGQb@zGhDbCiErEx@hAdJgHu@cEvCkHgBuH|A@`FxGrBXnDmCrLuPpD[jFjBbOmDxDcMm@mCkFgGOcFbA_Bu@J@u@x@wC~EcAv@XI`BwCdFdBbElGrDxGOpC~DRzCwBvG|G}EqEzInNsIdC{C]{CbD]lGd@{ArBnCfE}ClESrC~A{BbHaCXuAqAwEfB}B[lCnBzCnLAzFjCc@tC|AbAZvEbAdEsE`@_CqBgH`BmJy@eGjDgHEoAjEb@b@lFuB~NnEnKjH`HyAnH`EtEcCrHfAdMyB|MqI`DMvEdDlDc@x@y@_@_Cl@@~BxFiMx@uE_B_FzGaSpM}KrDiAbB{Q`BfEbEdHdAfF@_B}@Tm@lTjB~Na@rArFdUhJ~Eo@}AmMhMCfEmA~BtBpIhA`UgAiKcDqBHuD_Cl@aEjJtDzAUwBmIkDaBlDuEIoJwC{MbOwWtKpOnCi@rD_D}EwF~KJvCyBqFu@_A{@CcClVZlLdAiJ_DcDCiF_FxAiCdD^dBnD`Jn@rBeBdE?|HoDvOZnRyBClFdEt@~@xAgB`FjG}D\\lBwJnHyB`HaCv@MhCdGjBeDkBlBmCvPJaBlGx@tCj@aBxFgC|@_KxCDpYkEhBgEtFtErDv@pBnEvCaAnA|@lIq@LtDbCbB",
+    "type": "Ride"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
