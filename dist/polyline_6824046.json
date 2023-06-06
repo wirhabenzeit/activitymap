@@ -27737,6 +27737,15 @@
     "polyline": "lqbF|}t`NNcDeBaCzCuJtCwFfCmBrF{N[qF|CcDc@mK`LrJtO~B`BxGyBdFv@~EfJzNnKbGnJ{LrLsCv@cHlKhBzMqEpErAb@dDqCpJpAxCO|MvAzC|Gr@dObOvHId@oAgAcAdNjBjHqDlE?vLyLpDtBhF_C~HzGvJVzE}KeBmQpCmDdMbF|b@}XzBta@fCzEaBxGlQtDFbHjDlCgEdRfHhEmD`K~FvHyEnG?tCdIvCjJ^vA|CpHA|Bw@zJ_MjBv@pApFjIt@vFzCzFuDvHiO|Da@|ArEApJ`GrEc@tF~ExKe@fHgEjLtGlJ`I_MxGwBrEsHzF@vScKnTiF[oWt@_EvEeBwAuIbBuBWgDdHiCnNgBnAvDhHfG|Et@lCU`IkIuBuHzCuHhEoAdAmCkEmIGuJbGsHe@sJzD_DvDeLvFnFtFjAhExJGxGbDGlCzBlBbMtNxHnB`Ms@hLnHjMz@|HnN_@jB_ExEsEdVsDbBiI~DsFdGeBrKgJ\\_DpBG|BdL`HpEqBbKzCjIe@`FvFrAlJuC`CbB~Bi@w@dIaChCnCdSvFpDd@bCnHdDc@nGbJ|F|N}JlPdG}IgV_IsAa@{B|Kk@zFvChLeGjEmGaHdApE_GqM|CrHuHbDwQhGoEvYFcO{F{CmDfH_InJiThBwQ|Zm_@hH_OjD}ORmJdEqLEyNqGoKnFwLA_MuA}BgOaAkFoPrBeHfGwEx@aNnGmG}GmFoL|LiIN_AsChGgK|HgBdFmNrHmBhLaKlIwAdGkI`JcWqB_AwDxCqDkAq@}IjMuQ`Hy@lZlPhGBoJcEuGmJsS}JDmFsDoHsA}KuGcEeJjE}HsDaF|Em_@uCaLcMaJoDkFyG_A\\x@WcCcGnBkAuDyDaCePsIs@iLkHeAlFcJLiEnB}J}DoL?qP_HeIcSzBwP{BcQeViYiJy]gAuPsFgMkJ{JyDcAgBcHkD}BxK_VoEoJzCsGwAeBz@eKmEsQNmGyBuH`@aGhNyHzIq@rBiUlFeE}@cDuHCvA{Ia@sFkEyH}FG]cFvGiQ?iGgMq\\zAsKeBeWmG}AwByFhHeL`Cm@pH}NlAmOiFqGyP@uA`BeEsCnBqMqAmIfBwFkAaFjD}MnEE~EiE`F~AnC{B~DiMf@eNcG}IwFwQ`DsRaCsHD_FrFwE\\_GlEmFgCyIeL{Kk@k^yBoMNcf@rAwBqCcVhD{NdNoD|JeIbFgJkDqGiEq@}EmEq@aGpA_IaBaD{OuFqC{DqGoOkCiX}LcSgI}GcMsE_Se@uGyIgBsNqMyJgB{V`@{LqAeEYgQwIy^bAcEkBcJl@cGnGsNdHoHh@{LsKgHuX@gIaG}FsWqE{FZ_Cq[m\\kT_^iLkK",
     "type": "Ride"
   },
+  "9214945075": {
+    "name": "Lunch Ride",
+    "total_elevation_gain": 139.0,
+    "distance": 16154.0,
+    "elapsed_time": 4362,
+    "start_date_local": "2023-06-06T11:21:31Z",
+    "polyline": "fox@tzm~MmFzAaCdB{FvPuK{C{AfAaF|Ai`@wUeCpDuMyHuG~JkVsO|AcDGe@_YmC@kCcAy@}OeFyEQiAmGt@eCRsD]qD_AiCkATOSoKk_@wGsFmBcJaGmIqKwGeQcAkBVyXcAe@f@mZ{N\\iUq@iD{AIeA\\oQ_Me@BqAzAsDeEcI_G{GmDqGmF{@_DiBcCeEcCy@wFcCaCqJ_G}IoDwCwB_EEeNxFiEuHcDyCg@}@EkBqDoE_UeQiABw@pB}^cZ}P_DtA}HtA_EsEsB[}@kGyAe@_Bf@oGiBeBQqA}KuFKa@t@_B_A_AiPaJsIqO",
+    "type": "Ride"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
