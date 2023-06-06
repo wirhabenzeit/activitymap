@@ -11043,12 +11043,21 @@
     "type": "Hike"
   },
   "9207016230": {
-    "name": "Fahrt am Morgen",
+    "name": "Quilotoa - Angamarca",
     "total_elevation_gain": 1956.0,
     "distance": 64149.3,
     "elapsed_time": 89318,
     "start_date_local": "2023-06-04T07:09:52Z",
     "polyline": "boiDb`q`NbC}JJ~FuCxXgDlEqASMrGsAVsB~FuAzQwFxRsLnT`H_B`D|DvI|AlOiExEGrQdDtY~Bff@gLjDSo@hBoEjDfOMVp@iCdBvFj@tFq@pBbCxYoAtOtAzAfAbQ}I~BcGvEsEnGvDS|BgBvAtWeCjJKnq@rF|GqCcEmC}@mCf@gC_AmAfDv@fBjC`MsChGpArEq@~JtHhKMxA}AhCzFtMtDxn@wKhOt@d@cBrAvB|InBzB`CrDdRiH~DZtBlKqE?iGxC_IdJg@`A`AzBrMpA|AxGdArFe@zUrHhFuAdDPdMdGbFzOvC`BpGWt@mC`BgAjJr@jDiFhBbAdBdEhKwArLHxDrExGT~GeBhb@mAxG{DdIxAvQ{AxIl@jGjCvMZ~K_BdCZ|KvEk@jDtA`FtKjDrFQjEwBjNmCdClB`BzF|Fr@fNeJjB`BvClM~DzEmAhOxBjJrCN`LiGzAqBTwCzPqDx@fAcA|JzA`JdJzM|MxEzIw@\\mAs@iGlAsBnGxCjDSjCcB~M`CfFeAxWiNzL\\`B{CuBgBEmBhA`BvPdDiNcMv@oCrGaI`@sCHsJaCyByBmHlGsAx@iJpBaG`BX|ClNvJtKtONvExCnJkDbMbAvLsENgIhHoCVyEjK~BhCa@xA}H_HwJnTjClKi\\jDlGh@zLzDPjLiCfEp@}A|BUhEoDbC{BrEbHfA`GwCfKfEjOrBvHkFbGQn@p@DfFrDrCcEdEv@jArIwGe@oEnC_HyBeGP{@fBHxDnFjCz@pDmCxL}P`EQvEhBpO}DfDsMiGwI[kGbAwAw@?l@mDxEsAhAHBdAaDnGdBdEhGdDrHChCjEHdC}BdH|G{EuEjI~HaDzDiD~B{CUgDjL@wA|BjCpCCvA_DhEMvBd@CeBbOaD`@s@fDb@j@fFwBfOtEtKnHfCEpCaBlHbE|EcC|HjAlMaCvLiIrDKjEbDxDe@r@_Ae@mBp@Kj@pCvAlBkMv@qEaBkFdHwFnCeK|HoKhDeBpB_JLsFnAvEdEzG~@dFFJm@kB]Zg@lQr@fBx@pNc@XzCx@tAnUlJ|Ek@{AmMnMMbEiA|BxBjIhAfUgAsJgDsCDmDuBr@gEbKbE`Au@wBuHmDmAlDkFMsJyCcKH{AjNeW~@TfJpNjCe@tD{CyE{FpKJ|CuBaHkBGuCvVb@lKfAsIcDiDGsFsFxAqBpCF`CbE|Ip@lB}AzEIvGeDrPPfRwBBnFrDl@dApAE~BsAnB`GwDb@hBqJdHgCjHeC~@AdCdGfBcDoBlBoCfLt@hCi@Zj@yBdFx@pCj@_B|FgCz@yJzC@~KaDxLm@zA_EdElBh@zAxD|@rBnE~BcA`B`AnIq@NtD",
+    "type": "Ride"
+  },
+  "9209853471": {
+    "name": "Angamarca - Ambato ",
+    "total_elevation_gain": 1555.0,
+    "distance": 83078.4,
+    "elapsed_time": 29746,
+    "start_date_local": "2023-06-05T08:04:04Z",
+    "polyline": "xobFr`u`NfAqDgBwEhHuQjCwB?cDtFgI]eG~CaDa@iKjLtJfO`C`B|FwBdGt@rEdJ|NbKdG~J{LrLsCr@eHvKfB`NqE~DjAl@|CwClKnAnCO~M~A~CzGp@fObOnHIh@kAeAiA`NhBdHkDvFUnKeLvDpB`FaClI~GnKJ~DmLgBsPvCqD|LjF`IcDxX{SpAhGh@bYrCbFmBdCDtClQpDHnHdDzBiEpRfHjEoD|JfGhHgFxHJtB|HvCrJ`@jAtCnHB`Co@rA{EjCO~C}EjBt@pAlFrI~@nFzCzFgDhIcPxDQnB|JYpEbGhEm@`F~EdLa@fHeElLnGhJnI_MlGqBlF{HjFDlS_KtTmFW_Xj@iD|EmBwAwI~AgBOsDdHgCfNiBhApDhHfG`F|@zDu@pGaHRsB}BuErCkHnEoAhAoCeE{GWcLdGuHf@qBqAyFzD{CdEgL~ExEfGxAdE`KGhGnHvB|BnMxM`HzBvLy@hLnHnMpApIrNc@`J_L|TaDnD{L`KqF~JuIn@oDhBArB`LjH~E_CnM`DlFo@zEdGbBdJsCdC`BdCe@sAzCRhD_CjCvCfSlFfD^|B|HvD[nGvIrFhNwJdQbGqJuVkHiAg@yBbKu@pG|ClL}FnEgGcH~@rEcGoMxCjHgHhDaR`GmE~YD{N}FcDoD~GmHtJwTfBmQ~Zu_@rHuOzCwNVmJhEgMEiOqGsJvF}MIgLwAaCqOgA}EwOvB}H|F}D`AuNlGkGqGiFsMfMiHJiAwCvGqKhHuAxDoGl@cFnHiBhLeK|I}AzFaIbJiWyAgAsD~CuDy@mAgBBsGfMgQ|GeApYhPnHXqJmEyGoJiSqJAoFwDeIkAiK{FwDcBYcHrEuHoDkF~Eg_@yC}K_McJqDgFwGeAZx@YcCcGpBqAqDiDwC{PkIk@yKkHqAvAB`D_JDeEnB}J{DoL?mPyGuIyS`CsP}BwPgViYgJs]gAeQgFiL}JqK_EcA{A{GkD}BvKeVaEkJxCmH}A{@v@}KmEoQNsGwByH`@cGlNmHnIk@xBkUpFkEuAgDeHGtAcJc@oFiEoHuFAWmFtGmQKsGeM{[~AmJcBiWwGcCuB_GdPqRhEiJfA_NcFeHiPCoBbBcE{CnB_NsAgInBiFqA{EzC{MjX_DxDkOb@eO_G{I{C_IwAuHdDuPqBoPlFiEXiGtEuFeCcIiLkLi@m]{BkNLof@lAaBmCaVlDgOzMeD~I}GfGyKkDeGeEs@uF{Ea@uFvAaHu@_CsQ_IcCiDyGaQgCiWmLmReJqHeMqEgRWkH{JsAuMqMqJDkKgD_^AmNkJ_b@|@gFeBwIf@{FzGcO~GoH~@mGm@sEoJqFmYE_I}F_G}WqEsFR_Cue@gi@qIyPwHaF",
     "type": "Ride"
   }
 }
