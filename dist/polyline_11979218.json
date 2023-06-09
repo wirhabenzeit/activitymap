@@ -11068,5 +11068,14 @@
     "start_date_local": "2023-06-06T11:21:32Z",
     "polyline": "djx@t|m~M}Bz@_BdB_FvOgLyCmAdAiF~A{_@sUsChDaNuH}F~JwV_P`B}DwXgCa@c@LqBuDuBqLkDoEIeAiGbAyHWwDcAmCeAVYWgKc_@qGmFuBiJeGuIwKuGoPaAeFJaU{@{@j@}YsNTqUy@qDuAEaA^sQ}L]AuAdB_EwE{HuFkHwDiFiE_AgDgBgCuEoC}@{FsBoBoM_I_GsBeDeCwDKyN`GyDqHoDaDaAcEyFeG{JyG{EsEuAAMxAg@^a_@qZwPyCjDwNqEuBMw@{GcBe@mAj@wGsA_Ai@wB{KaGM]~@{BsRaK{GqL",
     "type": "Ride"
+  },
+  "9232693746": {
+    "name": "Spaziergang am Morgen",
+    "total_elevation_gain": 9.0,
+    "distance": 813.4,
+    "elapsed_time": 5017,
+    "start_date_local": "2023-06-08T08:19:04Z",
+    "polyline": "hggAnm{gPfElBpCqAcDrAuB}@iAD",
+    "type": "Walk"
   }
 }
