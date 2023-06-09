@@ -27746,6 +27746,15 @@
     "polyline": "fox@tzm~MmFzAaCdB{FvPuK{C{AfAaF|Ai`@wUeCpDuMyHuG~JkVsO|AcDGe@_YmC@kCcAy@}OeFyEQiAmGt@eCRsD]qD_AiCkATOSoKk_@wGsFmBcJaGmIqKwGeQcAkBVyXcAe@f@mZ{N\\iUq@iD{AIeA\\oQ_Me@BqAzAsDeEcI_G{GmDqGmF{@_DiBcCeEcCy@wFcCaCqJ_G}IoDwCwB_EEeNxFiEuHcDyCg@}@EkBqDoE_UeQiABw@pB}^cZ}P_DtA}HtA_EsEsB[}@kGyAe@_Bf@oGiBeBQqA}KuFKa@t@_B_A_AiPaJsIqO",
     "type": "Ride"
   },
+  "9231839183": {
+    "name": "Morning Hike",
+    "total_elevation_gain": 10.0,
+    "distance": 935.5,
+    "elapsed_time": 4739,
+    "start_date_local": "2023-06-08T08:19:01Z",
+    "polyline": "xggA|m{gPfD~AfDmAcDpAeE}@",
+    "type": "Hike"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
