@@ -11077,5 +11077,14 @@
     "start_date_local": "2023-06-08T08:19:04Z",
     "polyline": "hggAnm{gPfElBpCqAcDrAuB}@iAD",
     "type": "Walk"
+  },
+  "9234259665": {
+    "name": "Wanderung am Morgen",
+    "total_elevation_gain": 152.0,
+    "distance": 3569.5,
+    "elapsed_time": 6724,
+    "start_date_local": "2023-06-09T09:06:35Z",
+    "polyline": "xebDb~}jPiAYcEp@_Bm@yFIeNwAgAv@aDvGiA|FkGxCFhD[fAsQmKzOtJ|@NFoFpGwCXwD~@yC`Ai@nBqE`VzArBj@pE[rA`@",
+    "type": "Hike"
   }
 }

@@ -27755,6 +27755,15 @@
     "polyline": "xggA|m{gPfD~AfDmAcDpAeE}@",
     "type": "Hike"
   },
+  "9234282209": {
+    "name": "Morning Hike",
+    "total_elevation_gain": 170.0,
+    "distance": 3951.6,
+    "elapsed_time": 6870,
+    "start_date_local": "2023-06-09T09:06:27Z",
+    "polyline": "`~aDz~}jPwCo@wU}AiDxFmA`DIdCa@v@}FxC?`Eu@VXHeRqKhRjKPoF~CeAhBuAzAkIlDyFrUpArDn@",
+    "type": "Hike"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
