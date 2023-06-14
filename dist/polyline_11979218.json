@@ -11086,5 +11086,41 @@
     "start_date_local": "2023-06-09T09:06:35Z",
     "polyline": "xebDb~}jPiAYcEp@_Bm@yFIeNwAgAv@aDvGiA|FkGxCFhD[fAsQmKzOtJ|@NFoFpGwCXwD~@yC`Ai@nBqE`VzArBj@pE[rA`@",
     "type": "Hike"
+  },
+  "9264903386": {
+    "name": "Spaziergang am Morgen",
+    "total_elevation_gain": 11.0,
+    "distance": 1751.7,
+    "elapsed_time": 3902,
+    "start_date_local": "2023-06-10T08:32:52Z",
+    "polyline": "nlkCx{mlPvE~AdHn@vA]p@V\\yBg@k@iAAcAyBhBuCyAyEoGeGsBRm@W",
+    "type": "Walk"
+  },
+  "9264905218": {
+    "name": "Spaziergang am Morgen",
+    "total_elevation_gain": 31.0,
+    "distance": 1469.0,
+    "elapsed_time": 5777,
+    "start_date_local": "2023-06-11T08:24:47Z",
+    "polyline": "~ckA`oxkPwGnA]|@rAAxC`CjADz@pAkA}Ay@?o@w@d@g@EqAb@gAdEF",
+    "type": "Walk"
+  },
+  "9264907148": {
+    "name": "Spaziergang am Nachmittag",
+    "total_elevation_gain": 137.0,
+    "distance": 2187.9,
+    "elapsed_time": 4438,
+    "start_date_local": "2023-06-11T14:33:11Z",
+    "polyline": "nqq@xqtlP{AvAcIgDwEB_BjAm@IkChAwAlAsCnFmHV_EUkAu@l\\wIf@JpBsAlEArHzCpCoA",
+    "type": "Walk"
+  },
+  "9264969893": {
+    "name": "Spaziergang am Morgen",
+    "total_elevation_gain": 20.0,
+    "distance": 878.2,
+    "elapsed_time": 6148,
+    "start_date_local": "2023-06-12T08:19:03Z",
+    "polyline": "rrr@pncmPy@Iu@cAy@J@Vz@iBS}@|ALr@j@Kb@",
+    "type": "Walk"
   }
 }
