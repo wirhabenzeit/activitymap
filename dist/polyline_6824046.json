@@ -27818,6 +27818,15 @@
     "polyline": "rnq@rttlPkImDgD@_IpCuAlAyCpFwIPmCOkAs@jBr@dMGjCoF~EuC~@BpAiAvEIzH~C~EuB",
     "type": "Hike"
   },
+  "9267383510": {
+    "name": "Afternoon Hike",
+    "total_elevation_gain": 80.5,
+    "distance": 8754.6,
+    "elapsed_time": 12172,
+    "start_date_local": "2023-06-14T14:18:44Z",
+    "polyline": "vspCn_ffP|FbFZ|@sArCRBYCp@?qDtCyF^Jh@Ua@cAIFbAH[NRoAAb@h@vAjK`DbBUpAlBhD?hA|@INn@hXrUlATt@bBv_@v\\lV|SrA\\dAnB?pDhAnKdCzInB`EtI`Hc@~AqIvBzIyBZ{ApAU_B?wEkDuDmFeBwEcAqDqAiOu@eAIiBaBe@wv@kq@cAgBy@IeVcT",
+    "type": "Hike"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
