@@ -11070,7 +11070,7 @@
     "type": "Ride"
   },
   "9232693746": {
-    "name": "Spaziergang am Morgen",
+    "name": "Isla Sombrero Chino",
     "total_elevation_gain": 9.0,
     "distance": 813.4,
     "elapsed_time": 5017,
@@ -11079,7 +11079,7 @@
     "type": "Walk"
   },
   "9234259665": {
-    "name": "Wanderung am Morgen",
+    "name": "Isla Isabela - Volcan Sierra Negra",
     "total_elevation_gain": 152.0,
     "distance": 3569.5,
     "elapsed_time": 6724,
@@ -11088,7 +11088,7 @@
     "type": "Hike"
   },
   "9264903386": {
-    "name": "Spaziergang am Morgen",
+    "name": "Isla Isabela - Punta Moreno",
     "total_elevation_gain": 11.0,
     "distance": 1751.7,
     "elapsed_time": 3902,
@@ -11097,7 +11097,7 @@
     "type": "Walk"
   },
   "9264905218": {
-    "name": "Spaziergang am Morgen",
+    "name": "Isla Isabela - Urbina Bay",
     "total_elevation_gain": 31.0,
     "distance": 1469.0,
     "elapsed_time": 5777,
@@ -11106,7 +11106,7 @@
     "type": "Walk"
   },
   "9264907148": {
-    "name": "Spaziergang am Nachmittag",
+    "name": "Isla Isabela - Tagus Cove",
     "total_elevation_gain": 137.0,
     "distance": 2187.9,
     "elapsed_time": 4438,
@@ -11115,7 +11115,7 @@
     "type": "Walk"
   },
   "9264969893": {
-    "name": "Spaziergang am Morgen",
+    "name": "Isla Fernandina ",
     "total_elevation_gain": 20.0,
     "distance": 878.2,
     "elapsed_time": 6148,
@@ -11124,7 +11124,7 @@
     "type": "Walk"
   },
   "9276531571": {
-    "name": "Afternoon Kayaking",
+    "name": "Kayaking - Isla Isabela - Elizabeth Bay",
     "total_elevation_gain": 55.0,
     "distance": 4667.1,
     "elapsed_time": 5778,
@@ -11133,7 +11133,7 @@
     "type": "Kayaking"
   },
   "9276533822": {
-    "name": "Afternoon Hike",
+    "name": "Isla Santa Cruz - Tortuga Bay",
     "total_elevation_gain": 80.5,
     "distance": 8754.6,
     "elapsed_time": 12172,
@@ -11142,7 +11142,7 @@
     "type": "Hike"
   },
   "9276534647": {
-    "name": "Afternoon Hike",
+    "name": "Isla Bartolome",
     "total_elevation_gain": 113.0,
     "distance": 1725.1,
     "elapsed_time": 3990,
@@ -11151,7 +11151,7 @@
     "type": "Hike"
   },
   "9276535428": {
-    "name": "Morning Hike",
+    "name": "Isla Santiago - Puerto Egas",
     "total_elevation_gain": 21.0,
     "distance": 2354.4,
     "elapsed_time": 5887,

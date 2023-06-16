@@ -27827,6 +27827,15 @@
     "polyline": "vspCn_ffP|FbFZ|@sArCRBYCp@?qDtCyF^Jh@Ua@cAIFbAH[NRoAAb@h@vAjK`DbBUpAlBhD?hA|@INn@hXrUlATt@bBv_@v\\lV|SrA\\dAnB?pDhAnKdCzInB`EtI`Hc@~AqIvBzIyBZ{ApAU_B?wEkDuDmFeBwEcAqDqAiOu@eAIiBaBe@wv@kq@cAgBy@IeVcT",
     "type": "Hike"
   },
+  "9277445972": {
+    "name": "Morning Walk",
+    "total_elevation_gain": 31.0,
+    "distance": 1469.0,
+    "elapsed_time": 5777,
+    "start_date_local": "2023-06-11T08:24:47Z",
+    "polyline": "zbkAdoxkPsFjA]|@rAAxC`CjADz@pAkA}Ay@?o@w@d@g@EqAb@gApDH",
+    "type": "Walk"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
