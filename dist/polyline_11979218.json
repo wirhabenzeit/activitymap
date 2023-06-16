@@ -11122,5 +11122,50 @@
     "start_date_local": "2023-06-12T08:19:03Z",
     "polyline": "rrr@pncmPy@Iu@cAy@J@Vz@iBS}@|ALr@j@Kb@",
     "type": "Walk"
+  },
+  "9276531571": {
+    "name": "Afternoon Kayaking",
+    "total_elevation_gain": 55.0,
+    "distance": 4667.1,
+    "elapsed_time": 5778,
+    "start_date_local": "2023-06-10T15:19:19Z",
+    "polyline": "pusB`g{jP]_B^eHyCwDqBkE^oEq@w@lDH~@`@y@oAqAj@oE}EmBi@]dADyASj@qAe@Rd@mAx@fFl@bBi@F`BjCdDBZa@Hu@iDgA}AeAJcAq@kBSc@m@Nl@u@^T[pAC@d@vEv@z@z@`AfDa@rBrEjIx@jJhC~LGrL^jBd@XhEr`@r@tC",
+    "type": "Kayaking"
+  },
+  "9276533822": {
+    "name": "Afternoon Hike",
+    "total_elevation_gain": 80.5,
+    "distance": 8754.6,
+    "elapsed_time": 12172,
+    "start_date_local": "2023-06-14T14:18:44Z",
+    "polyline": "xppCz~efPlB\\rExDt@xAsAvCRBYCp@?[A{BhCsGl@Jh@Ua@cAIFbAH[NRoAAb@h@vAjK`DbBUpAlBhD?hA|@INn@hXrUlATt@bBv_@v\\lV|SrA\\dAnB?pDhAnKdCzInB`EtI`Hc@~AqIvBzIyBZ{ApAU_B?wEkDuDmFeBwEcAqDqAiOu@eAIiBaBe@wv@kq@cAgBy@IqNeM",
+    "type": "Hike"
+  },
+  "9276534647": {
+    "name": "Afternoon Hike",
+    "total_elevation_gain": 113.0,
+    "distance": 1725.1,
+    "elapsed_time": 3990,
+    "start_date_local": "2023-06-13T14:31:28Z",
+    "polyline": "fev@fotgPnANGb@pAs@`BNNUU\\jA~BkBv@g@[`@^J_@dB]kAyBV[WRuAUyAt@Da@{@SkCf@",
+    "type": "Hike"
+  },
+  "9276535428": {
+    "name": "Morning Hike",
+    "total_elevation_gain": 21.0,
+    "distance": 2354.4,
+    "elapsed_time": 5887,
+    "start_date_local": "2023-06-13T07:26:34Z",
+    "polyline": "|bn@boqiPlCbEvAtE_@jBTpAhBTdAjAUn@hAZAvA|ChCPjBj@QdGdBx@rAI~@\\eBSc@}PyOoCoH_GsIIsA",
+    "type": "Hike"
+  },
+  "9276536213": {
+    "name": "Morning Hike",
+    "total_elevation_gain": 17.0,
+    "distance": 964.6,
+    "elapsed_time": 5191,
+    "start_date_local": "2023-06-12T08:33:16Z",
+    "polyline": "dnr@vkcmPaAjAhBgC_@YL]h@K|AdAKb@",
+    "type": "Hike"
   }
 }
