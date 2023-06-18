@@ -27836,6 +27836,24 @@
     "polyline": "zbkAdoxkPsFjA]|@rAAxC`CjADz@pAkA}Ay@?o@w@d@g@EqAb@gApDH",
     "type": "Walk"
   },
+  "9290134609": {
+    "name": "Lunch Hike",
+    "total_elevation_gain": 1189.0,
+    "distance": 9552.7,
+    "elapsed_time": 19478,
+    "start_date_local": "2023-06-17T12:32:21Z",
+    "polyline": "bxiHbqd`NwBGe@n@Sy@{L}AeHaC_@ZgOZyC}@gNiAgB{@kAAkAoCiEeFgMwV_CiC{BScFsBqY}FsB\\{BaAuFZcNs@uBi@sBn@w@pA{DRcAtAsG}@qD_BeFUSK^eAWQ_@lAsBHcBr@gBEmGvCKu@p@qAk@l@pDg@{Bh@nAb@@l@YpCeA~B?bDgD|EjAjAJtDlFlRaDdAwLzHuDb@yAfBiAYeBN@t@i@b@m@UgDpAe@bCqHdCdAbFlBzEZ|CsGjJ_DzAgADuP{AaJCyB^u@SwCf@iJxF",
+    "type": "Hike"
+  },
+  "9290137937": {
+    "name": "Morning Hike",
+    "total_elevation_gain": 120.0,
+    "distance": 5634.0,
+    "elapsed_time": 12044,
+    "start_date_local": "2023-06-18T06:37:40Z",
+    "polyline": "l__Htdf`NcCoLbCdMd@b@G|C`@t@xB~@gAdByCj@oDvJQzOXpBtJvLfD|HdFpDxCxGVrChHlJ|@Xf@vDjDlCNxBlF`KrCrAz@rFbLo@jJj@jEzCtDtA`JUdBd@tCvB|AXdEfFtE|LbAfJt@|@zCnA",
+    "type": "Hike"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
