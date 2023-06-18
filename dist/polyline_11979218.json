@@ -11167,5 +11167,32 @@
     "start_date_local": "2023-06-12T08:33:16Z",
     "polyline": "dnr@vkcmPaAjAhBgC_@YL]h@K|AdAKb@",
     "type": "Hike"
+  },
+  "9291153595": {
+    "name": "Temple Machay, Refugio Carrel",
+    "total_elevation_gain": 1188.0,
+    "distance": 9488.6,
+    "elapsed_time": 19500,
+    "start_date_local": "2023-06-17T12:32:27Z",
+    "polyline": "nbjHxqd`NiC\\mCo@uDKYn@@u@}JcA}J}CaA\\eNZuCaAaNgAsBaAkA@iAqCwBoBaEuGqHgPcDyDwBF_As@sBSwBuBaBO{AaBuCw@iGXeFeAaBf@Ka@qBc@yE`@wQ}AkBl@u@pAaEV_AvAgQuDUXs@Sg@UVkAWISbAiDZ}@h@wBIcCtAA]m@Fz@Za@[k@NtAZWdDgAfCClDuApCqAz@jA~ALxDjFnR}Cj@g@v@aJtFmAp@qCN_BdBoDESjAkB@eCnAg@zBwHrChEpMN|BqGpJ_DrAcBHmPwAcQH}LzG",
+    "type": "Hike"
+  },
+  "9291154393": {
+    "name": "Wanderung am Morgen",
+    "total_elevation_gain": 5.0,
+    "distance": 570.2,
+    "elapsed_time": 2229,
+    "start_date_local": "2023-06-18T06:37:40Z",
+    "polyline": "j}~Gh~e`NkA{FtDhOCzC",
+    "type": "Hike"
+  },
+  "9291155690": {
+    "name": "Wanderung am Morgen",
+    "total_elevation_gain": 27.0,
+    "distance": 5156.2,
+    "elapsed_time": 4310,
+    "start_date_local": "2023-06-18T08:52:41Z",
+    "polyline": "b{~Ghyf`N}A~FZjF]tFl@tClIpJvDvInFvDvCrGRvCdHnJfAf@\\~ClDrCNzB|EhJhDnBr@lFj@PbKy@~Ij@fEtChE~ApFk@bBJ|Ab@xCxB~AZdEjFjFfNz@nIvG|C`An@j@zAx@V",
+    "type": "Hike"
   }
 }
