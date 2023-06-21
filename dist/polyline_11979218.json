@@ -11194,5 +11194,23 @@
     "start_date_local": "2023-06-18T08:52:41Z",
     "polyline": "b{~Ghyf`N}A~FZjF]tFl@tClIpJvDvInFvDvCrGRvCdHnJfAf@\\~ClDrCNzB|EhJhDnBr@lFj@PbKy@~Ij@fEtChE~ApFk@bBJ|Ab@xCxB~AZdEjFjFfNz@nIvG|C`An@j@zAx@V",
     "type": "Hike"
+  },
+  "9308755323": {
+    "name": "Wanderung am Morgen",
+    "total_elevation_gain": 985.0,
+    "distance": 12882.0,
+    "elapsed_time": 30901,
+    "start_date_local": "2023-06-20T08:21:16Z",
+    "polyline": "fg{Gtst_NQINzBm@PYzAkDX{BmAFq@wAE^t@TKg@ZGSy@~@@~A{A|B}@zEeAAQi@UV]_@fAxDnA`ARpAd@JoLhDy@bCi@NdAh@|DdI[lIpBuAlBmC_@jIk@lBTf@aA~ERdJ{@|LNXpBC`EvBx@rChBhBJfBrApA?rA|BpJGfAkAd@BXZM[CFl@c@c@L~@e@~AUQMl@oB`Al@x@x@bHtGlLnAbAhBf@l@x@vCj@z@oAxDb@r@~EUx@lBnFfFH|@xASr@p@ZB|@tDfA|AhBi@bD`@n@c@p@K`Em@h@w@Km@jAs@dDN~@k@`@_AhEKW`B{AQ_B|@_@e@u@TkBtAaDdADh@mCbAmVIqE{CoHaBuBaAaE}@XoAmA_DoAuCcD{Ce@qAeB{@eEXyCaBq@oCsCNyBuAY}BoB}BeHo@m@\\eCi@yBsDaDb@wCfGeHfKoFnC_ErDcCv@mAhBoK`AgAn@aClBo@Oe@Z_Aa@m@AoAeGuKVoJSoB^w@q@uE",
+    "type": "Hike"
+  },
+  "9308757669": {
+    "name": "Wanderung am Morgen",
+    "total_elevation_gain": 22.0,
+    "distance": 7756.7,
+    "elapsed_time": 5863,
+    "start_date_local": "2023-06-21T09:58:18Z",
+    "polyline": "r_|Gl{t_NjLgBlAqAxH}@lAoATsA~@GByDdAsATcBr@Tt@vB|@PAwBrAgInCkKlB|@lBs@dAoI`C`ClAzHx@dAvAs@vBpEpAuB|AAdA_D|C{CfLqCpEuEbF_@{AgUFaFrA}Gx@oLzBqGr@iEbGPrCm@hPaJrA{AxGmDnGaFtAyCKkGz@yHj@eBnAgAbGeCjJq@bCdAxBYrFxA",
+    "type": "Hike"
   }
 }
