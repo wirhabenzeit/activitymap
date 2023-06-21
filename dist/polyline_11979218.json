@@ -11212,5 +11212,14 @@
     "start_date_local": "2023-06-21T09:58:18Z",
     "polyline": "r_|Gl{t_NjLgBlAqAxH}@lAoATsA~@GByDdAsATcBr@Tt@vB|@PAwBrAgInCkKlB|@lBs@dAoI`C`ClAzHx@dAvAs@vBpEpAuB|AAdA_D|C{CfLqCpEuEbF_@{AgUFaFrA}Gx@oLzBqGr@iEbGPrCm@hPaJrA{AxGmDnGaFtAyCKkGz@yHj@eBnAgAbGeCjJq@bCdAxBYrFxA",
     "type": "Hike"
+  },
+  "9309200369": {
+    "name": "Mittagswanderung",
+    "total_elevation_gain": 730.0,
+    "distance": 9364.8,
+    "elapsed_time": 21710,
+    "start_date_local": "2023-06-19T11:27:11Z",
+    "polyline": "xr{Gv{t_Nn@rEy@jBHnD|@bEnEbAbAxEpBFpC`Lq@dBV`A~CnEzAz@EvAlCdF|@bFe@zClCpB~ArG`F|Hp@vCChHfClFG`Al@~A[h@`@pDS`@r@jAm@lEj@bAoCdIVfAwAKAx@hAxBj@jDfAfB|CpUvD~FhC]`@Mq@uAGwAfAf@f@eAO_Ah@aCu@q@LiCuHwC]q@T_@SeAaBiCGuHa@SS{AB{Cj@m@qAmFt@yBM{@cAe@p@yACw@cBiEDaBmBiCSeAQ_KqBeEA_DlA_G{AkJ}AoCMuD_A{BFiBqCoCy@{C_BiBw@cDwAkBEkAkEoAoB_DiCsBBiN\\mBs@yC",
+    "type": "Hike"
   }
 }
