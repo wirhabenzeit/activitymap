@@ -11221,5 +11221,14 @@
     "start_date_local": "2023-06-19T11:27:11Z",
     "polyline": "xr{Gv{t_Nn@rEy@jBHnD|@bEnEbAbAxEpBFpC`Lq@dBV`A~CnEzAz@EvAlCdF|@bFe@zClCpB~ArG`F|Hp@vCChHfClFG`Al@~A[h@`@pDS`@r@jAm@lEj@bAoCdIVfAwAKAx@hAxBj@jDfAfB|CpUvD~FhC]`@Mq@uAGwAfAf@f@eAO_Ah@aCu@q@LiCuHwC]q@T_@SeAaBiCGuHa@SS{AB{Cj@m@qAmFt@yBM{@cAe@p@yACw@cBiEDaBmBiCSeAQ_KqBeEA_DlA_G{AkJ}AoCMuD_A{BFiBqCoCy@{C_BiBw@cDwAkBEkAkEoAoB_DiCsBBiN\\mBs@yC",
     "type": "Hike"
+  },
+  "9316586274": {
+    "name": "Wanderung am Nachmittag",
+    "total_elevation_gain": 477.0,
+    "distance": 1983.9,
+    "elapsed_time": 5716,
+    "start_date_local": "2023-06-22T14:17:02Z",
+    "polyline": "j{~Gptf`Ne]XeCy@o@qAkGsB{@wBeDqCwB`@h@]qFiF^}CE{En@_Ea@eA",
+    "type": "Hike"
   }
 }
