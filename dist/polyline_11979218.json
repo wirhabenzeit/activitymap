@@ -11257,5 +11257,14 @@
     "start_date_local": "2023-06-25T11:44:39Z",
     "polyline": "efx@fjf}MyAoBFuIy@cFuDiFuHgCiD[gD{BmGmBoUoCeFx@sDnBy@tCeB]s@|@aCeAqBDqB|AMj@p@dAm@tDw@^oK|PkDrCe@dBkBb@aHjKSxAeBv@kAhBkBdAk@RqB{@iA@{@`@i@pAErCfAbBmBfDoAfJdCYfBdBe@zDlAjE@tFo@nFbB\\nDhIO|CTb@}Aq@q@bCRvAr@ZG|@wAp@NXqAKk@`@jAfA~AFL^HnBuA\\`@h@s@b@@`@n@Xg@tBtBDpBo@l@vBvBe@KfBt@bAqCfAL|AeCxA`Al@zDa@l@n@v@Kr@\\bAk@fIhEEzA`BnAxBPV^zGvAzGC|Bg@VhB`Qw@nPkFrB}DzCsCHs@FX|EgEzH_M~AyAbEoAvCkCdMgPq@e@NwA~@OnAaBYyBn@iC_ByB]oBt@_ISwCw@eD}B_C@mCc@?c@mB~AyCHsB]{CoAkB",
     "type": "Hike"
+  },
+  "9339798627": {
+    "name": "Fuya Fuya",
+    "total_elevation_gain": 605.0,
+    "distance": 4866.9,
+    "elapsed_time": 9030,
+    "start_date_local": "2023-06-26T10:24:05Z",
+    "polyline": "_bZn}w|MxAlB`Gn@~@|AzB~ApB`@~BvBbB|Mm@dC\\hGnAtC[|Cs@`Bg@n@aCv@cAjARBa@e@f@~AjDnAjEfGXt@i@xEVG\\x@e@NP`Bu@lBjBvBtBMv@s@n@_Fc@{Db@aJ{A{PuCoAqCoCuA_DKgDp@}Cu@sAeA}IyBqBiBU}BgBm@mA_H{@",
+    "type": "Hike"
   }
 }
