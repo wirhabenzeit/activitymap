@@ -27899,6 +27899,24 @@
     "polyline": "~h}Gtxd`NOcNv@e@q@wFP_`@fAwGtA}D`DsTxAmEQ}B^qDjCkCV}CZpBQp@qBfAg@lAQ`I}A~ESnK{EvGPf@o@zCmAt_@g@~CPrDv@xCDpI]d@z@zAYlC}BnDiAImCxFQt@l@|@_AfGPtCeA`BzAhCtBv@\\lAj@Vz@OdB`AtDdFfFrAp@pAlAj@fDR`Ga@bNF",
     "type": "Hike"
   },
+  "9335039651": {
+    "name": "Afternoon Hike",
+    "total_elevation_gain": 173.0,
+    "distance": 3007.4,
+    "elapsed_time": 2695,
+    "start_date_local": "2023-06-24T17:49:17Z",
+    "polyline": "asj@vyr|MfCkFiGkHnDrDGYdAaA}@{EZ^h@WoAcBsIkXvB`@bEqUtEkMs@y@xCaItA_BrC^f@kB",
+    "type": "Hike"
+  },
+  "9335113960": {
+    "name": "Lunch Hike",
+    "total_elevation_gain": 655.0,
+    "distance": 12606.5,
+    "elapsed_time": 12602,
+    "start_date_local": "2023-06-25T11:44:33Z",
+    "polyline": "}hx@|_f}MCwDy@qBBw@}CuEkBiAiKkBeF}CkEiAiKcBcIm@uEt@kEvB{@tCyAc@u@`A}BeAoCLgBnBt@tAo@xDwCrC{ItNeCjB[tA[\\gAG{HvLChAeBp@sAfBkCzAaCw@aCd@k@`FjAdBaBxB{AxKbCi@dBjBe@`EnA~Fi@jL`Bd@~CxGPjF{Aq@g@lCv@bDeAZMv@aBI]ZdBrAvAFDzBeAZTl@m@x@p@~@e@|ArBBtBi@?lAb@h@vBq@B`Cl@x@}CjAXvA{B`ABb@h@^xDi@|@n@nBTt@i@jIhEAtApBzAvKfCzAWxDVhCg@v@tAxAPvLy@vCuA|AE|F_BbBgAvAgDrCiCLq@fFmDzHmMxAqApE}AnC{BfMgPq@e@NaB~@MlAcBYsB^yCgBeEh@yDCuG{@eEs@qAmAk@AuCe@BRGu@cBfBsCQo@Z}Ac@oC}CiCPoH",
+    "type": "Hike"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
