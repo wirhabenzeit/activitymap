@@ -27926,6 +27926,24 @@
     "polyline": "s`Zz_x|Mb@^bGr@lAbBtBxAhBT|BtBlBhNm@dC\\hGhA|Dy@fDyGnFLg@f@xAjDpAlEfGTpC_@|Bb@DEzCw@fBhBzBtBMt@q@BgAh@w@ByBa@aDb@yI]oBLmBi@eBa@aGyCqAmDmDeA_Gx@uDw@}AcA_JaCuBeCm@sCaDyGu@",
     "type": "Hike"
   },
+  "9360163797": {
+    "name": "Lunch Hike",
+    "total_elevation_gain": 35.0,
+    "distance": 852.3,
+    "elapsed_time": 3762,
+    "start_date_local": "2023-06-27T11:18:28Z",
+    "polyline": "bjE~sxpMzCtAx@lCiCqE{CM",
+    "type": "Hike"
+  },
+  "9360165534": {
+    "name": "Afternoon Row",
+    "total_elevation_gain": 48.0,
+    "distance": 38697.3,
+    "elapsed_time": 7678,
+    "start_date_local": "2023-06-27T13:15:14Z",
+    "polyline": "xyDfhxpMWyC_DMk@q@hFuCaAyBD_DnD}FnBkAqAuDdAwA]oLhAeCo@e@_EhB}@sA`AwB~Bw@q@uFcGkGcD~@R{AjC_Ek@o@iIlAsLcDI`BgBd@qBgDTs@pIcAbGiLxBMmFkEm@wD}AuB|E_HvBsAlBG|AjB|@sC`ECDkA_BmA[sBzAkIa@kCbAaBNsBxCuE|HaAHcC|AmCrEqEd@]aAbApIkElEq@vBqDQkBwBoAbAmD{E}CH_E`A}Aj@_PoC}FWiC`A}ExC[X_AgJqHeDlBaAwA|@aDzGeAtCiDrDMbBgAN_Cy@aAq@_E|@aBwAqB{AsKnAqFsAeAG_C`GcBbDsEm@uGlBgEo@{FaBsCrDwCcAmDcDm@{NlBy@uAnGiIB}@yAwBj@aAlCe@hEjDdBCVwFkEmHfCeGx@DhEnCfDU~Af@d@s@wCsHeF_@G_CsK@EqB|DiC\\wAiOoGUiAd@qDdEiC_DiC[aBlDoCxBaEgH@aA_C`CyA|GV}AaB_E_@YeAfGuB@yCn@{@jBnC~@CUuKyDwHpBeBxAcLxAIrAhCxAk@wC}HH_GaKiIXsGxAu@jDz@tAcEcDgCkDXq@uBlFgEhA}FbBcDhCcC_@oCfBIZq@mBkBiEpAcAOOiCtB{BYqBw@_@sEbBuCK_B|AkAUsBwEsBqAy@yDdDoCi@mAcHaBwCtBaG^k@cF{BkCx@_D{@GkBrBcAA{AqGwC{@{DwF@u@bEcBxE~@~Am@A{EvC_G@uDlCi@aAyG|C?x@aBrDmA?wD}@_@iIhAgFIm@\\NjAo@NqLeBa@k@bA}C}CiASyCqDx@FyBgA}Ad@oDu@gBaDkB{A{G^eAnCw@|B_CdB}Ge@_AsHoDd@yHwCqF?}@pCu@rSzAfEiFxF{DeCvBo@g@VX|C}ArBcCCqAkCoCEcIv@gAhEi@tLmJpAqCO}Hl@eD~GmGr@{BaHmDkAqC_@gEiBsD_EmCuFu@q@oDrDiEHcG~@yBhFn@nCkEnCwAtHChOeC`@_Bk@{GnBcD{CsEZ}AjLdDlMFjHrEdDf@RjAjCmC_@d@rAfCgAzCwDvC`@nEhC|BfDcCtBQbFhLlDa@pAuF`CmB~B~Al@pEzDm@rFrA|Fs@fF|AtCuA|AtAeAhBxF]TpAtD~GnA@|@kFzAu@`GjGnDRj@hBeApExAfA`KiCVeAaAoFxAkAxEn@xEzHfBiA{@mKmAy@wJqB{@}Bf@aBlBk@hIPbBvApAtElGZzBeAd@mAvAuGc@gB",
+    "type": "Rowing"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
