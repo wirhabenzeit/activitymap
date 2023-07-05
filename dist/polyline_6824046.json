@@ -27971,6 +27971,15 @@
     "polyline": "eba`H}pgs@h@cYdAmF`QuY~F{CpHuF|AsBnCiHxG_FdC{HMwO`AaGjIsKjGuNnImHdBsCn@kGQ{E{AkFwEyH_AaFlDs[dCuLlEsGtFcGtReR~QwNvBwCxB}Fa@iAaBkACm@|CePuAsCnAiDhHyLrMyIvIqNfAy@nDs@zA_ChAgIR}Mt@gKpMab@vDm`@@}ByA{KkDgD_@cDPqCzCkJSoMbB[tAuDtG_EhIn@xBcCpBm@bDaDtEsBjF{ApCv@lACzBaE`BqAzLyCdGFbHcHfOwBz@ZpB~CbKmCrFmDhFgGhFaJbInC`IeMpCyGfBuB~CkCdE@bBeCpJaJzAu@d@_DpEa@XqGzCe@h@jFv@wDnHiM`B_S~@sBhBgB^HhBdEpF|h@_Fbf@`@rNeCpTa@nL^|JwJvS}ChQ{CxEJ`NcEfNcLtw@{GjXUvCs@A{AqCqAQoBcCoBiAcAKaDn@}BuBuGuBaIsK}GuBwBlBoDn@}@xDl@pFeF~GeFtEcAMeAsCs@c@oNrEeB}EaCG}KfEoHC{CzJmJhElAfHw@bId@fKzB`JfAxJrCxHzB`WQbYh@|NDhYiA`JuDpQe@fAg@c@r@`A]`Lv@tP~@xA`JpAxALxBm@h@p@G~@uMzMgEbMoBfBy@lCgFpEaF~@dCpQ]d@cADqCfLcVnG}FnDmDpFkKbJiEdByHr@qLrGoInBqCfBiGlGmIdB}IxD{WxB_GhC_E~CoLjNqTlTqHjL",
     "type": "Ride"
   },
+  "9394442776": {
+    "name": "Evening Ride",
+    "total_elevation_gain": 353.0,
+    "distance": 23455.1,
+    "elapsed_time": 3098,
+    "start_date_local": "2023-07-05T18:31:22Z",
+    "polyline": "yma`Hqtfs@dCqH|FyBvCfRp@P~KmIrHqHbCeA|DGnFoB|FwExIuEpQ_P`X{XdBw@~GgAzByErJDpBu@tBeExD_EV}HnFqCfEmExEmC|GmBpGm@fFuB~DOhJsIhTq@vHsCpIoFvDNhEqAdGuFZgB|BaC|DuLrMmN_@oBsDf@wKgBq@oAu@_OZuLrEsV|@qIOk`@g@yM\\yRgCmXyBkFuAqLuBeIg@{Kv@qHeAqG`AgA`HeC~C}JlHJ|G{CnFw@bDuIFyDqHwPLsBW_AyIcIkIsJuFkEaCcL}FoGw@cB{EoVsAgDeEgE}M|@kCu@qEmCqBSm@\\VtM}C`KM|Cd@xChDxCtAhK?fC_Ez`@sM`b@s@pJMbMcApIaBdCmFnBsG|L{OnK}IjOw@zChFbETdAqEdQ{C|Gkj@bh@gJ`MaBxGkEt`@p@nEdFbI|A|ETvEk@jFaBdDcJnIiGrNyHtJ{A~HHdOsBjGyGjFeE`JyItHaHjEuPxYk@tCApLoA~Te@pAoDzC}@`HyAlD",
+    "type": "Ride"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,

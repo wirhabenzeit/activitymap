@@ -11293,5 +11293,14 @@
     "start_date_local": "2023-07-04T18:24:20Z",
     "polyline": "spa`Henfs@|CoINuBlAoDtD}E~@aOJiOjAsHnPyX~F{ChIsG|EmKhDqBrB_C`BuDd@sDWqLbAqH~IqL`FeMnKaJt@kBh@cEMkH}AcFoFqJc@qDjEc^pBaJrNiQ~RgRdP{LfCuDjBoFgC}CbDsQyAgB^qBtIiOpM{H`IyNzAoArDs@rAkBvA_KH}Kx@mLrIkVvCwMbDa_@}AyMv@gCq@}I`AsDt@S|AhQzApExAbOxEpK`E~F~@tGQbH~CpLlFnJf@dCGzCeE~CeBhEuBpPiCxHkAhPCfRhCrDaBtFH`DlCxLpBvBhDjVbCrFoA|GKdWn@xBtCjEjEnOpGhI]pMdAvPfAv@pKtAzCo@b@b@C~@cNpNuDhLeClCm@|BwFvEyE~@lCfQY`@yCXcAzKwUpGaGhDoEpGmJ`IwElB{Hp@mLrGaJ|BwJbJmI`BsLvEuUbBoGvCmCtBuMpOkTbTwHrLiA`CoBpMvAhBCxMoBxBkF`D",
     "type": "Ride"
+  },
+  "9394265422": {
+    "name": "Abendlauf",
+    "total_elevation_gain": 62.0,
+    "distance": 3952.1,
+    "elapsed_time": 1445,
+    "start_date_local": "2023-07-05T18:44:50Z",
+    "polyline": "{ra`Hqvfs@|DeGl@SjAn@`AcAfC_@pBkCxAk@|AsG@eCxBwHvFeQjCkDnEyB`DjG`AHhKsAqA|H{GrLK`BcAjBdBdC}BbCq@dFgCpAuExFcOvJkAdBuBhAy@@{JjJ",
+    "type": "Run"
   }
 }
