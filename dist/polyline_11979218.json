@@ -11302,5 +11302,14 @@
     "start_date_local": "2023-07-05T18:44:50Z",
     "polyline": "{ra`Hqvfs@|DeGl@SjAn@`AcAfC_@pBkCxAk@|AsG@eCxBwHvFeQjCkDnEyB`DjG`AHhKsAqA|H{GrLK`BcAjBdBdC}BbCq@dFgCpAuExFcOvJkAdBuBhAy@@{JjJ",
     "type": "Run"
+  },
+  "9400977354": {
+    "name": "Abendlauf",
+    "total_elevation_gain": 67.0,
+    "distance": 4003.7,
+    "elapsed_time": 1577,
+    "start_date_local": "2023-07-06T19:30:57Z",
+    "polyline": "{wa`Hkpfs@jCmCfEwH`@OrA^dK{GlBiGFkC~IcZxDiEtDiBtAnE`BdAlLuAiArHkG`LaBpFnBnBuD`D]vEcDlBe@lAuCpCmOnKkAdBiCn@}@sCcJjG",
+    "type": "Run"
   }
 }
