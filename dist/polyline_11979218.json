@@ -11311,5 +11311,14 @@
     "start_date_local": "2023-07-06T19:30:57Z",
     "polyline": "{wa`Hkpfs@jCmCfEwH`@OrA^dK{GlBiGFkC~IcZxDiEtDiBtAnE`BdAlLuAiArHkG`LaBpFnBnBuD`D]vEcDlBe@lAuCpCmOnKkAdBiCn@}@sCcJjG",
     "type": "Run"
+  },
+  "9407788456": {
+    "name": "Abendradfahrt",
+    "total_elevation_gain": 378.0,
+    "distance": 24710.8,
+    "elapsed_time": 8165,
+    "start_date_local": "2023-07-07T19:03:51Z",
+    "polyline": "{pa`H}nfs@hBsDvCeMpB}Ap@{AtAgUFwK|@oEpPgYlGeD`ImG~AcCpBcGdEeCjByBdCkIOgOx@sFrIwKfGuNhKgJxAiGJ{C~C_CFgCdCeDgAeCdC}Ij@cLY]mGCqC_AuByNb@uBeC{DhA{JtBiAlImLbB{LmBwPMsLq@mEIyEkAyDv@iAjGeAxFaCdC}F~BqBf@cJWaLa@uC}BmFKmGhBaP~IsLPoFhB{C@mD{AoQfCqL|BoE|@aKrAmE~J}StFqDnCq@~BtDZC|@uGlGGjA]|FqIjQcGz@sFx@[V\\[tFPfBrC^|G`D|CFnHcAjATrDfEnApDbFhWbHvIfBrJpFpEjU`VBtD~GfOMnFmDvHwE^qHzCeHKyC`KgHjCiA~@rA~Gy@zHf@nKvBfIrAfLdCpG`CpWKrYf@pK@t]aAdIyEdU[pLz@`P~@jArJtAdEk@h@`BgNlNcE~LsBrBw@lCqFlEuEdA|BjQmBh@wBfLaVdGwDvBeBvBA\\l@Kb@pAWyAgAVIUkCvDuLtJaDfAeHn@_MlGsIrBsJbJeJrBeJ|DsWvBiGlCqFvEaK~LmPpPwAfA{@I{ExAy`@d_@sCgMq@m@oBfAyAhC_K~HuCy@aDE",
+    "type": "Ride"
   }
 }
