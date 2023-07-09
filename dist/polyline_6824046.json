@@ -28007,6 +28007,15 @@
     "polyline": "}_u~Gg{hv@bf@v_@fJkDMgHfM|AdAsUxb@mBb{@}X|G_DUmFhb@aMxXzOh^rNnEhGwA`MlStCpd@xWlc@nCpr@eF\\dEbOsCnk@~a@vcAou@~BpLzRhSxKxi@dCpv@yOhZ_Mfb@xBf@jKyUtF\\|BhEwKvQnJ~Px]Y|GpHxImElOzXdB`S}@fI{FvAyKwEkCfFt@bH~BfIbMRdHqMaAePrF~\\iErPzD?rD~I{Fj@cBbFkEmCpExG~IKmH~CaP{FiHpAqHxIyDz[`Gxj@rIfI~H~Sv@|MfZf~@`Ild@t@rr@oGxnAVhi@pEpd@o@|l@wCfKpAbJaIaO|Cb[vGjNNvOvR|b@sClU`H|g@vLlHlK|v@zJzPmWx@FvFaCdBfJoAdP|NtPzVbFdW|JpNhA_AaFkYtDhLzZh[t_@nHfEfFrCiElEz@tPnPXjErUfChNfg@lP~M|G\\lOvr@dAvOgCfOeOwBRpg@zJt^pOdScBvLlElF[`K{Hi@qCrK{UoCqHwKeC}OiDrBk@~X`I|`@mD~Y~JtRlIxl@v[tp@hFnN{EwBbF~IvZfPcL`HqCbQ~Mjq@kCt_@sD|Kw@he@aE`QbIdPj@~~AaHve@}LtZcXz_@{Kb_@oGvo@{^bvBoBte@WboAvE`IRbN{N|[bH~`Aub@|J}Y{KkOiSi}AnC}DnTnF~L{EgI_MfzAgJzMiG~WoOzLBf}@fPpu@VxV{DtPuQxQ}Edh@sAtt@kW~m@mDpm@@ro@kR~U_IjVdI_AxT~\\pQrHHjJgLdQ~GvHxJdAwGvDv@jGsD`GlC{@rAfD_EvArHpE{GzK{Mxk@qD~XqPxi@hM|UuF|}@rEnV{DmD`@dSwD~WwZdh@gFtX}B}IqCxNeAsEkEzFeBeJuOt_@cLrEwEpIZlO{GqIhAaUcCwKd@oKoCcM}CPOwCjE@hElj@kAnTnGjI@kOjE{H`LqEtOk_@lBzIlE}Fv@vEnD_O~AdJtFkYpZ}g@nD_VU{TvD~CsEsVnFm}@sMcUfQwj@~CsVhNym@zGkKuH_FdEeB{AcDgC|@|DqGcAmF`HiDcT{JdL{QMeK}PqG_V}]gDzDyCgBqJjk@yGrMam@lYwFhe@aXlRcNpU}M`g@qHjJ_c@c`@cNeEyKR}{@|_@{c@uDsFhMsZ`OkFvNia@t`@o[tPoMr[qs@vWyMxQg]`DiJyLsWkI{GiNy_@oXiQhHmg@wEcg@iRcJaLqNGsz@_[q[gA",
     "type": "Ride"
   },
+  "9417598378": {
+    "name": "Morning Ride",
+    "total_elevation_gain": 557.0,
+    "distance": 33529.4,
+    "elapsed_time": 9178,
+    "start_date_local": "2023-07-09T10:38:25Z",
+    "polyline": "yia`Hs~fs@p@iC~BgBf@cBdAgUDeKr@sDjPaYvQiMpFcLfEcC~AwBrBuGMmOlAgHbIeKnGyNvJsIfBeH?aCfDmCB}BhCqDkAcChCoJb@wKaHY{CeAoBuNb@kB[eAyAeAK_BdAoI`CsA~GaJxAsFfGiHpL}IrI_SpDkOvGcQeG{Oi@sVkB}K?cIcAwH_B}DRsGlBqCEoEy@_Fc@qIThC?wE|AiHjD}H~@kLlK}TjHoF~Bi@n@LtAxCf@DXqEh@_AtH[`BwApDmGxPmFp@iAr@sEt@ZWfI\\Vx@M~@qDtGkErIj@lBaC|CmApBaClGsC`E}@~En@rDoFnEoBzIsA~DPdDcE|BaBjOuBbA^jB|CbKsCvEsCxEmFjGqKhIrC`IcMvCkHvB}BdCsBlEDzCeEpHeHtAm@h@gD`Fk@@yEv@kAj@gEf@QXNRlJd@d@t@eEzGcKxA}Rn@sBfCiCdBhBl@fClFxg@aF|d@b@rN}BhTg@nK\\jMyJzS_DdQqCdEJ`NmElNkKju@gIl^Rn@xBsAfDc@hKRz@lAbAtGxBx@lBaArAmE`ATpDnNpArK\\hPk@dIz@lEgAlKnAjHg@tEh@dKzHxTxABlEmEd@Jx@bDEvA_[jX_\\hd@kIrI_FbByGkA{ABoE`B{GdJqGnPyN|LyU|KeVx\\uSxRkH|DF|F_@wEcXvDqTvFwHlE}DbGiKxI}D~A}Hp@oLnGqIrBiKrJqIbBeJzD{UhBqD`AwIbGcH|IcUhUoA~@{A?cFfB{m@~k@kACcAeEsAcCyAaAsEaA",
+    "type": "Ride"
+  },
   "407526720": {
     "name": "Afternoon Ride",
     "total_elevation_gain": 105.0,
