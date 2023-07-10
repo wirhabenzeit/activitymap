@@ -11338,5 +11338,14 @@
     "start_date_local": "2023-07-09T10:37:30Z",
     "polyline": "ura`H{kfs@hDoGb@eEjAyAn@aEdDmCDaIbAcHKuA\\g@MgLf@gDvQ{YbFoCpI{GrFaLjCwAhCkC`CiHGkP~@uFfJaMtF{MnKgJrAwG?}BnDmCBeCfCeDuAiCbCgIn@oLaHY_DkAa@aGmA_Gb@cBsBmCIgBdAiIdCwAnGiIbBaGjFsGtMiKfKiVxBuKrG{PaGoOu@}Y}AmH?{H{@mHcB}EXiG~AwCBeEiAiHSgG|A{IjEmKF{Dt@_FfKwTxGyEjCq@~CrD`@oEl@uApHM`BmAtDsG|PyFxAwGv@\\UfI\\Xx@KhAcEnGeElFr@jBGjBaClBi@dDcDrDcB~FmBrFl@zEgGpL{CbCOvB\\~DsE~ByAzNsB`A\\tBbDzJqC`F}CrEgFjGwKjIrC|HqLrCeHbEkEpAy@vDLnDyEfHyGrAk@n@gD|Eq@AuEr@mAp@_Ef@Q^xJb@JdAiD`HuKpAaRj@uBhCuCfBjBr@lDzE`a@JpDcFne@h@xMiCpU_@tK\\hLeKxTqC`PyCxELxMmEpNsKfv@yHh]Xf@dC}ArC[fKT~@fA~@tGjCfApBwA~@_Ev@A\\h@|CvMvAnLZlOo@bJ`AzDgArKfAjGg@vFn@pK|HlTbAD|DsE`AQfAjFIv@gCzAiVlTmIhKsQ`XaJhJoF~AkFgAuBAiE~A{G`JiE`MmBtC}MbL{HfEsKfEoVh]gSlRoIjEf@nFWr@VmC[wBi@AcGpAm@MaNpB_TtF_IhEkDvFcKzIoEjByHn@kLrGwInBwKvJqIfBeLpEmTtAsCx@cHnEsInKkUlUyAfAcAGsEtAmItIuPpN{CzDoNnLqDyHuAoAaEgAwCA",
     "type": "Ride"
+  },
+  "9425653692": {
+    "name": "Abendschwimmen",
+    "total_elevation_gain": 0.0,
+    "distance": 883.9,
+    "elapsed_time": 1968,
+    "start_date_local": "2023-07-10T19:07:09Z",
+    "polyline": "em``Hqpds@dTcIwDhC",
+    "type": "Swim"
   }
 }
