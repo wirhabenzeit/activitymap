@@ -1,14 +1,41 @@
-from flask import escape, jsonify
-import os
-from shapely.geometry import LineString
+#from flask import escape, jsonify
+#import os
+#from shapely.geometry import LineString
 import functions_framework
-from stravalib.client import Client
-import json
+#from stravalib.client import Client
+#import json
 import pandas as pd
+import geopandas as gpd
 from shapely import wkt
 from firebase_admin import db, initialize_app, get_app
-from google.cloud import secretmanager
-import polyline
+#from google.cloud import secretmanager
+#import polyline
+
+
+@functions_framework.http
+def strava_json(request):
+    request_args = request.args
+    if request_args and 'athlete' in request_args:
+        athlete = request_args["athlete"]
+    else:
+        athlete = 6824046
+    try:
+        default_app = get_app()
+    except ValueError:
+        default_app = initialize_app()
+    ref = db.reference(url="https://stravamap-386413-default-rtdb.europe-west1.firebasedatabase.app")
+    df=pd.DataFrame.from_dict(ref.get(),orient="index")
+    df = df[df.athlete == int(athlete)]
+    df=df[df.geometry.notnull()]
+    df.loc[df.geometry.notnull(),"geometry"] = df[df.geometry.notnull()].geometry.apply(wkt.loads)
+    df["geometry"] = df.geometry.apply(lambda x: x.simplify(0.0005, preserve_topology=False))
+    df = df[df.geometry.apply(lambda x: len(x.coords)) > 0]
+    gdf = gpd.GeoDataFrame(df, geometry="geometry")
+    gdf["start_date_local"] = gdf["start_date_local"].apply(lambda x: pd.Timestamp(x).timestamp())
+    if request_args and 'columns' in request_args:
+        gdf = gdf[request_args["columns"].split(",")]
+    gdf["id"] = gdf.index
+    return gdf.__geo_interface__
 
 
 @functions_framework.http
