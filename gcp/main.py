@@ -2,13 +2,13 @@
 #import os
 #from shapely.geometry import LineString
 import functions_framework
-#from stravalib.client import Client
+from stravalib.client import Client
 #import json
 import pandas as pd
 import geopandas as gpd
 from shapely import wkt
 from firebase_admin import db, initialize_app, get_app
-#from google.cloud import secretmanager
+from google.cloud import secretmanager
 #import polyline
 
 
@@ -36,6 +36,38 @@ def strava_json(request):
         gdf = gdf[request_args["columns"].split(",")]
     gdf["id"] = gdf.index
     return gdf.__geo_interface__
+
+@functions_framework.http
+def strava_refresh(request):
+    request_args = request.args
+    if request_args and 'athlete' in request_args:
+        athlete = request_args["athlete"]
+    else:
+        athlete = 6824046
+    client = secretmanager.SecretManagerServiceClient()
+    s_client=Client()
+    client_id = client.access_secret_version(request={"name": "projects/stravamap-386413/secrets/strava_client_id/versions/latest"}).payload.data.decode("UTF-8")
+    client_secret = client.access_secret_version(request={"name": "projects/stravamap-386413/secrets/strava_client_secret/versions/latest"}).payload.data.decode("UTF-8")
+    old_rt = client.access_secret_version(request={"name": f"projects/stravamap-386413/secrets/strava_refresh_token_{athlete}/versions/latest"}).payload.data.decode("UTF-8")
+    newcred = s_client.refresh_access_token(client_id=client_id,client_secret=client_secret,refresh_token=old_rt)
+
+    response = client.add_secret_version(
+        request={
+            "parent": f"projects/stravamap-386413/secrets/strava_access_token_{athlete}",
+            "payload": {"data": newcred["access_token"].encode("UTF-8") },
+        }
+    )
+    response2 = client.add_secret_version(
+        request={
+            "parent": f"projects/stravamap-386413/secrets/strava_refresh_token_{athlete}",
+                "payload": {"data": newcred["refresh_token"].encode("UTF-8") },
+            }
+        )
+    oldrt=list(client.list_secret_versions(request={"parent": f"projects/stravamap-386413/secrets/strava_refresh_token_{athlete}"}))[1].name
+    response3 = client.destroy_secret_version(request={"name": oldrt})
+    oldat=list(client.list_secret_versions(request={"parent": f"projects/stravamap-386413/secrets/strava_access_token_{athlete}"}))[1].name
+    response4 = client.destroy_secret_version(request={"name": oldat})
+    return "Success"
 
 
 @functions_framework.http
