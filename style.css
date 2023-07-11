@@ -49,6 +49,10 @@ html, body {
     left: 3em;
   }
 
+  .mapboxgl-ctrl-group button {
+    color: black !important;
+  }
+
   #feature-table-container {
     max-height: 400px;
     overflow-y: scroll;
