@@ -27,7 +27,7 @@ export class ValueFilterControl {
             const button = document.createElement('button');
             button.id = key;
             button.classList.add('filter-label');
-            button.innerHTML = `<i class="${filter.icon}"></i>`;
+            button.innerHTML = `<i class="${filter.icon}" title="${key}"></i>`;
             container.appendChild(button);
             const sliderbox = document.createElement('div');
             sliderbox.classList.add('slider-box');

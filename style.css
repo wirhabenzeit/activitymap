@@ -88,7 +88,7 @@ html, body {
   .sortable thead tr {
     background-color:var(--highlight-color);
     color: #ffffff;
-    text-align: left;
+    text-align: center;
     position: sticky; 
     top: 0px; 
   }
@@ -221,7 +221,7 @@ html, body {
     }
     .slider-box {
       width: 240px;
-      transform: translate(60px,-20px);
+      transform: translate(50px,-20px);
       border-radius: 2px;
       background-color: #ffffff;
       opacity: 0.0;

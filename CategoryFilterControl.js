@@ -33,7 +33,7 @@ export class CategoryFilterControl {
         Object.entries(this.sportsCategories).forEach(([key, value]) => {
             const button = document.createElement('button');
             button.id = key;
-            button.innerHTML = `<i class="${value.icon}"></i>`;
+            button.innerHTML = `<i class="${value.icon}" title=${key}></i>`;
             if (!value.active) {
                 button.classList.add('category-not-active');
             }

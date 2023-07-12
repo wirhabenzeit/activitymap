@@ -4,7 +4,6 @@ import "@fortawesome/fontawesome-free/css/solid.min.css";
 import "@fortawesome/fontawesome-free/css/brands.min.css";
 import 'sortable-tablesort/sortable.min.js'
 import mapboxgl, { FullscreenControl, GeolocateControl, NavigationControl } from 'mapbox-gl'; // 
-//import { MapboxExportControl, Size, PageOrientation, Format, DPI} from "@watergis/mapbox-gl-export";
 import { LayerSwitcherControl } from './LayerSwitcherControl';
 import { CategoryFilterControl } from './CategoryFilterControl';
 import { SelectionControl } from './SelectionControl';
@@ -18,9 +17,6 @@ if (athlete === null) {
   athlete = "6824046";
 }
 const url = `./strava_${athlete}.json`;
-
-//import ac from './activityConfig.json' assert {type: 'json'};
-//const activityFilters = ac.activityFilters;
 
 const layerSwitcherControl = new LayerSwitcherControl({
     "Mapbox Street": {url: 'mapbox://styles/mapbox/streets-v12?optimize=true', type: "vector", visible: true, overlay: false},
@@ -74,15 +70,15 @@ const featureTable = new FeatureTable({
         "body": (feature) => `<a href='https://www.strava.com/activities/${feature.id}' style='color:${categoryFilterControl.colorMap[feature.properties["type"]]}'>${feature.properties['name']}</a>`
     },
     "total_elevation_gain": {
-        "title": '<i class="fa-solid fa-up-down"></i>',
+        "title": '<i class="fa-solid fa-ruler-vertical"></i>',
         "body": (feature) => feature.properties['total_elevation_gain'].toFixed(0)
     },
     "distance": {
-        "title": '<i class="fa-solid fa-left-right"></i>',
+        "title": '<i class="fa-solid fa-ruler-horizontal"></i>',
         "body": (feature) => (feature.properties['distance']/1000).toFixed(1)
     },
     "elapsed_time": {
-        "title": '<i class="fa-solid fa-clock"></i>',
+        "title": '<i class="fa-solid fa-stopwatch"></i>',
         "body": (feature) => new Date(feature.properties['elapsed_time']*1000).toISOString().substr(11, 8)
     },
     "start_date_local": {
@@ -119,7 +115,6 @@ const valueFilterSettings = {
 const selectionControl = new SelectionControl(["routeLayer","routeLayerSelected"],"strava",featureTable.update);
 const geolocateControl = new GeolocateControl({positionOptions: {enableHighAccuracy: true},trackUserLocation: true,showUserHeading: true})
 const downloadControl = new DownloadControl()
-//const exportControl = new MapboxExportControl({PageSize: Size.A3,PageOrientation: PageOrientation.Portrait,Format: Format.PDF,DPI: DPI[300],Crosshair: false,PrintableArea: true})
 
 var filterController = new FilterController();
 filterController.addFilter("categoryActive",categoryFilterControl);
@@ -130,7 +125,6 @@ document.body.style.setProperty('--highlight-color', highlightColor);
 
 mapboxgl.accessToken = 'pk.eyJ1Ijoid2lyaGFiZW56ZWl0IiwiYSI6ImNrNHJrd3FidTByajkzbnA0anltbXVzcjIifQ.I2ThzlzjoJZ4KryOw2nbow';
 
-//Object.defineProperty(window, 'devicePixelRatio', { get: function() {return 300 / 96}});
 
 const map = new mapboxgl.Map({
     container: 'map',
@@ -145,7 +139,6 @@ map.addControl(new NavigationControl(), 'top-left');
 map.addControl(geolocateControl,"top-left");
 map.addControl(layerSwitcherControl, 'top-left');
 map.addControl(new FullscreenControl(), 'top-left');
-//map.addControl(exportControl, 'top-left');
 map.addControl(downloadControl, 'top-left');
 
 map.on('load', () => {

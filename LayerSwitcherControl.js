@@ -36,7 +36,7 @@ export class LayerSwitcherControl {
         
         const button = document.createElement('button');
         button.id = "layer-switcher-button";
-        button.innerHTML = '<i class="fa-solid fa-layer-group"></i>';
+        button.innerHTML = '<i class="fa-solid fa-layer-group" title="Open layer selection"></i>';
         
         const button3d = document.createElement('button');
         button3d.innerHTML = "3D";//'<i class="fa-solid fa-mountain-sun"></i>';
