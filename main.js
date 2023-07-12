@@ -123,7 +123,7 @@ filterController.addFilter("selected",selectionControl);
 const highlightColor = "#3298FD";
 document.body.style.setProperty('--highlight-color', highlightColor);
 
-mapboxgl.accessToken = 'pk.eyJ1Ijoid2lyaGFiZW56ZWl0IiwiYSI6ImNrNHJrd3FidTByajkzbnA0anltbXVzcjIifQ.I2ThzlzjoJZ4KryOw2nbow';
+mapboxgl.accessToken = 'pk.eyJ1Ijoid2lyaGFiZW56ZWl0IiwiYSI6ImNsanpzYW5uYjAycHozcG4zYjAxaWRmcHcifQ._kspcd24UylBUYfCR3odHg';
 
 
 const map = new mapboxgl.Map({
