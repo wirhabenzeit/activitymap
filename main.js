@@ -3,14 +3,15 @@ import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
 import "@fortawesome/fontawesome-free/css/solid.min.css";
 import "@fortawesome/fontawesome-free/css/brands.min.css";
 import 'sortable-tablesort/sortable.min.js'
-import mapboxgl, { FullscreenControl, GeolocateControl, NavigationControl } from 'mapbox-gl'; // or "const mapboxgl = require('mapbox-gl');"
-import { MapboxExportControl, Size, PageOrientation, Format, DPI} from "@watergis/mapbox-gl-export";
+import mapboxgl, { FullscreenControl, GeolocateControl, NavigationControl } from 'mapbox-gl'; // 
+//import { MapboxExportControl, Size, PageOrientation, Format, DPI} from "@watergis/mapbox-gl-export";
 import { LayerSwitcherControl } from './LayerSwitcherControl';
 import { CategoryFilterControl } from './CategoryFilterControl';
 import { SelectionControl } from './SelectionControl';
 import { FeatureTable } from './FeatureTable';
 import { FilterController } from './FilterController';
 import { ValueFilterControl } from './ValueFilterControl';
+import { DownloadControl } from './DownloadControl';
 
 var athlete = new URL(window.location.href).searchParams.get("athlete");
 if (athlete === null) {
@@ -22,11 +23,11 @@ const url = `./strava_${athlete}.json`;
 //const activityFilters = ac.activityFilters;
 
 const layerSwitcherControl = new LayerSwitcherControl({
-    "Mapbox Street": {url: 'mapbox://styles/mapbox/streets-v12', type: "vector", visible: true, overlay: false},
-    "Mapbox Outdoors": {url: 'mapbox://styles/mapbox/outdoors-v12', type: "vector", visible: false, overlay: false},
-    "Mapbox Light": {url: 'mapbox://styles/mapbox/light-v11', type: "vector", visible: false, overlay: false},
-    "Mapbox Dark": {url: 'mapbox://styles/mapbox/dark-v11', type: "vector", visible: false, overlay: false},
-    "Mapbox Satellite": {url: 'mapbox://styles/mapbox/satellite-v9', type: "vector", visible: false, overlay: false},
+    "Mapbox Street": {url: 'mapbox://styles/mapbox/streets-v12?optimize=true', type: "vector", visible: true, overlay: false},
+    "Mapbox Outdoors": {url: 'mapbox://styles/mapbox/outdoors-v12?optimize=true', type: "vector", visible: false, overlay: false},
+    "Mapbox Light": {url: 'mapbox://styles/mapbox/light-v11?optimize=true', type: "vector", visible: false, overlay: false},
+    "Mapbox Dark": {url: 'mapbox://styles/mapbox/dark-v11?optimize=true', type: "vector", visible: false, overlay: false},
+    "Mapbox Satellite": {url: 'mapbox://styles/mapbox/satellite-v9?optimize=true', type: "vector", visible: false, overlay: false},
     "Swisstopo Light": {url: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.leichte-basiskarte.vt/style.json", type: "vector", visible: false, overlay: false},
     "Swisstopo Pixelkarte": {url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg`, type: "raster", visible: false, overlay: false},
     "Swisstopo Winter": {url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe-winter/default/current/3857/{z}/{x}/{y}.jpeg`, type: "raster", visible: false, overlay: false},
@@ -117,7 +118,8 @@ const valueFilterSettings = {
 };
 const selectionControl = new SelectionControl(["routeLayer","routeLayerSelected"],"strava",featureTable.update);
 const geolocateControl = new GeolocateControl({positionOptions: {enableHighAccuracy: true},trackUserLocation: true,showUserHeading: true})
-const exportControl = new MapboxExportControl({PageSize: Size.A3,PageOrientation: PageOrientation.Portrait,Format: Format.PDF,DPI: DPI[300],Crosshair: false,PrintableArea: true})
+const downloadControl = new DownloadControl()
+//const exportControl = new MapboxExportControl({PageSize: Size.A3,PageOrientation: PageOrientation.Portrait,Format: Format.PDF,DPI: DPI[300],Crosshair: false,PrintableArea: true})
 
 var filterController = new FilterController();
 filterController.addFilter("categoryActive",categoryFilterControl);
@@ -128,10 +130,13 @@ document.body.style.setProperty('--highlight-color', highlightColor);
 
 mapboxgl.accessToken = 'pk.eyJ1Ijoid2lyaGFiZW56ZWl0IiwiYSI6ImNrNHJrd3FidTByajkzbnA0anltbXVzcjIifQ.I2ThzlzjoJZ4KryOw2nbow';
 
+//Object.defineProperty(window, 'devicePixelRatio', { get: function() {return 300 / 96}});
+
 const map = new mapboxgl.Map({
     container: 'map',
     zoom: 9,
-    center: [8,47]
+    center: [8,47],
+    preserveDrawingBuffer: true
 });
 
 var stravaData = {};
@@ -140,8 +145,8 @@ map.addControl(new NavigationControl(), 'top-left');
 map.addControl(geolocateControl,"top-left");
 map.addControl(layerSwitcherControl, 'top-left');
 map.addControl(new FullscreenControl(), 'top-left');
-map.addControl(exportControl, 'top-left');
-
+//map.addControl(exportControl, 'top-left');
+map.addControl(downloadControl, 'top-left');
 
 map.on('load', () => {
     fetchStrava();
