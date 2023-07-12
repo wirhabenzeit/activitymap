@@ -69,23 +69,23 @@ const categoryFilterControl = new CategoryFilterControl({
 });
 const featureTable = new FeatureTable({
     "name": {
-        "title": "TOUR",
+        "title": '<i class="fa-solid fa-route"></i>',
         "body": (feature) => `<a href='https://www.strava.com/activities/${feature.id}' style='color:${categoryFilterControl.colorMap[feature.properties["type"]]}'>${feature.properties['name']}</a>`
     },
     "total_elevation_gain": {
-        "title": "ELEV",
+        "title": '<i class="fa-solid fa-up-down"></i>',
         "body": (feature) => feature.properties['total_elevation_gain'].toFixed(0)
     },
     "distance": {
-        "title": "DIST",
+        "title": '<i class="fa-solid fa-left-right"></i>',
         "body": (feature) => (feature.properties['distance']/1000).toFixed(1)
     },
     "elapsed_time": {
-        "title": "TIME",
+        "title": '<i class="fa-solid fa-clock"></i>',
         "body": (feature) => new Date(feature.properties['elapsed_time']*1000).toISOString().substr(11, 8)
     },
     "start_date_local": {
-        "title": "DATE",
+        "title": '<i class="fa-solid fa-calendar-days"></i>',
         "body": (feature) => new Date(feature.properties['start_date_local']*1000).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}),
     }
 });

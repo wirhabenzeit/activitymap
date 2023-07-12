@@ -30,15 +30,16 @@ export class LayerSwitcherControl {
     onAdd(map) {
         this._map = map;
         this._container = document.createElement('div');
-        this._container.id = 'layer-switcher-container';
-        const label = document.createElement('div');
-        label.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
-        label.id = "layer-switcher";
+        //this._container.id = 'layer-switcher-container';
+        this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+        this._container.id = "layer-switcher";
+        
         const button = document.createElement('button');
         button.id = "layer-switcher-button";
         button.innerHTML = '<i class="fa-solid fa-layer-group"></i>';
+        
         const button3d = document.createElement('button');
-        button3d.innerHTML = '<i class="fa-solid fa-mountain-sun"></i>';
+        button3d.innerHTML = "3D";//'<i class="fa-solid fa-mountain-sun"></i>';
         if (this.threeDim) {
             button3d.classList.add('layer-switcher-3d-active');
         }
@@ -47,17 +48,17 @@ export class LayerSwitcherControl {
             this.toggleTerrain();
         };
 
-        label.appendChild(button);
-        label.appendChild(button3d);
-        this._container.appendChild(label);
+        
         const content = document.createElement('div');
         content.id = 'layer-switcher-content';
         content.appendChild(this.layerTable(this.backgroundMaps,false));
         content.appendChild(this.layerTable(this.overlayMaps,true));
-        this._container.appendChild(content);
 
         this.setMap(this.backgroundMaps[this.currentMap]);
-        
+        this._container.appendChild(button);
+        this._container.appendChild(content);
+        this._container.appendChild(button3d);
+
         return this._container;
     }
     
