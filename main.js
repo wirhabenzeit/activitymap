@@ -67,7 +67,7 @@ const categoryFilterControl = new CategoryFilterControl({
     "Misc": {
         "color": "#6A4C93",
         "icon": "fa-solid fa-person-circle-question",
-        "alias": [],
+        "alias": [], 
         "active": true
     }
 });
