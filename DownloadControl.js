@@ -22,7 +22,7 @@ export class DownloadControl {
             button.style.cursor = 'wait';
             var actualPixelRatio = window.devicePixelRatio;
             Object.defineProperty(window, 'devicePixelRatio', {
-                get: function() {return 300 / 96;}
+                get: function() {return 450 / 96;}
             });
             console.log(`Pixel ratio changed from ${actualPixelRatio} to ${window.devicePixelRatio}`);
             var hidden = document.createElement('div');
@@ -62,9 +62,6 @@ export class DownloadControl {
                     get: function() {return actualPixelRatio}
                 });
                 button.style.cursor = "pointer";
-                /*const png = document.getElementsByTagName("canvas")[0].toBlob(function(blob) {
-                    FileSaver.saveAs(blob, 'map.jpg');
-                }, "image/jpeg", 0.8);*/
             });
         };
         

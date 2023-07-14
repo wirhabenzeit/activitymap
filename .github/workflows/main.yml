@@ -1,4 +1,4 @@
-name: Pull and clean data
+name: Refresh Token
 
 on:
   push:
@@ -31,10 +31,7 @@ jobs:
         sudo apt-get install -y jq
     - name: Pull data
       run: |
-        curl "https://us-central1-stravamap-386413.cloudfunctions.net/strava_json?athlete=6824046&columns=name,total_elevation_gain,distance,elapsed_time,start_date_local,geometry,type" --output public/strava_6824046.json
-        curl "https://us-central1-stravamap-386413.cloudfunctions.net/strava_refresh?athlete=6824046"
-        curl "https://us-central1-stravamap-386413.cloudfunctions.net/strava_json?athlete=11979218&columns=name,total_elevation_gain,distance,elapsed_time,start_date_local,geometry,type" --output public/strava_11979218.json
-        curl "https://us-central1-stravamap-386413.cloudfunctions.net/strava_refresh?athlete=11979218"
+        curl "https://yvkdmnzwrhvjckzyznwu.supabase.co/functions/v1/strava-refresh"
     - name: Update Github pages
       run: |
         npm install

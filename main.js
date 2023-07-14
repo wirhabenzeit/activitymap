@@ -11,17 +11,24 @@ import { FeatureTable } from './FeatureTable';
 import { FilterController } from './FilterController';
 import { ValueFilterControl } from './ValueFilterControl';
 import { DownloadControl } from './DownloadControl';
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = 'https://yvkdmnzwrhvjckzyznwu.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2a2Rtbnp3cmh2amNrenl6bnd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODkzMTY4NjEsImV4cCI6MjAwNDg5Mjg2MX0.dTJIcC50-lwOTXHNsJ7fr4LVund8cI4LLQkJmED60BY'
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 var athlete = new URL(window.location.href).searchParams.get("athlete");
 if (athlete === null) {
-  athlete = "6824046";
+  athlete = 6824046;
 }
 const url = `./strava_${athlete}.json`;
+
 
 const layerSwitcherControl = new LayerSwitcherControl({
     "Mapbox Street": {url: 'mapbox://styles/mapbox/streets-v12?optimize=true', type: "vector", visible: true, overlay: false},
     "Mapbox Outdoors": {url: 'mapbox://styles/mapbox/outdoors-v12?optimize=true', type: "vector", visible: false, overlay: false},
     "Mapbox Light": {url: 'mapbox://styles/mapbox/light-v11?optimize=true', type: "vector", visible: false, overlay: false},
+    "Mapbox Topolight": {url: "mapbox://styles/wirhabenzeit/clk0tpduc00ab01qyguzi09gv", type: "vector", visible: false, overlay: false},
     "Mapbox Dark": {url: 'mapbox://styles/mapbox/dark-v11?optimize=true', type: "vector", visible: false, overlay: false},
     "Mapbox Satellite": {url: 'mapbox://styles/mapbox/satellite-v9?optimize=true', type: "vector", visible: false, overlay: false},
     "Swisstopo Light": {url: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.leichte-basiskarte.vt/style.json", type: "vector", visible: false, overlay: false},
@@ -64,7 +71,7 @@ const categoryFilterControl = new CategoryFilterControl({
         "active": true
     }
 });
-const featureTable = new FeatureTable({
+const featureTableSettings = {
     "name": {
         "title": '<i class="fa-solid fa-route"></i>',
         "body": (feature) => `<a href='https://www.strava.com/activities/${feature.id}' style='color:${categoryFilterControl.colorMap[feature.properties["type"]]}'>${feature.properties['name']}</a>`
@@ -85,7 +92,8 @@ const featureTable = new FeatureTable({
         "title": '<i class="fa-solid fa-calendar-days"></i>',
         "body": (feature) => new Date(feature.properties['start_date_local']*1000).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}),
     }
-});
+};
+const featureTable = new FeatureTable(featureTableSettings);
 const valueFilterSettings = {
     "start_date_local": {
         "icon": "fa-solid fa-calendar-days",
@@ -153,9 +161,49 @@ map.on('mouseleave', 'routeLayer', (event) => {
     map.getCanvas().style.cursor = '';
 });
 
+async function fetchSupabase(requiredFields, range) {
+    const { data, error } = await supabase.from('strava-activities').select(Array.from(requiredFields).join(',')).eq('athlete',athlete).range(...range);
+
+    data.forEach((feature) => {
+        const properties = {};
+        Object.entries(feature).forEach(([key,value]) => {
+            if (key != "geometry") {
+                properties[key] = value;
+            }
+            if (key != "geometry" && key != "id") {
+                delete feature[key];
+            }
+        });
+        feature.type = "Feature";
+        feature.properties = properties;
+    });
+    
+    return data;
+}
+
+
 async function fetchStrava() {
-    const response = await fetch(url);
-    stravaData = await response.json();
+    var requiredFields = new Set(["id","athlete","type","geometry:geometry_simplified"]);
+    Object.keys(valueFilterSettings).forEach((key) => {
+        requiredFields.add(key);
+    });
+    Object.keys(featureTableSettings).forEach((key) => {
+        requiredFields.add(key);
+    });
+    if (requiredFields.has("start_date_local")) {
+        requiredFields.add("start_date_local:start_date_local_timestamp");
+        requiredFields.delete("start_date_local");
+    }
+    const { nodata, counterror, count, status} = await supabase.from('strava-activities').select('*', { count: 'exact', head: true }).eq('athlete',athlete);
+    
+    const pageSize = 1000;
+    const numPages = Math.ceil(count / pageSize);
+    const ranges = Array.from({ length: numPages }, (_, i) => [i * pageSize, (i + 1) * pageSize]);
+    const promises = ranges.map((range) => fetchSupabase(requiredFields, range));
+    const results = await Promise.all(promises);
+    
+    stravaData = {"type":"FeatureCollection", "features": results.flat()};
+    
     map.addControl(categoryFilterControl, 'top-right');
     const valueFilterControl = new ValueFilterControl(valueFilterSettings,stravaData);
     filterController.addFilter("valueInRange",valueFilterControl);
