@@ -1,4 +1,4 @@
-name: Refresh Token
+name: Build pages
 
 on:
   push:
@@ -9,8 +9,6 @@ on:
   pull_request:
     branches:
       - main
-  schedule:
-    - cron: '0 */3 * * *'
 
 permissions:
   contents: write
@@ -19,30 +17,15 @@ permissions:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - name: Setup jq
-      run: |
-        sudo apt-get install -y jq
-    - name: Pull data
-      run: |
-        curl "https://yvkdmnzwrhvjckzyznwu.supabase.co/functions/v1/strava-refresh"
     - name: Update Github pages
       run: |
         npm install
         npm run build
-    - name: Commit new json file
-      run: |
-        git config --global user.name "wirhabenzeit"
-        git config --global user.email "dschroeder@ethz.ch"
-        git add dist*
-        git commit -m "Updating activities_geo.json" || echo "No changes to commit"
-        git push
     - name: Setup Pages
       uses: actions/configure-pages@v3
     - name: Upload artifact
