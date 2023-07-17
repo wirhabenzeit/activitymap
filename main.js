@@ -3,7 +3,10 @@ import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
 import "@fortawesome/fontawesome-free/css/solid.min.css";
 import "@fortawesome/fontawesome-free/css/brands.min.css";
 import 'sortable-tablesort/sortable.min.js'
-import mapboxgl, { FullscreenControl, GeolocateControl, NavigationControl } from 'mapbox-gl'; // 
+import mapboxgl, { FullscreenControl, GeolocateControl, NavigationControl } from 'mapbox-gl'; 
+import FileSaver from 'file-saver';
+import { createClient } from '@supabase/supabase-js'
+
 import { LayerSwitcherControl } from './LayerSwitcherControl';
 import { CategoryFilterControl } from './CategoryFilterControl';
 import { SelectionControl } from './SelectionControl';
@@ -11,7 +14,6 @@ import { FeatureTable } from './FeatureTable';
 import { FilterController } from './FilterController';
 import { ValueFilterControl } from './ValueFilterControl';
 import { DownloadControl } from './DownloadControl';
-import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://yvkdmnzwrhvjckzyznwu.supabase.co'
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2a2Rtbnp3cmh2amNrenl6bnd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODkzMTY4NjEsImV4cCI6MjAwNDg5Mjg2MX0.dTJIcC50-lwOTXHNsJ7fr4LVund8cI4LLQkJmED60BY'
@@ -21,8 +23,6 @@ var athlete = new URL(window.location.href).searchParams.get("athlete");
 if (athlete === null) {
   athlete = 6824046;
 }
-const url = `./strava_${athlete}.json`;
-
 
 const layerSwitcherControl = new LayerSwitcherControl({
     "Mapbox Street": {url: 'mapbox://styles/mapbox/streets-v12?optimize=true', type: "vector", visible: true, overlay: false},

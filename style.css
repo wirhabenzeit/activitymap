@@ -1,7 +1,6 @@
 @charset "UTF-8";
 @import "node_modules/nouislider/dist/nouislider.min.css";
 @import 'mapbox-gl/dist/mapbox-gl.css';
-@import '@watergis/mapbox-gl-export/css/styles.css';
 
 
 html, body {
