@@ -5,6 +5,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { decode, encode } from "https://esm.sh/@googlemaps/polyline-codec";
+import {default as simplify} from 'https://esm.sh/simplify-js';
 
 function simplify_activity(activity) {
   console.log(activity);
@@ -16,12 +17,19 @@ function simplify_activity(activity) {
   simplified_activity['start_date_local_timestamp'] = Math.round(new Date(activity['start_date_local']).getTime()/1000)
   simplified_activity['athlete'] = activity['athlete']['id']
   if ('map' in activity) {
-    var coordinates = ("polyline" in activity['map']) ? decode(activity['map']['polyline'],5) : decode(activity['map']['summary_polyline'],5)
-    coordinates = coordinates.map((coordinate: number[]) => [coordinate[1], coordinate[0]])
-    simplified_activity['geometry'] = {type: "LineString", coordinates: coordinates}
-    var coordinates = decode(activity['map']['summary_polyline'],5)
-    coordinates = coordinates.map((coordinate: number[]) => [coordinate[1], coordinate[0]])
-    simplified_activity['geometry_simplified'] = {type: "LineString", coordinates: coordinates}
+    if ("polyline" in activity['map']) {
+      var coordinates = decode(activity['map']['polyline'],5)
+      coordinates = coordinates.map((coordinate: number[]) => [coordinate[1], coordinate[0]])
+      simplified_activity['geometry'] = {type: "LineString", coordinates: coordinates}
+      var coordinates_dict = coordinates.map((coordinate: number[]) => {return {x: coordinate[0], y: coordinate[1]}})
+      var simplified_coordinates = simplify(coordinates_dict, 0.0001, true)
+      simplified_activity['geometry_simplified'] = {type: "LineString", coordinates: simplified_coordinates.map((coordinate: {x: number, y: number}) => [coordinate.x, coordinate.y])}
+    }
+    else {
+      var coordinates = decode(activity['map']['summary_polyline'],5)
+      coordinates = coordinates.map((coordinate: number[]) => [coordinate[1], coordinate[0]])
+      simplified_activity['geometry_simplified'] = {type: "LineString", coordinates: coordinates}
+    }
   }
   return simplified_activity
 }
