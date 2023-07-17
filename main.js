@@ -25,6 +25,7 @@ if (athlete === null) {
 
 const layerSwitcherControl = new LayerSwitcherControl({
     "Mapbox Street": {url: 'mapbox://styles/mapbox/streets-v12?optimize=true', type: "vector", visible: true, overlay: false},
+    "Mapbox Street 3D": {url: 'mapbox://styles/wirhabenzeit/clk6y6c1q00lk01pe8fqs0urn', type: "vector", visible: false, overlay: false},
     "Mapbox Outdoors": {url: 'mapbox://styles/mapbox/outdoors-v12?optimize=true', type: "vector", visible: false, overlay: false},
     "Mapbox Light": {url: 'mapbox://styles/mapbox/light-v11?optimize=true', type: "vector", visible: false, overlay: false},
     "Mapbox Topolight": {url: "mapbox://styles/wirhabenzeit/clk0tpduc00ab01qyguzi09gv", type: "vector", visible: false, overlay: false},

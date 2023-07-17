@@ -1,3 +1,10 @@
 node_modules
 .DS_Store
 supabase/*
+*.ipynb
+*.py
+*.code-workspace
+.vscode
+.env
+*.sql
+db.dump
