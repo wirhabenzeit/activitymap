@@ -26,8 +26,8 @@ jobs:
       run: |
         npm install
         npm run build
-        git config --global user.name "${{ env.CI_COMMIT_AUTHOR }}"
         git config --global user.email "dschroeder@ethz.ch"
+        git config --global user.name "Dominik Schröder"
         git add dist
         git commit -m "$Updated dist"
         git push
