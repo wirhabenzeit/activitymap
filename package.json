@@ -1,6 +1,6 @@
 {
   "name": "strava_map",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "homepage": "https://wirhabenzeit.github.io/stravamap",
   "scripts": {
     "start": "vite",
@@ -17,7 +17,6 @@
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.4.0",
     "@supabase/supabase-js": "^2.26.0",
-    "@watergis/mapbox-gl-export": "^2.0.0",
     "FileSaver": "^0.10.0",
     "mapbox-gl": "^2.15.0",
     "nouislider": "^15.7.0",

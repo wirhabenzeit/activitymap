@@ -1,9 +1,0 @@
-# An example requirements file, add your dependencies below
-sampleproject==2.0.0
-stravalib==1.3.3
-shapely==2.0.1
-firebase-admin==6.0.0
-pandas==2.0.0
-geopandas==0.13.0
-google-cloud-secret-manager==2.16.1
-polyline==2.0.0
