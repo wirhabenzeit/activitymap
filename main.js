@@ -4,7 +4,6 @@ import "@fortawesome/fontawesome-free/css/solid.min.css";
 import "@fortawesome/fontawesome-free/css/brands.min.css";
 import 'sortable-tablesort/sortable.min.js'
 import mapboxgl, { FullscreenControl, GeolocateControl, NavigationControl } from 'mapbox-gl'; 
-import FileSaver from 'file-saver';
 import { createClient } from '@supabase/supabase-js'
 
 import { LayerSwitcherControl } from './LayerSwitcherControl';
