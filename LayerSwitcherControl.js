@@ -8,16 +8,22 @@ export class LayerSwitcherControl {
         this.overlayMaps = {};
         this.currentMap; 
         this._map;
-        this.currentRasterMapName;
-        this.currentVectorMapName;
-        this.currentMapType;
         this.currentOverlayMaps = [];
-        this.threeDim = false;
+        const url = new URL(window.location);
+        this.threeDim = url.searchParams.has("3D") ? url.searchParams.get("3D") === "true" : false;
+
+        if (url.searchParams.has("maps")) {
+            const mapNames = url.searchParams.get("maps").split(",");
+            Object.entries(maps).forEach(([key, value]) => {
+                value.visible = mapNames.includes(key);
+            });
+        }
 
         Object.entries(maps).forEach(([key, value]) => {
             value.name = key;
             if (value.overlay) {
                 this.overlayMaps[key] = value;
+                if (value.visible) this.currentOverlayMaps.push(key);
             } else {
                 this.backgroundMaps[key] = value;
                 if (value.visible) {
@@ -30,7 +36,6 @@ export class LayerSwitcherControl {
     onAdd(map) {
         this._map = map;
         this._container = document.createElement('div');
-        //this._container.id = 'layer-switcher-container';
         this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
         this._container.id = "layer-switcher";
         
@@ -39,9 +44,10 @@ export class LayerSwitcherControl {
         button.innerHTML = '<i class="fa-solid fa-layer-group" title="Open layer selection"></i>';
         
         const button3d = document.createElement('button');
-        button3d.innerHTML = "3D";//'<i class="fa-solid fa-mountain-sun"></i>';
+        button3d.innerHTML = "3D";
         if (this.threeDim) {
             button3d.classList.add('layer-switcher-3d-active');
+            this.toggleTerrain();
         }
         button3d.onclick = () => {
             button3d.classList.toggle('layer-switcher-3d-active');
@@ -89,13 +95,8 @@ export class LayerSwitcherControl {
     
     async setMap(mapData) {
         if (mapData.type === "vector") {
-            if (this.currentMapType === "raster") {
-                this._map.removeLayer(this.currentRasterMapName);
-                this._map.removeSource(this.currentRasterMapName);
-            }
-            if (this.currentVectorMapName != mapData.name) {
-                this._map.setStyle(mapData.url);
-                this._map.once("styledata", () => {
+            this._map.setStyle(mapData.url);
+                this._map.once("style.load", () => {
                     this.onStyleChange();
                     if (this.threeDim) {
                         this.threeDim = false;
@@ -103,30 +104,24 @@ export class LayerSwitcherControl {
                     }
                     this.addOverlayMaps();
                 });
-                this.previousVectorMap = mapData.name;
-                this.currentMapType = "vector";
-            }
         }
         else {
-            if (this.currentMapType === "raster") {
-                this._map.removeLayer(this.currentRasterMapName);
-                this._map.removeSource(this.currentRasterMapName);
-            }
-            const firstOverlay = this.currentOverlayMaps.length > 0 ? this.currentOverlayMaps[0] : "routeLayer";
+            this._map.setStyle(undefined);
             this._map.addSource(mapData.name, {
                 type: 'raster',
                 tiles: [mapData.url],
                 tileSize: 256
             });
-            this._map.addLayer({
+            const layerData = {
                 id: mapData.name,
                 type: 'raster',
                 source: mapData.name
-            },
-            firstOverlay);
-            this.currentMapType = "raster";
-            this.currentRasterMapName = mapData.name;
+            };
+            this._map.addLayer(layerData);
+            this.onStyleChange();
+            this.addOverlayMaps();
         }
+        this.currentMap = mapData.name;
     }
 
     async addOverlayMap(mapData) {
@@ -135,15 +130,23 @@ export class LayerSwitcherControl {
             tiles: [mapData.url],
             tileSize: 256
         });
-        this._map.addLayer({
+        const overlayData = {
             id: mapData.name,
             type: 'raster',
             source: mapData.name,
             paint: {
                 'raster-opacity': mapData.opacity
             }
-        },
-        "routeLayer");
+        };
+        if (this._map.getLayer("routeLayer")) this._map.addLayer(overlayData,"routeLayer");
+        else this._map.addLayer(overlayData);
+    }
+
+    updateUrl() {
+        const url = new URL(window.location);
+        url.searchParams.set("maps", this.currentOverlayMaps.concat([this.currentMap]).join(","));
+        url.searchParams.set("3D", this.threeDim);
+        window.history.replaceState({}, "", url);
     }
 
     async addOverlayMaps() {
@@ -188,6 +191,7 @@ export class LayerSwitcherControl {
                         this.currentOverlayMaps.push(key);
                     }
                 }
+                this.updateUrl();
             };
             content.appendChild(mapButton);
         });

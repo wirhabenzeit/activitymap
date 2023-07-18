@@ -18,10 +18,8 @@ const supabaseUrl = 'https://yvkdmnzwrhvjckzyznwu.supabase.co'
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2a2Rtbnp3cmh2amNrenl6bnd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODkzMTY4NjEsImV4cCI6MjAwNDg5Mjg2MX0.dTJIcC50-lwOTXHNsJ7fr4LVund8cI4LLQkJmED60BY'
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-var athlete = new URL(window.location.href).searchParams.get("athlete");
-if (athlete === null) {
-  athlete = 6824046;
-}
+const urlParams = new URLSearchParams(window.location.search);
+const athlete = urlParams.has("athlete") ? urlParams.get("athlete") : 6824046;
 
 const layerSwitcherControl = new LayerSwitcherControl({
     "Mapbox Street": {url: 'mapbox://styles/mapbox/streets-v12?optimize=true', type: "vector", visible: true, overlay: false},
@@ -133,12 +131,16 @@ document.body.style.setProperty('--highlight-color', highlightColor);
 
 mapboxgl.accessToken = 'pk.eyJ1Ijoid2lyaGFiZW56ZWl0IiwiYSI6ImNsanpzYW5uYjAycHozcG4zYjAxaWRmcHcifQ._kspcd24UylBUYfCR3odHg';
 
-
+const zoom = urlParams.has("zoom") ? urlParams.get("zoom") : 9;
+const center = urlParams.has("center") ? urlParams.get("center").split(",").map((coord) => parseFloat(coord)) : [8,47];
+const pitch = urlParams.has("pitch") ? urlParams.get("pitch") : 0;
+const bearing = urlParams.has("bearing") ? urlParams.get("bearing") : 0;
 const map = new mapboxgl.Map({
     container: 'map',
-    zoom: 9,
-    center: [8,47],
-    preserveDrawingBuffer: true
+    zoom: zoom,
+    center: center,
+    pitch: pitch,
+    bearing: bearing
 });
 
 var stravaData = {};
@@ -148,6 +150,19 @@ map.addControl(geolocateControl,"top-left");
 map.addControl(layerSwitcherControl, 'top-left');
 map.addControl(new FullscreenControl(), 'top-left');
 map.addControl(downloadControl, 'top-left');
+
+map.on('moveend', () => {
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+    const pitch = map.getPitch();
+    const bearing = map.getBearing();
+    const url = new URL(window.location.href);
+    url.searchParams.set("center",`${center.lng},${center.lat}`);
+    url.searchParams.set("zoom",zoom);
+    url.searchParams.set("pitch",pitch);
+    url.searchParams.set("bearing",bearing);
+    window.history.replaceState({}, '', url);
+});
 
 map.on('load', () => {
     fetchStrava();
