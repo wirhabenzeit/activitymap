@@ -15,7 +15,15 @@ if (url.searchParams.has("code")) {
     .then(data => {
         if (data.athlete) {
             document.cookie = `athlete=${data.athlete}; max-age=${24*60*60*30}; path=/;`;
-            window.location.href = "/index.html";
+            window.location.href = "/";
+        }
+        else if (data.id) {
+            var url = new URL("/manage.html");
+            url.search = new URLSearchParams(data);
+            window.location.href = url.toString();
+        }
+        else {
+            document.getElementById("error").innerHTML = JSON.stringify(data);
         }
     });
 }

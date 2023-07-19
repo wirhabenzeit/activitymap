@@ -23,8 +23,9 @@ serve(async (req: Request) => {
     }});
     const { data, error } = await supabaseClient.from("strava-athletes").select("*").eq("id", json["athlete"]["id"])
     if (data.length == 0) {
+      const { data2, error2 } = await supabaseClient.from("strava-athletes").insert({access_token: json['access_token'], expires_at: json['expires_at'],'id': json['athlete']['id']})
       return new Response(
-        JSON.stringify({"Error": "Athlete not known"}),
+        JSON.stringify(json['athlete']),
         { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
         );
       }
