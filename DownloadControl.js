@@ -6,13 +6,12 @@ export class DownloadControl {
     constructor() {
         this._container = undefined;
         this._map = undefined;
-        document.style
     }
     
     onAdd = (map) => {
         this._map = map;
         this._container = document.createElement('div');
-        this._container.id = 'donwload-button-container';
+        this._container.id = 'download-button-container';
         this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
         const button = document.createElement('button');
         button.id = "download-button";
@@ -71,7 +70,7 @@ export class DownloadControl {
     
     onRemove() {
         this._container.parentNode.removeChild(this._container);
-        this._map = undefined;
+        this._map;
     }
     
 }

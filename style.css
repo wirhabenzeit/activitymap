@@ -234,4 +234,6 @@ html, body {
       opacity:1;
       transition-delay:0s;
     }
-    
+    #login-button > embed {
+      pointer-events: none;
+    }

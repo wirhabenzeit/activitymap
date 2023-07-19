@@ -21,6 +21,7 @@ export class ValueFilterControl {
         this._map = map;
         this._container = document.createElement('div');
         this._container.id = 'value-filter-container';
+        if (this.data.features.length == 0) return this._container;
         const container = document.createElement('div');
         container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
         container.id = "value-filter";

@@ -13,13 +13,18 @@ import { FeatureTable } from './FeatureTable';
 import { FilterController } from './FilterController';
 import { ValueFilterControl } from './ValueFilterControl';
 import { DownloadControl } from './DownloadControl';
+import { LoginControl } from './LoginControl';
 
 const supabaseUrl = 'https://yvkdmnzwrhvjckzyznwu.supabase.co'
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2a2Rtbnp3cmh2amNrenl6bnd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODkzMTY4NjEsImV4cCI6MjAwNDg5Mjg2MX0.dTJIcC50-lwOTXHNsJ7fr4LVund8cI4LLQkJmED60BY'
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 const urlParams = new URLSearchParams(window.location.search);
-const athlete = urlParams.has("athlete") ? urlParams.get("athlete") : 6824046;
+const getCookieValue = (name) => (
+    document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)')?.pop() || ''
+  )
+const athlete = 6824046; //getCookieValue("athlete") ? getCookieValue("athlete") : 0;
+//urlParams.has("athlete") ? urlParams.get("athlete") : 6824046;
 
 const layerSwitcherControl = new LayerSwitcherControl({
     "Mapbox Street": {url: 'mapbox://styles/mapbox/streets-v12?optimize=true', type: "vector", visible: true, overlay: false},
@@ -121,6 +126,7 @@ const valueFilterSettings = {
 const selectionControl = new SelectionControl(["routeLayer","routeLayerSelected"],"strava",featureTable.update);
 const geolocateControl = new GeolocateControl({positionOptions: {enableHighAccuracy: true},trackUserLocation: true,showUserHeading: true})
 const downloadControl = new DownloadControl()
+const loginControl = new LoginControl()
 
 var filterController = new FilterController();
 filterController.addFilter("categoryActive",categoryFilterControl);
@@ -150,6 +156,7 @@ map.addControl(geolocateControl,"top-left");
 map.addControl(layerSwitcherControl, 'top-left');
 map.addControl(new FullscreenControl(), 'top-left');
 map.addControl(downloadControl, 'top-left');
+if (athlete==0) map.addControl(loginControl, 'bottom-right');
 
 map.on('moveend', () => {
     const center = map.getCenter();
