@@ -97,25 +97,29 @@ export class LayerSwitcherControl {
             this._map.setStyle(mapData.url);
                 this._map.once("style.load", () => {
                     this.onStyleChange();
-                    this._map.addSource('mapbox-dem', {
-                        'type': 'raster-dem',
-                        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                        'tileSize': 512,
-                        'maxzoom': 14
-                    });
-                    this._map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.0 });
+                    if (this.threeDim) {
+                        this._map.addSource('mapbox-dem', {
+                            'type': 'raster-dem',
+                            'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                            'tileSize': 512,
+                            'maxzoom': 14
+                        });
+                        this._map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.0 });
+                    }
                     this.addOverlayMaps();
                 });
         }
         else {
             this._map.setStyle(undefined);
-            this._map.addSource('mapbox-dem', {
-                'type': 'raster-dem',
-                'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                'tileSize': 512,
-                'maxzoom': 14
-            });
-            this._map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.0 });
+            if (this.threeDim) {
+                this._map.addSource('mapbox-dem', {
+                    'type': 'raster-dem',
+                    'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                    'tileSize': 512,
+                    'maxzoom': 14
+                });
+                this._map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.0 });
+            }
             this._map.addSource(mapData.name, {
                 type: 'raster',
                 tiles: [mapData.url],
