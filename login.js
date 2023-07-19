@@ -15,9 +15,8 @@ if (url.searchParams.has("code")) {
     .then(data => {
         console.log(data);
         if (data.id) {
-            var url = new URL("/manage.html");
-            url.search = new URLSearchParams(data);
-            window.location.href = url.toString();
+            const params = new URLSearchParams(data).toString();
+            window.location.href = "/manage.html?" + params;
         }
         else if (data.athlete) {
             document.cookie = `athlete=${data.athlete}; max-age=${24*60*60*30}; path=/;`;

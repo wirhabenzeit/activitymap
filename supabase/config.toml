@@ -118,3 +118,6 @@ verify_jwt = false
 
 [functions.strava-login]
 verify_jwt = false
+
+[functions.strava-athlete]
+verify_jwt = false

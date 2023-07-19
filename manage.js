@@ -52,26 +52,21 @@ function tableRow(act) {
     return `<tr id=${act.id} class="${act['type']}">`+ tableRows.join("") + "</tr>";
 }
 
-function tableRows(data) {
-    const tableRowsData = data.map(tableRow);
-    if (tableRowsData.length > 0) { 
-        container.innerHTML = `<table class="sortable"><thead>
-        <tr>${Object.entries(tableColumns).map(([id, column]) => { return `<th>${column.title}</th>`; }).join("")}</tr>
-        </thead><tbody>`+
-        tableRowsData.join('\n') +
-        `<tfoot><tr><td colspan="${Object.entries(tableColumns).length}">${activities.count} Activities</td></tr></tfoot>` + 
-        "</tbody></table>";
-    } else {
-        container.innerHTML = '';
-    }
+var activities;
+
+const table_container = document.getElementById("table-container");
+const profile_container = document.getElementById("profile-container");
+
+if (url.searchParams.has("profile")) {
+    const profile = document.createElement("a");
+    profile.href = "https://www.strava.com/athletes/" + url.searchParams.get("id");
+    profile.style.textDecoration = "none";
+    profile.innerHTML = `<div class="profile"><img src="${url.searchParams.get("profile")}"><h2>${url.searchParams.get("firstname")} ${url.searchParams.get("lastname")}</h2></div>`;
+    profile_container.appendChild(profile);
 }
 
 
-var activities;
-
-const container = document.getElementById("table-container");
-
-if (url.searchParams.has("athlete")) {
+if (url.searchParams.has("id")) {
     const table = document.createElement("table");
     table.classList.add("sortable");
     const thead = document.createElement("thead");
@@ -87,8 +82,8 @@ if (url.searchParams.has("athlete")) {
     table.appendChild(thead);
     table.appendChild(tbody);
     table.appendChild(tfoot);
-    container.appendChild(table);
-    supabase.from('strava-activities').select("*", {count: "exact"}).eq('athlete',url.searchParams.get("athlete"))
+    table_container.appendChild(table);
+    supabase.from('strava-activities').select("*", {count: "exact"}).eq('athlete',url.searchParams.get("id"))
     .then(response => {
         tbody.innerHTML = response.data.map(tableRow).join('\n');
         tfootd.innerText = `${response.count} Activities`;
