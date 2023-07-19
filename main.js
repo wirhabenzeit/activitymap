@@ -23,8 +23,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const getCookieValue = (name) => (
     document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)')?.pop() || ''
   )
-const athlete = getCookieValue("athlete") ? getCookieValue("athlete") : 0;
-//urlParams.has("athlete") ? urlParams.get("athlete") : 6824046;
+const athlete = getCookieValue("athlete") ? getCookieValue("athlete") : (urlParams.has("athlete") ? urlParams.get("athlete") : 0);
 
 const layerSwitcherControl = new LayerSwitcherControl({
     "Mapbox Street": {url: 'mapbox://styles/mapbox/streets-v12?optimize=true', type: "vector", visible: true, overlay: false},

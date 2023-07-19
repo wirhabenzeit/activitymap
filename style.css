@@ -246,7 +246,7 @@ html, body {
     }
     #table-container {
       width: 50%;
-      height: 60%;
+      max-height: 60%;
       overflow-y: scroll;
       margin: auto;
       border: var(--highlight-color) solid 2px;
@@ -271,3 +271,14 @@ html, body {
       color: black;
       text-decoration: none;
     }
+#action-container {
+  margin-top: 2em;
+  margin-left:auto;
+  margin-right:auto;
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%,0);
+}
+#action-container > button {
+  margin: 0.5em;
+}

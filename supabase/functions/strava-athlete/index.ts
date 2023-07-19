@@ -21,7 +21,7 @@ serve(async (req: Request) => {
       );
   }
   else {
-    const response = await fetch(`https://www.strava.com/api/v3/athlete`, {headers: {'Authorization': "Bearer " + data['access_token']}});
+    const response = await fetch(`https://www.strava.com/api/v3/athlete`, {headers: {'Authorization': "Bearer " + data[0]['access_token']}});
     const json = await response.json();
     return new Response(
       JSON.stringify(json),

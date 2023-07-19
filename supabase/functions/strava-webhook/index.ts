@@ -59,7 +59,7 @@ serve(async (req: Request) => {
     console.log(data2,erro2);
     return new Response(
       JSON.stringify(simplified_activity),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
       )
     }
     else if ('aspect_type' in args && args['aspect_type']=="create" && "page" in args) {
@@ -75,19 +75,19 @@ serve(async (req: Request) => {
       console.log(data2,erro2);
       return new Response(
         JSON.stringify(simplified_activities),
-        { headers: { "Content-Type": "application/json" } },
+        { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
         )
     }
     else if ('hub.challenge' in args) {
       return new Response(
         JSON.stringify({"hub.challenge": args['hub.challenge']}),
-        { headers: { "Content-Type": "application/json" } },
+        { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
         )
       }
       else {
         return new Response(
           JSON.stringify({"Status": "Unknown request"}),
-          { headers: { "Content-Type": "application/json" } },
+          { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
           );
         }
       })

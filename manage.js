@@ -57,16 +57,18 @@ var activities;
 const table_container = document.getElementById("table-container");
 const profile_container = document.getElementById("profile-container");
 
-if (url.searchParams.has("profile")) {
+if (url.searchParams.has("id")) {
     const profile = document.createElement("a");
     profile.href = "https://www.strava.com/athletes/" + url.searchParams.get("id");
     profile.style.textDecoration = "none";
-    profile.innerHTML = `<div class="profile"><img src="${url.searchParams.get("profile")}"><h2>${url.searchParams.get("firstname")} ${url.searchParams.get("lastname")}</h2></div>`;
     profile_container.appendChild(profile);
-}
+    fetch("https://yvkdmnzwrhvjckzyznwu.supabase.co/functions/v1/strava-athlete?id=" + url.searchParams.get("id"))
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+        profile.innerHTML = `<div class="profile"><img src="${data.profile}"><h2>${data.firstname} ${data.lastname}</h2></div>`;
+    });
 
-
-if (url.searchParams.has("id")) {
     const table = document.createElement("table");
     table.classList.add("sortable");
     const thead = document.createElement("thead");
@@ -76,7 +78,32 @@ if (url.searchParams.has("id")) {
     const tfootr = document.createElement("tr");
     const tfootd = document.createElement("td");
     tfootd.setAttribute("colspan",Object.entries(tableColumns).length);
-    tfootd.innerText = "Loading...";
+    const tfootdspan = document.createElement("span");
+    tfootdspan.innerText = "Loading...";
+    tfootd.appendChild(tfootdspan);
+    const load_button = document.createElement("button");
+    load_button.style.marginLeft = "1em";
+    load_button.innerText = "Load More";
+    load_button.onclick = function() {
+        load_button.disabled = true;
+        load_button.innerText = "Loading...";
+        fetch(`https://yvkdmnzwrhvjckzyznwu.supabase.co/functions/v1/strava-webhook?page=${Math.floor(activities.length/200)+1}&owner_id=${url.searchParams.get("id")}&aspect_type=create&object_type=activity`)
+        .then(response => response.json())
+        .then(data => {
+            const newData = data.filter(act => !activities.some(a => a.id === act.id));
+            activities = activities.concat(newData);
+            tbody.innerHTML += newData.map(tableRow).join('\n');
+            tfootdspan.innerText = `${activities.length} Activities`;
+            if (data.length == 200) {
+                load_button.disabled = false;
+                load_button.innerText = "Load More";
+            }
+            else {
+                load_button.innerText = "No more activities";
+            }
+        })
+    }
+    tfootd.appendChild(load_button);
     tfootr.appendChild(tfootd);
     tfoot.appendChild(tfootr);
     table.appendChild(thead);
@@ -85,8 +112,9 @@ if (url.searchParams.has("id")) {
     table_container.appendChild(table);
     supabase.from('strava-activities').select("*", {count: "exact"}).eq('athlete',url.searchParams.get("id"))
     .then(response => {
+        activities = response.data;
         tbody.innerHTML = response.data.map(tableRow).join('\n');
-        tfootd.innerText = `${response.count} Activities`;
+        tfootdspan.innerText = `${response.count} Activities`;
     })
 }
 
