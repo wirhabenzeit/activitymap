@@ -12,5 +12,10 @@ if (url.searchParams.has("code")) {
         console.log(response)
         return response.json();
     })
-    .then(data => console.log(data));
+    .then(data => {
+        if (data.athlete) {
+            document.cookie = `athlete=${data.athlete}; max-age=${24*60*60*30}; path=/;`;
+            window.location.href = "/index.html";
+        }
+    });
 }

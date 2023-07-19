@@ -23,7 +23,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const getCookieValue = (name) => (
     document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)')?.pop() || ''
   )
-const athlete = 6824046; //getCookieValue("athlete") ? getCookieValue("athlete") : 0;
+const athlete = getCookieValue("athlete") ? getCookieValue("athlete") : 0;
 //urlParams.has("athlete") ? urlParams.get("athlete") : 6824046;
 
 const layerSwitcherControl = new LayerSwitcherControl({
