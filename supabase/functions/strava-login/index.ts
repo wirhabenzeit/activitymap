@@ -23,7 +23,7 @@ serve(async (req: Request) => {
     }});
     const { data, error } = await supabaseClient.from("strava-athletes").select("*").eq("id", json["athlete"]["id"])
     if (data.length == 0) {
-      const { data2, error2 } = await supabaseClient.from("strava-athletes").insert({access_token: json['access_token'], expires_at: json['expires_at'],'id': json['athlete']['id']})
+      const { data2, error2 } = await supabaseClient.from("strava-athletes").insert({access_token: json['access_token'], expires_at: json['expires_at'],'id': json['athlete']['id'], 'refresh_token': json['refresh_token']})
       return new Response(
         JSON.stringify(json['athlete']),
         { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
