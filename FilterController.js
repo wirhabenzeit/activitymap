@@ -22,14 +22,9 @@ export class FilterController {
     filter(args) {
         var filterArray = ["all"];
         Object.entries(args).forEach(([key, value]) => {
-            //console.log("Filtering on " + key + " with value " + value);
-            //console.log(this.filterCache[key]);
-            //console.log(this.filterCache);
             if (value) filterArray.push(this.filterCache[key]);
             else filterArray.push(this.negation(this.filterCache[key]));
         });
-        //console.log(`Filter returned for args ${JSON.stringify(args)}`);
-        //console.log(filterArray);
         return filterArray;
     }
 

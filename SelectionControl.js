@@ -3,7 +3,9 @@ import { Point } from 'mapbox-gl';
 export class SelectionControl {
     constructor(layers,source,selectionHandler) {
         this._map;
-        this.selectedFeatureIDs = [];
+        const url = new URL(window.location);
+
+        this.selectedFeatureIDs = url.searchParams.has("selected") ? url.searchParams.get("selected").split(",").map((id) => parseInt(id))  : [];
         this.selectedFeatures = [];
         this.canvas;
         this.layers = layers;
@@ -52,7 +54,9 @@ export class SelectionControl {
                 this._map.setFeatureState({source: this.source, id: feature.id}, {selected: true});
             }
         });
-        //console.log(this.selectedFeatures);
+        const url = new URL(window.location);
+        url.searchParams.set("selected", this.selectedFeatureIDs.join(","));
+        window.history.replaceState({}, '', url);
         this.selectionHandler(this.selectedFeatures); 
         this.onChange();
     }

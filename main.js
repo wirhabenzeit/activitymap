@@ -230,6 +230,7 @@ async function fetchStrava() {
 }
 
 function addDoubleLineLayer(innerWidth,outerWidth,innerColor,outerColor,source,layerName,filterArgs) {
+    const debugFilter = ["any",["in","type",...categoryFilterControl.activeCategories],["!in", "type", ...categoryFilterControl.allCategories]];
     map.addLayer({
         'id': layerName,
         'type': 'line',
@@ -269,9 +270,14 @@ function addRouteLayer() {
             data: stravaData,
             'generateId': false
         });
-        addDoubleLineLayer(2,3,categoryFilterControl.lineColor,"black","strava","routeLayer", {"selected": false, "valueInRange": true, "categoryActive": true});
+        selectionControl.selectedFeatureIDs.forEach((id) => {
+            map.setFeatureState({source: 'strava', id: id}, {selected: true});
+        });
+        selectionControl.selectedFeatures = stravaData.features.filter((feature) => selectionControl.selectedFeatureIDs.includes(feature.id));
+        addDoubleLineLayer(2,4,categoryFilterControl.lineColor,"black","strava","routeLayer", {"selected": false, "valueInRange": true, "categoryActive": true}); 
         addDoubleLineLayer(2,4,"white",categoryFilterControl.lineColor,"strava","routeLayerSelected",{"selected": true, "valueInRange": true, "categoryActive": true});
         addDoubleLineLayer(2,4,categoryFilterControl.lineColor,categoryFilterControl.lineColor,"strava","routeLayerHover",{"hovered": true});
+        selectionControl.postSelection();
     }
 }
 

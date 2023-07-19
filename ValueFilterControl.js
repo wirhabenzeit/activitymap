@@ -7,12 +7,13 @@ export class ValueFilterControl {
     }
 
     constructor(af,data) {
+        const url = new URL(window.location);
         this.valueFilters = af;
         this.data = data;
         Object.entries(this.valueFilters).forEach(([key, filter]) => {
             const values = this.data.features.map((d) => d.properties[key]);
             filter.range = {min: Math.min(...values), max: Math.max(...values)};
-            filter.values = [filter.range.min, filter.range.max];
+            filter.values = url.searchParams.has(key) ? url.searchParams.get(key).split(",").map((d) => Number(d)) : [filter.range.min, filter.range.max];
         });
     }
     
@@ -49,6 +50,9 @@ export class ValueFilterControl {
             slider.noUiSlider.on('change', (values, handle) => {
                 filter.values[0] = Number(values[0]);
                 filter.values[1] = Number(values[1]);
+                const url = new URL(window.location);
+                url.searchParams.set(key, values.join(","));
+                window.history.replaceState({}, '', url);
                 this.onChange();
             });
         });

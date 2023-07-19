@@ -47,7 +47,6 @@ export class LayerSwitcherControl {
         button3d.innerHTML = "3D";
         if (this.threeDim) {
             button3d.classList.add('layer-switcher-3d-active');
-            this.toggleTerrain();
         }
         button3d.onclick = () => {
             button3d.classList.toggle('layer-switcher-3d-active');
@@ -98,15 +97,25 @@ export class LayerSwitcherControl {
             this._map.setStyle(mapData.url);
                 this._map.once("style.load", () => {
                     this.onStyleChange();
-                    if (this.threeDim) {
-                        this.threeDim = false;
-                        this.toggleTerrain();
-                    }
+                    this._map.addSource('mapbox-dem', {
+                        'type': 'raster-dem',
+                        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                        'tileSize': 512,
+                        'maxzoom': 14
+                    });
+                    this._map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.0 });
                     this.addOverlayMaps();
                 });
         }
         else {
             this._map.setStyle(undefined);
+            this._map.addSource('mapbox-dem', {
+                'type': 'raster-dem',
+                'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                'tileSize': 512,
+                'maxzoom': 14
+            });
+            this._map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.0 });
             this._map.addSource(mapData.name, {
                 type: 'raster',
                 tiles: [mapData.url],

@@ -1,8 +1,8 @@
 export class CategoryFilterControl {
     constructor(sc) {
         this.allCategories = [];
+        this.activeCategories = [];
         this.sportsCategories = sc;
-        this.shownTracks = {};
 
         this.colorMap = new Proxy({}, {
             get: (target, name) => name in target ? target[name] : this.sportsCategories["Misc"].color
@@ -11,10 +11,14 @@ export class CategoryFilterControl {
             get: (target, name) => name in target ? target[name] : "Misc"
         })
 
+        const url = new URL(window.location);
+
         this.lineColor = ['match',['get', 'type']]; 
         Object.entries(this.sportsCategories).forEach(([key, value]) => {
-            this.shownTracks[key] = true;
+            value.active = url.searchParams.has(key) ? url.searchParams.get(key) == "true" : true;
             value.alias.forEach((alias) => {
+                this.allCategories.push(alias);
+                if (value.active) this.activeCategories.push(alias);
                 this.aliasMap[alias] = key;
                 this.colorMap[alias] = value.color;
                 this.lineColor.push(alias, value.color);
@@ -40,13 +44,15 @@ export class CategoryFilterControl {
             button.style.color = value.color;
             button.onclick = () => {
                 value.active = !value.active;
+                if (value.active) { value.alias.forEach((alias) => { this.activeCategories.push(alias); }); }
+                else { value.alias.forEach((alias) => { this.activeCategories.pop(alias);}); }
+                const url = new URL(window.location);
+                url.searchParams.set(key, value.active);
+                window.history.replaceState({}, '', url);
                 button.classList.toggle('category-not-active');
                 this.onChange();
             };
             label.appendChild(button);
-            Object.entries(value.alias).forEach(([key, value]) => {
-                this.allCategories.push(value);
-            });
         });
         this._container.appendChild(label);
         return this._container;
@@ -58,19 +64,11 @@ export class CategoryFilterControl {
     }
 
     filter() {
-        var includedCategories = [];
-        Object.entries(this.sportsCategories).forEach(([key, value]) => {
-            if (value.active) {
-                Object.entries(value.alias).forEach(([key, value]) => {
-                    includedCategories.push(value);
-                });
-            }
-        });
         if (this.sportsCategories["Misc"].active) {
-            return ["any",["in", "type", ...includedCategories],["!in", "type", "Hike", ...this.allCategories]];
+            return ["any",["in", "type",...this.activeCategories],["!in", "type", ...this.allCategories]];
         }
         else {
-            return ["in", "type", ...includedCategories];
+            return ["in", "type", ...this.activeCategories];
         }
     }
 }
