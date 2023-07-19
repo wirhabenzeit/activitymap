@@ -21,7 +21,7 @@ if (url.searchParams.has("code")) {
         }
         else if (data.athlete) {
             document.cookie = `athlete=${data.athlete}; max-age=${24*60*60*30}; path=/;`;
-            window.location.href = "/";
+            window.location.href = "/index.html";
         }
         else {
             document.getElementById("error").innerHTML = JSON.stringify(data);

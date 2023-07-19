@@ -19,15 +19,11 @@ export class LoginControl {
         const embed = document.createElement('embed');
         embed.src = 'btn_strava_connectwith_light.svg'
         button.appendChild(embed);
-        
-        /*button.onclick = () => {
-            //document.cookie = `athlete=6824046; max-age=${24*60*60*30}; path=/;`;
-            //location.reload();
-            return ;
-        };*/
 
         button.onclick = () => {
-            location.href = "https://www.strava.com/oauth/authorize?client_id=106267&response_type=code&redirect_uri=http://localhost:5173/login.html&approval_prompt=auto&scope=read,activity:read";
+            const href = window.location.href;
+            const dir = href.substring(0, href.lastIndexOf('/'));
+            location.href = `https://www.strava.com/oauth/authorize?client_id=106267&response_type=code&redirect_uri=${dir}/login.html&approval_prompt=auto&scope=read,activity:read`;
         };
         
         this._container.appendChild(button);
