@@ -13,14 +13,15 @@ if (url.searchParams.has("code")) {
         return response.json();
     })
     .then(data => {
-        if (data.athlete) {
-            document.cookie = `athlete=${data.athlete}; max-age=${24*60*60*30}; path=/;`;
-            window.location.href = "/";
-        }
-        else if (data.id) {
+        console.log(data);
+        if (data.id) {
             var url = new URL("/manage.html");
             url.search = new URLSearchParams(data);
             window.location.href = url.toString();
+        }
+        else if (data.athlete) {
+            document.cookie = `athlete=${data.athlete}; max-age=${24*60*60*30}; path=/;`;
+            //window.location.href = "/";
         }
         else {
             document.getElementById("error").innerHTML = JSON.stringify(data);

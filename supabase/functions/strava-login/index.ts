@@ -31,7 +31,7 @@ serve(async (req: Request) => {
       }
       else {
         return new Response(
-          JSON.stringify({"athlete": json['athlete']['id']}),
+          JSON.stringify({"athlete": json['athlete']['id'], "data.length": data.length }),
           { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
           );
       }
