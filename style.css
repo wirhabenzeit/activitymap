@@ -244,41 +244,22 @@ html, body {
     #login-button > embed {
       pointer-events: none;
     }
-    #table-container {
-      width: 50%;
-      max-height: 60%;
-      overflow-y: scroll;
-      margin: auto;
-      border: var(--highlight-color) solid 2px;
-      border-radius: 4px;
-    }
-    #profile-container {
-      margin: auto;
-      margin-top: 2em;
-      width: 300px;
-      margin-bottom: 2em;
-    }
-    .profile img {
-      border-radius: 100%;
-      display: block;
-      margin-left: auto;
-      margin-right: auto;
-      margin-bottom: 1em;
-    }
-    .profile h2{
-      margin: auto;
-      text-align: center;
-      color: black;
-      text-decoration: none;
-    }
-#action-container {
+.profile-table {
+  margin: auto;
   margin-top: 2em;
-  margin-left:auto;
-  margin-right:auto;
-  position: absolute;
-  left: 50%;
-  transform: translate(-50%,0);
 }
-#action-container > button {
-  margin: 0.5em;
+.profile-table {
+  font-family: sans-serif;
+  font-size: 11pt;
+}
+.profile-table-left {
+  padding-right: .2em;
+  color:#999999
+}
+.profile-table-right {
+  padding-left: .2em;
+  text-align: left;
+}
+#profile-container {
+  text-align: center;
 }

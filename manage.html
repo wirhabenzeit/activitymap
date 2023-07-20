@@ -4,10 +4,77 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Strava Map User Manager</title>
+  <style> 
+    #table-container {
+      display: inline-block;
+      width: 80%;
+      height: 100%;
+      overflow-y: scroll;
+      border: var(--highlight-color) solid 2px;
+      border-radius: 4px;
+    }
+    #profile-container {
+      height: 100%;
+      display: inline-block;
+      width: 20%;
+      vertical-align: top;
+    }
+    .profile img {
+      border-radius: 100%;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      margin-bottom: 1em;
+      margin-top: 1em;
+    }
+    .profile h2{
+      margin: auto;
+      text-align: center;
+      color: black;
+      text-decoration: none;
+    }
+    div {
+      box-sizing: border-box;
+    }
+    html, body {
+      height: 100%;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    h2 {
+      font-family: sans-serif;
+    }
+    .button-2 {
+    background-color: rgba(51, 51, 51, 0.05);
+    border-radius: 8px;
+    border-width: 0;
+    color: #333333;
+    cursor: pointer;
+    display: inline-block;
+    font-family: "Haas Grot Text R Web", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    list-style: none;
+    margin: 0;
+    padding: 10px 12px;
+    text-align: center;
+    transition: all 200ms;
+    vertical-align: baseline;
+    white-space: nowrap;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  </style>
 </head>
 <body>
   <script type="module" src="./manage.js"></script>
-  <div id="profile-container"></div>
-  <div id="table-container"></div>
+  <div style="height:100%">
+    <div id="profile-container"></div><div id="table-container"></div>
+  </div>
 </body>
 </html>

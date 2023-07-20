@@ -40,6 +40,22 @@ const tableColumns = {
     }
 };
 
+const profileColumns = {
+    "Country": (data) => data["country"],
+    "City": (data) => data["city"],
+    "Sex": (data) => (data["sex"]=="F") ? `<i class="fa-solid fa-venus"></i>` : `<i class="fa-solid fa-mars"></i>`,
+    "Weight": (data) => `${data["weight"]}kg`,
+    "Premium": (data) => (data["summit"]) ? `<i class="fa-solid fa-check"></i>` : `<i class="fa-solid fa-xmark"></i>`,
+    "Member since": (data) => new Date(data["created_at"]).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}),
+};
+
+function profileTable(data) {
+    const tableRows = Object.entries(profileColumns).map(function([id, column]) { 
+        return `<tr><td align="right" class="profile-table-left">${id}</td><td class="profile-table-right">${column(data)}</td></tr>`;
+    });
+    return tableRows.join("");
+}
+
 function tableRow(act) {
     const tableRows = Object.entries(tableColumns).map(function([id, column]) { 
         if ("sort" in column) {
@@ -61,18 +77,36 @@ if (url.searchParams.has("id")) {
     const profile = document.createElement("a");
     profile.href = "https://www.strava.com/athletes/" + url.searchParams.get("id");
     profile.style.textDecoration = "none";
+    const profile_table = document.createElement("table");
+    const colGroup = document.createElement("colgroup");
+    colGroup.innerHTML = `<col span="1" style="width: 50%;"><col span="1" style="width: 50%;">`;
+    profile_table.appendChild(colGroup);
+    profile_table.classList.add("profile-table");
+    //profile_table.style.verticalAlign = "top";
     profile_container.appendChild(profile);
+    profile_container.appendChild(profile_table);
     fetch("https://yvkdmnzwrhvjckzyznwu.supabase.co/functions/v1/strava-athlete?id=" + url.searchParams.get("id"))
     .then(response => response.json())
     .then(data => {
         console.log(data);
         profile.innerHTML = `<div class="profile"><img src="${data.profile}"><h2>${data.firstname} ${data.lastname}</h2></div>`;
+        profile_table.insertAdjacentHTML('beforeend', profileTable(data));
+        const button = document.createElement("button");
+        button.type = "button";
+        button.style.marginTop = "1em";
+        button.style.textAlign = "center";
+        button.classList.add("button-2");
+        button.innerText = "Open Map";
+        button.onclick = function() {
+            window.open(`./index.html`);
+        }
+        profile_container.appendChild(button);
     });
 
     const table = document.createElement("table");
     table.classList.add("sortable");
     const thead = document.createElement("thead");
-    thead.innerHTML = `<tr>${Object.entries(tableColumns).map(([id, column]) => { return `<th>${column.title}</th>`; }).join("")}</tr>`;
+    thead.innerHTML = `<tr style="height:3em;">${Object.entries(tableColumns).map(([id, column]) => { return `<th>${column.title}</th>`; }).join("")}</tr>`;
     const tbody = document.createElement("tbody");
     const tfoot = document.createElement("tfoot");
     const tfootr = document.createElement("tr");
@@ -92,7 +126,7 @@ if (url.searchParams.has("id")) {
         .then(data => {
             const newData = data.filter(act => !activities.some(a => a.id === act.id));
             activities = activities.concat(newData);
-            tbody.innerHTML += newData.map(tableRow).join('\n');
+            tbody.insertAdjacentHTML('beforeend', newData.map(tableRow).join('\n'));
             tfootdspan.innerText = `${activities.length} Activities`;
             if (data.length == 200) {
                 load_button.disabled = false;
