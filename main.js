@@ -126,7 +126,7 @@ const valueFilterSettings = {
 const selectionControl = new SelectionControl(["routeLayer","routeLayerSelected"],"strava",featureTable.update);
 const geolocateControl = new GeolocateControl({positionOptions: {enableHighAccuracy: true},trackUserLocation: true,showUserHeading: true})
 const downloadControl = new DownloadControl()
-const loginControl = new LoginControl()
+const loginControl = new LoginControl(athlete)
 
 var filterController = new FilterController();
 filterController.addFilter("categoryActive",categoryFilterControl);
@@ -156,7 +156,7 @@ map.addControl(geolocateControl,"top-left");
 map.addControl(layerSwitcherControl, 'top-left');
 map.addControl(new FullscreenControl(), 'top-left');
 map.addControl(downloadControl, 'top-left');
-if (athlete==0) map.addControl(loginControl, 'bottom-right');
+map.addControl(loginControl, 'bottom-right');
 
 map.on('moveend', () => {
     const center = map.getCenter();

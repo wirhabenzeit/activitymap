@@ -89,8 +89,14 @@ function menuBtnChange() {
 
 const strava_link = document.getElementById("strava-link");
 const table_container = document.getElementById("table-container");
+const logout = document.getElementById("logout-link");
 
 if (url.searchParams.has("id")) {
+    logout.onclick = () => {
+        document.cookie = `athlete=; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/;`;
+        window.location.href = "./index.html";
+    }
+
     strava_link.href = "https://www.strava.com/athletes/" + url.searchParams.get("id");
     fetch("https://yvkdmnzwrhvjckzyznwu.supabase.co/functions/v1/strava-athlete?id=" + url.searchParams.get("id"))
     .then(response => response.json())
