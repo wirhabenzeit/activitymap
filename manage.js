@@ -70,37 +70,37 @@ function tableRow(act) {
 
 var activities;
 
+let sidebar = document.querySelector(".sidebar");
+let closeBtn = document.querySelector("#btn");
+
+closeBtn.addEventListener("click", ()=>{
+  sidebar.classList.toggle("open");
+  menuBtnChange();
+});
+
+// following are the code to change sidebar button(optional)
+function menuBtnChange() {
+ if(sidebar.classList.contains("open")){
+   closeBtn.classList.replace("fa-bars", "fa-bars-staggered");//replacing the iocns class
+ }else {
+   closeBtn.classList.replace("fa-bars-staggered","fa-bars");//replacing the iocns class
+ }
+}
+
+const strava_link = document.getElementById("strava-link");
 const table_container = document.getElementById("table-container");
-const profile_container = document.getElementById("profile-container");
 
 if (url.searchParams.has("id")) {
-    const profile = document.createElement("a");
-    profile.href = "https://www.strava.com/athletes/" + url.searchParams.get("id");
-    profile.style.textDecoration = "none";
-    const profile_table = document.createElement("table");
-    const colGroup = document.createElement("colgroup");
-    colGroup.innerHTML = `<col span="1" style="width: 50%;"><col span="1" style="width: 50%;">`;
-    profile_table.appendChild(colGroup);
-    profile_table.classList.add("profile-table");
-    //profile_table.style.verticalAlign = "top";
-    profile_container.appendChild(profile);
-    profile_container.appendChild(profile_table);
+    strava_link.href = "https://www.strava.com/athletes/" + url.searchParams.get("id");
     fetch("https://yvkdmnzwrhvjckzyznwu.supabase.co/functions/v1/strava-athlete?id=" + url.searchParams.get("id"))
     .then(response => response.json())
     .then(data => {
         console.log(data);
-        profile.innerHTML = `<div class="profile"><img src="${data.profile}"><h2>${data.firstname} ${data.lastname}</h2></div>`;
-        profile_table.insertAdjacentHTML('beforeend', profileTable(data));
-        const button = document.createElement("button");
-        button.type = "button";
-        button.style.marginTop = "1em";
-        button.style.textAlign = "center";
-        button.classList.add("button-2");
-        button.innerText = "Open Map";
-        button.onclick = function() {
-            window.open(`./index.html`);
-        }
-        profile_container.appendChild(button);
+        document.getElementsByClassName("links_name")[0].innerText = data.firstname + " " + data.lastname;
+        strava_link.removeChild(document.getElementById("user-placeholder"));
+        const img = document.createElement("img");
+        img.src = data.profile_medium;
+        strava_link.insertAdjacentElement('afterbegin', img);
     });
 
     const table = document.createElement("table");
@@ -112,9 +112,12 @@ if (url.searchParams.has("id")) {
     const tfootr = document.createElement("tr");
     const tfootd = document.createElement("td");
     tfootd.setAttribute("colspan",Object.entries(tableColumns).length);
+    const footdiv = document.createElement("div");
+    footdiv.id = "table-footer";
+    tfootd.appendChild(footdiv);
     const tfootdspan = document.createElement("span");
     tfootdspan.innerText = "Loading...";
-    tfootd.appendChild(tfootdspan);
+    footdiv.appendChild(tfootdspan);
     const load_button = document.createElement("button");
     load_button.style.marginLeft = "1em";
     load_button.innerText = "Load More";
@@ -137,7 +140,7 @@ if (url.searchParams.has("id")) {
             }
         })
     }
-    tfootd.appendChild(load_button);
+    footdiv.appendChild(load_button);
     tfootr.appendChild(tfootd);
     tfoot.appendChild(tfootr);
     table.appendChild(thead);

@@ -244,22 +244,7 @@ html, body {
     #login-button > embed {
       pointer-events: none;
     }
-.profile-table {
-  margin: auto;
-  margin-top: 2em;
-}
-.profile-table {
-  font-family: sans-serif;
-  font-size: 11pt;
-}
-.profile-table-left {
-  padding-right: .2em;
-  color:#999999
-}
-.profile-table-right {
-  padding-left: .2em;
-  text-align: left;
-}
-#profile-container {
-  text-align: center;
+#table-footer > button {
+  padding: 5px;
+  transform: translate(0,-2px);
 }

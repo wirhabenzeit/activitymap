@@ -93,6 +93,7 @@ const featureTableSettings = {
     "start_date_local": {
         "title": '<i class="fa-solid fa-calendar-days"></i>',
         "body": (feature) => new Date(feature.properties['start_date_local']*1000).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}),
+        "sort": (feature) => feature.properties['start_date_local']
     }
 };
 const featureTable = new FeatureTable(featureTableSettings);
