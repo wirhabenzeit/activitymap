@@ -17,11 +17,11 @@ if (url.searchParams.has("code")) {
         if (data.id) {
             const params = new URLSearchParams(data).toString();
             document.cookie = `athlete=${data.athlete}; max-age=${24*60*60*30}; path=/;`;
-            window.location.href = "/manage.html?id=" + id;
+            window.location.href = "./manage.html?id=" + data.id;
         }
         else if (data.athlete) {
             document.cookie = `athlete=${data.athlete}; max-age=${24*60*60*30}; path=/;`;
-            window.location.href = "/index.html";
+            window.location.href = "./index.html";
         }
         else {
             document.getElementById("error").innerHTML = JSON.stringify(data);
