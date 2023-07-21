@@ -1,0 +1,113 @@
+.sortable {
+  border-collapse: collapse;
+  margin: 0;
+  font-size: 9;
+  font-family: sans-serif;
+  width: 100%;
+  table-layout: auto;
+}
+.sortable thead,
+.sortable tfoot {
+  background-color:var(--highlight-color);
+  color: #ffffff;
+  text-align: center;
+  position: sticky; 
+  top: 0px; 
+}
+table thead {
+  inset-block-start: 0; /* "top" */
+}
+table tfoot {
+  inset-block-end: 0; /* "bottom" */
+}
+.sortable th,
+.sortable td {
+  padding: 4px 4px;
+}
+.sortable tbody tr {
+  border-bottom: 1px solid #dddddd;
+}
+.sortable tbody tr:nth-of-type(even) {
+  background-color: #f3f3f3;
+}
+.sortable tbody tr:nth-of-type(odd) {
+  background-color: #ffffff;
+}
+.sortable td { 
+  text-align: end; 
+  font-family: monospace;
+  white-space: nowrap;
+}
+.sortable td:first-child { 
+    text-align: left; 
+    font-family: sans-serif;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 1px;    
+    width: 100%;
+}  
+.sortable tfoot td {
+    text-align: center !important;
+}
+.sortable tbody tr:last-of-type {
+  border-bottom: 2px solid var(--highlight-color);
+}
+.sortable tbody tr:hover {
+  color: var(--highlight-color);
+}
+.sortable th {
+  cursor: pointer;
+}
+.sortable th.no-sort {
+  pointer-events: none;
+}
+.sortable th::after, .sortable th::before {
+  transition: color 0.1s ease-in-out;
+  font-size: 1.2em;
+  color: transparent;
+}
+.sortable th::after {
+  margin-left: 3px;
+  content: "\f0dc";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th:hover::after {
+  color: inherit;
+}
+.sortable th.dir-d::after {
+  color: inherit;
+  content: "\f0dd";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th.dir-u::after {
+  color: inherit;
+  content: "\f0de";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th.indicator-left::after {
+  content: "";
+}
+.sortable th.indicator-left::before {
+  margin-right: 3px;
+  content: "\f0dc";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th.indicator-left:hover::before {
+  color: inherit;
+}
+.sortable th.indicator-left.dir-d::before {
+  color: inherit;
+  content: "\f0dd";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}
+.sortable th.indicator-left.dir-u::before {
+  color: inherit;
+  content: "\f0de";
+  font-family: "Font Awesome 6 Free";
+  font-size: small;
+}

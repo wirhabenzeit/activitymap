@@ -1,5 +1,13 @@
 export class CategoryFilterControl {
     constructor(sc) {
+        const style = document.createElement('style');
+        style.innerHTML = `
+        .category-not-active {
+            color: #999999 !important;
+        }
+        `
+        document.head.appendChild(style);
+
         this.allCategories = [];
         this.activeCategories = [];
         this.sportsCategories = sc;

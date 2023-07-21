@@ -1,10 +1,26 @@
 import { Point } from 'mapbox-gl';
 
+const styles = `
+.boxdraw {
+    background: rgba(56, 135, 190, 0.1);
+    border: 2px solid #3887be;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+}
+`
+
 export class SelectionControl {
     constructor(layers,source,selectionHandler) {
+        const styleSheet = document.createElement("style")
+        styleSheet.innerText = styles
+        document.head.appendChild(styleSheet)
+
         this._map;
         const url = new URL(window.location);
-
+        
         this.selectedFeatureIDs = url.searchParams.has("selected") ? url.searchParams.get("selected").split(",").map((id) => parseInt(id))  : [];
         this.selectedFeatures = [];
         this.canvas;
@@ -39,7 +55,7 @@ export class SelectionControl {
         this.canvas.addEventListener('mousedown', this.mouseDown, true);
         return this._container;
     }
-
+    
     postSelection = () => {
         this.selectedFeatureIDs.forEach(id => {
             this._map.setFeatureState({source: this.source, id: id}, {selected: false});

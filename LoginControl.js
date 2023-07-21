@@ -19,6 +19,7 @@ export class LoginControl {
             button.type = 'button';
             button.id = "login-button";
             const embed = document.createElement('embed');
+            embed.style.pointerEvents = 'none';
             embed.src = 'btn_strava_connectwith_light.svg'
             button.appendChild(embed);
 

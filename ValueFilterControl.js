@@ -1,12 +1,54 @@
 import noUiSlider from 'nouislider';
 import wNumb from 'wnumb';
 
+const styles = `
+.noUiSlider {
+    width: 100%;
+    padding: 0 16px;
+}
+.noUi-connect {
+    background: var(--highlight-color);
+}
+.noUi-handle-lower .noUi-tooltip {
+    transform: translate(-100%,66px) translate(17px,0px);
+    box-shadow: 0 0 0 2px rgba(0,0,0,.1);
+}
+.noUi-handle-upper .noUi-tooltip {
+    transform: translate(-100%,2px) translate(17px,0px);
+    box-shadow: 0 0 0 2px rgba(0,0,0,.1);
+}
+.noUi-tooltip {
+    font-size: 1em;
+    font-family: sans-serif;
+}
+.slider-box {
+    width: 240px;
+    transform: translate(50px,-25px);
+    border-radius: 2px;
+    background-color: #ffffff;
+    opacity: 0.0;
+    visibility:hidden;
+    position: fixed;
+    right: 100px;
+    transition: visibility 0s linear 0.5s,opacity 0.5s linear;
+}
+.filter-label:hover + .slider-box, .slider-box:hover {
+    visibility:visible;
+    opacity:1;
+    transition-delay:0s;
+}
+`
+
 export class ValueFilterControl {
     onChange() {
         return; 
     }
-
+    
     constructor(af,data) {
+        const styleSheet = document.createElement("style")
+        styleSheet.innerText = styles
+        document.head.appendChild(styleSheet)
+        
         const url = new URL(window.location);
         this.valueFilters = af;
         this.data = data;
@@ -46,7 +88,7 @@ export class ValueFilterControl {
                     decimals: filter.decimals,
                 }),
                 connect: true,
-                tooltips: {to: filter.tooltip },
+                tooltips: filter.tooltip,
             });
             slider.noUiSlider.on('change', (values, handle) => {
                 filter.values[0] = Number(values[0]);

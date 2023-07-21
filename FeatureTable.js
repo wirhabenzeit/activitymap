@@ -1,9 +1,31 @@
+const styles = `
+#feature-table-container {
+    max-height: 35em;
+    width: 29em;
+    overflow-y: scroll;
+    pointer-events: all;
+    margin: 10px;
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px rgba(0,0,0,.1);
+    transform: translate(3em,0);
+  }
+  #feature-table-container:empty { 
+    box-shadow: none;
+  }
+`
+
+
 export class FeatureTable {
     onChange() {
         return;
     }
 
     constructor(tc) {
+        const styleSheet = document.createElement("style")
+        styleSheet.innerText = styles
+        document.head.appendChild(styleSheet)
+
+        this._map;
         this.tableColumns = tc;
         this.hover = "";
     }
@@ -25,10 +47,10 @@ export class FeatureTable {
     tableRow = (feature) => {
         const tableRows = Object.entries(this.tableColumns).map(function([id, column]) { 
             if ("sort" in column) {
-                return `<td data-sort='${column.sort(feature)}'>${column.body(feature)}</td>`;
+                return `<td data-sort='${column.sort(feature.properties)}'>${column.body(feature.properties)}</td>`;
             }
             else {
-                return `<td>${column.body(feature)}</td>`;
+                return `<td>${column.body(feature.properties)}</td>`;
             }
         });
         return `<tr id=${feature.properties["id"]} class="${feature.properties['type']}">`+ tableRows.join("") + "</tr>";

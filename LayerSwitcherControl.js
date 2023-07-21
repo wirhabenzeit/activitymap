@@ -1,9 +1,38 @@
+const styles = `
+#layer-switcher-content {
+    visibility:hidden;
+    opacity:0;
+    transition: visibility 0s linear 0.5s,opacity 0.5s linear;
+}
+
+#layer-switcher-button:hover + #layer-switcher-content, #layer-switcher-content:hover {
+    visibility:visible;
+    opacity:1;
+    transition-delay:0s;
+}
+
+.layer-switcher-3d-active {
+    color: var(--highlight-color) !important;
+}
+
+#layer-switcher-content {
+    position: absolute;
+    left: 3em;
+    top: 0em;
+    z-index: 99999;
+}
+`
+
 export class LayerSwitcherControl {
     onStyleChange = () => {
         return;
     }
-
+    
     constructor(maps) {
+        const styleSheet = document.createElement("style")
+        styleSheet.innerText = styles
+        document.head.appendChild(styleSheet)
+
         this.backgroundMaps = {};
         this.overlayMaps = {};
         this.currentMap; 
@@ -11,14 +40,14 @@ export class LayerSwitcherControl {
         this.currentOverlayMaps = [];
         const url = new URL(window.location);
         this.threeDim = url.searchParams.has("3D") ? url.searchParams.get("3D") === "true" : false;
-
+        
         if (url.searchParams.has("maps")) {
             const mapNames = url.searchParams.get("maps").split(",");
             Object.entries(maps).forEach(([key, value]) => {
                 value.visible = mapNames.includes(key);
             });
         }
-
+        
         Object.entries(maps).forEach(([key, value]) => {
             value.name = key;
             if (value.overlay) {
@@ -32,7 +61,7 @@ export class LayerSwitcherControl {
             }
         });
     }
-
+    
     onAdd(map) {
         this._map = map;
         this._container = document.createElement('div');
@@ -52,18 +81,18 @@ export class LayerSwitcherControl {
             button3d.classList.toggle('layer-switcher-3d-active');
             this.toggleTerrain();
         };
-
+        
         
         const content = document.createElement('div');
         content.id = 'layer-switcher-content';
         content.appendChild(this.layerTable(this.backgroundMaps,false));
         content.appendChild(this.layerTable(this.overlayMaps,true));
-
+        
         this.setMap(this.backgroundMaps[this.currentMap]);
         this._container.appendChild(button);
         this._container.appendChild(content);
         this._container.appendChild(button3d);
-
+        
         return this._container;
     }
     
@@ -71,14 +100,14 @@ export class LayerSwitcherControl {
         this._container.parentNode.removeChild(this._container);
         this._map = undefined;
     }
-
+    
     toggleTerrain = () => {
         if (!this._map.getSource('mapbox-dem')) {
-        this._map.addSource('mapbox-dem', {
-            'type': 'raster-dem',
-            'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
-            'tileSize': 512,
-            'maxzoom': 14
+            this._map.addSource('mapbox-dem', {
+                'type': 'raster-dem',
+                'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                'tileSize': 512,
+                'maxzoom': 14
             });
         }
         if (!this.threeDim) {
@@ -95,19 +124,19 @@ export class LayerSwitcherControl {
     async setMap(mapData) {
         if (mapData.type === "vector") {
             this._map.setStyle(mapData.url);
-                this._map.once("style.load", () => {
-                    this.onStyleChange();
-                    if (this.threeDim) {
-                        this._map.addSource('mapbox-dem', {
-                            'type': 'raster-dem',
-                            'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                            'tileSize': 512,
-                            'maxzoom': 14
-                        });
-                        this._map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.0 });
-                    }
-                    this.addOverlayMaps();
-                });
+            this._map.once("style.load", () => {
+                this.onStyleChange();
+                if (this.threeDim) {
+                    this._map.addSource('mapbox-dem', {
+                        'type': 'raster-dem',
+                        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                        'tileSize': 512,
+                        'maxzoom': 14
+                    });
+                    this._map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.0 });
+                }
+                this.addOverlayMaps();
+            });
         }
         else {
             this._map.setStyle(undefined);
@@ -136,7 +165,7 @@ export class LayerSwitcherControl {
         }
         this.currentMap = mapData.name;
     }
-
+    
     async addOverlayMap(mapData) {
         this._map.addSource(mapData.name, {
             type: 'raster',
@@ -154,14 +183,14 @@ export class LayerSwitcherControl {
         if (this._map.getLayer("routeLayer")) this._map.addLayer(overlayData,"routeLayer");
         else this._map.addLayer(overlayData);
     }
-
+    
     updateUrl() {
         const url = new URL(window.location);
         url.searchParams.set("maps", this.currentOverlayMaps.concat([this.currentMap]).join(","));
         url.searchParams.set("3D", this.threeDim);
         window.history.replaceState({}, "", url);
     }
-
+    
     async addOverlayMaps() {
         Object.entries(this.overlayMaps).forEach(([key, value]) => {
             if (value.visible) {
@@ -169,7 +198,7 @@ export class LayerSwitcherControl {
             }
         });
     }
-
+    
     layerTable(maps, overlay = false) {
         const content = document.createElement('div');
         content.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
