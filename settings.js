@@ -87,25 +87,29 @@ const filterSettings = {
         "icon": "fa-solid fa-calendar-days",
         "tooltip": {to: (value) => new Date(value*1000).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})},
         "step": 3600*24,
-        "decimals": 0
+        "decimals": 0,
+        "scale": (x) => x**(1/2)
     },
     "distance": {
         "icon": "fa-solid fa-ruler-horizontal",
         "tooltip": {to: (value) => `${Math.round(value)/1000}km`},
         "step": 1000,
-        "decimals": 0
+        "decimals": 0,
+        "scale": (x) => x**(2)
     },
     "total_elevation_gain": {
         "icon": "fa-solid fa-ruler-vertical",
         "tooltip": {to: (value) => `${Math.round(value)}m`},
         "step": 10,
-        "decimals": 0
+        "decimals": 0,
+        "scale": (x) => x**(2)
     },
     "elapsed_time": {
         "icon": "fa-solid fa-stopwatch",
         "tooltip": {to: (value) => `${new Date(value*1000).toISOString().substr(11, 8)}`},
         "step": 60,
-        "decimals": 0
+        "decimals": 0,
+        "scale": (x) => x**(2)
     }
 };
 

@@ -55,6 +55,11 @@ export class ValueFilterControl {
         Object.entries(this.valueFilters).forEach(([key, filter]) => {
             const values = this.data.features.map((d) => d.properties[key]);
             filter.range = {min: Math.min(...values), max: Math.max(...values)};
+            if ("scale" in filter) {
+                [...Array(9).keys()].forEach((i) => {
+                    filter.range[`${i+1}0%`] = [filter.range.min + filter.scale((i+1)/10)*(filter.range.max-filter.range.min), filter.step];
+                });
+            }
             filter.values = url.searchParams.has(key) ? url.searchParams.get(key).split(",").map((d) => Number(d)) : [filter.range.min, filter.range.max];
         });
     }
