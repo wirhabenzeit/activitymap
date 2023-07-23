@@ -69,7 +69,8 @@ const tableSettings = {
     },
     "elev_high": {
         "title": '<i class="fa-solid fa-mountain"></i>',
-        "body": (feature) => feature['elev_high']
+        "body": (feature) => (feature["elev_high"]==null)? "N/A" : feature['elev_high'].toFixed(0),
+        "sort": (feature) => (feature["elev_high"]==null)? 0 : feature['elev_high']
     },
     "distance": {
         "title": '<i class="fa-solid fa-ruler-horizontal"></i>',
@@ -103,13 +104,6 @@ const filterSettings = {
     },
     "total_elevation_gain": {
         "icon": "fa-solid fa-ruler-vertical",
-        "tooltip": {to: (value) => `${Math.round(value)}m`},
-        "step": 10,
-        "decimals": 0,
-        "scale": (x) => x**(2)
-    },
-    "elev_high": {
-        "icon": "fa-solid fa-mountain",
         "tooltip": {to: (value) => `${Math.round(value)}m`},
         "step": 10,
         "decimals": 0,
