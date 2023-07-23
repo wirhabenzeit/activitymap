@@ -104,6 +104,13 @@ const filterSettings = {
         "decimals": 0,
         "scale": (x) => x**(2)
     },
+    "elev_high": {
+        "icon": "fa-solid fa-mountain",
+        "tooltip": {to: (value) => `${Math.round(value)}m`},
+        "step": 10,
+        "decimals": 0,
+        "scale": (x) => x**(2)
+    },
     "elapsed_time": {
         "icon": "fa-solid fa-stopwatch",
         "tooltip": {to: (value) => `${new Date(value*1000).toISOString().substr(11, 8)}`},
