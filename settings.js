@@ -69,7 +69,7 @@ const tableSettings = {
     },
     "elev_high": {
         "title": '<i class="fa-solid fa-mountain"></i>',
-        "body": (feature) => feature['elev_high'].toFixed(0)
+        "body": (feature) => feature['elev_high']
     },
     "distance": {
         "title": '<i class="fa-solid fa-ruler-horizontal"></i>',
