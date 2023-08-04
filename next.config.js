@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: false,
   output: "export",
-  basePath: "/nextjs-github-pages",
+  basePath: "/stravamap",
   images: {
     unoptimized: true,
   },
