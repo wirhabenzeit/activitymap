@@ -1,34 +1,23 @@
-
-import './sortable.css';
 import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
 import "@fortawesome/fontawesome-free/css/solid.min.css";
 import "@fortawesome/fontawesome-free/css/brands.min.css";
-import 'sortable-tablesort/sortable.min.js'
+import { Grid, UserComponentRegistry } from 'ag-grid-community';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
+import "./manage.css";
+
 import { createClient } from '@supabase/supabase-js'
 
-import { tableSettings } from './settings.js';
+import { categorySettings, aliasMap, tableSettingsList } from './settings.js';
 
 const highlightColor = "#3298FD";
 document.body.style.setProperty('--highlight-color', highlightColor);
 
-const supabaseUrl = 'https://yvkdmnzwrhvjckzyznwu.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2a2Rtbnp3cmh2amNrenl6bnd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODkzMTY4NjEsImV4cCI6MjAwNDg5Mjg2MX0.dTJIcC50-lwOTXHNsJ7fr4LVund8cI4LLQkJmED60BY'
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabase = createClient("http://"+supabaseUrl, supabaseKey)
 
 const url = new URL(window.location);
-
-function tableRow(act) {
-    const tableRows = Object.entries(tableSettings).map(function([id, column]) { 
-        if ("sort" in column) {
-            return `<td data-sort='${column.sort(act)}'>${column.body(act)}</td>`;
-        }
-        else {
-            return `<td>${column.body(act)}</td>`;
-        }
-    });
-    return `<tr id=${act.id} class="${act['type']}">`+ tableRows.join("") + "</tr>";
-}
-
 var activities;
 
 let sidebar = document.querySelector(".sidebar");
@@ -39,7 +28,6 @@ closeBtn.addEventListener("click", ()=>{
   menuBtnChange();
 });
 
-// following are the code to change sidebar button(optional)
 function menuBtnChange() {
  if(sidebar.classList.contains("open")){
    closeBtn.classList.replace("fa-bars", "fa-bars-staggered");//replacing the iocns class
@@ -49,97 +37,117 @@ function menuBtnChange() {
 }
 
 const strava_link = document.getElementById("strava-link");
-const table_container = document.getElementById("table-container");
 const logout = document.getElementById("logout-link");
 
-if (url.searchParams.has("id")) {
-    logout.onclick = () => {
-        document.cookie = `athlete=; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/;`;
-        window.location.href = "./index.html";
-    }
-
-    strava_link.href = "https://www.strava.com/athletes/" + url.searchParams.get("id");
-
-    fetch("https://yvkdmnzwrhvjckzyznwu.supabase.co/functions/v1/strava-athlete?id=" + url.searchParams.get("id"))
-    .then(response => response.json())
-    .then(data => {
-        console.log(data);
-        document.getElementsByClassName("links_name")[0].innerText = data.firstname + " " + data.lastname;
-        strava_link.removeChild(document.getElementById("user-placeholder"));
-        const img = document.createElement("img");
-        img.src = data.profile_medium;
-        strava_link.insertAdjacentElement('afterbegin', img);
-    });
-
-    const table = document.createElement("table");
-    table.classList.add("sortable");
-    const thead = document.createElement("thead");
-    thead.innerHTML = `<tr style="height:3em;">${Object.entries(tableSettings).map(([id, column]) => { return `<th>${column.title}</th>`; }).join("")}</tr>`;
-    const tbody = document.createElement("tbody");
-    const tfoot = document.createElement("tfoot");
-    const tfootr = document.createElement("tr");
-    const tfootd = document.createElement("td");
-    tfootd.setAttribute("colspan",Object.entries(tableSettings).length);
-    const footdiv = document.createElement("div");
-    footdiv.id = "table-footer";
-    tfootd.appendChild(footdiv);
-    const tfootdspan = document.createElement("span");
-    tfootdspan.innerText = "Loading...";
-    footdiv.appendChild(tfootdspan);
-    const load_button = document.createElement("button");
-    load_button.style.marginLeft = "1em";
-    load_button.style.padding = "5px";
-    load_button.style.transform = "translateY(-2px)";
-    load_button.innerText = "Load More";
-    load_button.onclick = function() {
-        load_button.disabled = true;
-        load_button.innerText = "Loading...";
-        fetch(`https://yvkdmnzwrhvjckzyznwu.supabase.co/functions/v1/strava-webhook?page=${Math.floor(activities.length/200)+1}&owner_id=${url.searchParams.get("id")}&aspect_type=create&object_type=activity`)
-        .then(response => response.json())
-        .then(data => {
-            const newData = data.filter(act => !activities.some(a => a.id === act.id));
-            activities = activities.concat(newData);
-            tbody.insertAdjacentHTML('beforeend', newData.map(tableRow).join('\n'));
-            tfootdspan.innerText = `${activities.length} Activities`;
-            if (data.length == 200) {
-                load_button.disabled = false;
-                load_button.innerText = "Load More";
-            }
-            else {
-                load_button.innerText = "No more activities";
-            }
-        })
-    }
-    footdiv.appendChild(load_button);
-    tfootr.appendChild(tfootd);
-    tfoot.appendChild(tfootr);
-    table.appendChild(thead);
-    table.appendChild(tbody);
-    table.appendChild(tfoot);
-    table_container.appendChild(table);
-
-    fetchSupabase(url.searchParams.get("id"), tbody, tfootdspan);
+logout.onclick = () => {
+    document.cookie = `athlete=; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/;`;
+    window.location.href = "./index.html";
 }
 
-async function fetchSupabase(athlete, table_body, tfoot) {
-    const { nodata, counterror, count, status} = await supabase.from('strava-activities').select('*', { count: 'exact', head: true }).eq('athlete',athlete);
+var dataTable; 
 
-    tfoot.innerText = `${count} Activities`;
+if (url.searchParams.has("id")) {
+    console.log(url.searchParams.get("id"));
+    supabase.from('strava-athletes-profile').select('*').eq('id',6824046)
+        .then(response => {
+            if (response.data.length > 0) {
+                document.getElementById("user_name").innerText = response.data[0].first_name + " " + response.data[0].last_name;
+                strava_link.removeChild(document.getElementById("user-placeholder"));
+                const img = document.createElement("img");
+                img.src = response.data[0].profile_medium;
+                strava_link.insertAdjacentElement('afterbegin', img);
+            }
+    });
 
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchSupabase(url.searchParams.get("id"));
+    });
+}
+
+
+const categoryButtons = Object.entries(categorySettings).map(([key, value]) => {
+    const button = {
+        text: `<i class="${value.icon}" style="color:${value.active?value.color:"gray"}"></i>`,
+        action: function ( e, dt, node, config ) {
+            value.active = !value.active;
+            e.currentTarget.firstChild.firstChild.style.color = value.active ? value.color : "gray";
+            dt.draw();
+        }
+    }
+    return button;
+});
+
+class CustomHeaderComp extends new UserComponentRegistry().agGridDefaults['agColumnHeader'] {
+    init(params) {
+        super.init(params)
+        this.eGui.querySelector('[ref="eText"]').innerHTML = params.displayName;
+    }
+}
+class CustomHeaderGroupComp extends new UserComponentRegistry().agGridDefaults['agColumnGroupHeader'] {
+    init(params) {
+        super.init(params)
+        this.eGui.querySelector('[ref="agLabel"]').innerHTML = params.displayName;
+    }
+}
+
+const gridOptions = {
+    columnDefs: tableSettingsList,
+    rowData: null,
+    defaultColDef: {
+        resizable: false,
+        filter: true,
+        sortable: true,
+        floatingFilter: true,
+        suppressMenu: true,
+        suppressSizeToFit: true,
+        maxWidth: 100,
+        cellClass: 'ag-right-aligned-cell',
+        cellStyle: { 'font-family': 'monospace' },
+    },
+    components: {
+        agColumnHeader: CustomHeaderComp,
+        agColumnGroupHeader: CustomHeaderGroupComp
+    },
+    pagination: true,
+    onGridReady: (event) => { 
+        event.api.sizeColumnsToFit();
+        window.onresize = () => {
+            event.api.sizeColumnsToFit();
+        }
+    },
+    onColumnGroupOpened: (event) => event.api.sizeColumnsToFit(),
+    getRowId: (params) => params.data.id,
+}
+
+const grid = new Grid(document.querySelector('#myGrid'), gridOptions);
+
+async function fetchSupabase(athlete) {
     var requiredFields = new Set(["id","type"]);
-    Object.keys(tableSettings).forEach((key) => {
+    Object.keys(tableSettingsList).forEach((key) => {
         requiredFields.add(key);
     });
+    //Array.from(requiredFields).join(','), 
+    const response = await supabase.from('strava-activities').select("*",{ count: 'exact' }).eq('athlete',athlete).range(0,1000);
+    activities = response.data;
+
+    gridOptions.api.setRowData(response.data);
+
+    console.log(activities[0]);
+    const count = response.count;
+
     
     const pageSize = 1000;
     const numPages = Math.ceil(count / pageSize);
-    const ranges = Array.from({ length: numPages }, (_, i) => [i * pageSize, (i + 1) * pageSize]);
+    const ranges = Array.from({ length: numPages - 1 }, (_, i) => [(i+1) * pageSize+1, (i + 2) * pageSize]);
 
     ranges.map((range) => {
-        supabase.from('strava-activities').select(Array.from(requiredFields).join(','), {count: "exact"}).eq('athlete',athlete).range(...range)
+        supabase.from('strava-activities').select('*').eq('athlete',athlete).range(...range)
         .then(response => {
-            activities = response.data;
-            table_body.innerHTML += response.data.map(tableRow).join('\n');
+            //gridOptions.rowData.concat(response.data);
+            gridOptions.api.applyTransaction({add:response.data});
+            //gridOptions.api.setRowData(response.data);
+            //datatable.rows.add(response.data).draw();
+            //table_body.innerHTML += response.data.map(tableRow).join('\n');
         })
     });
 }

@@ -16,11 +16,11 @@ import { ValueFilterControl } from './ValueFilterControl';
 import { DownloadControl } from './DownloadControl';
 import { LoginControl } from './LoginControl';
 
-import {mapSettings, categorySettings, filterSettings, tableSettings} from './settings.js';
+import {mapSettings, categorySettings, filterSettings, tableSettingsMap} from './settings.js';
 
-const supabaseUrl = 'https://yvkdmnzwrhvjckzyznwu.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2a2Rtbnp3cmh2amNrenl6bnd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODkzMTY4NjEsImV4cCI6MjAwNDg5Mjg2MX0.dTJIcC50-lwOTXHNsJ7fr4LVund8cI4LLQkJmED60BY'
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabase = createClient("http://"+supabaseUrl, supabaseKey)
 
 const urlParams = new URLSearchParams(window.location.search);
 const getCookieValue = (name) => (
@@ -30,7 +30,7 @@ const athlete = getCookieValue("athlete") ? getCookieValue("athlete") : (urlPara
 
 const layerSwitcherControl = new LayerSwitcherControl(mapSettings);
 const categoryFilterControl = new CategoryFilterControl(categorySettings);
-const featureTable = new FeatureTable(tableSettings);
+const featureTable = new FeatureTable(tableSettingsMap);
 const selectionControl = new SelectionControl(["routeLayer","routeLayerSelected"],"strava",featureTable.update);
 const geolocateControl = new GeolocateControl({positionOptions: {enableHighAccuracy: true},trackUserLocation: true,showUserHeading: true})
 const downloadControl = new DownloadControl()
@@ -117,7 +117,7 @@ async function fetchStrava() {
     Object.keys(filterSettings).forEach((key) => {
         requiredFields.add(key);
     });
-    Object.keys(tableSettings).forEach((key) => {
+    Object.keys(tableSettingsMap).forEach((key) => {
         requiredFields.add(key);
     });
     const { nodata, counterror, count, status} = await supabase.from('strava-activities').select('*', { count: 'exact', head: true }).eq('athlete',athlete);
