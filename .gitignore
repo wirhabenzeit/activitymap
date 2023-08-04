@@ -4,7 +4,7 @@ node_modules
 *.py
 *.code-workspace
 .vscode
-.env
+.env*
 *.sql
 db.dump
 dist
