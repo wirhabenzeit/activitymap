@@ -4,7 +4,7 @@ import { filterSettings } from "./settings";
 import Cookies from "js-cookie";
 
 const supabase = createClient(
-  "http://" + process.env.NEXT_PUBLIC_SUPABASE_URL,
+  "https://" + process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
