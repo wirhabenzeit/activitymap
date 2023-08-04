@@ -38,7 +38,7 @@ function LoginButton() {
       color="inherit"
       sx={{ p: 0 }}
     >
-      <img src="/btn_strava_connectwith_light.svg" />
+      <img src="btn_strava_connectwith_light.svg" />
     </IconButton>
   );
 }

@@ -64,7 +64,7 @@ export class ActivityContextProvider extends Component {
     if (prevState.code === undefined && this.state.code !== undefined) {
       //console.log("Fetching athlete for code " + this.state.code);
       fetch(
-        "http://" +
+        "https://" +
           process.env.NEXT_PUBLIC_SUPABASE_URL +
           "/functions/v1/strava-login?code=" +
           this.state.code
