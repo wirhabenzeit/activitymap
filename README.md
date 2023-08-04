@@ -1,24 +1,38 @@
-# Display Strava activities on a map
+This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
-## Example 
+## Getting Started
 
-[Hiking Diary](https://wirhabenzeit.github.io/stravamap/)
+First, run the development server:
 
-## Replication Steps
-Here are the steps I took to get this up-and-running. If other people start using this I'll find a more streamlined
-way to replicate this, especially by removing the need for steps 4 and 5.
-
-### Step 1: Prepare Strava
-Create an "application" on [Strava](https://www.strava.com/settings/api). Put "local host" (without the quotes)
-in the "Authorization Callback Domain" field.
-
-### Step 2: Add Strava Secrets to Google Cloud Platform
-Add `strava_client_id`, `strava_client_secret`, `strava_access_token`, `strava_refresh_token` to the Secret Manager
-
-### Step 3: Deploy Cloud functions 
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
 ```
-cd gcp 
-gcloud functions deploy strava_geojson --runtime python311 --trigger-http --allow-unauthenticated
-gcloud functions deploy strava_webhook --runtime python311 --trigger-http 
---allow-unauthenticated
-```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
+
+[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
+
+The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+
+This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
