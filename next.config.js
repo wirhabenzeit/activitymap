@@ -2,7 +2,8 @@
 const nextConfig = {
   reactStrictMode: false,
   output: "export",
-  basePath: "/stravamap",
+  basePath: process.env.NEXT_PUBLIC_BASEPATH,
+  assetPrefix: process.env.NEXT_PUBLIC_BASEPATH + "/",
   images: {
     unoptimized: true,
   },

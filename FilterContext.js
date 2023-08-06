@@ -1,7 +1,12 @@
 import React, { useState, createContext, useContext } from "react";
 import { categorySettings, filterSettings } from "./settings";
 
-const filterState = { categories: {}, values: {}, selected: [] };
+const filterState = {
+  categories: {},
+  values: {},
+  selected: [],
+  highlighted: 0,
+};
 
 Object.entries(categorySettings).forEach(([key, category]) => {
   filterState.categories[key] = {
@@ -20,8 +25,17 @@ export const FilterContextProvider = ({ children }) => {
   const [filter, setFilter] = useState(filterState);
 
   const setSelected = (selected) => {
-    //console.log("setSelected", selected);
-    setFilter((filter) => ({ ...filter, selected: selected }));
+    console.log("setSelected", selected);
+    setFilter((filter) => ({
+      ...filter,
+      selected: selected,
+      highlighted: 0,
+    }));
+  };
+
+  const setHighlighted = (highlighted) => {
+    //console.log("setHighlighted", selected);
+    setFilter((filter) => ({ ...filter, highlighted: highlighted }));
   };
 
   const toggleCategory = (selectedID) => {
@@ -102,6 +116,7 @@ export const FilterContextProvider = ({ children }) => {
         updateCategoryFilter,
         updateValueFilter,
         setSelected,
+        setHighlighted,
       }}
     >
       {children}

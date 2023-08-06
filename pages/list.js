@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useMemo, useState } from "react";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import {
   DataGrid,
   GridToolbarContainer,
@@ -10,6 +11,7 @@ import {
   GridToolbarExport,
   GridFooterContainer,
 } from "@mui/x-data-grid";
+import Head from "next/head";
 import { listSettings } from "@/settings";
 import { ActivityContext } from "@/ActivityContext";
 import { FilterContext } from "@/FilterContext";
@@ -20,6 +22,22 @@ import { GridPagination } from "@mui/x-data-grid";
 import { useGridSelector } from "@mui/x-data-grid";
 import { selectedGridRowsCountSelector } from "@mui/x-data-grid";
 
+export function LoadMoreButton() {
+  const [disabled, setDisabled] = useState(false);
+  const activityContext = React.useContext(ActivityContext);
+  return (
+    <Button
+      onClick={async () => {
+        const newActivities = await activityContext.loadMore();
+        setDisabled(newActivities === 0);
+      }}
+      disabled={disabled}
+    >
+      Load More
+    </Button>
+  );
+}
+
 export function CustomFooterStatusComponent() {
   const apiRef = useGridApiContext();
   const nSelected = useGridSelector(apiRef, selectedGridRowsCountSelector);
@@ -27,8 +45,9 @@ export function CustomFooterStatusComponent() {
   return (
     <GridFooterContainer>
       <Box sx={{ p: 1, display: "flex" }}>
-        {nSelected > 0 ? nSelected + "/" + nTotal : nTotal} Activities
+        {nSelected > 0 ? nSelected + "/" + nTotal : nTotal} Acts.
       </Box>
+      <LoadMoreButton />
       <GridPagination />
     </GridFooterContainer>
   );
@@ -96,24 +115,31 @@ export default function List() {
   };
 
   return (
-    <DataGrid
-      rows={activityContext.geoJson.features.filter(customFilter)}
-      columns={listSettings.columns}
-      pageSizeOptions={[100]}
-      checkboxSelection
-      disableColumnFilter
-      slots={{ toolbar: CustomToolbar, footer: CustomFooterStatusComponent }}
-      rowSelectionModel={filter.selected}
-      onRowSelectionModelChange={(newRowSelectionModel) => {
-        filter.setSelected(newRowSelectionModel);
-      }}
-      sortModel={listState.full.sortModel}
-      onSortModelChange={(model) => listState.setSortModel("full", model)}
-      columnVisibilityModel={listState.full.columnVisibilityModel}
-      onColumnVisibilityModelChange={(newModel) =>
-        listState.setColumnVisibilityModel("full", newModel)
-      }
-      //localeText={{footerRowSelected: (count) => `${count} activit${(count===1)?"y":"ies"} selected`}}
-    />
+    <>
+      <Head>
+        <title>StravaMap - Activity List</title>
+      </Head>
+      <DataGrid
+        rows={activityContext.geoJson.features.filter(customFilter)}
+        columns={listSettings.columns}
+        disableColumnMenu
+        pageSizeOptions={[100]}
+        density="compact"
+        checkboxSelection
+        disableColumnFilter
+        slots={{ toolbar: CustomToolbar, footer: CustomFooterStatusComponent }}
+        rowSelectionModel={filter.selected}
+        onRowSelectionModelChange={(newRowSelectionModel) => {
+          filter.setSelected(newRowSelectionModel);
+        }}
+        sortModel={listState.full.sortModel}
+        onSortModelChange={(model) => listState.setSortModel("full", model)}
+        columnVisibilityModel={listState.full.columnVisibilityModel}
+        onColumnVisibilityModelChange={(newModel) =>
+          listState.setColumnVisibilityModel("full", newModel)
+        }
+        //localeText={{footerRowSelected: (count) => `${count} activit${(count===1)?"y":"ies"} selected`}}
+      />
+    </>
   );
 }

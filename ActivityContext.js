@@ -4,11 +4,12 @@ import { filterSettings } from "./settings";
 import Cookies from "js-cookie";
 
 const supabase = createClient(
-  "https://" + process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
 const defaultState = {
+  activityDict: {},
   geoJson: { type: "FeatureCollection", features: [] },
   loading: true,
   loaded: false,
@@ -29,7 +30,7 @@ const requiredFields = new Set([
   "total_elevation_gain",
   "start_date_local",
   "start_date_local_timestamp",
-  "geometry:geometry_simplified",
+  "geometry_simplified",
   "start_latlng",
   "end_latlng",
   "kudos_count",
@@ -60,12 +61,11 @@ export class ActivityContextProvider extends Component {
   }
 
   async componentDidUpdate(prevProps, prevState) {
-    //console.log("state changed to ", this.state);
+    console.log("state changed to ", this.state);
     if (prevState.code === undefined && this.state.code !== undefined) {
       //console.log("Fetching athlete for code " + this.state.code);
       fetch(
-        "https://" +
-          process.env.NEXT_PUBLIC_SUPABASE_URL +
+        process.env.NEXT_PUBLIC_SUPABASE_URL +
           "/functions/v1/strava-login?code=" +
           this.state.code
       )
@@ -144,44 +144,93 @@ export class ActivityContextProvider extends Component {
     }
   }
 
+  loadMore = async () => {
+    console.log("loading more");
+    this.setState((prev) => ({ ...prev, loading: true }));
+    const response = await fetch(
+      `${
+        process.env.NEXT_PUBLIC_SUPABASE_URL
+      }/functions/v1/strava-webhook?page=${
+        Math.floor(this.state.geoJson.features.length / 200) + 1
+      }&owner_id=${this.state.athlete}&aspect_type=create&object_type=activity`
+    );
+    const data = await response.json();
+    console.log(data);
+    const newData = data.filter(
+      (act) => !this.state.geoJson.features.some((a) => a.id === act.id)
+    );
+    console.log(newData);
+    if (newData.length > 0) {
+      const newGeojsonFeatures = newData.map(this.parseFeature);
+      const activityDict = newData.reduce((obj, act) => {
+        obj[act.id] = act;
+        return obj;
+      }, {});
+      this.setState((prev) => ({
+        ...prev,
+        activityDict: { ...prev.activityDict, ...activityDict },
+        geoJson: {
+          type: "FeatureCollection",
+          features: [...prev.geoJson.features, ...newGeojsonFeatures],
+        },
+      }));
+      this.setState((prev) => ({ ...prev, loading: false }));
+      return newData.length;
+    } else {
+      console.log("no new data");
+      this.setState((prev) => ({ ...prev, loading: false }));
+      return 0;
+    }
+  };
+
+  parseFeature = (feature) => {
+    feature.bbox = feature.geometry_simplified.coordinates.reduce(
+      (acc, coord) => {
+        return [
+          Math.min(acc[0], coord[0]),
+          Math.min(acc[1], coord[1]),
+          Math.max(acc[2], coord[0]),
+          Math.max(acc[3], coord[1]),
+        ];
+      },
+      [Infinity, Infinity, -Infinity, -Infinity]
+    );
+    const jsonFeature = {
+      type: "Feature",
+      geometry: feature.geometry_simplified,
+      bbox: feature.bbox,
+      id: feature.id,
+      properties: {},
+    };
+    Object.entries(feature).forEach(([key, value]) => {
+      if (key != "geometry_simplified" && key != "bbox") {
+        jsonFeature.properties[key] = value;
+      }
+    });
+    return jsonFeature;
+  };
+
   async fetchSupabase(range) {
     const { data, error } = await supabase
       .from("strava-activities")
       .select(Array.from(requiredFields).join(","))
       .eq("athlete", this.state.athlete)
       .range(...range);
+    const featureList = [];
+    const activityDict = {};
     data.forEach((feature) => {
-      const properties = {};
-      Object.entries(feature).forEach(([key, value]) => {
-        if (key != "geometry") {
-          properties[key] = value;
-        }
-        if (key != "geometry" && key != "id") {
-          delete feature[key];
-        }
-      });
-      feature.type = "Feature";
-      feature.properties = properties;
-    });
-    const newFilterRange = {};
-    Object.keys(filterSettings).forEach((key) => {
-      newFilterRange[key] = [
-        Math.min(...data.map((feature) => feature.properties[key])),
-        Math.max(...data.map((feature) => feature.properties[key])),
-      ];
+      const jsonFeature = this.parseFeature(feature);
+      activityDict[feature.id] = feature;
+      featureList.push(jsonFeature);
     });
     this.setState((prev) => ({
       ...prev,
+      activityDict: { ...prev.activityDict, ...activityDict },
       geoJson: {
         type: "FeatureCollection",
-        features: [...prev.geoJson.features, ...data],
+        features: [...prev.geoJson.features, ...featureList],
       },
     }));
-    //console.log("Wrote " + data.length + " activities to geoJson");
-    /*const filterRange = {};
-            Object.keys(filterSettings).forEach((key) => { 
-                filterRange[key] = [Math.min(...geoJson.features.map((feature) => feature.properties[key])), Math.max(...geoJson.features.map((feature) => feature.properties[key]))];
-            });*/
     return data.length;
   }
 
@@ -203,6 +252,7 @@ export class ActivityContextProvider extends Component {
           ...this.state,
           setAthlete: this.setAthlete,
           setCode: this.setCode,
+          loadMore: this.loadMore,
         }}
       >
         {children}
