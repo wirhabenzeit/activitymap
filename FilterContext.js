@@ -37,6 +37,21 @@ export const FilterContextProvider = ({ children }) => {
     //console.log("setHighlighted", selected);
     setFilter((filter) => ({ ...filter, highlighted: highlighted }));
   };
+  const setOnlyCategory = (selectedID) => {
+    setFilter((filter) => ({
+      ...filter,
+      categories: Object.entries(filter.categories).reduce(
+        (acc, [key, value]) => {
+          acc[key] = {
+            active: key === selectedID,
+            filter: key === selectedID ? categorySettings[key].alias : [],
+          };
+          return acc;
+        },
+        {}
+      ),
+    }));
+  };
 
   const toggleCategory = (selectedID) => {
     if (filter.categories[selectedID].active) {
@@ -113,6 +128,7 @@ export const FilterContextProvider = ({ children }) => {
       value={{
         ...filter,
         toggleCategory,
+        setOnlyCategory,
         updateCategoryFilter,
         updateValueFilter,
         setSelected,
