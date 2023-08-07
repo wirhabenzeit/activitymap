@@ -15,7 +15,7 @@ import { ActivityContext } from "@/ActivityContext";
 export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
   const activityContext = React.useContext(ActivityContext);
 
-  console.log(activityContext.filterRange, activityContext.loaded);
+  //console.log(activityContext.filterRange, activityContext.loaded);
   const theme = useTheme();
   const openedMixin = (theme) => ({
     width: drawerWidth,
@@ -84,7 +84,7 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
           </ListItem>
         ))}
       </List>
-      {activityContext.loaded && (
+      {activityContext.geoJson.features.length > 1 && (
         <>
           <Divider />
           <List>

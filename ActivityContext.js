@@ -18,6 +18,8 @@ const defaultState = {
   code: undefined,
   athlete_name: undefined,
   athlete_img: undefined,
+  guestMode: false,
+  activityList: [],
 };
 
 const requiredFields = new Set([
@@ -60,85 +62,92 @@ export class ActivityContextProvider extends Component {
     this.state = defaultState;
   }
 
+  getAthleteData = async () => {
+    const { data, error } = await supabase
+      .from("strava-athletes-profile")
+      .select("*")
+      .eq("id", this.state.athlete);
+    if (data && data.length === 1)
+      this.setState((prev) => ({
+        ...prev,
+        athlete_name: data[0].first_name + " " + data[0].last_name,
+        athlete_img: data[0].profile_medium,
+      }));
+  };
+
+  getAthleteActivities = async () => {
+    const { nodata, counterror, count, status } = await supabase
+      .from("strava-activities")
+      .select("*", { count: "exact", head: true })
+      .eq("athlete", this.state.athlete);
+
+    const pageSize = 1000;
+    const numPages = Math.ceil(count / pageSize);
+    const ranges = Array.from({ length: numPages }, (_, i) => [
+      i * pageSize,
+      (i + 1) * pageSize - 1,
+    ]);
+    const promises = ranges.map((range) =>
+      this.fetchSupabase((sb) =>
+        sb.eq("athlete", this.state.athlete).range(...range)
+      )
+    );
+    return Promise.all(promises);
+  };
+
+  setFilterRanges = () => {
+    this.setState((prev) => ({
+      ...prev,
+      loading: false,
+      loaded: true,
+      filterRange: Object.entries(filterSettings)
+        .map(([key, value]) => [
+          key,
+          [
+            Math.min(
+              ...prev.geoJson.features.map((feature) => feature.properties[key])
+            ),
+            Math.max(
+              ...prev.geoJson.features.map((feature) => feature.properties[key])
+            ),
+          ],
+        ])
+        .reduce((obj, [key, value]) => ((obj[key] = value), obj), {}),
+    }));
+  };
+
   async componentDidUpdate(prevProps, prevState) {
     console.log("state changed to ", this.state);
     if (prevState.code === undefined && this.state.code !== undefined) {
-      //console.log("Fetching athlete for code " + this.state.code);
       fetch(
         process.env.NEXT_PUBLIC_SUPABASE_URL +
           "/functions/v1/strava-login?code=" +
           this.state.code
       )
         .then((response) => {
-          //console.log(response);
           return response.json();
         })
         .then((data) => {
-          //console.log(data);
           this.setState((prev) => ({ ...prev, athlete: data.athlete }));
           Cookies.set("athlete", data.athlete, { expires: 365 });
-          history.pushState({}, "StravaMap", "/");
+          history.pushState({}, "StravaMap", "/list");
         });
-    }
-    if (
+    } else if (
       (prevState.athlete === undefined || prevState.athlete === 0) &&
       this.state.athlete !== 0 &&
       this.state.athlete !== undefined
     ) {
-      //console.log("Fetching data for athlete " + this.state.athlete);
-
-      supabase
-        .from("strava-athletes-profile")
-        .select("*")
-        .eq("id", this.state.athlete)
-        .then(({ data, error }) => {
-          if (data && data.length === 1)
-            this.setState((prev) => ({
-              ...prev,
-              athlete_name: data[0].first_name + " " + data[0].last_name,
-              athlete_img: data[0].profile_medium,
-            }));
-        });
-
-      const { nodata, counterror, count, status } = await supabase
-        .from("strava-activities")
-        .select("*", { count: "exact", head: true })
-        .eq("athlete", this.state.athlete);
-
-      const pageSize = 1000;
-      const numPages = Math.ceil(count / pageSize);
-      const ranges = Array.from({ length: numPages }, (_, i) => [
-        i * pageSize,
-        (i + 1) * pageSize - 1,
-      ]);
-      const promises = ranges.map((range) => this.fetchSupabase(range));
-
-      const results = await Promise.all(promises);
-      //console.log("got " + results.flat().length + " out of "+count+" activities");
-      //const geoJson = {"type":"FeatureCollection", "features": results.flat()};
-
-      this.setState((prev) => ({
-        ...prev,
-        loading: false,
-        loaded: true,
-        filterRange: Object.entries(filterSettings)
-          .map(([key, value]) => [
-            key,
-            [
-              Math.min(
-                ...prev.geoJson.features.map(
-                  (feature) => feature.properties[key]
-                )
-              ),
-              Math.max(
-                ...prev.geoJson.features.map(
-                  (feature) => feature.properties[key]
-                )
-              ),
-            ],
-          ])
-          .reduce((obj, [key, value]) => ((obj[key] = value), obj), {}),
-      }));
+      this.getAthleteData();
+      const result = await this.getAthleteActivities();
+      this.setFilterRanges();
+    } else if (
+      prevState.activityList.length === 0 &&
+      this.state.activityList.length > 0
+    ) {
+      const result = await this.fetchSupabase((sb) =>
+        sb.in("id", this.state.activityList)
+      );
+      this.setFilterRanges();
     } else if (prevState.athlete === undefined && this.state.athlete === 0) {
       this.setState((prev) => ({ ...prev, loaded: false, loading: false }));
     }
@@ -210,12 +219,12 @@ export class ActivityContextProvider extends Component {
     return jsonFeature;
   };
 
-  async fetchSupabase(range) {
-    const { data, error } = await supabase
-      .from("strava-activities")
-      .select(Array.from(requiredFields).join(","))
-      .eq("athlete", this.state.athlete)
-      .range(...range);
+  async fetchSupabase(query) {
+    const { data, error } = await query(
+      supabase
+        .from("strava-activities")
+        .select(Array.from(requiredFields).join(","))
+    );
     const featureList = [];
     const activityDict = {};
     data.forEach((feature) => {
@@ -239,9 +248,20 @@ export class ActivityContextProvider extends Component {
     //console.log("setAthlete", athlete);
   };
 
+  setActivityList = (activities) => {
+    this.setState((prevState) => ({
+      ...prevState,
+      activityList: activities,
+    }));
+  };
+
   setCode = (code) => {
     this.setState((prevState) => ({ ...prevState, code: code }));
     //console.log("setCode", code);
+  };
+
+  setGuestMode = () => {
+    this.setState((prevState) => ({ ...prevState, guestMode: true }));
   };
 
   render = () => {
@@ -253,6 +273,8 @@ export class ActivityContextProvider extends Component {
           setAthlete: this.setAthlete,
           setCode: this.setCode,
           loadMore: this.loadMore,
+          setGuestMode: this.setGuestMode,
+          setActivityList: this.setActivityList,
         }}
       >
         {children}

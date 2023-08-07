@@ -1,12 +1,13 @@
 {
-  "name": "stravamap2",
+  "name": "stravamap",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "analyze": "cross-env ANALYZE=true next build"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -18,8 +19,10 @@
     "@mui/icons-material": "^5.14.3",
     "@mui/material": "^5.14.3",
     "@mui/x-data-grid": "^6.10.2",
+    "@next/bundle-analyzer": "^13.4.13",
     "@supabase/supabase-js": "^2.31.0",
     "autoprefixer": "10.4.14",
+    "cross-env": "^7.0.3",
     "eslint": "8.45.0",
     "eslint-config-next": "13.4.12",
     "file-saver": "^2.0.5",
@@ -30,6 +33,7 @@
     "mapbox-gl": "^2.15.0",
     "material-react-table": "^1.14.0",
     "next": "13.4.12",
+    "next-compose-plugins": "^2.2.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-map-gl": "^7.1.3",

@@ -1,11 +1,4 @@
-import React, {
-  Component,
-  useState,
-  useEffect,
-  createContext,
-  useContext,
-  use,
-} from "react";
+import React, { Component, createContext } from "react";
 import { mapSettings } from "./settings";
 
 const mapPosition = {
@@ -18,7 +11,7 @@ const mapPosition = {
 const mapState = {
   baseMap: null,
   overlayMaps: [],
-  threeDim: true,
+  threeDim: false,
   position: mapPosition,
 };
 
@@ -49,6 +42,8 @@ export class MapContextProvider extends Component {
           toggleOverlayMap: this.toggleOverlayMap,
           toggleThreeDim: this.toggleThreeDim,
           updateMapPosition: this.updateMapPosition,
+          setThreeDim: this.setThreeDim,
+          setOverlayMaps: this.setOverlayMaps,
         }}
       >
         {children}
@@ -58,6 +53,15 @@ export class MapContextProvider extends Component {
 
   setBaseMap = (key) => {
     this.setState((map) => ({ ...map, baseMap: key }));
+  };
+
+  setOverlayMaps = (keys) => {
+    this.setState((map) => ({ ...map, overlayMaps: keys }));
+  };
+
+  setThreeDim = (threeDim) => {
+    console.log("Setting threeDim", threeDim);
+    this.setState((map) => ({ ...map, threeDim: threeDim }));
   };
 
   toggleOverlayMap = (key) => {

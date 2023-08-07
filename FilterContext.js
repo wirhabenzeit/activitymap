@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext } from "react";
+import React, { useState, createContext, useEffect } from "react";
 import { categorySettings, filterSettings } from "./settings";
 
 const filterState = {
@@ -23,6 +23,10 @@ const FilterContext = createContext(filterState);
 
 export const FilterContextProvider = ({ children }) => {
   const [filter, setFilter] = useState(filterState);
+
+  useEffect(() => {
+    console.log("filter", filter);
+  }, [filter]);
 
   const setSelected = (selected) => {
     console.log("setSelected", selected);

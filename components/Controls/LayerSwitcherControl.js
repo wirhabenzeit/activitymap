@@ -41,11 +41,10 @@ const styles = `
   }
 `;
 
-class LayerSwitcherControl {
-  constructor(context) {
-    //console.log("LayerSwitcherControl constructor");
-    this.context = context;
-
+class LayerSwitcherControl extends Component {
+  static contextType = MapContext;
+  constructor(props) {
+    super();
     this.backgroundMaps = {};
     this.overlayMaps = {};
 
@@ -57,9 +56,15 @@ class LayerSwitcherControl {
         this.backgroundMaps[key] = value;
       }
     });
+    console.log(this.state);
   }
 
-  onAdd(map) {
+  onRemove = () => {
+    this._container.parentNode.removeChild(this._container);
+    this._map = undefined;
+  };
+
+  onAdd = (map) => {
     //console.log("LayerSwitcherControl onAdd");
     const styleSheet = document.createElement("style");
     styleSheet.innerText = styles;
@@ -78,13 +83,28 @@ class LayerSwitcherControl {
 
     const button3d = document.createElement("button");
     button3d.innerHTML = "3D";
-    if (this.context.position.threeDim) {
+    button3d.onClick = () => {
+      console.log(this);
+      console.log(this.props);
+      console.log("3d button clicked");
+    };
+    /*if (this.props.context.position.threeDim) {
       button3d.classList.add("layer-switcher-3d-active");
     }
     button3d.onclick = () => {
-      button3d.classList.toggle("layer-switcher-3d-active");
-      this.toggleTerrain();
-    };
+      console.log(this.props.context);
+      if (this.props.context.threeDim) {
+        console.log("switching to 2d");
+        button3d.classList.remove("layer-switcher-3d-active");
+        this._map.easeTo({ pitch: 0, duration: 1000 });
+        this.props.context.setThreeDim(false);
+      } else {
+        console.log("switching to 3d");
+        button3d.classList.add("layer-switcher-3d-active");
+        this._map.easeTo({ pitch: 60, duration: 1000 });
+        this.props.context.setThreeDim(true);
+      }
+    };*/
 
     const content = document.createElement("div");
     content.id = "layer-switcher-content";
@@ -96,9 +116,9 @@ class LayerSwitcherControl {
     this._container.appendChild(button3d);
 
     return this._container;
-  }
+  };
 
-  onRemove() {
+  /*onRemove() {
     this._container.parentNode.removeChild(this._container);
     this._map = undefined;
   }
@@ -118,7 +138,7 @@ class LayerSwitcherControl {
       this._map.setTerrain();
       this._map.removeSource("mapbox-dem");
     }
-  };
+  };*/
 
   layerTable = (maps, overlay = false) => {
     const content = document.createElement("div");
@@ -127,26 +147,29 @@ class LayerSwitcherControl {
       const mapButton = document.createElement("button");
       mapButton.id = key;
       mapButton.className = "mapboxgl-ctrl-layer";
-      if (
-        (overlay && this.context.overlayMaps.includes(key)) ||
-        (!overlay && key === this.context.baseMap)
+      /*if (
+        (overlay && this.props.context.overlayMaps.includes(key)) ||
+        (!overlay && key === this.props.context.baseMap)
       ) {
         mapButton.classList.toggle("mapboxgl-ctrl-layer-active");
-      }
+      }*/
       mapButton.innerHTML = key;
-      mapButton.onclick = () => {
+      mapButton.onClick = () => {
+        console.log("mapButton clicked");
+      };
+      /*mapButton.onclick = () => {
         if (overlay) {
-          this.context.toggleOverlayMap(key);
+          this.props.context.toggleOverlayMap(key);
         } else {
           Object.entries(this.backgroundMaps).forEach(([key, value]) => {
             document
               .getElementById(key)
               .classList.remove("mapboxgl-ctrl-layer-active");
           });
-          this.context.setBaseMap(key);
+          this.props.context.setBaseMap(key);
         }
         mapButton.classList.toggle("mapboxgl-ctrl-layer-active");
-      };
+      };*/
       content.appendChild(mapButton);
     });
     return content;

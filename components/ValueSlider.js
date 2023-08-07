@@ -60,7 +60,7 @@ export default function SliderBox({ open, name }) {
       : (x) =>
           min +
           (max - min) * filterSettings[name].scale((x - min) / (max - min));
-  if (value[0] === undefined) setValue(minmax);
+  if (value && value[0] === undefined) setValue(minmax);
 
   return (
     <SidebarButton

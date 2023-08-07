@@ -1,4 +1,7 @@
 /** @type {import('next').NextConfig} */
+
+//const { default: next } = require("next/types");
+
 const nextConfig = {
   reactStrictMode: false,
   output: "export",
@@ -9,4 +12,8 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+//module.exports= nextConfig;
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
+});
+module.exports = withBundleAnalyzer(nextConfig);

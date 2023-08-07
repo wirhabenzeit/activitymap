@@ -21,13 +21,14 @@ import { listSettings } from "@/settings";
 import { Paper } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material/styles";
+import LayerSwitcher from "@/components/LayerSwitcher";
 
-function LayerSwitcher(props) {
-  useControl(() => new LayerSwitcherControl(props.context), {
+/*function LayerSwitcher(props) {
+  useControl(() => new LayerSwitcherControl(props), {
     position: props.position,
   });
   return null;
-}
+}*/
 
 function Download(props) {
   useControl(() => new DownloadControl(props.context), {
@@ -158,6 +159,10 @@ function Map() {
         onClick={(evt) =>
           filter.setSelected(evt.features.map((feature) => feature.id))
         }
+        terrain={{
+          source: "mapbox-dem",
+          exaggeration: map.threeDim ? 1.5 : 0,
+        }}
       >
         {mapSettings[map.baseMap].type == "raster" && (
           <Source
@@ -168,11 +173,21 @@ function Map() {
             <Layer id="baseMap" type="raster" paint={{ "raster-opacity": 1 }} />
           </Source>
         )}
+        <Source
+          id="mapbox-dem"
+          type="raster-dem"
+          url="mapbox://mapbox.mapbox-terrain-dem-v1"
+          tileSize={512}
+          maxzoom={14}
+        />
         <NavigationControl position="top-right" />
         <GeolocateControl position="top-right" />
         <FullscreenControl position="top-right" />
         <Download position="top-right" context={map} />
-        <LayerSwitcher position="top-left" context={map} />
+        <LayerSwitcher
+          sx={{ position: "absolute", top: 10, left: 10 }}
+          mapRef={mapRef}
+        />
         {map.overlayMaps.map((mapName) => {
           return (
             <Source
@@ -191,7 +206,6 @@ function Map() {
             </Source>
           );
         })}
-
         <RouteSource data={activities}>
           <RouteLayer filter={filter} />
         </RouteSource>

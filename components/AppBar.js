@@ -1,21 +1,30 @@
 import * as React from "react";
-import { styled } from "@mui/material/styles";
+import { ThemeProvider, styled, createTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import MuiAppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
-import MenuIcon from "@mui/icons-material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import MapIcon from "@mui/icons-material/Map";
 import Menu from "@mui/material/Menu";
-import Button from "@mui/material/Button";
+import { Tabs, Tab } from "@mui/material";
 import Avatar from "@mui/material/Avatar";
 import { ActivityContext } from "@/ActivityContext";
+
 import IconButton from "@mui/material/IconButton";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import Cookies from "js-cookie";
+import ShareIcon from "@mui/icons-material/IosShare";
+
+import ShareDialog from "@/components/ShareDialog";
+
+const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+  },
+});
 
 export const LinkWithQuery = ({ children, href, ...props }) => {
   const search = useRouter().query.athlete;
@@ -29,8 +38,6 @@ export const LinkWithQuery = ({ children, href, ...props }) => {
   );
 };
 
-const pages = { Map: "/", List: "/list" };
-
 function LoginButton() {
   return (
     <IconButton
@@ -40,6 +47,30 @@ function LoginButton() {
     >
       <img src="btn_strava_connectwith_light.svg" />
     </IconButton>
+  );
+}
+
+function ShareButton() {
+  const [open, setOpen] = React.useState(false);
+
+  const handleClickOpen = () => {
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <IconButton
+        sx={{ mx: 2, color: "secondary.light" }}
+        onClick={handleClickOpen}
+      >
+        <ShareIcon />
+      </IconButton>
+      <ShareDialog open={open} handleClose={handleClose} />
+    </>
   );
 }
 
@@ -109,61 +140,26 @@ function UserSettings() {
   );
 }
 
-function PageLinks({ setPage }) {
-  const [anchorElNav, setAnchorElNav] = React.useState(null);
+function PageLinks({ page, setPage }) {
+  const activityContext = React.useContext(ActivityContext);
+  const urlParam = activityContext.guestMode
+    ? activityContext.activityList.length > 0
+      ? `?activities=${activityContext.activityList.join(",")}`
+      : `?athlete=${activityContext.athlete}`
+    : "";
 
   return (
     <>
-      <Box sx={{ flexGrow: 1, display: { xs: "flex", sm: "none" } }}>
-        <IconButton
-          size="large"
-          aria-label="account of current user"
-          aria-controls="menu-appbar"
-          aria-haspopup="true"
-          onClick={(e) => {
-            setAnchorElNav(e.currentTarget);
-          }}
-          color="inherit"
-        >
-          <MenuIcon />
-        </IconButton>
-        <Menu
-          id="menu-appbar"
-          anchorEl={anchorElNav}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "left",
-          }}
-          keepMounted
-          transformOrigin={{
-            vertical: "top",
-            horizontal: "left",
-          }}
-          open={Boolean(anchorElNav)}
-          onClose={() => {
-            setAnchorElNav(null);
-          }}
-          sx={{
-            display: { xs: "block", sm: "none" },
+      <Box>
+        <Tabs
+          value={page}
+          onChange={(e, v) => {
+            setPage(v);
           }}
         >
-          {Object.entries(pages).map(([name, url]) => (
-            <MenuItem key={name}>
-              <LinkWithQuery href={url} key={name}>
-                <Typography textAlign="center">{name}</Typography>
-              </LinkWithQuery>
-            </MenuItem>
-          ))}
-        </Menu>
-      </Box>
-      <Box sx={{ flexGrow: 1, display: { xs: "none", sm: "flex" } }}>
-        {Object.entries(pages).map(([name, url]) => (
-          <LinkWithQuery href={url} key={name}>
-            <Button key={name} sx={{ my: 2, color: "white", display: "block" }}>
-              {name}
-            </Button>
-          </LinkWithQuery>
-        ))}
+          <Tab label="Map" component={Link} href={"/" + urlParam} />
+          <Tab label="List" component={Link} href={"/list" + urlParam} />
+        </Tabs>
       </Box>
     </>
   );
@@ -198,42 +194,53 @@ export default function ResponsiveAppBar({
 
   return (
     <AppBar position="fixed" open={open}>
-      <Toolbar>
-        <IconButton
-          color="inherit"
-          aria-label="open drawer"
-          onClick={() => {
-            setOpen(true);
-          }}
-          edge="start"
-          sx={{
-            marginRight: 3,
-            ...(open && { display: "none" }),
-          }}
-        >
-          <ChevronRightIcon />
-        </IconButton>
-        <MapIcon sx={{ mr: 1 }} />
-        <Typography
-          variant="h6"
-          noWrap
-          component="a"
-          href="/"
-          sx={{
-            mr: 2,
-            //fontFamily: 'monospace', //
-            fontWeight: 700,
-            //letterSpacing: '.3rem',
-            color: "inherit",
-            textDecoration: "none",
-          }}
-        >
-          StravaMap
-        </Typography>
-        <PageLinks setPage={setPage} />
-        {activityContext.loaded && Cookies.get("athlete") && <UserSettings />}
-        {!activityContext.loaded && !activityContext.loading && <LoginButton />}
-      </Toolbar>
+      <ThemeProvider theme={darkTheme}>
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            onClick={() => {
+              setOpen(true);
+            }}
+            edge="start"
+            sx={{
+              marginRight: 3,
+              ...(open && { display: "none" }),
+            }}
+          >
+            <ChevronRightIcon />
+          </IconButton>
+          <MapIcon sx={{ mr: 1, display: { xs: "none", sm: "flex" } }} />
+          <Typography
+            variant="h6"
+            noWrap
+            component="a"
+            href="/"
+            sx={{
+              mr: 2,
+              fontWeight: 700,
+              color: "inherit",
+              textDecoration: "none",
+              display: { xs: "none", sm: "flex" },
+            }}
+          >
+            StravaMap
+          </Typography>
+          <PageLinks page={page} setPage={setPage} />
+          <Box sx={{ flexGrow: 1 }} />
+          {activityContext.loaded &&
+            Cookies.get("athlete") &&
+            !activityContext.guestMode && (
+              <>
+                <ShareButton />
+                <UserSettings />
+              </>
+            )}
+          {!activityContext.loaded && !activityContext.loading && (
+            <LoginButton />
+          )}
+        </Toolbar>
+      </ThemeProvider>
     </AppBar>
   );
 }
