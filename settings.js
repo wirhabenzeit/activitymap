@@ -1,6 +1,59 @@
 import { Link } from "@mui/material";
 import { gridStringOrNumberComparator } from "@mui/x-data-grid";
 
+const stravaTypes = [
+  "AlpineSki",
+  "BackcountrySki",
+  "Badminton",
+  "Canoeing",
+  "Crossfit",
+  "EBikeRide",
+  "Elliptical",
+  "EMountainBikeRide",
+  "Golf",
+  "GravelRide",
+  "Handcycle",
+  "HighIntensityIntervalTraining",
+  "Hike",
+  "IceSkate",
+  "InlineSkate",
+  "Kayaking",
+  "Kitesurf",
+  "MountainBikeRide",
+  "NordicSki",
+  "Pickleball",
+  "Pilates",
+  "Racquetball",
+  "Ride",
+  "RockClimbing",
+  "RollerSki",
+  "Rowing",
+  "Run",
+  "Sail",
+  "Skateboard",
+  "Snowboard",
+  "Snowshoe",
+  "Soccer",
+  "Squash",
+  "StairStepper",
+  "StandUpPaddling",
+  "Surfing",
+  "Swim",
+  "TableTennis",
+  "Tennis",
+  "TrailRun",
+  "Velomobile",
+  "VirtualRide",
+  "VirtualRow",
+  "VirtualRun",
+  "Walk",
+  "WeightTraining",
+  "Wheelchair",
+  "Windsurf",
+  "Workout",
+  "Yoga",
+];
+
 const mapSettings = {
   "Mapbox Street": {
     url: "mapbox://styles/mapbox/streets-v12?optimize=true",
@@ -102,13 +155,30 @@ const categorySettings = {
   "Walk / Run / Hike": {
     color: "#FF595E",
     icon: "walking",
-    alias: ["Walk", "Run", "Hike", "RockClimbing", "Snowshoe", "VirtualRun"],
+    alias: [
+      "Walk",
+      "Run",
+      "Hike",
+      "TrailRun",
+      "RockClimbing",
+      "Snowshoe",
+      "VirtualRun",
+    ],
     active: true,
   },
   Ride: {
     color: "#8AC926",
     icon: "biking",
-    alias: ["Ride", "VirtualRide", "EBikeRide", "Handcycle", "Velomobile"],
+    alias: [
+      "Ride",
+      "VirtualRide",
+      "GravelRide",
+      "MountainBikeRide",
+      "EBikeRide",
+      "EMountainBikeRide",
+      "Handcycle",
+      "Velomobile",
+    ],
     active: true,
   },
   "Alpine Ski": {
@@ -142,6 +212,15 @@ const categorySettings = {
       "Windsurf",
       "Workout",
       "Yoga",
+      "Badminton",
+      "HighIntensityIntervalTraining",
+      "Pickelball",
+      "Pilates",
+      "Racquetball",
+      "Squash",
+      "TableTennis",
+      "Tennis",
+      "VirtualRow",
     ],
     active: true,
   },
@@ -193,9 +272,9 @@ function decFormatter(unit = "", decimals = 0) {
 const listSettings = {
   columns: [
     {
-      field: "type",
+      field: "sport_type",
       headerName: "Type",
-      valueGetter: (params) => params.row.properties.type,
+      valueGetter: (params) => params.row.properties.sport_type,
       flex: 1,
       minWidth: 60,
     },
@@ -214,14 +293,14 @@ const listSettings = {
       valueGetter: (params) => ({
         name: params.row.properties.name,
         id: params.row.id,
-        type: params.row.properties.type,
+        type: params.row.properties.sport_type,
       }),
       renderCell: (params) => (
         <Link
           href={`https://www.strava.com/activities/${params.value.id}`}
           target="_blank"
           rel="noreferrer"
-          sx={{ color: colorMap[params.value.type] }}
+          sx={{ color: colorMap[params.value.sport_type] }}
         >
           {params.value.name}
         </Link>

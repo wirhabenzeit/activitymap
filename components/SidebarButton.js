@@ -5,14 +5,12 @@ export default function SidebarButton(props) {
     <Box
       sx={{ width: 1, display: "flex", flexDirection: "row" }}
       onMouseEnter={() => {
-        console.log("mouse enter");
         props.setContentOpen(true);
       }}
       onMouseLeave={
         "onMouseLeave" in props
           ? props.onMouseLeave
           : () => {
-              console.log("mouse leave");
               props.setContentOpen(false);
             }
       }

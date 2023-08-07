@@ -79,7 +79,7 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
       <Divider />
       <List>
         {Object.keys(categorySettings).map((key) => (
-          <ListItem sx={{ px: 0, py: 1 }} key={key}>
+          <ListItem sx={{ px: 0, py: 0 }} key={key}>
             <MultiSelect open={open} name={key} />
           </ListItem>
         ))}

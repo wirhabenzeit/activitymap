@@ -21,7 +21,7 @@ const defaultState = {
 };
 
 const requiredFields = new Set([
-  "type",
+  "sport_type",
   "name",
   "id",
   "distance",

@@ -47,7 +47,7 @@ function RouteSource(props) {
 function RouteLayer(props) {
   const theme = useTheme();
 
-  const color = ["match", ["get", "type"]];
+  const color = ["match", ["get", "sport_type"]];
   Object.entries(categorySettings).forEach(([key, value]) => {
     value.alias.forEach((alias) => {
       color.push(alias, value.color);
@@ -56,7 +56,7 @@ function RouteLayer(props) {
   color.push("#000000");
   const categoryFilter = [
     "in",
-    "type",
+    "sport_type",
     ...Object.values(props.filter.categories)
       .map((category) => category.filter)
       .flat(),

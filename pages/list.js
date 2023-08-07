@@ -103,7 +103,7 @@ export default function List() {
     activeCat.push(...value.filter);
   });
   const customFilter = (data) => {
-    if (!activeCat.includes(data.properties.type)) return false;
+    if (!activeCat.includes(data.properties.sport_type)) return false;
     if (
       Object.entries(filter.values).some(
         ([key, value]) =>
