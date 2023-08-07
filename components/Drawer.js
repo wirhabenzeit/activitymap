@@ -6,7 +6,7 @@ import IconButton from "@mui/material/IconButton";
 import Divider from "@mui/material/Divider";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import ListItem from "@mui/material/ListItem";
+import { ListItem } from "@mui/material";
 import MultiSelect from "@/components/MultiSelect";
 import ValueSlider from "@/components/ValueSlider";
 import { filterSettings, categorySettings } from "@/settings";
@@ -14,6 +14,8 @@ import { ActivityContext } from "@/ActivityContext";
 
 export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
   const activityContext = React.useContext(ActivityContext);
+
+  console.log(activityContext.filterRange, activityContext.loaded);
   const theme = useTheme();
   const openedMixin = (theme) => ({
     width: drawerWidth,
@@ -87,11 +89,21 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
           <Divider />
           <List>
             {Object.keys(filterSettings).map((key) => (
-              <ListItem sx={{ px: 0, py: 1 }} key={key}>
+              <ListItem sx={{ px: 0, py: 0 }} key={key}>
                 <ValueSlider open={open} name={key} />
               </ListItem>
             ))}
           </List>
+          {/*
+          <Divider />
+          {activityContext.loaded && (
+            <List>
+              <ListItem sx={{ px: 0, py: 1 }} key="datePicker">
+                <DateFilter open={open} />
+              </ListItem>
+            </List>
+          )}
+          <Divider />*/}
         </>
       )}
     </Drawer>

@@ -38,19 +38,40 @@ export const FilterContextProvider = ({ children }) => {
     setFilter((filter) => ({ ...filter, highlighted: highlighted }));
   };
   const setOnlyCategory = (selectedID) => {
-    setFilter((filter) => ({
-      ...filter,
-      categories: Object.entries(filter.categories).reduce(
-        (acc, [key, value]) => {
-          acc[key] = {
-            active: key === selectedID,
-            filter: key === selectedID ? categorySettings[key].alias : [],
-          };
-          return acc;
-        },
-        {}
-      ),
-    }));
+    setFilter((filter) => {
+      if (
+        filter.categories[selectedID].active &&
+        Object.values(filter.categories).filter((category) => category.active)
+          .length === 1
+      ) {
+        return {
+          ...filter,
+          categories: Object.entries(filter.categories).reduce(
+            (acc, [key, value]) => {
+              acc[key] = {
+                active: true,
+                filter: categorySettings[key].alias,
+              };
+              return acc;
+            },
+            {}
+          ),
+        };
+      }
+      return {
+        ...filter,
+        categories: Object.entries(filter.categories).reduce(
+          (acc, [key, value]) => {
+            acc[key] = {
+              active: key === selectedID,
+              filter: key === selectedID ? categorySettings[key].alias : [],
+            };
+            return acc;
+          },
+          {}
+        ),
+      };
+    });
   };
 
   const toggleCategory = (selectedID) => {

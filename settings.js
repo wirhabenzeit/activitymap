@@ -93,13 +93,13 @@ const mapSettings = {
 };
 
 const categorySettings = {
-  BackcountryNordicSki: {
+  "BC & XC Ski": {
     color: "#1982C4",
     icon: "skiing-nordic",
     alias: ["BackcountrySki", "NordicSki", "RollerSki"],
     active: true,
   },
-  WalkRun: {
+  "Walk / Run / Hike": {
     color: "#FF595E",
     icon: "walking",
     alias: ["Walk", "Run", "Hike", "RockClimbing", "Snowshoe", "VirtualRun"],
@@ -111,13 +111,13 @@ const categorySettings = {
     alias: ["Ride", "VirtualRide", "EBikeRide", "Handcycle", "Velomobile"],
     active: true,
   },
-  AlpineSki: {
+  "Alpine Ski": {
     color: "#3FA7D6",
     icon: "person-skiing",
     alias: ["AlpineSki", "Snowboard"],
     active: true,
   },
-  Misc: {
+  Miscellaneous: {
     color: "#6A4C93",
     icon: "person-circle-question",
     alias: [
@@ -162,20 +162,27 @@ const filterSettings = {
       new Date(value * 1000).toLocaleDateString("de-DE", {
         day: "2-digit",
         month: "2-digit",
-        year: "numeric",
+        year: "2-digit",
       }),
+    scale: (x) => 2 * x - x ** 2,
   },
   distance: {
     icon: "ruler-horizontal",
     tooltip: (value) => `${Math.round(value / 1000)}km`,
+    scale: (x) => x ** 2,
   },
   total_elevation_gain: {
     icon: "ruler-vertical",
     tooltip: (value) => `${Math.round(value)}m`,
+    scale: (x) => x ** 2,
   },
   elapsed_time: {
     icon: "stopwatch",
-    tooltip: (value) => `${new Date(value * 1000).toISOString().substr(11, 8)}`,
+    tooltip: (value) => {
+      const date = new Date(value * 1000);
+      return `${date.getUTCHours()}h${date.getUTCMinutes()}`;
+    },
+    scale: (x) => x ** 2,
   },
 };
 
