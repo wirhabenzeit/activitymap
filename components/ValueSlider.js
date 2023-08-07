@@ -54,6 +54,12 @@ export default function SliderBox({ open, name }) {
     : activityContext.filterRange[name];
   const min = activityContext.loading ? undefined : minmax[0];
   const max = activityContext.loading ? undefined : minmax[1];
+  const scale =
+    activityContext.loading || !("scale" in filterSettings[name])
+      ? (x) => x
+      : (x) =>
+          min +
+          (max - min) * filterSettings[name].scale((x - min) / (max - min));
   if (value[0] === undefined) setValue(minmax);
 
   return (
@@ -72,21 +78,14 @@ export default function SliderBox({ open, name }) {
           sx={{ ml: 3, mr: 3 }}
           min={min}
           max={max}
-          scale={
-            "scale" in filterSettings[name]
-              ? (x) =>
-                  min +
-                  (max - min) *
-                    filterSettings[name].scale((x - min) / (max - min))
-              : (x) => x
-          }
+          scale={scale}
           valueLabelFormat={(value) => filterSettings[name].tooltip(value)}
           value={value}
           onChange={(event, newValue) => {
             setValue(newValue);
           }}
           onChangeCommitted={(event, newValue) => {
-            filterContext.updateValueFilter(name, newValue);
+            filterContext.updateValueFilter(name, newValue.map(scale));
           }}
           size="small"
           valueLabelDisplay="on"
