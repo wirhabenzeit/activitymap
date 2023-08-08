@@ -13,9 +13,9 @@ import {
 } from "@mui/x-data-grid";
 import Head from "next/head";
 import { listSettings } from "@/settings";
-import { ActivityContext } from "@/ActivityContext";
-import { FilterContext } from "@/FilterContext";
-import { ListContext } from "@/ListContext";
+import { ActivityContext } from "@/components/Context/ActivityContext";
+import { FilterContext } from "@/components/Context/FilterContext";
+import { ListContext } from "@/components/Context/ListContext";
 import { CheckBoxOutlineBlank, CheckBox } from "@mui/icons-material";
 import { useGridRootProps } from "@mui/x-data-grid";
 import { GridPagination } from "@mui/x-data-grid";
@@ -39,6 +39,7 @@ export function LoadMoreButton() {
 }
 
 export function CustomFooterStatusComponent() {
+  const activityContext = React.useContext(ActivityContext);
   const apiRef = useGridApiContext();
   const nSelected = useGridSelector(apiRef, selectedGridRowsCountSelector);
   const nTotal = apiRef.current.getRowsCount();
@@ -47,7 +48,7 @@ export function CustomFooterStatusComponent() {
       <Box sx={{ p: 1, display: "flex" }}>
         {nSelected > 0 ? nSelected + "/" + nTotal : nTotal} Acts.
       </Box>
-      <LoadMoreButton />
+      {!activityContext.guestMode && <LoadMoreButton />}
       <GridPagination />
     </GridFooterContainer>
   );

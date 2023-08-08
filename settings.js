@@ -145,6 +145,15 @@ const mapSettings = {
   },
 };
 
+const defaultMapPosition = {
+  zoom: 9,
+  longitude: 8,
+  latitude: 47,
+  center: [8, 47],
+  pitch: 0,
+  bearing: 0,
+};
+
 const categorySettings = {
   "BC & XC Ski": {
     color: "#1982C4",
@@ -556,4 +565,10 @@ const listSettings = {
   },
 };
 
-export { mapSettings, categorySettings, filterSettings, listSettings };
+export {
+  mapSettings,
+  defaultMapPosition,
+  categorySettings,
+  filterSettings,
+  listSettings,
+};

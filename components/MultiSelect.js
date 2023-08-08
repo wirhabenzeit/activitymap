@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 const { library, config } = require("@fortawesome/fontawesome-svg-core");
 import { fas } from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
-import { FilterContext } from "@/FilterContext";
+import { FilterContext } from "@/components/Context/FilterContext";
 import { categorySettings } from "@/settings";
 import SidebarButton from "@/components/SidebarButton";
 
@@ -73,7 +73,6 @@ export default function MultiSelect({ open, name }) {
               setSelectOpen(false);
             }}
             MenuProps={{
-              dense: true,
               sx: {
                 "&& .Mui-selected": {
                   backgroundColor: categorySettings[name].color + "20",

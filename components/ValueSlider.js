@@ -8,9 +8,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 const { library, config } = require("@fortawesome/fontawesome-svg-core");
 import { fas } from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
-import { FilterContext } from "@/FilterContext";
+import { FilterContext } from "@/components/Context/FilterContext";
 import { filterSettings } from "@/settings";
-import { ActivityContext } from "@/ActivityContext";
+import { ActivityContext } from "@/components/Context/ActivityContext";
 import SidebarButton from "@/components/SidebarButton";
 
 const Slider = styled(MuiSlider)(({ theme }) => ({

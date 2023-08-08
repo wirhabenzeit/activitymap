@@ -1,18 +1,10 @@
 import React, { Component, createContext } from "react";
-import { mapSettings } from "./settings";
+import { mapSettings } from "@/settings";
 
-const mapPosition = {
-  zoom: 9,
-  longitude: 8,
-  latitude: 47,
-  pitch: 0,
-  bearing: 0,
-};
 const mapState = {
   baseMap: null,
   overlayMaps: [],
   threeDim: false,
-  position: mapPosition,
 };
 
 Object.entries(mapSettings).forEach(([key, map]) => {
@@ -33,6 +25,7 @@ export class MapContextProvider extends Component {
   }
 
   render() {
+    console.log("MapContextProvider render");
     const { children } = this.props;
     return (
       <MapContext.Provider
@@ -41,9 +34,8 @@ export class MapContextProvider extends Component {
           setBaseMap: this.setBaseMap,
           toggleOverlayMap: this.toggleOverlayMap,
           toggleThreeDim: this.toggleThreeDim,
-          updateMapPosition: this.updateMapPosition,
-          setThreeDim: this.setThreeDim,
           setOverlayMaps: this.setOverlayMaps,
+          setThreeDim: this.setThreeDim,
         }}
       >
         {children}
@@ -53,15 +45,6 @@ export class MapContextProvider extends Component {
 
   setBaseMap = (key) => {
     this.setState((map) => ({ ...map, baseMap: key }));
-  };
-
-  setOverlayMaps = (keys) => {
-    this.setState((map) => ({ ...map, overlayMaps: keys }));
-  };
-
-  setThreeDim = (threeDim) => {
-    console.log("Setting threeDim", threeDim);
-    this.setState((map) => ({ ...map, threeDim: threeDim }));
   };
 
   toggleOverlayMap = (key) => {
@@ -75,12 +58,16 @@ export class MapContextProvider extends Component {
     });
   };
 
-  toggleThreeDim = () => {
-    this.setState((map) => ({ ...map, threeDim: !map.threeDim }));
+  setOverlayMaps = (overlayMaps) => {
+    this.setState((map) => ({ ...map, overlayMaps: overlayMaps }));
   };
 
-  updateMapPosition = (newPosition) => {
-    this.setState((map) => ({ ...map, position: newPosition }));
+  setThreeDim = (threeDim) => {
+    this.setState((map) => ({ ...map, threeDim: threeDim }));
+  };
+
+  toggleThreeDim = () => {
+    this.setState((map) => ({ ...map, threeDim: !map.threeDim }));
   };
 }
 

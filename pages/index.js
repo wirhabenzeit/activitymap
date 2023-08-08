@@ -1,4 +1,11 @@
-import React, { useRef, useState, useCallback } from "react";
+import {
+  useRef,
+  useState,
+  useContext,
+  useCallback,
+  useMemo,
+  useEffect,
+} from "react";
 import ReactMapGL, {
   NavigationControl,
   GeolocateControl,
@@ -8,14 +15,14 @@ import ReactMapGL, {
   Source,
 } from "react-map-gl";
 import Head from "next/head";
-import { MapContext } from "@/MapContext";
+import { MapContext } from "@/components/Context/MapContext";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { mapSettings } from "@/settings";
-import { LayerSwitcherControl } from "@/components/Controls/LayerSwitcherControl";
 import { DownloadControl } from "@/components/Controls/DownloadControl";
-import { ActivityContext } from "@/ActivityContext";
-import { FilterContext } from "@/FilterContext";
-import { ListContext } from "@/ListContext";
+import { SelectionControl } from "@/components/Controls/SelectionControl";
+import { ActivityContext } from "@/components/Context/ActivityContext";
+import { FilterContext } from "@/components/Context/FilterContext";
+import { ListContext } from "@/components/Context/ListContext";
 import { categorySettings } from "@/settings";
 import { listSettings } from "@/settings";
 import { Paper } from "@mui/material";
@@ -23,29 +30,42 @@ import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material/styles";
 import LayerSwitcher from "@/components/LayerSwitcher";
 
-/*function LayerSwitcher(props) {
-  useControl(() => new LayerSwitcherControl(props), {
-    position: props.position,
-  });
-  return null;
-}*/
-
 function Download(props) {
-  useControl(() => new DownloadControl(props.context), {
+  useControl(() => new DownloadControl(), {
     position: props.position,
   });
   return null;
 }
 
+function Selection(props) {
+  const filterContext = useContext(FilterContext);
+
+  useControl(
+    () =>
+      new SelectionControl({
+        mapRef: props.mapRef,
+        layers: ["routeLayerBG", "routeLayerBGsel"],
+        source: "routeSource",
+        selectionHandler: (sel) => filterContext.setSelected(sel),
+      }),
+    {
+      position: props.position,
+    }
+  );
+  return null;
+}
+
 function RouteSource(props) {
+  const activityContext = useContext(ActivityContext);
   return (
-    <Source data={props.data.geoJson} id="routeSource" type="geojson">
+    <Source data={activityContext.geoJson} id="routeSource" type="geojson">
       {props.children}
     </Source>
   );
 }
 
-function RouteLayer(props) {
+function RouteLayer() {
+  const filterContext = useContext(FilterContext);
   const theme = useTheme();
 
   const color = ["match", ["get", "sport_type"]];
@@ -58,22 +78,22 @@ function RouteLayer(props) {
   const categoryFilter = [
     "in",
     "sport_type",
-    ...Object.values(props.filter.categories)
+    ...Object.values(filterContext.categories)
       .map((category) => category.filter)
       .flat(),
   ];
   const valueFilter = ["all"];
-  Object.entries(props.filter.values).forEach(([key, value]) => {
+  Object.entries(filterContext.values).forEach(([key, value]) => {
     if (value[0] !== undefined) {
       valueFilter.push([">=", key, value[0]]);
       valueFilter.push(["<=", key, value[1]]);
     }
   });
-  const selectedFilter = ["in", "id", ...props.filter.selected];
-  const unselectedFilter = ["!in", "id", ...props.filter.selected];
+  const selectedFilter = ["in", "id", ...filterContext.selected];
+  const unselectedFilter = ["!in", "id", ...filterContext.selected];
   const filterAll = ["all", categoryFilter, valueFilter, unselectedFilter];
   const filterSel = ["all", categoryFilter, valueFilter, selectedFilter];
-  const filterHigh = ["==", "id", props.filter.highlighted];
+  const filterHigh = ["==", "id", filterContext.highlighted];
   return (
     <>
       <Layer
@@ -126,15 +146,64 @@ function RouteLayer(props) {
   );
 }
 
-function Map() {
+function Map(props) {
   const [cursor, setCursor] = useState("auto");
   const onMouseEnter = useCallback(() => setCursor("pointer"), []);
   const onMouseLeave = useCallback(() => setCursor("auto"), []);
-  const map = React.useContext(MapContext);
-  const filter = React.useContext(FilterContext);
-  const activities = React.useContext(ActivityContext);
-  const listState = React.useContext(ListContext);
-  const mapRef = useRef();
+  const map = useContext(MapContext);
+  const filter = useContext(FilterContext);
+  const activities = useContext(ActivityContext);
+  const listState = useContext(ListContext);
+
+  const controls = useMemo(
+    () => (
+      <>
+        <NavigationControl position="top-right" />
+        <GeolocateControl position="top-right" />
+        <FullscreenControl position="top-right" />
+        <Download position="top-right" context={map} />
+        <Selection position="top-right" mapRef={props.mapRef} />
+        <LayerSwitcher
+          sx={{ position: "absolute", top: 10, left: 10 }}
+          mapRef={props.mapRef}
+        />
+      </>
+    ),
+    [map]
+  );
+
+  const overlayMaps = useMemo(
+    () => (
+      <>
+        {map.overlayMaps.map((mapName) => (
+          <Source
+            key={mapName + "source"}
+            id={mapName}
+            type="raster"
+            tiles={[mapSettings[mapName].url]}
+            tileSize={256}
+          >
+            <Layer
+              key={mapName + "layer"}
+              id={mapName}
+              type="raster"
+              paint={{ "raster-opacity": mapSettings[mapName].opacity }}
+            />
+          </Source>
+        ))}
+      </>
+    ),
+    [map]
+  );
+
+  const routes = useMemo(
+    () => (
+      <RouteSource>
+        <RouteLayer />
+      </RouteSource>
+    ),
+    [activities, filter]
+  );
 
   return (
     <>
@@ -142,10 +211,19 @@ function Map() {
         <title>StravaMap</title>
       </Head>
       <ReactMapGL
-        ref={mapRef}
+        reuseMaps
+        styleDiffing={false}
+        ref={props.mapRef}
+        boxZoom={false}
+        //initialViewState={viewport}
+        onLoad={() => {
+          if (props.mapRef.current) {
+            props.mapRef.current.flyTo(props.mapPosition, 5000);
+          }
+        }}
         projection="globe"
-        {...map.position}
-        onMove={(evt) => map.updateMapPosition(evt.viewState)}
+        //{...map.position}
+        //onMove={(evt) => map.updateMapPosition(evt.viewState)}
         mapStyle={
           mapSettings[map.baseMap].type == "vector"
             ? mapSettings[map.baseMap].url
@@ -155,10 +233,10 @@ function Map() {
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         cursor={cursor}
-        interactiveLayerIds={["routeLayerBG", "routeLayerBGsel"]}
-        onClick={(evt) =>
-          filter.setSelected(evt.features.map((feature) => feature.id))
-        }
+        //interactiveLayerIds={["routeLayerBG", "routeLayerBGsel"]}
+        //onClick={(evt) =>
+        //  filter.setSelected(evt.features.map((feature) => feature.id))
+        //}
         terrain={{
           source: "mapbox-dem",
           exaggeration: map.threeDim ? 1.5 : 0,
@@ -180,35 +258,9 @@ function Map() {
           tileSize={512}
           maxzoom={14}
         />
-        <NavigationControl position="top-right" />
-        <GeolocateControl position="top-right" />
-        <FullscreenControl position="top-right" />
-        <Download position="top-right" context={map} />
-        <LayerSwitcher
-          sx={{ position: "absolute", top: 10, left: 10 }}
-          mapRef={mapRef}
-        />
-        {map.overlayMaps.map((mapName) => {
-          return (
-            <Source
-              key={mapName + "source"}
-              id={mapName}
-              type="raster"
-              tiles={[mapSettings[mapName].url]}
-              tileSize={256}
-            >
-              <Layer
-                key={mapName + "layer"}
-                id={mapName}
-                type="raster"
-                paint={{ "raster-opacity": mapSettings[mapName].opacity }}
-              />
-            </Source>
-          );
-        })}
-        <RouteSource data={activities}>
-          <RouteLayer filter={filter} />
-        </RouteSource>
+        {controls}
+        {overlayMaps}
+        {routes}
       </ReactMapGL>
       <Paper
         elevation={3}
@@ -248,9 +300,12 @@ function Map() {
             onRowClick={(row, params) => {
               console.log(row.id + " clicked");
               filter.setHighlighted(row.id);
-              mapRef.current?.fitBounds(activities.activityDict[row.id].bbox, {
-                padding: 100,
-              });
+              props.mapRef.current?.fitBounds(
+                activities.activityDict[row.id].bbox,
+                {
+                  padding: 100,
+                }
+              );
             }}
           />
         </div>

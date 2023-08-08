@@ -1,5 +1,5 @@
 import React, { useState, createContext, useEffect } from "react";
-import { categorySettings, filterSettings } from "./settings";
+import { categorySettings, filterSettings } from "@/settings";
 
 const filterState = {
   categories: {},
@@ -23,6 +23,7 @@ const FilterContext = createContext(filterState);
 
 export const FilterContextProvider = ({ children }) => {
   const [filter, setFilter] = useState(filterState);
+  console.log("FilterContextProvider render");
 
   useEffect(() => {
     console.log("filter", filter);
@@ -38,9 +39,9 @@ export const FilterContextProvider = ({ children }) => {
   };
 
   const setHighlighted = (highlighted) => {
-    //console.log("setHighlighted", selected);
     setFilter((filter) => ({ ...filter, highlighted: highlighted }));
   };
+
   const setOnlyCategory = (selectedID) => {
     setFilter((filter) => {
       if (

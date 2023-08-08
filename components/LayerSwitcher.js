@@ -1,4 +1,4 @@
-import { MapContext } from "@/MapContext";
+import { MapContext } from "@/components/Context/MapContext";
 import { mapSettings } from "@/settings";
 import { useContext, useState } from "react";
 import {
@@ -76,6 +76,17 @@ function LayerSwitcher(props) {
         anchorEl={anchorEl}
         open={open}
         onClose={handleClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        sx={{
+          "&& .MuiList-root": { py:.5 },
+        }}
       >
         <MenuList dense>
         {Object.entries(mapSettings)
@@ -97,55 +108,6 @@ function LayerSwitcher(props) {
             ))}
         </MenuList>
       </Menu>
-    </Box>
-  );
-}
-
-function LayerSwitcherO(props) {
-  const mapContext = useContext(MapContext);
-
-  return (
-    <Box sx={{ width: "120px", ...props.sx }}>
-      <FormControl {...formProps}>
-        <InputLabel id="BaseMap">Base Map</InputLabel>
-        <Select
-          {...selectProps}
-          value={mapContext.baseMap}
-          onChange={(e, v) => {
-            console.log("choosing", e, v);
-            mapContext.setBaseMap(e.target.value);
-          }}
-        >
-          {Object.entries(mapSettings)
-            .filter(([key, val]) => val.overlay === false)
-            .map(([key, val]) => (
-              <MenuItem key={key} value={key}>
-                {key}
-              </MenuItem>
-            ))}
-        </Select>
-      </FormControl>
-      <FormControl size="small" {...formProps}>
-        <InputLabel id="BaseMap">Overlay Maps</InputLabel>
-        <Select
-          {...selectProps}
-          multiple
-          value={mapContext.overlayMaps}
-          renderValue={(selected) => selected.join(", ") + " "}
-          onChange={(e, v) => {
-            console.log("choosing", e, v);
-            mapContext.setOverlayMaps(e.target.value);
-          }}
-        >
-          {Object.entries(mapSettings)
-            .filter(([key, val]) => val.overlay === true)
-            .map(([key, val]) => (
-              <MenuItem key={key} value={key}>
-                {key}
-              </MenuItem>
-            ))}
-        </Select>
-      </FormControl>
     </Box>
   );
 }

@@ -10,7 +10,7 @@ import MapIcon from "@mui/icons-material/Map";
 import Menu from "@mui/material/Menu";
 import { Tabs, Tab } from "@mui/material";
 import Avatar from "@mui/material/Avatar";
-import { ActivityContext } from "@/ActivityContext";
+import { ActivityContext } from "@/components/Context/ActivityContext";
 
 import IconButton from "@mui/material/IconButton";
 import Link from "next/link";
@@ -50,7 +50,7 @@ function LoginButton() {
   );
 }
 
-function ShareButton() {
+function ShareButton({ mapRef }) {
   const [open, setOpen] = React.useState(false);
 
   const handleClickOpen = () => {
@@ -69,7 +69,7 @@ function ShareButton() {
       >
         <ShareIcon />
       </IconButton>
-      <ShareDialog open={open} handleClose={handleClose} />
+      <ShareDialog open={open} handleClose={handleClose} mapRef={mapRef} />
     </>
   );
 }
@@ -171,6 +171,7 @@ export default function ResponsiveAppBar({
   drawerWidth,
   page,
   setPage,
+  mapRef,
 }) {
   const activityContext = React.useContext(ActivityContext);
 
@@ -232,7 +233,7 @@ export default function ResponsiveAppBar({
             Cookies.get("athlete") &&
             !activityContext.guestMode && (
               <>
-                <ShareButton />
+                <ShareButton mapRef={mapRef} />
                 <UserSettings />
               </>
             )}

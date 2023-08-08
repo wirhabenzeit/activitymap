@@ -1,4 +1,4 @@
-import { listSettings } from "./settings";
+import { listSettings } from "../../settings";
 import { createContext, Component } from "react";
 
 const ListContext = createContext(listSettings.defaultState);
@@ -11,7 +11,7 @@ export class ListContextProvider extends Component {
   }
 
   render() {
-    //console.log("ListContextProvider render");
+    console.log("ListContextProvider render");
     const { children } = this.props;
     return (
       <ListContext.Provider

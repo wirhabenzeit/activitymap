@@ -29,6 +29,7 @@ export default function Layout(props) {
         drawerWidth={drawerWidth}
         page={props.page}
         setPage={props.setPage}
+        mapRef={props.mapRef}
       ></ResponsiveAppBar>
       <ResponsiveDrawer
         open={open}

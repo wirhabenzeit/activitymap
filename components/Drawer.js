@@ -10,7 +10,7 @@ import { ListItem } from "@mui/material";
 import MultiSelect from "@/components/MultiSelect";
 import ValueSlider from "@/components/ValueSlider";
 import { filterSettings, categorySettings } from "@/settings";
-import { ActivityContext } from "@/ActivityContext";
+import { ActivityContext } from "@/components/Context/ActivityContext";
 
 export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
   const activityContext = React.useContext(ActivityContext);

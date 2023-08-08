@@ -1,24 +1,27 @@
 import { useRouter } from "next/router";
-import { useEffect, useContext, useState } from "react";
-import { ActivityContext } from "@/ActivityContext";
-import { MapContext } from "@/MapContext";
+import { useEffect, useContext, useState, cloneElement, useRef } from "react";
+import { ActivityContext } from "@/components/Context/ActivityContext";
+import { MapContext } from "@/components/Context/MapContext";
 import Layout from "@/components/Layout";
 import Cookies from "js-cookie";
 import { Backdrop, CircularProgress } from "@mui/material";
-import { mapSettings } from "./settings";
-import { ListContext } from "./ListContext";
+import { mapSettings, defaultMapPosition } from "./settings";
+import { ListContext } from "@/components/Context/ListContext";
 
 const pages = {
   "/": { name: "Map", index: 0 },
   "/list": { name: "List", index: 1 },
 };
 
-export default function Home(props) {
+export default function Home({ children }) {
   const activityContext = useContext(ActivityContext);
   const mapContext = useContext(MapContext);
   const listContext = useContext(ListContext);
   const router = useRouter();
   const [page, setPage] = useState(0);
+  const [mapPosition, setMapPosition] = useState(defaultMapPosition);
+  const mapRef = useRef();
+  console.log(defaultMapPosition);
 
   useEffect(() => {
     setPage(pages[router.pathname].index);
@@ -29,7 +32,7 @@ export default function Home(props) {
     if ("mapPosition" in router.query) {
       const mapPos = JSON.parse(router.query.mapPosition);
       console.log(mapPos);
-      mapContext.updateMapPosition(mapPos);
+      setMapPosition(mapPos);
     }
     if ("baseMap" in router.query) {
       console.log("Setting base map", router.query.baseMap);
@@ -74,8 +77,8 @@ export default function Home(props) {
   }, [router.isReady]);
   return (
     <>
-      <Layout page={page} setPage={setPage}>
-        {props.children}
+      <Layout page={page} setPage={setPage} mapRef={mapRef}>
+        {cloneElement(children, { mapPosition: mapPosition, mapRef: mapRef })}
       </Layout>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}

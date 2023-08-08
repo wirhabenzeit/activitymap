@@ -1,6 +1,6 @@
 import { createContext, Component } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { filterSettings } from "./settings";
+import { filterSettings } from "@/settings";
 import Cookies from "js-cookie";
 
 const supabase = createClient(
@@ -265,6 +265,7 @@ export class ActivityContextProvider extends Component {
   };
 
   render = () => {
+    console.log("ActivityContext render");
     const { children } = this.props;
     return (
       <ActivityContext.Provider
