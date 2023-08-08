@@ -31,7 +31,6 @@ export default function Home({ children }) {
     }
     if ("mapPosition" in router.query) {
       const mapPos = JSON.parse(router.query.mapPosition);
-      console.log(mapPos);
       setMapPosition(mapPos);
     }
     if ("baseMap" in router.query) {

@@ -26,7 +26,7 @@ import { ListContext } from "@/components/Context/ListContext";
 import { categorySettings } from "@/settings";
 import { listSettings } from "@/settings";
 import { Paper } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { DataGrid, GridColumnMenu } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material/styles";
 import LayerSwitcher from "@/components/LayerSwitcher";
 
@@ -143,6 +143,18 @@ function RouteLayer() {
         filter={filterHigh}
       />
     </>
+  );
+}
+
+function CustomColumnMenu(props) {
+  return (
+    <GridColumnMenu
+      {...props}
+      slots={{
+        // Hide `columnMenuColumnsItem`
+        columnMenuSortItem: null,
+      }}
+    />
   );
 }
 
@@ -267,48 +279,47 @@ function Map(props) {
         sx={{
           zIndex: 2,
           position: "absolute",
-          left: "0px",
-          width: "80%",
-          right: "0px",
+          left: "40px",
+          maxWidth: "800px",
+          height: filter.selected.length > 7 ? "210px" : "auto",
+          right: "10px",
           bottom: "30px",
           margin: "auto",
-          alignContent: "center",
           display: filter.selected.length > 0 ? "block" : "none",
         }}
       >
-        <div width="100%">
-          <DataGrid
-            hideFooter
-            rowHeight={35}
-            rows={activities.geoJson.features.filter((data) =>
-              filter.selected.includes(data.id)
-            )}
-            autoHeight
-            initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-            pageSizeOptions={[10]}
-            columns={listSettings.columns}
-            disableColumnFilter
-            density="compact"
-            sortModel={listState.compact.sortModel}
-            onSortModelChange={(model) =>
-              listState.setSortModel("compact", model)
-            }
-            columnVisibilityModel={listState.compact.columnVisibilityModel}
-            onColumnVisibilityModelChange={(newModel) =>
-              listState.setColumnVisibilityModel("compact", newModel)
-            }
-            onRowClick={(row, params) => {
-              console.log(row.id + " clicked");
-              filter.setHighlighted(row.id);
-              props.mapRef.current?.fitBounds(
-                activities.activityDict[row.id].bbox,
-                {
-                  padding: 100,
-                }
-              );
-            }}
-          />
-        </div>
+        <DataGrid
+          hideFooter={true}
+          rowHeight={35}
+          disableColumnMenu={true}
+          rows={activities.geoJson.features.filter((data) =>
+            filter.selected.includes(data.id)
+          )}
+          autoHeight={filter.selected.length <= 7}
+          initialState={{ pagination: { paginationModel: { pageSize: 100 } } }}
+          //pageSizeOptions={[10]}
+          columns={listSettings.columns}
+          disableColumnFilter
+          density="compact"
+          sortModel={listState.compact.sortModel}
+          onSortModelChange={(model) =>
+            listState.setSortModel("compact", model)
+          }
+          columnVisibilityModel={listState.compact.columnVisibilityModel}
+          onColumnVisibilityModelChange={(newModel) =>
+            listState.setColumnVisibilityModel("compact", newModel)
+          }
+          onRowClick={(row, params) => {
+            console.log(row.id + " clicked");
+            filter.setHighlighted(row.id);
+            props.mapRef.current?.fitBounds(
+              activities.activityDict[row.id].bbox,
+              {
+                padding: 100,
+              }
+            );
+          }}
+        />
       </Paper>
     </>
   );

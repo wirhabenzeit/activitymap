@@ -146,10 +146,10 @@ const mapSettings = {
 };
 
 const defaultMapPosition = {
-  zoom: 9,
+  zoom: 8,
   longitude: 8,
   latitude: 47,
-  center: [8, 47],
+  center: [8, 46.75],
   pitch: 0,
   bearing: 0,
 };
@@ -283,6 +283,7 @@ const listSettings = {
     {
       field: "sport_type",
       headerName: "Type",
+      description: "Sport type",
       valueGetter: (params) => params.row.properties.sport_type,
       flex: 1,
       minWidth: 60,
@@ -320,6 +321,8 @@ const listSettings = {
     {
       field: "start_date_local_timestamp",
       headerName: "Day",
+      description:
+        "Start date of the activity. Click on the column header to sort by date.",
       flex: 1,
       minWidth: 80,
       renderHeader: (params) => <i className="fa-solid fa-calendar"></i>,
@@ -360,7 +363,7 @@ const listSettings = {
       headerName: "Elapsed time",
       renderHeader: (params) => (
         <>
-          <i className="fa-solid fa-stopwatch"></i>&nbsp;elapsed
+          <i className="fa-solid fa-stopwatch"></i>
         </>
       ),
       field: "elapsed_time",
@@ -379,7 +382,7 @@ const listSettings = {
       headerName: "Moving time",
       renderHeader: (params) => (
         <>
-          <i className="fa-solid fa-stopwatch"></i>&nbsp;moving
+          <i className="fa-solid fa-stopwatch"></i>
         </>
       ),
       field: "moving_time",
@@ -412,7 +415,6 @@ const listSettings = {
       renderHeader: (params) => (
         <>
           <i className="fa-solid fa-mountain"></i>
-          <span>&nbsp;gain</span>
         </>
       ),
       headerName: "Elev Gain",
@@ -427,7 +429,6 @@ const listSettings = {
       renderHeader: (params) => (
         <>
           <i className="fa-solid fa-mountain"></i>
-          <span>&nbsp;high</span>
         </>
       ),
       headerName: "Elev High",
@@ -457,7 +458,6 @@ const listSettings = {
       renderHeader: (params) => (
         <>
           <i className="fa-solid fa-bolt-lightning"></i>
-          <span>&nbsp;wavg</span>
         </>
       ),
       headerName: "Weighted Avg Watts",
@@ -472,7 +472,6 @@ const listSettings = {
       renderHeader: (params) => (
         <>
           <i className="fa-solid fa-bolt-lightning"></i>
-          <span>&nbsp;avg</span>
         </>
       ),
       headerName: "Avg Watts",
@@ -487,7 +486,6 @@ const listSettings = {
       renderHeader: (params) => (
         <>
           <i className="fa-solid fa-bolt-lightning"></i>
-          <span>&nbsp;avg</span>
         </>
       ),
       headerName: "Max Watts",
@@ -502,7 +500,6 @@ const listSettings = {
       renderHeader: (params) => (
         <>
           <i className="fa-solid fa-heart"></i>
-          <span>&nbsp;avg</span>
         </>
       ),
       headerName: "Avg Heartrate",
@@ -517,7 +514,6 @@ const listSettings = {
       renderHeader: (params) => (
         <>
           <i className="fa-solid fa-heart"></i>
-          <span>&nbsp;max</span>
         </>
       ),
       headerName: "Max Heartrate",

@@ -19,7 +19,6 @@ export class SelectionControl {
     document.head.appendChild(styleSheet);
 
     this.mapRef = props.mapRef;
-    this._map;
     this.canvas;
     this.layers = props.layers;
     this.source = props.source;
@@ -34,10 +33,6 @@ export class SelectionControl {
   }
 
   onAdd(map) {
-    console.log(this.mapRef.current.getMap());
-    console.log(map);
-    this._map = map;
-    //this.canvas = map.getCanvasContainer();
     this.canvas = this.mapRef.current.getCanvasContainer();
     this._container = document.createElement("div");
 
@@ -128,6 +123,5 @@ export class SelectionControl {
 
   onRemove() {
     this._container.parentNode.removeChild(this._container);
-    this._map = undefined;
   }
 }

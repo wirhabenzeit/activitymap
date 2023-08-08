@@ -33,7 +33,7 @@ export function LoadMoreButton() {
       }}
       disabled={disabled}
     >
-      Load More
+      Reload
     </Button>
   );
 }
@@ -94,7 +94,6 @@ export default function List() {
         </rootProps.slots.baseButton>
         <GridToolbarColumnsButton />
         <GridToolbarDensitySelector />
-        <GridToolbarExport />
       </GridToolbarContainer>
     );
   };
