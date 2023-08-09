@@ -95,17 +95,18 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
             </ListItem>
           ))}
         </List>
-        {activityContext.geoJson.features.length > 1 && (
-          <>
-            <Divider />
-            <List sx={{ position: "unset" }}>
-              {Object.keys(filterSettings).map((key) => (
-                <ListItem sx={{ px: 0, py: 0, position: "unset" }} key={key}>
-                  <ValueSlider open={open} name={key} />
-                </ListItem>
-              ))}
-            </List>
-            {/*
+        {activityContext.loaded &&
+          activityContext.geoJson.features.length > 1 && (
+            <>
+              <Divider />
+              <List sx={{ position: "unset" }}>
+                {Object.keys(filterSettings).map((key) => (
+                  <ListItem sx={{ px: 0, py: 0, position: "unset" }} key={key}>
+                    <ValueSlider open={open} name={key} />
+                  </ListItem>
+                ))}
+              </List>
+              {/*
           <Divider />
           {activityContext.loaded && (
             <List>
@@ -115,8 +116,8 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
             </List>
           )}
           <Divider />*/}
-          </>
-        )}
+            </>
+          )}
       </Box>
     </Drawer>
   );
