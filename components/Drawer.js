@@ -63,11 +63,7 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
   }));
 
   return (
-    <Drawer
-      variant="permanent"
-      open={open}
-      PaperProps={{ sx: { position: "unset" } }}
-    >
+    <Drawer variant="permanent" open={open}>
       <DrawerHeader>
         <IconButton
           onClick={() => {
@@ -88,9 +84,9 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
           height: 1,
         }}
       >
-        <List sx={{ position: "unset" }}>
+        <List>
           {Object.keys(categorySettings).map((key) => (
-            <ListItem sx={{ px: 0, py: 0, position: "unset" }} key={key}>
+            <ListItem sx={{ px: 0, py: 0 }} key={key}>
               <MultiSelect open={open} name={key} />
             </ListItem>
           ))}
@@ -99,9 +95,9 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
           activityContext.geoJson.features.length > 1 && (
             <>
               <Divider />
-              <List sx={{ position: "unset" }}>
+              <List>
                 {Object.keys(filterSettings).map((key) => (
-                  <ListItem sx={{ px: 0, py: 0, position: "unset" }} key={key}>
+                  <ListItem sx={{ px: 0, py: 0 }} key={key}>
                     <ValueSlider open={open} name={key} />
                   </ListItem>
                 ))}
