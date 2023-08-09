@@ -276,6 +276,14 @@ const filterSettings = {
   },
 };
 
+const binaryFilters = {
+  commute: {
+    icon: "briefcase",
+    label: "Commutes",
+    defaultValue: undefined,
+  },
+};
+
 function decFormatter(unit = "", decimals = 0) {
   return (num) => (num == undefined ? null : num.toFixed(decimals) + unit);
 }
@@ -290,7 +298,9 @@ const listSettings = {
       valueGetter: (params) => params.row.properties.sport_type,
       renderCell: (params) => (
         <i
-          class={`fa-solid fa-${categorySettings[aliasMap[params.value]].icon}`}
+          className={`fa-solid fa-${
+            categorySettings[aliasMap[params.value]].icon
+          }`}
           title={params.value}
           style={{ color: colorMap[params.value] }}
         />
@@ -575,5 +585,6 @@ export {
   defaultMapPosition,
   categorySettings,
   filterSettings,
+  binaryFilters,
   listSettings,
 };

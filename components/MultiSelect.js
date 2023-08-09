@@ -52,7 +52,7 @@ export default function MultiSelect({ open, name }) {
     >
       <FormControl
         sx={{
-          mx: 1,
+          mr: 2,
           width: 1,
         }}
         size="small"

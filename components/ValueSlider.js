@@ -87,7 +87,7 @@ export default function SliderBox({ open, name }) {
     >
       <Slider
         getAriaLabel={() => name}
-        sx={{ width: "160px", ml: 3, mt: 1 }}
+        sx={{ width: "160px", mx: 3, mt: 1 }}
         min={min}
         max={max}
         scale={scale}

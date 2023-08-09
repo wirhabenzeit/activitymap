@@ -124,7 +124,7 @@ export default function List() {
         <title>StravaMap - Activity List</title>
       </Head>
       <DataGrid
-        rows={activityContext.geoJson.features.filter(customFilter)}
+        rows={activityContext.geoJson.features.filter(filter.filterFn)}
         columns={listSettings.columns}
         disableColumnMenu
         pageSizeOptions={[100]}

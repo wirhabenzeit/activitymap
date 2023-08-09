@@ -66,6 +66,7 @@ function RouteSource(props) {
 
 function RouteLayer() {
   const filterContext = useContext(FilterContext);
+  const activityContext = useContext(ActivityContext);
   const theme = useTheme();
 
   const color = ["match", ["get", "sport_type"]];
@@ -75,7 +76,7 @@ function RouteLayer() {
     });
   });
   color.push("#000000");
-  const categoryFilter = [
+  /*const categoryFilter = [
     "in",
     "sport_type",
     ...Object.values(filterContext.categories)
@@ -88,11 +89,19 @@ function RouteLayer() {
       valueFilter.push([">=", key, value[0]]);
       valueFilter.push(["<=", key, value[1]]);
     }
-  });
+  });*/
+  const filter = [
+    "in",
+    "id",
+    ...activityContext.geoJson.features
+      .filter(filterContext.filterFn)
+      .map((feature) => feature.properties.id),
+  ];
+  console.log(filter);
   const selectedFilter = ["in", "id", ...filterContext.selected];
   const unselectedFilter = ["!in", "id", ...filterContext.selected];
-  const filterAll = ["all", categoryFilter, valueFilter, unselectedFilter];
-  const filterSel = ["all", categoryFilter, valueFilter, selectedFilter];
+  const filterAll = ["all", filter, unselectedFilter];
+  const filterSel = ["all", filter, selectedFilter];
   const filterHigh = ["==", "id", filterContext.highlighted];
   return (
     <>

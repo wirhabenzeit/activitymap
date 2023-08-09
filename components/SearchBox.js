@@ -43,7 +43,7 @@ export default function SearchBox({ open, name }) {
       }
     >
       <TextField
-        sx={{ ml: 0.5, width: 1 }}
+        sx={{ width: 1, mr: 1 }}
         margin="none"
         size="small"
         label="Activity Title"

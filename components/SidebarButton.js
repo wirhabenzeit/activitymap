@@ -33,8 +33,9 @@ export default function SidebarButton(props) {
       <Box
         sx={{
           display: props.open ? "flex" : "none",
+          visibility: props.open ? "visible" : "hidden",
           alignItems: "center",
-          width: "210px",
+          width: "220px",
           height: "50px",
           p: 0,
           pb: 0.5,
@@ -60,13 +61,10 @@ export default function SidebarButton(props) {
           paper: {
             sx: {
               pointerEvents: "auto",
-              width: "210px",
-              height: "50px",
               justifyContent: "center",
               alignItems: "center",
-              pl: 0,
-              pr: 2,
-              py: 0.5,
+              maxWidth: "220px",
+              p: 1,
             },
           },
         }}

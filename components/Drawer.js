@@ -11,7 +11,8 @@ import { ListItem } from "@mui/material";
 import MultiSelect from "@/components/MultiSelect";
 import ValueSlider from "@/components/ValueSlider";
 import SearchBox from "@/components/SearchBox";
-import { filterSettings, categorySettings } from "@/settings";
+import CheckboxFilter from "@/components/CheckboxFilter";
+import { filterSettings, categorySettings, binaryFilters } from "@/settings";
 import { ActivityContext } from "@/components/Context/ActivityContext";
 
 export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
@@ -97,6 +98,11 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
           <ListItem sx={{ px: 0, py: 0 }} key="search">
             <SearchBox open={open} />
           </ListItem>
+          {Object.keys(binaryFilters).map((key) => (
+            <ListItem sx={{ px: 0, py: 0 }} key={key}>
+              <CheckboxFilter open={open} name={key} />
+            </ListItem>
+          ))}
         </List>
         {activityContext.loaded &&
           activityContext.geoJson.features.length > 1 && (

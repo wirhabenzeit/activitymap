@@ -1,10 +1,11 @@
 import React, { useState, createContext, useEffect } from "react";
-import { categorySettings, filterSettings } from "@/settings";
+import { categorySettings, filterSettings, binaryFilters } from "@/settings";
 
 const filterState = {
   categories: {},
   values: {},
   search: "",
+  binary: {},
   selected: [],
   highlighted: 0,
 };
@@ -18,6 +19,10 @@ Object.entries(categorySettings).forEach(([key, category]) => {
 
 Object.entries(filterSettings).forEach(([key, filter]) => {
   filterState.values[key] = [undefined, undefined];
+});
+
+Object.entries(binaryFilters).forEach(([key, filter]) => {
+  filterState.binary[key] = filter.defaultValue;
 });
 
 const FilterContext = createContext(filterState);
@@ -129,6 +134,13 @@ export const FilterContextProvider = ({ children }) => {
     }));
   };
 
+  const setBinary = (selectedID, newValue) => {
+    setFilter((filter) => ({
+      ...filter,
+      binary: { ...filter.binary, [selectedID]: newValue },
+    }));
+  };
+
   const updateCategoryFilter = (selectedID, newFilter) => {
     if (newFilter.length > 0) {
       setFilter((filter) => ({
@@ -157,6 +169,34 @@ export const FilterContextProvider = ({ children }) => {
     }
   };
 
+  const activeCat = [];
+  Object.entries(filter.categories).forEach(([key, value]) => {
+    activeCat.push(...value.filter);
+  });
+
+  const filterFn = (data) => {
+    if (!activeCat.includes(data.properties.sport_type)) return false;
+    if (
+      filter.search &&
+      !data.properties.name.toLowerCase().includes(filter.search.toLowerCase())
+    )
+      return false;
+    if (
+      Object.entries(filter.values).some(
+        ([key, value]) =>
+          data.properties[key] < value[0] || data.properties[key] > value[1]
+      )
+    )
+      return false;
+    if (
+      Object.entries(filter.binary).some(
+        ([key, value]) => value !== undefined && data.properties[key] != value
+      )
+    )
+      return false;
+    return true;
+  };
+
   return (
     <FilterContext.Provider
       value={{
@@ -168,6 +208,8 @@ export const FilterContextProvider = ({ children }) => {
         setSelected,
         setHighlighted,
         setSearch,
+        setBinary,
+        filterFn,
       }}
     >
       {children}

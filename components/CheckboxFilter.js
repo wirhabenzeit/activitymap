@@ -7,50 +7,64 @@ import { fas } from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
 import { FilterContext } from "@/components/Context/FilterContext";
 import SidebarButton from "@/components/SidebarButton";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import { Cancel, Circle, Help, CheckCircle } from "@mui/icons-material";
+import { filterSettings, categorySettings, binaryFilters } from "@/settings";
+console.log(categorySettings);
 
-export default function SearchBox({ open, name }) {
-  const [openSearch, setOpenSearch] = React.useState(false);
+export default function CheckboxFilter({ open, name }) {
+  const [openContent, setOpenContent] = React.useState(false);
   const filterContext = React.useContext(FilterContext);
-  const [value, setValue] = useState(filterContext.search);
+  const [value, setValue] = useState(filterContext.binary[name]);
 
-  useEffect(() => {
-    const setSearch = setTimeout(() => {
-      filterContext.setSearch(value);
-    }, 500);
-
-    return () => clearTimeout(setSearch);
-  }, [value]);
+  useEffect(() => filterContext.setBinary(name, value), [value]);
 
   return (
     <SidebarButton
       open={open}
-      contentOpen={openSearch}
-      setContentOpen={setOpenSearch}
+      contentOpen={openContent}
+      setContentOpen={setOpenContent}
       button={
         <IconButton
           sx={{
             width: "30px",
             mx: "1px",
-            color: value == "" ? "text.disabled" : "primary",
+            color: value === undefined ? "text.disabled" : "primary",
           }}
           onClick={() => {
-            setValue("");
-            filterContext.setSearch(name, "");
+            setValue(undefined);
+            filterContext.setBinary(name, undefined);
           }}
         >
-          <FontAwesomeIcon fontSize="medium" icon="magnifying-glass" />
+          <FontAwesomeIcon fontSize="medium" icon={binaryFilters[name].icon} />
         </IconButton>
       }
     >
-      <TextField
-        sx={{ ml: 0.5, width: 1 }}
-        margin="none"
-        size="small"
-        label="Activity Title"
-        value={value}
-        onChange={(event) => {
-          setValue(event.target.value);
-        }}
+      <FormControlLabel
+        label={binaryFilters[name].label}
+        labelPlacement="start"
+        control={
+          <Checkbox
+            sx={{ mr: 1 }}
+            icon={<Cancel />}
+            color="default"
+            checkedIcon={<CheckCircle />}
+            indeterminateIcon={<Help />}
+            checked={value}
+            indeterminate={value === undefined}
+            onChange={(event) => {
+              console.log(value);
+              if (value === undefined) {
+                setValue(true);
+              } else if (value) {
+                setValue(false);
+              } else {
+                setValue(undefined);
+              }
+            }}
+          />
+        }
       />
     </SidebarButton>
   );
