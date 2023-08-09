@@ -54,6 +54,7 @@ export default function MultiSelect({ open, name }) {
         sx={{
           mr: 2,
           width: 1,
+          minWidth: "150px",
         }}
         size="small"
         variant="standard"
