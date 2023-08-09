@@ -49,47 +49,46 @@ export default function MultiSelect({ open, name }) {
           />
         </IconButton>
       }
-      content={
-        <FormControl
-          sx={{
-            mx: 1,
-            width: 1,
+    >
+      <FormControl
+        sx={{
+          mx: 1,
+          width: 1,
+        }}
+        size="small"
+        variant="standard"
+      >
+        <InputLabel id={name + "-label"}>{name}</InputLabel>
+        <Select
+          //id={name}
+          //labelId={name+"-label"}
+          multiple
+          value={context.categories[name].filter}
+          onChange={selectChange}
+          renderValue={(selected) => selected.join(", ")}
+          open={selectOpen}
+          onOpen={(event) => setSelectOpen(true)}
+          onClose={(event) => {
+            setContentOpen(false);
+            setSelectOpen(false);
           }}
-          size="small"
-          variant="standard"
-        >
-          <InputLabel id={name + "-label"}>{name}</InputLabel>
-          <Select
-            //id={name}
-            //labelId={name+"-label"}
-            multiple
-            value={context.categories[name].filter}
-            onChange={selectChange}
-            renderValue={(selected) => selected.join(", ")}
-            open={selectOpen}
-            onOpen={(event) => setSelectOpen(true)}
-            onClose={(event) => {
-              setContentOpen(false);
-              setSelectOpen(false);
-            }}
-            MenuProps={{
-              sx: {
-                "&& .Mui-selected": {
-                  backgroundColor: categorySettings[name].color + "20",
-                },
-                "&& .MuiList-root": { padding: 0 },
+          MenuProps={{
+            sx: {
+              "&& .Mui-selected": {
+                backgroundColor: categorySettings[name].color + "20",
               },
-            }}
-            style={{ fontSize: "0.8rem" }}
-          >
-            {categorySettings[name].alias.map((type) => (
-              <MenuItem key={type} value={type}>
-                {type}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      }
-    />
+              "&& .MuiList-root": { padding: 0 },
+            },
+          }}
+          style={{ fontSize: "0.8rem" }}
+        >
+          {categorySettings[name].alias.map((type) => (
+            <MenuItem key={type} value={type}>
+              {type}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </SidebarButton>
   );
 }

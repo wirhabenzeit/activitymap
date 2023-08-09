@@ -26,18 +26,6 @@ const darkTheme = createTheme({
   },
 });
 
-export const LinkWithQuery = ({ children, href, ...props }) => {
-  const search = useRouter().query.athlete;
-  return (
-    <Link
-      href={search !== undefined ? href + "?athlete=" + search : href}
-      {...props}
-    >
-      {children}
-    </Link>
-  );
-};
-
 function LoginButton() {
   return (
     <IconButton
@@ -63,10 +51,7 @@ function ShareButton({ mapRef }) {
 
   return (
     <>
-      <IconButton
-        sx={{ mx: 2, color: "secondary.light" }}
-        onClick={handleClickOpen}
-      >
+      <IconButton sx={{ mx: 2 }} onClick={handleClickOpen}>
         <ShareIcon />
       </IconButton>
       <ShareDialog open={open} handleClose={handleClose} mapRef={mapRef} />
@@ -156,6 +141,12 @@ function PageLinks({ page, setPage }) {
           onChange={(e, v) => {
             setPage(v);
           }}
+          textColor="inherit"
+          TabIndicatorProps={{
+            style: {
+              backgroundColor: "white",
+            },
+          }}
         >
           <Tab label="Map" component={Link} href={"/" + urlParam} />
           <Tab label="List" component={Link} href={"/list" + urlParam} />
@@ -196,7 +187,7 @@ export default function ResponsiveAppBar({
   return (
     <AppBar position="fixed" open={open}>
       <ThemeProvider theme={darkTheme}>
-        <Toolbar>
+        <Toolbar sx={{ pl: { xs: 0, sm: 0 } }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -205,13 +196,14 @@ export default function ResponsiveAppBar({
             }}
             edge="start"
             sx={{
-              marginRight: 3,
+              p: 0,
+              mx: 0.25,
               ...(open && { display: "none" }),
             }}
           >
             <ChevronRightIcon />
           </IconButton>
-          <MapIcon sx={{ mr: 1, display: { xs: "none", sm: "flex" } }} />
+          <MapIcon sx={{ mx: 1, display: { xs: "none", sm: "flex" } }} />
           <Typography
             variant="h6"
             noWrap

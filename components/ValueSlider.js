@@ -50,7 +50,7 @@ export default function SliderBox({ open, name }) {
   const [value, setValue] = useState(filterContext.values[name]);
   const activityContext = React.useContext(ActivityContext);
   const minmax = activityContext.loading
-    ? undefined
+    ? [undefined, undefined]
     : activityContext.filterRange[name];
   const min = activityContext.loading ? undefined : minmax[0];
   const max = activityContext.loading ? undefined : minmax[1];
@@ -68,29 +68,40 @@ export default function SliderBox({ open, name }) {
       contentOpen={openSlider}
       setContentOpen={setOpenSlider}
       button={
-        <IconButton sx={{ width: "30px", mx: "1px" }}>
+        <IconButton
+          sx={{
+            width: "30px",
+            mx: "1px",
+            color: minmax.every((v, i) => v === value[i])
+              ? "text.disabled"
+              : "primary",
+          }}
+          onClick={() => {
+            setValue(minmax);
+            filterContext.updateValueFilter(name, minmax.map(scale));
+          }}
+        >
           <FontAwesomeIcon fontSize="medium" icon={filterSettings[name].icon} />
         </IconButton>
       }
-      content={
-        <Slider
-          getAriaLabel={() => name}
-          sx={{ ml: 3, mr: 3 }}
-          min={min}
-          max={max}
-          scale={scale}
-          valueLabelFormat={(value) => filterSettings[name].tooltip(value)}
-          value={value}
-          onChange={(event, newValue) => {
-            setValue(newValue);
-          }}
-          onChangeCommitted={(event, newValue) => {
-            filterContext.updateValueFilter(name, newValue.map(scale));
-          }}
-          size="small"
-          valueLabelDisplay="on"
-        />
-      }
-    />
+    >
+      <Slider
+        getAriaLabel={() => name}
+        sx={{ width: "160px", ml: 3, mt: 1 }}
+        min={min}
+        max={max}
+        scale={scale}
+        valueLabelFormat={(value) => filterSettings[name].tooltip(value)}
+        value={value}
+        onChange={(event, newValue) => {
+          setValue(newValue);
+        }}
+        onChangeCommitted={(event, newValue) => {
+          filterContext.updateValueFilter(name, newValue.map(scale));
+        }}
+        size="small"
+        valueLabelDisplay="on"
+      />
+    </SidebarButton>
   );
 }

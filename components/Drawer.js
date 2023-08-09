@@ -2,6 +2,7 @@ import * as React from "react";
 import { styled, useTheme } from "@mui/material/styles";
 import MuiDrawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
+import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Divider from "@mui/material/Divider";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -62,7 +63,11 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
   }));
 
   return (
-    <Drawer variant="permanent" open={open}>
+    <Drawer
+      variant="permanent"
+      open={open}
+      PaperProps={{ sx: { position: "unset" } }}
+    >
       <DrawerHeader>
         <IconButton
           onClick={() => {
@@ -77,24 +82,30 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
         </IconButton>
       </DrawerHeader>
       <Divider />
-      <List>
-        {Object.keys(categorySettings).map((key) => (
-          <ListItem sx={{ px: 0, py: 0 }} key={key}>
-            <MultiSelect open={open} name={key} />
-          </ListItem>
-        ))}
-      </List>
-      {activityContext.geoJson.features.length > 1 && (
-        <>
-          <Divider />
-          <List>
-            {Object.keys(filterSettings).map((key) => (
-              <ListItem sx={{ px: 0, py: 0 }} key={key}>
-                <ValueSlider open={open} name={key} />
-              </ListItem>
-            ))}
-          </List>
-          {/*
+      <Box
+        sx={{
+          width: 1,
+          height: 1,
+        }}
+      >
+        <List sx={{ position: "unset" }}>
+          {Object.keys(categorySettings).map((key) => (
+            <ListItem sx={{ px: 0, py: 0, position: "unset" }} key={key}>
+              <MultiSelect open={open} name={key} />
+            </ListItem>
+          ))}
+        </List>
+        {activityContext.geoJson.features.length > 1 && (
+          <>
+            <Divider />
+            <List sx={{ position: "unset" }}>
+              {Object.keys(filterSettings).map((key) => (
+                <ListItem sx={{ px: 0, py: 0, position: "unset" }} key={key}>
+                  <ValueSlider open={open} name={key} />
+                </ListItem>
+              ))}
+            </List>
+            {/*
           <Divider />
           {activityContext.loaded && (
             <List>
@@ -104,8 +115,9 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
             </List>
           )}
           <Divider />*/}
-        </>
-      )}
+          </>
+        )}
+      </Box>
     </Drawer>
   );
 }

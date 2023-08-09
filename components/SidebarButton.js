@@ -3,7 +3,7 @@ import { Box, Paper } from "@mui/material";
 export default function SidebarButton(props) {
   return (
     <Box
-      sx={{ width: 1, display: "flex", flexDirection: "row" }}
+      sx={{ width: 1, display: "flex" }}
       onMouseEnter={() => {
         props.setContentOpen(true);
       }}
@@ -29,18 +29,19 @@ export default function SidebarButton(props) {
         elevation={props.contentOpen && !props.open ? 3 : 0}
         sx={{
           zIndex: 10,
-          position: "fixed",
+          position: "absolute",
           left: "32px",
-          padding: 0,
           width: "210px",
           height: "50px",
-          display: "flex",
+          display: props.contentOpen || props.open ? "block" : "none",
           justifyContent: "center",
           alignItems: "center",
-          visibility: props.contentOpen || props.open ? "visible" : "hidden",
+          pl: 0,
+          pr: 2,
+          py: 0.5,
         }}
       >
-        {props.content}
+        {props.children}
       </Paper>
     </Box>
   );
