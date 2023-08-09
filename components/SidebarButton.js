@@ -36,9 +36,8 @@ export default function SidebarButton(props) {
           alignItems: "center",
           width: "210px",
           height: "50px",
-          pl: 0,
-          pr: 2,
-          py: 0.5,
+          p: 0,
+          pb: 0.5,
         }}
       >
         {props.children}

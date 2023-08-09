@@ -236,10 +236,12 @@ const categorySettings = {
 };
 
 const colorMap = {};
+const aliasMap = {};
 
 Object.entries(categorySettings).forEach(([key, value]) => {
   value.alias.forEach((alias) => {
     colorMap[alias] = value.color;
+    aliasMap[alias] = key;
   });
 });
 
@@ -284,7 +286,15 @@ const listSettings = {
       field: "sport_type",
       headerName: "Type",
       description: "Sport type",
+      renderHeader: (params) => <i className="fa-solid fa-child-reaching"></i>,
       valueGetter: (params) => params.row.properties.sport_type,
+      renderCell: (params) => (
+        <i
+          class={`fa-solid fa-${categorySettings[aliasMap[params.value]].icon}`}
+          title={params.value}
+          style={{ color: colorMap[params.value] }}
+        />
+      ),
       flex: 1,
       minWidth: 60,
     },
@@ -310,7 +320,6 @@ const listSettings = {
           href={`https://www.strava.com/activities/${params.value.id}`}
           target="_blank"
           rel="noreferrer"
-          sx={{ color: colorMap[params.value.sport_type] }}
         >
           {params.value.name}
         </Link>

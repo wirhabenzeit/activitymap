@@ -10,6 +10,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { ListItem } from "@mui/material";
 import MultiSelect from "@/components/MultiSelect";
 import ValueSlider from "@/components/ValueSlider";
+import SearchBox from "@/components/SearchBox";
 import { filterSettings, categorySettings } from "@/settings";
 import { ActivityContext } from "@/components/Context/ActivityContext";
 
@@ -90,6 +91,12 @@ export default function ResponsiveDrawer({ open, setOpen, drawerWidth }) {
               <MultiSelect open={open} name={key} />
             </ListItem>
           ))}
+        </List>
+        <Divider />
+        <List>
+          <ListItem sx={{ px: 0, py: 0 }} key="search">
+            <SearchBox open={open} />
+          </ListItem>
         </List>
         {activityContext.loaded &&
           activityContext.geoJson.features.length > 1 && (

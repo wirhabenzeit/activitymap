@@ -52,6 +52,7 @@ const requiredFields = new Set([
   "elev_low",
   "suffer_score",
   "athlete",
+  "commute",
 ]);
 
 const ActivityContext = createContext(defaultState);

@@ -8,7 +8,6 @@ import {
   useGridApiContext,
   GridToolbarColumnsButton,
   GridToolbarDensitySelector,
-  GridToolbarExport,
   GridFooterContainer,
 } from "@mui/x-data-grid";
 import Head from "next/head";
@@ -104,6 +103,11 @@ export default function List() {
   });
   const customFilter = (data) => {
     if (!activeCat.includes(data.properties.sport_type)) return false;
+    if (
+      filter.search &&
+      !data.properties.name.toLowerCase().includes(filter.search.toLowerCase())
+    )
+      return false;
     if (
       Object.entries(filter.values).some(
         ([key, value]) =>

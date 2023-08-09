@@ -4,6 +4,7 @@ import { categorySettings, filterSettings } from "@/settings";
 const filterState = {
   categories: {},
   values: {},
+  search: "",
   selected: [],
   highlighted: 0,
 };
@@ -121,6 +122,13 @@ export const FilterContextProvider = ({ children }) => {
     }
   };
 
+  const setSearch = (newSearch) => {
+    setFilter((filter) => ({
+      ...filter,
+      search: newSearch,
+    }));
+  };
+
   const updateCategoryFilter = (selectedID, newFilter) => {
     if (newFilter.length > 0) {
       setFilter((filter) => ({
@@ -159,6 +167,7 @@ export const FilterContextProvider = ({ children }) => {
         updateValueFilter,
         setSelected,
         setHighlighted,
+        setSearch,
       }}
     >
       {children}
