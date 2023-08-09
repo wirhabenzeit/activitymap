@@ -37,9 +37,9 @@ export default function SidebarButton(props) {
       <Paper
         elevation={props.contentOpen && !props.open ? 3 : 0}
         sx={{
-          zIndex: 10,
           ...(!props.open && {
-            position: "fixed",
+            zIndex: "modal",
+            position: "absolute",
             left: "32px",
             top: position.y,
           }),
