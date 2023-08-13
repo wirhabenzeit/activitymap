@@ -32,6 +32,7 @@ jobs:
       VITE_STRAVA_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_STRAVA_CLIENT_ID }}
       VITE_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      VITE_BASEPATH: "/stravamap"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
