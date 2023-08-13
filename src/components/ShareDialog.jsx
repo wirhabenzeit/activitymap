@@ -57,6 +57,7 @@ function ShareDialog({ open, handleClose }) {
   var shareUrl =
     window.location.origin +
     window.location.pathname +
+    window.location.hash +
     "?" +
     new URLSearchParams({
       ...(mapValue && {

@@ -47,7 +47,6 @@ export function CustomFooterStatusComponent() {
       <Box sx={{ p: 1, display: "flex" }}>
         {nSelected > 0 ? nSelected + "/" + nTotal : nTotal} Acts.
       </Box>
-      {!activityContext.guestMode && <LoadMoreButton />}
       <GridPagination />
     </GridFooterContainer>
   );
