@@ -1,6 +1,5 @@
 import * as React from "react";
-import { useState } from "react";
-import { Box, Popper, Paper, Fade, Typography } from "@mui/material";
+import { useState, useEffect } from "react";
 import MuiSlider from "@mui/material/Slider";
 import { styled } from "@mui/material/styles";
 import IconButton from "@mui/material/IconButton";
@@ -8,10 +7,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 const { library, config } = require("@fortawesome/fontawesome-svg-core");
 import { fas } from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
-import { FilterContext } from "@/components/Context/FilterContext";
 import { filterSettings } from "@/settings";
-import { ActivityContext } from "@/components/Context/ActivityContext";
 import SidebarButton from "@/components/SidebarButton";
+import { FilterContext } from "@/components/Context/FilterContext";
 
 const Slider = styled(MuiSlider)(({ theme }) => ({
   '& .MuiSlider-markLabel[data-index="0"]': {
@@ -46,21 +44,20 @@ const Slider = styled(MuiSlider)(({ theme }) => ({
 export default function SliderBox({ open, name }) {
   const [openSlider, setOpenSlider] = React.useState(false);
   const filterContext = React.useContext(FilterContext);
-
   const [value, setValue] = useState(filterContext.values[name]);
-  const activityContext = React.useContext(ActivityContext);
-  const minmax = activityContext.loading
-    ? [undefined, undefined]
-    : activityContext.filterRange[name];
-  const min = activityContext.loading ? undefined : minmax[0];
-  const max = activityContext.loading ? undefined : minmax[1];
-  const scale =
-    activityContext.loading || !("scale" in filterSettings[name])
-      ? (x) => x
-      : (x) =>
-          min +
-          (max - min) * filterSettings[name].scale((x - min) / (max - min));
-  if (value && value[0] === undefined) setValue(minmax);
+
+  const minmax = filterContext.filterRanges[name];
+  const min = minmax[0];
+  const max = minmax[1];
+  const scale = !("scale" in filterSettings[name])
+    ? (x) => x
+    : (x) =>
+        min + (max - min) * filterSettings[name].scale((x - min) / (max - min));
+  //if (value && value[0] === undefined) setValue(minmax);
+
+  useEffect(() => {
+    if (value[0] === undefined) setValue(filterContext.filterRanges[name]);
+  }, [filterContext.filterRanges[name]]);
 
   return (
     <SidebarButton

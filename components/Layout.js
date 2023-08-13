@@ -4,6 +4,8 @@ import Box from "@mui/material/Box";
 import ResponsiveAppBar from "@/components/AppBar";
 import CssBaseline from "@mui/material/CssBaseline";
 import ResponsiveDrawer from "@/components/Drawer";
+import Map from "@/pages/index";
+import List from "@/pages/list";
 
 const drawerWidth = 250;
 
@@ -27,9 +29,8 @@ export default function Layout(props) {
         open={open}
         setOpen={setOpen}
         drawerWidth={drawerWidth}
-        page={props.page}
-        setPage={props.setPage}
         mapRef={props.mapRef}
+        nav={props.nav}
       ></ResponsiveAppBar>
       <ResponsiveDrawer
         open={open}
@@ -48,9 +49,7 @@ export default function Layout(props) {
         }}
       >
         <DrawerHeader sx={{ flexGrow: 0 }} />
-        <Box sx={{ flexGrow: 1, overflow: "hidden", width: 1 }}>
-          {props.children}
-        </Box>
+        {props.children}
       </Box>
     </Box>
   );

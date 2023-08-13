@@ -1,7 +1,10 @@
-import { createContext, Component } from "react";
+import { createContext, useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { useSearchParams } from "react-router-dom";
 import { filterSettings } from "@/settings";
 import Cookies from "js-cookie";
+//import { useSearchParams } from "next/navigation";
+//import { useQueryParams, NumberParam, withDefault } from "use-query-params";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -13,13 +16,11 @@ const defaultState = {
   geoJson: { type: "FeatureCollection", features: [] },
   loading: true,
   loaded: false,
-  filterRange: {},
   athlete: undefined,
   code: undefined,
   athlete_name: undefined,
   athlete_img: undefined,
   guestMode: false,
-  activityList: [],
 };
 
 const requiredFields = new Set([
@@ -57,30 +58,41 @@ const requiredFields = new Set([
 
 const ActivityContext = createContext(defaultState);
 
-export class ActivityContextProvider extends Component {
-  constructor() {
-    super();
-    this.state = defaultState;
-  }
+export function ActivityContextProvider({ children }) {
+  const [state, setState] = useState(defaultState);
+  console.log("query:", useSearchParams().get("athlete"));
+  //const [query, setQuery] = useQueryParams({ athlete: NumberParam });
 
-  getAthleteData = async () => {
+  /*useEffect(() => {
+    if (state.athlete !== undefined && state.athlete !== 0) {
+      const fetchData = async () => {
+        getAthleteData();
+        const result = await getAthleteActivities();
+        setFilterRanges();
+      };
+      fetchData();
+    }
+  }, [state.athlete]);*/
+
+  const getAthleteData = async (athlete) => {
     const { data, error } = await supabase
       .from("strava-athletes-profile")
       .select("*")
-      .eq("id", this.state.athlete);
+      .eq("id", athlete);
     if (data && data.length === 1)
-      this.setState((prev) => ({
-        ...prev,
+      return {
+        athlete: athlete,
         athlete_name: data[0].first_name + " " + data[0].last_name,
         athlete_img: data[0].profile_medium,
-      }));
+      };
+    else throw new Error("No athlete data found");
   };
 
-  getAthleteActivities = async () => {
+  const getAthleteActivities = async (athlete) => {
     const { nodata, counterror, count, status } = await supabase
       .from("strava-activities")
       .select("*", { count: "exact", head: true })
-      .eq("athlete", this.state.athlete);
+      .eq("athlete", athlete);
 
     const pageSize = 1000;
     const numPages = Math.ceil(count / pageSize);
@@ -89,94 +101,71 @@ export class ActivityContextProvider extends Component {
       (i + 1) * pageSize - 1,
     ]);
     const promises = ranges.map((range) =>
-      this.fetchSupabase((sb) =>
-        sb.eq("athlete", this.state.athlete).range(...range)
-      )
+      fetchSupabase((sb) => sb.eq("athlete", athlete).range(...range))
     );
     return Promise.all(promises);
   };
 
-  setFilterRanges = () => {
-    this.setState((prev) => ({
-      ...prev,
-      loading: false,
-      loaded: true,
-      filterRange: Object.entries(filterSettings)
-        .map(([key, value]) => [
-          key,
-          [
-            Math.min(
-              ...prev.geoJson.features.map((feature) => feature.properties[key])
-            ),
-            Math.max(
-              ...prev.geoJson.features.map((feature) => feature.properties[key])
-            ),
-          ],
-        ])
-        .reduce((obj, [key, value]) => ((obj[key] = value), obj), {}),
-    }));
-  };
-
-  async componentDidUpdate(prevProps, prevState) {
-    console.log("state changed to ", this.state);
-    if (prevState.code === undefined && this.state.code !== undefined) {
+  /*async componentDidUpdate(prevProps, prevState) {
+    console.log("state changed to ", state);
+    if (prevState.code === undefined && state.code !== undefined) {
       fetch(
         process.env.NEXT_PUBLIC_SUPABASE_URL +
           "/functions/v1/strava-login?code=" +
-          this.state.code
+          state.code
       )
         .then((response) => {
           return response.json();
         })
         .then((data) => {
-          this.setState((prev) => ({ ...prev, athlete: data.athlete }));
+          setState((prev) => ({ ...prev, athlete: data.athlete }));
           Cookies.set("athlete", data.athlete, { expires: 365 });
           history.pushState({}, "StravaMap", "/list");
         });
     } else if (
       (prevState.athlete === undefined || prevState.athlete === 0) &&
-      this.state.athlete !== 0 &&
-      this.state.athlete !== undefined
+      state.athlete !== 0 &&
+      state.athlete !== undefined
     ) {
       this.getAthleteData();
       const result = await this.getAthleteActivities();
       this.setFilterRanges();
     } else if (
       prevState.activityList.length === 0 &&
-      this.state.activityList.length > 0
+      state.activityList.length > 0
     ) {
-      const result = await this.fetchSupabase((sb) =>
-        sb.in("id", this.state.activityList)
+      const result = await this.stateabase((sb) =>
+        sb.in("id", state.activityList)
       );
       this.setFilterRanges();
-    } else if (prevState.athlete === undefined && this.state.athlete === 0) {
-      this.setState((prev) => ({ ...prev, loaded: false, loading: false }));
+    } else if (prevState.athlete === undefined && state.athlete === 0) {
+      setState((prev) => ({ ...prev, loaded: false, loading: false }));
     }
-  }
+  }*/
 
-  loadMore = async () => {
+  const loadMore = async () => {
     console.log("loading more");
-    this.setState((prev) => ({ ...prev, loading: true }));
+    setState((prev) => ({ ...prev, loading: true }));
     const response = await fetch(
       `${
         process.env.NEXT_PUBLIC_SUPABASE_URL
       }/functions/v1/strava-webhook?page=${
-        Math.floor(this.state.geoJson.features.length / 200) + 1
-      }&owner_id=${this.state.athlete}&aspect_type=create&object_type=activity`
+        Math.floor(state.geoJson.features.length / 200) + 1
+      }&owner_id=${state.athlete}&aspect_type=create&object_type=activity`
     );
     const data = await response.json();
     console.log(data);
     const newData = data.filter(
-      (act) => !this.state.geoJson.features.some((a) => a.id === act.id)
+      (act) => !state.geoJson.features.some((a) => a.id === act.id)
     );
     console.log(newData);
     if (newData.length > 0) {
-      const newGeojsonFeatures = newData.map(this.parseFeature);
+      const newGeojsonFeatures = newData.map(parseFeature);
       const activityDict = newData.reduce((obj, act) => {
         obj[act.id] = act;
         return obj;
       }, {});
-      this.setState((prev) => ({
+      setState((prev) => ({
         ...prev,
         activityDict: { ...prev.activityDict, ...activityDict },
         geoJson: {
@@ -184,16 +173,16 @@ export class ActivityContextProvider extends Component {
           features: [...prev.geoJson.features, ...newGeojsonFeatures],
         },
       }));
-      this.setState((prev) => ({ ...prev, loading: false }));
+      setState((prev) => ({ ...prev, loading: false }));
       return newData.length;
     } else {
       console.log("no new data");
-      this.setState((prev) => ({ ...prev, loading: false }));
+      setState((prev) => ({ ...prev, loading: false }));
       return 0;
     }
   };
 
-  parseFeature = (feature) => {
+  const parseFeature = (feature) => {
     feature.bbox = feature.geometry_simplified.coordinates.reduce(
       (acc, coord) => {
         return [
@@ -220,20 +209,15 @@ export class ActivityContextProvider extends Component {
     return jsonFeature;
   };
 
-  async fetchSupabase(query) {
+  const fetchSupabase = async (query) => {
     const { data, error } = await query(
       supabase
         .from("strava-activities")
         .select(Array.from(requiredFields).join(","))
     );
-    const featureList = [];
-    const activityDict = {};
-    data.forEach((feature) => {
-      const jsonFeature = this.parseFeature(feature);
-      activityDict[feature.id] = feature;
-      featureList.push(jsonFeature);
-    });
-    this.setState((prev) => ({
+    //const activityDict = {};
+    return data.map(parseFeature);
+    setState((prev) => ({
       ...prev,
       activityDict: { ...prev.activityDict, ...activityDict },
       geoJson: {
@@ -242,47 +226,59 @@ export class ActivityContextProvider extends Component {
       },
     }));
     return data.length;
-  }
+  };
 
-  setAthlete = (athlete) => {
-    this.setState((prevState) => ({ ...prevState, athlete: Number(athlete) }));
+  const setAthlete = async (athlete) => {
+    const athlete_data = await getAthleteData(athlete);
+    const activities = await getAthleteActivities(athlete);
+    setState((prevState) => ({
+      ...prevState,
+      ...athlete_data,
+      loading: false,
+      loaded: true,
+      geoJson: { type: "FeatureCollection", features: activities.flat() },
+      activityDict: activities.flat().reduce((obj, act) => {
+        obj[act.id] = act;
+        return obj;
+      }, {}),
+    }));
+    //setFilterRanges();
+    //setState((prevState) => ({ ...prevState, athlete: Number(athlete) }));
     //console.log("setAthlete", athlete);
   };
 
-  setActivityList = (activities) => {
-    this.setState((prevState) => ({
+  const setActivityList = (activities) => {
+    setState((prevState) => ({
       ...prevState,
       activityList: activities,
     }));
   };
 
-  setCode = (code) => {
-    this.setState((prevState) => ({ ...prevState, code: code }));
+  const setCode = (code) => {
+    setState((prevState) => ({ ...prevState, code: code }));
     //console.log("setCode", code);
   };
 
-  setGuestMode = () => {
-    this.setState((prevState) => ({ ...prevState, guestMode: true }));
+  const setGuestMode = () => {
+    setState((prevState) => ({ ...prevState, guestMode: true }));
   };
 
-  render = () => {
-    console.log("ActivityContext render");
-    const { children } = this.props;
-    return (
-      <ActivityContext.Provider
-        value={{
-          ...this.state,
-          setAthlete: this.setAthlete,
-          setCode: this.setCode,
-          loadMore: this.loadMore,
-          setGuestMode: this.setGuestMode,
-          setActivityList: this.setActivityList,
-        }}
-      >
-        {children}
-      </ActivityContext.Provider>
-    );
-  };
+  //setAthlete(Cookies.get("athlete"));
+
+  return (
+    <ActivityContext.Provider
+      value={{
+        ...state,
+        setAthlete: setAthlete,
+        setCode: setCode,
+        loadMore: loadMore,
+        setGuestMode: setGuestMode,
+        setActivityList: setActivityList,
+      }}
+    >
+      {children}
+    </ActivityContext.Provider>
+  );
 }
 
 export { ActivityContext };

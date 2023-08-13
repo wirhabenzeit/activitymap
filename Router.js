@@ -4,14 +4,9 @@ import { ActivityContext } from "@/components/Context/ActivityContext";
 import { MapContext } from "@/components/Context/MapContext";
 import Layout from "@/components/Layout";
 import Cookies from "js-cookie";
-import { Backdrop, CircularProgress } from "@mui/material";
+import { Backdrop, CircularProgress, Box, Tabs, Tab } from "@mui/material";
 import { mapSettings, defaultMapPosition } from "./settings";
 import { ListContext } from "@/components/Context/ListContext";
-
-const pages = {
-  "/": { name: "Map", index: 0 },
-  "/list": { name: "List", index: 1 },
-};
 
 export default function Home({ children }) {
   const activityContext = useContext(ActivityContext);
@@ -21,10 +16,54 @@ export default function Home({ children }) {
   const [page, setPage] = useState(0);
   const [mapPosition, setMapPosition] = useState(defaultMapPosition);
   const mapRef = useRef();
-  console.log(defaultMapPosition);
+  const [value, setValue] = useState(0);
+
+  const handleChange = (event, newValue) => {
+    setValue(newValue);
+  };
+
+  function BasicTabs() {
+    return (
+      <Box sx={{ width: "100%" }}>
+        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+          <Tabs
+            value={value}
+            onChange={handleChange}
+            aria-label="basic tabs example"
+          >
+            <Tab label="Item One" />
+            <Tab label="Item Two" />
+          </Tabs>
+        </Box>
+      </Box>
+    );
+  }
+
+  function PageLinks() {
+    return (
+      <>
+        <Box>
+          <Tabs
+            value={page}
+            onChange={(e, v) => {
+              setPage(v);
+            }}
+            textColor="inherit"
+            TabIndicatorProps={{
+              style: {
+                backgroundColor: "white",
+              },
+            }}
+          >
+            <Tab label="Map" id="map" />
+            <Tab label="List" id="list" />
+          </Tabs>
+        </Box>
+      </>
+    );
+  }
 
   useEffect(() => {
-    setPage(pages[router.pathname].index);
     if (!router.isReady) return;
     if ("code" in router.query) {
       activityContext.setCode(router.query.code);
@@ -74,10 +113,16 @@ export default function Home({ children }) {
       activityContext.setAthlete(null);
     }
   }, [router.isReady]);
+
+  console.log("Router render");
   return (
     <>
-      <Layout page={page} setPage={setPage} mapRef={mapRef}>
-        {cloneElement(children, { mapPosition: mapPosition, mapRef: mapRef })}
+      <Layout nav={<BasicTabs />} mapRef={mapRef}>
+        {cloneElement(children, {
+          mapPosition: mapPosition,
+          mapRef: mapRef,
+          page: page,
+        })}
       </Layout>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}

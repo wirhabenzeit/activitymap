@@ -1,11 +1,14 @@
-import React, { useState, createContext, useEffect } from "react";
+import { useContext, createContext, useState, useEffect } from "react";
 import { categorySettings, filterSettings, binaryFilters } from "@/settings";
+import { ActivityContext } from "./ActivityContext";
 
 const filterState = {
   categories: {},
   values: {},
   search: "",
   binary: {},
+  filterRanges: {},
+  filterIDs: [],
   selected: [],
   highlighted: 0,
 };
@@ -19,6 +22,7 @@ Object.entries(categorySettings).forEach(([key, category]) => {
 
 Object.entries(filterSettings).forEach(([key, filter]) => {
   filterState.values[key] = [undefined, undefined];
+  filterState.filterRanges[key] = [undefined, undefined];
 });
 
 Object.entries(binaryFilters).forEach(([key, filter]) => {
@@ -27,17 +31,57 @@ Object.entries(binaryFilters).forEach(([key, filter]) => {
 
 const FilterContext = createContext(filterState);
 
-export const FilterContextProvider = ({ children }) => {
-  const [filter, setFilter] = useState(filterState);
+export function FilterContextProvider({ children }) {
+  const [state, setState] = useState(filterState);
+  const activityContext = useContext(ActivityContext);
+
   console.log("FilterContextProvider render");
 
   useEffect(() => {
-    console.log("filter", filter);
-  }, [filter]);
+    if (activityContext.athlete !== undefined) {
+      console.log("Setting Filter Ranges");
+      setFilterRanges();
+    }
+  }, [activityContext]);
+
+  const setStateCustom = (fn) => {
+    setState((prev) => {
+      const newState = fn(prev);
+      return {
+        ...newState,
+        filterIDs: Object.entries(activityContext.activityDict)
+          .filter(([key, value]) => filterFn(value, newState))
+          .map(([key, value]) => Number(key)),
+      };
+    });
+  };
+
+  const setFilterRanges = () => {
+    setStateCustom((prev) => ({
+      ...prev,
+      filterRanges: Object.entries(filterSettings)
+        .map(([key, value]) => [
+          key,
+          [
+            Math.min(
+              ...Object.values(activityContext.activityDict).map(
+                (feature) => feature.properties[key]
+              )
+            ),
+            Math.max(
+              ...Object.values(activityContext.activityDict).map(
+                (feature) => feature.properties[key]
+              )
+            ),
+          ],
+        ])
+        .reduce((obj, [key, value]) => ((obj[key] = value), obj), {}),
+    }));
+  };
 
   const setSelected = (selected) => {
     console.log("setSelected", selected);
-    setFilter((filter) => ({
+    setStateCustom((filter) => ({
       ...filter,
       selected: selected,
       highlighted: 0,
@@ -45,11 +89,14 @@ export const FilterContextProvider = ({ children }) => {
   };
 
   const setHighlighted = (highlighted) => {
-    setFilter((filter) => ({ ...filter, highlighted: highlighted }));
+    setStateCustom((filter) => ({
+      ...filter,
+      highlighted: highlighted,
+    }));
   };
 
   const setOnlyCategory = (selectedID) => {
-    setFilter((filter) => {
+    setStateCustom((filter) => {
       if (
         filter.categories[selectedID].active &&
         Object.values(filter.categories).filter((category) => category.active)
@@ -86,8 +133,8 @@ export const FilterContextProvider = ({ children }) => {
   };
 
   const toggleCategory = (selectedID) => {
-    if (filter.categories[selectedID].active) {
-      setFilter((filter) => ({
+    if (state.categories[selectedID].active) {
+      setStateCustom((filter) => ({
         ...filter,
         categories: {
           ...filter.categories,
@@ -99,7 +146,7 @@ export const FilterContextProvider = ({ children }) => {
         },
       }));
     } else {
-      setFilter((filter) => ({
+      setStateCustom((filter) => ({
         ...filter,
         categories: {
           ...filter.categories,
@@ -115,12 +162,12 @@ export const FilterContextProvider = ({ children }) => {
 
   const updateValueFilter = (selectedID, newFilter) => {
     if (newFilter.length > 0) {
-      setFilter((filter) => ({
+      setStateCustom((filter) => ({
         ...filter,
         values: { ...filter.values, [selectedID]: newFilter },
       }));
     } else {
-      setFilter((filter) => ({
+      setStateCustom((filter) => ({
         ...filter,
         values: { ...filter.values, [selectedID]: [undefined, undefined] },
       }));
@@ -128,14 +175,15 @@ export const FilterContextProvider = ({ children }) => {
   };
 
   const setSearch = (newSearch) => {
-    setFilter((filter) => ({
+    setStateCustom((filter) => ({
       ...filter,
       search: newSearch,
     }));
   };
 
   const setBinary = (selectedID, newValue) => {
-    setFilter((filter) => ({
+    console.log("setBinary", selectedID, newValue);
+    setStateCustom((filter) => ({
       ...filter,
       binary: { ...filter.binary, [selectedID]: newValue },
     }));
@@ -143,7 +191,7 @@ export const FilterContextProvider = ({ children }) => {
 
   const updateCategoryFilter = (selectedID, newFilter) => {
     if (newFilter.length > 0) {
-      setFilter((filter) => ({
+      setStateCustom((filter) => ({
         ...filter,
         categories: {
           ...filter.categories,
@@ -155,7 +203,7 @@ export const FilterContextProvider = ({ children }) => {
         },
       }));
     } else {
-      setFilter((filter) => ({
+      setStateCustom((filter) => ({
         ...filter,
         categories: {
           ...filter.categories,
@@ -169,27 +217,26 @@ export const FilterContextProvider = ({ children }) => {
     }
   };
 
-  const activeCat = [];
-  Object.entries(filter.categories).forEach(([key, value]) => {
-    activeCat.push(...value.filter);
-  });
-
-  const filterFn = (data) => {
+  const filterFn = (data, state) => {
+    const activeCat = [];
+    Object.entries(state.categories).forEach(([key, value]) => {
+      activeCat.push(...value.filter);
+    });
     if (!activeCat.includes(data.properties.sport_type)) return false;
     if (
-      filter.search &&
-      !data.properties.name.toLowerCase().includes(filter.search.toLowerCase())
+      state.search &&
+      !data.properties.name.toLowerCase().includes(state.search.toLowerCase())
     )
       return false;
     if (
-      Object.entries(filter.values).some(
+      Object.entries(state.values).some(
         ([key, value]) =>
           data.properties[key] < value[0] || data.properties[key] > value[1]
       )
     )
       return false;
     if (
-      Object.entries(filter.binary).some(
+      Object.entries(state.binary).some(
         ([key, value]) => value !== undefined && data.properties[key] != value
       )
     )
@@ -200,21 +247,25 @@ export const FilterContextProvider = ({ children }) => {
   return (
     <FilterContext.Provider
       value={{
-        ...filter,
-        toggleCategory,
-        setOnlyCategory,
-        updateCategoryFilter,
-        updateValueFilter,
-        setSelected,
-        setHighlighted,
-        setSearch,
-        setBinary,
-        filterFn,
+        ...state,
+        //...(activityContext.loaded && {
+        //  filterIDs: activityContext.geoJson.features
+        //    .filter(this.filterFn)
+        //    .map((feature) => feature.properties.id),
+        //}),
+        toggleCategory: toggleCategory,
+        setOnlyCategory: setOnlyCategory,
+        updateCategoryFilter: updateCategoryFilter,
+        updateValueFilter: updateValueFilter,
+        setSelected: setSelected,
+        setHighlighted: setHighlighted,
+        setSearch: setSearch,
+        setBinary: setBinary,
       }}
     >
       {children}
     </FilterContext.Provider>
   );
-};
+}
 
 export { FilterContext };

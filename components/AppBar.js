@@ -19,6 +19,7 @@ import Cookies from "js-cookie";
 import ShareIcon from "@mui/icons-material/IosShare";
 
 import ShareDialog from "@/components/ShareDialog";
+import { PropaneSharp } from "@mui/icons-material";
 
 const darkTheme = createTheme({
   palette: {
@@ -55,6 +56,23 @@ function ShareButton({ mapRef }) {
         <ShareIcon />
       </IconButton>
       <ShareDialog open={open} handleClose={handleClose} mapRef={mapRef} />
+    </>
+  );
+}
+
+export function User({ mapRef }) {
+  const activityContext = React.useContext(ActivityContext);
+  return (
+    <>
+      {activityContext.loaded &&
+        Cookies.get("athlete") &&
+        !activityContext.guestMode && (
+          <>
+            <ShareButton mapRef={mapRef} />
+            <UserSettings />
+          </>
+        )}
+      {!activityContext.loaded && !activityContext.loading && <LoginButton />}
     </>
   );
 }
@@ -125,47 +143,13 @@ function UserSettings() {
   );
 }
 
-function PageLinks({ page, setPage }) {
-  const activityContext = React.useContext(ActivityContext);
-  const urlParam = activityContext.guestMode
-    ? activityContext.activityList.length > 0
-      ? `?activities=${activityContext.activityList.join(",")}`
-      : `?athlete=${activityContext.athlete}`
-    : "";
-
-  return (
-    <>
-      <Box>
-        <Tabs
-          value={page}
-          onChange={(e, v) => {
-            setPage(v);
-          }}
-          textColor="inherit"
-          TabIndicatorProps={{
-            style: {
-              backgroundColor: "white",
-            },
-          }}
-        >
-          <Tab label="Map" component={Link} href={"/" + urlParam} />
-          <Tab label="List" component={Link} href={"/list" + urlParam} />
-        </Tabs>
-      </Box>
-    </>
-  );
-}
-
 export default function ResponsiveAppBar({
   open,
   setOpen,
+  nav,
   drawerWidth,
-  page,
-  setPage,
   mapRef,
 }) {
-  const activityContext = React.useContext(ActivityContext);
-
   const AppBar = styled(MuiAppBar, {
     shouldForwardProp: (prop) => prop !== "open",
   })(({ theme, open }) => ({
@@ -219,19 +203,9 @@ export default function ResponsiveAppBar({
           >
             StravaMap
           </Typography>
-          <PageLinks page={page} setPage={setPage} />
+          {nav}
           <Box sx={{ flexGrow: 1 }} />
-          {activityContext.loaded &&
-            Cookies.get("athlete") &&
-            !activityContext.guestMode && (
-              <>
-                <ShareButton mapRef={mapRef} />
-                <UserSettings />
-              </>
-            )}
-          {!activityContext.loaded && !activityContext.loading && (
-            <LoginButton />
-          )}
+          <User mapRef={mapRef} />
         </Toolbar>
       </ThemeProvider>
     </AppBar>

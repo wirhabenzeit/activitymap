@@ -1,6 +1,5 @@
 import * as React from "react";
-import { useState, useEffect } from "react";
-import { IconButton, TextField } from "@mui/material";
+import { IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 const { library, config } = require("@fortawesome/fontawesome-svg-core");
 import { fas } from "@fortawesome/free-solid-svg-icons";
@@ -9,16 +8,12 @@ import { FilterContext } from "@/components/Context/FilterContext";
 import SidebarButton from "@/components/SidebarButton";
 import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
-import { Cancel, Circle, Help, CheckCircle } from "@mui/icons-material";
-import { filterSettings, categorySettings, binaryFilters } from "@/settings";
-console.log(categorySettings);
+import { Cancel, Help, CheckCircle } from "@mui/icons-material";
+import { categorySettings, binaryFilters } from "@/settings";
 
 export default function CheckboxFilter({ open, name }) {
   const [openContent, setOpenContent] = React.useState(false);
   const filterContext = React.useContext(FilterContext);
-  const [value, setValue] = useState(filterContext.binary[name]);
-
-  useEffect(() => filterContext.setBinary(name, value), [value]);
 
   return (
     <SidebarButton
@@ -30,10 +25,12 @@ export default function CheckboxFilter({ open, name }) {
           sx={{
             width: "30px",
             mx: "1px",
-            color: value === undefined ? "text.disabled" : "primary",
+            color:
+              filterContext.binary[name] === undefined
+                ? "text.disabled"
+                : "primary",
           }}
           onClick={() => {
-            setValue(undefined);
             filterContext.setBinary(name, undefined);
           }}
         >
@@ -51,16 +48,15 @@ export default function CheckboxFilter({ open, name }) {
             color="default"
             checkedIcon={<CheckCircle />}
             indeterminateIcon={<Help />}
-            checked={value}
-            indeterminate={value === undefined}
+            checked={filterContext.binary[name] === true}
+            indeterminate={filterContext.binary[name] === undefined}
             onChange={(event) => {
-              console.log(value);
-              if (value === undefined) {
-                setValue(true);
-              } else if (value) {
-                setValue(false);
+              if (filterContext.binary[name] === undefined) {
+                filterContext.setBinary(name, true);
+              } else if (filterContext.binary[name] === true) {
+                filterContext.setBinary(name, false);
               } else {
-                setValue(undefined);
+                filterContext.setBinary(name, undefined);
               }
             }}
           />

@@ -5,20 +5,23 @@ import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
 import "@fortawesome/fontawesome-free/css/solid.min.css";
 import { ActivityContextProvider } from "@/components/Context/ActivityContext";
 import { ListContextProvider } from "@/components/Context/ListContext";
-import Router from "@/Router";
+import { Profiler } from "react";
+
+import NextAdapterApp from "next-query-params/app";
+import { QueryParamProvider } from "use-query-params";
 
 export default function App({ Component, pageProps }) {
   return (
-    <FilterContextProvider>
-      <MapContextProvider>
-        <ActivityContextProvider>
-          <ListContextProvider>
-            <Router>
+    <QueryParamProvider adapter={NextAdapterApp}>
+      <ActivityContextProvider>
+        <FilterContextProvider>
+          <MapContextProvider>
+            <ListContextProvider>
               <Component {...pageProps} />
-            </Router>
-          </ListContextProvider>
-        </ActivityContextProvider>
-      </MapContextProvider>
-    </FilterContextProvider>
+            </ListContextProvider>
+          </MapContextProvider>
+        </FilterContextProvider>
+      </ActivityContextProvider>
+    </QueryParamProvider>
   );
 }

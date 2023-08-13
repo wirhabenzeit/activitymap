@@ -1,337 +1,308 @@
+import MapView from "@/components/Map";
+import ListView from "@/components/List";
 import {
-  useRef,
-  useState,
-  useContext,
-  useCallback,
-  useMemo,
-  useEffect,
-} from "react";
-import ReactMapGL, {
-  NavigationControl,
-  GeolocateControl,
-  FullscreenControl,
-  useControl,
-  Layer,
-  Source,
-} from "react-map-gl";
-import Head from "next/head";
-import { MapContext } from "@/components/Context/MapContext";
-import "mapbox-gl/dist/mapbox-gl.css";
-import { mapSettings } from "@/settings";
-import { DownloadControl } from "@/components/Controls/DownloadControl";
-import { SelectionControl } from "@/components/Controls/SelectionControl";
+  Box,
+  Backdrop,
+  CircularProgress,
+  Tabs,
+  Tab,
+  CssBaseline,
+  Toolbar,
+  Typography,
+  MenuItem,
+  Divider,
+  List,
+  ListItem,
+  IconButton,
+} from "@mui/material";
+import { User } from "@/components/AppBar";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import MapIcon from "@mui/icons-material/Map";
+import { ThemeProvider, styled, createTheme } from "@mui/material/styles";
+
+import ResponsiveAppBar from "@/components/AppBar";
+import MuiAppBar from "@mui/material/AppBar";
+import MuiDrawer from "@mui/material/Drawer";
+import ResponsiveDrawer from "@/components/Drawer";
+import {
+  mapSettings,
+  defaultMapPosition,
+  categorySettings,
+  binaryFilters,
+  filterSettings,
+} from "@/settings";
+import Layout from "@/components/Layout";
+import MultiSelect from "@/components/MultiSelect";
+import SearchBox from "@/components/SearchBox";
+import ValueSlider from "@/components/ValueSlider";
+import CheckboxFilter from "@/components/CheckboxFilter";
 import { ActivityContext } from "@/components/Context/ActivityContext";
 import { FilterContext } from "@/components/Context/FilterContext";
-import { ListContext } from "@/components/Context/ListContext";
-import { categorySettings } from "@/settings";
-import { listSettings } from "@/settings";
-import { Paper } from "@mui/material";
-import { DataGrid, GridColumnMenu } from "@mui/x-data-grid";
-import { useTheme } from "@mui/material/styles";
-import LayerSwitcher from "@/components/LayerSwitcher";
 
-function Download(props) {
-  useControl(() => new DownloadControl(), {
-    position: props.position,
-  });
-  return null;
-}
+import { useQueryParam, NumberParam, withDefault } from "use-query-params";
 
-function Selection(props) {
-  const filterContext = useContext(FilterContext);
+import { useState, useEffect, useContext, useRef } from "react";
 
-  useControl(
-    () =>
-      new SelectionControl({
-        mapRef: props.mapRef,
-        layers: ["routeLayerBG", "routeLayerBGsel"],
-        source: "routeSource",
-        selectionHandler: (sel) => filterContext.setSelected(sel),
-      }),
-    {
-      position: props.position,
-    }
-  );
-  return null;
-}
+const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+  },
+});
 
-function RouteSource(props) {
-  const activityContext = useContext(ActivityContext);
+const DrawerHeader = styled("div")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  padding: theme.spacing(0, 1),
+  ...theme.mixins.toolbar,
+}));
+
+const drawerWidth = 250;
+
+const AppBar = styled(MuiAppBar, {
+  shouldForwardProp: (prop) => prop !== "open",
+})(({ theme, open }) => ({
+  zIndex: theme.zIndex.drawer + 1,
+  transition: theme.transitions.create(["width", "margin"], {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  ...(open && {
+    marginLeft: drawerWidth,
+    width: `calc(100% - ${drawerWidth}px)`,
+    transition: theme.transitions.create(["width", "margin"], {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+  }),
+}));
+
+const openedMixin = (theme) => ({
+  width: drawerWidth,
+  transition: theme.transitions.create("width", {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.enteringScreen,
+  }),
+  overflowX: "hidden",
+});
+
+const closedMixin = (theme) => ({
+  transition: theme.transitions.create("width", {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  overflowX: "hidden",
+  width: `calc(${theme.spacing(4)} + 1px)`,
+});
+
+const Drawer = styled(MuiDrawer, {
+  shouldForwardProp: (prop) => prop !== "open",
+})(({ theme, open }) => ({
+  width: drawerWidth,
+  flexShrink: 0,
+  whiteSpace: "nowrap",
+  boxSizing: "border-box",
+  ...(open && {
+    ...openedMixin(theme),
+    "& .MuiDrawer-paper": openedMixin(theme),
+  }),
+  ...(!open && {
+    ...closedMixin(theme),
+    "& .MuiDrawer-paper": closedMixin(theme),
+  }),
+}));
+
+function CustomTabPanel(props) {
+  const { children, value, index, ...other } = props;
+
   return (
-    <Source data={activityContext.geoJson} id="routeSource" type="geojson">
-      {props.children}
-    </Source>
-  );
-}
-
-function RouteLayer() {
-  const filterContext = useContext(FilterContext);
-  const activityContext = useContext(ActivityContext);
-  const theme = useTheme();
-
-  const color = ["match", ["get", "sport_type"]];
-  Object.entries(categorySettings).forEach(([key, value]) => {
-    value.alias.forEach((alias) => {
-      color.push(alias, value.color);
-    });
-  });
-  color.push("#000000");
-  /*const categoryFilter = [
-    "in",
-    "sport_type",
-    ...Object.values(filterContext.categories)
-      .map((category) => category.filter)
-      .flat(),
-  ];
-  const valueFilter = ["all"];
-  Object.entries(filterContext.values).forEach(([key, value]) => {
-    if (value[0] !== undefined) {
-      valueFilter.push([">=", key, value[0]]);
-      valueFilter.push(["<=", key, value[1]]);
-    }
-  });*/
-  const filter = [
-    "in",
-    "id",
-    ...activityContext.geoJson.features
-      .filter(filterContext.filterFn)
-      .map((feature) => feature.properties.id),
-  ];
-  console.log(filter);
-  const selectedFilter = ["in", "id", ...filterContext.selected];
-  const unselectedFilter = ["!in", "id", ...filterContext.selected];
-  const filterAll = ["all", filter, unselectedFilter];
-  const filterSel = ["all", filter, selectedFilter];
-  const filterHigh = ["==", "id", filterContext.highlighted];
-  return (
-    <>
-      <Layer
-        source="routeSource"
-        id="routeLayerBG"
-        type="line"
-        paint={{ "line-color": "black", "line-width": 4 }}
-        filter={filterAll}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerFG"
-        type="line"
-        paint={{ "line-color": color, "line-width": 2 }}
-        filter={filterAll}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerBGsel"
-        type="line"
-        paint={{ "line-color": "black", "line-width": 6 }}
-        filter={filterSel}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerMIDsel"
-        type="line"
-        paint={{ "line-color": color, "line-width": 4 }}
-        filter={filterSel}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerFGsel"
-        type="line"
-        paint={{ "line-color": "white", "line-width": 2 }}
-        filter={filterSel}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerHigh"
-        type="line"
-        paint={{
-          "line-color": theme.palette.primary.light,
-          "line-width": 6,
-          "line-opacity": 0.4,
-        }}
-        filter={filterHigh}
-      />
-    </>
-  );
-}
-
-function CustomColumnMenu(props) {
-  return (
-    <GridColumnMenu
-      {...props}
-      slots={{
-        // Hide `columnMenuColumnsItem`
-        columnMenuSortItem: null,
+    <Box
+      role="tabpanel"
+      component="main"
+      hidden={value !== index}
+      id={`tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      sx={{
+        height: 1,
+        width: 1,
+        p: 0,
+        display: "flex",
+        flexDirection: "column",
       }}
-    />
+      {...other}
+    >
+      {value === index && (
+        <>
+          <DrawerHeader sx={{ flexGrow: 0 }} />
+          <Box sx={{ width: 1, flexGrow: 1, minHeight: 0, minWidth: 0 }}>
+            {children}
+          </Box>
+        </>
+      )}
+    </Box>
   );
 }
 
-function Map(props) {
-  const [cursor, setCursor] = useState("auto");
-  const onMouseEnter = useCallback(() => setCursor("pointer"), []);
-  const onMouseLeave = useCallback(() => setCursor("auto"), []);
-  const map = useContext(MapContext);
-  const filter = useContext(FilterContext);
-  const activities = useContext(ActivityContext);
-  const listState = useContext(ListContext);
-
-  const controls = useMemo(
-    () => (
-      <>
-        <NavigationControl position="top-right" />
-        <GeolocateControl position="top-right" />
-        <FullscreenControl position="top-right" />
-        <Download position="top-right" context={map} />
-        <Selection position="top-right" mapRef={props.mapRef} />
-        <LayerSwitcher
-          sx={{ position: "absolute", top: 10, left: 10 }}
-          mapRef={props.mapRef}
-        />
-      </>
-    ),
-    [map]
+function Index(props) {
+  const [mapPosition, setMapPosition] = useState(defaultMapPosition);
+  const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const mapRef = useRef();
+  const activityContext = useContext(ActivityContext);
+  const filterContext = useContext(FilterContext);
+  /*const activityContext = useContext(ActivityContext);*/
+  const [athlete, setAthlete] = useQueryParam(
+    "athlete",
+    withDefault(NumberParam, 0)
   );
-
-  const overlayMaps = useMemo(
-    () => (
-      <>
-        {map.overlayMaps.map((mapName) => (
-          <Source
-            key={mapName + "source"}
-            id={mapName}
-            type="raster"
-            tiles={[mapSettings[mapName].url]}
-            tileSize={256}
-          >
-            <Layer
-              key={mapName + "layer"}
-              id={mapName}
-              type="raster"
-              paint={{ "raster-opacity": mapSettings[mapName].opacity }}
-            />
-          </Source>
-        ))}
-      </>
-    ),
-    [map]
-  );
-
-  const routes = useMemo(
-    () => (
-      <RouteSource>
-        <RouteLayer />
-      </RouteSource>
-    ),
-    [activities, filter]
-  );
+  console.log(filterContext.filterRanges);
 
   return (
-    <>
-      <Head>
-        <title>StravaMap</title>
-      </Head>
-      <ReactMapGL
-        reuseMaps
-        styleDiffing={false}
-        ref={props.mapRef}
-        boxZoom={false}
-        //initialViewState={viewport}
-        onLoad={() => {
-          if (props.mapRef.current) {
-            props.mapRef.current.flyTo(props.mapPosition, 5000);
-          }
-        }}
-        projection="globe"
-        //{...map.position}
-        //onMove={(evt) => map.updateMapPosition(evt.viewState)}
-        mapStyle={
-          mapSettings[map.baseMap].type == "vector"
-            ? mapSettings[map.baseMap].url
-            : undefined
-        }
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-        cursor={cursor}
-        //interactiveLayerIds={["routeLayerBG", "routeLayerBGsel"]}
-        //onClick={(evt) =>
-        //  filter.setSelected(evt.features.map((feature) => feature.id))
-        //}
-        terrain={{
-          source: "mapbox-dem",
-          exaggeration: map.threeDim ? 1.5 : 0,
-        }}
-      >
-        {mapSettings[map.baseMap].type == "raster" && (
-          <Source
-            type="raster"
-            tiles={[mapSettings[map.baseMap].url]}
-            tileSize={256}
+    <Box sx={{ display: "flex", width: 1, height: 1 }}>
+      <CssBaseline />
+      <AppBar position="fixed" open={open}>
+        <ThemeProvider theme={darkTheme}>
+          <Toolbar sx={{ pl: { xs: 0, sm: 0 } }}>
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              onClick={() => {
+                setOpen(true);
+              }}
+              edge="start"
+              sx={{
+                p: 0,
+                mx: 0.25,
+                ...(open && { display: "none" }),
+              }}
+            >
+              <ChevronRightIcon />
+            </IconButton>
+            <MapIcon sx={{ mx: 1, display: { xs: "none", sm: "flex" } }} />
+            <Typography
+              variant="h6"
+              noWrap
+              component="a"
+              href="/"
+              sx={{
+                mr: 2,
+                fontWeight: 700,
+                color: "inherit",
+                textDecoration: "none",
+                display: { xs: "none", sm: "flex" },
+              }}
+            >
+              StravaMap
+            </Typography>
+            <Box>
+              <Tabs
+                value={page}
+                onChange={(e, v) => {
+                  setPage(v);
+                }}
+                textColor="inherit"
+                TabIndicatorProps={{
+                  style: {
+                    backgroundColor: "white",
+                  },
+                }}
+              >
+                <Tab label="Map" id="map" />
+                <Tab label="List" id="list" />
+              </Tabs>
+            </Box>
+            <Box sx={{ flexGrow: 1 }} />
+            <User mapRef={mapRef} />
+          </Toolbar>
+        </ThemeProvider>
+      </AppBar>
+      <Drawer variant="permanent" open={open}>
+        <DrawerHeader>
+          <IconButton
+            onClick={() => {
+              setOpen(false);
+            }}
           >
-            <Layer id="baseMap" type="raster" paint={{ "raster-opacity": 1 }} />
-          </Source>
-        )}
-        <Source
-          id="mapbox-dem"
-          type="raster-dem"
-          url="mapbox://mapbox.mapbox-terrain-dem-v1"
-          tileSize={512}
-          maxzoom={14}
-        />
-        {controls}
-        {overlayMaps}
-        {routes}
-      </ReactMapGL>
-      <Paper
-        elevation={3}
-        sx={{
-          zIndex: 2,
-          position: "absolute",
-          left: "40px",
-          maxWidth: "800px",
-          height: filter.selected.length > 7 ? "210px" : "auto",
-          right: "10px",
-          bottom: "30px",
-          margin: "auto",
-          display: filter.selected.length > 0 ? "block" : "none",
-        }}
-      >
-        <DataGrid
-          hideFooter={true}
-          rowHeight={35}
-          disableColumnMenu={true}
-          rows={activities.geoJson.features.filter((data) =>
-            filter.selected.includes(data.id)
-          )}
-          autoHeight={filter.selected.length <= 7}
-          initialState={{ pagination: { paginationModel: { pageSize: 100 } } }}
-          //pageSizeOptions={[10]}
-          columns={listSettings.columns}
-          disableColumnFilter
-          density="compact"
-          sortModel={listState.compact.sortModel}
-          onSortModelChange={(model) =>
-            listState.setSortModel("compact", model)
-          }
-          columnVisibilityModel={listState.compact.columnVisibilityModel}
-          onColumnVisibilityModelChange={(newModel) =>
-            listState.setColumnVisibilityModel("compact", newModel)
-          }
-          onRowClick={(row, params) => {
-            console.log(row.id + " clicked");
-            filter.setHighlighted(row.id);
-            props.mapRef.current?.fitBounds(
-              activities.activityDict[row.id].bbox,
-              {
-                padding: 100,
-              }
-            );
+            <ChevronLeftIcon />
+          </IconButton>
+        </DrawerHeader>
+        <Divider />
+        <Box
+          sx={{
+            width: 1,
+            height: 1,
           }}
-        />
-      </Paper>
+        >
+          <List>
+            {Object.keys(categorySettings).map((key) => (
+              <ListItem sx={{ px: 0, py: 0 }} key={key}>
+                <MultiSelect open={open} name={key} />
+              </ListItem>
+            ))}
+          </List>
+          <Divider />
+          <List>
+            <ListItem sx={{ px: 0, py: 0 }} key="search">
+              <SearchBox open={open} />
+            </ListItem>
+            {Object.keys(binaryFilters).map((key) => (
+              <ListItem sx={{ px: 0, py: 0 }} key={key}>
+                <CheckboxFilter open={open} name={key} />
+              </ListItem>
+            ))}
+          </List>
+          <Divider />
+          <List>
+            {Object.keys(filterSettings).map((key) => (
+              <ListItem sx={{ px: 0, py: 0 }} key={key}>
+                <ValueSlider open={open} name={key} />
+              </ListItem>
+            ))}
+          </List>
+          {/*
+          <Divider />
+          {activityContext.loaded && (
+            <List>
+              <ListItem sx={{ px: 0, py: 1 }} key="datePicker">
+                <DateFilter open={open} />
+              </ListItem>
+            </List>
+          )}
+          <Divider />*/}
+        </Box>
+      </Drawer>
+      <CustomTabPanel value={page} index={0}>
+        <MapView mapRef={mapRef} mapPosition={mapPosition} />
+      </CustomTabPanel>
+      <CustomTabPanel value={page} index={1}>
+        <ListView />
+      </CustomTabPanel>
+      <Backdrop
+        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        open={activityContext.loading}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
+    </Box>
+  );
+  return (
+    <>
+      <Layout nav={<PageLinks />} mapRef={mapRef}>
+        <h1>Home</h1>
+      </Layout>
+    </>
+  );
+  return (
+    <>
+      <CustomTabPanel value={props.page} index={0}>
+        <Map mapRef={props.mapRef} mapPosition={props.mapPosition} />
+      </CustomTabPanel>
+      <CustomTabPanel value={props.page} index={1}>
+        <List />
+      </CustomTabPanel>
     </>
   );
 }
 
-export default Map;
+export default Index;
