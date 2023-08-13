@@ -1,5 +1,6 @@
 {
   "name": "stravamap",
+  "homepage": "https://wirhabenzeit.github.com/stravamap",
   "private": false,
   "version": "0.1.0",
   "type": "module",
