@@ -9,7 +9,7 @@ import { BrowserRouter as Router } from "react-router-dom";
 import { SelectionContextProvider } from "./contexts/SelectionContext.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <Router>
+  <Router basename={import.meta.env.VITE_BASEURL}>
     <ActivityContextProvider>
       <MapContextProvider>
         <ListContextProvider>
