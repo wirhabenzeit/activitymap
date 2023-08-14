@@ -262,12 +262,6 @@ function App() {
           </Routes>
         </Box>
       </Box>
-      <Backdrop
-        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
-        open={activityContext.loading}
-      >
-        <CircularProgress color="inherit" />
-      </Backdrop>
     </Box>
   );
 }

@@ -4,6 +4,7 @@ import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import MenuItem from "@mui/material/MenuItem";
 import Menu from "@mui/material/Menu";
+import CircularProgress from "@mui/material/CircularProgress";
 import Avatar from "@mui/material/Avatar";
 import { ActivityContext } from "/src/contexts/ActivityContext";
 
@@ -62,6 +63,7 @@ export function User() {
           </>
         )}
       {!activityContext.loaded && !activityContext.loading && <LoginButton />}
+      {activityContext.loading && <CircularProgress color="inherit" />}
     </>
   );
 }
