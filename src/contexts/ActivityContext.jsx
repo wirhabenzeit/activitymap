@@ -96,6 +96,37 @@ function ActivityContextProvider({ children }) {
     return Promise.all(promises);
   };
 
+  const reloadActivity = async (athlete, id) => {
+    setState((prev) => ({
+      ...prev,
+      loading: true,
+      loaded: false,
+    }));
+    const response = await fetch(
+      `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/functions/v1/strava-webhook?object_id=${id}&owner_id=${athlete}&aspect_type=update&object_type=activity`
+    );
+    const data = await response.json();
+    if (data) {
+      const newFeature = parseFeature(data);
+      setState((prev) => ({
+        ...prev,
+        loaded: true,
+        loading: false,
+        activityDict: { ...prev.activityDict, [id]: newFeature },
+        geoJson: {
+          type: "FeatureCollection",
+          features: [
+            ...prev.geoJson.features.filter((act) => act.id !== id),
+            newFeature,
+          ],
+        },
+      }));
+    }
+    return data;
+  };
+
   const loadMore = async () => {
     console.log("loading more");
     setState((prev) => ({ ...prev, loading: true }));
@@ -252,6 +283,7 @@ function ActivityContextProvider({ children }) {
         loadMore: loadMore,
         setGuestMode: setGuestMode,
         setActivityList: setActivityList,
+        reloadActivity: reloadActivity,
       }}
     >
       {children}

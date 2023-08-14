@@ -1,7 +1,6 @@
 import * as React from "react";
 import { useMemo, useState } from "react";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
+import { Box, Menu, MenuItem, Button } from "@mui/material";
 import {
   DataGrid,
   GridToolbarContainer,
@@ -103,7 +102,7 @@ export default function List() {
         rows={filter.filterIDs.map((key) => activityContext.activityDict[key])} //.filter((data) =>
         //  filter.filterIDs.includes(data.properties.id)
         //)}
-        columns={listSettings.columns}
+        columns={listSettings(activityContext).columns}
         disableColumnMenu
         pageSizeOptions={[100]}
         density="compact"

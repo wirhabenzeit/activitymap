@@ -279,6 +279,12 @@ function Map({ mapRef }) {
                   ? "inherit"
                   : "hidden !important",
             },
+            ".MuiDataGrid-columnSeparator": {
+              visibility:
+                selectionContext.selected.length > 0
+                  ? "inherit"
+                  : "hidden !important",
+            },
           }}
           rowHeight={35}
           disableColumnMenu={true}
@@ -288,7 +294,7 @@ function Map({ mapRef }) {
           autoHeight={selectionContext.selected.length <= 7}
           initialState={{ pagination: { paginationModel: { pageSize: 100 } } }}
           //pageSizeOptions={[10]}
-          columns={listSettings.columns}
+          columns={listSettings(activityContext).columns}
           disableColumnFilter
           density="compact"
           sortModel={listContext.compact.sortModel}

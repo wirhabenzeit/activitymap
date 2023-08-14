@@ -109,7 +109,12 @@ function UserSettings() {
             setAnchorElUser(null);
           }}
         >
-          <Link href={"https://strava.com/athletes/" + activityContext.athlete}>
+          <Link
+            component="button"
+            color="inherit"
+            href={"https://strava.com/athletes/" + activityContext.athlete}
+            underline="none"
+          >
             <Typography textAlign="center">Strava Profile</Typography>
           </Link>
         </MenuItem>

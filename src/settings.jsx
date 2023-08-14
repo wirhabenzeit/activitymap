@@ -1,4 +1,4 @@
-import { Link, Tooltip } from "@mui/material";
+import { IconButton, Link, Tooltip } from "@mui/material";
 import { gridStringOrNumberComparator } from "@mui/x-data-grid";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { library } from "@fortawesome/fontawesome-svg-core";
@@ -291,7 +291,7 @@ function decFormatter(unit = "", decimals = 0) {
   return (num) => (num == undefined ? null : num.toFixed(decimals) + unit);
 }
 
-const listSettings = {
+const listSettings = (activityContext) => ({
   columns: [
     {
       field: "sport_type",
@@ -554,6 +554,35 @@ const listSettings = {
       valueGetter: (params) => params.row.properties.max_heartrate,
       valueFormatter: (params) => decFormatter("bpm")(params.value),
     },
+    {
+      field: "edit",
+      headerName: "Edit Activity",
+      width: 30,
+      type: "number",
+      sortable: false,
+      align: "center",
+      headerAlign: "center",
+      valueGetter: (params) => params.row.id,
+      renderHeader: (params) => (
+        <Tooltip title="Edit Activity">
+          <FontAwesomeIcon fontSize="small" icon="edit" />
+        </Tooltip>
+      ),
+      renderCell: (params) => (
+        <IconButton
+          onClick={() =>
+            console.log(
+              activityContext.reloadActivity(
+                params.row.properties.athlete,
+                params.row.properties.id
+              )
+            )
+          }
+        >
+          <FontAwesomeIcon fontSize="small" icon="rotate" />
+        </IconButton>
+      ),
+    },
   ],
   defaultState: {
     compact: {
@@ -571,6 +600,7 @@ const listSettings = {
         average_watts: false,
         weighted_average_watts: false,
         average_heartrate: false,
+        edit: false,
       },
     },
     full: {
@@ -585,10 +615,11 @@ const listSettings = {
         max_heartrate: false,
         max_power: false,
         average_watts: false,
+        edit: false,
       },
     },
   },
-};
+});
 
 export {
   mapSettings,
