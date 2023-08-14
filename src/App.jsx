@@ -248,7 +248,7 @@ function App() {
       <Box
         sx={{
           height: "100vh",
-          width: 1,
+          width: "calc(100% - 33px)",
           display: "flex",
           p: 0,
           flexDirection: "column",
