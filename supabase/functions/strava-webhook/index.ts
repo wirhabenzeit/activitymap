@@ -65,10 +65,12 @@ function simplify_activity(activity) {
     "total_photo_count",
     "has_kudoed",
     "suffer_score",
+    "description",
+    "calories",
   ];
   const simplified_activity: { [key: string]: any } = {};
   for (const key of result_keys) {
-    simplified_activity[key] = activity[key];
+    if (key in activity) simplified_activity[key] = activity[key];
   }
   simplified_activity["start_date_local_timestamp"] = Math.round(
     new Date(activity["start_date_local"]).getTime() / 1000
@@ -144,7 +146,7 @@ serve(async (req: Request) => {
       .eq("id", athlete)
       .single();
     const response = await fetch(
-      `https://www.strava.com/api/v3/activities/${id}?include_all_efforts=false`,
+      `https://www.strava.com/api/v3/activities/${id}?include_all_efforts=`,
       { headers: { Authorization: "Bearer " + data["access_token"] } }
     );
     const activity = await response.json();
