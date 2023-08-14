@@ -247,7 +247,7 @@ function App() {
       </Drawer>
       <Box
         sx={{
-          height: "100vh",
+          height: "100%",
           width: "calc(100% - 33px)",
           display: "flex",
           p: 0,
