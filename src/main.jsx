@@ -9,7 +9,7 @@ import { BrowserRouter as Router } from "react-router-dom";
 import { SelectionContextProvider } from "./contexts/SelectionContext.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <Router basename="/stravamap">
+  <Router basename={import.meta.env.VITE_BASEPATH}>
     <ActivityContextProvider>
       <MapContextProvider>
         <ListContextProvider>
