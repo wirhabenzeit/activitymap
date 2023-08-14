@@ -75,7 +75,7 @@ export function FilterContextProvider({ children }) {
     if (
       activityContext.loaded &&
       !state.filterRangesSet &&
-      activityContext.geoJson.features.length > 1
+      activityContext.geoJson.features.length >= 1
     ) {
       setFilterRanges();
     }
@@ -87,7 +87,6 @@ export function FilterContextProvider({ children }) {
       const filterIDs = Object.entries(activityContext.activityDict)
         .filter(([key, value]) => filterFn(value, newState))
         .map(([key, value]) => Number(key));
-      //console.log(newState, filterIDs, activityContext.activityDict);
       return {
         ...newState,
         filterIDs: filterIDs,

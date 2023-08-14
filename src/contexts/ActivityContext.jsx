@@ -229,7 +229,6 @@ function ActivityContextProvider({ children }) {
   };
 
   useEffect(() => {
-    console.log(searchParams.toString());
     if (searchParams.get("code")) setCode(searchParams.get("code"));
     else if (searchParams.get("athlete"))
       setAthlete(Number(searchParams.get("athlete")));
