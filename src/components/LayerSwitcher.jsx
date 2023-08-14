@@ -83,7 +83,6 @@ function LayerSwitcher(props) {
           />
         </IconButton>
       </Paper>
-      <Paper>testtext</Paper>
       <Menu
         anchorEl={anchorEl}
         open={open}
