@@ -24,6 +24,7 @@ export default function MultiSelect({ open, name }) {
 
   const [contentOpen, setContentOpen] = React.useState(false);
   const [selectOpen, setSelectOpen] = React.useState(false);
+
   return (
     <SidebarButton
       open={open}
@@ -53,8 +54,8 @@ export default function MultiSelect({ open, name }) {
       <FormControl
         sx={{
           mr: 2,
-          width: 1,
-          minWidth: "150px",
+          ml: 0,
+          width: "200px",
         }}
         size="small"
         variant="standard"

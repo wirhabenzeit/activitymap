@@ -1,9 +1,25 @@
-import { useRef, useState } from "react";
+import { useRef, useState, cloneElement, useEffect } from "react";
+import { Box, Popover, Fade } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 
-import { Box, Popover } from "@mui/material";
-
-export default function SidebarButton(props) {
+export default function SidebarButton({
+  inlineProps = {},
+  popoverProps = {},
+  ...props
+}) {
   const buttonRef = useRef(null);
+  const theme = useTheme();
+  const [delayOpen, setDelayOpen] = useState(props.open);
+
+  useEffect(() => {
+    if (props.open) {
+      setDelayOpen(true);
+    } else {
+      setTimeout(() => {
+        setDelayOpen(false);
+      }, theme.transitions.duration.leavingScreen);
+    }
+  }, [props.open]);
 
   return (
     <Box
@@ -22,7 +38,6 @@ export default function SidebarButton(props) {
     >
       <Box
         sx={{
-          width: "32px",
           height: "50px",
           display: "flex",
           alignItems: "center",
@@ -30,18 +45,22 @@ export default function SidebarButton(props) {
       >
         {props.button}
       </Box>
-      {props.open && (
-        <Box
-          sx={{
-            alignItems: "center",
-            width: "210px",
-            height: "50px",
-            p: 0,
-            pb: 0.5,
-          }}
+      {delayOpen && (
+        <Fade
+          in={props.open}
+          timeout={theme.transitions.duration.enteringScreen}
         >
-          {props.children}
-        </Box>
+          <Box
+            sx={{
+              alignItems: "center",
+              width: "210px",
+              height: "50px",
+              p: 0,
+            }}
+          >
+            {props.children}
+          </Box>
+        </Fade>
       )}
       {!props.open && (
         <Popover

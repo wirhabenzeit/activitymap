@@ -1,15 +1,9 @@
 import * as React from "react";
-import { ThemeProvider, styled, createTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import Link from "@mui/material/Link";
-import MuiAppBar from "@mui/material/AppBar";
-import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import MenuItem from "@mui/material/MenuItem";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import MapIcon from "@mui/icons-material/Map";
 import Menu from "@mui/material/Menu";
-import { Tabs, Tab } from "@mui/material";
 import Avatar from "@mui/material/Avatar";
 import { ActivityContext } from "/src/contexts/ActivityContext";
 

@@ -5,7 +5,6 @@ import {
   Backdrop,
   CircularProgress,
   Tabs,
-  Button,
   Tab,
   CssBaseline,
   Toolbar,
@@ -37,11 +36,7 @@ import ValueSlider from "/src/components/ValueSlider";
 import CheckboxFilter from "/src/components/CheckboxFilter";
 import { ActivityContext } from "/src/contexts/ActivityContext";
 
-import { useState, useEffect, useContext, useRef, forwardRef } from "react";
-
-const MyLink = forwardRef((props, ref) => (
-  <NavLink innerRef={ref} {...props} />
-));
+import { useState, useContext, useRef, forwardRef } from "react";
 
 const darkTheme = createTheme({
   palette: {
@@ -186,8 +181,6 @@ function App() {
                   onClick={() => {
                     goTo("/");
                   }}
-                  //component={NavLink}
-                  //to={"/" + search}
                 />
                 <Tab
                   label="List"
@@ -195,8 +188,6 @@ function App() {
                   onClick={() => {
                     goTo("/list");
                   }}
-                  //component={NavLink}
-                  //to={"/list" + search}
                 />
               </Tabs>
             </Box>
@@ -220,6 +211,7 @@ function App() {
           sx={{
             width: 1,
             height: 1,
+            overflowY: "scroll",
           }}
         >
           <List>

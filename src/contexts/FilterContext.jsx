@@ -201,7 +201,7 @@ export function FilterContextProvider({ children }) {
     }
   };
 
-  const setSearch = (name, newSearch) => {
+  const setSearch = (newSearch) => {
     setStateCustom((filter) => ({
       ...filter,
       search: newSearch,
@@ -253,7 +253,7 @@ export function FilterContextProvider({ children }) {
       return false;
     }
     if (
-      state.search !== "" &&
+      state.search &&
       !data.properties["name"]
         .toLowerCase()
         .includes(state.search.toLowerCase())

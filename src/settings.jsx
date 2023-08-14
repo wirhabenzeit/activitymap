@@ -298,7 +298,9 @@ const listSettings = {
       headerName: "Type",
       description: "Sport type",
       renderHeader: (params) => (
-        <FontAwesomeIcon fontSize="small" icon="child-reaching" />
+        <Tooltip title="Sport type">
+          <FontAwesomeIcon fontSize="small" icon="child-reaching" />
+        </Tooltip>
       ),
       valueGetter: (params) => params.row.properties.sport_type,
       renderCell: (params) => (
@@ -344,12 +346,12 @@ const listSettings = {
     {
       field: "start_date_local_timestamp",
       headerName: "Day",
-      description:
-        "Start date of the activity. Click on the column header to sort by date.",
       flex: 1,
       minWidth: 80,
       renderHeader: (params) => (
-        <FontAwesomeIcon fontSize="small" icon="calendar" />
+        <Tooltip title="Start date">
+          <FontAwesomeIcon fontSize="small" icon="calendar" />
+        </Tooltip>
       ),
       type: "number",
       valueGetter: (params) => params.row.properties.start_date_local_timestamp,
@@ -366,7 +368,9 @@ const listSettings = {
       flex: 1,
       minWidth: 60,
       renderHeader: (params) => (
-        <FontAwesomeIcon fontSize="small" icon="clock" />
+        <Tooltip title="Start time">
+          <FontAwesomeIcon fontSize="small" icon="clock" />
+        </Tooltip>
       ),
       valueGetter: (params) => {
         const date = new Date(params.row.properties.start_date_local);
@@ -389,7 +393,9 @@ const listSettings = {
     {
       headerName: "Elapsed time",
       renderHeader: (params) => (
-        <FontAwesomeIcon fontSize="small" icon="stopwatch" />
+        <Tooltip title="Elapsed time">
+          <FontAwesomeIcon fontSize="small" icon="stopwatch" />
+        </Tooltip>
       ),
       field: "elapsed_time",
       flex: 1,
@@ -406,7 +412,9 @@ const listSettings = {
     {
       headerName: "Moving time",
       renderHeader: (params) => (
-        <FontAwesomeIcon fontSize="small" icon="stopwatch" />
+        <Tooltip title="Moving time">
+          <FontAwesomeIcon fontSize="small" icon="stopwatch" />
+        </Tooltip>
       ),
       field: "moving_time",
       flex: 1,
@@ -422,9 +430,9 @@ const listSettings = {
     {
       field: "distance",
       renderHeader: (params) => (
-        <>
+        <Tooltip title="Distance">
           <FontAwesomeIcon fontSize="small" icon="ruler-horizontal" />
-        </>
+        </Tooltip>
       ),
       headerName: "Distance",
       type: "number",
@@ -436,9 +444,9 @@ const listSettings = {
     {
       field: "total_elevation_gain",
       renderHeader: (params) => (
-        <>
+        <Tooltip title="Elevation gain">
           <FontAwesomeIcon fontSize="small" icon="mountain" />
-        </>
+        </Tooltip>
       ),
       headerName: "Elev Gain",
       type: "number",
@@ -450,11 +458,11 @@ const listSettings = {
     {
       field: "elev_high",
       renderHeader: (params) => (
-        <>
+        <Tooltip title="Elevation high">
           <FontAwesomeIcon fontSize="small" icon="mountain" />
-        </>
+        </Tooltip>
       ),
-      headerName: "Elev High",
+      headerName: "Elevation High",
       type: "number",
       flex: 1,
       minWidth: 70,
@@ -464,12 +472,12 @@ const listSettings = {
     {
       field: "elev_low",
       renderHeader: (params) => (
-        <>
+        <Tooltip title="Elevation low">
           <FontAwesomeIcon fontSize="small" icon="mountain" />
           <span>:low</span>
-        </>
+        </Tooltip>
       ),
-      headerName: "Elev Low",
+      headerName: "Elevation Low",
       type: "number",
       flex: 1,
       minWidth: 70,
@@ -479,9 +487,9 @@ const listSettings = {
     {
       field: "weighted_average_watts",
       renderHeader: (params) => (
-        <>
+        <Tooltip title="Weighted average watts">
           <FontAwesomeIcon fontSize="small" icon="bolt-lightning" />
-        </>
+        </Tooltip>
       ),
       headerName: "Weighted Avg Watts",
       type: "number",
@@ -493,9 +501,9 @@ const listSettings = {
     {
       field: "average_watts",
       renderHeader: (params) => (
-        <>
+        <Tooltip title="Average watts">
           <FontAwesomeIcon fontSize="small" icon="bolt-lightning" />
-        </>
+        </Tooltip>
       ),
       headerName: "Avg Watts",
       type: "number",
@@ -507,9 +515,9 @@ const listSettings = {
     {
       field: "max_watts",
       renderHeader: (params) => (
-        <>
+        <Tooltip title="Max watts">
           <FontAwesomeIcon fontSize="small" icon="bolt-lightning" />
-        </>
+        </Tooltip>
       ),
       headerName: "Max Watts",
       type: "number",
@@ -521,9 +529,9 @@ const listSettings = {
     {
       field: "average_heartrate",
       renderHeader: (params) => (
-        <>
+        <Tooltip title="Average heartrate">
           <FontAwesomeIcon fontSize="small" icon="heart" />
-        </>
+        </Tooltip>
       ),
       headerName: "Avg Heartrate",
       type: "number",
@@ -535,9 +543,9 @@ const listSettings = {
     {
       field: "max_heartrate",
       renderHeader: (params) => (
-        <>
+        <Tooltip title="Max heartrate">
           <FontAwesomeIcon fontSize="small" icon="heart" />
-        </>
+        </Tooltip>
       ),
       headerName: "Max Heartrate",
       type: "number",

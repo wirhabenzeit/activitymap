@@ -28,14 +28,13 @@ export default function SearchBox({ open, name }) {
       setContentOpen={setOpenSearch}
       button={
         <IconButton
+          disabled={filterContext.search === ""}
           sx={{
             width: "30px",
             mx: "1px",
-            color:
-              filterContext.search[name] == "" ? "text.disabled" : "primary",
           }}
           onClick={() => {
-            filterContext.setSearch(name, "");
+            filterContext.setSearch("");
           }}
         >
           <FontAwesomeIcon fontSize="medium" icon="magnifying-glass" />
@@ -43,13 +42,13 @@ export default function SearchBox({ open, name }) {
       }
     >
       <TextField
-        sx={{ width: 1, mr: 1 }}
+        sx={{ width: "200px", mr: 1, mt: 0.5 }}
         margin="none"
         size="small"
         label="Activity Title"
-        value={filterContext.search[name]}
+        value={filterContext.search}
         onChange={(event) => {
-          filterContext.setSearch(name, event.target.value);
+          filterContext.setSearch(event.target.value);
         }}
       />
     </SidebarButton>

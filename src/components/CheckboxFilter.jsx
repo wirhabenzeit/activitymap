@@ -23,18 +23,14 @@ export default function CheckboxFilter({ open, name }) {
       setContentOpen={setOpenContent}
       button={
         <IconButton
+          disabled={filterContext.binary[name] === undefined}
           sx={{
             width: "30px",
             mx: "1px",
-            color:
-              filterContext.binary[name] === undefined
-                ? "text.disabled"
-                : "primary",
           }}
           onClick={() => {
             console.log("setBinary");
             filterContext.setBinary(name, undefined);
-            //setValue(undefined);
           }}
         >
           <FontAwesomeIcon fontSize="medium" icon={binaryFilters[name].icon} />

@@ -1,12 +1,7 @@
 import { createContext, useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { filterSettings } from "../settings";
 import Cookies from "js-cookie";
 import { useSearchParams } from "react-router-dom";
-import { RequestQuoteSharp } from "@mui/icons-material";
-
-//import { useSearchParams } from "next/navigation";
-//import { useQueryParams, NumberParam, withDefault } from "use-query-params";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -234,6 +229,7 @@ function ActivityContextProvider({ children }) {
   };
 
   useEffect(() => {
+    console.log(searchParams.toString());
     if (searchParams.get("code")) setCode(searchParams.get("code"));
     else if (searchParams.get("athlete"))
       setAthlete(Number(searchParams.get("athlete")));

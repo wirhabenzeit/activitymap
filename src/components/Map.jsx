@@ -279,16 +279,13 @@ function Map({ mapRef }) {
                   ? "inherit"
                   : "hidden !important",
             },
-            ".MuiDataGrid-sortIcon": {
-              //opacity: "inherit !important",
-            },
           }}
           rowHeight={35}
           disableColumnMenu={true}
           rows={selectionContext.selected.map(
             (key) => activityContext.activityDict[key]
           )}
-          autoHeight={true}
+          autoHeight={selectionContext.selected.length <= 7}
           initialState={{ pagination: { paginationModel: { pageSize: 100 } } }}
           //pageSizeOptions={[10]}
           columns={listSettings.columns}

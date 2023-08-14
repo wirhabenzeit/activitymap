@@ -10,6 +10,7 @@ library.add(fas);
 import { filterSettings } from "../settings";
 import SidebarButton from "/src/components/SidebarButton";
 import { FilterContext } from "/src/contexts/FilterContext";
+import { Tooltip } from "@mui/material";
 
 const Slider = styled(MuiSlider)(({ theme }) => ({
   '& .MuiSlider-markLabel[data-index="0"]': {
@@ -66,12 +67,10 @@ export default function SliderBox({ open, name }) {
       setContentOpen={setOpenSlider}
       button={
         <IconButton
+          disabled={minmax.every((v, i) => v === value[i])}
           sx={{
             width: "30px",
             mx: "1px",
-            color: minmax.every((v, i) => v === value[i])
-              ? "text.disabled"
-              : "primary",
           }}
           onClick={() => {
             setValue(minmax);
