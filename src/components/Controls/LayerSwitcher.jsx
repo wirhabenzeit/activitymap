@@ -19,7 +19,7 @@ import {
 import { MapContext } from "/src/contexts/MapContext";
 import { mapSettings } from "../../settings";
 
-function LayerSwitcher(props) {
+export function LayerSwitcher(props) {
   const mapContext = useContext(MapContext);
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -125,5 +125,3 @@ function LayerSwitcher(props) {
     </Box>
   );
 }
-
-export default LayerSwitcher;

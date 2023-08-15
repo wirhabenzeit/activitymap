@@ -24,7 +24,7 @@ import { mapSettings, categorySettings, listSettings } from "../settings";
 
 import { DownloadControl } from "/src/components/Controls/DownloadControl";
 import { SelectionControl } from "/src/components/Controls/SelectionControl";
-import LayerSwitcher from "/src/components/controls/LayerSwitcher";
+import { LayerSwitcher } from "/src/components/Controls/LayerSwitcher";
 
 function Download(props) {
   useControl(() => new DownloadControl(), {
