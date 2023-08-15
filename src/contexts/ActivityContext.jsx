@@ -129,21 +129,18 @@ function ActivityContextProvider({ children }) {
 
   const loadMore = async () => {
     console.log("loading more");
-    setState((prev) => ({ ...prev, loading: true }));
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-webhook?page=${
         Math.floor(state.geoJson.features.length / 200) + 1
       }&owner_id=${state.athlete}&aspect_type=create&object_type=activity`
     );
     const data = await response.json();
-    console.log(data);
     const newData = data.filter(
       (act) => !state.geoJson.features.some((a) => a.id === act.id)
     );
-    console.log(newData);
     if (newData.length > 0) {
       const newGeojsonFeatures = newData.map(parseFeature);
-      const activityDict = newData.reduce((obj, act) => {
+      const activityDict = newGeojsonFeatures.reduce((obj, act) => {
         obj[act.id] = act;
         return obj;
       }, {});
@@ -155,11 +152,9 @@ function ActivityContextProvider({ children }) {
           features: [...prev.geoJson.features, ...newGeojsonFeatures],
         },
       }));
-      setState((prev) => ({ ...prev, loading: false }));
       return newData.length;
     } else {
       console.log("no new data");
-      setState((prev) => ({ ...prev, loading: false }));
       return 0;
     }
   };
@@ -278,11 +273,7 @@ function ActivityContextProvider({ children }) {
     <ActivityContext.Provider
       value={{
         ...state,
-        setAthlete: setAthlete,
-        setCode: setCode,
         loadMore: loadMore,
-        setGuestMode: setGuestMode,
-        setActivityList: setActivityList,
         reloadActivity: reloadActivity,
       }}
     >

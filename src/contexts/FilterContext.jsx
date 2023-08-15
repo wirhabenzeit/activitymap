@@ -74,7 +74,6 @@ export function FilterContextProvider({ children }) {
   useEffect(() => {
     if (
       activityContext.loaded &&
-      !state.filterRangesSet &&
       activityContext.geoJson.features.length >= 1
     ) {
       setFilterRanges();

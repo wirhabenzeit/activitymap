@@ -1,11 +1,9 @@
-import {
-  useRef,
-  useState,
-  useContext,
-  useCallback,
-  useMemo,
-  useEffect,
-} from "react";
+import { useState, useContext, useCallback, useMemo, useEffect } from "react";
+
+import { Paper } from "@mui/material";
+import { DataGrid } from "@mui/x-data-grid";
+import { useTheme } from "@mui/material/styles";
+
 import ReactMapGL, {
   NavigationControl,
   GeolocateControl,
@@ -14,21 +12,19 @@ import ReactMapGL, {
   Layer,
   Source,
 } from "react-map-gl";
-import { MapContext } from "/src/contexts/MapContext";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { mapSettings } from "../settings";
-import { DownloadControl } from "/src/components/Controls/DownloadControl";
-import { SelectionControl } from "/src/components/Controls/SelectionControl";
+
+import { MapContext } from "/src/contexts/MapContext";
 import { ActivityContext } from "/src/contexts/ActivityContext";
 import { SelectionContext } from "/src/contexts/SelectionContext";
 import { FilterContext } from "/src/contexts/FilterContext";
 import { ListContext } from "/src/contexts/ListContext";
-import { categorySettings } from "../settings";
-import { listSettings } from "../settings";
-import { Paper } from "@mui/material";
-import { DataGrid, GridColumnMenu } from "@mui/x-data-grid";
-import { useTheme } from "@mui/material/styles";
-import LayerSwitcher from "/src/components/LayerSwitcher";
+
+import { mapSettings, categorySettings, listSettings } from "../settings";
+
+import { DownloadControl } from "/src/components/Controls/DownloadControl";
+import { SelectionControl } from "/src/components/Controls/SelectionControl";
+import LayerSwitcher from "/src/components/controls/LayerSwitcher";
 
 function Download(props) {
   useControl(() => new DownloadControl(), {
@@ -51,20 +47,14 @@ function Selection(props) {
   );
 }
 
-/*function RouteSource(props) {
-  const activityContext = useContext(ActivityContext);
-  return (
-    {props.children}
-  );
-}*/
-
 function RouteLayer() {
   const filterContext = useContext(FilterContext);
   const selectionContext = useContext(SelectionContext);
   const activityContext = useContext(ActivityContext);
 
-  console.log("routeLayer render");
-  //console.log(filterContext.filterIDs, activityContext);
+  console.log(
+    `routeLayer render ${filterContext.filterIDs.length}/${activityContext.geoJson.features.length} rows`
+  );
 
   const theme = useTheme();
 
@@ -195,14 +185,6 @@ function Map({ mapRef }) {
     [activityContext.geoJson, filterContext]
   );
 
-  useEffect(() => {
-    console.log("Map render");
-    return () => {
-      //mapRef.current?.getMap().setTerrain();
-      console.log("Map unmount");
-    };
-  }, []);
-
   return (
     <>
       <ReactMapGL
@@ -226,9 +208,6 @@ function Map({ mapRef }) {
         mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
         cursor={cursor}
         interactiveLayerIds={["routeLayerBG", "routeLayerBGsel"]}
-        //onClick={(evt) =>
-        //  filter.setSelected(evt.features.map((feature) => feature.id))
-        //}
         terrain={{
           source: "mapbox-dem",
           exaggeration: map.threeDim ? 1.5 : 0,
@@ -293,7 +272,6 @@ function Map({ mapRef }) {
           )}
           autoHeight={selectionContext.selected.length <= 7}
           initialState={{ pagination: { paginationModel: { pageSize: 100 } } }}
-          //pageSizeOptions={[10]}
           columns={listSettings(activityContext).columns}
           disableColumnFilter
           density="compact"

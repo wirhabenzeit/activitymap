@@ -1,6 +1,7 @@
-import * as React from "react";
-import { useMemo, useState } from "react";
-import { Box, Menu, MenuItem, Button } from "@mui/material";
+import { useMemo, useState, useContext } from "react";
+
+import { Box, Button } from "@mui/material";
+import { CheckBoxOutlineBlank, CheckBox } from "@mui/icons-material";
 import {
   DataGrid,
   GridToolbarContainer,
@@ -8,21 +9,22 @@ import {
   GridToolbarColumnsButton,
   GridToolbarDensitySelector,
   GridFooterContainer,
+  useGridRootProps,
+  GridPagination,
+  useGridSelector,
+  selectedGridRowsCountSelector,
 } from "@mui/x-data-grid";
-import { listSettings } from "../settings";
+
 import { ActivityContext } from "/src/contexts/ActivityContext";
 import { FilterContext } from "/src/contexts/FilterContext";
 import { SelectionContext } from "/src/contexts/SelectionContext";
 import { ListContext } from "/src/contexts/ListContext";
-import { CheckBoxOutlineBlank, CheckBox } from "@mui/icons-material";
-import { useGridRootProps } from "@mui/x-data-grid";
-import { GridPagination } from "@mui/x-data-grid";
-import { useGridSelector } from "@mui/x-data-grid";
-import { selectedGridRowsCountSelector } from "@mui/x-data-grid";
+
+import { listSettings } from "../settings";
 
 export function LoadMoreButton() {
   const [disabled, setDisabled] = useState(false);
-  const activityContext = React.useContext(ActivityContext);
+  const activityContext = useContext(ActivityContext);
   return (
     <Button
       onClick={async () => {
@@ -37,7 +39,6 @@ export function LoadMoreButton() {
 }
 
 export function CustomFooterStatusComponent() {
-  const activityContext = React.useContext(ActivityContext);
   const apiRef = useGridApiContext();
   const nSelected = useGridSelector(apiRef, selectedGridRowsCountSelector);
   const nTotal = apiRef.current.getRowsCount();
@@ -52,10 +53,13 @@ export function CustomFooterStatusComponent() {
 }
 
 export default function List() {
-  const activityContext = React.useContext(ActivityContext);
-  const selectionContext = React.useContext(SelectionContext);
-  const filter = React.useContext(FilterContext);
-  const listState = React.useContext(ListContext);
+  const activityContext = useContext(ActivityContext);
+  const selectionContext = useContext(SelectionContext);
+  const filter = useContext(FilterContext);
+  const listState = useContext(ListContext);
+
+  const rows = filter.filterIDs.map((key) => activityContext.activityDict[key]);
+  console.log(`List render: ${rows.length} rows`);
 
   const CustomToolbar = () => {
     const rootProps = useGridRootProps();
@@ -99,9 +103,7 @@ export default function List() {
   return (
     <>
       <DataGrid
-        rows={filter.filterIDs.map((key) => activityContext.activityDict[key])} //.filter((data) =>
-        //  filter.filterIDs.includes(data.properties.id)
-        //)}
+        rows={rows}
         columns={listSettings(activityContext).columns}
         disableColumnMenu
         pageSizeOptions={[100]}
@@ -119,7 +121,6 @@ export default function List() {
         onColumnVisibilityModelChange={(newModel) =>
           listState.setColumnVisibilityModel("full", newModel)
         }
-        //localeText={{footerRowSelected: (count) => `${count} activit${(count===1)?"y":"ies"} selected`}}
       />
     </>
   );

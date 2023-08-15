@@ -1,11 +1,6 @@
-import { MapContext } from "/src/contexts/MapContext";
-import { mapSettings } from "../settings";
 import { useContext, useState } from "react";
 import {
-  FormControl,
-  InputLabel,
   MenuItem,
-  Select,
   Box,
   IconButton,
   Menu,
@@ -13,34 +8,16 @@ import {
   MenuList,
   Divider,
   Paper,
-  Icon,
+  ListItemIcon,
 } from "@mui/material";
-import MapIcon from "@mui/icons-material/Map";
-import CheckIcon from "@mui/icons-material/Check";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ThreeDimIcon from "@mui/icons-material/ThreeDRotation";
+import {
+  Map as MapIcon,
+  Check as CheckIcon,
+  ThreeDRotation as ThreeDimIcon,
+} from "@mui/icons-material";
 
-const selectProps = {
-  width: "100%",
-  MenuProps: {
-    sx: {
-      "&& .MuiList-root": { padding: 0 },
-    },
-  },
-  style: { fontSize: "0.8rem" },
-  inputProps: {
-    sx: { p: "3px" },
-  },
-};
-
-const formProps = {
-  sx: {
-    width: 1,
-    my: 1,
-    backgroundColor: "background.paper",
-  },
-  size: "small",
-};
+import { MapContext } from "/src/contexts/MapContext";
+import { mapSettings } from "../../settings";
 
 function LayerSwitcher(props) {
   const mapContext = useContext(MapContext);

@@ -1,9 +1,6 @@
-import MapView from "/src/components/Map";
-import ListView from "/src/components/List";
+import { useState, useContext, useRef, forwardRef } from "react";
 import {
   Box,
-  Backdrop,
-  CircularProgress,
   Tabs,
   Tab,
   CssBaseline,
@@ -13,30 +10,30 @@ import {
   List,
   ListItem,
   IconButton,
+  AppBar as MuiAppBar,
+  Drawer as MuiDrawer,
 } from "@mui/material";
 import {
-  Routes,
-  Route,
-  NavLink,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-import { User } from "/src/components/AppBar";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import MapIcon from "@mui/icons-material/Map";
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  Map as MapIcon,
+} from "@mui/icons-material";
 import { ThemeProvider, styled, createTheme } from "@mui/material/styles";
+import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 
-import MuiAppBar from "@mui/material/AppBar";
-import MuiDrawer from "@mui/material/Drawer";
-import { categorySettings, binaryFilters, filterSettings } from "/src/settings";
-import MultiSelect from "/src/components/MultiSelect";
-import SearchBox from "/src/components/SearchBox";
-import ValueSlider from "/src/components/ValueSlider";
-import CheckboxFilter from "/src/components/CheckboxFilter";
 import { ActivityContext } from "/src/contexts/ActivityContext";
 
-import { useState, useContext, useRef, forwardRef } from "react";
+import MapView from "/src/components/Map";
+import ListView from "/src/components/List";
+import { User } from "/src/components/AppBar";
+import {
+  MultiSelect,
+  SearchBox,
+  ValueSlider,
+  CheckboxFilter,
+} from "/src/components/Drawer";
+
+import { categorySettings, binaryFilters, filterSettings } from "/src/settings";
 
 const darkTheme = createTheme({
   palette: {
