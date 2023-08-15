@@ -5,9 +5,9 @@ node_modules
 *.code-workspace
 .vscode
 .env*
-*.sql
 db.dump
 dist
 .next*
 out*
-*data.sql
+*seed.sql
+migrations
