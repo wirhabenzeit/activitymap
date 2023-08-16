@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 import FileSaver from "file-saver";
 
@@ -58,11 +58,28 @@ const lineDashArray = [
   ["literal", [1, 0]],
 ];
 
-export function LayerSAC({ selection, bbox }) {
+export function LayerSAC({ bbox, mapRef }) {
   const [cards, setCards] = useState([]);
+  const [selection, setSelection] = useState([]);
   const [json, setJson] = useState({ type: "FeatureCollection", features: [] });
   const [activeStep, setActiveStep] = useState(0);
   const [activePhoto, setActivePhoto] = useState(0);
+
+  const onClick = useCallback((e) => {
+    const bbox = [
+      [e.point.x - 5, e.point.y - 5],
+      [e.point.x + 5, e.point.y + 5],
+    ];
+    const selectedFeatures = mapRef.current
+      .getMap()
+      .queryRenderedFeatures(bbox, {
+        layers: ["SAC"],
+      });
+    setSelection(selectedFeatures);
+  }, []);
+
+  mapRef.current.getMap().off("click", onClick);
+  mapRef.current.getMap().on("click", onClick);
 
   async function fetchGeoJSON() {
     const bboxCH = [
@@ -165,11 +182,12 @@ export function LayerSAC({ selection, bbox }) {
         sx={{
           zIndex: 2,
           position: "absolute",
-          left: "40px",
-          maxWidth: "320px",
-          right: "10px",
-          width: "calc(100% - 50px)",
-          bottom: "30px",
+          left: "10px",
+          //right: "0px",
+          //marginLeft: "auto",
+          //marginRight: "auto",
+          width: "320px",
+          bottom: "10px",
           margin: "auto",
           visibility: cards.length > 0 ? "visible" : "hidden",
         }}
@@ -322,31 +340,33 @@ export function LayerSAC({ selection, bbox }) {
                 </Button>
               </CardActions>
             </Card>
-            <MobileStepper
-              variant="dots"
-              steps={cards.length}
-              position="static"
-              activeStep={activeStep}
-              sx={{ maxWidth: 400, flexGrow: 1 }}
-              nextButton={
-                <Button
-                  size="small"
-                  onClick={handleNext}
-                  disabled={activeStep === cards.length - 1}
-                >
-                  Next <KeyboardArrowRight />
-                </Button>
-              }
-              backButton={
-                <Button
-                  size="small"
-                  onClick={handleBack}
-                  disabled={activeStep === 0}
-                >
-                  <KeyboardArrowLeft /> Back
-                </Button>
-              }
-            />
+            {cards.length > 1 && (
+              <MobileStepper
+                variant="dots"
+                steps={cards.length}
+                position="static"
+                activeStep={activeStep}
+                sx={{ maxWidth: 400, flexGrow: 1 }}
+                nextButton={
+                  <Button
+                    size="small"
+                    onClick={handleNext}
+                    disabled={activeStep === cards.length - 1}
+                  >
+                    Next <KeyboardArrowRight />
+                  </Button>
+                }
+                backButton={
+                  <Button
+                    size="small"
+                    onClick={handleBack}
+                    disabled={activeStep === 0}
+                  >
+                    <KeyboardArrowLeft /> Back
+                  </Button>
+                }
+              />
+            )}
           </>
         )}
       </Paper>

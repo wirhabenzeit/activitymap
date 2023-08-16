@@ -158,7 +158,6 @@ function Map({ mapRef }) {
   const filterContext = useContext(FilterContext);
   const selectionContext = useContext(SelectionContext);
   const listContext = useContext(ListContext);
-  const [selectionState, setSelectionState] = useState([]);
 
   const controls = useMemo(
     () => (
@@ -190,7 +189,7 @@ function Map({ mapRef }) {
             return (
               <CustomLayer
                 bbox={map.position.bbox}
-                selection={selectionState}
+                mapRef={mapRef}
                 key="SACrouteLayer"
               />
             );
@@ -214,17 +213,13 @@ function Map({ mapRef }) {
         })}
       </>
     ),
-    [map, selectionState]
+    [map]
   );
 
   const routes = useMemo(
     () => <RouteLayer />,
     [activityContext.geoJson, filterContext]
   );
-
-  const onClick = useCallback((event) => {
-    setSelectionState(event.features);
-  }, []);
 
   return (
     <>
@@ -249,12 +244,10 @@ function Map({ mapRef }) {
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
         cursor={cursor}
-        interactiveLayerIds={["SAC"]}
         terrain={{
           source: "mapbox-dem",
           exaggeration: map.threeDim ? 1.5 : 0,
         }}
-        onClick={onClick}
       >
         {mapSettings[map.baseMap].type == "raster" && (
           <Source
