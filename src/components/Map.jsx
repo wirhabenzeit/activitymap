@@ -248,6 +248,7 @@ function Map({ mapRef }) {
           source: "mapbox-dem",
           exaggeration: map.threeDim ? 1.5 : 0,
         }}
+        interactiveLayerIds={["routeLayerBG", "routeLayerBGsel", "SAC"]}
       >
         {mapSettings[map.baseMap].type == "raster" && (
           <Source

@@ -121,6 +121,12 @@ const mapSettings = {
     visible: false,
     overlay: false,
   },
+  "SAC Tourenportal": {
+    overlay: true,
+    visible: false,
+    type: "custom",
+    component: LayerSAC,
+  },
   "Swisstopo Ski": {
     url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/{z}/{x}/{y}.png`,
     type: "raster",
@@ -148,12 +154,6 @@ const mapSettings = {
     visible: false,
     opacity: 0.4,
     overlay: true,
-  },
-  SAC: {
-    overlay: true,
-    visible: false,
-    type: "custom",
-    component: LayerSAC,
   },
 };
 

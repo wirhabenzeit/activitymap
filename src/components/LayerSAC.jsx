@@ -17,6 +17,7 @@ import {
   IconButton,
   Tooltip,
   ImageListItemBar,
+  Skeleton,
 } from "@mui/material";
 
 import proj4 from "proj4";
@@ -65,7 +66,7 @@ export function LayerSAC({ bbox, mapRef }) {
   const [activeStep, setActiveStep] = useState(0);
   const [activePhoto, setActivePhoto] = useState(0);
 
-  const onClick = useCallback((e) => {
+  const onClick = (e) => {
     const bbox = [
       [e.point.x - 5, e.point.y - 5],
       [e.point.x + 5, e.point.y + 5],
@@ -76,10 +77,15 @@ export function LayerSAC({ bbox, mapRef }) {
         layers: ["SAC"],
       });
     setSelection(selectedFeatures);
-  }, []);
+    console.log("SAC route selection", selectedFeatures);
+  };
 
-  mapRef.current.getMap().off("click", onClick);
-  mapRef.current.getMap().on("click", onClick);
+  console.log("LayerSAC render");
+
+  useEffect(() => {
+    console.log("Register click handler");
+    mapRef.current.getMap().on("click", onClick);
+  }, []);
 
   async function fetchGeoJSON() {
     const bboxCH = [
@@ -111,7 +117,8 @@ export function LayerSAC({ bbox, mapRef }) {
   useEffect(() => {
     const bboxArea =
       (bbox._ne.lat - bbox._sw.lat) * (bbox._ne.lng - bbox._sw.lng);
-    if (bboxArea < 0.02) fetchGeoJSON();
+    if (bboxArea < 0.02 || mapRef.current.getMap().getZoom() > 12.5)
+      fetchGeoJSON();
     else setJson({ type: "FeatureCollection", features: [] });
   }, [bbox]);
 
@@ -126,20 +133,29 @@ export function LayerSAC({ bbox, mapRef }) {
   };
 
   async function fetchCards() {
-    const urls = selection.map(
-      (feature) =>
-        "https://corsproxy.io/?" +
-        encodeURIComponent(
-          `https://www.sac-cas.ch/en/?type=1567765346410&tx_usersaccas2020_sac2020[routeId]=${feature.properties.route_id}&output_lang=en`
-        )
-    );
-    const responses = await Promise.all(urls.map((url) => fetch(url)));
-    const data = await Promise.all(
-      responses.map((response) => response.json())
-    );
-    setCards(data);
+    setCards(selection.map((feature) => undefined));
     setActiveStep(0);
     setActivePhoto(0);
+    const responses = await Promise.all(
+      selection.map((feature, id) => fetchCard(id, feature.properties.route_id))
+    );
+  }
+
+  useEffect(() => {
+    console.log(cards);
+  }, [cards]);
+
+  async function fetchCard(id, route_id) {
+    const url =
+      "https://corsproxy.io/?" +
+      encodeURIComponent(
+        `https://www.sac-cas.ch/en/?type=1567765346410&tx_usersaccas2020_sac2020[routeId]=${route_id}&output_lang=en`
+      );
+    const response = await fetch(url);
+    const data = await response.json();
+    console.log(data);
+    setCards((cards) => cards.map((v, i) => (i === id ? data : v)));
+    return data;
   }
 
   useEffect(() => {
@@ -161,7 +177,7 @@ export function LayerSAC({ bbox, mapRef }) {
             "line-dasharray": lineDashArray,
           }}
         />
-        {cards.length > 0 && (
+        {cards.length > 0 && cards[activeStep] && (
           <Layer
             id="SACsel"
             key="SACsel"
@@ -194,8 +210,11 @@ export function LayerSAC({ bbox, mapRef }) {
       >
         {cards.length > 0 && (
           <>
-            <Card sx={{ width: 320 }}>
-              {cards[activeStep].photos.length > 0 && (
+            <Card sx={{ width: 320, minHeight: 300 }}>
+              {cards[activeStep] === undefined && (
+                <Skeleton variant="rectangular" width={320} height={200} />
+              )}
+              {cards[activeStep] && cards[activeStep].photos.length > 0 && (
                 <div style={{ position: "relative", width: 320, height: 200 }}>
                   <Box
                     component="img"
@@ -267,77 +286,96 @@ export function LayerSAC({ bbox, mapRef }) {
                 </div>
               )}
               <CardContent>
-                <Typography variant="h5" component="div">
-                  {cards[activeStep].destination_poi.display_name}
-                </Typography>
-                <Chip
-                  icon={<TerrainIcon />}
-                  label={cards[activeStep].destination_poi.altitude + "m"}
-                  size="small"
-                  sx={{ mx: 0.5 }}
-                />
-                <Chip
-                  icon={<HikingIcon />}
-                  label={cards[activeStep].main_difficulty}
-                  size="small"
-                  sx={{ mx: 0.5 }}
-                />
-                <Typography
-                  variant="body2"
-                  component="div"
-                  color="text.secondary"
-                  sx={{ mt: 0.5 }}
-                >
-                  {cards[activeStep].title}
-                </Typography>
+                {cards[activeStep] === undefined && (
+                  <Skeleton variant="text" sx={{ fontSize: "2rem" }} />
+                )}
+                {cards[activeStep] && (
+                  <Typography variant="h5" component="div">
+                    {cards[activeStep].destination_poi.display_name}
+                  </Typography>
+                )}
+                {cards[activeStep] && (
+                  <>
+                    <Chip
+                      icon={<TerrainIcon />}
+                      label={cards[activeStep].destination_poi.altitude + "m"}
+                      size="small"
+                      sx={{ mx: 0.5 }}
+                    />
+                    <Chip
+                      icon={<HikingIcon />}
+                      label={cards[activeStep].main_difficulty}
+                      size="small"
+                      sx={{ mx: 0.5 }}
+                    />
+                  </>
+                )}
+                {cards[activeStep] === undefined && <Skeleton variant="text" />}
+                {cards[activeStep] && (
+                  <Typography
+                    variant="body2"
+                    component="div"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
+                    {cards[activeStep].title}
+                  </Typography>
+                )}
               </CardContent>
               <CardActions sx={{ justifyContent: "center", p: 0 }}>
-                <Button
-                  size="small"
-                  href={`https://www.sac-cas.ch/en/huts-and-tours/sac-route-portal/${cards[activeStep].destination_poi_id}/${cards[activeStep].type}/${cards[activeStep].id}`}
-                  target="_blank"
-                  startIcon={<LinkIcon />}
-                >
-                  SAC
-                </Button>
-                <Button
-                  size="small"
-                  target="_blank"
-                  startIcon={<DownloadIcon />}
-                  onClick={() => {
-                    const features = json.features.filter(
-                      (feature) =>
-                        feature.properties.route_id === cards[activeStep].id
-                    );
-                    console.log(features);
-                    const options = {
-                      metadata: {
-                        name: `${cards[activeStep].destination_poi.display_name}: ${cards[activeStep].title}`,
-                        author: {
-                          name: "SAC Route Portal",
-                          link: {
-                            href: `https://www.sac-cas.ch/en/huts-and-tours/sac-route-portal/${cards[activeStep].destination_poi_id}/${cards[activeStep].type}/${cards[activeStep].id}`,
+                {cards[activeStep] === undefined && (
+                  <Skeleton variant="rounded" width={200} height={10} />
+                )}
+                {cards[activeStep] && (
+                  <>
+                    <Button
+                      size="small"
+                      href={`https://www.sac-cas.ch/en/huts-and-tours/sac-route-portal/${cards[activeStep].destination_poi_id}/${cards[activeStep].type}/${cards[activeStep].id}`}
+                      target="_blank"
+                      startIcon={<LinkIcon />}
+                    >
+                      SAC
+                    </Button>
+                    <Button
+                      size="small"
+                      target="_blank"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => {
+                        const features = json.features.filter(
+                          (feature) =>
+                            feature.properties.route_id === cards[activeStep].id
+                        );
+                        console.log(features);
+                        const options = {
+                          metadata: {
+                            name: `${cards[activeStep].destination_poi.display_name}: ${cards[activeStep].title}`,
+                            author: {
+                              name: "SAC Route Portal",
+                              link: {
+                                href: `https://www.sac-cas.ch/en/huts-and-tours/sac-route-portal/${cards[activeStep].destination_poi_id}/${cards[activeStep].type}/${cards[activeStep].id}`,
+                              },
+                            },
                           },
-                        },
-                      },
-                    };
-                    const gpx = GeoJsonToGpx(
-                      { type: "FeatureCollection", features },
-                      options
-                    );
-                    console.log(gpx);
-                    const gpxString = new XMLSerializer().serializeToString(
-                      gpx
-                    );
-                    console.log(gpxString);
-                    const file = new File([gpxString], "test.gpx", {
-                      type: "text/xml;charset=utf-8",
-                    });
-                    FileSaver.saveAs(file);
-                  }}
-                >
-                  GPX
-                </Button>
+                        };
+                        const gpx = GeoJsonToGpx(
+                          { type: "FeatureCollection", features },
+                          options
+                        );
+                        console.log(gpx);
+                        const gpxString = new XMLSerializer().serializeToString(
+                          gpx
+                        );
+                        console.log(gpxString);
+                        const file = new File([gpxString], "test.gpx", {
+                          type: "text/xml;charset=utf-8",
+                        });
+                        FileSaver.saveAs(file);
+                      }}
+                    >
+                      GPX
+                    </Button>
+                  </>
+                )}
               </CardActions>
             </Card>
             {cards.length > 1 && (
