@@ -109,6 +109,12 @@ const mapSettings = {
     visible: false,
     overlay: false,
   },
+  "Swisstopo Satellite": {
+    url: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.leichte-basiskarte-imagery.vt/style.json",
+    type: "vector",
+    visible: false,
+    overlay: false,
+  },
   "Swisstopo Pixelkarte": {
     url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg`,
     type: "raster",
