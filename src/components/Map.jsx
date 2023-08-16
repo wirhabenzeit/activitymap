@@ -79,6 +79,10 @@ function RouteLayer() {
         id="routeLayerBG"
         type="line"
         paint={{ "line-color": "black", "line-width": 4 }}
+        layout={{
+          "line-join": "round",
+          "line-cap": "round",
+        }}
         filter={filterAll}
       />
       <Layer
@@ -86,6 +90,10 @@ function RouteLayer() {
         id="routeLayerFG"
         type="line"
         paint={{ "line-color": color, "line-width": 2 }}
+        layout={{
+          "line-join": "round",
+          "line-cap": "round",
+        }}
         filter={filterAll}
       />
       <Layer
@@ -93,6 +101,10 @@ function RouteLayer() {
         id="routeLayerBGsel"
         type="line"
         paint={{ "line-color": "black", "line-width": 6 }}
+        layout={{
+          "line-join": "round",
+          "line-cap": "round",
+        }}
         filter={filterSel}
       />
       <Layer
@@ -100,6 +112,10 @@ function RouteLayer() {
         id="routeLayerMIDsel"
         type="line"
         paint={{ "line-color": color, "line-width": 4 }}
+        layout={{
+          "line-join": "round",
+          "line-cap": "round",
+        }}
         filter={filterSel}
       />
       <Layer
@@ -107,6 +123,10 @@ function RouteLayer() {
         id="routeLayerFGsel"
         type="line"
         paint={{ "line-color": "white", "line-width": 2 }}
+        layout={{
+          "line-join": "round",
+          "line-cap": "round",
+        }}
         filter={filterSel}
       />
       <Layer
@@ -117,6 +137,10 @@ function RouteLayer() {
           "line-color": theme.palette.primary.light,
           "line-width": 6,
           "line-opacity": 0.4,
+        }}
+        layout={{
+          "line-join": "round",
+          "line-cap": "round",
         }}
         filter={filterHigh}
       />
@@ -134,6 +158,7 @@ function Map({ mapRef }) {
   const filterContext = useContext(FilterContext);
   const selectionContext = useContext(SelectionContext);
   const listContext = useContext(ListContext);
+  const [selectionState, setSelectionState] = useState([]);
 
   const controls = useMemo(
     () => (
@@ -159,31 +184,47 @@ function Map({ mapRef }) {
   const overlayMaps = useMemo(
     () => (
       <>
-        {map.overlayMaps.map((mapName) => (
-          <Source
-            key={mapName + "source"}
-            id={mapName}
-            type="raster"
-            tiles={[mapSettings[mapName].url]}
-            tileSize={256}
-          >
-            <Layer
-              key={mapName + "layer"}
-              id={mapName}
-              type="raster"
-              paint={{ "raster-opacity": mapSettings[mapName].opacity }}
-            />
-          </Source>
-        ))}
+        {map.overlayMaps.map((mapName) => {
+          if (mapSettings[mapName].type == "custom") {
+            const CustomLayer = mapSettings[mapName].component;
+            return (
+              <CustomLayer
+                bbox={map.position.bbox}
+                selection={selectionState}
+                key="SACrouteLayer"
+              />
+            );
+          } else
+            return (
+              <Source
+                key={mapName + "source"}
+                id={mapName}
+                type="raster"
+                tiles={[mapSettings[mapName].url]}
+                tileSize={256}
+              >
+                <Layer
+                  key={mapName + "layer"}
+                  id={mapName}
+                  type="raster"
+                  paint={{ "raster-opacity": mapSettings[mapName].opacity }}
+                />
+              </Source>
+            );
+        })}
       </>
     ),
-    [map]
+    [map, selectionState]
   );
 
   const routes = useMemo(
     () => <RouteLayer />,
     [activityContext.geoJson, filterContext]
   );
+
+  const onClick = useCallback((event) => {
+    setSelectionState(event.features);
+  }, []);
 
   return (
     <>
@@ -194,10 +235,11 @@ function Map({ mapRef }) {
         boxZoom={false}
         {...viewport}
         onMove={(evt) => setViewport(evt.viewState)}
-        projection="globe"
         onMoveEnd={(evt) => {
-          map.setPosition(evt.viewState);
+          console.log(evt);
+          map.setPosition(mapRef.current.getMap().getBounds(), evt.viewState);
         }}
+        projection="globe"
         mapStyle={
           mapSettings[map.baseMap].type == "vector"
             ? mapSettings[map.baseMap].url
@@ -207,11 +249,12 @@ function Map({ mapRef }) {
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
         cursor={cursor}
-        interactiveLayerIds={["routeLayerBG", "routeLayerBGsel"]}
+        interactiveLayerIds={["SAC"]}
         terrain={{
           source: "mapbox-dem",
           exaggeration: map.threeDim ? 1.5 : 0,
         }}
+        onClick={onClick}
       >
         {mapSettings[map.baseMap].type == "raster" && (
           <Source

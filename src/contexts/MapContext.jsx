@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext } from "react";
 import { mapSettings, defaultMapPosition } from "../settings";
 import { useSearchParams } from "react-router-dom";
+import proj4 from "proj4";
 
 const mapState = {
   baseMap: null,
@@ -61,8 +62,8 @@ export function MapContextProvider({ children }) {
     setState((map) => ({ ...map, threeDim: !map.threeDim }));
   };
 
-  const setPosition = (position) => {
-    setState((map) => ({ ...map, position: position }));
+  const setPosition = (bbox, position) => {
+    setState((map) => ({ ...map, position: { ...position, bbox: bbox } }));
   };
   console.log("MapContextProvider render");
 

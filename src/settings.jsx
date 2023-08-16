@@ -5,6 +5,8 @@ import { library } from "@fortawesome/fontawesome-svg-core";
 import { fas } from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
 
+import { LayerSAC } from "/src/components/LayerSAC";
+
 const stravaTypes = [
   "AlpineSki",
   "BackcountrySki",
@@ -147,6 +149,12 @@ const mapSettings = {
     opacity: 0.4,
     overlay: true,
   },
+  SAC: {
+    overlay: true,
+    visible: false,
+    type: "custom",
+    component: LayerSAC,
+  },
 };
 
 const defaultMapPosition = {
@@ -155,6 +163,10 @@ const defaultMapPosition = {
   latitude: 46.8,
   pitch: 0,
   bearing: 0,
+  bbox: {
+    _sw: { lng: 5.3, lat: 45.9 },
+    _ne: { lng: 11.1, lat: 47.8 },
+  },
 };
 
 const categorySettings = {
