@@ -25,6 +25,7 @@ import { ActivityContext } from "/src/contexts/ActivityContext";
 
 import MapView from "/src/components/Map";
 import ListView from "/src/components/List";
+import StatsView from "/src/components/Stats";
 import { User } from "/src/components/AppBar";
 import {
   MultiSelect,
@@ -104,7 +105,7 @@ const Drawer = styled(MuiDrawer, {
   }),
 }));
 
-const pathMap = { "/": 0, "/list": 1 };
+const pathMap = { "/": 0, "/list": 1, "/stats": 2 };
 
 function App() {
   const { pathname, search } = useLocation();
@@ -115,7 +116,7 @@ function App() {
   let navigate = useNavigate();
 
   const goTo = (path) => {
-    if (path === "/list") {
+    if (page === 0) {
       console.log("Removing terrain");
       mapRef.current.getMap().setTerrain();
     }
@@ -184,6 +185,13 @@ function App() {
                   index={1}
                   onClick={() => {
                     goTo("/list");
+                  }}
+                />
+                <Tab
+                  label="Stats"
+                  index={2}
+                  onClick={() => {
+                    goTo("/stats");
                   }}
                 />
               </Tabs>
@@ -256,6 +264,7 @@ function App() {
           <Routes>
             <Route exact path="/" element={<MapView mapRef={mapRef} />} />
             <Route exact path="/list" element={<ListView />} />
+            <Route exact path="/stats" element={<StatsView />} />
           </Routes>
         </Box>
       </Box>

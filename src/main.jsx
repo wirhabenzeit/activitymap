@@ -7,6 +7,7 @@ import { MapContextProvider } from "./contexts/MapContext.jsx";
 import { ListContextProvider } from "./contexts/ListContext.jsx";
 import { BrowserRouter as Router } from "react-router-dom";
 import { SelectionContextProvider } from "./contexts/SelectionContext.jsx";
+import { StatsContextProvider } from "./contexts/StatsContext.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <Router basename={import.meta.env.VITE_BASEPATH}>
@@ -14,9 +15,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <MapContextProvider>
         <ListContextProvider>
           <FilterContextProvider>
-            <SelectionContextProvider>
-              <App />
-            </SelectionContextProvider>
+            <StatsContextProvider>
+              <SelectionContextProvider>
+                <App />
+              </SelectionContextProvider>
+            </StatsContextProvider>
           </FilterContextProvider>
         </ListContextProvider>
       </MapContextProvider>
