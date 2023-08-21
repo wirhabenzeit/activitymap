@@ -19,12 +19,9 @@ import {
   MenuItem,
   InputLabel,
   Card,
-  Paper,
   CardContent,
   Unstable_Grid2 as Grid,
-  ToggleButton,
 } from "@mui/material";
-import { styled } from "@mui/material/styles";
 
 import { aliasMap, categorySettings } from "../settings";
 import * as d3 from "d3-array";
@@ -32,42 +29,60 @@ import * as d3t from "d3-time";
 import * as d3tf from "d3-time-format";
 import { FilterContext } from "../contexts/FilterContext";
 
-const Item = styled(Paper)(({ theme }) => ({
-  backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
-  ...theme.typography.body2,
-  padding: theme.spacing(1),
-  textAlign: "center",
-  color: theme.palette.text.secondary,
-}));
+const addZeros = (val, min, max, step) => {
+  val.sort((a, b) => a[0] - b[0]);
+  const newVals = [];
+  var cur = min;
+  var ind = 0;
+  while (cur <= max) {
+    if (ind < val.length && cur == val[ind][0]) {
+      newVals.push(val[ind]);
+      ind += 1;
+    } else {
+      newVals.push([cur, 0]);
+    }
+    cur += step;
+  }
+  console.log(min, max, step, val, newVals);
+  return newVals;
+};
 
-function range(from, to, step = 1) {
-  return [...Array(Math.floor((to - from) / step)).keys()].map(
-    (i) => i * step + from
+const cumSum = (val) => {
+  val.sort((a, b) => a[0] - b[0]);
+  return d3.zip(
+    val.map(([x, y]) => x),
+    d3.cumsum(val.map(([x, y]) => y))
   );
-}
-function fillZeros(arr, step = 1) {
-  return arr.reduce(
-    (prev, curr) => [
-      ...prev,
-      ...(prev.length > 0 && prev[prev.length - 1][0] < curr[0] - step
-        ? range(prev[prev.length - 1][0] + step, curr[0], step).map((x) => [
-            x,
-            0,
-          ])
-        : []),
-      curr,
-    ],
-    []
+};
+
+const occurrencesOfMonth = (date, from, to) => {
+  const month = date.getMonth();
+  return (
+    to.getFullYear() -
+    from.getFullYear() -
+    1 +
+    (to.getMonth() >= month ? 1 : 0) +
+    (from.getMonth() <= month ? 1 : 0)
   );
-}
-
-//import { ActivityContext } from "/src/contexts/ActivityContext";
-
-// make sure parent container have a defined height when using
-// responsive component, otherwise height will be 0 and
-// no chart will be rendered.
-// website examples showcase many properties,
-// you'll often use just a few of them.
+};
+const occurrencesOfWeek = (date, from, to) => {
+  const week = parseInt(d3tf.timeFormat("%W")(date));
+  return (
+    to.getFullYear() -
+    from.getFullYear() -
+    1 +
+    (parseInt(d3tf.timeFormat("%W")(from)) <= week ? 1 : 0) +
+    (parseInt(d3tf.timeFormat("%W")(to)) >= week ? 1 : 0)
+  );
+};
+const occurrencesOfDay = (date, from, to) => {
+  const day = date.getDay();
+  return (
+    d3t.timeDay.count(d3t.timeMonday.ceil(from), d3t.timeSunday.floor(to)) / 7 +
+    (day >= from.getDay() ? 1 : 0) +
+    (day <= to.getDay() ? 1 : 0)
+  );
+};
 
 function YearlySummary() {
   const statsContext = useContext(StatsContext);
@@ -84,7 +99,7 @@ function YearlySummary() {
     year: {
       label: "Year",
       format: (v) => v,
-      fun: (d) => d.date.getFullYear(),
+      fun: (date) => date.getFullYear(),
       unit: "",
       step: 1,
       scale: "linear",
@@ -92,7 +107,7 @@ function YearlySummary() {
     yearMonth: {
       label: "Year/Month",
       format: (v) => v,
-      fun: (d) => d.date.getFullYear() + d.date.getMonth() / 12,
+      fun: (date) => date.getFullYear() + date.getMonth() / 12,
       unit: "",
       step: 1 / 12,
       scale: "linear",
@@ -101,8 +116,9 @@ function YearlySummary() {
       label: "Month",
       format: (v) =>
         new Date(2023, v, 1).toLocaleString("default", { month: "short" }),
-      fun: (d) => d.date.getMonth(),
-      relative: "years",
+      fun: (date) => date.getMonth(),
+      relative: "year",
+      occurrencesIn: (date, from, to) => occurrencesOfMonth(date, from, to),
       unit: "",
       step: 1,
       scale: "point",
@@ -110,8 +126,9 @@ function YearlySummary() {
     week: {
       label: "Week",
       format: (v) => v,
-      fun: (d) => parseInt(d3tf.timeFormat("%W")(d.date)),
-      relative: "years",
+      fun: (date) => parseInt(d3tf.timeFormat("%W")(date)),
+      relative: "year",
+      occurrencesIn: (date, from, to) => occurrencesOfWeek(date, from, to),
       unit: "",
       step: 1,
       scale: "linear",
@@ -122,8 +139,9 @@ function YearlySummary() {
         new Date(Date.UTC(2017, 0, 2 + v)).toLocaleString("default", {
           weekday: "short",
         }),
-      fun: (d) => (d.date.getDay() + 6) % 7,
-      relative: "weeks",
+      fun: (date) => (date.getDay() + 6) % 7,
+      relative: "week",
+      occurrencesIn: (date, from, to) => occurrencesOfDay(date, from, to),
       unit: "",
       step: 1,
       scale: "point",
@@ -150,29 +168,22 @@ function YearlySummary() {
       unit: "h",
     },
   };
+  const extent = d3.extent(statsContext.data, (d) => d.date);
+  const extentInYear = (year) => [
+    year == years[0] ? extent[0] : new Date(year, 0, 1),
+    year == years[1] ? extent[1] : new Date(year + 1, 0, 1),
+  ];
+  const years = extent.map((d) => d.getFullYear());
+
+  const normalizer = (date) =>
+    timePeriods[timePeriod].relative
+      ? timePeriods[timePeriod].occurrencesIn(
+          date,
+          ...(yearAvg ? extent : extentInYear(date.getFullYear()))
+        )
+      : 1;
+
   const stats = {
-    count: {
-      label: "Count",
-      fun: (v) =>
-        timePeriods[timePeriod].relative && yearAvg
-          ? v.length / statsContext[timePeriods[timePeriod].relative].length
-          : v.length,
-      format: (v) =>
-        timePeriods[timePeriod].relative ? v.toFixed(1) : v.toFixed(),
-    },
-    total: {
-      label: "Total",
-      format: values[value].format,
-      fun: (v) =>
-        timePeriods[timePeriod].relative && yearAvg
-          ? d3.sum(v, values[value].fun) /
-            statsContext[timePeriods[timePeriod].relative].filter((d) =>
-              timePeriod == "day" && !yearAvg
-                ? d.getFullYear() == v[0].date.getFullYear()
-                : true
-            ).length
-          : d3.sum(v, values[value].fun),
-    },
     avg: {
       label: "Average",
       fun: (v) => d3.mean(v, values[value].fun),
@@ -193,7 +204,32 @@ function YearlySummary() {
       format: values[value].format,
       fun: (v) => d3.max(v, values[value].fun),
     },
+    count: {
+      label: "Count",
+      fun: (v) => v.length / normalizer(v[0].date),
+      format: (v) =>
+        timePeriods[timePeriod].relative ? v.toFixed(1) : v.toFixed(),
+    },
+    cumCount: {
+      label: "Cumulative Count",
+      fun: (v) => v.length / normalizer(v[0].date),
+      format: (v) =>
+        timePeriods[timePeriod].relative ? v.toFixed(1) : v.toFixed(),
+      cumulative: true,
+    },
+    total: {
+      label: "Total",
+      format: values[value].format,
+      fun: (v) => d3.sum(v, values[value].fun) / normalizer(v[0].date),
+    },
+    cumTotal: {
+      label: "Cumulative Total",
+      format: values[value].format,
+      fun: (v) => d3.sum(v, values[value].fun) / normalizer(v[0].date),
+      cumulative: true,
+    },
   };
+
   const groups = {
     sport_group: {
       label: "Sport Group",
@@ -212,40 +248,54 @@ function YearlySummary() {
     },
   };
 
-  const data = (
-    yearAvg || !timePeriods[timePeriod].relative
-      ? d3.rollups(
-          d3.filter(statsContext.data, (f) =>
-            filterContext.filterIDs.includes(f.id)
-          ),
-          stats[stat].fun,
-          groups[group].fun,
-          timePeriods[timePeriod].fun
-        )
-      : d3
-          .rollups(
-            d3.filter(statsContext.data, (f) =>
-              filterContext.filterIDs.includes(f.id)
-            ),
-            stats[stat].fun,
-            groups[group].fun,
-            (f) => f.date.getFullYear(),
-            timePeriods[timePeriod].fun
-          )
-          .map(([sport, years]) =>
-            years.map(([year, data]) => [[sport, year], data])
-          )
-          .flat()
-  ).map(([id, data]) => ({
+  const inputData = d3.filter(statsContext.data, (f) =>
+    filterContext.filterIDs.includes(f.id)
+  );
+  var rollupData;
+  const separateByYear = !yearAvg && timePeriods[timePeriod].relative;
+
+  if (!yearAvg && timePeriods[timePeriod].relative) {
+    rollupData = d3
+      .rollups(
+        inputData,
+        stats[stat].fun,
+        groups[group].fun,
+        (f) => f.date.getFullYear(),
+        (f) => timePeriods[timePeriod].fun(f.date)
+      )
+      .map(([sport, years]) =>
+        years.map(([year, data]) => [[sport, year], data])
+      )
+      .flat();
+  } else {
+    rollupData = d3.rollups(
+      inputData,
+      stats[stat].fun,
+      groups[group].fun,
+      (f) => timePeriods[timePeriod].fun(f.date)
+    );
+  }
+
+  const xRange = (year) => {
+    const step = timePeriods[timePeriod].step;
+    if (!timePeriods[timePeriod].relative)
+      return [...extent.map(timePeriods[timePeriod].fun), step];
+    if (yearAvg) return timePeriod == "month" ? [0, 11, step] : [0, 53, step];
+    const range = d3t.timeDay
+      .range(...extentInYear(year))
+      .map(timePeriods[timePeriod].fun);
+    return [Math.min(...range), Math.max(...range), step];
+  };
+
+  const data = rollupData.map(([id, data]) => ({
     id: id,
-    color:
-      yearAvg || !timePeriods[timePeriod].relative
-        ? groups[group].color(id)
-        : groups[group].color(id[0]),
-    data: fillZeros(
-      data.sort((a, b) => a[0] - b[0]),
-      timePeriods[timePeriod].step
-    ).map(([d, v]) => ({ x: d, y: v })),
+    color: separateByYear
+      ? groups[group].color(id[0])
+      : groups[group].color(id),
+    data: (stats[stat].cumulative
+      ? cumSum(data)
+      : addZeros(data, ...xRange(separateByYear ? id[1] : id))
+    ).map(([x, y]) => ({ x: x, y: y })),
   }));
   const minMax = d3.extent(statsContext.years).map((d) => d.getFullYear());
 
@@ -289,35 +339,40 @@ function YearlySummary() {
                     ))}
                 </Select>
               </FormControl>
-              {timePeriods[timePeriod].relative && (
-                <>
-                  <ButtonGroup variant="outlined">
-                    <Button
-                      disabled={yearAvg || yearHigh == minMax[0]}
-                      onClick={(e) => {
-                        setYearHigh(yearHigh - 1);
-                      }}
-                    >
-                      -
-                    </Button>
-                    <Button
-                      onClick={(e) => {
-                        setYearAvg(!yearAvg);
-                      }}
-                    >
-                      {yearAvg ? "Avg" : yearHigh}
-                    </Button>
-                    <Button
-                      disabled={yearAvg || yearHigh == minMax[1]}
-                      onClick={(e) => {
-                        setYearHigh(yearHigh + 1);
-                      }}
-                    >
-                      +
-                    </Button>
-                  </ButtonGroup>
-                </>
-              )}
+              <ButtonGroup variant="outlined">
+                <Button
+                  disabled={
+                    !timePeriods[timePeriod].relative ||
+                    yearAvg ||
+                    yearHigh == minMax[0]
+                  }
+                  onClick={(e) => {
+                    setYearHigh(yearHigh - 1);
+                  }}
+                >
+                  -
+                </Button>
+                <Button
+                  disabled={!timePeriods[timePeriod].relative}
+                  onClick={(e) => {
+                    setYearAvg(!yearAvg);
+                  }}
+                >
+                  {yearAvg ? "Avg" : yearHigh}
+                </Button>
+                <Button
+                  disabled={
+                    !timePeriods[timePeriod].relative ||
+                    yearAvg ||
+                    yearHigh == minMax[1]
+                  }
+                  onClick={(e) => {
+                    setYearHigh(yearHigh + 1);
+                  }}
+                >
+                  +
+                </Button>
+              </ButtonGroup>
               <FormControl sx={{ mx: 1 }}>
                 <InputLabel>Group</InputLabel>
                 <Select
@@ -355,7 +410,7 @@ function YearlySummary() {
                   value={value}
                   label="Value"
                   onChange={(event) => setValue(event.target.value)}
-                  disabled={stat === "count"}
+                  disabled={stat in ["count", "cumCount"]}
                 >
                   {Object.entries(values).map(([key, aggregator]) => (
                     <MenuItem value={key} key={key}>

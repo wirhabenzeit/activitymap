@@ -50,9 +50,10 @@ export function StatsContextProvider({ children }) {
       );
       //const month = d3t.timeMonth.range(...extent);
       const weeks = d3t.timeWeek.range(
-        d3t.timeYear.floor(extent[0]),
+        d3t.timeMonday.floor(extent[0]),
         extent[1]
       );
+      //console.log(extent, years, weeks);
       //const day = d3t.timeDay.range(...extent);
       /*console.log(
         d3a.rollup(
