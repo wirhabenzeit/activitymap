@@ -5,6 +5,9 @@ import { library } from "@fortawesome/fontawesome-svg-core";
 import { fas } from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
 
+import * as d3t from "d3-time";
+import * as d3tf from "d3-time-format";
+
 import { LayerSAC } from "/src/components/LayerSAC";
 
 const stravaTypes = [
@@ -639,6 +642,161 @@ const listSettings = (activityContext) => ({
   },
 });
 
+const occurrencesOfMonth = (date, from, to) => {
+  const month = date.getMonth();
+  return (
+    to.getFullYear() -
+    from.getFullYear() -
+    1 +
+    (to.getMonth() >= month ? 1 : 0) +
+    (from.getMonth() <= month ? 1 : 0)
+  );
+};
+const occurrencesOfWeek = (date, from, to) => {
+  const week = parseInt(d3tf.timeFormat("%W")(date));
+  return (
+    to.getFullYear() -
+    from.getFullYear() -
+    1 +
+    (parseInt(d3tf.timeFormat("%W")(from)) <= week ? 1 : 0) +
+    (parseInt(d3tf.timeFormat("%W")(to)) >= week ? 1 : 0)
+  );
+};
+const occurrencesOfDay = (date, from, to) => {
+  const day = date.getDay();
+  return (
+    d3t.timeDay.count(d3t.timeMonday.ceil(from), d3t.timeSunday.floor(to)) / 7 +
+    (day >= from.getDay() ? 1 : 0) +
+    (day <= to.getDay() ? 1 : 0)
+  );
+};
+
+const timelineSettings = {
+  timePeriods: {
+    year: {
+      label: "Year",
+      format: (v) => new Date(v).getFullYear(),
+      fun: (date) => d3t.timeYear.floor(date),
+      range: (extent) =>
+        d3t.timeYear.range(
+          d3t.timeYear.floor(extent[0]),
+          d3t.timeYear.ceil(extent[1])
+        ),
+      occurrencesIn: () => 1,
+    },
+    yearMonth: {
+      label: "Year/Month",
+      format: (v) => d3tf.timeFormat("%y/%m")(new Date(v)),
+      fun: (date) => d3t.timeMonth.floor(date),
+      range: (extent) =>
+        d3t.timeMonth.range(
+          d3t.timeMonth.floor(extent[0]),
+          d3t.timeMonth.ceil(extent[1])
+        ),
+      occurrencesIn: () => 1,
+    },
+    month: {
+      label: "Month",
+      format: (v) => d3tf.timeFormat("%b")(new Date(v)),
+      tickValues: "every 1 month",
+      fun: (date) => {
+        const newDate = d3t.timeMonth.floor(date);
+        newDate.setFullYear(2018);
+        return newDate;
+      },
+      relative: true,
+      range: (extent) =>
+        d3t.timeMonth.range(
+          ...extent.map((date) =>
+            d3t.timeMonth.floor(new Date(d3tf.timeFormat("2018-%m-%d")(date)))
+          )
+        ),
+      occurrencesIn: (date, from, to) => occurrencesOfMonth(date, from, to),
+    },
+    week: {
+      label: "Week",
+      format: (v) => d3tf.timeFormat("%b-%d")(new Date(v)),
+      tickValues: "every 1 month",
+      fun: (date) => {
+        const newDate = d3t.timeDay.floor(date);
+        newDate.setFullYear(2018);
+        return d3t.timeMonday.floor(newDate);
+      },
+      relative: true,
+      range: (extent) =>
+        d3t.timeMonday.range(
+          ...extent.map((date) =>
+            d3t.timeMonday.floor(new Date(d3tf.timeFormat("2018-%m-%d")(date)))
+          )
+        ),
+      occurrencesIn: (date, from, to) => occurrencesOfWeek(date, from, to),
+    },
+    day: {
+      label: "Weekday",
+      format: (v) =>
+        new Date(v).toLocaleString("default", {
+          weekday: "short",
+        }),
+      fun: (date) => new Date(2018, 0, 1 + ((date.getDay() + 6) % 7)),
+      relative: true,
+      range: () =>
+        d3t.timeDay.range(new Date(2018, 0, 1), new Date(2018, 0, 8)),
+      occurrencesIn: (date, from, to) => occurrencesOfDay(date, from, to),
+    },
+  },
+  values: {
+    distance: {
+      fun: (d) => d.distance,
+      format: (v) =>
+        v >= 10_000_000
+          ? (v / 1_000_000).toFixed() + "k"
+          : (v / 1000).toFixed(),
+      label: "Distance",
+      unit: "km",
+    },
+    elevation: {
+      fun: (d) => d.total_elevation_gain,
+      format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
+      label: "Elevation",
+      unit: "m",
+    },
+    time: {
+      fun: (d) => d.elapsed_time,
+      format: (v) => (v / 3600).toFixed(1),
+      label: "Duration",
+      unit: "h",
+    },
+  },
+  groups: {
+    sport_group: {
+      label: "Group",
+      fun: (d) => aliasMap[d.sport_type],
+      color: (id) => categorySettings[id].color,
+    },
+    sport_type: {
+      label: "Type",
+      fun: (d) => d.sport_type,
+      color: (id) => categorySettings[aliasMap[id]].color,
+    },
+    no_group: {
+      label: "All",
+      fun: (d) => "All",
+      color: (id) => "#000000",
+    },
+  },
+  timeGroups: {
+    all: (year) => ({
+      fun: (d) => "All",
+      selected: year,
+    }),
+    byYear: (year) => ({
+      fun: (d) => d.date.getFullYear(),
+      highlight: year,
+      selected: year,
+    }),
+  },
+};
+
 export {
   mapSettings,
   defaultMapPosition,
@@ -647,4 +805,5 @@ export {
   binaryFilters,
   listSettings,
   aliasMap,
+  timelineSettings,
 };

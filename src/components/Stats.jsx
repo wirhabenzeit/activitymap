@@ -24,6 +24,8 @@ import {
   Typography,
 } from "@mui/material";
 
+import { timelineSettings } from "../settings";
+
 import { aliasMap, categorySettings } from "../settings";
 import * as d3 from "d3-array";
 import * as d3t from "d3-time";
@@ -34,35 +36,6 @@ import { library } from "@fortawesome/fontawesome-svg-core";
 import { fas } from "@fortawesome/free-solid-svg-icons";
 import { Title } from "@mui/icons-material";
 library.add(fas);
-
-const occurrencesOfMonth = (date, from, to) => {
-  const month = date.getMonth();
-  return (
-    to.getFullYear() -
-    from.getFullYear() -
-    1 +
-    (to.getMonth() >= month ? 1 : 0) +
-    (from.getMonth() <= month ? 1 : 0)
-  );
-};
-const occurrencesOfWeek = (date, from, to) => {
-  const week = parseInt(d3tf.timeFormat("%W")(date));
-  return (
-    to.getFullYear() -
-    from.getFullYear() -
-    1 +
-    (parseInt(d3tf.timeFormat("%W")(from)) <= week ? 1 : 0) +
-    (parseInt(d3tf.timeFormat("%W")(to)) >= week ? 1 : 0)
-  );
-};
-const occurrencesOfDay = (date, from, to) => {
-  const day = date.getDay();
-  return (
-    d3t.timeDay.count(d3t.timeMonday.ceil(from), d3t.timeSunday.floor(to)) / 7 +
-    (day >= from.getDay() ? 1 : 0) +
-    (day <= to.getDay() ? 1 : 0)
-  );
-};
 
 const formProps = { m: 1, display: "inline-flex", verticalAlign: "middle" };
 
@@ -100,216 +73,115 @@ function YearlySummary() {
   ];
 
   const [timePeriod, setTimePeriod] = React.useState("week");
-  const [yearAvg, setYearAvg] = React.useState(false);
-  const [yearHigh, setYearHigh] = React.useState(new Date().getFullYear());
   const [stat, setStat] = React.useState("count");
   const [group, setGroup] = React.useState("sport_group");
+  const [timeGroup, setTimeGroup] = React.useState(
+    timelineSettings.timeGroups.byYear(2023)
+  );
   const [value, setValue] = React.useState("distance");
 
-  const timePeriods = {
-    year: {
-      label: "Year",
-      format: (v) => new Date(v).getFullYear(),
-      fun: (date) => d3t.timeYear.floor(date),
-      range: () =>
-        d3t.timeYear.range(
-          d3t.timeYear.floor(extent[0]),
-          d3t.timeYear.ceil(extent[1])
-        ),
-    },
-    yearMonth: {
-      label: "Year/Month",
-      format: (v) => d3tf.timeFormat("%y/%m")(new Date(v)),
-      fun: (date) => d3t.timeMonth.floor(date),
-      range: () =>
-        d3t.timeMonth.range(
-          d3t.timeMonth.floor(extent[0]),
-          d3t.timeMonth.ceil(extent[1])
-        ),
-    },
-    month: {
-      label: "Month",
-      format: (v) => d3tf.timeFormat("%b")(new Date(v)),
-      tickValues: "every 1 month",
-      fun: (date) => {
-        const newDate = d3t.timeMonth.floor(date);
-        newDate.setFullYear(2018);
-        return newDate;
-      },
-      relative: true,
-      range: (year) =>
-        d3t.timeMonth.range(
-          ...extentInYear(year).map((date) =>
-            d3t.timeMonth.floor(new Date(d3tf.timeFormat("2018-%m-%d")(date)))
-          )
-        ),
-      occurrencesIn: (date, from, to) => occurrencesOfMonth(date, from, to),
-    },
-    week: {
-      label: "Week",
-      format: (v) => d3tf.timeFormat("%b-%d")(new Date(v)),
-      tickValues: "every 1 month",
-      fun: (date) => {
-        const newDate = d3t.timeDay.floor(date);
-        newDate.setFullYear(2018);
-        return d3t.timeMonday.floor(newDate);
-      },
-      relative: true,
-      range: (year) =>
-        d3t.timeMonday.range(
-          ...extentInYear(year).map((date) =>
-            d3t.timeMonday.floor(new Date(d3tf.timeFormat("2018-%m-%d")(date)))
-          )
-        ),
-      occurrencesIn: (date, from, to) => occurrencesOfWeek(date, from, to),
-    },
-    day: {
-      label: "Day",
-      format: (v) =>
-        new Date(v).toLocaleString("default", {
-          weekday: "short",
-        }),
-      fun: (date) => new Date(2018, 0, 1 + ((date.getDay() + 6) % 7)),
-      relative: true,
-      range: () =>
-        d3t.timeDay.range(new Date(2018, 0, 1), new Date(2018, 0, 8)),
-      occurrencesIn: (date, from, to) => occurrencesOfDay(date, from, to),
-    },
-  };
-
-  const values = {
-    distance: {
-      fun: (d) => d.distance,
-      format: (v) =>
-        v >= 10_000_000
-          ? (v / 1_000_000).toFixed() + "k"
-          : (v / 1000).toFixed(),
-      label: "Distance",
-      unit: "km",
-    },
-    elevation: {
-      fun: (d) => d.total_elevation_gain,
-      format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
-      label: "Elevation",
-      unit: "m",
-    },
-    time: {
-      fun: (d) => d.elapsed_time,
-      format: (v) => (v / 3600).toFixed(1),
-      label: "Duration",
-      unit: "h",
-    },
-  };
+  const [yearAvg, setYearAvg] = React.useState(false);
 
   const normalizer = (date) =>
-    timePeriods[timePeriod].relative
-      ? timePeriods[timePeriod].occurrencesIn(
-          date,
-          ...(yearAvg ? extent : extentInYear(date.getFullYear()))
-        )
-      : 1;
+    timelineSettings.timePeriods[timePeriod].occurrencesIn(
+      date,
+      ...(yearAvg ? extent : extentInYear(date.getFullYear()))
+    );
 
   const stats = {
     avg: {
       label: "Average",
-      fun: (v) => d3.mean(v, values[value].fun),
-      format: values[value].format,
-      unit: values[value].unit,
+      fun: (v) => d3.mean(v, timelineSettings.values[value].fun),
+      format: timelineSettings.values[value].format,
+      unit: timelineSettings.values[value].unit,
     },
     median: {
       label: "Median",
-      format: values[value].format,
-      fun: (v) => d3.median(v, values[value].fun),
-      unit: values[value].unit,
+      format: timelineSettings.values[value].format,
+      fun: (v) => d3.median(v, timelineSettings.values[value].fun),
+      unit: timelineSettings.values[value].unit,
     },
     min: {
       label: "Min",
-      format: values[value].format,
-      fun: (v) => d3.min(v, values[value].fun),
-      unit: values[value].unit,
+      format: timelineSettings.values[value].format,
+      fun: (v) => d3.min(v, timelineSettings.values[value].fun),
+      unit: timelineSettings.values[value].unit,
     },
     max: {
       label: "Max",
-      format: values[value].format,
-      fun: (v) => d3.max(v, values[value].fun),
-      unit: values[value].unit,
+      format: timelineSettings.values[value].format,
+      fun: (v) => d3.max(v, timelineSettings.values[value].fun),
+      unit: timelineSettings.values[value].unit,
     },
     count: {
       label: "Count",
       fun: (v) => v.length / normalizer(v[0].date),
       format: (v) =>
-        timePeriods[timePeriod].relative ? v.toFixed(1) : v.toFixed(),
+        timelineSettings.timePeriods[timePeriod].relative
+          ? v.toFixed(1)
+          : v.toFixed(),
       unit: "",
     },
     cumCount: {
       label: "Cumulative Count",
       fun: (v) => v.length / normalizer(v[0].date),
       format: (v) =>
-        timePeriods[timePeriod].relative ? v.toFixed(1) : v.toFixed(),
+        timelineSettings.timePeriods[timePeriod].relative
+          ? v.toFixed(1)
+          : v.toFixed(),
       cumulative: true,
       unit: "",
     },
     total: {
       label: "Total",
-      format: values[value].format,
-      fun: (v) => d3.sum(v, values[value].fun) / normalizer(v[0].date),
-      unit: values[value].unit,
+      format: timelineSettings.values[value].format,
+      fun: (v) =>
+        d3.sum(v, timelineSettings.values[value].fun) / normalizer(v[0].date),
+      unit: timelineSettings.values[value].unit,
     },
     cumTotal: {
       label: "Cumulative Total",
-      format: values[value].format,
-      fun: (v) => d3.sum(v, values[value].fun) / normalizer(v[0].date),
+      format: timelineSettings.values[value].format,
+      fun: (v) =>
+        d3.sum(v, timelineSettings.values[value].fun) / normalizer(v[0].date),
       cumulative: true,
-      unit: values[value].unit,
-    },
-  };
-
-  const groups = {
-    sport_group: {
-      label: "Group",
-      fun: (d) => aliasMap[d.sport_type],
-      color: (id) => categorySettings[id].color,
-    },
-    sport_type: {
-      label: "Type",
-      fun: (d) => d.sport_type,
-      color: (id) => categorySettings[aliasMap[id]].color,
-    },
-    no_group: {
-      label: "All",
-      fun: (d) => "All",
-      color: (id) => "#000000",
+      unit: timelineSettings.values[value].unit,
     },
   };
 
   var rollup;
-  const separateByYear = !yearAvg && timePeriods[timePeriod].relative;
+  const separateByYear =
+    !yearAvg && timelineSettings.timePeriods[timePeriod].relative;
 
-  if (!yearAvg && timePeriods[timePeriod].relative) {
+  if (!yearAvg && timelineSettings.timePeriods[timePeriod].relative) {
     rollup = new d3.InternMap(
       d3
         .map(
           d3.rollup(
             inputData,
             stats[stat].fun,
-            groups[group].fun,
+            timelineSettings.groups[group].fun,
             (f) => f.date.getFullYear(),
-            (f) => timePeriods[timePeriod].fun(f.date)
+            (f) => timelineSettings.timePeriods[timePeriod].fun(f.date)
           ),
           ([id, data]) => d3.map(data, ([x, y]) => [[id, x], y])
         )
         .flat()
     );
   } else {
-    rollup = d3.rollup(inputData, stats[stat].fun, groups[group].fun, (f) =>
-      timePeriods[timePeriod].fun(f.date)
+    rollup = d3.rollup(
+      inputData,
+      stats[stat].fun,
+      timelineSettings.groups[group].fun,
+      (f) => timelineSettings.timePeriods[timePeriod].fun(f.date)
     );
   }
 
-  const fillZeros = (data, year) => {
+  const fillZeros = (data, extent) => {
     const out = [];
-    timePeriods[timePeriod].range(year).forEach((date) => {
-      const transformedDate = timePeriods[timePeriod].fun(date);
+    timelineSettings.timePeriods[timePeriod].range(extent).forEach((date) => {
+      const transformedDate =
+        timelineSettings.timePeriods[timePeriod].fun(date);
       if (data.has(transformedDate)) {
         out.push([transformedDate, data.get(transformedDate)]);
       } else {
@@ -328,15 +200,32 @@ function YearlySummary() {
   const rollupData = Array.from(rollup.entries()).map(([id, data]) => [
     id,
     stats[stat].cumulative
-      ? makeCumulative(fillZeros(data, separateByYear ? id[1] : null))
-      : fillZeros(data, separateByYear ? id[1] : null),
+      ? makeCumulative(
+          fillZeros(
+            data,
+            separateByYear
+              ? extentInYear(id[1])
+              : timelineSettings.timePeriods[timePeriod].relative
+              ? extentInYear(2018)
+              : extent
+          )
+        )
+      : fillZeros(
+          data,
+          separateByYear
+            ? extentInYear(id[1])
+            : timelineSettings.timePeriods[timePeriod].relative
+            ? extentInYear(2018)
+            : extent
+        ),
   ]);
+  //  console.log(Array.from(rollup.get("All").entries()));
 
   const data = rollupData.map(([id, data]) => ({
     id: id,
     color: separateByYear
-      ? groups[group].color(id[0])
-      : groups[group].color(id),
+      ? timelineSettings.groups[group].color(id[0])
+      : timelineSettings.groups[group].color(id),
     data: data.map(([x, y]) => ({ x: x, y: y })),
   }));
 
@@ -355,7 +244,7 @@ function YearlySummary() {
             }}
           >
             <ListSubheader>Absolute</ListSubheader>
-            {Object.entries(timePeriods)
+            {Object.entries(timelineSettings.timePeriods)
               .filter(([key, agg]) => !agg.relative)
               .map(([key, aggregator]) => (
                 <MenuItem value={key} key={key}>
@@ -363,7 +252,7 @@ function YearlySummary() {
                 </MenuItem>
               ))}
             <ListSubheader>Relative</ListSubheader>
-            {Object.entries(timePeriods)
+            {Object.entries(timelineSettings.timePeriods)
               .filter(([key, agg]) => agg.relative)
               .map(([key, aggregator]) => (
                 <MenuItem value={key} key={key}>
@@ -372,40 +261,6 @@ function YearlySummary() {
               ))}
           </Select>
         </FormControl>
-        <ButtonGroup variant="outlined">
-          <Button
-            disabled={
-              !timePeriods[timePeriod].relative ||
-              yearAvg ||
-              yearHigh == years[0]
-            }
-            onClick={(e) => {
-              setYearHigh(yearHigh - 1);
-            }}
-          >
-            -
-          </Button>
-          <Button
-            disabled={!timePeriods[timePeriod].relative}
-            onClick={(e) => {
-              setYearAvg(!yearAvg);
-            }}
-          >
-            {yearAvg ? "Avg" : yearHigh}
-          </Button>
-          <Button
-            disabled={
-              !timePeriods[timePeriod].relative ||
-              yearAvg ||
-              yearHigh == years[1]
-            }
-            onClick={(e) => {
-              setYearHigh(yearHigh + 1);
-            }}
-          >
-            +
-          </Button>
-        </ButtonGroup>
         <FormControl>
           <InputLabel>Sport</InputLabel>
           <Select
@@ -414,13 +269,53 @@ function YearlySummary() {
             label="Sport"
             onChange={(event) => setGroup(event.target.value)}
           >
-            {Object.entries(groups).map(([key, aggregator]) => (
-              <MenuItem value={key} key={key}>
-                {aggregator.label}
-              </MenuItem>
-            ))}
+            {Object.entries(timelineSettings.groups).map(
+              ([key, aggregator]) => (
+                <MenuItem value={key} key={key}>
+                  {aggregator.label}
+                </MenuItem>
+              )
+            )}
           </Select>
         </FormControl>
+        <ButtonGroup variant="outlined">
+          <Button
+            disabled={
+              !timelineSettings.timePeriods[timePeriod].relative ||
+              yearAvg ||
+              timeGroup.selected == years[0]
+            }
+            onClick={(e) => {
+              setTimeGroup(
+                timelineSettings.timeGroups.byYear(timeGroup.selected - 1)
+              );
+            }}
+          >
+            -
+          </Button>
+          <Button
+            disabled={!timelineSettings.timePeriods[timePeriod].relative}
+            onClick={(e) => {
+              setYearAvg(!yearAvg);
+            }}
+          >
+            {yearAvg ? "Avg" : timeGroup.selected}
+          </Button>
+          <Button
+            disabled={
+              !timelineSettings.timePeriods[timePeriod].relative ||
+              yearAvg ||
+              timeGroup.selected == years[1]
+            }
+            onClick={(e) => {
+              setTimeGroup(
+                timelineSettings.timeGroups.byYear(timeGroup.selected + 1)
+              );
+            }}
+          >
+            +
+          </Button>
+        </ButtonGroup>
         <FormControl>
           <InputLabel>Stat</InputLabel>
           <Select
@@ -445,11 +340,13 @@ function YearlySummary() {
             onChange={(event) => setValue(event.target.value)}
             disabled={["count", "cumCount"].includes(stat)}
           >
-            {Object.entries(values).map(([key, aggregator]) => (
-              <MenuItem value={key} key={key}>
-                {aggregator.label}
-              </MenuItem>
-            ))}
+            {Object.entries(timelineSettings.values).map(
+              ([key, aggregator]) => (
+                <MenuItem value={key} key={key}>
+                  {aggregator.label}
+                </MenuItem>
+              )
+            )}
           </Select>
         </FormControl>
       </TitleBox>
@@ -478,7 +375,9 @@ function YearlySummary() {
                     }}
                   >
                     {separateByYear && point.serieId[1] + "-"}
-                    {timePeriods[timePeriod].format(point.data.xFormatted)}
+                    {timelineSettings.timePeriods[timePeriod].format(
+                      point.data.xFormatted
+                    )}
                   </Typography>
                   <FontAwesomeIcon
                     fontSize="small"
@@ -525,21 +424,23 @@ function YearlySummary() {
         axisBottom={{
           tickPadding: 5,
           tickRotation: 0,
-          format: timePeriods[timePeriod].format,
+          format: timelineSettings.timePeriods[timePeriod].format,
           tickValues: 6,
         }}
         axisLeft={{
           //tickSize: 5,
           tickPadding: 5,
           tickRotation: 0,
-          legend: stat == "count" ? "#" : values[value].unit,
+          legend: stat == "count" ? "#" : timelineSettings.values[value].unit,
           format: stats[stat].format,
           tickValues: 5,
         }}
         colors={(d) =>
           addAlpha(
             d.color,
-            yearAvg || d.id[1] == yearHigh || !timePeriods[timePeriod].relative
+            yearAvg ||
+              d.id[1] == timeGroup.highlight ||
+              !timelineSettings.timePeriods[timePeriod].relative
               ? 1
               : 0.1
           )
@@ -598,7 +499,9 @@ const TypePie = () => {
   return (
     <>
       <TitleBox>
-        <Typography variant="h6">Sport</Typography>
+        <Typography variant="h6" key="title">
+          Sport
+        </Typography>
         <FormControl>
           <InputLabel>Value</InputLabel>
           <Select
