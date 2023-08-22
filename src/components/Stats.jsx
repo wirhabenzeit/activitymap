@@ -4,24 +4,20 @@ import { ResponsiveAreaBump } from "@nivo/bump";
 import { ResponsiveLine } from "@nivo/line";
 import React, { useContext } from "react";
 import { StatsContext } from "../contexts/StatsContext";
-import { ActivityContext } from "../contexts/ActivityContext";
 function addAlpha(color, opacity) {
   const _opacity = Math.round(Math.min(Math.max(opacity || 1, 0), 1) * 255);
   return color + _opacity.toString(16).toUpperCase();
 }
 import {
   ListSubheader,
-  CardHeader,
+  Paper,
   ButtonGroup,
   Button,
   FormControl,
   Select,
   MenuItem,
   InputLabel,
-  Divider,
-  Card,
   Box,
-  CardContent,
   Unstable_Grid2 as Grid,
   Chip,
   Typography,
@@ -70,6 +66,11 @@ function YearlySummary() {
   const statsContext = useContext(StatsContext);
   const filterContext = useContext(FilterContext);
   const extent = d3.extent(statsContext.data, (d) => d.date);
+  const years = extent.map((d) => d.getFullYear());
+  const extentInYear = (year) => [
+    year == years[0] ? extent[0] : new Date(year, 0, 1),
+    year == years[1] ? extent[1] : new Date(year, 11, 31),
+  ];
 
   const [timePeriod, setTimePeriod] = React.useState("week");
   const [yearAvg, setYearAvg] = React.useState(false);
@@ -83,7 +84,6 @@ function YearlySummary() {
       label: "Year",
       format: (v) => new Date(v).getFullYear(),
       fun: (date) => d3t.timeYear.floor(date),
-      tickValues: "every 1 year",
       range: () =>
         d3t.timeYear.range(
           d3t.timeYear.floor(extent[0]),
@@ -92,9 +92,8 @@ function YearlySummary() {
     },
     yearMonth: {
       label: "Year/Month",
-      format: (v) => d3tf.timeFormat("%m/%y")(new Date(v)),
+      format: (v) => d3tf.timeFormat("%m-%y")(new Date(v)),
       fun: (date) => d3t.timeMonth.floor(date),
-      tickValues: "every 6 months",
       range: () =>
         d3t.timeMonth.range(
           d3t.timeMonth.floor(extent[0]),
@@ -110,64 +109,41 @@ function YearlySummary() {
         newDate.setFullYear(2018);
         return newDate;
       },
-      relative: "year",
-      range: (year) => {
-        if (year == extent[0].getFullYear())
-          return d3t.timeMonth.range(
-            d3t.timeMonth.floor(extent[0]).setFullYear(2018),
-            new Date(2018, 11, 31)
-          );
-        else if (year == extent[1].getFullYear())
-          return d3t.timeMonth.range(
-            new Date(2018, 0, 1),
-            d3t.timeMonth.ceil(extent[1]).setFullYear(2018)
-          );
-        else
-          return d3t.timeMonth.range(
-            new Date(2018, 0, 1),
-            new Date(2018, 11, 31)
-          );
-      },
+      relative: true,
+      range: (year) =>
+        d3t.timeMonth.range(
+          ...extentInYear(year).map((date) =>
+            d3t.timeMonth.floor(new Date(d3tf.timeFormat("2018-%m-%d")(date)))
+          )
+        ),
       occurrencesIn: (date, from, to) => occurrencesOfMonth(date, from, to),
     },
     week: {
       label: "Week",
-      format: (v) => d3tf.timeFormat("%b")(new Date(v)),
+      format: (v) => d3tf.timeFormat("%b-%d")(new Date(v)),
       tickValues: "every 1 month",
       fun: (date) => {
         const newDate = d3t.timeDay.floor(date);
         newDate.setFullYear(2018);
         return d3t.timeMonday.floor(newDate);
       },
-      relative: "year",
-      range: (year) => {
-        if (year == extent[0].getFullYear())
-          return d3t.timeMonday.range(
-            d3t.timeMonday.floor(extent[0]).setFullYear(2018),
-            new Date(2018, 11, 31)
-          );
-        else if (year == extent[1].getFullYear())
-          return d3t.timeMonday.range(
-            new Date(2018, 0, 1),
-            d3t.timeMonday.ceil(extent[1]).setFullYear(2018)
-          );
-        else
-          return d3t.timeMonday.range(
-            new Date(2018, 0, 1),
-            new Date(2018, 11, 31)
-          );
-      },
+      relative: true,
+      range: (year) =>
+        d3t.timeMonday.range(
+          ...extentInYear(year).map((date) =>
+            d3t.timeMonday.floor(new Date(d3tf.timeFormat("2018-%m-%d")(date)))
+          )
+        ),
       occurrencesIn: (date, from, to) => occurrencesOfWeek(date, from, to),
     },
     day: {
       label: "Day",
-      tickValues: "every 1 day",
       format: (v) =>
         new Date(v).toLocaleString("default", {
           weekday: "short",
         }),
       fun: (date) => new Date(2018, 0, 1 + ((date.getDay() + 6) % 7)),
-      relative: "week",
+      relative: true,
       range: () =>
         d3t.timeDay.range(new Date(2018, 0, 1), new Date(2018, 0, 8)),
       occurrencesIn: (date, from, to) => occurrencesOfDay(date, from, to),
@@ -177,13 +153,16 @@ function YearlySummary() {
   const values = {
     distance: {
       fun: (d) => d.distance,
-      format: (v) => (v / 1000).toFixed(),
+      format: (v) =>
+        v >= 10_000_000
+          ? (v / 1_000_000).toFixed() + "k"
+          : (v / 1000).toFixed(),
       label: "Distance",
       unit: "km",
     },
     elevation: {
       fun: (d) => d.total_elevation_gain,
-      format: (v) => v.toFixed(),
+      format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
       label: "Elevation",
       unit: "m",
     },
@@ -194,12 +173,6 @@ function YearlySummary() {
       unit: "h",
     },
   };
-
-  const extentInYear = (year) => [
-    year == years[0] ? extent[0] : new Date(year, 0, 1),
-    year == years[1] ? extent[1] : new Date(year + 1, 0, 1),
-  ];
-  const years = extent.map((d) => d.getFullYear());
 
   const normalizer = (date) =>
     timePeriods[timePeriod].relative
@@ -266,12 +239,12 @@ function YearlySummary() {
 
   const groups = {
     sport_group: {
-      label: "Sport Group",
+      label: "Group",
       fun: (d) => aliasMap[d.sport_type],
       color: (id) => categorySettings[id].color,
     },
     sport_type: {
-      label: "Sport Type",
+      label: "Type",
       fun: (d) => d.sport_type,
       color: (id) => categorySettings[aliasMap[id]].color,
     },
@@ -342,228 +315,242 @@ function YearlySummary() {
       : groups[group].color(id),
     data: data.map(([x, y]) => ({ x: x, y: y })),
   }));
-  const minMax = d3.extent(statsContext.years).map((d) => d.getFullYear());
+
+  const formProps = { m: 1, display: "inline-flex", verticalAlign: "middle" };
 
   return (
-    statsContext.loaded && (
-      <Card>
-        <CardHeader
-          title="Yearly Summary"
-          action={
-            <Grid
-              container
-              justify="center"
-              alignItems="center"
-              direction="row"
-            >
-              <FormControl sx={{ mx: 1 }}>
-                <InputLabel>Axis</InputLabel>
-                <Select
-                  size="small"
-                  value={timePeriod}
-                  label="Value"
-                  onChange={(event) => {
-                    setTimePeriod(event.target.value);
+    <>
+      <Box
+        sx={{
+          height: "60px",
+          width: 1,
+          mt: 1,
+          overflowX: "auto",
+          alignItems: "center",
+          justifyContent: "center",
+          whiteSpace: "noWrap",
+        }}
+      >
+        <Typography sx={formProps} variant="h6">
+          Timeline
+        </Typography>
+        <FormControl sx={formProps}>
+          <InputLabel>Axis</InputLabel>
+          <Select
+            size="small"
+            value={timePeriod}
+            label="Value"
+            onChange={(event) => {
+              setTimePeriod(event.target.value);
+            }}
+          >
+            <ListSubheader>Absolute</ListSubheader>
+            {Object.entries(timePeriods)
+              .filter(([key, agg]) => !agg.relative)
+              .map(([key, aggregator]) => (
+                <MenuItem value={key} key={key}>
+                  {aggregator.label}
+                </MenuItem>
+              ))}
+            <ListSubheader>Relative</ListSubheader>
+            {Object.entries(timePeriods)
+              .filter(([key, agg]) => agg.relative)
+              .map(([key, aggregator]) => (
+                <MenuItem value={key} key={key}>
+                  {aggregator.label}
+                </MenuItem>
+              ))}
+          </Select>
+        </FormControl>
+        <ButtonGroup variant="outlined">
+          <Button
+            disabled={
+              !timePeriods[timePeriod].relative ||
+              yearAvg ||
+              yearHigh == years[0]
+            }
+            onClick={(e) => {
+              setYearHigh(yearHigh - 1);
+            }}
+          >
+            -
+          </Button>
+          <Button
+            disabled={!timePeriods[timePeriod].relative}
+            onClick={(e) => {
+              setYearAvg(!yearAvg);
+            }}
+          >
+            {yearAvg ? "Avg" : yearHigh}
+          </Button>
+          <Button
+            disabled={
+              !timePeriods[timePeriod].relative ||
+              yearAvg ||
+              yearHigh == years[1]
+            }
+            onClick={(e) => {
+              setYearHigh(yearHigh + 1);
+            }}
+          >
+            +
+          </Button>
+        </ButtonGroup>
+        <FormControl sx={formProps}>
+          <InputLabel>Sport</InputLabel>
+          <Select
+            size="small"
+            value={group}
+            label="Sport"
+            onChange={(event) => setGroup(event.target.value)}
+          >
+            {Object.entries(groups).map(([key, aggregator]) => (
+              <MenuItem value={key} key={key}>
+                {aggregator.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl sx={formProps}>
+          <InputLabel>Stat</InputLabel>
+          <Select
+            size="small"
+            value={stat}
+            label="Value"
+            onChange={(event) => setStat(event.target.value)}
+          >
+            {Object.entries(stats).map(([key, aggregator]) => (
+              <MenuItem value={key} key={key}>
+                {aggregator.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl sx={formProps}>
+          <InputLabel>Value</InputLabel>
+          <Select
+            size="small"
+            value={value}
+            label="Value"
+            onChange={(event) => setValue(event.target.value)}
+            disabled={["count", "cumCount"].includes(stat)}
+          >
+            {Object.entries(values).map(([key, aggregator]) => (
+              <MenuItem value={key} key={key}>
+                {aggregator.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+      <ResponsiveLine
+        animate
+        margin={{ top: 10, right: 20, bottom: 30, left: 40 }}
+        curve="monotoneX"
+        useMesh={true}
+        isInteractive={true}
+        tooltip={({ point }) => {
+          return (
+            <Chip
+              size="small"
+              label={
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
                   }}
                 >
-                  <ListSubheader>Absolute</ListSubheader>
-                  {Object.entries(timePeriods)
-                    .filter(([key, agg]) => !agg.relative)
-                    .map(([key, aggregator]) => (
-                      <MenuItem value={key} key={key}>
-                        {aggregator.label}
-                      </MenuItem>
-                    ))}
-                  <ListSubheader>Relative</ListSubheader>
-                  {Object.entries(timePeriods)
-                    .filter(([key, agg]) => agg.relative)
-                    .map(([key, aggregator]) => (
-                      <MenuItem value={key} key={key}>
-                        {aggregator.label}
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
-              <ButtonGroup variant="outlined">
-                <Button
-                  disabled={
-                    !timePeriods[timePeriod].relative ||
-                    yearAvg ||
-                    yearHigh == minMax[0]
-                  }
-                  onClick={(e) => {
-                    setYearHigh(yearHigh - 1);
-                  }}
-                >
-                  -
-                </Button>
-                <Button
-                  disabled={!timePeriods[timePeriod].relative}
-                  onClick={(e) => {
-                    setYearAvg(!yearAvg);
-                  }}
-                >
-                  {yearAvg ? "Avg" : yearHigh}
-                </Button>
-                <Button
-                  disabled={
-                    !timePeriods[timePeriod].relative ||
-                    yearAvg ||
-                    yearHigh == minMax[1]
-                  }
-                  onClick={(e) => {
-                    setYearHigh(yearHigh + 1);
-                  }}
-                >
-                  +
-                </Button>
-              </ButtonGroup>
-              <FormControl sx={{ mx: 1 }}>
-                <InputLabel>Group</InputLabel>
-                <Select
-                  size="small"
-                  value={group}
-                  label="Group"
-                  onChange={(event) => setGroup(event.target.value)}
-                >
-                  {Object.entries(groups).map(([key, aggregator]) => (
-                    <MenuItem value={key} key={key}>
-                      {aggregator.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl sx={{ mx: 1 }}>
-                <InputLabel>Stat</InputLabel>
-                <Select
-                  size="small"
-                  value={stat}
-                  label="Value"
-                  onChange={(event) => setStat(event.target.value)}
-                >
-                  {Object.entries(stats).map(([key, aggregator]) => (
-                    <MenuItem value={key} key={key}>
-                      {aggregator.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl sx={{ mx: 1 }}>
-                <InputLabel>Value</InputLabel>
-                <Select
-                  size="small"
-                  value={value}
-                  label="Value"
-                  onChange={(event) => setValue(event.target.value)}
-                  disabled={["count", "cumCount"].includes(stat)}
-                >
-                  {Object.entries(values).map(([key, aggregator]) => (
-                    <MenuItem value={key} key={key}>
-                      {aggregator.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          }
-        />
-        <CardContent sx={{ width: 1, aspectRatio: 3 }}>
-          <ResponsiveLine
-            animate
-            margin={{ top: 10, right: 20, bottom: 20, left: 40 }}
-            curve="monotoneX"
-            //enablePointLabel={false}
-            useMesh={true}
-            //enableSlices="x"
-            //sliceTooltip={({ slice }) => JSON.stringify(slice)}
-            isInteractive={true}
-            tooltip={({ point }) => {
-              console.log(point);
-              return (
-                <Chip
-                  label={
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Typography sx={{ mr: 1 }}>
-                        {timePeriods[timePeriod].format(point.data.xFormatted)}
-                      </Typography>
-                      <FontAwesomeIcon
-                        fontSize="small"
-                        icon={
-                          categorySettings[
+                  <Typography
+                    sx={{
+                      mr: 1,
+                      fontFamily: "monospace",
+                      fontSize: "small",
+                    }}
+                  >
+                    {separateByYear && point.serieId[1] + "-"}
+                    {timePeriods[timePeriod].format(point.data.xFormatted)}
+                  </Typography>
+                  <FontAwesomeIcon
+                    fontSize="small"
+                    icon={
+                      group == "no_group"
+                        ? "child-reaching"
+                        : categorySettings[
                             separateByYear ? point.serieId[0] : point.serieId
                           ].icon
-                        }
-                        color={
-                          categorySettings[
+                    }
+                    color={
+                      group == "no_group"
+                        ? "#000000"
+                        : categorySettings[
                             separateByYear ? point.serieId[0] : point.serieId
                           ].color
-                        }
-                      />
-                      <Divider orientation="vertical" flexItem />
-                      <Typography sx={{ ml: 1 }}>
-                        {stats[stat].format(point.data.y) + stats[stat].unit}
-                      </Typography>
-                    </Box>
-                  }
-                  variant="filled"
-                />
-              );
-            }}
-            //enablePoints={timePeriods[timePeriod].step == 1}
-            yFormat={stats[stat].format}
-            data={data}
-            xScale={{
-              type: "time",
-              format: "%Y-%m-%d",
-              useUTC: false,
-              precision: "day",
-            }}
-            xFormat="time:%Y-%m-%d"
-            axisBottom={{
-              //tickSize: 5,
-              tickPadding: 5,
-              tickRotation: 0,
-              format: timePeriods[timePeriod].format,
-              tickValues: timePeriods[timePeriod].tickValues,
-            }}
-            axisLeft={{
-              //tickSize: 5,
-              tickPadding: 5,
-              tickRotation: 0,
-              legend: stat == "count" ? "#" : values[value].unit,
-              format: stats[stat].format,
-            }}
-            colors={(d) =>
-              addAlpha(
-                d.color,
-                yearAvg ||
-                  d.id[1] == yearHigh ||
-                  !timePeriods[timePeriod].relative
-                  ? 1
-                  : 0.15
-              )
-            }
-            onClick={(d) => {
-              console.log(d);
-              setYearHigh(d.serieId[1]);
-            }}
-          />
-        </CardContent>
-      </Card>
-    )
+                    }
+                  />
+                  <Typography
+                    sx={{
+                      ml: 1,
+                      fontSize: "small",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {stats[stat].format(point.data.y) + stats[stat].unit}
+                  </Typography>
+                </Box>
+              }
+              variant="filled"
+            />
+          );
+        }}
+        enablePoints={!["yearMonth", "week"].includes(timePeriod)}
+        yFormat={stats[stat].format}
+        data={data}
+        xScale={{
+          type: "time",
+          format: "%Y-%m-%d",
+          useUTC: false,
+          precision: "day",
+        }}
+        xFormat="time:%Y-%m-%d"
+        axisBottom={{
+          tickPadding: 5,
+          tickRotation: 0,
+          format: timePeriods[timePeriod].format,
+          tickValues: 6,
+        }}
+        axisLeft={{
+          //tickSize: 5,
+          tickPadding: 5,
+          tickRotation: 0,
+          legend: stat == "count" ? "#" : values[value].unit,
+          format: stats[stat].format,
+          tickValues: 5,
+        }}
+        colors={(d) =>
+          addAlpha(
+            d.color,
+            yearAvg || d.id[1] == yearHigh || !timePeriods[timePeriod].relative
+              ? 1
+              : 0.1
+          )
+        }
+        onClick={(d) => {
+          setYearHigh(d.serieId[1]);
+        }}
+      />
+    </>
   );
 }
 
 export default function StatsView() {
   const statsContext = useContext(StatsContext);
   return (
-    <Grid container spacing={2}>
-      <Grid xs={12}>{statsContext.loaded && <YearlySummary />}</Grid>
+    <Grid>
+      <Grid xs={12} lg={8}>
+        <Paper sx={{ width: 1, aspectRatio: 3 }}>
+          {statsContext.loaded && <YearlySummary />}
+        </Paper>
+      </Grid>
     </Grid>
   );
 }
