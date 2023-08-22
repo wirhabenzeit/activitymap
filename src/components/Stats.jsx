@@ -1,6 +1,7 @@
 // install (please try to align the version of installed @nivo packages)
 // yarn add @nivo/bump
 import { ResponsiveAreaBump } from "@nivo/bump";
+import { ResponsivePie } from "@nivo/pie";
 import { ResponsiveLine } from "@nivo/line";
 import React, { useContext } from "react";
 import { StatsContext } from "../contexts/StatsContext";
@@ -31,6 +32,7 @@ import { FilterContext } from "../contexts/FilterContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import { fas } from "@fortawesome/free-solid-svg-icons";
+import { Title } from "@mui/icons-material";
 library.add(fas);
 
 const occurrencesOfMonth = (date, from, to) => {
@@ -62,10 +64,35 @@ const occurrencesOfDay = (date, from, to) => {
   );
 };
 
+const formProps = { m: 1, display: "inline-flex", verticalAlign: "middle" };
+
+function TitleBox({ children }) {
+  return (
+    <Box
+      sx={{
+        height: "60px",
+        width: 1,
+        mt: 1,
+        overflowX: "auto",
+        alignItems: "center",
+        justifyContent: "center",
+        whiteSpace: "noWrap",
+      }}
+    >
+      {children.map((child) => (
+        <child.type {...child.props} sx={formProps} />
+      ))}
+    </Box>
+  );
+}
+
 function YearlySummary() {
   const statsContext = useContext(StatsContext);
   const filterContext = useContext(FilterContext);
-  const extent = d3.extent(statsContext.data, (d) => d.date);
+  const inputData = d3.filter(statsContext.data, (f) =>
+    filterContext.filterIDs.includes(f.id)
+  );
+  const extent = d3.extent(inputData, (d) => d.date);
   const years = extent.map((d) => d.getFullYear());
   const extentInYear = (year) => [
     year == years[0] ? extent[0] : new Date(year, 0, 1),
@@ -92,7 +119,7 @@ function YearlySummary() {
     },
     yearMonth: {
       label: "Year/Month",
-      format: (v) => d3tf.timeFormat("%m-%y")(new Date(v)),
+      format: (v) => d3tf.timeFormat("%y/%m")(new Date(v)),
       fun: (date) => d3t.timeMonth.floor(date),
       range: () =>
         d3t.timeMonth.range(
@@ -255,9 +282,6 @@ function YearlySummary() {
     },
   };
 
-  const inputData = d3.filter(statsContext.data, (f) =>
-    filterContext.filterIDs.includes(f.id)
-  );
   var rollup;
   const separateByYear = !yearAvg && timePeriods[timePeriod].relative;
 
@@ -316,25 +340,11 @@ function YearlySummary() {
     data: data.map(([x, y]) => ({ x: x, y: y })),
   }));
 
-  const formProps = { m: 1, display: "inline-flex", verticalAlign: "middle" };
-
   return (
     <>
-      <Box
-        sx={{
-          height: "60px",
-          width: 1,
-          mt: 1,
-          overflowX: "auto",
-          alignItems: "center",
-          justifyContent: "center",
-          whiteSpace: "noWrap",
-        }}
-      >
-        <Typography sx={formProps} variant="h6">
-          Timeline
-        </Typography>
-        <FormControl sx={formProps}>
+      <TitleBox>
+        <Typography variant="h6">Timeline</Typography>
+        <FormControl>
           <InputLabel>Axis</InputLabel>
           <Select
             size="small"
@@ -396,7 +406,7 @@ function YearlySummary() {
             +
           </Button>
         </ButtonGroup>
-        <FormControl sx={formProps}>
+        <FormControl>
           <InputLabel>Sport</InputLabel>
           <Select
             size="small"
@@ -411,7 +421,7 @@ function YearlySummary() {
             ))}
           </Select>
         </FormControl>
-        <FormControl sx={formProps}>
+        <FormControl>
           <InputLabel>Stat</InputLabel>
           <Select
             size="small"
@@ -426,7 +436,7 @@ function YearlySummary() {
             ))}
           </Select>
         </FormControl>
-        <FormControl sx={formProps}>
+        <FormControl>
           <InputLabel>Value</InputLabel>
           <Select
             size="small"
@@ -442,10 +452,10 @@ function YearlySummary() {
             ))}
           </Select>
         </FormControl>
-      </Box>
+      </TitleBox>
       <ResponsiveLine
         animate
-        margin={{ top: 10, right: 20, bottom: 30, left: 40 }}
+        margin={{ top: 10, right: 20, bottom: 100, left: 40 }}
         curve="monotoneX"
         useMesh={true}
         isInteractive={true}
@@ -542,14 +552,99 @@ function YearlySummary() {
   );
 }
 
+const TypePie = () => {
+  const statsContext = useContext(StatsContext);
+  const filterContext = useContext(FilterContext);
+  const inputData = d3.filter(statsContext.data, (f) =>
+    filterContext.filterIDs.includes(f.id)
+  );
+  const [value, setValue] = React.useState("count");
+  const values = {
+    count: {
+      fun: (v) => v.length,
+      label: "Count",
+      unit: "",
+    },
+    distance: {
+      fun: (v) => d3.sum(v, (d) => d.distance),
+      format: (v) => (v / 1000).toFixed() + "km",
+      label: "Distance",
+      unit: "km",
+    },
+    elevation: {
+      fun: (v) => d3.sum(v, (d) => d.total_elevation_gain),
+      format: (v) => (v / 1_000).toFixed() + "km",
+      label: "Elevation",
+      unit: "km",
+    },
+    time: {
+      fun: (v) => d3.sum(v, (d) => d.elapsed_time),
+      format: (v) => (v / 3600).toFixed() + "h",
+      label: "Duration",
+      unit: "h",
+    },
+  };
+
+  const rollup = d3.map(
+    d3.rollup(inputData, values[value].fun, (d) => aliasMap[d.sport_type]),
+    ([key, value]) => ({
+      id: key,
+      value: value,
+      color: categorySettings[key].color,
+    })
+  );
+  console.log(rollup);
+
+  return (
+    <>
+      <TitleBox>
+        <Typography variant="h6">Sport</Typography>
+        <FormControl>
+          <InputLabel>Value</InputLabel>
+          <Select
+            size="small"
+            value={value}
+            label="Value"
+            onChange={(event) => setValue(event.target.value)}
+          >
+            {Object.entries(values).map(([key, aggregator]) => (
+              <MenuItem value={key} key={key}>
+                {aggregator.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </TitleBox>
+      <ResponsivePie
+        data={rollup}
+        margin={{ top: 40, right: 80, bottom: 80, left: 80 }}
+        innerRadius={0.5}
+        padAngle={0.7}
+        cornerRadius={3}
+        activeOuterRadiusOffset={8}
+        borderWidth={1}
+        arcLinkLabelsSkipAngle={10}
+        arcLinkLabelsThickness={2}
+        arcLinkLabelsColor={{ from: "color" }}
+        arcLabelsSkipAngle={10}
+        colors={(d) => d.data.color}
+        valueFormat={values[value].format}
+      />
+    </>
+  );
+};
+
 export default function StatsView() {
   const statsContext = useContext(StatsContext);
   return (
-    <Grid>
-      <Grid xs={12} lg={8}>
-        <Paper sx={{ width: 1, aspectRatio: 3 }}>
+    <Grid container>
+      <Grid xs={12} md={8}>
+        <Paper sx={{ height: 400 }}>
           {statsContext.loaded && <YearlySummary />}
         </Paper>
+      </Grid>
+      <Grid xs={12} md={4}>
+        <Paper sx={{ height: 400 }}>{statsContext.loaded && <TypePie />}</Paper>
       </Grid>
     </Grid>
   );

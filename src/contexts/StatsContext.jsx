@@ -26,7 +26,6 @@ export function StatsContextProvider({ children }) {
       data.forEach((feature) => {
         feature.date = new Date(feature.start_date_local);
       });
-      const extent = d3a.extent(data, (d) => d.date);
       setState({
         loaded: true,
         data: data,
