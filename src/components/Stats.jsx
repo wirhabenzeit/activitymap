@@ -1,9 +1,9 @@
 // install (please try to align the version of installed @nivo packages)
 // yarn add @nivo/bump
-import { ResponsiveAreaBump } from "@nivo/bump";
 import { ResponsivePie } from "@nivo/pie";
 import { ResponsiveLine } from "@nivo/line";
-import React, { useContext } from "react";
+import { ResponsiveCalendar, ResponsiveTimeRange } from "@nivo/calendar";
+import React, { useContext, cloneElement } from "react";
 import { StatsContext } from "../contexts/StatsContext";
 function addAlpha(color, opacity) {
   const _opacity = Math.round(Math.min(Math.max(opacity || 1, 0), 1) * 255);
@@ -14,6 +14,7 @@ import {
   Paper,
   ButtonGroup,
   Button,
+  Skeleton,
   FormControl,
   Select,
   MenuItem,
@@ -22,9 +23,12 @@ import {
   Unstable_Grid2 as Grid,
   Chip,
   Typography,
+  useMediaQuery,
+  Divider,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 
-import { timelineSettings } from "../settings";
+import { calendarSettings, pieSettings, timelineSettings } from "../settings";
 
 import { aliasMap, categorySettings } from "../settings";
 import * as d3 from "d3-array";
@@ -52,449 +56,392 @@ function TitleBox({ children }) {
         whiteSpace: "noWrap",
       }}
     >
-      {children.map((child) => (
-        <child.type {...child.props} sx={formProps} />
-      ))}
+      {children.map((child) =>
+        //<child.type {...child.props} sx={formProps} />
+        cloneElement(child, { sx: formProps })
+      )}
     </Box>
+  );
+}
+
+function CustomSelect({
+  propName,
+  name,
+  value,
+  options,
+  setState,
+  headers,
+  sx,
+  disabled,
+}) {
+  return (
+    <FormControl key={propName} sx={sx} disabled={disabled}>
+      <InputLabel>{name}</InputLabel>
+      <Select
+        size="small"
+        value={value.id}
+        label="Sport"
+        onChange={(event) =>
+          setState({
+            [propName]: options[event.target.value],
+          })
+        }
+      >
+        {!headers &&
+          Object.entries(options).map(([key, aggregator]) => (
+            <MenuItem value={key} key={key}>
+              {aggregator.label}
+            </MenuItem>
+          ))}
+        {headers &&
+          headers.reduce(
+            (prev, header) => [
+              ...prev,
+              <ListSubheader key={header.title}>{header.title}</ListSubheader>,
+              ...Object.entries(options)
+                .filter(([key, agg]) => header.filter(agg))
+                .map(([key, aggregator]) => (
+                  <MenuItem value={key} key={key}>
+                    {aggregator.label}
+                  </MenuItem>
+                )),
+            ],
+            []
+          )}
+      </Select>
+    </FormControl>
+  );
+}
+
+function CustomPicker({
+  propName,
+  options,
+  value,
+  range,
+  disabled,
+  setState,
+  sx,
+}) {
+  return (
+    <ButtonGroup variant="outlined" key={propName} sx={sx}>
+      <Button
+        disabled={disabled || !value.highlight || value.selected == range[0]}
+        onClick={(e) => {
+          setState({
+            [propName]: options.byYear(value.selected - 1),
+          });
+        }}
+      >
+        -
+      </Button>
+      <Button
+        disabled={disabled}
+        onClick={(e) => {
+          if (value.highlight)
+            setState({
+              [propName]: options.all(value.selected),
+            });
+          else
+            setState({
+              [propName]: options.byYear(value.selected),
+            });
+        }}
+      >
+        {value.label}
+      </Button>
+      <Button
+        disabled={disabled || !value.highlight || value.selected == range[1]}
+        onClick={(e) => {
+          setState({
+            [propName]: options.byYear(value.selected + 1),
+          });
+        }}
+      >
+        +
+      </Button>
+    </ButtonGroup>
   );
 }
 
 function YearlySummary() {
   const statsContext = useContext(StatsContext);
-  const filterContext = useContext(FilterContext);
-  const inputData = d3.filter(statsContext.data, (f) =>
-    filterContext.filterIDs.includes(f.id)
+  const theme = useTheme();
+
+  const lineDict = d3.rollup(
+    statsContext.timeline.data,
+    (v) => v[0],
+    (d) => d.id
   );
-  const extent = d3.extent(inputData, (d) => d.date);
-  const years = extent.map((d) => d.getFullYear());
-  const extentInYear = (year) => [
-    year == years[0] ? extent[0] : new Date(year, 0, 1),
-    year == years[1] ? extent[1] : new Date(year, 11, 31),
-  ];
+  const groups = timelineSettings.groups;
+  const timePeriods = timelineSettings.timePeriods;
+  const timeGroups = timelineSettings.timeGroups;
+  const values = timelineSettings.values;
+  const stats = timelineSettings.stats(statsContext.timeline);
+  const years =
+    statsContext.data && statsContext.data.length > 0
+      ? d3.extent(statsContext.data, (d) => d.date).map((d) => d.getFullYear())
+      : [undefined, undefined];
 
-  const [timePeriod, setTimePeriod] = React.useState("week");
-  const [stat, setStat] = React.useState("count");
-  const [group, setGroup] = React.useState("sport_group");
-  const [timeGroup, setTimeGroup] = React.useState(
-    timelineSettings.timeGroups.byYear(2023)
-  );
-  const [value, setValue] = React.useState("distance");
-
-  const [yearAvg, setYearAvg] = React.useState(false);
-
-  const normalizer = (date) =>
-    timelineSettings.timePeriods[timePeriod].occurrencesIn(
-      date,
-      ...(yearAvg ? extent : extentInYear(date.getFullYear()))
-    );
-
-  const stats = {
-    avg: {
-      label: "Average",
-      fun: (v) => d3.mean(v, timelineSettings.values[value].fun),
-      format: timelineSettings.values[value].format,
-      unit: timelineSettings.values[value].unit,
-    },
-    median: {
-      label: "Median",
-      format: timelineSettings.values[value].format,
-      fun: (v) => d3.median(v, timelineSettings.values[value].fun),
-      unit: timelineSettings.values[value].unit,
-    },
-    min: {
-      label: "Min",
-      format: timelineSettings.values[value].format,
-      fun: (v) => d3.min(v, timelineSettings.values[value].fun),
-      unit: timelineSettings.values[value].unit,
-    },
-    max: {
-      label: "Max",
-      format: timelineSettings.values[value].format,
-      fun: (v) => d3.max(v, timelineSettings.values[value].fun),
-      unit: timelineSettings.values[value].unit,
-    },
-    count: {
-      label: "Count",
-      fun: (v) => v.length / normalizer(v[0].date),
-      format: (v) =>
-        timelineSettings.timePeriods[timePeriod].relative
-          ? v.toFixed(1)
-          : v.toFixed(),
-      unit: "",
-    },
-    cumCount: {
-      label: "Cumulative Count",
-      fun: (v) => v.length / normalizer(v[0].date),
-      format: (v) =>
-        timelineSettings.timePeriods[timePeriod].relative
-          ? v.toFixed(1)
-          : v.toFixed(),
-      cumulative: true,
-      unit: "",
-    },
-    total: {
-      label: "Total",
-      format: timelineSettings.values[value].format,
-      fun: (v) =>
-        d3.sum(v, timelineSettings.values[value].fun) / normalizer(v[0].date),
-      unit: timelineSettings.values[value].unit,
-    },
-    cumTotal: {
-      label: "Cumulative Total",
-      format: timelineSettings.values[value].format,
-      fun: (v) =>
-        d3.sum(v, timelineSettings.values[value].fun) / normalizer(v[0].date),
-      cumulative: true,
-      unit: timelineSettings.values[value].unit,
-    },
-  };
-
-  var rollup;
-  const separateByYear =
-    !yearAvg && timelineSettings.timePeriods[timePeriod].relative;
-
-  if (!yearAvg && timelineSettings.timePeriods[timePeriod].relative) {
-    rollup = new d3.InternMap(
-      d3
-        .map(
-          d3.rollup(
-            inputData,
-            stats[stat].fun,
-            timelineSettings.groups[group].fun,
-            (f) => f.date.getFullYear(),
-            (f) => timelineSettings.timePeriods[timePeriod].fun(f.date)
-          ),
-          ([id, data]) => d3.map(data, ([x, y]) => [[id, x], y])
-        )
-        .flat()
-    );
-  } else {
-    rollup = d3.rollup(
-      inputData,
-      stats[stat].fun,
-      timelineSettings.groups[group].fun,
-      (f) => timelineSettings.timePeriods[timePeriod].fun(f.date)
-    );
-  }
-
-  const fillZeros = (data, extent) => {
-    const out = [];
-    timelineSettings.timePeriods[timePeriod].range(extent).forEach((date) => {
-      const transformedDate =
-        timelineSettings.timePeriods[timePeriod].fun(date);
-      if (data.has(transformedDate)) {
-        out.push([transformedDate, data.get(transformedDate)]);
-      } else {
-        out.push([transformedDate, 0]);
-      }
-    });
-    return out;
-  };
-  const makeCumulative = (data) => {
-    return d3.zip(
-      data.map(([x, y]) => x),
-      d3.cumsum(data.map(([x, y]) => y))
+  const LineTooltip = ({ point }) => {
+    const lineProps = lineDict.get(point.serieId);
+    return (
+      <Chip
+        sx={{
+          backgroundColor: theme.palette.background.paper,
+          border: 1,
+          borderColor: lineProps.color,
+        }}
+        size="small"
+        label={
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <Typography
+              sx={{
+                mr: 1,
+                fontSize: "small",
+              }}
+            >
+              {lineProps.xLabel(point.data.xFormatted)}
+            </Typography>
+            <FontAwesomeIcon
+              fontSize="small"
+              icon={lineProps.icon}
+              color={lineProps.color}
+            />
+            <Typography
+              sx={{
+                ml: 1,
+                fontSize: "small",
+              }}
+            >
+              {lineProps.yLabel(point.data.yFormatted)}
+            </Typography>
+          </Box>
+        }
+        variant="filled"
+      />
     );
   };
-
-  const rollupData = Array.from(rollup.entries()).map(([id, data]) => [
-    id,
-    stats[stat].cumulative
-      ? makeCumulative(
-          fillZeros(
-            data,
-            separateByYear
-              ? extentInYear(id[1])
-              : timelineSettings.timePeriods[timePeriod].relative
-              ? extentInYear(2018)
-              : extent
-          )
-        )
-      : fillZeros(
-          data,
-          separateByYear
-            ? extentInYear(id[1])
-            : timelineSettings.timePeriods[timePeriod].relative
-            ? extentInYear(2018)
-            : extent
-        ),
-  ]);
-  //  console.log(Array.from(rollup.get("All").entries()));
-
-  const data = rollupData.map(([id, data]) => ({
-    id: id,
-    color: separateByYear
-      ? timelineSettings.groups[group].color(id[0])
-      : timelineSettings.groups[group].color(id),
-    data: data.map(([x, y]) => ({ x: x, y: y })),
-  }));
 
   return (
     <>
       <TitleBox>
-        <Typography variant="h6">Timeline</Typography>
-        <FormControl>
-          <InputLabel>Axis</InputLabel>
-          <Select
-            size="small"
-            value={timePeriod}
-            label="Value"
-            onChange={(event) => {
-              setTimePeriod(event.target.value);
-            }}
-          >
-            <ListSubheader>Absolute</ListSubheader>
-            {Object.entries(timelineSettings.timePeriods)
-              .filter(([key, agg]) => !agg.relative)
-              .map(([key, aggregator]) => (
-                <MenuItem value={key} key={key}>
-                  {aggregator.label}
-                </MenuItem>
-              ))}
-            <ListSubheader>Relative</ListSubheader>
-            {Object.entries(timelineSettings.timePeriods)
-              .filter(([key, agg]) => agg.relative)
-              .map(([key, aggregator]) => (
-                <MenuItem value={key} key={key}>
-                  {aggregator.label}
-                </MenuItem>
-              ))}
-          </Select>
-        </FormControl>
-        <FormControl>
-          <InputLabel>Sport</InputLabel>
-          <Select
-            size="small"
-            value={group}
-            label="Sport"
-            onChange={(event) => setGroup(event.target.value)}
-          >
-            {Object.entries(timelineSettings.groups).map(
-              ([key, aggregator]) => (
-                <MenuItem value={key} key={key}>
-                  {aggregator.label}
-                </MenuItem>
-              )
-            )}
-          </Select>
-        </FormControl>
-        <ButtonGroup variant="outlined">
-          <Button
-            disabled={
-              !timelineSettings.timePeriods[timePeriod].relative ||
-              yearAvg ||
-              timeGroup.selected == years[0]
-            }
-            onClick={(e) => {
-              setTimeGroup(
-                timelineSettings.timeGroups.byYear(timeGroup.selected - 1)
-              );
-            }}
-          >
-            -
-          </Button>
-          <Button
-            disabled={!timelineSettings.timePeriods[timePeriod].relative}
-            onClick={(e) => {
-              setYearAvg(!yearAvg);
-            }}
-          >
-            {yearAvg ? "Avg" : timeGroup.selected}
-          </Button>
-          <Button
-            disabled={
-              !timelineSettings.timePeriods[timePeriod].relative ||
-              yearAvg ||
-              timeGroup.selected == years[1]
-            }
-            onClick={(e) => {
-              setTimeGroup(
-                timelineSettings.timeGroups.byYear(timeGroup.selected + 1)
-              );
-            }}
-          >
-            +
-          </Button>
-        </ButtonGroup>
-        <FormControl>
-          <InputLabel>Stat</InputLabel>
-          <Select
-            size="small"
-            value={stat}
-            label="Value"
-            onChange={(event) => setStat(event.target.value)}
-          >
-            {Object.entries(stats).map(([key, aggregator]) => (
-              <MenuItem value={key} key={key}>
-                {aggregator.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl>
-          <InputLabel>Value</InputLabel>
-          <Select
-            size="small"
-            value={value}
-            label="Value"
-            onChange={(event) => setValue(event.target.value)}
-            disabled={["count", "cumCount"].includes(stat)}
-          >
-            {Object.entries(timelineSettings.values).map(
-              ([key, aggregator]) => (
-                <MenuItem value={key} key={key}>
-                  {aggregator.label}
-                </MenuItem>
-              )
-            )}
-          </Select>
-        </FormControl>
+        <Typography variant="h6" key="heading">
+          Timeline
+        </Typography>
+        <CustomSelect
+          key="timePeriod"
+          propName="timePeriod"
+          value={statsContext.timeline.timePeriod}
+          name="Axis"
+          options={timePeriods}
+          setState={statsContext.setTimeline}
+          headers={[
+            { title: "Absolute", filter: (opt) => !opt.relative },
+            { title: "Relative", filter: (opt) => opt.relative },
+          ]}
+        />
+        <CustomSelect
+          key="group"
+          propName="group"
+          value={statsContext.timeline.group}
+          name="Sport"
+          options={groups}
+          setState={statsContext.setTimeline}
+        />
+        <CustomPicker
+          key="timeGroup"
+          propName="timeGroup"
+          options={timeGroups}
+          value={statsContext.timeline.timeGroup}
+          range={years}
+          disabled={!statsContext.timeline.timePeriod.relative}
+          setState={statsContext.setTimeline}
+        />
+        <CustomSelect
+          key="stat"
+          propName="stat"
+          value={statsContext.timeline.stat}
+          name="Stat"
+          options={stats}
+          setState={statsContext.setTimeline}
+        />
+        <CustomSelect
+          key="value"
+          propName="value"
+          value={statsContext.timeline.value}
+          name="Value"
+          options={values}
+          setState={statsContext.setTimeline}
+          disabled={["count", "cumCount"].includes(
+            statsContext.timeline.stat.id
+          )}
+        />
       </TitleBox>
-      <ResponsiveLine
-        animate
-        margin={{ top: 10, right: 20, bottom: 100, left: 40 }}
-        curve="monotoneX"
-        useMesh={true}
-        isInteractive={true}
-        tooltip={({ point }) => {
-          return (
-            <Chip
-              size="small"
-              label={
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      mr: 1,
-                      fontFamily: "monospace",
-                      fontSize: "small",
-                    }}
-                  >
-                    {separateByYear && point.serieId[1] + "-"}
-                    {timelineSettings.timePeriods[timePeriod].format(
-                      point.data.xFormatted
-                    )}
-                  </Typography>
-                  <FontAwesomeIcon
-                    fontSize="small"
-                    icon={
-                      group == "no_group"
-                        ? "child-reaching"
-                        : categorySettings[
-                            separateByYear ? point.serieId[0] : point.serieId
-                          ].icon
-                    }
-                    color={
-                      group == "no_group"
-                        ? "#000000"
-                        : categorySettings[
-                            separateByYear ? point.serieId[0] : point.serieId
-                          ].color
-                    }
-                  />
-                  <Typography
-                    sx={{
-                      ml: 1,
-                      fontSize: "small",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {stats[stat].format(point.data.y) + stats[stat].unit}
-                  </Typography>
-                </Box>
-              }
-              variant="filled"
-            />
-          );
-        }}
-        enablePoints={!["yearMonth", "week"].includes(timePeriod)}
-        yFormat={stats[stat].format}
-        data={data}
-        xScale={{
-          type: "time",
-          format: "%Y-%m-%d",
-          useUTC: false,
-          precision: "day",
-        }}
-        xFormat="time:%Y-%m-%d"
-        axisBottom={{
-          tickPadding: 5,
-          tickRotation: 0,
-          format: timelineSettings.timePeriods[timePeriod].format,
-          tickValues: 6,
-        }}
-        axisLeft={{
-          //tickSize: 5,
-          tickPadding: 5,
-          tickRotation: 0,
-          legend: stat == "count" ? "#" : timelineSettings.values[value].unit,
-          format: stats[stat].format,
-          tickValues: 5,
-        }}
-        colors={(d) =>
-          addAlpha(
-            d.color,
-            yearAvg ||
-              d.id[1] == timeGroup.highlight ||
-              !timelineSettings.timePeriods[timePeriod].relative
-              ? 1
-              : 0.1
-          )
-        }
-        onClick={(d) => {
-          setYearHigh(d.serieId[1]);
-        }}
-      />
+      {!statsContext.timeline.loaded && (
+        <Skeleton
+          variant="rounded"
+          width="90%"
+          height="80%"
+          sx={{ margin: "auto" }}
+        />
+      )}
+      {statsContext.timeline.loaded && (
+        <ResponsiveLine
+          animate
+          margin={{ top: 10, right: 20, bottom: 100, left: 40 }}
+          curve="monotoneX"
+          useMesh={true}
+          isInteractive={true}
+          data={statsContext.timeline.data}
+          tooltip={({ point }) => <LineTooltip point={point} />}
+          enablePoints={statsContext.timeline.timePeriod.enablePoints}
+          yFormat={statsContext.timeline.stat.format}
+          xScale={{
+            type: "time",
+            format: "%Y-%m-%d",
+            useUTC: false,
+            precision: "day",
+          }}
+          xFormat="time:%Y-%m-%d"
+          axisBottom={{
+            tickPadding: 5,
+            tickRotation: 0,
+            format: statsContext.timeline.timePeriod.format,
+            tickValues: 6,
+          }}
+          axisLeft={{
+            tickPadding: 5,
+            tickRotation: 0,
+            legend: statsContext.timeline.stat.unit,
+            format: statsContext.timeline.stat.format,
+            tickValues: 5,
+          }}
+          colors={(d) => addAlpha(d.color, lineDict.get(d.id).alpha)}
+          onClick={(d) => lineDict.get(d.serieId).onClick()}
+        />
+      )}
     </>
   );
 }
 
+const ActivityCalendar = () => {
+  const statsContext = useContext(StatsContext);
+  const values = calendarSettings.values;
+  const theme = useTheme();
+  console.log(statsContext.calendar);
+
+  return (
+    <>
+      <TitleBox>
+        <Typography variant="h6" key="heading">
+          Calendar
+        </Typography>
+        <CustomSelect
+          key="value"
+          propName="value"
+          value={statsContext.calendar.value}
+          name="Value"
+          options={values}
+          setState={statsContext.setCalendar}
+        />
+      </TitleBox>
+      {statsContext.calendar.data && statsContext.calendar.data.length > 0 && (
+        <Box
+          sx={{
+            height: 140,
+            width: 1,
+            overflowX: "auto",
+            overflowY: "hidden",
+            whiteSpace: "noWrap",
+          }}
+        >
+          <ResponsiveTimeRange
+            margin={{ top: 40, right: 10, bottom: 10, left: 30 }}
+            data={statsContext.calendar.data}
+            from={statsContext.calendar.extent[0].toISOString().slice(0, 10)}
+            to={statsContext.calendar.extent[1].toISOString().slice(0, 10)}
+            emptyColor="#eeeeee"
+            //colors={["#61cdbb", "#97e3d5", "#e8c1a0", "#f47560"]}
+            //width={500}
+            width={
+              d3t.timeDay.count(...statsContext.calendar.extent) * 1.8 + 100
+            }
+            yearSpacing={40}
+            dayRadius={4}
+            weekdayTicks={[0, 2, 4, 6]}
+            monthLegend={(year, month, date) =>
+              date.getMonth() % 3 == 0 ? d3tf.timeFormat("%b %Y")(date) : ""
+            }
+            minValue={0}
+            maxValue={statsContext.calendar.value.maxValue}
+            monthBorderColor="#ffffff"
+            dayBorderWidth={2}
+            firstWeekday="monday"
+            dayBorderColor="#ffffff"
+            tooltip={({ day, value, color }) => {
+              return (
+                <Chip
+                  sx={{
+                    backgroundColor: theme.palette.background.paper,
+                    border: 1,
+                    borderColor: color,
+                  }}
+                  variant="filled"
+                  size="small"
+                  label={
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography sx={{ fontSize: "small" }}>
+                        {d3tf.timeFormat("%a, %b %d")(new Date(day))}
+                      </Typography>
+                      <Divider
+                        sx={{ mx: 1, height: 20 }}
+                        orientation="vertical"
+                      />
+                      <Typography sx={{ fontSize: "small" }} color={color}>
+                        {statsContext.calendar.value.format(value)}
+                      </Typography>
+                    </Box>
+                  }
+                />
+              );
+            }}
+            //valueFormat={statsContext.calendar.value.format}
+            /*legendFormat={statsContext.calendar.value.format}
+            legends={[
+              {
+                anchor: "top",
+                direction: "row",
+                translateY: -50,
+                translateX: -100,
+                itemCount: 4,
+                itemWidth: 30,
+                itemHeight: 30,
+                itemsSpacing: 30,
+                itemDirection: "right-to-left",
+              },
+            ]}*/
+          />
+        </Box>
+      )}
+    </>
+  );
+};
+
 const TypePie = () => {
   const statsContext = useContext(StatsContext);
-  const filterContext = useContext(FilterContext);
-  const inputData = d3.filter(statsContext.data, (f) =>
-    filterContext.filterIDs.includes(f.id)
-  );
-  const [value, setValue] = React.useState("count");
-  const values = {
-    count: {
-      fun: (v) => v.length,
-      label: "Count",
-      unit: "",
-    },
-    distance: {
-      fun: (v) => d3.sum(v, (d) => d.distance),
-      format: (v) => (v / 1000).toFixed() + "km",
-      label: "Distance",
-      unit: "km",
-    },
-    elevation: {
-      fun: (v) => d3.sum(v, (d) => d.total_elevation_gain),
-      format: (v) => (v / 1_000).toFixed() + "km",
-      label: "Elevation",
-      unit: "km",
-    },
-    time: {
-      fun: (v) => d3.sum(v, (d) => d.elapsed_time),
-      format: (v) => (v / 3600).toFixed() + "h",
-      label: "Duration",
-      unit: "h",
-    },
-  };
-
-  const rollup = d3.map(
-    d3.rollup(inputData, values[value].fun, (d) => aliasMap[d.sport_type]),
-    ([key, value]) => ({
-      id: key,
-      value: value,
-      color: categorySettings[key].color,
-    })
-  );
-  console.log(rollup);
+  const values = pieSettings.values;
+  const groups = pieSettings.groups;
+  const timeGroups = pieSettings.timeGroups;
 
   return (
     <>
@@ -502,37 +449,56 @@ const TypePie = () => {
         <Typography variant="h6" key="title">
           Sport
         </Typography>
-        <FormControl>
-          <InputLabel>Value</InputLabel>
-          <Select
-            size="small"
-            value={value}
-            label="Value"
-            onChange={(event) => setValue(event.target.value)}
-          >
-            {Object.entries(values).map(([key, aggregator]) => (
-              <MenuItem value={key} key={key}>
-                {aggregator.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <CustomSelect
+          key="value"
+          propName="value"
+          value={statsContext.pie.value}
+          name="Value"
+          options={values}
+          setState={statsContext.setPie}
+        />
+        <CustomSelect
+          key="group"
+          propName="group"
+          value={statsContext.pie.group}
+          name="Sport"
+          options={groups}
+          setState={statsContext.setPie}
+        />
+        <CustomPicker
+          key="timeGroup"
+          propName="timeGroup"
+          options={timeGroups}
+          value={statsContext.pie.timeGroup}
+          range={[2014, 2023]}
+          setState={statsContext.setPie}
+        />
       </TitleBox>
-      <ResponsivePie
-        data={rollup}
-        margin={{ top: 40, right: 80, bottom: 80, left: 80 }}
-        innerRadius={0.5}
-        padAngle={0.7}
-        cornerRadius={3}
-        activeOuterRadiusOffset={8}
-        borderWidth={1}
-        arcLinkLabelsSkipAngle={10}
-        arcLinkLabelsThickness={2}
-        arcLinkLabelsColor={{ from: "color" }}
-        arcLabelsSkipAngle={10}
-        colors={(d) => d.data.color}
-        valueFormat={values[value].format}
-      />
+      {!statsContext.pie.loaded && (
+        <Skeleton
+          variant="rounded"
+          width="90%"
+          height="80%"
+          sx={{ margin: "auto" }}
+        />
+      )}
+      {statsContext.pie.loaded && (
+        <ResponsivePie
+          data={statsContext.pie.data}
+          margin={{ top: 40, right: 120, bottom: 100, left: 120 }}
+          innerRadius={0.6}
+          padAngle={0.7}
+          cornerRadius={5}
+          activeOuterRadiusOffset={8}
+          borderWidth={0}
+          arcLinkLabelsSkipAngle={10}
+          arcLinkLabelsThickness={2}
+          arcLinkLabelsColor={{ from: "color" }}
+          arcLabelsSkipAngle={20}
+          colors={(d) => d.data.color}
+          valueFormat={statsContext.pie.value.format}
+        />
+      )}
     </>
   );
 };
@@ -541,13 +507,20 @@ export default function StatsView() {
   const statsContext = useContext(StatsContext);
   return (
     <Grid container>
-      <Grid xs={12} md={8}>
+      <Grid xs={12} lg={8}>
         <Paper sx={{ height: 400 }}>
-          {statsContext.loaded && <YearlySummary />}
+          <YearlySummary />
         </Paper>
       </Grid>
-      <Grid xs={12} md={4}>
-        <Paper sx={{ height: 400 }}>{statsContext.loaded && <TypePie />}</Paper>
+      <Grid xs={12} lg={4}>
+        <Paper sx={{ height: 400 }}>
+          <TypePie />
+        </Paper>
+      </Grid>
+      <Grid xs={12}>
+        <Paper sx={{ height: 200 }}>
+          <ActivityCalendar />
+        </Paper>
       </Grid>
     </Grid>
   );

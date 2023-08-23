@@ -23,6 +23,7 @@
     "@mui/material": "^5.14.5",
     "@mui/x-data-grid": "^6.11.1",
     "@nivo/bump": "^0.83.0",
+    "@nivo/calendar": "^0.83.0",
     "@nivo/line": "^0.83.0",
     "@nivo/pie": "^0.83.0",
     "@supabase/supabase-js": "^2.32.0",
