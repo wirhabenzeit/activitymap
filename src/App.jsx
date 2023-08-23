@@ -36,6 +36,12 @@ import {
 
 import { categorySettings, binaryFilters, filterSettings } from "/src/settings";
 
+const StyledTab = styled((props) => <Tab disableRipple {...props} />)(
+  ({ theme }) => ({
+    minWidth: 60,
+  })
+);
+
 const darkTheme = createTheme({
   palette: {
     mode: "dark",
@@ -173,21 +179,21 @@ function App() {
                   },
                 }}
               >
-                <Tab
+                <StyledTab
                   label="Map"
                   index={0}
                   onClick={() => {
                     goTo("/");
                   }}
                 />
-                <Tab
+                <StyledTab
                   label="List"
                   index={1}
                   onClick={() => {
                     goTo("/list");
                   }}
                 />
-                <Tab
+                <StyledTab
                   label="Stats"
                   index={2}
                   onClick={() => {
