@@ -1,10 +1,16 @@
 import { useContext, createContext, useState, useEffect, useRef } from "react";
 import { ActivityContext } from "./ActivityContext";
 import { FilterContext } from "./FilterContext";
+import { SelectionContext } from "./SelectionContext";
 import * as d3tf from "d3-time-format";
 import * as d3 from "d3-array";
 
-import { timelineSettings, pieSettings, calendarSettings } from "../settings";
+import {
+  timelineSettings,
+  pieSettings,
+  calendarSettings,
+  scatterSettings,
+} from "../settings";
 
 const defaultTimeline = {
   timePeriod: timelineSettings.timePeriods.week,
@@ -16,6 +22,7 @@ const defaultTimeline = {
 
 const defaultStats = {
   data: [],
+  allData: [],
   extent: [undefined, undefined],
   timeline: {
     ...defaultTimeline,
@@ -27,23 +34,84 @@ const defaultStats = {
     group: pieSettings.groups.sport_group,
     timeGroup: pieSettings.timeGroups.all(2023),
     loaded: false,
+    data: [],
   },
   calendar: {
     value: calendarSettings.values.elevation,
     extent: [undefined, undefined],
+    loaded: false,
+    data: [],
+    activitiesByDate: {},
+    colorScaleFn: (colors) => (value) => colors[0],
+    onClick: () => {},
+  },
+  scatter: {
+    xValue: scatterSettings.values.date,
+    yValue: scatterSettings.values.elevation,
+    size: scatterSettings.values.distance,
+    group: scatterSettings.groups.sport_group,
+    loaded: false,
+    extent: {
+      x: [undefined, undefined],
+      y: [undefined, undefined],
+      size: [undefined, undefined],
+    },
+    onClick: () => {},
   },
 };
 
 const StatsContext = createContext(defaultStats);
 
-const updateCalendar = (data, calendar) => {
-  const rollup = d3.rollups(data, calendar.value.fun, (f) =>
+const updateScatter = (data, scatter, setSelected) => {
+  const groups = d3.group(data, scatter.group.fun);
+
+  const extent = {
+    x: d3.extent(data, scatter.xValue.fun),
+    y: d3.extent(data, scatter.yValue.fun),
+    size: d3.extent(data, scatter.size.fun),
+  };
+
+  const outData = d3.map(groups, ([key, value]) => ({
+    id: key,
+    color: scatter.group.color(key),
+    icon: scatter.group.icon(key),
+    data: value.map((d) => ({
+      x: scatter.xValue.fun(d),
+      y: scatter.yValue.fun(d),
+      selected: d.selected,
+      id: d.id,
+      title: d.name,
+      size:
+        ((scatter.size.fun(d) - extent.size[0]) /
+          (extent.size[1] - extent.size[0])) *
+          10 +
+        2,
+    })),
+  }));
+
+  const onClick = (point) => setSelected([point.data.id]);
+
+  return { data: outData, extent: extent, onClick: onClick };
+};
+
+const updateCalendar = (data, calendar, selectedDays, setSelected) => {
+  const activitiesByDate = d3.group(data, (f) =>
     d3tf.timeFormat("%Y-%m-%d")(f.date)
   );
-  return d3.map(rollup, ([key, value]) => ({
-    value: value,
+  const outData = d3.map(activitiesByDate, ([key, value]) => ({
+    value: selectedDays.includes(key) ? "selected" : calendar.value.fun(value),
     day: key,
   }));
+  const onClick = (point) => {
+    const selected = activitiesByDate.get(point.day);
+    if (selected) setSelected(selected.map((f) => f.id));
+    else setSelected([]);
+  };
+  return {
+    data: outData,
+    activitiesByDate: activitiesByDate,
+    onClick: onClick,
+  };
 };
 
 const updatePie = (data, pie) => {
@@ -142,10 +210,15 @@ const updateTimeline = (data, timeline, setTimeline) => {
 export function StatsContextProvider({ children }) {
   const activityContext = useContext(ActivityContext);
   const filterContext = useContext(FilterContext);
+  const selectionContext = useContext(SelectionContext);
   const [state, setState] = useState(defaultStats);
 
   const setTimeline = (newTimeline) => {
-    const timeline = { ...state.timeline, ...newTimeline };
+    const timeline = {
+      ...state.timeline,
+      ...newTimeline,
+      extent: state.extent,
+    };
     // stats depend on the other props
     if (!("stat" in newTimeline))
       timeline.stat = timelineSettings.stats(timeline)[timeline.stat.id];
@@ -159,11 +232,7 @@ export function StatsContextProvider({ children }) {
         timeline.timeGroup.highlight
       );
 
-    const data = updateTimeline(
-      d3.filter(state.data, (f) => filterContext.filterIDs.includes(f.id)),
-      timeline,
-      setTimeline
-    );
+    const data = updateTimeline(state.data, timeline, setTimeline);
     setState((state) => ({
       ...state,
       timeline: {
@@ -177,10 +246,7 @@ export function StatsContextProvider({ children }) {
 
   const setPie = (newPie) => {
     const pie = { ...state.pie, ...newPie };
-    const data = updatePie(
-      d3.filter(state.data, (f) => filterContext.filterIDs.includes(f.id)),
-      pie
-    );
+    const data = updatePie(state.data, pie);
     setState((state) => ({
       ...state,
       pie: {
@@ -193,16 +259,58 @@ export function StatsContextProvider({ children }) {
 
   const setCalendar = (newCalendar) => {
     const calendar = { ...state.calendar, ...newCalendar };
-    const filteredData = d3.filter(state.data, (f) =>
-      filterContext.filterIDs.includes(f.id)
+    const colorScaleFn = (colors) => {
+      const realColors = colors.slice(1, colors.length - 1);
+      return (value) => {
+        var retVal;
+        if (value === 0) retVal = colors[0];
+        else if (value === "selected") retVal = colors[colors.length - 1];
+        else
+          retVal =
+            realColors[
+              Math.floor(
+                Math.min(value / calendar.value.maxValue, 1) *
+                  (realColors.length - 1)
+              )
+            ];
+        return retVal;
+      };
+    };
+    const data = updateCalendar(
+      state.data,
+      calendar,
+      selectionContext.selected.map((id) =>
+        activityContext.activityDict[id].properties.start_date_local.slice(
+          0,
+          10
+        )
+      ),
+      selectionContext.setSelected
     );
-    const data = updateCalendar(filteredData, calendar);
     setState((state) => ({
       ...state,
       calendar: {
         ...calendar,
-        data: data,
-        extent: d3.extent(filteredData, (f) => f.date),
+        ...data,
+        extent: d3.extent(state.data, (f) => f.date),
+        colorScaleFn: colorScaleFn,
+        loaded: true,
+      },
+    }));
+  };
+
+  const setScatter = (newScatter) => {
+    const scatter = { ...state.scatter, ...newScatter };
+    const data = updateScatter(
+      state.data,
+      scatter,
+      selectionContext.setSelected
+    );
+    setState((state) => ({
+      ...state,
+      scatter: {
+        ...scatter,
+        ...data,
         loaded: true,
       },
     }));
@@ -210,16 +318,12 @@ export function StatsContextProvider({ children }) {
 
   useEffect(() => {
     if (activityContext.loaded && state.data.length > 0) {
-      setTimeline({
-        extent: d3.extent(
-          activityContext.geoJson.features,
-          (f) => f.properties.date
-        ),
-      });
+      setTimeline({});
       setPie({});
       setCalendar({});
+      setScatter({});
     }
-  }, [activityContext.loaded, filterContext.filterIDs]);
+  }, [state.data]);
 
   useEffect(() => {
     if (activityContext.loaded) {
@@ -228,15 +332,36 @@ export function StatsContextProvider({ children }) {
       );
       data.forEach((feature) => {
         feature.date = new Date(feature.start_date_local);
+        feature.selected = selectionContext.selected.includes(feature.id);
       });
+      console.log(data);
       setState({
         ...state,
         loaded: true,
         extent: d3.extent(data, (f) => f.date),
-        data: data,
+        allData: data,
       });
     }
   }, [activityContext.geoJson]);
+
+  useEffect(() => {
+    if (activityContext.loaded) {
+      setState((state) => {
+        const data = state.allData.filter((feature) =>
+          filterContext.filterIDs.includes(feature.id)
+        );
+        data.forEach((feature) => {
+          feature.selected = selectionContext.selected.includes(feature.id);
+        });
+        const extent = d3.extent(data, (f) => f.date);
+        return {
+          ...state,
+          extent: extent,
+          data: data,
+        };
+      });
+    }
+  }, [state.allData, filterContext.filterIDs, selectionContext.selected]);
 
   return (
     <StatsContext.Provider
@@ -245,6 +370,7 @@ export function StatsContextProvider({ children }) {
         setTimeline: setTimeline,
         setPie: setPie,
         setCalendar: setCalendar,
+        setScatter: setScatter,
       }}
     >
       {children}

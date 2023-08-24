@@ -26,6 +26,7 @@
     "@nivo/calendar": "^0.83.0",
     "@nivo/line": "^0.83.0",
     "@nivo/pie": "^0.83.0",
+    "@nivo/scatterplot": "^0.83.0",
     "@supabase/supabase-js": "^2.32.0",
     "d3-array": "^3.2.4",
     "d3-scale-chromatic": "^3.0.0",

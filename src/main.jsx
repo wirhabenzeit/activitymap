@@ -15,11 +15,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <MapContextProvider>
         <ListContextProvider>
           <FilterContextProvider>
-            <StatsContextProvider>
-              <SelectionContextProvider>
+            <SelectionContextProvider>
+              <StatsContextProvider>
                 <App />
-              </SelectionContextProvider>
-            </StatsContextProvider>
+              </StatsContextProvider>
+            </SelectionContextProvider>
           </FilterContextProvider>
         </ListContextProvider>
       </MapContextProvider>

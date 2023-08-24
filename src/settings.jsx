@@ -681,6 +681,52 @@ const calendarSettings = {
   },
 };
 
+const scatterSettings = {
+  values: {
+    distance: {
+      id: "distance",
+      fun: (d) => d.distance,
+      format: (v) => (v / 1000).toFixed() + "km",
+      formatAxis: (v) => (v / 1000).toFixed(),
+      label: "Distance",
+      unit: "km",
+    },
+    elevation: {
+      id: "elevation",
+      fun: (d) => d.total_elevation_gain,
+      format: (v) => (v / 1.0).toFixed() + "m",
+      formatAxis: (v) => (v / 1.0).toFixed(),
+      label: "Elevation",
+      unit: "km",
+    },
+    time: {
+      id: "time",
+      fun: (d) => d.elapsed_time,
+      format: (v) => (v / 3600).toFixed(1) + "h",
+      formatAxis: (v) => (v / 3600).toFixed(1),
+      label: "Duration",
+      unit: "h",
+    },
+    date: {
+      id: "date",
+      fun: (d) => d.start_date_local_timestamp,
+      formatAxis: (v) => d3tf.timeFormat("%b %Y")(new Date(v * 1000)),
+      format: (v) => d3tf.timeFormat("%Y-%m-%d")(new Date(v * 1000)),
+      label: "Date",
+      unit: "",
+    },
+  },
+  groups: {
+    sport_group: {
+      id: "sport_group",
+      fun: (d) => aliasMap[d.sport_type],
+      color: (id) => categorySettings[id].color,
+      icon: (id) => categorySettings[id].icon,
+      label: "Group",
+    },
+  },
+};
+
 const pieSettings = {
   values: {
     count: {
@@ -999,4 +1045,5 @@ export {
   timelineSettings,
   pieSettings,
   calendarSettings,
+  scatterSettings,
 };

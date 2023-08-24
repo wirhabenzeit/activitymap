@@ -9,6 +9,7 @@ const SelectionContext = createContext(selectionState);
 
 export function SelectionContextProvider({ children }) {
   const [state, setState] = useState(selectionState);
+  console.log("SelectionContextProvider render");
 
   const setSelected = (selected) => {
     const selectedUnique = new Set(selected);

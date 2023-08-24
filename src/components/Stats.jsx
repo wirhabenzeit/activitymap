@@ -2,7 +2,8 @@
 // yarn add @nivo/bump
 import { ResponsivePie } from "@nivo/pie";
 import { ResponsiveLine } from "@nivo/line";
-import { ResponsiveCalendar, ResponsiveTimeRange } from "@nivo/calendar";
+import { ResponsiveTimeRange } from "@nivo/calendar";
+import { ResponsiveScatterPlotCanvas } from "@nivo/scatterplot";
 import React, { useContext, cloneElement } from "react";
 import { StatsContext } from "../contexts/StatsContext";
 function addAlpha(color, opacity) {
@@ -23,22 +24,23 @@ import {
   Unstable_Grid2 as Grid,
   Chip,
   Typography,
-  useMediaQuery,
   Divider,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
-import { calendarSettings, pieSettings, timelineSettings } from "../settings";
+import {
+  calendarSettings,
+  pieSettings,
+  timelineSettings,
+  scatterSettings,
+} from "../settings";
 
-import { aliasMap, categorySettings } from "../settings";
 import * as d3 from "d3-array";
 import * as d3t from "d3-time";
 import * as d3tf from "d3-time-format";
-import { FilterContext } from "../contexts/FilterContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import { fas } from "@fortawesome/free-solid-svg-icons";
-import { Title } from "@mui/icons-material";
 library.add(fas);
 
 const formProps = { m: 1, display: "inline-flex", verticalAlign: "middle" };
@@ -333,7 +335,6 @@ const ActivityCalendar = () => {
   const statsContext = useContext(StatsContext);
   const values = calendarSettings.values;
   const theme = useTheme();
-  console.log(statsContext.calendar);
 
   return (
     <>
@@ -366,8 +367,14 @@ const ActivityCalendar = () => {
             from={statsContext.calendar.extent[0].toISOString().slice(0, 10)}
             to={statsContext.calendar.extent[1].toISOString().slice(0, 10)}
             emptyColor="#eeeeee"
-            //colors={["#61cdbb", "#97e3d5", "#e8c1a0", "#f47560"]}
-            //width={500}
+            colorScale={statsContext.calendar.colorScaleFn([
+              "#eeeeee",
+              "#61cdbb",
+              "#97e3d5",
+              "#e8c1a0",
+              "#f47560",
+              "#000000",
+            ])}
             width={
               d3t.timeDay.count(...statsContext.calendar.extent) * 1.8 + 100
             }
@@ -377,13 +384,11 @@ const ActivityCalendar = () => {
             monthLegend={(year, month, date) =>
               date.getMonth() % 3 == 0 ? d3tf.timeFormat("%b %Y")(date) : ""
             }
-            minValue={0}
-            maxValue={statsContext.calendar.value.maxValue}
             monthBorderColor="#ffffff"
             dayBorderWidth={2}
-            firstWeekday="monday"
             dayBorderColor="#ffffff"
-            tooltip={({ day, value, color }) => {
+            onClick={statsContext.calendar.onClick}
+            tooltip={({ day, color, value }) => {
               return (
                 <Chip
                   sx={{
@@ -408,30 +413,147 @@ const ActivityCalendar = () => {
                         orientation="vertical"
                       />
                       <Typography sx={{ fontSize: "small" }} color={color}>
-                        {statsContext.calendar.value.format(value)}
+                        {value !== "selected"
+                          ? statsContext.calendar.value.format(value)
+                          : statsContext.calendar.activitiesByDate
+                              .get(day)
+                              .map((act) => act.name)
+                              .join(", ")}
                       </Typography>
                     </Box>
                   }
                 />
               );
             }}
-            //valueFormat={statsContext.calendar.value.format}
-            /*legendFormat={statsContext.calendar.value.format}
-            legends={[
-              {
-                anchor: "top",
-                direction: "row",
-                translateY: -50,
-                translateX: -100,
-                itemCount: 4,
-                itemWidth: 30,
-                itemHeight: 30,
-                itemsSpacing: 30,
-                itemDirection: "right-to-left",
-              },
-            ]}*/
           />
         </Box>
+      )}
+    </>
+  );
+};
+
+const Scatter = () => {
+  const statsContext = useContext(StatsContext);
+  const values = scatterSettings.values;
+  const theme = useTheme();
+  var dataDict;
+  if (statsContext.scatter.data)
+    dataDict = d3.rollup(
+      statsContext.scatter.data,
+      (v) => v[0],
+      (d) => d.id
+    );
+
+  const ScatterTooltip = ({ point }) => {
+    const catProps = dataDict.get(point.serieId);
+    return (
+      <Chip
+        sx={{
+          backgroundColor: theme.palette.background.paper,
+          border: 1,
+          borderColor: catProps.color,
+        }}
+        size="small"
+        label={
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <FontAwesomeIcon
+              fontSize="small"
+              icon={catProps.icon}
+              color={catProps.color}
+            />
+            <Typography
+              sx={{
+                ml: 1,
+                fontSize: "small",
+              }}
+            >
+              {point.data.title}
+            </Typography>
+          </Box>
+        }
+        variant="filled"
+      />
+    );
+  };
+
+  return (
+    <>
+      <TitleBox>
+        <Typography variant="h6" key="heading">
+          Scatter
+        </Typography>
+        <CustomSelect
+          key="xValue"
+          propName="xValue"
+          value={statsContext.scatter.xValue}
+          name="X"
+          options={values}
+          setState={statsContext.setScatter}
+        />
+        <CustomSelect
+          key="yValue"
+          propName="yValue"
+          value={statsContext.scatter.yValue}
+          name="Y"
+          options={values}
+          setState={statsContext.setScatter}
+        />
+        <CustomSelect
+          key="size"
+          propName="size"
+          value={statsContext.scatter.size}
+          name="Size"
+          options={values}
+          setState={statsContext.setScatter}
+        />
+      </TitleBox>
+      {statsContext.scatter.loaded && statsContext.data.length > 0 && (
+        <ResponsiveScatterPlotCanvas
+          data={statsContext.scatter.data}
+          margin={{ top: 10, right: 40, bottom: 100, left: 60 }}
+          xScale={{ type: "linear", min: "auto", max: "auto" }}
+          yScale={{ type: "linear", min: "auto", max: "auto" }}
+          blendMode="multiply"
+          xFormat={statsContext.scatter.xValue.format}
+          yFormat={statsContext.scatter.yValue.format}
+          nodeSize={(d) => d.data.size}
+          colors={(d) => dataDict.get(d.serieId).color}
+          axisTop={null}
+          axisRight={null}
+          axisBottom={{
+            orient: "bottom",
+            tickSize: 5,
+            tickPadding: 5,
+            tickRotation: 0,
+            format: statsContext.scatter.xValue.formatAxis,
+          }}
+          axisLeft={{
+            orient: "left",
+            tickSize: 5,
+            tickPadding: 5,
+            tickRotation: 0,
+            format: statsContext.scatter.yValue.formatAxis,
+          }}
+          tooltip={({ node }) => <ScatterTooltip point={node} />}
+          renderNode={(ctx, node) => {
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, node.size / 2, 0, 2 * Math.PI);
+            ctx.fillStyle = node.color;
+            ctx.fill();
+            if (node.data.selected) {
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, node.size / 2 + 2, 0, 2 * Math.PI);
+              ctx.strokeStyle = "#000000";
+              ctx.stroke();
+            }
+          }}
+          onClick={statsContext.scatter.onClick}
+        />
       )}
     </>
   );
@@ -504,7 +626,6 @@ const TypePie = () => {
 };
 
 export default function StatsView() {
-  const statsContext = useContext(StatsContext);
   return (
     <Grid container>
       <Grid xs={12} lg={8}>
@@ -520,6 +641,11 @@ export default function StatsView() {
       <Grid xs={12}>
         <Paper sx={{ height: 200 }}>
           <ActivityCalendar />
+        </Paper>
+      </Grid>
+      <Grid xs={12} lg={7}>
+        <Paper sx={{ height: 400 }}>
+          <Scatter />
         </Paper>
       </Grid>
     </Grid>
