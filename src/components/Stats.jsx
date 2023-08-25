@@ -529,6 +529,7 @@ const Scatter = () => {
             orient: "bottom",
             tickSize: 5,
             tickPadding: 5,
+            tickValues: 3,
             tickRotation: 0,
             format: statsContext.scatter.xValue.formatAxis,
           }}
@@ -536,6 +537,7 @@ const Scatter = () => {
             orient: "left",
             tickSize: 5,
             tickPadding: 5,
+            tickValues: 4,
             tickRotation: 0,
             format: statsContext.scatter.yValue.formatAxis,
           }}
