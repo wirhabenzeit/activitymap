@@ -436,6 +436,20 @@ const listSettings = (activityContext) => ({
       valueFormatter: (params) => decFormatter("km", 1)(params.value),
     },
     {
+      field: "average_speed",
+      renderHeader: (params) => (
+        <Tooltip title="Average speed">
+          <FontAwesomeIcon fontSize="small" icon="tachometer-alt" />
+        </Tooltip>
+      ),
+      headerName: "Avg Speed",
+      type: "number",
+      flex: 1,
+      minWidth: 70,
+      valueGetter: (params) => params.row.properties.average_speed,
+      valueFormatter: (params) => decFormatter("km/h", 1)(params.value * 3.6),
+    },
+    {
       field: "total_elevation_gain",
       renderHeader: (params) => (
         <Tooltip title="Elevation gain">
@@ -549,6 +563,20 @@ const listSettings = (activityContext) => ({
       valueFormatter: (params) => decFormatter("bpm")(params.value),
     },
     {
+      field: "kudos_count",
+      renderHeader: (params) => (
+        <Tooltip title="Kudos">
+          <FontAwesomeIcon fontSize="small" icon="thumbs-up" />
+        </Tooltip>
+      ),
+      headerName: "Kudos Count",
+      type: "number",
+      flex: 1,
+      minWidth: 80,
+      valueGetter: (params) => params.row.properties.kudos_count,
+      valueFormatter: (params) => decFormatter("")(params.value),
+    },
+    {
       field: "edit",
       headerName: "Edit Activity",
       width: 30,
@@ -595,6 +623,8 @@ const listSettings = (activityContext) => ({
         weighted_average_watts: false,
         average_heartrate: false,
         edit: false,
+        kudos_count: false,
+        average_speed: false,
       },
     },
     full: {
@@ -610,6 +640,8 @@ const listSettings = (activityContext) => ({
         max_power: false,
         average_watts: false,
         edit: false,
+        kudos_count: false,
+        average_speed: false,
       },
     },
   },
@@ -715,6 +747,22 @@ const scatterSettings = {
       label: "Date",
       unit: "",
     },
+    kudos_count: {
+      id: "kudos_count",
+      fun: (d) => d.kudos_count,
+      format: (v) => v,
+      formatAxis: (v) => v,
+      label: "Kudos",
+      unit: "",
+    },
+    average_speed: {
+      id: "average_speed",
+      fun: (d) => d.average_speed,
+      format: (v) => (v * 3.6).toFixed(1) + "km/h",
+      formatAxis: (v) => (v * 3.6).toFixed(1),
+      label: "Avg Speed",
+      unit: "km/h",
+    },
   },
   groups: {
     sport_group: {
@@ -755,6 +803,13 @@ const pieSettings = {
       format: (v) => (v / 3600).toFixed() + "h",
       label: "Duration",
       unit: "h",
+    },
+    kudos_count: {
+      id: "kudos_count",
+      fun: (v) => d3.sum(v, (d) => d.kudos_count),
+      format: (v) => v,
+      label: "Kudos",
+      unit: "",
     },
   },
   groups: {
@@ -901,6 +956,13 @@ const timelineSettings = {
       format: (v) => (v / 3600).toFixed(1),
       label: "Duration",
       unit: "h",
+    },
+    kudos_count: {
+      id: "kudos_count",
+      fun: (d) => d.kudos_count,
+      format: (v) => v,
+      label: "Kudos",
+      unit: "",
     },
   },
   groups: {
