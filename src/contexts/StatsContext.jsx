@@ -10,6 +10,8 @@ import {
   pieSettings,
   calendarSettings,
   scatterSettings,
+  mapStatSettings,
+  violinSettings,
 } from "../settings";
 
 const defaultTimeline = {
@@ -24,15 +26,28 @@ const defaultStats = {
   data: [],
   allData: [],
   extent: [undefined, undefined],
+  map: {
+    value: mapStatSettings.values.elevation,
+    timeGroup: mapStatSettings.timeGroups.all(2023),
+    loaded: false,
+  },
   timeline: {
     ...defaultTimeline,
     stat: timelineSettings.stats(defaultTimeline).cumTotal,
+    loaded: false,
     data: [],
   },
   pie: {
     value: pieSettings.values.elevation,
     group: pieSettings.groups.sport_group,
     timeGroup: pieSettings.timeGroups.all(2023),
+    loaded: false,
+    data: [],
+  },
+  violin: {
+    color: violinSettings.color,
+    value: violinSettings.values.elevation,
+    group: violinSettings.groups.sport_group,
     loaded: false,
     data: [],
   },
@@ -50,6 +65,7 @@ const defaultStats = {
     yValue: scatterSettings.values.elevation,
     size: scatterSettings.values.distance,
     group: scatterSettings.groups.sport_group,
+    color: scatterSettings.color,
     loaded: false,
     extent: {
       x: [undefined, undefined],
@@ -60,9 +76,87 @@ const defaultStats = {
   },
 };
 
+function addAlpha(color, opacity) {
+  const _opacity = Math.round(Math.min(Math.max(opacity || 1, 0), 1) * 255);
+  return color + _opacity.toString(16).toUpperCase();
+}
+
 const StatsContext = createContext(defaultStats);
 
-const updateScatter = (data, scatter, setSelected) => {
+const updateMap = (data, map) => {
+  const filteredData = d3.filter(data, (f) => map.timeGroup.filter(f));
+  const rollup = d3.rollups(filteredData, map.value.fun, (f) => f.country);
+  console.log(rollup);
+  const outData = d3.map(rollup, ([key, value]) => ({
+    id: key,
+    value: value,
+  }));
+  const domain = d3.extent(outData, (d) => d.value).map((d) => d / 1);
+  return { data: outData, domain: domain };
+};
+
+const updateViolin = (data, violin) => {
+  console.log("update violin");
+  const nBins = 100;
+  const bandwidth = 0.1;
+
+  const stat = (v) => {
+    const values = v.map(violin.value.fun);
+    const extent = d3.extent(values);
+    const quantiles = [
+      ...d3.range(0, 10, 1),
+      ...d3.range(10, 91, 5),
+      ...d3.range(91, 101, 1),
+    ].reduce((prev, q) => ({ ...prev, [q]: d3.quantile(values, q / 100) }), {});
+    //v.sort((a, b) => -violin.value.fun(a) + violin.value.fun(b));
+    const outliers = v
+      .filter((v) => violin.value.fun(v) >= quantiles[95])
+      .map((v) => ({
+        group: violin.group.fun(v),
+        value: violin.value.fun(v),
+        id: v.id,
+        color: violin.color(v),
+        icon: violin.group.icon(violin.group.fun(v)),
+      }));
+
+    function kde(kernel, thresholds, data) {
+      return thresholds.map((t) => [t, d3.mean(data, (d) => kernel(t - d))]);
+    }
+    function epanechnikov(bandwidth) {
+      return (x) =>
+        Math.abs((x /= bandwidth)) <= 1 ? (0.75 * (1 - x * x)) / bandwidth : 0;
+    }
+    const density = kde(
+      epanechnikov(bandwidth * (extent[1] - extent[0])),
+      Object.values(quantiles),
+      values
+    );
+    const densityMax = d3.max(density, (d) => d[1]);
+    density.forEach((d) => (d[1] = d[1] / densityMax));
+    const quantileDensity = d3
+      .zip(Object.keys(quantiles), density)
+      .reduce((prev, [k, d]) => ({ ...prev, [parseInt(k)]: d }), {});
+
+    return {
+      outliers,
+      kde: quantileDensity,
+    };
+  };
+  var outData = d3
+    .rollups(data, stat, (f) => violin.group.fun(f))
+    .sort((a, b) => a[0] - b[0]);
+  const outliers = outData.map(([group, value]) => value.outliers).flat();
+  const groups = outData.map(([group, value]) => group);
+  const kdes = outData.map(([group, value]) => ({
+    group: group,
+    color: violin.group.color(group),
+    quantiles: value.kde,
+  }));
+  return { outliers: outliers, groups: groups, kdes: kdes };
+};
+
+const updateScatter = (data, scatter) => {
+  console.log("update scatter");
   const groups = d3.group(data, scatter.group.fun);
 
   const extent = {
@@ -78,9 +172,10 @@ const updateScatter = (data, scatter, setSelected) => {
     data: value.map((d) => ({
       x: scatter.xValue.fun(d),
       y: scatter.yValue.fun(d),
-      selected: d.selected,
       id: d.id,
       title: d.name,
+      color: scatter.group.color(key),
+      icon: scatter.group.icon(key),
       size:
         ((scatter.size.fun(d) - extent.size[0]) /
           (extent.size[1] - extent.size[0])) *
@@ -89,9 +184,7 @@ const updateScatter = (data, scatter, setSelected) => {
     })),
   }));
 
-  const onClick = (point) => setSelected([point.data.id]);
-
-  return { data: outData, extent: extent, onClick: onClick };
+  return { data: outData, extent: extent };
 };
 
 const updateCalendar = (data, calendar, selectedDays, setSelected) => {
@@ -122,6 +215,7 @@ const updatePie = (data, pie) => {
     id: key,
     value: value,
     color: pie.group.color(key),
+    icon: pie.group.icon(key),
   }));
 };
 
@@ -244,6 +338,19 @@ export function StatsContextProvider({ children }) {
     }));
   };
 
+  const setViolin = (newViolin) => {
+    const violin = { ...state.violin, ...newViolin };
+    const data = updateViolin(state.data, violin);
+    setState((state) => ({
+      ...state,
+      violin: {
+        ...violin,
+        ...data,
+        loaded: true,
+      },
+    }));
+  };
+
   const setPie = (newPie) => {
     const pie = { ...state.pie, ...newPie };
     const data = updatePie(state.data, pie);
@@ -252,6 +359,19 @@ export function StatsContextProvider({ children }) {
       pie: {
         ...pie,
         data: data,
+        loaded: true,
+      },
+    }));
+  };
+
+  const setMap = (newMap) => {
+    const map = { ...state.map, ...newMap };
+    const data = updateMap(state.data, map);
+    setState((state) => ({
+      ...state,
+      map: {
+        ...map,
+        ...data,
         loaded: true,
       },
     }));
@@ -301,11 +421,7 @@ export function StatsContextProvider({ children }) {
 
   const setScatter = (newScatter) => {
     const scatter = { ...state.scatter, ...newScatter };
-    const data = updateScatter(
-      state.data,
-      scatter,
-      selectionContext.setSelected
-    );
+    const data = updateScatter(state.data, scatter);
     setState((state) => ({
       ...state,
       scatter: {
@@ -322,6 +438,7 @@ export function StatsContextProvider({ children }) {
       setPie({});
       setCalendar({});
       setScatter({});
+      setViolin({});
     }
   }, [state.data]);
 
@@ -332,7 +449,6 @@ export function StatsContextProvider({ children }) {
       );
       data.forEach((feature) => {
         feature.date = new Date(feature.start_date_local);
-        feature.selected = selectionContext.selected.includes(feature.id);
       });
       console.log(data);
       setState({
@@ -350,9 +466,6 @@ export function StatsContextProvider({ children }) {
         const data = state.allData.filter((feature) =>
           filterContext.filterIDs.includes(feature.id)
         );
-        data.forEach((feature) => {
-          feature.selected = selectionContext.selected.includes(feature.id);
-        });
         const extent = d3.extent(data, (f) => f.date);
         return {
           ...state,
@@ -361,7 +474,7 @@ export function StatsContextProvider({ children }) {
         };
       });
     }
-  }, [state.allData, filterContext.filterIDs, selectionContext.selected]);
+  }, [state.allData, filterContext.filterIDs]);
 
   return (
     <StatsContext.Provider
@@ -371,6 +484,8 @@ export function StatsContextProvider({ children }) {
         setPie: setPie,
         setCalendar: setCalendar,
         setScatter: setScatter,
+        setMap: setMap,
+        setViolin: setViolin,
       }}
     >
       {children}

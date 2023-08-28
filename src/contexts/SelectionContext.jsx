@@ -11,12 +11,13 @@ export function SelectionContextProvider({ children }) {
   const [state, setState] = useState(selectionState);
   console.log("SelectionContextProvider render");
 
-  const setSelected = (selected) => {
-    const selectedUnique = new Set(selected);
-
+  const setSelected = (newSelected) => {
     setState((filter) => ({
       ...filter,
-      selected: [...selectedUnique],
+      selected:
+        typeof newSelected === "function"
+          ? newSelected(filter.selected)
+          : [...new Set(newSelected)],
       highlighted: 0,
     }));
   };

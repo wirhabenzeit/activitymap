@@ -773,6 +773,240 @@ const scatterSettings = {
       label: "Group",
     },
   },
+  color: (type) => categorySettings[type].color,
+};
+
+const mapStatSettings = {
+  values: {
+    count: {
+      id: "count",
+      fun: (v) => v.length,
+      label: "Count",
+      unit: "",
+    },
+    distance: {
+      id: "distance",
+      fun: (v) => d3.sum(v, (d) => d.distance),
+      format: (v) => (v / 1000).toFixed() + "km",
+      label: "Distance",
+      unit: "km",
+    },
+    elevation: {
+      id: "elevation",
+      fun: (v) => d3.sum(v, (d) => d.total_elevation_gain),
+      format: (v) => (v / 1_000).toFixed() + "km",
+      label: "Elevation",
+      unit: "km",
+    },
+    time: {
+      id: "time",
+      fun: (v) => d3.sum(v, (d) => d.elapsed_time),
+      format: (v) => (v / 3600).toFixed() + "h",
+      label: "Duration",
+      unit: "h",
+    },
+    kudos_count: {
+      id: "kudos_count",
+      fun: (v) => d3.sum(v, (d) => d.kudos_count),
+      format: (v) => v,
+      label: "Kudos",
+      unit: "",
+    },
+  },
+  timeGroups: {
+    all: (year) => ({
+      id: "all",
+      filter: (d) => true,
+      selected: year,
+      label: "All",
+    }),
+    byYear: (year) => ({
+      id: "year",
+      filter: (d) => d.date.getFullYear() == year,
+      selected: year,
+      highlight: year,
+      label: year,
+    }),
+  },
+};
+
+const boxSettings = {
+  values: {
+    distance: {
+      id: "distance",
+      fun: (d) => d.distance,
+      format: (v) => (v / 1000).toFixed() + "km",
+      formatAxis: (v) => (v / 1000).toFixed(),
+      label: "Distance",
+      unit: "km",
+    },
+    elevation: {
+      id: "elevation",
+      fun: (d) => d.total_elevation_gain,
+      format: (v) => v.toFixed() + "m",
+      formatAxis: (v) => v.toFixed(),
+      label: "Elevation",
+      unit: "m",
+    },
+    time: {
+      id: "time",
+      fun: (d) => d.elapsed_time,
+      format: (v) => (v / 3600).toFixed() + "h",
+      formatAxis: (v) => (v / 3600).toFixed(),
+      label: "Duration",
+      unit: "h",
+    },
+    average_speed: {
+      id: "average_speed",
+      fun: (d) => d.average_speed,
+      format: (v) => (v * 3.6).toFixed(1) + "km/h",
+      formatAxis: (v) => (v * 3.6).toFixed(1),
+      label: "Avg Speed",
+      unit: "km/h",
+    },
+    kudos_count: {
+      id: "kudos_count",
+      fun: (v) => d3.sum(v, (d) => d.kudos_count),
+      format: (v) => v,
+      formatAxis: (v) => v,
+      label: "Kudos",
+      unit: "",
+    },
+  },
+  mainGroups: {
+    sport_group: {
+      id: "sport_group",
+      fun: (d) => aliasMap[d.sport_type],
+      color: (id) => categorySettings[id].color,
+      label: "Group",
+    },
+    sport_type: {
+      id: "sport_type",
+      fun: (d) => d.sport_type,
+      color: (id) => colorMap[id],
+      label: "Type",
+    },
+    no_group: {
+      id: "no_group",
+      fun: (d) => undefined,
+      color: (id) => "#eeeeee",
+      label: "All sports",
+    },
+  },
+  secondaryGroups: {
+    year: {
+      id: "year",
+      fun: (d) => d.date.getFullYear(),
+      format: (v) => v,
+      label: "Year",
+    },
+    month: {
+      id: "month",
+      fun: (d) => d.date.getMonth(),
+      format: (v) => d3tf.timeFormat("%b")(new Date(0, v)),
+      label: "Month",
+    },
+    weekday: {
+      id: "weekday",
+      fun: (d) => (d.date.getDay() + 6) % 7,
+      format: (v) => d3tf.timeFormat("%a")(new Date(2018, 0, 1 + v)),
+      label: "Weekday",
+    },
+    no_group: {
+      id: "no_group",
+      fun: (d) => undefined,
+      format: (v) => "",
+      label: "All times",
+    },
+  },
+};
+
+const violinSettings = {
+  color: (v) => colorMap[v.sport_type],
+  values: {
+    distance: {
+      id: "distance",
+      fun: (d) => d.distance,
+      format: (v) => (v / 1000).toFixed() + "km",
+      formatAxis: (v) => (v / 1000).toFixed(),
+      label: "Distance",
+      unit: "km",
+    },
+    elevation: {
+      id: "elevation",
+      fun: (d) => d.total_elevation_gain,
+      format: (v) => v.toFixed() + "m",
+      formatAxis: (v) => v.toFixed(),
+      label: "Elevation",
+      unit: "m",
+    },
+    time: {
+      id: "time",
+      fun: (d) => d.elapsed_time,
+      format: (v) => (v / 3600).toFixed() + "h",
+      formatAxis: (v) => (v / 3600).toFixed(),
+      label: "Duration",
+      unit: "h",
+    },
+    average_speed: {
+      id: "average_speed",
+      fun: (d) => d.average_speed,
+      format: (v) => (v * 3.6).toFixed(1) + "km/h",
+      formatAxis: (v) => (v * 3.6).toFixed(1),
+      label: "Avg Speed",
+      unit: "km/h",
+    },
+    kudos_count: {
+      id: "kudos_count",
+      fun: (d) => d.kudos_count,
+      format: (v) => v,
+      formatAxis: (v) => v,
+      label: "Kudos",
+      unit: "",
+    },
+  },
+  groups: {
+    sport_group: {
+      id: "sport_group",
+      fun: (d) => aliasMap[d.sport_type],
+      format: (v) => v,
+      label: "Group",
+      icon: (id) => categorySettings[id].icon,
+      color: (id) => categorySettings[id].color,
+    },
+    sport_type: {
+      id: "sport_type",
+      fun: (d) => d.sport_type,
+      format: (v) => v,
+      label: "Type",
+      icon: (id) => categorySettings[aliasMap[id]].icon,
+      color: (id) => colorMap[id],
+    },
+    year: {
+      id: "year",
+      fun: (d) => d.date.getFullYear(),
+      format: (v) => v,
+      label: "Year",
+      icon: () => "child-reaching",
+      color: () => "#eeeeee",
+    },
+    month: {
+      id: "month",
+      fun: (d) => d.date.getMonth(),
+      format: (v) => d3tf.timeFormat("%b")(new Date(0, v)),
+      label: "Month",
+      icon: () => "child-reaching",
+      color: () => "#eeeeee",
+    },
+    weekday: {
+      id: "weekday",
+      fun: (d) => (d.date.getDay() + 6) % 7,
+      format: (v) => d3tf.timeFormat("%a")(new Date(2018, 0, 1 + v)),
+      label: "Weekday",
+      icon: () => "child-reaching",
+      color: () => "#eeeeee",
+    },
+  },
 };
 
 const pieSettings = {
@@ -1108,4 +1342,7 @@ export {
   pieSettings,
   calendarSettings,
   scatterSettings,
+  mapStatSettings,
+  boxSettings,
+  violinSettings,
 };

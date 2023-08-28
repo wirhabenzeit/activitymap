@@ -2,6 +2,9 @@ import { createContext, useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Cookies from "js-cookie";
 import { useSearchParams } from "react-router-dom";
+//import { Buffer } from "buffer";
+//import * as geocoder from "local-reverse-geocoder";
+//import country from "which-country";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -171,6 +174,7 @@ function ActivityContextProvider({ children }) {
       },
       [Infinity, Infinity, -Infinity, -Infinity]
     );
+    //feature.country = country([...feature.start_latlng].reverse());
     const jsonFeature = {
       type: "Feature",
       geometry: feature.geometry_simplified,

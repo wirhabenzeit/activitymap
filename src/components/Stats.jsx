@@ -3,9 +3,30 @@
 import { ResponsivePie } from "@nivo/pie";
 import { ResponsiveLine } from "@nivo/line";
 import { ResponsiveTimeRange } from "@nivo/calendar";
-import { ResponsiveScatterPlotCanvas } from "@nivo/scatterplot";
-import React, { useContext, cloneElement } from "react";
+import {
+  ResponsiveScatterPlotCanvas,
+  ResponsiveScatterPlot,
+} from "@nivo/scatterplot";
+import { ResponsiveChoropleth } from "@nivo/geo";
+import { ResponsiveBoxPlot } from "@nivo/boxplot";
+import {
+  ResponsiveSwarmPlot,
+  ResponsiveSwarmPlotCanvas,
+} from "@nivo/swarmplot";
+import React, {
+  useContext,
+  cloneElement,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
+
 import { StatsContext } from "../contexts/StatsContext";
+import { ActivityContext } from "../contexts/ActivityContext";
+import { SelectionContext } from "../contexts/SelectionContext";
+
+import { useTooltip } from "@nivo/tooltip";
+
 function addAlpha(color, opacity) {
   const _opacity = Math.round(Math.min(Math.max(opacity || 1, 0), 1) * 255);
   return color + _opacity.toString(16).toUpperCase();
@@ -33,11 +54,18 @@ import {
   pieSettings,
   timelineSettings,
   scatterSettings,
+  mapStatSettings,
+  boxSettings,
+  violinSettings,
 } from "../settings";
+
+import countries from "../data/world_countries.json";
 
 import * as d3 from "d3-array";
 import * as d3t from "d3-time";
 import * as d3tf from "d3-time-format";
+import * as d3sc from "d3-scale-chromatic";
+import * as d3s from "d3-scale";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import { fas } from "@fortawesome/free-solid-svg-icons";
@@ -65,6 +93,16 @@ function TitleBox({ children }) {
     </Box>
   );
 }
+
+const symmetricDifference = (arrayA, arrayB) => {
+  const setA = new Set(arrayA);
+  const setB = new Set(arrayB);
+
+  const diffA = Array.from(setA).filter((x) => !setB.has(x));
+  const diffB = Array.from(setB).filter((x) => !setA.has(x));
+
+  return [...diffA, ...diffB];
+};
 
 function CustomSelect({
   propName,
@@ -165,6 +203,53 @@ function CustomPicker({
   );
 }
 
+const ChipTooltip = ({ color = "#eeeeee", icon, textLeft, textRight }) => {
+  const theme = useTheme();
+  return (
+    <Chip
+      sx={{
+        backgroundColor: theme.palette.background.paper,
+        border: 1,
+        borderColor: color,
+      }}
+      size="small"
+      label={
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          {textLeft && (
+            <Typography
+              sx={{
+                mr: 1,
+                fontSize: "small",
+              }}
+            >
+              {textLeft}
+            </Typography>
+          )}
+          {icon && (
+            <FontAwesomeIcon fontSize="small" icon={icon} color={color} />
+          )}
+          {textRight && (
+            <Typography
+              sx={{
+                ml: 1,
+                fontSize: "small",
+              }}
+            >
+              {textRight}
+            </Typography>
+          )}
+        </Box>
+      }
+      variant="filled"
+    />
+  );
+};
+
 function YearlySummary() {
   const statsContext = useContext(StatsContext);
   const theme = useTheme();
@@ -187,44 +272,11 @@ function YearlySummary() {
   const LineTooltip = ({ point }) => {
     const lineProps = lineDict.get(point.serieId);
     return (
-      <Chip
-        sx={{
-          backgroundColor: theme.palette.background.paper,
-          border: 1,
-          borderColor: lineProps.color,
-        }}
-        size="small"
-        label={
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <Typography
-              sx={{
-                mr: 1,
-                fontSize: "small",
-              }}
-            >
-              {lineProps.xLabel(point.data.xFormatted)}
-            </Typography>
-            <FontAwesomeIcon
-              fontSize="small"
-              icon={lineProps.icon}
-              color={lineProps.color}
-            />
-            <Typography
-              sx={{
-                ml: 1,
-                fontSize: "small",
-              }}
-            >
-              {lineProps.yLabel(point.data.yFormatted)}
-            </Typography>
-          </Box>
-        }
-        variant="filled"
+      <ChipTooltip
+        color={lineProps.color}
+        icon={lineProps.icon}
+        textRight={lineProps.yLabel(point.data.yFormatted)}
+        textLeft={lineProps.xLabel(point.data.xFormatted)}
       />
     );
   };
@@ -388,43 +440,21 @@ const ActivityCalendar = () => {
             dayBorderWidth={2}
             dayBorderColor="#ffffff"
             onClick={statsContext.calendar.onClick}
-            tooltip={({ day, color, value }) => {
-              return (
-                <Chip
-                  sx={{
-                    backgroundColor: theme.palette.background.paper,
-                    border: 1,
-                    borderColor: color,
-                  }}
-                  variant="filled"
-                  size="small"
-                  label={
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Typography sx={{ fontSize: "small" }}>
-                        {d3tf.timeFormat("%a, %b %d")(new Date(day))}
-                      </Typography>
-                      <Divider
-                        sx={{ mx: 1, height: 20 }}
-                        orientation="vertical"
-                      />
-                      <Typography sx={{ fontSize: "small" }} color={color}>
-                        {value !== "selected"
-                          ? statsContext.calendar.value.format(value)
-                          : statsContext.calendar.activitiesByDate
-                              .get(day)
-                              .map((act) => act.name)
-                              .join(", ")}
-                      </Typography>
-                    </Box>
-                  }
-                />
-              );
-            }}
+            tooltip={({ day, color, value }) => (
+              <ChipTooltip
+                color={color}
+                icon="calendar-days"
+                textRight={
+                  value !== "selected"
+                    ? statsContext.calendar.value.format(value)
+                    : statsContext.calendar.activitiesByDate
+                        .get(day)
+                        .map((act) => act.name)
+                        .join(", ")
+                }
+                textLeft={d3tf.timeFormat("%a, %b %d")(new Date(day))}
+              />
+            )}
           />
         </Box>
       )}
@@ -434,52 +464,8 @@ const ActivityCalendar = () => {
 
 const Scatter = () => {
   const statsContext = useContext(StatsContext);
+  const selectionContext = useContext(SelectionContext);
   const values = scatterSettings.values;
-  const theme = useTheme();
-  var dataDict;
-  if (statsContext.scatter.data)
-    dataDict = d3.rollup(
-      statsContext.scatter.data,
-      (v) => v[0],
-      (d) => d.id
-    );
-
-  const ScatterTooltip = ({ point }) => {
-    const catProps = dataDict.get(point.serieId);
-    return (
-      <Chip
-        sx={{
-          backgroundColor: theme.palette.background.paper,
-          border: 1,
-          borderColor: catProps.color,
-        }}
-        size="small"
-        label={
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <FontAwesomeIcon
-              fontSize="small"
-              icon={catProps.icon}
-              color={catProps.color}
-            />
-            <Typography
-              sx={{
-                ml: 1,
-                fontSize: "small",
-              }}
-            >
-              {point.data.title}
-            </Typography>
-          </Box>
-        }
-        variant="filled"
-      />
-    );
-  };
 
   return (
     <>
@@ -522,9 +508,21 @@ const Scatter = () => {
           xFormat={statsContext.scatter.xValue.format}
           yFormat={statsContext.scatter.yValue.format}
           nodeSize={(d) => d.data.size}
-          colors={(d) => dataDict.get(d.serieId).color}
+          colors={(d) => statsContext.scatter.color(d.serieId)}
           axisTop={null}
           axisRight={null}
+          /*annotations={selectionContext.selected.map((id) => ({
+            type: "circle",
+            match: {
+              id: id,
+            },
+            noteX: 0,
+            noteY: 0,
+            offset: 3,
+            noteTextOffset: 0,
+            noteWidth: 0,
+            note: "test",
+          }))}*/
           axisBottom={{
             orient: "bottom",
             tickSize: 5,
@@ -541,20 +539,288 @@ const Scatter = () => {
             tickRotation: 0,
             format: statsContext.scatter.yValue.formatAxis,
           }}
-          tooltip={({ node }) => <ScatterTooltip point={node} />}
+          tooltip={({ node }) => (
+            <ChipTooltip
+              color={node.data.color}
+              icon={node.data.icon}
+              textRight={node.data.title}
+            />
+          )}
           renderNode={(ctx, node) => {
             ctx.beginPath();
             ctx.arc(node.x, node.y, node.size / 2, 0, 2 * Math.PI);
             ctx.fillStyle = node.color;
             ctx.fill();
-            if (node.data.selected) {
+            if (selectionContext.selected.includes(node.data.id)) {
               ctx.beginPath();
-              ctx.arc(node.x, node.y, node.size / 2 + 2, 0, 2 * Math.PI);
+              ctx.arc(node.x, node.y, node.size / 2 + 3, 0, 2 * Math.PI);
               ctx.strokeStyle = "#000000";
+              ctx.lineWidth = 2;
               ctx.stroke();
             }
           }}
-          onClick={statsContext.scatter.onClick}
+          onClick={(point, event) => {
+            if (event.metaKey)
+              selectionContext.setSelected((selected) =>
+                symmetricDifference(selected, [point.data.id])
+              );
+            else selectionContext.setSelected([point.data.id]);
+          }}
+        />
+      )}
+    </>
+  );
+};
+
+const ViolinLayer =
+  ({ steps, data, tooltip }) =>
+  ({ xScale, yScale, innerWidth }) => {
+    const { showTooltipFromEvent, hideTooltip } = useTooltip();
+    return (
+      <>
+        {data.map(({ group, quantiles, color }) => {
+          const x0 = xScale(group);
+          const qs = [0, ...steps, 100]
+            .slice(2)
+            .reduce(
+              (prev, curr) => [...prev, [prev[prev.length - 1][1], curr]],
+              [[0, steps[0]]]
+            );
+          const coordsToPath = (coords, scale) =>
+            coords
+              .map(([y, x]) => `${x0 + scale * x},${yScale(y)}`)
+              .join(" L ");
+          return (
+            <g key={group}>
+              {qs.map(([q0, q1]) => {
+                const violinForw = Object.entries(quantiles)
+                  .filter(([q, d]) => q >= q0 && q <= q1)
+                  .map(([q, d]) => d);
+                const violinRev = violinForw.slice().reverse();
+                const d =
+                  "M " +
+                  coordsToPath(violinForw, innerWidth / data.length / 3) +
+                  " L " +
+                  coordsToPath(violinRev, -innerWidth / data.length / 3) +
+                  " Z";
+                return (
+                  <path
+                    key={group + q0}
+                    d={d}
+                    fill={addAlpha(color, 0.2)}
+                    stroke={addAlpha(color, 0.5)}
+                    onMouseEnter={(e) =>
+                      showTooltipFromEvent(
+                        tooltip({
+                          group: group,
+                          quantiles: {
+                            [q0]: quantiles[q0],
+                            [q1]: quantiles[q1],
+                          },
+                        }),
+                        e
+                      )
+                    }
+                    onMouseLeave={(e) => hideTooltip()}
+                  />
+                );
+              })}
+            </g>
+          );
+        })}
+      </>
+    );
+  };
+
+const ViolinPlot = () => {
+  const statsContext = useContext(StatsContext);
+  const activityContext = useContext(ActivityContext);
+  const selectionContext = useContext(SelectionContext);
+
+  const [nodeId, setNodeId] = useState(null);
+  const handleMouseMove = useCallback(
+    (node) => setNodeId(node.id),
+    [setNodeId]
+  );
+  const handleMouseLeave = useCallback(() => setNodeId(null), [setNodeId]);
+
+  const values = violinSettings.values;
+  const groups = violinSettings.groups;
+
+  return (
+    <>
+      <TitleBox>
+        <Typography variant="h6" key="heading">
+          Violin Plot
+        </Typography>
+        <CustomSelect
+          key="value"
+          propName="value"
+          value={statsContext.violin.value}
+          name="Value"
+          options={values}
+          setState={statsContext.setViolin}
+        />
+        <CustomSelect
+          key="group"
+          propName="group"
+          value={statsContext.violin.group}
+          name="Group"
+          options={groups}
+          setState={statsContext.setViolin}
+        />
+      </TitleBox>
+      {statsContext.violin.loaded && (
+        <ResponsiveSwarmPlot
+          data={statsContext.violin.outliers}
+          groups={statsContext.violin.groups}
+          identity="id"
+          tooltip={(props) => {
+            return (
+              <ChipTooltip
+                color={props.data.color}
+                icon={props.data.icon}
+                textRight={
+                  activityContext.activityDict[props.id].properties.name
+                }
+                textLeft=""
+              />
+            );
+          }}
+          value="value"
+          annotations={selectionContext.selected.map((id) => ({
+            type: "circle",
+            match: {
+              id: id,
+            },
+            noteX: 50,
+            noteY: 10,
+            offset: 2,
+            noteTextOffset: -3,
+            noteWidth: 5,
+            note: activityContext.activityDict[id].properties.name,
+          }))}
+          colors={(d) => addAlpha(d.data.color, nodeId === d.id ? 1 : 0.6)}
+          valueFormat={statsContext.violin.value.format}
+          //valueScale={{ type: "log", min: 10, max: 9000, reverse: false }}
+          forceStrength={4}
+          simulationIterations={100}
+          margin={{ top: 10, right: 30, bottom: 100, left: 80 }}
+          axisBottom={{
+            orient: "top",
+            tickSize: 10,
+            tickPadding: 5,
+            tickRotation: 0,
+            format: statsContext.violin.group.format,
+          }}
+          axisLeft={{
+            orient: "left",
+            tickSize: 10,
+            tickPadding: 5,
+            tickRotation: 0,
+            format: statsContext.violin.value.formatAxis,
+            tickValues: 5,
+          }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          axisTop={null}
+          axisRight={null}
+          onClick={(point, event) => {
+            if (event.metaKey)
+              selectionContext.setSelected((selected) =>
+                symmetricDifference(selected, [point.data.id])
+              );
+            else selectionContext.setSelected([point.data.id]);
+          }}
+          layers={[
+            "grid",
+            "axes",
+            ViolinLayer({
+              data: statsContext.violin.kdes,
+              steps: [25, 50, 75, 90],
+              tooltip: ({ group, quantiles }) => {
+                const qs = Object.entries(quantiles);
+                return (
+                  <ChipTooltip
+                    textLeft={"Q" + qs[0][0] + "-" + qs[1][0] + "%"}
+                    color={statsContext.violin.group.color(group)}
+                    icon={statsContext.violin.group.icon(group)}
+                    textRight={
+                      statsContext.violin.value.format(qs[0][1][0]) +
+                      " – " +
+                      statsContext.violin.value.format(qs[1][1][0])
+                    }
+                  />
+                );
+              },
+            }),
+            "circles",
+            "annotations",
+            "mesh",
+          ]}
+        />
+      )}
+    </>
+  );
+};
+
+const SumMap = () => {
+  const statsContext = useContext(StatsContext);
+  const values = mapStatSettings.values;
+  const timeGroups = mapStatSettings.timeGroups;
+
+  return (
+    <>
+      <TitleBox>
+        <Typography variant="h6" key="title">
+          Summary Map
+        </Typography>
+        <CustomSelect
+          key="value"
+          propName="value"
+          value={statsContext.map.value}
+          name="Value"
+          options={values}
+          setState={statsContext.setMap}
+        />
+        <CustomPicker
+          key="timeGroup"
+          propName="timeGroup"
+          options={timeGroups}
+          value={statsContext.map.timeGroup}
+          range={[2014, 2023]}
+          setState={statsContext.setMap}
+        />
+      </TitleBox>
+      {!statsContext.map.loaded && (
+        <Skeleton
+          variant="rounded"
+          width="90%"
+          height="80%"
+          sx={{ margin: "auto" }}
+        />
+      )}
+      {statsContext.map.loaded && (
+        <ResponsiveChoropleth
+          data={statsContext.map.data}
+          features={countries.features}
+          margin={{ top: 0, right: 40, bottom: 100, left: 50 }}
+          height={340}
+          colors={
+            d3s.scaleQuantize().range(d3sc.schemeBuPu[5])[
+              statsContext.map.domain
+            ]
+          }
+          domain={statsContext.map.domain}
+          unknownColor="#ffffff"
+          label="properties.name"
+          projectionTranslation={[0.5, 0.5]}
+          projectionRotation={[0, 0, 0]}
+          enableGraticule={true}
+          graticuleLineColor="#dddddd"
+          borderWidth={0.5}
+          borderColor="#152538"
+          valueFormat={statsContext.map.value.format}
         />
       )}
     </>
@@ -619,6 +885,14 @@ const TypePie = () => {
           arcLinkLabelsThickness={2}
           arcLinkLabelsColor={{ from: "color" }}
           arcLabelsSkipAngle={20}
+          tooltip={({ datum }) => (
+            <ChipTooltip
+              color={datum.color}
+              textRight={datum.formattedValue}
+              textLeft={datum.label}
+              icon="hiking"
+            />
+          )}
           colors={(d) => d.data.color}
           valueFormat={statsContext.pie.value.format}
         />
@@ -645,9 +919,14 @@ export default function StatsView() {
           <ActivityCalendar />
         </Paper>
       </Grid>
-      <Grid xs={12} lg={7}>
+      <Grid xs={12}>
         <Paper sx={{ height: 400 }}>
           <Scatter />
+        </Paper>
+      </Grid>
+      <Grid xs={12}>
+        <Paper sx={{ height: 400 }}>
+          <ViolinPlot />
         </Paper>
       </Grid>
     </Grid>
