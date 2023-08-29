@@ -19,13 +19,38 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
+
+import { scaleLinear, scaleLog, scaleSqrt, scaleOrdinal } from "@visx/scale";
+import { Circle } from "@visx/shape";
+import { Group } from "@visx/group";
+import { Axis, AxisLeft } from "@visx/axis";
+import ParentSize from "@visx/responsive/lib/components/ParentSize";
+import { GridColumns, GridRows } from "@visx/grid";
+import { GlyphStar } from "@visx/glyph";
+import {
+  AnimatedAxis,
+  AnimatedGridRows,
+  AnimatedGridColumns,
+} from "@visx/react-spring";
+import {
+  Annotation,
+  HtmlLabel,
+  Label,
+  Connector,
+  CircleSubject,
+  LineSubject,
+} from "@visx/annotation";
+import { useTooltip, TooltipWithBounds } from "@visx/tooltip";
+import { localPoint } from "@visx/event";
+import { voronoi } from "@visx/voronoi";
 
 import { StatsContext } from "../contexts/StatsContext";
 import { ActivityContext } from "../contexts/ActivityContext";
 import { SelectionContext } from "../contexts/SelectionContext";
 
-import { useTooltip } from "@nivo/tooltip";
+//import { useTooltip } from "@nivo/tooltip";
 
 function addAlpha(color, opacity) {
   const _opacity = Math.round(Math.min(Math.max(opacity || 1, 0), 1) * 255);
@@ -46,6 +71,7 @@ import {
   Chip,
   Typography,
   Divider,
+  Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
@@ -203,7 +229,47 @@ function CustomPicker({
   );
 }
 
-const ChipTooltip = ({ color = "#eeeeee", icon, textLeft, textRight }) => {
+const IconTooltip = ({
+  icon = "child-reaching",
+  textLeft,
+  textRight,
+  color = "#eeeeee",
+  left,
+  top,
+}) => (
+  <TooltipWithBounds left={left + 10} top={top + 10}>
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+      }}
+    >
+      {textLeft && (
+        <Typography
+          sx={{
+            mr: 1,
+            fontSize: "small",
+          }}
+        >
+          {textLeft}
+        </Typography>
+      )}
+      {icon && <FontAwesomeIcon fontSize="small" icon={icon} color={color} />}
+      {textRight && (
+        <Typography
+          sx={{
+            ml: 1,
+            fontSize: "small",
+          }}
+        >
+          {textRight}
+        </Typography>
+      )}
+    </Box>
+  </TooltipWithBounds>
+);
+
+const ChipTooltip = ({ color = "#eeeeee", icon, textLeft, textRight, sx }) => {
   const theme = useTheme();
   return (
     <Chip
@@ -211,6 +277,7 @@ const ChipTooltip = ({ color = "#eeeeee", icon, textLeft, textRight }) => {
         backgroundColor: theme.palette.background.paper,
         border: 1,
         borderColor: color,
+        ...sx,
       }}
       size="small"
       label={
@@ -572,6 +639,244 @@ const Scatter = () => {
   );
 };
 
+const ScatterVisx = ({ width, height }) => {
+  const statsContext = useContext(StatsContext);
+  const selectionContext = useContext(SelectionContext);
+  const values = scatterSettings.values;
+  const data = statsContext.data;
+
+  const {
+    showTooltip,
+    hideTooltip,
+    tooltipData,
+    tooltipOpen,
+    tooltipTop = 0,
+    tooltipLeft = 0,
+  } = useTooltip();
+
+  const svgRef = useRef(null);
+
+  const margin = { top: 30, left: 60, right: 30, bottom: 90 };
+  const innerWidth = width - margin.left - margin.right;
+  const innerHeight = height - margin.top - margin.bottom;
+
+  const x = (d) => statsContext.scatter.xValue.fun(d);
+  const y = (d) => statsContext.scatter.yValue.fun(d);
+  const radius = (d) => statsContext.scatter.size.fun(d);
+  const color = (d) =>
+    statsContext.scatter.group.color(statsContext.scatter.group.fun(d));
+
+  const xScale = scaleLinear({
+    range: [margin.left, innerWidth + margin.left],
+    domain: d3.extent(data, x),
+  });
+
+  const yScale = scaleLinear({
+    range: [innerHeight + margin.top, margin.top],
+    domain: d3.extent(data, y),
+    nice: true,
+  });
+
+  const rScale = scaleSqrt({
+    range: [0, 5],
+    domain: d3.extent(data, radius),
+  });
+
+  const colorScale = scaleOrdinal({
+    range: [...new Set(data.map(color))],
+    domain: [...new Set(data.map(color))],
+  });
+
+  const voronoiLayout = useMemo(
+    () =>
+      voronoi({
+        x: (d) => xScale(x(d)) ?? 0,
+        y: (d) => yScale(y(d)) ?? 0,
+        width,
+        height,
+      })(data),
+    [data, width, height, xScale, yScale]
+  );
+
+  let tooltipTimeout;
+
+  const handleMouseMove = useCallback(
+    (event) => {
+      if (tooltipTimeout) clearTimeout(tooltipTimeout);
+      if (!svgRef.current) return;
+
+      const point = localPoint(svgRef.current, event);
+      if (!point) return;
+      const neighborRadius = 100;
+      const closest = voronoiLayout.find(point.x, point.y, neighborRadius);
+      if (closest) {
+        showTooltip({
+          tooltipLeft: xScale(x(closest.data)),
+          tooltipTop: yScale(y(closest.data)),
+          tooltipData: closest.data,
+        });
+      }
+    },
+    [xScale, yScale, showTooltip, voronoiLayout]
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    tooltipTimeout = window.setTimeout(() => {
+      hideTooltip();
+    }, 300);
+  }, [hideTooltip]);
+
+  const handleClick = useCallback(
+    (event) => {
+      if (!svgRef.current) return;
+
+      if (tooltipData) {
+        if (event.metaKey)
+          selectionContext.setSelected((selected) => {
+            return symmetricDifference(selected, [tooltipData.id]);
+          });
+        else selectionContext.setSelected([tooltipData.id]);
+      }
+    },
+    [tooltipData]
+  );
+
+  return (
+    <>
+      <TitleBox>
+        <Typography variant="h6" key="heading">
+          Scatter
+        </Typography>
+        <CustomSelect
+          key="xValue"
+          propName="xValue"
+          value={statsContext.scatter.xValue}
+          name="X"
+          options={values}
+          setState={statsContext.setScatter}
+        />
+        <CustomSelect
+          key="yValue"
+          propName="yValue"
+          value={statsContext.scatter.yValue}
+          name="Y"
+          options={values}
+          setState={statsContext.setScatter}
+        />
+        <CustomSelect
+          key="size"
+          propName="size"
+          value={statsContext.scatter.size}
+          name="Size"
+          options={values}
+          setState={statsContext.setScatter}
+        />
+      </TitleBox>
+      {statsContext.scatter.loaded && statsContext.data.length > 0 && (
+        <svg width="100%" height="100%" ref={svgRef} position="relative">
+          <rect
+            x={margin.left}
+            y={margin.top}
+            width={innerWidth}
+            height={innerHeight}
+            fill="transparent"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            onTouchMove={handleMouseMove}
+            onTouchEnd={handleMouseLeave}
+            onClick={handleClick}
+          />
+          <AxisLeft
+            scale={yScale}
+            left={margin.left}
+            numTicks={5}
+            tickFormat={statsContext.scatter.yValue.formatAxis}
+          />
+          <AnimatedAxis
+            orientation="bottom"
+            scale={xScale}
+            top={innerHeight + margin.top}
+            tickFormat={statsContext.scatter.xValue.formatAxis}
+            numTicks={4}
+          />
+          <AnimatedGridColumns
+            top={margin.top}
+            scale={xScale}
+            height={innerHeight}
+            strokeOpacity={0.1}
+            stroke="#000"
+            pointerEvents="none"
+            numTicks={5}
+          />
+          <AnimatedGridRows
+            left={margin.left}
+            scale={yScale}
+            width={innerWidth}
+            strokeOpacity={0.1}
+            stroke="#000"
+            pointerEvents="none"
+            numTicks={5}
+          />
+          <Group pointerEvents="none">
+            {data.map((point, i) => (
+              <>
+                <Circle
+                  key={i}
+                  cx={xScale(x(point))}
+                  cy={yScale(y(point))}
+                  r={rScale(radius(point)) * (tooltipData === point ? 1.5 : 1)}
+                  fill={colorScale(color(point))}
+                  fillOpacity={tooltipData === point ? 1 : 0.8}
+                  stroke={
+                    selectionContext.selected.includes(point.id)
+                      ? "black"
+                      : colorScale(color(point))
+                  }
+                />
+                {selectionContext.selected.includes(point.id) && (
+                  <Annotation
+                    x={xScale(x(point))}
+                    y={yScale(y(point))}
+                    dx={-20}
+                    dy={-5}
+                  >
+                    <Connector />
+                    <HtmlLabel
+                      showAnchorLine={false}
+                      containerStyle={{
+                        fontSize: "8pt",
+                        width: "200px",
+                        height: "28px",
+                        padding: "2px",
+                        textAlign: "right",
+                      }}
+                      verticalAnchor="middle"
+                    >
+                      <span>{point.name}</span>
+                    </HtmlLabel>
+                  </Annotation>
+                )}
+              </>
+            ))}
+          </Group>
+        </svg>
+      )}
+      {tooltipOpen &&
+        tooltipData &&
+        tooltipLeft != null &&
+        tooltipTop != null && (
+          <IconTooltip
+            left={tooltipLeft + 5}
+            top={tooltipTop + 5}
+            color={color(tooltipData)}
+            textLeft=""
+            textRight={tooltipData.name}
+          />
+        )}
+    </>
+  );
+};
+
 const ViolinLayer =
   ({ steps, data, tooltip }) =>
   ({ xScale, yScale, innerWidth }) => {
@@ -922,6 +1227,15 @@ export default function StatsView() {
       <Grid xs={12}>
         <Paper sx={{ height: 400 }}>
           <Scatter />
+        </Paper>
+      </Grid>
+      <Grid xs={12}>
+        <Paper sx={{ height: 500, width: "100%", position: "relative" }}>
+          <ParentSize>
+            {({ width, height }) => (
+              <ScatterVisx width={width} height={height} />
+            )}
+          </ParentSize>
         </Paper>
       </Grid>
       <Grid xs={12}>
