@@ -7,12 +7,6 @@ import {
   ResponsiveScatterPlotCanvas,
   ResponsiveScatterPlot,
 } from "@nivo/scatterplot";
-import { ResponsiveChoropleth } from "@nivo/geo";
-import { ResponsiveBoxPlot } from "@nivo/boxplot";
-import {
-  ResponsiveSwarmPlot,
-  ResponsiveSwarmPlotCanvas,
-} from "@nivo/swarmplot";
 import React, {
   useContext,
   cloneElement,
@@ -20,10 +14,27 @@ import React, {
   useCallback,
   useMemo,
   useRef,
+  useEffect,
 } from "react";
 
-import { scaleLinear, scaleLog, scaleSqrt, scaleOrdinal } from "@visx/scale";
-import { Circle } from "@visx/shape";
+const selectedBrushStyle = {
+  fill: `url(#brush_pattern)`,
+  stroke: "white",
+};
+
+import {
+  scaleLinear,
+  scaleLog,
+  scaleSqrt,
+  scaleOrdinal,
+  scaleBand,
+  scaleTime,
+} from "@visx/scale";
+import { curveMonotoneX } from "@visx/curve";
+import { ViolinPlot, BoxPlot } from "@visx/stats";
+import { PatternLines } from "@visx/pattern";
+import { LinearGradient, GradientTealBlue } from "@visx/gradient";
+import { Circle, LinePath, AreaClosed } from "@visx/shape";
 import { Group } from "@visx/group";
 import { Axis, AxisLeft } from "@visx/axis";
 import ParentSize from "@visx/responsive/lib/components/ParentSize";
@@ -42,15 +53,18 @@ import {
   CircleSubject,
   LineSubject,
 } from "@visx/annotation";
-import { useTooltip, TooltipWithBounds } from "@visx/tooltip";
+import { useTooltip, TooltipWithBounds, withTooltip } from "@visx/tooltip";
 import { localPoint } from "@visx/event";
 import { voronoi } from "@visx/voronoi";
+import { Brush } from "@visx/brush";
+import BaseBrush, {
+  BaseBrushState,
+  UpdateBrush,
+} from "@visx/brush/lib/BaseBrush";
 
 import { StatsContext } from "../contexts/StatsContext";
 import { ActivityContext } from "../contexts/ActivityContext";
 import { SelectionContext } from "../contexts/SelectionContext";
-
-//import { useTooltip } from "@nivo/tooltip";
 
 function addAlpha(color, opacity) {
   const _opacity = Math.round(Math.min(Math.max(opacity || 1, 0), 1) * 255);
@@ -70,10 +84,23 @@ import {
   Unstable_Grid2 as Grid,
   Chip,
   Typography,
-  Divider,
-  Tooltip,
+  Slider as MuiSlider,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, styled } from "@mui/material/styles";
+
+const Slider = styled(MuiSlider)(({ theme }) => ({
+  "& .MuiSlider-markLabel": {
+    //transform: "translateY(0.5rem)",
+    fontSize: "0.7rem",
+    top: "20px",
+  },
+  "& .MuiSlider-active": {
+    marginBottom: "0px !important",
+    marginTop: "20px",
+    cursor: "crosshair",
+    color: "green",
+  },
+}));
 
 import {
   calendarSettings,
@@ -83,239 +110,23 @@ import {
   mapStatSettings,
   boxSettings,
   violinSettings,
+  timelineSettingsVisx,
 } from "../settings";
 
-import countries from "../data/world_countries.json";
+import {
+  TitleBox,
+  CustomSelect,
+  CustomPicker,
+  symmetricDifference,
+  ChipTooltip,
+  IconTooltip,
+} from "./StatsUtilities.jsx";
 
 import * as d3 from "d3-array";
 import * as d3t from "d3-time";
 import * as d3tf from "d3-time-format";
 import * as d3sc from "d3-scale-chromatic";
 import * as d3s from "d3-scale";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { library } from "@fortawesome/fontawesome-svg-core";
-import { fas } from "@fortawesome/free-solid-svg-icons";
-library.add(fas);
-
-const formProps = { m: 1, display: "inline-flex", verticalAlign: "middle" };
-
-function TitleBox({ children }) {
-  return (
-    <Box
-      sx={{
-        height: "60px",
-        width: 1,
-        mt: 1,
-        overflowX: "auto",
-        alignItems: "center",
-        justifyContent: "center",
-        whiteSpace: "noWrap",
-      }}
-    >
-      {children.map((child) =>
-        //<child.type {...child.props} sx={formProps} />
-        cloneElement(child, { sx: formProps })
-      )}
-    </Box>
-  );
-}
-
-const symmetricDifference = (arrayA, arrayB) => {
-  const setA = new Set(arrayA);
-  const setB = new Set(arrayB);
-
-  const diffA = Array.from(setA).filter((x) => !setB.has(x));
-  const diffB = Array.from(setB).filter((x) => !setA.has(x));
-
-  return [...diffA, ...diffB];
-};
-
-function CustomSelect({
-  propName,
-  name,
-  value,
-  options,
-  setState,
-  headers,
-  sx,
-  disabled,
-}) {
-  return (
-    <FormControl key={propName} sx={sx} disabled={disabled}>
-      <InputLabel>{name}</InputLabel>
-      <Select
-        size="small"
-        value={value.id}
-        label="Sport"
-        onChange={(event) =>
-          setState({
-            [propName]: options[event.target.value],
-          })
-        }
-      >
-        {!headers &&
-          Object.entries(options).map(([key, aggregator]) => (
-            <MenuItem value={key} key={key}>
-              {aggregator.label}
-            </MenuItem>
-          ))}
-        {headers &&
-          headers.reduce(
-            (prev, header) => [
-              ...prev,
-              <ListSubheader key={header.title}>{header.title}</ListSubheader>,
-              ...Object.entries(options)
-                .filter(([key, agg]) => header.filter(agg))
-                .map(([key, aggregator]) => (
-                  <MenuItem value={key} key={key}>
-                    {aggregator.label}
-                  </MenuItem>
-                )),
-            ],
-            []
-          )}
-      </Select>
-    </FormControl>
-  );
-}
-
-function CustomPicker({
-  propName,
-  options,
-  value,
-  range,
-  disabled,
-  setState,
-  sx,
-}) {
-  return (
-    <ButtonGroup variant="outlined" key={propName} sx={sx}>
-      <Button
-        disabled={disabled || !value.highlight || value.selected == range[0]}
-        onClick={(e) => {
-          setState({
-            [propName]: options.byYear(value.selected - 1),
-          });
-        }}
-      >
-        -
-      </Button>
-      <Button
-        disabled={disabled}
-        onClick={(e) => {
-          if (value.highlight)
-            setState({
-              [propName]: options.all(value.selected),
-            });
-          else
-            setState({
-              [propName]: options.byYear(value.selected),
-            });
-        }}
-      >
-        {value.label}
-      </Button>
-      <Button
-        disabled={disabled || !value.highlight || value.selected == range[1]}
-        onClick={(e) => {
-          setState({
-            [propName]: options.byYear(value.selected + 1),
-          });
-        }}
-      >
-        +
-      </Button>
-    </ButtonGroup>
-  );
-}
-
-const IconTooltip = ({
-  icon = "child-reaching",
-  textLeft,
-  textRight,
-  color = "#eeeeee",
-  left,
-  top,
-}) => (
-  <TooltipWithBounds left={left + 10} top={top + 10}>
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-      }}
-    >
-      {textLeft && (
-        <Typography
-          sx={{
-            mr: 1,
-            fontSize: "small",
-          }}
-        >
-          {textLeft}
-        </Typography>
-      )}
-      {icon && <FontAwesomeIcon fontSize="small" icon={icon} color={color} />}
-      {textRight && (
-        <Typography
-          sx={{
-            ml: 1,
-            fontSize: "small",
-          }}
-        >
-          {textRight}
-        </Typography>
-      )}
-    </Box>
-  </TooltipWithBounds>
-);
-
-const ChipTooltip = ({ color = "#eeeeee", icon, textLeft, textRight, sx }) => {
-  const theme = useTheme();
-  return (
-    <Chip
-      sx={{
-        backgroundColor: theme.palette.background.paper,
-        border: 1,
-        borderColor: color,
-        ...sx,
-      }}
-      size="small"
-      label={
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          {textLeft && (
-            <Typography
-              sx={{
-                mr: 1,
-                fontSize: "small",
-              }}
-            >
-              {textLeft}
-            </Typography>
-          )}
-          {icon && (
-            <FontAwesomeIcon fontSize="small" icon={icon} color={color} />
-          )}
-          {textRight && (
-            <Typography
-              sx={{
-                ml: 1,
-                fontSize: "small",
-              }}
-            >
-              {textRight}
-            </Typography>
-          )}
-        </Box>
-      }
-      variant="filled"
-    />
-  );
-};
 
 function YearlySummary() {
   const statsContext = useContext(StatsContext);
@@ -450,6 +261,344 @@ function YearlySummary() {
   );
 }
 
+function BrushHandle({ x, height, isBrushActive }) {
+  const pathWidth = 8;
+  const pathHeight = 15;
+  if (!isBrushActive) {
+    return null;
+  }
+  return (
+    <Group left={x + pathWidth / 2} top={(height - pathHeight) / 2}>
+      <path
+        fill="#f2f2f2"
+        d="M -4.5 0.5 L 3.5 0.5 L 3.5 15.5 L -4.5 15.5 L -4.5 0.5 M -1.5 4 L -1.5 12 M 0.5 4 L 0.5 12"
+        stroke="#999999"
+        strokeWidth="1"
+        style={{ cursor: "ew-resize" }}
+      />
+    </Group>
+  );
+}
+
+const TimelineVisx = withTooltip(
+  ({
+    width,
+    height,
+    hideTooltip,
+    showTooltip,
+    tooltipOpen,
+    tooltipData,
+    tooltipLeft,
+    tooltipTop,
+  }) => {
+    const statsContext = useContext(StatsContext);
+    const theme = useTheme();
+
+    const groups = timelineSettingsVisx.groups;
+    const values = timelineSettingsVisx.values;
+    const stats = timelineSettingsVisx.stats;
+    const averages = timelineSettingsVisx.averages;
+
+    const data = statsContext.timelineVisx.data;
+
+    const svgRef = useRef(null);
+    const brushRef = useRef(null);
+    const [filteredData, setFilteredData] = useState(data);
+
+    useEffect(() => {
+      if (brushRef.current && brushRef.current.state.extent.x1 !== -1) {
+        const currentExtent = brushRef.current.state.extent;
+        console.log(currentExtent);
+        onBrushChange({
+          x0: brushXScale.invert(currentExtent.x0),
+          x1: brushXScale.invert(currentExtent.x1),
+        });
+      } else {
+        setFilteredData(data);
+        xScale.domain(statsContext.extent);
+      }
+    }, [data]);
+
+    const [window, setWindow] = useState(
+      statsContext.timelineVisx.averaging.window
+    );
+
+    const onBrushChange = (domain) => {
+      if (!domain) return;
+      const { x0, x1 } = domain;
+      setFilteredData(
+        data.map(({ group, data, color }) => ({
+          group,
+          color,
+          data: data.filter(
+            (s) => s.date.getTime() >= x0 && s.date.getTime() <= x1
+          ),
+        }))
+      );
+      xScale.domain([x0, x1]);
+    };
+
+    const margin = useMemo(
+      () => ({
+        top: 100,
+        left: 60,
+        right: 30,
+        bottom: 50,
+      }),
+      []
+    );
+
+    const innerHeight = height - margin.top - margin.bottom;
+
+    const innerWidth = width - margin.left - margin.right;
+
+    const topChartHeight = 0.85 * innerHeight;
+    const separatorHeight = 15;
+    const bottomChartHeight = innerHeight - topChartHeight - separatorHeight;
+
+    const brushXScale = useMemo(
+      () => scaleTime().domain(statsContext.extent).range([0, innerWidth]),
+      [statsContext.extent, width, height, margin]
+    );
+
+    const initialBrushPosition = useMemo(
+      () => ({
+        start: { x: -1 },
+        end: { x: -1 },
+      }),
+      [brushXScale]
+    );
+
+    useEffect(() => {
+      data.forEach(({ group, data }) => {
+        const data_values_avg = timelineSettingsVisx.averages
+          .movingAvg(window)
+          .fun(data.map((d) => d.value));
+        data.forEach((d, i) => {
+          d.movingAvg = data_values_avg[i];
+        });
+      });
+    }, [data, window]);
+
+    const yScale = useMemo(
+      () =>
+        scaleLinear({
+          range: [topChartHeight, 0],
+          domain: [
+            0,
+            Math.max(
+              ...data
+                .map(({ group, data }) => data.map((d) => d.movingAvg))
+                .flat()
+            ),
+          ],
+          nice: true,
+        }),
+      [data, width, height, margin]
+    );
+
+    const brushYScale = useMemo(
+      () =>
+        scaleLinear({
+          range: [bottomChartHeight, 0],
+          domain: [
+            0,
+            Math.max(
+              ...data
+                .map(({ group, data }) => data.map((d) => d.movingAvg))
+                .flat()
+            ),
+          ],
+          nice: true,
+        }),
+      [data, width, height, margin]
+    );
+
+    const xScale = useMemo(
+      () => scaleTime().domain(statsContext.extent).range([0, innerWidth]),
+      [statsContext.extent, width, height, margin]
+    );
+
+    return (
+      data.length > 0 && (
+        <>
+          <svg width="100%" height="100%" ref={svgRef} position="relative">
+            <LinearGradient from="#f5f2e3" to="#ecf4f3" id="timeline" />
+            <rect
+              x={0}
+              y={0}
+              width={width}
+              height={height}
+              fill="url(#timeline)"
+              rx={14}
+            />
+            <foreignObject
+              width={width}
+              height={height}
+              x={10}
+              y={10}
+              position="absolute"
+            >
+              <TitleBox sx={{ position: "absolute", top: 0, left: 0 }}>
+                <Typography variant="h6" key="heading">
+                  Timeline
+                </Typography>
+                <CustomSelect
+                  key="group"
+                  propName="group"
+                  value={statsContext.timelineVisx.group}
+                  name="Sport"
+                  options={groups}
+                  setState={statsContext.setTimelineVisx}
+                />
+                <CustomSelect
+                  key="value"
+                  propName="value"
+                  value={statsContext.timelineVisx.value}
+                  name="Y"
+                  options={values}
+                  setState={statsContext.setTimelineVisx}
+                />
+                <CustomSelect
+                  key="timePeriod"
+                  propName="timePeriod"
+                  value={statsContext.timelineVisx.timePeriod}
+                  name="X"
+                  options={timelineSettingsVisx.timePeriods}
+                  setState={statsContext.setTimelineVisx}
+                />
+                <Box width="150px" key="windowSize">
+                  <Slider
+                    {...statsContext.timelineVisx.timePeriod.averaging}
+                    slotProps={{ markLabel: { fontSize: "0.8rem" } }}
+                    sx={{ mb: 1 }}
+                    size="small"
+                    valueLabelDisplay="off"
+                    value={window} //{statsContext.timelineVisx.averaging.window}
+                    onChange={
+                      (e, v) => setWindow(v) //statsContext.setTimelineVisx({averaging: averages.movingAvg(v),})
+                    }
+                    onChangeCommitted={(e, v) =>
+                      statsContext.setTimelineVisx({
+                        averaging: averages.movingAvg(v),
+                      })
+                    }
+                  />
+                </Box>
+              </TitleBox>
+            </foreignObject>
+            <Group key="lines" left={margin.left} top={margin.top}>
+              <Axis
+                orientation="top"
+                scale={xScale}
+                hideAxisLine={true}
+                tickStroke="#ddd"
+              />
+              <AnimatedAxis
+                orientation="left"
+                scale={yScale}
+                top={0}
+                tickFormat={statsContext.timelineVisx.value.format}
+                hideAxisLine={true}
+                tickStroke="#ddd"
+              />
+              <AnimatedGridRows
+                scale={yScale}
+                width={innerWidth}
+                stroke="#ddd"
+              />
+              <GridColumns
+                scale={xScale}
+                height={topChartHeight}
+                stroke="#ddd"
+              />
+              {filteredData.map(
+                ({ group, data, color }) =>
+                  data.length > 0 && (
+                    <LinePath
+                      key={group}
+                      curve={curveMonotoneX}
+                      data={data}
+                      x={(d) => xScale(d.date) ?? 0}
+                      y={(d) => yScale(d.movingAvg) ?? 0}
+                      stroke={color}
+                    />
+                  )
+              )}
+            </Group>
+            <Group
+              key="brush"
+              top={topChartHeight + margin.top + 30}
+              left={margin.left}
+            >
+              <AnimatedAxis
+                orientation="bottom"
+                scale={brushXScale}
+                top={bottomChartHeight}
+                hideAxisLine={true}
+                tickStroke="#ddd"
+              />
+              <PatternLines
+                id="brush_pattern"
+                height={8}
+                width={8}
+                stroke="#fff"
+                strokeWidth={1}
+                orientation={["diagonal"]}
+              />
+              {data.map(({ group, data, color }) => (
+                <AreaClosed
+                  key={group}
+                  curve={curveMonotoneX}
+                  data={data}
+                  x={(d) => brushXScale(d.date) ?? 0}
+                  y={(d) => brushYScale(d.movingAvg) ?? 0}
+                  yScale={brushYScale}
+                  stroke="#000"
+                  strokeWidth={1}
+                  strokeOpacity={0.2}
+                  fill="#000"
+                  fillOpacity={0.2}
+                />
+              ))}
+              <Brush
+                xScale={brushXScale}
+                yScale={brushYScale}
+                width={innerWidth}
+                height={bottomChartHeight}
+                handleSize={8}
+                margin={{ top: 0, left: margin.left, right: 0, bottom: 0 }}
+                innerRef={brushRef}
+                resizeTriggerAreas={["left", "right"]}
+                brushDirection="horizontal"
+                initialBrushPosition={initialBrushPosition}
+                onChange={onBrushChange}
+                onClick={() => {
+                  setFilteredData(data);
+                  xScale.domain(statsContext.extent);
+                }}
+                //selectedBoxStyle={selectedBrushStyle}
+                useWindowMoveEvents
+                //renderBrushHandle={(props) => <BrushHandle {...props} />}
+              />
+            </Group>
+          </svg>
+          {tooltipOpen &&
+            tooltipData &&
+            tooltipLeft != null &&
+            tooltipTop != null && (
+              <IconTooltip
+                left={tooltipLeft}
+                top={tooltipTop}
+                {...tooltipData}
+              />
+            )}
+        </>
+      )
+    );
+  }
+);
+
 const ActivityCalendar = () => {
   const statsContext = useContext(StatsContext);
   const values = calendarSettings.values;
@@ -529,608 +678,502 @@ const ActivityCalendar = () => {
   );
 };
 
-const Scatter = () => {
-  const statsContext = useContext(StatsContext);
-  const selectionContext = useContext(SelectionContext);
-  const values = scatterSettings.values;
-
-  return (
-    <>
-      <TitleBox>
-        <Typography variant="h6" key="heading">
-          Scatter
-        </Typography>
-        <CustomSelect
-          key="xValue"
-          propName="xValue"
-          value={statsContext.scatter.xValue}
-          name="X"
-          options={values}
-          setState={statsContext.setScatter}
-        />
-        <CustomSelect
-          key="yValue"
-          propName="yValue"
-          value={statsContext.scatter.yValue}
-          name="Y"
-          options={values}
-          setState={statsContext.setScatter}
-        />
-        <CustomSelect
-          key="size"
-          propName="size"
-          value={statsContext.scatter.size}
-          name="Size"
-          options={values}
-          setState={statsContext.setScatter}
-        />
-      </TitleBox>
-      {statsContext.scatter.loaded && statsContext.data.length > 0 && (
-        <ResponsiveScatterPlotCanvas
-          data={statsContext.scatter.data}
-          margin={{ top: 10, right: 40, bottom: 100, left: 60 }}
-          xScale={{ type: "linear", min: "auto", max: "auto" }}
-          yScale={{ type: "linear", min: "auto", max: "auto" }}
-          blendMode="multiply"
-          xFormat={statsContext.scatter.xValue.format}
-          yFormat={statsContext.scatter.yValue.format}
-          nodeSize={(d) => d.data.size}
-          colors={(d) => statsContext.scatter.color(d.serieId)}
-          axisTop={null}
-          axisRight={null}
-          /*annotations={selectionContext.selected.map((id) => ({
-            type: "circle",
-            match: {
-              id: id,
-            },
-            noteX: 0,
-            noteY: 0,
-            offset: 3,
-            noteTextOffset: 0,
-            noteWidth: 0,
-            note: "test",
-          }))}*/
-          axisBottom={{
-            orient: "bottom",
-            tickSize: 5,
-            tickPadding: 5,
-            tickValues: 3,
-            tickRotation: 0,
-            format: statsContext.scatter.xValue.formatAxis,
-          }}
-          axisLeft={{
-            orient: "left",
-            tickSize: 5,
-            tickPadding: 5,
-            tickValues: 4,
-            tickRotation: 0,
-            format: statsContext.scatter.yValue.formatAxis,
-          }}
-          tooltip={({ node }) => (
-            <ChipTooltip
-              color={node.data.color}
-              icon={node.data.icon}
-              textRight={node.data.title}
-            />
-          )}
-          renderNode={(ctx, node) => {
-            ctx.beginPath();
-            ctx.arc(node.x, node.y, node.size / 2, 0, 2 * Math.PI);
-            ctx.fillStyle = node.color;
-            ctx.fill();
-            if (selectionContext.selected.includes(node.data.id)) {
-              ctx.beginPath();
-              ctx.arc(node.x, node.y, node.size / 2 + 3, 0, 2 * Math.PI);
-              ctx.strokeStyle = "#000000";
-              ctx.lineWidth = 2;
-              ctx.stroke();
-            }
-          }}
-          onClick={(point, event) => {
-            if (event.metaKey)
-              selectionContext.setSelected((selected) =>
-                symmetricDifference(selected, [point.data.id])
-              );
-            else selectionContext.setSelected([point.data.id]);
-          }}
-        />
-      )}
-    </>
-  );
-};
-
-const ScatterVisx = ({ width, height }) => {
-  const statsContext = useContext(StatsContext);
-  const selectionContext = useContext(SelectionContext);
-  const values = scatterSettings.values;
-  const data = statsContext.data;
-
-  const {
-    showTooltip,
+const ScatterVisx = withTooltip(
+  ({
+    width,
+    height,
     hideTooltip,
-    tooltipData,
+    showTooltip,
     tooltipOpen,
-    tooltipTop = 0,
-    tooltipLeft = 0,
-  } = useTooltip();
+    tooltipData,
+    tooltipLeft,
+    tooltipTop,
+  }) => {
+    const statsContext = useContext(StatsContext);
+    const selectionContext = useContext(SelectionContext);
+    const values = scatterSettings.values;
+    const data = statsContext.data;
 
-  const svgRef = useRef(null);
+    const svgRef = useRef(null);
+    const margin = { top: 30, left: 60, right: 30, bottom: 90 };
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
 
-  const margin = { top: 30, left: 60, right: 30, bottom: 90 };
-  const innerWidth = width - margin.left - margin.right;
-  const innerHeight = height - margin.top - margin.bottom;
+    const color = (d) =>
+      statsContext.scatter.group.color(statsContext.scatter.group.fun(d));
 
-  const x = (d) => statsContext.scatter.xValue.fun(d);
-  const y = (d) => statsContext.scatter.yValue.fun(d);
-  const radius = (d) => statsContext.scatter.size.fun(d);
-  const color = (d) =>
-    statsContext.scatter.group.color(statsContext.scatter.group.fun(d));
+    const xScale = scaleLinear({
+      range: [margin.left, innerWidth + margin.left],
+      domain: d3.extent(data, statsContext.scatter.xValue.fun),
+    });
 
-  const xScale = scaleLinear({
-    range: [margin.left, innerWidth + margin.left],
-    domain: d3.extent(data, x),
-  });
+    const yScale = scaleLinear({
+      range: [innerHeight + margin.top, margin.top],
+      domain: d3.extent(data, statsContext.scatter.yValue.fun),
+      nice: true,
+    });
 
-  const yScale = scaleLinear({
-    range: [innerHeight + margin.top, margin.top],
-    domain: d3.extent(data, y),
-    nice: true,
-  });
+    const rScale = scaleSqrt({
+      range: [0, 5],
+      domain: d3.extent(data, statsContext.scatter.size.fun),
+    });
 
-  const rScale = scaleSqrt({
-    range: [0, 5],
-    domain: d3.extent(data, radius),
-  });
+    const colorScale = scaleOrdinal({
+      range: [...new Set(data.map(color))],
+      domain: [...new Set(data.map(color))],
+    });
 
-  const colorScale = scaleOrdinal({
-    range: [...new Set(data.map(color))],
-    domain: [...new Set(data.map(color))],
-  });
+    const voronoiLayout = useMemo(
+      () =>
+        voronoi({
+          x: (d) => xScale(statsContext.scatter.xValue.fun(d)) ?? 0,
+          y: (d) => yScale(statsContext.scatter.yValue.fun(d)) ?? 0,
+          width,
+          height,
+        })(data),
+      [data, width, height, xScale, yScale]
+    );
 
-  const voronoiLayout = useMemo(
-    () =>
-      voronoi({
-        x: (d) => xScale(x(d)) ?? 0,
-        y: (d) => yScale(y(d)) ?? 0,
-        width,
-        height,
-      })(data),
-    [data, width, height, xScale, yScale]
-  );
+    let tooltipTimeout;
 
-  let tooltipTimeout;
+    const handleMouseMove = useCallback(
+      (event) => {
+        if (tooltipTimeout) clearTimeout(tooltipTimeout);
+        if (!svgRef.current) return;
 
-  const handleMouseMove = useCallback(
-    (event) => {
-      if (tooltipTimeout) clearTimeout(tooltipTimeout);
-      if (!svgRef.current) return;
-
-      const point = localPoint(svgRef.current, event);
-      if (!point) return;
-      const neighborRadius = 100;
-      const closest = voronoiLayout.find(point.x, point.y, neighborRadius);
-      if (closest) {
-        showTooltip({
-          tooltipLeft: xScale(x(closest.data)),
-          tooltipTop: yScale(y(closest.data)),
-          tooltipData: closest.data,
-        });
-      }
-    },
-    [xScale, yScale, showTooltip, voronoiLayout]
-  );
-
-  const handleMouseLeave = useCallback(() => {
-    tooltipTimeout = window.setTimeout(() => {
-      hideTooltip();
-    }, 300);
-  }, [hideTooltip]);
-
-  const handleClick = useCallback(
-    (event) => {
-      if (!svgRef.current) return;
-
-      if (tooltipData) {
-        if (event.metaKey)
-          selectionContext.setSelected((selected) => {
-            return symmetricDifference(selected, [tooltipData.id]);
+        const point = localPoint(svgRef.current, event);
+        if (!point) return;
+        const neighborRadius = 100;
+        const closest = voronoiLayout.find(point.x, point.y, neighborRadius);
+        if (closest) {
+          showTooltip({
+            tooltipLeft: xScale(statsContext.scatter.xValue.fun(closest.data)),
+            tooltipTop: yScale(statsContext.scatter.yValue.fun(closest.data)),
+            tooltipData: closest.data,
           });
-        else selectionContext.setSelected([tooltipData.id]);
-      }
-    },
-    [tooltipData]
-  );
+        }
+      },
+      [xScale, yScale, showTooltip, voronoiLayout]
+    );
 
-  return (
-    <>
-      <TitleBox>
-        <Typography variant="h6" key="heading">
-          Scatter
-        </Typography>
-        <CustomSelect
-          key="xValue"
-          propName="xValue"
-          value={statsContext.scatter.xValue}
-          name="X"
-          options={values}
-          setState={statsContext.setScatter}
-        />
-        <CustomSelect
-          key="yValue"
-          propName="yValue"
-          value={statsContext.scatter.yValue}
-          name="Y"
-          options={values}
-          setState={statsContext.setScatter}
-        />
-        <CustomSelect
-          key="size"
-          propName="size"
-          value={statsContext.scatter.size}
-          name="Size"
-          options={values}
-          setState={statsContext.setScatter}
-        />
-      </TitleBox>
-      {statsContext.scatter.loaded && statsContext.data.length > 0 && (
-        <svg width="100%" height="100%" ref={svgRef} position="relative">
-          <rect
-            x={margin.left}
-            y={margin.top}
-            width={innerWidth}
-            height={innerHeight}
-            fill="transparent"
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onTouchMove={handleMouseMove}
-            onTouchEnd={handleMouseLeave}
-            onClick={handleClick}
-          />
-          <AxisLeft
-            scale={yScale}
-            left={margin.left}
-            numTicks={5}
-            tickFormat={statsContext.scatter.yValue.formatAxis}
-          />
-          <AnimatedAxis
-            orientation="bottom"
-            scale={xScale}
-            top={innerHeight + margin.top}
-            tickFormat={statsContext.scatter.xValue.formatAxis}
-            numTicks={4}
-          />
-          <AnimatedGridColumns
-            top={margin.top}
-            scale={xScale}
-            height={innerHeight}
-            strokeOpacity={0.1}
-            stroke="#000"
-            pointerEvents="none"
-            numTicks={5}
-          />
-          <AnimatedGridRows
-            left={margin.left}
-            scale={yScale}
-            width={innerWidth}
-            strokeOpacity={0.1}
-            stroke="#000"
-            pointerEvents="none"
-            numTicks={5}
-          />
-          <Group pointerEvents="none">
-            {data.map((point, i) => (
-              <>
-                <Circle
-                  key={i}
-                  cx={xScale(x(point))}
-                  cy={yScale(y(point))}
-                  r={rScale(radius(point)) * (tooltipData === point ? 1.5 : 1)}
-                  fill={colorScale(color(point))}
-                  fillOpacity={tooltipData === point ? 1 : 0.8}
-                  stroke={
-                    selectionContext.selected.includes(point.id)
-                      ? "black"
-                      : colorScale(color(point))
-                  }
-                />
-                {selectionContext.selected.includes(point.id) && (
-                  <Annotation
-                    x={xScale(x(point))}
-                    y={yScale(y(point))}
-                    dx={-20}
-                    dy={-5}
-                  >
-                    <Connector />
-                    <HtmlLabel
-                      showAnchorLine={false}
-                      containerStyle={{
-                        fontSize: "8pt",
-                        width: "200px",
-                        height: "28px",
-                        padding: "2px",
-                        textAlign: "right",
-                      }}
-                      verticalAnchor="middle"
-                    >
-                      <span>{point.name}</span>
-                    </HtmlLabel>
-                  </Annotation>
-                )}
-              </>
-            ))}
-          </Group>
-        </svg>
-      )}
-      {tooltipOpen &&
-        tooltipData &&
-        tooltipLeft != null &&
-        tooltipTop != null && (
-          <IconTooltip
-            left={tooltipLeft + 5}
-            top={tooltipTop + 5}
-            color={color(tooltipData)}
-            textLeft=""
-            textRight={tooltipData.name}
-          />
-        )}
-    </>
-  );
-};
+    const handleMouseLeave = useCallback(() => {
+      tooltipTimeout = window.setTimeout(() => {
+        hideTooltip();
+      }, 300);
+    }, [hideTooltip]);
 
-const ViolinLayer =
-  ({ steps, data, tooltip }) =>
-  ({ xScale, yScale, innerWidth }) => {
-    const { showTooltipFromEvent, hideTooltip } = useTooltip();
+    const handleClick = useCallback(
+      (event) => {
+        if (!svgRef.current) return;
+
+        if (tooltipData) {
+          if (event.metaKey)
+            selectionContext.setSelected((selected) => {
+              return symmetricDifference(selected, [tooltipData.id]);
+            });
+          else selectionContext.setSelected([tooltipData.id]);
+        }
+      },
+      [tooltipData]
+    );
+
     return (
       <>
-        {data.map(({ group, quantiles, color }) => {
-          const x0 = xScale(group);
-          const qs = [0, ...steps, 100]
-            .slice(2)
-            .reduce(
-              (prev, curr) => [...prev, [prev[prev.length - 1][1], curr]],
-              [[0, steps[0]]]
-            );
-          const coordsToPath = (coords, scale) =>
-            coords
-              .map(([y, x]) => `${x0 + scale * x},${yScale(y)}`)
-              .join(" L ");
-          return (
-            <g key={group}>
-              {qs.map(([q0, q1]) => {
-                const violinForw = Object.entries(quantiles)
-                  .filter(([q, d]) => q >= q0 && q <= q1)
-                  .map(([q, d]) => d);
-                const violinRev = violinForw.slice().reverse();
-                const d =
-                  "M " +
-                  coordsToPath(violinForw, innerWidth / data.length / 3) +
-                  " L " +
-                  coordsToPath(violinRev, -innerWidth / data.length / 3) +
-                  " Z";
-                return (
-                  <path
-                    key={group + q0}
-                    d={d}
-                    fill={addAlpha(color, 0.2)}
-                    stroke={addAlpha(color, 0.5)}
-                    onMouseEnter={(e) =>
-                      showTooltipFromEvent(
-                        tooltip({
-                          group: group,
-                          quantiles: {
-                            [q0]: quantiles[q0],
-                            [q1]: quantiles[q1],
-                          },
-                        }),
-                        e
-                      )
+        <TitleBox>
+          <Typography variant="h6" key="heading">
+            Scatter
+          </Typography>
+          <CustomSelect
+            key="xValue"
+            propName="xValue"
+            value={statsContext.scatter.xValue}
+            name="X"
+            options={values}
+            setState={statsContext.setScatter}
+          />
+          <CustomSelect
+            key="yValue"
+            propName="yValue"
+            value={statsContext.scatter.yValue}
+            name="Y"
+            options={values}
+            setState={statsContext.setScatter}
+          />
+          <CustomSelect
+            key="size"
+            propName="size"
+            value={statsContext.scatter.size}
+            name="Size"
+            options={values}
+            setState={statsContext.setScatter}
+          />
+        </TitleBox>
+        {statsContext.loaded && statsContext.data.length > 0 && (
+          <svg width="100%" height="100%" ref={svgRef} position="relative">
+            <rect
+              x={margin.left}
+              y={margin.top}
+              width={innerWidth}
+              height={innerHeight}
+              fill="transparent"
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+              onTouchMove={handleMouseMove}
+              onTouchEnd={handleMouseLeave}
+              onClick={handleClick}
+            />
+            <AxisLeft
+              scale={yScale}
+              left={margin.left}
+              numTicks={5}
+              tickFormat={statsContext.scatter.yValue.formatAxis}
+            />
+            <AnimatedAxis
+              orientation="bottom"
+              scale={xScale}
+              top={innerHeight + margin.top}
+              tickFormat={statsContext.scatter.xValue.formatAxis}
+              numTicks={4}
+            />
+            <AnimatedGridColumns
+              top={margin.top}
+              scale={xScale}
+              height={innerHeight}
+              strokeOpacity={0.1}
+              stroke="#000"
+              pointerEvents="none"
+              numTicks={5}
+            />
+            <AnimatedGridRows
+              left={margin.left}
+              scale={yScale}
+              width={innerWidth}
+              strokeOpacity={0.1}
+              stroke="#000"
+              pointerEvents="none"
+              numTicks={5}
+            />
+            <Group pointerEvents="none">
+              {data.map((point, i) => (
+                <g key={i}>
+                  <Circle
+                    cx={xScale(statsContext.scatter.xValue.fun(point))}
+                    cy={yScale(statsContext.scatter.yValue.fun(point))}
+                    r={
+                      rScale(statsContext.scatter.size.fun(point)) *
+                      (tooltipData === point ? 1.5 : 1)
                     }
-                    onMouseLeave={(e) => hideTooltip()}
+                    fill={colorScale(color(point))}
+                    fillOpacity={tooltipData === point ? 1 : 0.8}
+                    stroke={
+                      selectionContext.selected.includes(point.id)
+                        ? "black"
+                        : colorScale(color(point))
+                    }
                   />
-                );
-              })}
-            </g>
-          );
-        })}
+                  {selectionContext.selected.includes(point.id) && (
+                    <Annotation
+                      x={xScale(statsContext.scatter.xValue.fun(point))}
+                      y={yScale(statsContext.scatter.yValue.fun(point))}
+                      dx={-20}
+                      dy={-5}
+                    >
+                      <Connector />
+                      <HtmlLabel
+                        showAnchorLine={false}
+                        containerStyle={{
+                          fontSize: "8pt",
+                          width: "200px",
+                          height: "28px",
+                          padding: "2px",
+                          textAlign: "right",
+                        }}
+                        verticalAnchor="middle"
+                      >
+                        <span>{point.name}</span>
+                      </HtmlLabel>
+                    </Annotation>
+                  )}
+                </g>
+              ))}
+            </Group>
+          </svg>
+        )}
+        {tooltipOpen &&
+          tooltipData &&
+          tooltipLeft != null &&
+          tooltipTop != null && (
+            <IconTooltip
+              left={tooltipLeft + 5}
+              top={tooltipTop + 5}
+              color={color(tooltipData)}
+              textLeft=""
+              textRight={tooltipData.name}
+            />
+          )}
       </>
     );
-  };
+  }
+);
 
-const ViolinPlot = () => {
-  const statsContext = useContext(StatsContext);
-  const activityContext = useContext(ActivityContext);
-  const selectionContext = useContext(SelectionContext);
+const ViolinVisx = withTooltip(
+  ({
+    width,
+    height,
+    hideTooltip,
+    showTooltip,
+    tooltipOpen,
+    tooltipData,
+    tooltipLeft,
+    tooltipTop,
+  }) => {
+    const statsContext = useContext(StatsContext);
+    const selectionContext = useContext(SelectionContext);
+    const values = violinSettings.values;
+    const groups = violinSettings.groups;
+    const scaleYs = violinSettings.scaleYs;
 
-  const [nodeId, setNodeId] = useState(null);
-  const handleMouseMove = useCallback(
-    (node) => setNodeId(node.id),
-    [setNodeId]
-  );
-  const handleMouseLeave = useCallback(() => setNodeId(null), [setNodeId]);
+    const svgRef = useRef(null);
+    const [nodeId, setNodeId] = useState(null);
+    const margin = useMemo(
+      () => ({
+        top: 80,
+        left: 60,
+        right: 30,
+        bottom: 30,
+      }),
+      []
+    );
 
-  const values = violinSettings.values;
-  const groups = violinSettings.groups;
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
 
-  return (
-    <>
-      <TitleBox>
-        <Typography variant="h6" key="heading">
-          Violin Plot
-        </Typography>
-        <CustomSelect
-          key="value"
-          propName="value"
-          value={statsContext.violin.value}
-          name="Value"
-          options={values}
-          setState={statsContext.setViolin}
-        />
-        <CustomSelect
-          key="group"
-          propName="group"
-          value={statsContext.violin.group}
-          name="Group"
-          options={groups}
-          setState={statsContext.setViolin}
-        />
-      </TitleBox>
-      {statsContext.violin.loaded && (
-        <ResponsiveSwarmPlot
-          data={statsContext.violin.outliers}
-          groups={statsContext.violin.groups}
-          identity="id"
-          tooltip={(props) => {
-            return (
-              <ChipTooltip
-                color={props.data.color}
-                icon={props.data.icon}
-                textRight={
-                  activityContext.activityDict[props.id].properties.name
-                }
-                textLeft=""
+    const xScale = useMemo(
+      () =>
+        scaleBand({
+          range: [margin.left, innerWidth + margin.left],
+          domain: statsContext.violin.groups,
+          padding: 0,
+        }),
+      [margin, innerWidth, statsContext.violin.groups]
+    );
+
+    const yScale = useMemo(
+      () =>
+        statsContext.violin.scaleY.scale({
+          range: [innerHeight + margin.top, margin.top],
+          domain: [
+            statsContext.violin.value.minValue,
+            statsContext.violin.value.maxValue ||
+              Math.max(...statsContext.data.map(statsContext.violin.value.fun)),
+          ],
+        }),
+      [
+        statsContext.data,
+        statsContext.violin.value,
+        statsContext.violin.scaleY,
+        innerHeight,
+        margin,
+      ]
+    );
+
+    const outlierNum = 8;
+
+    const data = useMemo(() => {
+      return statsContext.violin.compute({
+        margin,
+        innerWidth,
+        innerHeight,
+        xScale,
+        yScale,
+        outlierNum,
+      });
+    }, [margin, innerWidth, innerHeight, xScale, yScale]);
+
+    const boxWidth = xScale.bandwidth();
+    const constrainedWidth = Math.min(100, 0.8 * boxWidth);
+
+    return (
+      statsContext.violin.loaded && (
+        <>
+          <svg width="100%" height="100%" ref={svgRef} position="relative">
+            <GradientTealBlue id="statsplot" />
+            <rect
+              x={0}
+              y={0}
+              width={width}
+              height={height}
+              fill="url(#statsplot)"
+              rx={14}
+            />
+            <foreignObject
+              width={width}
+              height={height}
+              x={10}
+              y={10}
+              position="absolute"
+            >
+              <TitleBox sx={{ position: "absolute", top: 0, left: 0 }}>
+                <Typography variant="h6" key="heading">
+                  Violin Plot
+                </Typography>
+                <CustomSelect
+                  key="value"
+                  propName="value"
+                  value={statsContext.violin.value}
+                  name="Value"
+                  options={values}
+                  setState={statsContext.setViolin}
+                />
+                <CustomSelect
+                  key="group"
+                  propName="group"
+                  value={statsContext.violin.group}
+                  name="Group"
+                  options={groups}
+                  setState={statsContext.setViolin}
+                />
+                <CustomSelect
+                  key="scaleY"
+                  propName="scaleY"
+                  value={statsContext.violin.scaleY}
+                  name="Scale"
+                  options={scaleYs}
+                  setState={statsContext.setViolin}
+                />
+              </TitleBox>
+            </foreignObject>
+            <PatternLines
+              id="hViolinLines"
+              height={3}
+              width={3}
+              stroke="#ced4da"
+              strokeWidth={1}
+              // fill="rgba(0,0,0,0.3)"
+              orientation={["horizontal"]}
+            />
+            <AnimatedAxis
+              orientation="top"
+              scale={xScale}
+              top={margin.top}
+              tickFormat={(d) => statsContext.violin.group.format(d)}
+              hideAxisLine={true}
+              hideTicks={true}
+              numTicks={15}
+              tickLabelProps={{
+                fill: "#ffffff",
+                angle: 90,
+                textAnchor: "begin",
+                dy: 0,
+                dx: 15,
+                fontWeight: "bold",
+              }}
+            />
+            <AxisLeft
+              scale={yScale}
+              left={margin.left}
+              top={0}
+              tickValues={statsContext.violin.scaleY.ticks(yScale)}
+              tickFormat={statsContext.violin.value.formatAxis}
+              hideAxisLine={true}
+              hideTicks={true}
+              tickLabelProps={{ fill: "#ffffff" }}
+            />
+            <AnimatedGridRows
+              left={margin.left}
+              scale={yScale}
+              width={innerWidth}
+              strokeOpacity={0.15}
+              stroke="#fff"
+            />
+            <Group>
+              {data.map((d) => (
+                <g key={d.group}>
+                  {d.binData && (
+                    <ViolinPlot
+                      data={d.binData}
+                      stroke="#dee2e6"
+                      left={
+                        xScale(d.group) + boxWidth / 2 - constrainedWidth / 2
+                      }
+                      width={constrainedWidth}
+                      valueScale={yScale}
+                      fill="url(#hViolinLines)"
+                    />
+                  )}
+                  {d.stats && (
+                    <BoxPlot
+                      {...d.stats}
+                      left={
+                        xScale(d.group) + boxWidth / 2 - constrainedWidth / 5
+                      }
+                      boxWidth={constrainedWidth * 0.4}
+                      fill="#FFFFFF"
+                      fillOpacity={0.3}
+                      stroke="#FFFFFF"
+                      strokeWidth={2}
+                      valueScale={yScale}
+                      medianProps={{
+                        style: {
+                          stroke: "white",
+                        },
+                      }}
+                    />
+                  )}
+                  {d.points.map((outlier) => (
+                    <Circle
+                      key={outlier.data.id}
+                      cx={outlier.x}
+                      cy={outlier.y}
+                      r={nodeId === outlier.data.id ? 5 : 3}
+                      fill={statsContext.violin.color(outlier.data)}
+                      fillOpacity={0.8}
+                      stroke={
+                        selectionContext.selected.includes(outlier.data.id)
+                          ? "#000"
+                          : "#FFF"
+                      }
+                      strokeWidth={2}
+                      onMouseOver={(e) => {
+                        setNodeId(outlier.data.id);
+                        showTooltip({
+                          tooltipLeft: outlier.x,
+                          tooltipTop: outlier.y,
+                          tooltipData: {
+                            textRight: outlier.data.name,
+                            color: statsContext.violin.color(outlier.data),
+                            icon: statsContext.violin.icon(outlier.data),
+                            textLeft: statsContext.violin.value.format(
+                              statsContext.violin.value.fun(outlier.data)
+                            ),
+                          },
+                        });
+                      }}
+                      onMouseLeave={() => {
+                        hideTooltip();
+                        setNodeId(null);
+                      }}
+                    />
+                  ))}
+                </g>
+              ))}
+            </Group>
+          </svg>
+          {tooltipOpen &&
+            tooltipData &&
+            tooltipLeft != null &&
+            tooltipTop != null && (
+              <IconTooltip
+                left={tooltipLeft}
+                top={tooltipTop}
+                {...tooltipData}
               />
-            );
-          }}
-          value="value"
-          annotations={selectionContext.selected.map((id) => ({
-            type: "circle",
-            match: {
-              id: id,
-            },
-            noteX: 50,
-            noteY: 10,
-            offset: 2,
-            noteTextOffset: -3,
-            noteWidth: 5,
-            note: activityContext.activityDict[id].properties.name,
-          }))}
-          colors={(d) => addAlpha(d.data.color, nodeId === d.id ? 1 : 0.6)}
-          valueFormat={statsContext.violin.value.format}
-          //valueScale={{ type: "log", min: 10, max: 9000, reverse: false }}
-          forceStrength={4}
-          simulationIterations={100}
-          margin={{ top: 10, right: 30, bottom: 100, left: 80 }}
-          axisBottom={{
-            orient: "top",
-            tickSize: 10,
-            tickPadding: 5,
-            tickRotation: 0,
-            format: statsContext.violin.group.format,
-          }}
-          axisLeft={{
-            orient: "left",
-            tickSize: 10,
-            tickPadding: 5,
-            tickRotation: 0,
-            format: statsContext.violin.value.formatAxis,
-            tickValues: 5,
-          }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          axisTop={null}
-          axisRight={null}
-          onClick={(point, event) => {
-            if (event.metaKey)
-              selectionContext.setSelected((selected) =>
-                symmetricDifference(selected, [point.data.id])
-              );
-            else selectionContext.setSelected([point.data.id]);
-          }}
-          layers={[
-            "grid",
-            "axes",
-            ViolinLayer({
-              data: statsContext.violin.kdes,
-              steps: [25, 50, 75, 90],
-              tooltip: ({ group, quantiles }) => {
-                const qs = Object.entries(quantiles);
-                return (
-                  <ChipTooltip
-                    textLeft={"Q" + qs[0][0] + "-" + qs[1][0] + "%"}
-                    color={statsContext.violin.group.color(group)}
-                    icon={statsContext.violin.group.icon(group)}
-                    textRight={
-                      statsContext.violin.value.format(qs[0][1][0]) +
-                      " – " +
-                      statsContext.violin.value.format(qs[1][1][0])
-                    }
-                  />
-                );
-              },
-            }),
-            "circles",
-            "annotations",
-            "mesh",
-          ]}
-        />
-      )}
-    </>
-  );
-};
-
-const SumMap = () => {
-  const statsContext = useContext(StatsContext);
-  const values = mapStatSettings.values;
-  const timeGroups = mapStatSettings.timeGroups;
-
-  return (
-    <>
-      <TitleBox>
-        <Typography variant="h6" key="title">
-          Summary Map
-        </Typography>
-        <CustomSelect
-          key="value"
-          propName="value"
-          value={statsContext.map.value}
-          name="Value"
-          options={values}
-          setState={statsContext.setMap}
-        />
-        <CustomPicker
-          key="timeGroup"
-          propName="timeGroup"
-          options={timeGroups}
-          value={statsContext.map.timeGroup}
-          range={[2014, 2023]}
-          setState={statsContext.setMap}
-        />
-      </TitleBox>
-      {!statsContext.map.loaded && (
-        <Skeleton
-          variant="rounded"
-          width="90%"
-          height="80%"
-          sx={{ margin: "auto" }}
-        />
-      )}
-      {statsContext.map.loaded && (
-        <ResponsiveChoropleth
-          data={statsContext.map.data}
-          features={countries.features}
-          margin={{ top: 0, right: 40, bottom: 100, left: 50 }}
-          height={340}
-          colors={
-            d3s.scaleQuantize().range(d3sc.schemeBuPu[5])[
-              statsContext.map.domain
-            ]
-          }
-          domain={statsContext.map.domain}
-          unknownColor="#ffffff"
-          label="properties.name"
-          projectionTranslation={[0.5, 0.5]}
-          projectionRotation={[0, 0, 0]}
-          enableGraticule={true}
-          graticuleLineColor="#dddddd"
-          borderWidth={0.5}
-          borderColor="#152538"
-          valueFormat={statsContext.map.value.format}
-        />
-      )}
-    </>
-  );
-};
+            )}
+        </>
+      )
+    );
+  }
+);
 
 const TypePie = () => {
   const statsContext = useContext(StatsContext);
@@ -1220,17 +1263,21 @@ export default function StatsView() {
         </Paper>
       </Grid>
       <Grid xs={12}>
+        <Paper sx={{ height: 400, width: "100%", position: "relative" }}>
+          <ParentSize>
+            {({ width, height }) => (
+              <TimelineVisx width={width} height={height} />
+            )}
+          </ParentSize>
+        </Paper>
+      </Grid>
+      <Grid xs={12}>
         <Paper sx={{ height: 200 }}>
           <ActivityCalendar />
         </Paper>
       </Grid>
       <Grid xs={12}>
-        <Paper sx={{ height: 400 }}>
-          <Scatter />
-        </Paper>
-      </Grid>
-      <Grid xs={12}>
-        <Paper sx={{ height: 500, width: "100%", position: "relative" }}>
+        <Paper sx={{ height: 400, width: "100%", position: "relative" }}>
           <ParentSize>
             {({ width, height }) => (
               <ScatterVisx width={width} height={height} />
@@ -1238,10 +1285,19 @@ export default function StatsView() {
           </ParentSize>
         </Paper>
       </Grid>
-      <Grid xs={12}>
+      {/*<Grid xs={12}>
         <Paper sx={{ height: 400 }}>
-          <ViolinPlot />
+          <ViolinPlotNivo />
         </Paper>
+            </Grid>*/}
+      <Grid xs={12}>
+        <Box sx={{ height: "400px", width: "100%", position: "relative" }}>
+          <ParentSize>
+            {({ width, height }) => (
+              <ViolinVisx width={width} height={height} />
+            )}
+          </ParentSize>
+        </Box>
       </Grid>
     </Grid>
   );

@@ -9,6 +9,8 @@ import * as d3t from "d3-time";
 import * as d3 from "d3-array";
 import * as d3tf from "d3-time-format";
 
+import { scaleLog, scaleLinear, scaleSqrt } from "@visx/scale";
+
 import { LayerSAC } from "/src/components/LayerSAC";
 
 const stravaTypes = [
@@ -923,14 +925,16 @@ const boxSettings = {
 
 const violinSettings = {
   color: (v) => colorMap[v.sport_type],
+  icon: (v) => categorySettings[aliasMap[v.sport_type]].icon,
   values: {
     distance: {
       id: "distance",
-      fun: (d) => d.distance,
-      format: (v) => (v / 1000).toFixed() + "km",
-      formatAxis: (v) => (v / 1000).toFixed(),
+      fun: (d) => d.distance / 1000,
+      format: (v) => (v / 1.0).toFixed() + "km",
+      formatAxis: (v) => (v / 1.0).toFixed(),
       label: "Distance",
       unit: "km",
+      minValue: 1,
     },
     elevation: {
       id: "elevation",
@@ -939,31 +943,38 @@ const violinSettings = {
       formatAxis: (v) => v.toFixed(),
       label: "Elevation",
       unit: "m",
+      minValue: 10,
     },
     time: {
       id: "time",
-      fun: (d) => d.elapsed_time,
-      format: (v) => (v / 3600).toFixed() + "h",
-      formatAxis: (v) => (v / 3600).toFixed(),
+      fun: (d) => d.elapsed_time / 3600,
+      format: (v) => (v / 1.0).toFixed(1) + "h",
+      formatAxis: (v) => (v / 1.0).toFixed(v > 1 ? 0 : 1),
       label: "Duration",
       unit: "h",
+      minValue: 0.2,
     },
     average_speed: {
       id: "average_speed",
-      fun: (d) => d.average_speed,
-      format: (v) => (v * 3.6).toFixed(1) + "km/h",
-      formatAxis: (v) => (v * 3.6).toFixed(1),
+      fun: (d) => d.average_speed * 3.6,
+      format: (v) => (v * 1.0).toFixed(0) + "km/h",
+      formatAxis: (v) => (v * 1.0).toFixed(0),
       label: "Avg Speed",
       unit: "km/h",
+      minValue: 1,
+      maxValue: 50,
     },
-    kudos_count: {
+    /*kudos_count: {
       id: "kudos_count",
-      fun: (d) => d.kudos_count,
-      format: (v) => v,
-      formatAxis: (v) => v,
+      fun: (d) => d.kudos_count + 1,
+      format: (v) => v - 1,
+      formatAxis: (v) => v - 1,
       label: "Kudos",
       unit: "",
-    },
+      minValue: 1,
+      tickValues: [1, 2, 3, 6, 11, 21],
+      discrete: true,
+    },*/
   },
   groups: {
     sport_group: {
@@ -1005,6 +1016,28 @@ const violinSettings = {
       label: "Weekday",
       icon: () => "child-reaching",
       color: () => "#eeeeee",
+    },
+  },
+  scaleYs: {
+    log: {
+      id: "log",
+      label: "Log",
+      scale: (props) =>
+        scaleLog({ ...props, base: 10, nice: true, clamp: true }),
+      ticks: (scale) =>
+        scale.ticks().filter((d, i) => [0, 1, 4].includes(i % 9)),
+    },
+    linear: {
+      id: "linear",
+      label: "Linear",
+      scale: (props) => scaleLinear({ ...props, nice: true }),
+      ticks: (scale) => scale.ticks(),
+    },
+    sqrt: {
+      id: "sqrt",
+      label: "Sqrt",
+      scale: (props) => scaleSqrt({ ...props, nice: true }),
+      ticks: (scale) => scale.ticks(),
     },
   },
 };
@@ -1330,6 +1363,150 @@ const timelineSettings = {
   }),
 };
 
+const timelineSettingsVisx = {
+  values: {
+    count: {
+      id: "count",
+      fun: (v) => v.length,
+      label: "Count",
+      unit: "",
+    },
+    distance: {
+      id: "distance",
+      fun: (v) => d3.sum(v, (d) => d.distance),
+      format: (v) =>
+        v >= 10_000_000
+          ? (v / 1_000_000).toFixed() + "k"
+          : (v / 1000).toFixed(),
+      label: "Distance",
+      unit: "km",
+    },
+    elevation: {
+      id: "elevation",
+      fun: (v) => d3.sum(v, (d) => d.total_elevation_gain),
+      format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
+      label: "Elevation",
+      unit: "m",
+    },
+    time: {
+      id: "time",
+      fun: (v) => d3.sum(v, (d) => d.elapsed_time),
+      format: (v) => (v / 3600).toFixed(1),
+      label: "Duration",
+      unit: "h",
+    },
+    kudos_count: {
+      id: "kudos_count",
+      fun: (v) => d3.sum(v, (d) => d.kudos_count),
+      format: (v) => v,
+      label: "Kudos",
+      unit: "",
+    },
+  },
+  timePeriods: {
+    year: {
+      id: "year",
+      label: "Year",
+      tick: d3t.timeYear,
+      averaging: {
+        disabled: true,
+        marks: [],
+        min: 0,
+        max: 0,
+      },
+    },
+    month: {
+      id: "month",
+      label: "Month",
+      tick: d3t.timeMonth,
+      averaging: {
+        disabled: false,
+        marks: [
+          { value: 0, label: "0m" },
+          { value: 2, label: "5m" },
+        ],
+        min: 0,
+        max: 2,
+      },
+    },
+    week: {
+      id: "week",
+      label: "Week",
+      tick: d3t.timeMonday,
+      averaging: {
+        disabled: false,
+        marks: [
+          { value: 0, label: "0w" },
+          { value: 1, label: "3w" },
+          { value: 4, label: "9w" },
+        ],
+        min: 0,
+        max: 4,
+      },
+    },
+    day: {
+      id: "day",
+      label: "Day",
+      tick: d3t.timeDay,
+      averaging: {
+        disabled: false,
+        marks: [
+          { value: 1, label: "3d" },
+          { value: 10, label: "3w" },
+          { value: 30, label: "2m" },
+        ],
+        min: 0,
+        max: 30,
+      },
+    },
+  },
+  groups: {
+    sport_group: {
+      id: "sport_group",
+      label: "Group",
+      fun: (d) => aliasMap[d.sport_type],
+      color: (id) => categorySettings[id].color,
+      icon: (id) => categorySettings[id].icon,
+    },
+    sport_type: {
+      id: "sport_type",
+      label: "Type",
+      fun: (d) => d.sport_type,
+      color: (id) => categorySettings[aliasMap[id]].color,
+      icon: (id) => categorySettings[aliasMap[id]].icon,
+    },
+    no_group: {
+      id: "no_group",
+      label: "All",
+      fun: (d) => "All",
+      color: (id) => "#000000",
+      icon: (id) => "child-reaching",
+    },
+  },
+  averages: {
+    movingAvg: (N) => ({
+      id: "movingAvg",
+      label: "Moving Average",
+      window: N,
+      fun: (values) => {
+        if (!values || values.length < N) {
+          return values;
+        }
+        const result = [];
+        for (let i = 0; i < values.length; i++) {
+          const start = Math.max(0, i - N);
+          const end = Math.min(values.length, i + N + 1);
+          const subArray = values.slice(start, end);
+          const sum = subArray.reduce((a, b) => a + b);
+          const average = sum / subArray.length;
+          result.push(average);
+        }
+        return result;
+      },
+    }),
+  },
+};
+
 export {
   mapSettings,
   defaultMapPosition,
@@ -1345,4 +1522,5 @@ export {
   mapStatSettings,
   boxSettings,
   violinSettings,
+  timelineSettingsVisx,
 };

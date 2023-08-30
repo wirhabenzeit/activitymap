@@ -1,9 +1,18 @@
-import { useContext, createContext, useState, useEffect, useRef } from "react";
+import {
+  useContext,
+  createContext,
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+} from "react";
 import { ActivityContext } from "./ActivityContext";
 import { FilterContext } from "./FilterContext";
 import { SelectionContext } from "./SelectionContext";
 import * as d3tf from "d3-time-format";
 import * as d3 from "d3-array";
+import * as d3f from "d3-force";
+import * as d3t from "d3-time";
 
 import {
   timelineSettings,
@@ -12,6 +21,7 @@ import {
   scatterSettings,
   mapStatSettings,
   violinSettings,
+  timelineSettingsVisx,
 } from "../settings";
 
 const defaultTimeline = {
@@ -20,6 +30,34 @@ const defaultTimeline = {
   group: timelineSettings.groups.sport_group,
   timeGroup: timelineSettings.timeGroups.byYear(2023),
   loaded: false,
+};
+
+const repel = (data, x, y, r, ticks = 100) => {
+  const entries = data.map((d) => ({
+    x0: x(d),
+    y0: y(d),
+    r: r(d),
+    data: d,
+  }));
+
+  const simulation = d3f
+    .forceSimulation(entries)
+    .force(
+      "x",
+      d3f.forceX((d) => d.x0)
+    )
+    .force(
+      "y",
+      d3f.forceY((d) => d.y0)
+    )
+    .force(
+      "collide",
+      d3f.forceCollide((d) => d.r)
+    );
+
+  for (let i = 0; i < ticks; i++) simulation.tick();
+
+  return simulation.nodes();
 };
 
 const defaultStats = {
@@ -37,6 +75,14 @@ const defaultStats = {
     loaded: false,
     data: [],
   },
+  timelineVisx: {
+    value: timelineSettingsVisx.values.elevation,
+    group: timelineSettingsVisx.groups.sport_group,
+    timePeriod: timelineSettingsVisx.timePeriods.day,
+    averaging: timelineSettingsVisx.averages.movingAvg(7),
+    loaded: false,
+    data: [],
+  },
   pie: {
     value: pieSettings.values.elevation,
     group: pieSettings.groups.sport_group,
@@ -46,10 +92,12 @@ const defaultStats = {
   },
   violin: {
     color: violinSettings.color,
+    icon: violinSettings.icon,
     value: violinSettings.values.elevation,
     group: violinSettings.groups.sport_group,
+    scaleY: violinSettings.scaleYs.log,
     loaded: false,
-    data: [],
+    compute: () => [],
   },
   calendar: {
     value: calendarSettings.values.elevation,
@@ -93,98 +141,6 @@ const updateMap = (data, map) => {
   }));
   const domain = d3.extent(outData, (d) => d.value).map((d) => d / 1);
   return { data: outData, domain: domain };
-};
-
-const updateViolin = (data, violin) => {
-  console.log("update violin");
-  const nBins = 100;
-  const bandwidth = 0.1;
-
-  const stat = (v) => {
-    const values = v.map(violin.value.fun);
-    const extent = d3.extent(values);
-    const quantiles = [
-      ...d3.range(0, 10, 1),
-      ...d3.range(10, 91, 5),
-      ...d3.range(91, 101, 1),
-    ].reduce((prev, q) => ({ ...prev, [q]: d3.quantile(values, q / 100) }), {});
-    //v.sort((a, b) => -violin.value.fun(a) + violin.value.fun(b));
-    const outliers = v
-      .filter((v) => violin.value.fun(v) >= quantiles[95])
-      .map((v) => ({
-        group: violin.group.fun(v),
-        value: violin.value.fun(v),
-        id: v.id,
-        color: violin.color(v),
-        icon: violin.group.icon(violin.group.fun(v)),
-      }));
-
-    function kde(kernel, thresholds, data) {
-      return thresholds.map((t) => [t, d3.mean(data, (d) => kernel(t - d))]);
-    }
-    function epanechnikov(bandwidth) {
-      return (x) =>
-        Math.abs((x /= bandwidth)) <= 1 ? (0.75 * (1 - x * x)) / bandwidth : 0;
-    }
-    const density = kde(
-      epanechnikov(bandwidth * (extent[1] - extent[0])),
-      Object.values(quantiles),
-      values
-    );
-    const densityMax = d3.max(density, (d) => d[1]);
-    density.forEach((d) => (d[1] = d[1] / densityMax));
-    const quantileDensity = d3
-      .zip(Object.keys(quantiles), density)
-      .reduce((prev, [k, d]) => ({ ...prev, [parseInt(k)]: d }), {});
-
-    return {
-      outliers,
-      kde: quantileDensity,
-    };
-  };
-  var outData = d3
-    .rollups(data, stat, (f) => violin.group.fun(f))
-    .sort((a, b) => a[0] - b[0]);
-  const outliers = outData.map(([group, value]) => value.outliers).flat();
-  const groups = outData.map(([group, value]) => group);
-  const kdes = outData.map(([group, value]) => ({
-    group: group,
-    color: violin.group.color(group),
-    quantiles: value.kde,
-  }));
-  return { outliers: outliers, groups: groups, kdes: kdes };
-};
-
-const updateScatter = (data, scatter) => {
-  console.log("update scatter");
-  const groups = d3.group(data, scatter.group.fun);
-
-  const extent = {
-    x: d3.extent(data, scatter.xValue.fun),
-    y: d3.extent(data, scatter.yValue.fun),
-    size: d3.extent(data, scatter.size.fun),
-  };
-
-  const outData = d3.map(groups, ([key, value]) => ({
-    id: key,
-    color: scatter.group.color(key),
-    icon: scatter.group.icon(key),
-    data: value.map((d) => ({
-      x: scatter.xValue.fun(d),
-      y: scatter.yValue.fun(d),
-      id: d.id,
-      title: d.name,
-      color: scatter.group.color(key),
-      icon: scatter.group.icon(key),
-      size:
-        ((scatter.size.fun(d) - extent.size[0]) /
-          (extent.size[1] - extent.size[0])) *
-          10 +
-        2,
-    })),
-  }));
-
-  return { data: outData, extent: extent };
 };
 
 const updateCalendar = (data, calendar, selectedDays, setSelected) => {
@@ -301,13 +257,55 @@ const updateTimeline = (data, timeline, setTimeline) => {
   return outData;
 };
 
+const computeTimelineVisx = ({ data, extent, group, fun, tick, avgFun }) => {
+  return d3.groups(data, group.fun).map(([groupName, groupData]) => {
+    const bins = d3
+      .bin()
+      .value((d) => d.date)
+      .domain(extent)
+      .thresholds(tick.range(...extent))(groupData)
+      .map((d) => ({
+        date: d3t.timeDay(d.x0),
+        value: fun(d),
+      }));
+
+    const data_values_avg = avgFun(bins.map((d) => d.value));
+    bins.forEach((d, i) => {
+      d.movingAvg = data_values_avg[i];
+    });
+
+    return { group: groupName, data: bins, color: group.color(groupName) };
+  });
+};
+
 export function StatsContextProvider({ children }) {
   const activityContext = useContext(ActivityContext);
   const filterContext = useContext(FilterContext);
   const selectionContext = useContext(SelectionContext);
   const [state, setState] = useState(defaultStats);
 
+  const setTimelineVisx = (newTimeline) => {
+    const timeline = { ...state.timelineVisx, ...newTimeline };
+    console.log("setting timeline visx", timeline);
+    setState((state) => ({
+      ...state,
+      timelineVisx: {
+        ...state.timelineVisx,
+        ...timeline,
+        data: computeTimelineVisx({
+          data: state.data,
+          extent: state.extent,
+          group: timeline.group,
+          fun: timeline.value.fun,
+          tick: timeline.timePeriod.tick,
+          avgFun: timeline.averaging.fun,
+        }),
+      },
+    }));
+  };
+
   const setTimeline = (newTimeline) => {
+    console.log("setting timeline");
     const timeline = {
       ...state.timeline,
       ...newTimeline,
@@ -339,14 +337,104 @@ export function StatsContextProvider({ children }) {
   };
 
   const setViolin = (newViolin) => {
+    console.log("setting violin");
     const violin = { ...state.violin, ...newViolin };
-    const data = updateViolin(state.data, violin);
+
+    const compute = ({
+      innerHeight,
+      innerWidth,
+      margin,
+      yScale,
+      xScale,
+      outlierNum,
+    }) => {
+      const bins = d3
+        .range(innerHeight + margin.top, margin.top, -innerHeight / 20)
+        .concat(margin.top)
+        .map(yScale.invert);
+
+      const data = d3
+        .groups(
+          state.data.filter(
+            (d) =>
+              violin.value.minValue <= violin.value.fun(d) &&
+              (violin.value.maxValue == undefined ||
+                violin.value.fun(d) <= violin.value.maxValue)
+          ),
+          violin.group.fun
+        )
+        .map(([group, data]) => {
+          const data_values = data.map(violin.value.fun);
+          const binData = d3.bin().thresholds(bins).domain(yScale.domain())(
+            data_values
+          );
+
+          const bulk = binData.filter((d) => d.length >= outlierNum);
+
+          if (d3.sum(bulk.map((d) => d.length)) < 20) {
+            return {
+              group: group,
+              binData: [],
+              stats: undefined,
+              points: repel(
+                data.filter(
+                  (d) => violin.value.minValue <= violin.value.fun(d)
+                ),
+                (d) => xScale(group) + xScale.bandwidth() / 2,
+                (d) => yScale(violin.value.fun(d)),
+                (d) => 3
+              ),
+            };
+          }
+
+          const outliers = data.filter(
+            (d) =>
+              violin.value.fun(d) < bulk[0].x0 ||
+              violin.value.fun(d) > bulk[bulk.length - 1].x1
+          );
+          const outliersX = outliers.map((d) => yScale(violin.value.fun(d)));
+
+          const outliersRep = repel(
+            outliers,
+            (d) => xScale(group) + xScale.bandwidth() / 2,
+            (d) => yScale(violin.value.fun(d)),
+            (d) => 4
+          );
+
+          const data_values_remaining = binData
+            .filter(
+              (d) => d.x0 >= bulk[0].x0 && d.x1 <= bulk[bulk.length - 1].x1
+            )
+            .flat();
+
+          return {
+            group: group,
+            binData: binData.map((d) => ({
+              count: d.length,
+              value: d.x0,
+            })),
+            stats: {
+              count: data_values_remaining.length,
+              min: d3.min(data_values_remaining),
+              max: d3.max(data_values_remaining),
+              median: d3.median(data_values_remaining),
+              firstQuartile: d3.quantile(data_values_remaining, 0.25),
+              thirdQuartile: d3.quantile(data_values_remaining, 0.75),
+            },
+            points: outliersRep,
+          };
+        });
+      console.log("computed violin plot");
+      return data;
+    };
+
     setState((state) => ({
       ...state,
       violin: {
         ...violin,
-        ...data,
+        compute: compute,
         loaded: true,
+        groups: d3.group(state.data, violin.group.fun).keys(),
       },
     }));
   };
@@ -420,14 +508,11 @@ export function StatsContextProvider({ children }) {
   };
 
   const setScatter = (newScatter) => {
-    const scatter = { ...state.scatter, ...newScatter };
-    const data = updateScatter(state.data, scatter);
     setState((state) => ({
       ...state,
       scatter: {
-        ...scatter,
-        ...data,
-        loaded: true,
+        ...state.scatter,
+        ...newScatter,
       },
     }));
   };
@@ -439,6 +524,7 @@ export function StatsContextProvider({ children }) {
       setCalendar({});
       setScatter({});
       setViolin({});
+      setTimelineVisx({});
     }
   }, [state.data]);
 
@@ -453,7 +539,6 @@ export function StatsContextProvider({ children }) {
       console.log(data);
       setState({
         ...state,
-        loaded: true,
         extent: d3.extent(data, (f) => f.date),
         allData: data,
       });
@@ -471,6 +556,7 @@ export function StatsContextProvider({ children }) {
           ...state,
           extent: extent,
           data: data,
+          loaded: true,
         };
       });
     }
@@ -481,6 +567,7 @@ export function StatsContextProvider({ children }) {
       value={{
         ...state,
         setTimeline: setTimeline,
+        setTimelineVisx: setTimelineVisx,
         setPie: setPie,
         setCalendar: setCalendar,
         setScatter: setScatter,
