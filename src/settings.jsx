@@ -188,18 +188,16 @@ var categorySettings = {
     alias: ["BackcountrySki", "NordicSki", "RollerSki"],
     active: true,
   },
-  "Walk / Run / Hike": {
+  "Trail / Hike": {
     color: "#FF595E",
     icon: "walking",
-    alias: [
-      "Walk",
-      "Run",
-      "Hike",
-      "TrailRun",
-      "RockClimbing",
-      "Snowshoe",
-      "VirtualRun",
-    ],
+    alias: ["Hike", "TrailRun", "RockClimbing", "Snowshoe"],
+    active: true,
+  },
+  Run: {
+    color: "#FFCA3A",
+    icon: "running",
+    alias: ["Run", "VirtualRun"],
     active: true,
   },
   Ride: {
@@ -217,12 +215,12 @@ var categorySettings = {
     ],
     active: true,
   },
-  "Alpine Ski": {
+  /*"Alpine Ski": {
     color: "#3FA7D6",
     icon: "person-skiing",
     alias: ["AlpineSki", "Snowboard"],
     active: true,
-  },
+  },*/
 };
 
 const usedTypes = Object.values(categorySettings).flatMap((x) => x.alias);

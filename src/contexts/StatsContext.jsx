@@ -81,6 +81,7 @@ const defaultStats = {
     timePeriod: timelineSettingsVisx.timePeriods.day,
     averaging: timelineSettingsVisx.averages.movingAvg(7),
     loaded: false,
+    groups: [],
     data: [],
   },
   pie: {
@@ -97,6 +98,7 @@ const defaultStats = {
     group: violinSettings.groups.sport_group,
     scaleY: violinSettings.scaleYs.log,
     loaded: false,
+    stats: undefined,
     compute: () => [],
   },
   calendar: {
@@ -123,11 +125,6 @@ const defaultStats = {
     onClick: () => {},
   },
 };
-
-function addAlpha(color, opacity) {
-  const _opacity = Math.round(Math.min(Math.max(opacity || 1, 0), 1) * 255);
-  return color + _opacity.toString(16).toUpperCase();
-}
 
 const StatsContext = createContext(defaultStats);
 
@@ -258,24 +255,44 @@ const updateTimeline = (data, timeline, setTimeline) => {
 };
 
 const computeTimelineVisx = ({ data, extent, group, fun, tick, avgFun }) => {
-  return d3.groups(data, group.fun).map(([groupName, groupData]) => {
-    const bins = d3
-      .bin()
-      .value((d) => d.date)
-      .domain(extent)
-      .thresholds(tick.range(...extent))(groupData)
-      .map((d) => ({
+  const groups = [...d3.group(data, group.fun).keys()];
+  const bins = d3
+    .bin()
+    .value((d) => d.date)
+    .domain(extent)
+    .thresholds(tick.range(...extent))(data)
+    .map((d) => {
+      const reduce = d3.rollup(d, fun, group.fun);
+      groups.forEach((g) => {
+        if (!reduce.has(g)) reduce.set(g, 0);
+      });
+      return {
         date: d3t.timeDay(d.x0),
-        value: fun(d),
-      }));
+        values: reduce,
+      };
+    });
 
+  const movingAvg = new d3.InternMap(
+    groups.map((g) => [g, avgFun(bins.map((d) => d.values.get(g)))])
+  );
+
+  bins.forEach((d, i) => {
+    const iMovingAvg = new d3.InternMap(
+      d3.map(movingAvg, ([k, g]) => [k, g[i]])
+    );
+    d.movingAvg = iMovingAvg;
+  });
+
+  return { groups: groups, data: bins, color: group.color };
+
+  /*return d3.groups(data, group.fun).map(([groupName, groupData]) => {
     const data_values_avg = avgFun(bins.map((d) => d.value));
     bins.forEach((d, i) => {
       d.movingAvg = data_values_avg[i];
     });
 
-    return { group: groupName, data: bins, color: group.color(groupName) };
-  });
+    return { groups: groups, data: bins };
+  });*/
 };
 
 export function StatsContextProvider({ children }) {
@@ -292,7 +309,7 @@ export function StatsContextProvider({ children }) {
       timelineVisx: {
         ...state.timelineVisx,
         ...timeline,
-        data: computeTimelineVisx({
+        ...computeTimelineVisx({
           data: state.data,
           extent: state.extent,
           group: timeline.group,
@@ -392,7 +409,14 @@ export function StatsContextProvider({ children }) {
               violin.value.fun(d) < bulk[0].x0 ||
               violin.value.fun(d) > bulk[bulk.length - 1].x1
           );
-          const outliersX = outliers.map((d) => yScale(violin.value.fun(d)));
+
+          console.log(
+            "outliers before repel",
+            group,
+            xScale.domain(),
+            xScale.bandwidth(),
+            outliers.map((d) => yScale(violin.value.fun(d)))
+          );
 
           const outliersRep = repel(
             outliers,
@@ -400,6 +424,8 @@ export function StatsContextProvider({ children }) {
             (d) => yScale(violin.value.fun(d)),
             (d) => 4
           );
+
+          console.log("outliers after repel", outliersRep);
 
           const data_values_remaining = binData
             .filter(
@@ -434,7 +460,7 @@ export function StatsContextProvider({ children }) {
         ...violin,
         compute: compute,
         loaded: true,
-        groups: d3.group(state.data, violin.group.fun).keys(),
+        groups: [...d3.group(state.data, violin.group.fun).keys()],
       },
     }));
   };

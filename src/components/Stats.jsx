@@ -3,10 +3,6 @@
 import { ResponsivePie } from "@nivo/pie";
 import { ResponsiveLine } from "@nivo/line";
 import { ResponsiveTimeRange } from "@nivo/calendar";
-import {
-  ResponsiveScatterPlotCanvas,
-  ResponsiveScatterPlot,
-} from "@nivo/scatterplot";
 import React, {
   useContext,
   cloneElement,
@@ -19,7 +15,7 @@ import React, {
 
 const selectedBrushStyle = {
   fill: `url(#brush_pattern)`,
-  stroke: "white",
+  stroke: "#1976d2",
 };
 
 import {
@@ -31,10 +27,10 @@ import {
   scaleTime,
 } from "@visx/scale";
 import { curveMonotoneX } from "@visx/curve";
-import { ViolinPlot, BoxPlot } from "@visx/stats";
+//import { ViolinPlot, BoxPlot } from "@visx/stats";
 import { PatternLines } from "@visx/pattern";
 import { LinearGradient, GradientTealBlue } from "@visx/gradient";
-import { Circle, LinePath, AreaClosed } from "@visx/shape";
+import { Circle, LinePath, AreaClosed, AreaStack } from "@visx/shape";
 import { Group } from "@visx/group";
 import { Axis, AxisLeft } from "@visx/axis";
 import ParentSize from "@visx/responsive/lib/components/ParentSize";
@@ -121,6 +117,8 @@ import {
   ChipTooltip,
   IconTooltip,
 } from "./StatsUtilities.jsx";
+
+import ViolinPlot from "./Charts/ViolinPlot.jsx";
 
 import * as d3 from "d3-array";
 import * as d3t from "d3-time";
@@ -299,24 +297,40 @@ const TimelineVisx = withTooltip(
     const stats = timelineSettingsVisx.stats;
     const averages = timelineSettingsVisx.averages;
 
+    const groupNames = statsContext.timelineVisx.groups;
     const data = statsContext.timelineVisx.data;
+    const color = statsContext.timelineVisx.group.color;
 
     const svgRef = useRef(null);
     const brushRef = useRef(null);
     const [filteredData, setFilteredData] = useState(data);
 
-    useEffect(() => {
+    const getCurrentExtent = useCallback(() => {
       if (brushRef.current && brushRef.current.state.extent.x1 !== -1) {
         const currentExtent = brushRef.current.state.extent;
-        console.log(currentExtent);
-        onBrushChange({
-          x0: brushXScale.invert(currentExtent.x0),
-          x1: brushXScale.invert(currentExtent.x1),
-        });
+        return [
+          brushXScale.invert(currentExtent.x0).getTime(),
+          brushXScale.invert(currentExtent.x1).getTime(),
+        ];
       } else {
-        setFilteredData(data);
-        xScale.domain(statsContext.extent);
+        return statsContext.extent;
       }
+    });
+
+    const filterData = useMemo(
+      () =>
+        ([x0, x1]) =>
+          setFilteredData(
+            data.filter(
+              ({ date }) => date.getTime() >= x0 && date.getTime() <= x1
+            )
+          ),
+      [data]
+    );
+
+    useEffect(() => {
+      //onBrushChange(getCurrentExtent());
+      filterData(getCurrentExtent());
     }, [data]);
 
     const [window, setWindow] = useState(
@@ -325,16 +339,8 @@ const TimelineVisx = withTooltip(
 
     const onBrushChange = (domain) => {
       if (!domain) return;
-      const { x0, x1 } = domain;
-      setFilteredData(
-        data.map(({ group, data, color }) => ({
-          group,
-          color,
-          data: data.filter(
-            (s) => s.date.getTime() >= x0 && s.date.getTime() <= x1
-          ),
-        }))
-      );
+      const [x0, x1] = [new Date(domain.x0), new Date(domain.x1)];
+      filterData([x0, x1]);
       xScale.domain([x0, x1]);
     };
 
@@ -361,6 +367,10 @@ const TimelineVisx = withTooltip(
       [statsContext.extent, width, height, margin]
     );
 
+    useEffect(() => {
+      console.log("env change");
+    }, [statsContext.extent, width, height, margin]);
+
     const initialBrushPosition = useMemo(
       () => ({
         start: { x: -1 },
@@ -370,13 +380,19 @@ const TimelineVisx = withTooltip(
     );
 
     useEffect(() => {
-      data.forEach(({ group, data }) => {
-        const data_values_avg = timelineSettingsVisx.averages
-          .movingAvg(window)
-          .fun(data.map((d) => d.value));
-        data.forEach((d, i) => {
-          d.movingAvg = data_values_avg[i];
-        });
+      const movingAvg = new d3.InternMap(
+        groupNames.map((g) => [
+          g,
+          timelineSettingsVisx.averages
+            .movingAvg(window)
+            .fun(data.map((d) => d.values.get(g))),
+        ])
+      );
+      data.forEach((d, i) => {
+        const iMovingAvg = new d3.InternMap(
+          d3.map(movingAvg, ([k, g]) => [k, g[i]])
+        );
+        d.movingAvg = iMovingAvg;
       });
     }, [data, window]);
 
@@ -387,9 +403,7 @@ const TimelineVisx = withTooltip(
           domain: [
             0,
             Math.max(
-              ...data
-                .map(({ group, data }) => data.map((d) => d.movingAvg))
-                .flat()
+              ...data.map(({ date, movingAvg }) => d3.sum(movingAvg.values()))
             ),
           ],
           nice: true,
@@ -404,9 +418,7 @@ const TimelineVisx = withTooltip(
           domain: [
             0,
             Math.max(
-              ...data
-                .map(({ group, data }) => data.map((d) => d.movingAvg))
-                .flat()
+              ...data.map(({ date, movingAvg }) => d3.sum(movingAvg.values()))
             ),
           ],
           nice: true,
@@ -414,10 +426,14 @@ const TimelineVisx = withTooltip(
       [data, width, height, margin]
     );
 
-    const xScale = useMemo(
-      () => scaleTime().domain(statsContext.extent).range([0, innerWidth]),
-      [statsContext.extent, width, height, margin]
-    );
+    const xScale = useMemo(() => {
+      console.log(
+        "xScale change",
+        getCurrentExtent().map((d) => new Date(d))
+      );
+
+      return scaleTime().domain(getCurrentExtent()).range([0, innerWidth]);
+    }, [statsContext.extent, width, height, margin]);
 
     return (
       data.length > 0 && (
@@ -487,6 +503,11 @@ const TimelineVisx = withTooltip(
                 </Box>
               </TitleBox>
             </foreignObject>
+            <style>{`
+        .visx-axis-tick svg {
+          user-select: none;
+        }
+      `}</style>
             <Group key="lines" left={margin.left} top={margin.top}>
               <Axis
                 orientation="top"
@@ -512,19 +533,18 @@ const TimelineVisx = withTooltip(
                 height={topChartHeight}
                 stroke="#ddd"
               />
-              {filteredData.map(
-                ({ group, data, color }) =>
-                  data.length > 0 && (
-                    <LinePath
-                      key={group}
-                      curve={curveMonotoneX}
-                      data={data}
-                      x={(d) => xScale(d.date) ?? 0}
-                      y={(d) => yScale(d.movingAvg) ?? 0}
-                      stroke={color}
-                    />
-                  )
-              )}
+              <AreaStack
+                data={filteredData}
+                keys={groupNames}
+                value={(d, key) => d.movingAvg.get(key)}
+                x={(d) => xScale(d.data.date)}
+                y0={(d) => yScale(d[0])}
+                y1={(d) => yScale(d[1])}
+                strokeWidth={2}
+                strokeOpacity={1}
+                color={(key, i) => color(key)}
+                fillOpacity={0.3}
+              />
             </Group>
             <Group
               key="brush"
@@ -542,17 +562,17 @@ const TimelineVisx = withTooltip(
                 id="brush_pattern"
                 height={8}
                 width={8}
-                stroke="#fff"
+                stroke="#1976d2"
                 strokeWidth={1}
                 orientation={["diagonal"]}
               />
-              {data.map(({ group, data, color }) => (
+              {groupNames.map((groupName) => (
                 <AreaClosed
-                  key={group}
+                  key={groupName}
                   curve={curveMonotoneX}
                   data={data}
-                  x={(d) => brushXScale(d.date) ?? 0}
-                  y={(d) => brushYScale(d.movingAvg) ?? 0}
+                  x={(d) => brushXScale(d.date)}
+                  y={(d) => brushYScale(d.movingAvg.get(groupName))}
                   yScale={brushYScale}
                   stroke="#000"
                   strokeWidth={1}
@@ -574,10 +594,10 @@ const TimelineVisx = withTooltip(
                 initialBrushPosition={initialBrushPosition}
                 onChange={onBrushChange}
                 onClick={() => {
-                  setFilteredData(data);
+                  filterData(statsContext.extent);
                   xScale.domain(statsContext.extent);
                 }}
-                //selectedBoxStyle={selectedBrushStyle}
+                selectedBoxStyle={selectedBrushStyle}
                 useWindowMoveEvents
                 //renderBrushHandle={(props) => <BrushHandle {...props} />}
               />
@@ -916,265 +936,6 @@ const ScatterVisx = withTooltip(
   }
 );
 
-const ViolinVisx = withTooltip(
-  ({
-    width,
-    height,
-    hideTooltip,
-    showTooltip,
-    tooltipOpen,
-    tooltipData,
-    tooltipLeft,
-    tooltipTop,
-  }) => {
-    const statsContext = useContext(StatsContext);
-    const selectionContext = useContext(SelectionContext);
-    const values = violinSettings.values;
-    const groups = violinSettings.groups;
-    const scaleYs = violinSettings.scaleYs;
-
-    const svgRef = useRef(null);
-    const [nodeId, setNodeId] = useState(null);
-    const margin = useMemo(
-      () => ({
-        top: 80,
-        left: 60,
-        right: 30,
-        bottom: 30,
-      }),
-      []
-    );
-
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
-
-    const xScale = useMemo(
-      () =>
-        scaleBand({
-          range: [margin.left, innerWidth + margin.left],
-          domain: statsContext.violin.groups,
-          padding: 0,
-        }),
-      [margin, innerWidth, statsContext.violin.groups]
-    );
-
-    const yScale = useMemo(
-      () =>
-        statsContext.violin.scaleY.scale({
-          range: [innerHeight + margin.top, margin.top],
-          domain: [
-            statsContext.violin.value.minValue,
-            statsContext.violin.value.maxValue ||
-              Math.max(...statsContext.data.map(statsContext.violin.value.fun)),
-          ],
-        }),
-      [
-        statsContext.data,
-        statsContext.violin.value,
-        statsContext.violin.scaleY,
-        innerHeight,
-        margin,
-      ]
-    );
-
-    const outlierNum = 8;
-
-    const data = useMemo(() => {
-      return statsContext.violin.compute({
-        margin,
-        innerWidth,
-        innerHeight,
-        xScale,
-        yScale,
-        outlierNum,
-      });
-    }, [margin, innerWidth, innerHeight, xScale, yScale]);
-
-    const boxWidth = xScale.bandwidth();
-    const constrainedWidth = Math.min(100, 0.8 * boxWidth);
-
-    return (
-      statsContext.violin.loaded && (
-        <>
-          <svg width="100%" height="100%" ref={svgRef} position="relative">
-            <GradientTealBlue id="statsplot" />
-            <rect
-              x={0}
-              y={0}
-              width={width}
-              height={height}
-              fill="url(#statsplot)"
-              rx={14}
-            />
-            <foreignObject
-              width={width}
-              height={height}
-              x={10}
-              y={10}
-              position="absolute"
-            >
-              <TitleBox sx={{ position: "absolute", top: 0, left: 0 }}>
-                <Typography variant="h6" key="heading">
-                  Violin Plot
-                </Typography>
-                <CustomSelect
-                  key="value"
-                  propName="value"
-                  value={statsContext.violin.value}
-                  name="Value"
-                  options={values}
-                  setState={statsContext.setViolin}
-                />
-                <CustomSelect
-                  key="group"
-                  propName="group"
-                  value={statsContext.violin.group}
-                  name="Group"
-                  options={groups}
-                  setState={statsContext.setViolin}
-                />
-                <CustomSelect
-                  key="scaleY"
-                  propName="scaleY"
-                  value={statsContext.violin.scaleY}
-                  name="Scale"
-                  options={scaleYs}
-                  setState={statsContext.setViolin}
-                />
-              </TitleBox>
-            </foreignObject>
-            <PatternLines
-              id="hViolinLines"
-              height={3}
-              width={3}
-              stroke="#ced4da"
-              strokeWidth={1}
-              // fill="rgba(0,0,0,0.3)"
-              orientation={["horizontal"]}
-            />
-            <AnimatedAxis
-              orientation="top"
-              scale={xScale}
-              top={margin.top}
-              tickFormat={(d) => statsContext.violin.group.format(d)}
-              hideAxisLine={true}
-              hideTicks={true}
-              numTicks={15}
-              tickLabelProps={{
-                fill: "#ffffff",
-                angle: 90,
-                textAnchor: "begin",
-                dy: 0,
-                dx: 15,
-                fontWeight: "bold",
-              }}
-            />
-            <AxisLeft
-              scale={yScale}
-              left={margin.left}
-              top={0}
-              tickValues={statsContext.violin.scaleY.ticks(yScale)}
-              tickFormat={statsContext.violin.value.formatAxis}
-              hideAxisLine={true}
-              hideTicks={true}
-              tickLabelProps={{ fill: "#ffffff" }}
-            />
-            <AnimatedGridRows
-              left={margin.left}
-              scale={yScale}
-              width={innerWidth}
-              strokeOpacity={0.15}
-              stroke="#fff"
-            />
-            <Group>
-              {data.map((d) => (
-                <g key={d.group}>
-                  {d.binData && (
-                    <ViolinPlot
-                      data={d.binData}
-                      stroke="#dee2e6"
-                      left={
-                        xScale(d.group) + boxWidth / 2 - constrainedWidth / 2
-                      }
-                      width={constrainedWidth}
-                      valueScale={yScale}
-                      fill="url(#hViolinLines)"
-                    />
-                  )}
-                  {d.stats && (
-                    <BoxPlot
-                      {...d.stats}
-                      left={
-                        xScale(d.group) + boxWidth / 2 - constrainedWidth / 5
-                      }
-                      boxWidth={constrainedWidth * 0.4}
-                      fill="#FFFFFF"
-                      fillOpacity={0.3}
-                      stroke="#FFFFFF"
-                      strokeWidth={2}
-                      valueScale={yScale}
-                      medianProps={{
-                        style: {
-                          stroke: "white",
-                        },
-                      }}
-                    />
-                  )}
-                  {d.points.map((outlier) => (
-                    <Circle
-                      key={outlier.data.id}
-                      cx={outlier.x}
-                      cy={outlier.y}
-                      r={nodeId === outlier.data.id ? 5 : 3}
-                      fill={statsContext.violin.color(outlier.data)}
-                      fillOpacity={0.8}
-                      stroke={
-                        selectionContext.selected.includes(outlier.data.id)
-                          ? "#000"
-                          : "#FFF"
-                      }
-                      strokeWidth={2}
-                      onMouseOver={(e) => {
-                        setNodeId(outlier.data.id);
-                        showTooltip({
-                          tooltipLeft: outlier.x,
-                          tooltipTop: outlier.y,
-                          tooltipData: {
-                            textRight: outlier.data.name,
-                            color: statsContext.violin.color(outlier.data),
-                            icon: statsContext.violin.icon(outlier.data),
-                            textLeft: statsContext.violin.value.format(
-                              statsContext.violin.value.fun(outlier.data)
-                            ),
-                          },
-                        });
-                      }}
-                      onMouseLeave={() => {
-                        hideTooltip();
-                        setNodeId(null);
-                      }}
-                    />
-                  ))}
-                </g>
-              ))}
-            </Group>
-          </svg>
-          {tooltipOpen &&
-            tooltipData &&
-            tooltipLeft != null &&
-            tooltipTop != null && (
-              <IconTooltip
-                left={tooltipLeft}
-                top={tooltipTop}
-                {...tooltipData}
-              />
-            )}
-        </>
-      )
-    );
-  }
-);
-
 const TypePie = () => {
   const statsContext = useContext(StatsContext);
   const values = pieSettings.values;
@@ -1294,7 +1055,7 @@ export default function StatsView() {
         <Box sx={{ height: "400px", width: "100%", position: "relative" }}>
           <ParentSize>
             {({ width, height }) => (
-              <ViolinVisx width={width} height={height} />
+              <ViolinPlot width={width} height={height} />
             )}
           </ParentSize>
         </Box>
