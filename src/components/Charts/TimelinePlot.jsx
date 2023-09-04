@@ -23,19 +23,6 @@ import { GridColumns, GridRows } from "@visx/grid";
 import { Brush } from "@visx/brush";
 import { Zoom, applyMatrixToPoint } from "@visx/zoom";
 
-import {
-  AnimatedAxis,
-  AnimatedGridRows,
-  AnimatedGridColumns,
-} from "@visx/react-spring";
-import {
-  Annotation,
-  HtmlLabel,
-  Label,
-  Connector,
-  CircleSubject,
-  LineSubject,
-} from "@visx/annotation";
 import { useTooltip, TooltipWithBounds, withTooltip } from "@visx/tooltip";
 import { localPoint } from "@visx/event";
 
@@ -43,12 +30,7 @@ import { StatsContext } from "../../contexts/StatsContext";
 import { SelectionContext } from "../../contexts/SelectionContext";
 
 import { Typography, Box, Slider } from "@mui/material";
-import {
-  useTheme,
-  styled,
-  ThemeProvider,
-  createTheme,
-} from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 
 const initialTransform = {
   scaleX: 1,
@@ -226,6 +208,7 @@ const TimelineVisx = withTooltip(
                     id="area-background-gradient"
                     from="#3b6978"
                     to="#204051"
+                    key="area-background-gradient"
                   />
                   {groupNames.map((groupName) => (
                     <LinearGradient
@@ -244,6 +227,7 @@ const TimelineVisx = withTooltip(
                     height={height}
                     rx={14}
                     fill="url(#area-background-gradient)"
+                    key="bg"
                   />
                   <foreignObject
                     width={width}
@@ -251,6 +235,7 @@ const TimelineVisx = withTooltip(
                     x={10}
                     y={10}
                     position="absolute"
+                    key="title"
                   >
                     <TitleBox sx={{ position: "absolute", top: 0, left: 0 }}>
                       <Typography
@@ -306,94 +291,93 @@ const TimelineVisx = withTooltip(
                   </foreignObject>
                   <style>{`.visx-axis-tick svg { user-select: none; } `}</style>
                   <Group key="lines" left={margin.left} top={margin.top}>
-                    <>
-                      <Axis
-                        orientation="top"
-                        scale={xScale(zoom)}
-                        numTicks={5}
-                        hideAxisLine={true}
-                        hideTicks={true}
-                        tickLabelProps={{
-                          fill: theme.palette.text.primary,
-                          fontSize: 10,
-                          textAnchor: "middle",
-                        }}
-                      />
-                      <Axis
-                        orientation="left"
-                        scale={yScale}
-                        top={0}
-                        numTicks={5}
-                        tickFormat={statsContext.timelineVisx.value.format}
-                        hideAxisLine={true}
-                        hideTicks={true}
-                        tickLabelProps={{
-                          fill: theme.palette.text.primary,
-                          fontSize: 10,
-                          textAnchor: "end",
-                        }}
-                      />
-                      <GridRows
-                        scale={yScale}
-                        width={innerWidth}
-                        stroke={theme.palette.text.primary}
-                        strokeOpacity={0.1}
-                      />
-                      <GridColumns
-                        scale={xScale(zoom)}
-                        height={topChartHeight}
-                        stroke={theme.palette.text.primary}
-                        strokeOpacity={0.1}
-                      />
-                      <AreaStack
-                        data={data.filter(({ date }) => {
-                          const [x0, x1] = getZoomExtent(zoom.transformMatrix);
-                          return date.getTime() >= x0 && date.getTime() <= x1;
-                        })}
-                        keys={groupNames}
-                        value={(d, key) => d.movingAvg.get(key)}
-                        x={(d) => xScale(zoom)(d.data.date)}
-                        y0={(d) => yScale(d[0])}
-                        y1={(d) => yScale(d[1])}
-                      >
-                        {({ stacks, path }) =>
-                          stacks.map((stack) => (
-                            <path
-                              key={`stack-${stack.key}`}
-                              d={path(stack) || ""}
-                              fill={`url(#timeline-${stack.key})`}
-                              stroke={theme.palette.text.primary}
-                              strokeWidth={1}
-                              strokeOpacity={0.1}
-                            />
-                          ))
-                        }
-                      </AreaStack>
-                      <rect
-                        width={innerWidth}
-                        height={topChartHeight}
-                        rx={14}
-                        fill="transparent"
-                        style={{
-                          cursor: zoom.isDragging ? "grabbing" : "grab",
-                          touchAction: "none",
-                        }}
-                        ref={zoom.containerRef}
-                        onTouchStart={zoom.dragStart}
-                        onTouchMove={zoom.dragMove}
-                        onTouchEnd={zoom.dragEnd}
-                        onMouseDown={zoom.dragStart}
-                        onMouseMove={zoom.dragMove}
-                        onMouseUp={zoom.dragEnd}
-                        onMouseLeave={() => {
-                          if (zoom.isDragging) zoom.dragEnd();
-                        }}
-                        onDoubleClick={(event) => {
-                          const point = localPoint(event) || { x: 0, y: 0 };
-                          zoom.scale({ scaleX: 1.1, scaleY: 1.1, point });
-                        }}
-                      />
-                    </>
+                    <Axis
+                      orientation="top"
+                      scale={xScale(zoom)}
+                      numTicks={5}
+                      hideAxisLine={true}
+                      hideTicks={true}
+                      tickLabelProps={{
+                        fill: theme.palette.text.primary,
+                        fontSize: 10,
+                        textAnchor: "middle",
+                      }}
+                    />
+                    <Axis
+                      orientation="left"
+                      scale={yScale}
+                      top={0}
+                      numTicks={5}
+                      tickFormat={statsContext.timelineVisx.value.format}
+                      hideAxisLine={true}
+                      hideTicks={true}
+                      tickLabelProps={{
+                        fill: theme.palette.text.primary,
+                        fontSize: 10,
+                        textAnchor: "end",
+                      }}
+                    />
+                    <GridRows
+                      scale={yScale}
+                      width={innerWidth}
+                      stroke={theme.palette.text.primary}
+                      strokeOpacity={0.1}
+                    />
+                    <GridColumns
+                      scale={xScale(zoom)}
+                      height={topChartHeight}
+                      stroke={theme.palette.text.primary}
+                      strokeOpacity={0.1}
+                    />
+                    <AreaStack
+                      data={data.filter(({ date }) => {
+                        const [x0, x1] = getZoomExtent(zoom.transformMatrix);
+                        return date.getTime() >= x0 && date.getTime() <= x1;
+                      })}
+                      keys={groupNames}
+                      value={(d, key) => d.movingAvg.get(key)}
+                      x={(d) => xScale(zoom)(d.data.date)}
+                      y0={(d) => yScale(d[0])}
+                      y1={(d) => yScale(d[1])}
+                    >
+                      {({ stacks, path }) =>
+                        stacks.map((stack) => (
+                          <path
+                            key={`stack-${stack.key}`}
+                            d={path(stack) || ""}
+                            fill={`url(#timeline-${stack.key})`}
+                            stroke={theme.palette.text.primary}
+                            strokeWidth={1}
+                            strokeOpacity={0.1}
+                          />
+                        ))
+                      }
+                    </AreaStack>
+                    <rect
+                      width={innerWidth}
+                      height={topChartHeight}
+                      rx={14}
+                      fill="transparent"
+                      style={{
+                        cursor: zoom.isDragging ? "grabbing" : "grab",
+                        touchAction: "none",
+                      }}
+                      ref={zoom.containerRef}
+                      onTouchStart={zoom.dragStart}
+                      onTouchMove={zoom.dragMove}
+                      onTouchEnd={zoom.dragEnd}
+                      onMouseDown={zoom.dragStart}
+                      onMouseMove={zoom.dragMove}
+                      onMouseUp={zoom.dragEnd}
+                      onMouseLeave={() => {
+                        if (zoom.isDragging) zoom.dragEnd();
+                      }}
+                      onDoubleClick={(event) => {
+                        const point = localPoint(event) || { x: 0, y: 0 };
+                        zoom.scale({ scaleX: 1.1, scaleY: 1.1, point });
+                        console.log(zoom);
+                      }}
+                    />
                   </Group>
                   <Group
                     key="brush"
