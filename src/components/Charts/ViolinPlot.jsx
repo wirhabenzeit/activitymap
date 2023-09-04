@@ -8,24 +8,19 @@ import React, {
   useEffect,
 } from "react";
 
-const selectedBrushStyle = {
-  fill: `url(#brush_pattern)`,
-  stroke: "#1976d2",
-};
+import * as d3 from "d3-array";
+import * as d3f from "d3-force";
 
-import {
-  scaleLinear,
-  scaleLog,
-  scaleSqrt,
-  scaleOrdinal,
-  scaleBand,
-  scaleTime,
-} from "@visx/scale";
+import { scaleBand } from "@visx/scale";
 
 import { ViolinPlot, BoxPlot } from "@visx/stats";
 import { PatternLines } from "@visx/pattern";
-import { LinearGradient, GradientTealBlue } from "@visx/gradient";
-import { Circle, LinePath, AreaClosed, AreaStack } from "@visx/shape";
+import {
+  LinearGradient,
+  GradientTealBlue,
+  GradientDarkgreenGreen,
+} from "@visx/gradient";
+import { Circle } from "@visx/shape";
 import { Group } from "@visx/group";
 import { Axis, AxisLeft } from "@visx/axis";
 import {
@@ -43,22 +38,27 @@ import {
 } from "@visx/annotation";
 import { useTooltip, TooltipWithBounds, withTooltip } from "@visx/tooltip";
 import { localPoint } from "@visx/event";
-import { voronoi } from "@visx/voronoi";
 
 import { StatsContext } from "../../contexts/StatsContext";
-import { ActivityContext } from "../../contexts/ActivityContext";
 import { SelectionContext } from "../../contexts/SelectionContext";
 
-function addAlpha(color, opacity) {
-  const _opacity = Math.round(Math.min(Math.max(opacity || 1, 0), 1) * 255);
-  return color + _opacity.toString(16).toUpperCase();
-}
 import { Typography } from "@mui/material";
-import { useTheme, styled } from "@mui/material/styles";
+import {
+  useTheme,
+  styled,
+  ThemeProvider,
+  createTheme,
+} from "@mui/material/styles";
 
 import { violinSettings } from "../../settings";
 
 import { TitleBox, CustomSelect, IconTooltip } from "../StatsUtilities.jsx";
+
+const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+  },
+});
 
 const ViolinVisx = withTooltip(
   ({
@@ -79,6 +79,9 @@ const ViolinVisx = withTooltip(
 
     const svgRef = useRef(null);
     const [nodeId, setNodeId] = useState(null);
+    const [animatedPoints, setAnimatedPoints] = useState({});
+    const theme = useTheme();
+
     const margin = useMemo(
       () => ({
         top: 80,
@@ -98,7 +101,6 @@ const ViolinVisx = withTooltip(
         domain: statsContext.violin.groups,
         padding: 0,
       });
-      console.log("computied xScale", statsContext.violin.groups);
       return newXscale;
     }, [margin, innerWidth, statsContext.violin.groups]);
 
@@ -121,36 +123,55 @@ const ViolinVisx = withTooltip(
       ]
     );
 
-    const outlierNum = 8;
+    const points = useMemo(() => {
+      if (!statsContext.violin.pointData) return [];
+      const newPts = d3
+        .map(statsContext.violin.pointData, ([group, data]) =>
+          data?.map((d) => ({
+            x0: xScale(group) + xScale.bandwidth() / 2,
+            x: xScale(group) + xScale.bandwidth() / 2,
+            y0: yScale(statsContext.violin.value.fun(d)),
+            y: yScale(statsContext.violin.value.fun(d)),
+            data: d,
+          }))
+        )
+        .flat();
+      return newPts;
+    }, [statsContext.violin.pointData, xScale, yScale]);
 
-    const data = useMemo(() => {
-      console.log("computing violin data");
-      return statsContext.violin.compute({
-        margin,
-        innerWidth,
-        innerHeight,
-        xScale,
-        yScale,
-        outlierNum,
+    useEffect(() => {
+      const simulation = d3f
+        .forceSimulation()
+        .force(
+          "x",
+          d3f.forceX((d) => d.x0)
+        )
+        .force(
+          "y",
+          d3f.forceY((d) => d.y0)
+        )
+        .force(
+          "collide",
+          d3f.forceCollide((d) => (d.data.id === nodeId ? 5 : 3))
+        );
+
+      simulation.on("tick", () => {
+        setAnimatedPoints([...simulation.nodes()]);
       });
-    }, [margin, innerWidth, innerHeight, xScale, yScale]);
+
+      simulation.nodes([...points]);
+      simulation.restart();
+      return () => simulation.stop();
+    }, [statsContext.violin.pointData, xScale, yScale, nodeId]);
 
     const boxWidth = xScale.bandwidth();
     const constrainedWidth = Math.min(100, 0.8 * boxWidth);
-
-    console.log(
-      "rendering violin",
-      new Date(),
-      data[0]?.stats,
-      data[0]?.points,
-      data[0]?.binData
-    );
 
     return (
       statsContext.violin.loaded && (
         <>
           <svg width="100%" height="100%" ref={svgRef} position="relative">
-            <GradientTealBlue id="statsplot" />
+            <GradientDarkgreenGreen id="statsplot" />
             <rect
               x={0}
               y={0}
@@ -166,35 +187,41 @@ const ViolinVisx = withTooltip(
               y={10}
               position="absolute"
             >
-              <TitleBox sx={{ position: "absolute", top: 0, left: 0 }}>
-                <Typography variant="h6" key="heading">
-                  Violin Plot
-                </Typography>
-                <CustomSelect
-                  key="value"
-                  propName="value"
-                  value={statsContext.violin.value}
-                  name="Value"
-                  options={values}
-                  setState={statsContext.setViolin}
-                />
-                <CustomSelect
-                  key="group"
-                  propName="group"
-                  value={statsContext.violin.group}
-                  name="Group"
-                  options={groups}
-                  setState={statsContext.setViolin}
-                />
-                <CustomSelect
-                  key="scaleY"
-                  propName="scaleY"
-                  value={statsContext.violin.scaleY}
-                  name="Scale"
-                  options={scaleYs}
-                  setState={statsContext.setViolin}
-                />
-              </TitleBox>
+              <ThemeProvider theme={darkTheme}>
+                <TitleBox sx={{ position: "absolute", top: 0, left: 0 }}>
+                  <Typography
+                    variant="h6"
+                    key="heading"
+                    color={theme.palette.primary.contrastText}
+                  >
+                    Violin Plot
+                  </Typography>
+                  <CustomSelect
+                    key="value"
+                    propName="value"
+                    value={statsContext.violin.value}
+                    name="Value"
+                    options={values}
+                    setState={statsContext.setViolin}
+                  />
+                  <CustomSelect
+                    key="group"
+                    propName="group"
+                    value={statsContext.violin.group}
+                    name="Group"
+                    options={groups}
+                    setState={statsContext.setViolin}
+                  />
+                  <CustomSelect
+                    key="scaleY"
+                    propName="scaleY"
+                    value={statsContext.violin.scaleY}
+                    name="Scale"
+                    options={scaleYs}
+                    setState={statsContext.setViolin}
+                  />
+                </TitleBox>
+              </ThemeProvider>
             </foreignObject>
             <PatternLines
               id="hViolinLines"
@@ -240,26 +267,22 @@ const ViolinVisx = withTooltip(
               stroke="#fff"
             />
             <Group>
-              {data.map((d) => (
-                <g key={d.group}>
-                  {d.binData && d.binData.length > 0 && (
+              {statsContext.violin.groups.map((group) => (
+                <g key={group}>
+                  {statsContext.violin.violinData.get(group) && (
                     <ViolinPlot
-                      data={d.binData}
+                      data={statsContext.violin.violinData.get(group)}
                       stroke="#dee2e6"
-                      left={
-                        xScale(d.group) + boxWidth / 2 - constrainedWidth / 2
-                      }
+                      left={xScale(group) + boxWidth / 2 - constrainedWidth / 2}
                       width={constrainedWidth}
                       valueScale={yScale}
                       fill="url(#hViolinLines)"
                     />
                   )}
-                  {d.stats && d.stat && (
+                  {statsContext.violin.statData.get(group) && (
                     <BoxPlot
-                      {...d.stats}
-                      left={
-                        xScale(d.group) + boxWidth / 2 - constrainedWidth / 5
-                      }
+                      {...statsContext.violin.statData.get(group)}
+                      left={xScale(group) + boxWidth / 2 - constrainedWidth / 5}
                       boxWidth={constrainedWidth * 0.4}
                       fill="#FFFFFF"
                       fillOpacity={0.3}
@@ -273,7 +296,12 @@ const ViolinVisx = withTooltip(
                       }}
                     />
                   )}
-                  {d.points.map((outlier) => (
+                </g>
+              ))}
+              <g key="points">
+                {animatedPoints &&
+                  animatedPoints.length > 0 &&
+                  animatedPoints.map((outlier) => (
                     <Circle
                       key={outlier.data.id}
                       cx={outlier.x}
@@ -308,8 +336,7 @@ const ViolinVisx = withTooltip(
                       }}
                     />
                   ))}
-                </g>
-              ))}
+              </g>
             </Group>
           </svg>
           {tooltipOpen &&

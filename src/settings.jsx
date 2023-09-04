@@ -182,25 +182,29 @@ const defaultMapPosition = {
 };
 
 var categorySettings = {
-  "BC & XC Ski": {
+  bcXcSki: {
+    name: "BC & XC Ski",
     color: "#1982C4",
     icon: "skiing-nordic",
     alias: ["BackcountrySki", "NordicSki", "RollerSki"],
     active: true,
   },
-  "Trail / Hike": {
+  trailHike: {
+    name: "Trail / Hike",
     color: "#FF595E",
     icon: "walking",
     alias: ["Hike", "TrailRun", "RockClimbing", "Snowshoe"],
     active: true,
   },
-  Run: {
+  run: {
+    name: "Run",
     color: "#FFCA3A",
     icon: "running",
     alias: ["Run", "VirtualRun"],
     active: true,
   },
-  Ride: {
+  ride: {
+    name: "Ride",
     color: "#8AC926",
     icon: "biking",
     alias: [
@@ -225,7 +229,8 @@ var categorySettings = {
 
 const usedTypes = Object.values(categorySettings).flatMap((x) => x.alias);
 
-categorySettings.Miscellaneous = {
+categorySettings.misc = {
+  name: "Miscellaneous",
   color: "#6A4C93",
   icon: "person-circle-question",
   alias: stravaTypes.filter((x) => !usedTypes.includes(x)),
@@ -978,7 +983,7 @@ const violinSettings = {
     sport_group: {
       id: "sport_group",
       fun: (d) => aliasMap[d.sport_type],
-      format: (v) => v,
+      format: (v) => categorySettings[v].name,
       label: "Group",
       icon: (id) => categorySettings[id].icon,
       color: (id) => categorySettings[id].color,
@@ -1454,7 +1459,7 @@ const timelineSettingsVisx = {
           { value: 30, label: "2m" },
         ],
         min: 0,
-        max: 30,
+        max: 45,
       },
     },
   },

@@ -127,7 +127,9 @@ export function MultiSelect({ open, name }) {
         size="small"
         variant="standard"
       >
-        <InputLabel id={name + "-label"}>{name}</InputLabel>
+        <InputLabel id={name + "-label"}>
+          {categorySettings[name].name}
+        </InputLabel>
         <Select
           //id={name}
           //labelId={name+"-label"}

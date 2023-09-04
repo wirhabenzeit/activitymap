@@ -32,34 +32,6 @@ const defaultTimeline = {
   loaded: false,
 };
 
-const repel = (data, x, y, r, ticks = 100) => {
-  const entries = data.map((d) => ({
-    x0: x(d),
-    y0: y(d),
-    r: r(d),
-    data: d,
-  }));
-
-  const simulation = d3f
-    .forceSimulation(entries)
-    .force(
-      "x",
-      d3f.forceX((d) => d.x0)
-    )
-    .force(
-      "y",
-      d3f.forceY((d) => d.y0)
-    )
-    .force(
-      "collide",
-      d3f.forceCollide((d) => d.r)
-    );
-
-  for (let i = 0; i < ticks; i++) simulation.tick();
-
-  return simulation.nodes();
-};
-
 const defaultStats = {
   data: [],
   allData: [],
@@ -79,7 +51,7 @@ const defaultStats = {
     value: timelineSettingsVisx.values.elevation,
     group: timelineSettingsVisx.groups.sport_group,
     timePeriod: timelineSettingsVisx.timePeriods.day,
-    averaging: timelineSettingsVisx.averages.movingAvg(7),
+    averaging: timelineSettingsVisx.averages.movingAvg(30),
     loaded: false,
     groups: [],
     data: [],
@@ -98,8 +70,10 @@ const defaultStats = {
     group: violinSettings.groups.sport_group,
     scaleY: violinSettings.scaleYs.log,
     loaded: false,
-    stats: undefined,
-    compute: () => [],
+    statData: undefined,
+    pointData: undefined,
+    violinData: undefined,
+    groups: [],
   },
   calendar: {
     value: calendarSettings.values.elevation,
@@ -354,113 +328,88 @@ export function StatsContextProvider({ children }) {
   };
 
   const setViolin = (newViolin) => {
-    console.log("setting violin");
     const violin = { ...state.violin, ...newViolin };
+    const groups = [...new Set(state.data.map(violin.group.fun))]; //[...d3.group(state.data, violin.group.fun).keys()];
+    groups.sort(d3.ascending);
 
-    const compute = ({
-      innerHeight,
-      innerWidth,
-      margin,
-      yScale,
-      xScale,
-      outlierNum,
-    }) => {
-      const bins = d3
-        .range(innerHeight + margin.top, margin.top, -innerHeight / 20)
-        .concat(margin.top)
-        .map(yScale.invert);
+    const yDomain = [
+      violin.value.minValue,
+      violin.value.maxValue || Math.max(...state.data.map(violin.value.fun)),
+    ];
 
-      const data = d3
-        .groups(
-          state.data.filter(
-            (d) =>
-              violin.value.minValue <= violin.value.fun(d) &&
-              (violin.value.maxValue == undefined ||
-                violin.value.fun(d) <= violin.value.maxValue)
-          ),
-          violin.group.fun
+    const yScale = violin.scaleY.scale({ domain: yDomain, range: [0, 1] });
+
+    const outlierNum = 8;
+
+    const violinData = new d3.InternMap();
+    const statData = new d3.InternMap();
+    const pointData = new d3.InternMap();
+
+    const bins = d3.range(0, 1, 0.05).concat(1).map(yScale.invert);
+
+    const data = d3.groups(
+      state.data.filter(
+        (d) =>
+          violin.value.minValue <= violin.value.fun(d) &&
+          (violin.value.maxValue == undefined ||
+            violin.value.fun(d) <= violin.value.maxValue)
+      ),
+      violin.group.fun
+    );
+
+    data.forEach(([group, data]) => {
+      const data_values = data.map(violin.value.fun);
+      const binData = d3.bin().thresholds(bins).domain(yDomain)(data_values);
+
+      const bulk = binData.filter((d) => d.length >= outlierNum);
+
+      if (d3.sum(bulk.map((d) => d.length)) < 20) {
+        pointData.set(group, data);
+        statData.set(group, undefined);
+        violinData.set(group, undefined);
+        return;
+      }
+
+      pointData.set(
+        group,
+        data.filter(
+          (d) =>
+            violin.value.fun(d) < bulk[0].x0 ||
+            violin.value.fun(d) > bulk[bulk.length - 1].x1
         )
-        .map(([group, data]) => {
-          const data_values = data.map(violin.value.fun);
-          const binData = d3.bin().thresholds(bins).domain(yScale.domain())(
-            data_values
-          );
+      );
 
-          const bulk = binData.filter((d) => d.length >= outlierNum);
+      const data_values_remaining = binData
+        .filter((d) => d.x0 >= bulk[0].x0 && d.x1 <= bulk[bulk.length - 1].x1)
+        .flat();
 
-          if (d3.sum(bulk.map((d) => d.length)) < 20) {
-            return {
-              group: group,
-              binData: [],
-              stats: undefined,
-              points: repel(
-                data.filter(
-                  (d) => violin.value.minValue <= violin.value.fun(d)
-                ),
-                (d) => xScale(group) + xScale.bandwidth() / 2,
-                (d) => yScale(violin.value.fun(d)),
-                (d) => 3
-              ),
-            };
-          }
+      statData.set(group, {
+        count: data_values_remaining.length,
+        min: d3.min(data_values_remaining),
+        max: d3.max(data_values_remaining),
+        median: d3.median(data_values_remaining),
+        firstQuartile: d3.quantile(data_values_remaining, 0.25),
+        thirdQuartile: d3.quantile(data_values_remaining, 0.75),
+      });
 
-          const outliers = data.filter(
-            (d) =>
-              violin.value.fun(d) < bulk[0].x0 ||
-              violin.value.fun(d) > bulk[bulk.length - 1].x1
-          );
-
-          console.log(
-            "outliers before repel",
-            group,
-            xScale.domain(),
-            xScale.bandwidth(),
-            outliers.map((d) => yScale(violin.value.fun(d)))
-          );
-
-          const outliersRep = repel(
-            outliers,
-            (d) => xScale(group) + xScale.bandwidth() / 2,
-            (d) => yScale(violin.value.fun(d)),
-            (d) => 4
-          );
-
-          console.log("outliers after repel", outliersRep);
-
-          const data_values_remaining = binData
-            .filter(
-              (d) => d.x0 >= bulk[0].x0 && d.x1 <= bulk[bulk.length - 1].x1
-            )
-            .flat();
-
-          return {
-            group: group,
-            binData: binData.map((d) => ({
-              count: d.length,
-              value: d.x0,
-            })),
-            stats: {
-              count: data_values_remaining.length,
-              min: d3.min(data_values_remaining),
-              max: d3.max(data_values_remaining),
-              median: d3.median(data_values_remaining),
-              firstQuartile: d3.quantile(data_values_remaining, 0.25),
-              thirdQuartile: d3.quantile(data_values_remaining, 0.75),
-            },
-            points: outliersRep,
-          };
-        });
-      console.log("computed violin plot");
-      return data;
-    };
+      violinData.set(
+        group,
+        binData.map((d) => ({
+          count: d.length,
+          value: d.x0,
+        }))
+      );
+    });
 
     setState((state) => ({
       ...state,
       violin: {
         ...violin,
-        compute: compute,
         loaded: true,
-        groups: [...d3.group(state.data, violin.group.fun).keys()],
+        statData: statData,
+        pointData: pointData,
+        violinData: violinData,
+        groups: groups,
       },
     }));
   };

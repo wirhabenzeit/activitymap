@@ -15,7 +15,7 @@ import React, {
 
 const selectedBrushStyle = {
   fill: `url(#brush_pattern)`,
-  stroke: "#1976d2",
+  stroke: "#fff",
 };
 
 import {
@@ -29,7 +29,11 @@ import {
 import { curveMonotoneX } from "@visx/curve";
 //import { ViolinPlot, BoxPlot } from "@visx/stats";
 import { PatternLines } from "@visx/pattern";
-import { LinearGradient, GradientTealBlue } from "@visx/gradient";
+import {
+  LinearGradient,
+  GradientTealBlue,
+  GradientOrangeRed,
+} from "@visx/gradient";
 import { Circle, LinePath, AreaClosed, AreaStack } from "@visx/shape";
 import { Group } from "@visx/group";
 import { Axis, AxisLeft } from "@visx/axis";
@@ -82,7 +86,18 @@ import {
   Typography,
   Slider as MuiSlider,
 } from "@mui/material";
-import { useTheme, styled } from "@mui/material/styles";
+import {
+  useTheme,
+  styled,
+  ThemeProvider,
+  createTheme,
+} from "@mui/material/styles";
+
+const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+  },
+});
 
 const Slider = styled(MuiSlider)(({ theme }) => ({
   "& .MuiSlider-markLabel": {
@@ -125,6 +140,7 @@ import * as d3t from "d3-time";
 import * as d3tf from "d3-time-format";
 import * as d3sc from "d3-scale-chromatic";
 import * as d3s from "d3-scale";
+import { ThemeContext } from "@emotion/react";
 
 function YearlySummary() {
   const statsContext = useContext(StatsContext);
@@ -259,25 +275,6 @@ function YearlySummary() {
   );
 }
 
-function BrushHandle({ x, height, isBrushActive }) {
-  const pathWidth = 8;
-  const pathHeight = 15;
-  if (!isBrushActive) {
-    return null;
-  }
-  return (
-    <Group left={x + pathWidth / 2} top={(height - pathHeight) / 2}>
-      <path
-        fill="#f2f2f2"
-        d="M -4.5 0.5 L 3.5 0.5 L 3.5 15.5 L -4.5 15.5 L -4.5 0.5 M -1.5 4 L -1.5 12 M 0.5 4 L 0.5 12"
-        stroke="#999999"
-        strokeWidth="1"
-        style={{ cursor: "ew-resize" }}
-      />
-    </Group>
-  );
-}
-
 const TimelineVisx = withTooltip(
   ({
     width,
@@ -349,7 +346,7 @@ const TimelineVisx = withTooltip(
         top: 100,
         left: 60,
         right: 30,
-        bottom: 50,
+        bottom: 30,
       }),
       []
     );
@@ -366,10 +363,6 @@ const TimelineVisx = withTooltip(
       () => scaleTime().domain(statsContext.extent).range([0, innerWidth]),
       [statsContext.extent, width, height, margin]
     );
-
-    useEffect(() => {
-      console.log("env change");
-    }, [statsContext.extent, width, height, margin]);
 
     const initialBrushPosition = useMemo(
       () => ({
@@ -439,14 +432,28 @@ const TimelineVisx = withTooltip(
       data.length > 0 && (
         <>
           <svg width="100%" height="100%" ref={svgRef} position="relative">
-            <LinearGradient from="#f5f2e3" to="#ecf4f3" id="timeline" />
+            <LinearGradient
+              id="area-background-gradient"
+              from="#3b6978"
+              to="#204051"
+            />
+            {groupNames.map((groupName) => (
+              <LinearGradient
+                key={groupName}
+                id={`timeline-${groupName}`}
+                from={color(groupName)}
+                to={color(groupName)}
+                fromOpacity={0.8}
+                toOpacity={0.3}
+              />
+            ))}
             <rect
               x={0}
               y={0}
               width={width}
               height={height}
-              fill="url(#timeline)"
               rx={14}
+              fill="url(#area-background-gradient)"
             />
             <foreignObject
               width={width}
@@ -456,7 +463,11 @@ const TimelineVisx = withTooltip(
               position="absolute"
             >
               <TitleBox sx={{ position: "absolute", top: 0, left: 0 }}>
-                <Typography variant="h6" key="heading">
+                <Typography
+                  variant="h6"
+                  key="heading"
+                  color={theme.palette.text.primary}
+                >
                   Timeline
                 </Typography>
                 <CustomSelect
@@ -503,35 +514,45 @@ const TimelineVisx = withTooltip(
                 </Box>
               </TitleBox>
             </foreignObject>
-            <style>{`
-        .visx-axis-tick svg {
-          user-select: none;
-        }
-      `}</style>
+            <style>{`.visx-axis-tick svg { user-select: none; } `}</style>
             <Group key="lines" left={margin.left} top={margin.top}>
               <Axis
                 orientation="top"
                 scale={xScale}
+                numTicks={5}
                 hideAxisLine={true}
-                tickStroke="#ddd"
+                hideTicks={true}
+                tickLabelProps={{
+                  fill: theme.palette.text.primary,
+                  fontSize: 10,
+                  textAnchor: "middle",
+                }}
               />
-              <AnimatedAxis
+              <Axis
                 orientation="left"
                 scale={yScale}
                 top={0}
+                numTicks={5}
                 tickFormat={statsContext.timelineVisx.value.format}
                 hideAxisLine={true}
-                tickStroke="#ddd"
+                hideTicks={true}
+                tickLabelProps={{
+                  fill: theme.palette.text.primary,
+                  fontSize: 10,
+                  textAnchor: "end",
+                }}
               />
-              <AnimatedGridRows
+              <GridRows
                 scale={yScale}
                 width={innerWidth}
-                stroke="#ddd"
+                stroke={theme.palette.text.primary}
+                strokeOpacity={0.1}
               />
               <GridColumns
                 scale={xScale}
                 height={topChartHeight}
-                stroke="#ddd"
+                stroke={theme.palette.text.primary}
+                strokeOpacity={0.1}
               />
               <AreaStack
                 data={filteredData}
@@ -540,15 +561,24 @@ const TimelineVisx = withTooltip(
                 x={(d) => xScale(d.data.date)}
                 y0={(d) => yScale(d[0])}
                 y1={(d) => yScale(d[1])}
-                strokeWidth={2}
-                strokeOpacity={1}
-                color={(key, i) => color(key)}
-                fillOpacity={0.3}
-              />
+              >
+                {({ stacks, path }) =>
+                  stacks.map((stack) => (
+                    <path
+                      key={`stack-${stack.key}`}
+                      d={path(stack) || ""}
+                      fill={`url(#timeline-${stack.key})`}
+                      stroke={theme.palette.text.primary}
+                      strokeWidth={1}
+                      strokeOpacity={0.1}
+                    />
+                  ))
+                }
+              </AreaStack>
             </Group>
             <Group
               key="brush"
-              top={topChartHeight + margin.top + 30}
+              top={topChartHeight + margin.top + separatorHeight}
               left={margin.left}
             >
               <AnimatedAxis
@@ -556,13 +586,18 @@ const TimelineVisx = withTooltip(
                 scale={brushXScale}
                 top={bottomChartHeight}
                 hideAxisLine={true}
-                tickStroke="#ddd"
+                hideTicks={true}
+                tickLabelProps={{
+                  fill: theme.palette.text.primary,
+                  fontSize: 10,
+                  textAnchor: "middle",
+                }}
               />
               <PatternLines
                 id="brush_pattern"
                 height={8}
                 width={8}
-                stroke="#1976d2"
+                stroke={theme.palette.text.primary}
                 strokeWidth={1}
                 orientation={["diagonal"]}
               />
@@ -574,10 +609,10 @@ const TimelineVisx = withTooltip(
                   x={(d) => brushXScale(d.date)}
                   y={(d) => brushYScale(d.movingAvg.get(groupName))}
                   yScale={brushYScale}
-                  stroke="#000"
+                  stroke={theme.palette.text.primary}
                   strokeWidth={1}
-                  strokeOpacity={0.2}
-                  fill="#000"
+                  strokeOpacity={0.1}
+                  fill={theme.palette.text.primary}
                   fillOpacity={0.2}
                 />
               ))}
@@ -715,33 +750,52 @@ const ScatterVisx = withTooltip(
     const data = statsContext.data;
 
     const svgRef = useRef(null);
-    const margin = { top: 30, left: 60, right: 30, bottom: 90 };
+    const margin = useMemo(
+      () => ({ top: 30, left: 60, right: 30, bottom: 90 }),
+      []
+    );
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
     const color = (d) =>
       statsContext.scatter.group.color(statsContext.scatter.group.fun(d));
 
-    const xScale = scaleLinear({
-      range: [margin.left, innerWidth + margin.left],
-      domain: d3.extent(data, statsContext.scatter.xValue.fun),
-    });
+    const xScale = useMemo(
+      () =>
+        scaleLinear({
+          range: [margin.left, innerWidth + margin.left],
+          domain: d3.extent(data, statsContext.scatter.xValue.fun),
+        }),
+      [data, statsContext.scatter.xValue, width]
+    );
 
-    const yScale = scaleLinear({
-      range: [innerHeight + margin.top, margin.top],
-      domain: d3.extent(data, statsContext.scatter.yValue.fun),
-      nice: true,
-    });
+    const yScale = useMemo(
+      () =>
+        scaleLinear({
+          range: [innerHeight + margin.top, margin.top],
+          domain: d3.extent(data, statsContext.scatter.yValue.fun),
+          nice: true,
+        }),
+      [data, statsContext.scatter.yValue, height]
+    );
 
-    const rScale = scaleSqrt({
-      range: [0, 5],
-      domain: d3.extent(data, statsContext.scatter.size.fun),
-    });
+    const rScale = useMemo(
+      () =>
+        scaleSqrt({
+          range: [0, 5],
+          domain: d3.extent(data, statsContext.scatter.size.fun),
+        }),
+      [data, statsContext.scatter.size]
+    );
 
-    const colorScale = scaleOrdinal({
-      range: [...new Set(data.map(color))],
-      domain: [...new Set(data.map(color))],
-    });
+    const colorScale = useMemo(
+      () =>
+        scaleOrdinal({
+          range: [...new Set(data.map(color))],
+          domain: [...new Set(data.map(color))],
+        }),
+      [data]
+    );
 
     const voronoiLayout = useMemo(
       () =>
@@ -924,8 +978,8 @@ const ScatterVisx = withTooltip(
           tooltipLeft != null &&
           tooltipTop != null && (
             <IconTooltip
-              left={tooltipLeft + 5}
-              top={tooltipTop + 5}
+              left={tooltipLeft}
+              top={tooltipTop}
               color={color(tooltipData)}
               textLeft=""
               textRight={tooltipData.name}
@@ -1027,7 +1081,9 @@ export default function StatsView() {
         <Paper sx={{ height: 400, width: "100%", position: "relative" }}>
           <ParentSize>
             {({ width, height }) => (
-              <TimelineVisx width={width} height={height} />
+              <ThemeProvider theme={darkTheme}>
+                <TimelineVisx width={width} height={height} />
+              </ThemeProvider>
             )}
           </ParentSize>
         </Paper>
@@ -1046,11 +1102,6 @@ export default function StatsView() {
           </ParentSize>
         </Paper>
       </Grid>
-      {/*<Grid xs={12}>
-        <Paper sx={{ height: 400 }}>
-          <ViolinPlotNivo />
-        </Paper>
-            </Grid>*/}
       <Grid xs={12}>
         <Box sx={{ height: "400px", width: "100%", position: "relative" }}>
           <ParentSize>
