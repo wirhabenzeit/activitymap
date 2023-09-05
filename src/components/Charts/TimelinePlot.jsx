@@ -80,6 +80,7 @@ import { timelineSettingsVisx } from "../../settings";
 
 import { TitleBox, CustomSelect, IconTooltip } from "../StatsUtilities.jsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { memo } from "react";
 
 const selectedBrushStyle = {
   fill: `url(#brush_pattern)`,
@@ -109,20 +110,25 @@ const TimelineVisx = withTooltip(
     const color = statsContext.timelineVisx.group.color;
 
     const topChartRef = useRef(null);
+    const bottomChartRef = useRef(null);
     const [currentExtent, setCurrentExtent] = useState(statsContext.extent);
     const [transform, setTransform] = useState({
       x: 0,
       scale: 1,
     });
+    const [memoTransform, setMemoTransform] = useState(transform);
 
     useEffect(() => {
-      setCurrentExtent(statsContext.extent);
+      if (statsContext.extent[0] === undefined) return;
+      setCurrentExtent((currentExtent) =>
+        currentExtent[0] === undefined ? statsContext.extent : currentExtent
+      );
     }, [statsContext.extent]);
     const [isDragging, setIsDragging] = useState(false);
+    const [brushOver, setBrushOver] = useState(false);
 
     const zoomAroundPoint = (point, zoom, transform0 = undefined) => {
       if (transform0 === undefined) transform0 = transform;
-      //const { x } = topChartRef.current.getBoundingClientRect();
       var scale = zoom * transform0.scale;
       var scale = Math.min(Math.max(1, scale), 50);
       var transformX =
@@ -154,15 +160,17 @@ const TimelineVisx = withTooltip(
           if (pinching) return cancel();
           setTranslate(() => x);
         },
-        onPinch: ({ origin: [ox, oy], first, movement: [ms], memo }) => {
+        onDragStart: ({ event }) => setIsDragging(true),
+        onDragEnd: ({ event }) => setIsDragging(false),
+        onPinch: ({ origin: [ox, oy], first, movement: [ms], memo, event }) => {
           if (first) {
             memo = [
               transform.x,
-              ox, //- topChartRef.current.getBoundingClientRect().x,
+              ox - topChartRef.current.getBoundingClientRect().x,
               transform.scale,
             ];
           }
-          zoomAroundPoint(ox, ms, { scale: memo[2], x: memo[0] });
+          zoomAroundPoint(memo[1], ms, { scale: memo[2], x: memo[0] });
           return memo;
         },
         onWheel: ({ event, movement, active, pinching }) => {
@@ -184,7 +192,72 @@ const TimelineVisx = withTooltip(
     );
 
     useEffect(() => {
-      //console.log(transform);
+      console.log(brushOver);
+    }, [brushOver]);
+    useGesture(
+      {
+        onMove: ({ active, xy }) => {
+          const pos = xy[0] - bottomChartRef.current.getBoundingClientRect().x;
+          const brush = currentExtent.map((d) => brushXScale(d));
+          if (Math.abs(pos - brush[0]) < 3) setBrushOver("left");
+          else if (Math.abs(pos - brush[1]) < 3) setBrushOver("right");
+          else if (pos > brush[0] && pos < brush[1]) setBrushOver("middle");
+          else setBrushOver(false);
+        },
+        onDrag: ({
+          offset: [x, y],
+          initial: [x0, y0],
+          xy: [x1, y1],
+          first,
+          memo,
+        }) => {
+          if (first) {
+            const pos = x0 - bottomChartRef.current.getBoundingClientRect().x;
+            const brush = currentExtent.map((d) => brushXScale(d));
+            console.log("first", pos, brush);
+            if (Math.abs(pos - brush[0]) < 3)
+              memo = { mode: "left", transform: { ...transform } };
+            else if (Math.abs(pos - brush[1]) < 3)
+              memo = { mode: "right", transform: { ...transform } };
+            else if (pos > brush[0] && pos < brush[1])
+              memo = { mode: "middle", transform: { ...transform } };
+            else memo = { mode: undefined, transform: { ...transform } };
+          }
+          if (memo.mode === "middle") {
+            setTranslate(() => -x * transform.scale);
+          } else if (memo.mode === "left")
+            zoomAroundPoint(
+              innerWidth,
+              Math.min(
+                1 / (1 + (memo.transform.scale * (x0 - x1)) / innerWidth),
+                50 / memo.transform.scale
+              ),
+              memo.transform
+            );
+          else if (memo.mode === "right")
+            zoomAroundPoint(
+              0,
+              Math.min(
+                1 / (1 + (memo.transform.scale * (x1 - x0)) / innerWidth),
+                50 / memo.transform.scale
+              ),
+              memo.transform
+            );
+          return memo;
+        },
+      },
+      {
+        target: bottomChartRef,
+        drag: {
+          filterTaps: true,
+          from: () => [-transform.x / transform.scale, 0],
+        },
+        eventOptions: { passive: false },
+        pinch: { rubberband: false },
+      }
+    );
+
+    useEffect(() => {
       setCurrentExtent(
         getZoomExtent({
           scaleX: transform.scale,
@@ -214,6 +287,10 @@ const TimelineVisx = withTooltip(
       statsContext.timelineVisx.averaging.window
     );
 
+    useEffect(() => {
+      setWindow(statsContext.timelineVisx.averaging.window);
+    }, [statsContext.timelineVisx.averaging.window]);
+
     const margin = useMemo(
       () => ({
         top: 100,
@@ -242,7 +319,7 @@ const TimelineVisx = withTooltip(
         groupNames.map((g) => [
           g,
           timelineSettingsVisx.averages
-            .movingAvg(window)
+            .gaussianAvg(window)
             .fun(data.map((d) => d.values.get(g))),
         ])
       );
@@ -252,7 +329,7 @@ const TimelineVisx = withTooltip(
         );
         d.movingAvg = iMovingAvg;
       });
-    }, [data, window]);
+    }, [window]);
 
     const yScale = useMemo(
       () =>
@@ -292,12 +369,7 @@ const TimelineVisx = withTooltip(
     return (
       data.length > 0 && (
         <>
-          <svg
-            width="100%"
-            height="100%"
-            position="relative"
-            style={{ touchAction: "none" }}
-          >
+          <svg width="100%" height="100%" position="relative">
             <LinearGradient
               id="area-background-gradient"
               from="#3b6978"
@@ -366,41 +438,6 @@ const TimelineVisx = withTooltip(
                   options={timelineSettingsVisx.timePeriods}
                   setState={statsContext.setTimelineVisx}
                 />
-                <Box key="windowSize">
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item>
-                      <FontAwesomeIcon
-                        icon="chart-column"
-                        color={theme.palette.text.primary}
-                      />
-                    </Grid>
-                    <Grid item width="100px">
-                      <Slider
-                        {...statsContext.timelineVisx.timePeriod.averaging}
-                        //slotProps={{ markLabel: { fontSize: "0.8rem" } }}
-                        //sx={{ mb: 1 }}
-                        marks={true}
-                        size="small"
-                        valueLabelDisplay="on"
-                        value={window} //{statsContext.timelineVisx.averaging.window}
-                        onChange={
-                          (e, v) => setWindow(v) //statsContext.setTimelineVisx({averaging: averages.movingAvg(v),})
-                        }
-                        onChangeCommitted={(e, v) =>
-                          statsContext.setTimelineVisx({
-                            averaging: averages.movingAvg(v),
-                          })
-                        }
-                      />
-                    </Grid>
-                    <Grid item>
-                      <FontAwesomeIcon
-                        icon="chart-area"
-                        color={theme.palette.text.primary}
-                      />
-                    </Grid>
-                  </Grid>
-                </Box>
                 <ButtonGroup size="small" key="zoom">
                   <Button
                     onClick={() => zoomAroundPoint(innerWidth / 2, 0.66)}
@@ -431,6 +468,41 @@ const TimelineVisx = withTooltip(
                     <ChevronRight />
                   </Button>
                 </ButtonGroup>
+                <Box key="avg">
+                  {!statsContext.timelineVisx.timePeriod.averaging.disabled && (
+                    <Grid container spacing={2} alignItems="center" key="avg">
+                      <Grid item>
+                        <FontAwesomeIcon
+                          icon="chart-column"
+                          color={theme.palette.text.primary}
+                        />
+                      </Grid>
+                      <Grid item width="100px">
+                        <Slider
+                          {...statsContext.timelineVisx.timePeriod.averaging}
+                          //slotProps={{ markLabel: { fontSize: "0.8rem" } }}
+                          //sx={{ mb: 1 }}
+                          marks={true}
+                          size="small"
+                          valueLabelDisplay="on"
+                          value={window}
+                          onChange={(e, v) => setWindow(v)}
+                          onChangeCommitted={(e, v) =>
+                            statsContext.setTimelineVisx({
+                              averaging: averages.gaussianAvg(v),
+                            })
+                          }
+                        />
+                      </Grid>
+                      <Grid item>
+                        <FontAwesomeIcon
+                          icon="chart-area"
+                          color={theme.palette.text.primary}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
+                </Box>
               </TitleBox>
             </foreignObject>
             <Group key="lines" left={margin.left} top={margin.top}>
@@ -514,42 +586,6 @@ const TimelineVisx = withTooltip(
                   );
                 }}
               />
-              {/*<rect
-                      width={innerWidth}
-                      height={topChartHeight}
-                      rx={14}
-                      fill="transparent"
-                      style={{
-                        cursor: zoom.isDragging ? "grabbing" : "grab",
-                        touchAction: "none",
-                      }}
-                      ref={zoom.containerRef}
-                      onTouchStart={zoom.dragStart}
-                      onTouchMove={zoom.dragMove}
-                      onTouchEnd={zoom.dragEnd}
-                      onMouseDown={zoom.dragStart}
-                      onMouseMove={zoom.dragMove}
-                      onMouseUp={zoom.dragEnd}
-                      onMouseLeave={() => {
-                        if (zoom.isDragging) zoom.dragEnd();
-                      }}
-                      onDoubleClick={(event) => {
-                        const point = localPoint(event) || { x: 0, y: 0 };
-                        zoom.scale({ scaleX: 1.1, scaleY: 1.1, point });
-                        console.log(zoom);
-                      }}
-                      onScroll={(event) => {
-                        console.log(event.nativeEvent);
-                        if (!event.deltaY) return;
-                        var sign;
-                        if (Math.abs(event.deltaY) > Math.abs(event.deltaX))
-                          sign = Math.sign(event.deltaY);
-                        else sign = -Math.sign(event.deltaX);
-                        zoom.translate({
-                          translateX: sign * 10,
-                        });
-                      }}
-                    />*/}
             </Group>
             <Group
               key="brush"
@@ -567,9 +603,10 @@ const TimelineVisx = withTooltip(
                   fontSize: 10,
                   textAnchor: "middle",
                 }}
+                key="brushAxis"
               />
               {groupNames.map((groupName) => (
-                <>
+                <React.Fragment key={groupName}>
                   <AreaClosed
                     key={groupName}
                     curve={curveMonotoneX}
@@ -599,8 +636,46 @@ const TimelineVisx = withTooltip(
                     fill={theme.palette.text.primary}
                     fillOpacity={0.5}
                   />
-                </>
+                </React.Fragment>
               ))}
+              <rect
+                x={brushXScale(currentExtent[0])}
+                y={0}
+                width={
+                  brushXScale(currentExtent[1]) - brushXScale(currentExtent[0])
+                }
+                height={bottomChartHeight}
+                fill={theme.palette.text.primary}
+                fillOpacity={0.1}
+                stroke="transparent"
+              />
+              {[0, 1].map((i) => (
+                <line
+                  key={"brush" + i}
+                  x1={brushXScale(currentExtent[i])}
+                  x2={brushXScale(currentExtent[i])}
+                  y1={0}
+                  y2={bottomChartHeight}
+                  stroke={theme.palette.text.primary}
+                  strokeWidth={1}
+                  strokeOpacity={0.5}
+                />
+              ))}
+              <rect
+                width={innerWidth}
+                height={bottomChartHeight}
+                fill="transparent"
+                ref={bottomChartRef}
+                style={{
+                  touchAction: "none",
+                  cursor:
+                    brushOver == "middle"
+                      ? "grab"
+                      : brushOver == false
+                      ? "default"
+                      : "ew-resize",
+                }}
+              />
             </Group>
           </svg>
           {tooltipOpen &&

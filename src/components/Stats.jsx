@@ -681,7 +681,7 @@ export default function StatsView() {
         </Paper>
       </Grid>
       <Grid xs={12}>
-        <Paper sx={{ height: 400, width: "100%", position: "relative" }}>
+        <Box sx={{ height: 400, width: "100%", position: "relative" }}>
           <ParentSize>
             {({ width, height }) => (
               <ThemeProvider theme={darkTheme}>
@@ -689,7 +689,7 @@ export default function StatsView() {
               </ThemeProvider>
             )}
           </ParentSize>
-        </Paper>
+        </Box>
       </Grid>
       <Grid xs={12}>
         <Paper sx={{ height: 200 }}>

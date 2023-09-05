@@ -1411,17 +1411,19 @@ const timelineSettingsVisx = {
       id: "year",
       label: "Year",
       tick: d3t.timeYear,
+      days: 365,
       averaging: {
         disabled: true,
         valueLabelFormat: (v) => "",
         min: 0,
-        max: 0,
+        max: 1,
       },
     },
     month: {
       id: "month",
       label: "Month",
       tick: d3t.timeMonth,
+      days: 30,
       averaging: {
         disabled: false,
         valueLabelFormat: (v) => "±" + v + " months",
@@ -1433,6 +1435,7 @@ const timelineSettingsVisx = {
       id: "week",
       label: "Week",
       tick: d3t.timeMonday,
+      days: 7,
       averaging: {
         disabled: false,
         valueLabelFormat: (v) => "±" + v + " weeks",
@@ -1444,6 +1447,7 @@ const timelineSettingsVisx = {
       id: "day",
       label: "Day",
       tick: d3t.timeDay,
+      days: 1,
       averaging: {
         disabled: false,
         valueLabelFormat: (v) => "±" + v + " days",
@@ -1492,6 +1496,31 @@ const timelineSettingsVisx = {
           const sum = subArray.reduce((a, b) => a + b);
           const average = sum / subArray.length;
           result.push(average);
+        }
+        return result;
+      },
+    }),
+    gaussianAvg: (N) => ({
+      id: "gaussianAvg",
+      label: "Gaussian Average",
+      window: N,
+      fun: (values) => {
+        if (!values || values.length < N) {
+          return values;
+        }
+        const result = [];
+        for (let i = 0; i < values.length; i++) {
+          const start = Math.max(0, i - N);
+          const end = Math.min(values.length, i + N + 1);
+          //const subArray = values.slice(start, end);
+          var newResult = 0;
+          var normalizer = 0;
+          for (let j = start; j < end; j++) {
+            const weight = Math.exp(-Math.pow(2 * (i - j), 2) / (1 + N * N));
+            newResult += values[j] * weight;
+            normalizer += weight;
+          }
+          result.push(newResult / normalizer);
         }
         return result;
       },

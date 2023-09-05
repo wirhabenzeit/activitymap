@@ -51,7 +51,7 @@ const defaultStats = {
     value: timelineSettingsVisx.values.elevation,
     group: timelineSettingsVisx.groups.sport_group,
     timePeriod: timelineSettingsVisx.timePeriods.day,
-    averaging: timelineSettingsVisx.averages.movingAvg(30),
+    averaging: timelineSettingsVisx.averages.gaussianAvg(30),
     loaded: false,
     groups: [],
     data: [],
@@ -228,7 +228,8 @@ const updateTimeline = (data, timeline, setTimeline) => {
   return outData;
 };
 
-const computeTimelineVisx = ({ data, extent, group, fun, tick, avgFun }) => {
+const computeTimelineVisx = ({ data, extent, group, fun, tick, avg }) => {
+  console.log("computing timeline", avg);
   const groups = [...d3.group(data, group.fun).keys()];
   const bins = d3
     .bin()
@@ -247,7 +248,7 @@ const computeTimelineVisx = ({ data, extent, group, fun, tick, avgFun }) => {
     });
 
   const movingAvg = new d3.InternMap(
-    groups.map((g) => [g, avgFun(bins.map((d) => d.values.get(g)))])
+    groups.map((g) => [g, avg.fun(bins.map((d) => d.values.get(g)))])
   );
 
   bins.forEach((d, i) => {
@@ -258,15 +259,6 @@ const computeTimelineVisx = ({ data, extent, group, fun, tick, avgFun }) => {
   });
 
   return { groups: groups, data: bins, color: group.color };
-
-  /*return d3.groups(data, group.fun).map(([groupName, groupData]) => {
-    const data_values_avg = avgFun(bins.map((d) => d.value));
-    bins.forEach((d, i) => {
-      d.movingAvg = data_values_avg[i];
-    });
-
-    return { groups: groups, data: bins };
-  });*/
 };
 
 export function StatsContextProvider({ children }) {
@@ -278,8 +270,21 @@ export function StatsContextProvider({ children }) {
   const setTimelineVisx = (newTimeline) => {
     const timeline = { ...state.timelineVisx, ...newTimeline };
     if ("timePeriod" in newTimeline) {
-      if (newTimeline.timePeriod == timelineSettingsVisx.timePeriods.year)
-        newTimeline.averaging = timelineSettingsVisx.averages.movingAvg(0);
+      console.log(
+        "old window",
+        timeline.averaging.window,
+        "in days",
+        timeline.averaging.window * state.timelineVisx.timePeriod.days,
+        "new window",
+        (timeline.averaging.window * state.timelineVisx.timePeriod.days) /
+          newTimeline.timePeriod.days
+      );
+      timeline.averaging = timelineSettingsVisx.averages.gaussianAvg(
+        Math.round(
+          (timeline.averaging.window * state.timelineVisx.timePeriod.days) /
+            newTimeline.timePeriod.days
+        )
+      );
     }
     console.log("setting timeline visx", timeline);
     setState((state) => ({
@@ -293,7 +298,7 @@ export function StatsContextProvider({ children }) {
           group: timeline.group,
           fun: timeline.value.fun,
           tick: timeline.timePeriod.tick,
-          avgFun: timeline.averaging.fun,
+          avg: timeline.averaging,
         }),
       },
     }));
