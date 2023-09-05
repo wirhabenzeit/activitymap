@@ -8,8 +8,6 @@ import React, {
   useEffect,
 } from "react";
 
-import { useSpring, animated } from "@react-spring/web";
-
 import { useGesture } from "@use-gesture/react";
 
 import * as d3 from "d3-array";
@@ -24,30 +22,64 @@ import { curveMonotoneX } from "@visx/curve";
 import { Group } from "@visx/group";
 import { Axis } from "@visx/axis";
 import { GridColumns, GridRows } from "@visx/grid";
-import { Brush } from "@visx/brush";
-import { Zoom, applyMatrixToPoint } from "@visx/zoom";
 
 import { useTooltip, TooltipWithBounds, withTooltip } from "@visx/tooltip";
-import { localPoint } from "@visx/event";
 
 import { StatsContext } from "../../contexts/StatsContext";
 import { SelectionContext } from "../../contexts/SelectionContext";
 
-import { Typography, Box, Slider } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import {
+  Typography,
+  Box,
+  Slider as MuiSlider,
+  ButtonGroup,
+  IconButton,
+  Button,
+  Grid,
+} from "@mui/material";
+import { useTheme, styled } from "@mui/material/styles";
+import {
+  ZoomIn as ZoomInIcon,
+  ZoomOut as ZoomOutIcon,
+  ChevronRight,
+  ChevronLeft,
+} from "@mui/icons-material";
 
-const initialTransform = {
-  scaleX: 1,
-  scaleY: 1,
-  translateX: 0,
-  translateY: 0,
-  skewX: 0,
-  skewY: 0,
-};
+const Slider = styled(MuiSlider)(({ theme }) => ({
+  "& .MuiSlider-markLabel": {
+    //transform: "translateY(0.5rem)",
+    fontSize: "0.7rem",
+    top: "20px",
+  },
+  "& .MuiSlider-active": {
+    marginBottom: "0px !important",
+    marginTop: "20px",
+    cursor: "crosshair",
+    color: "green",
+  },
+  "& .MuiSlider-valueLabel": {
+    fontSize: 11,
+    fontWeight: "normal",
+    backgroundColor: "unset",
+    color: theme.palette.text.primary,
+    "&:before": {
+      display: "none",
+    },
+    "& *": {
+      background: "transparent",
+      color: theme.palette.mode === "dark" ? "#fff" : "#000",
+    },
+  },
+  "& .MuiSlider-thumb > span": {
+    transform: "translateX(0%)",
+    top: 10,
+  },
+}));
 
 import { timelineSettingsVisx } from "../../settings";
 
 import { TitleBox, CustomSelect, IconTooltip } from "../StatsUtilities.jsx";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 const selectedBrushStyle = {
   fill: `url(#brush_pattern)`,
@@ -80,7 +112,6 @@ const TimelineVisx = withTooltip(
     const [currentExtent, setCurrentExtent] = useState(statsContext.extent);
     const [transform, setTransform] = useState({
       x: 0,
-      y: 0,
       scale: 1,
     });
 
@@ -89,59 +120,31 @@ const TimelineVisx = withTooltip(
     }, [statsContext.extent]);
     const [isDragging, setIsDragging] = useState(false);
 
-    /*useGesture(
-      {
-        onDragStart: ({ event }) => {
-          if (!(event instanceof KeyboardEvent)) setIsDragging(true);
-        },
-        onDrag: ({ event, pinching, cancel }) => {
-          if (pinching) {
-            cancel();
-            setIsDragging(false);
-          } else if (!(event instanceof KeyboardEvent)) {
-            console.log("drag", event);
-          }
-        },
-        onDragEnd: () => setIsDragging(false),
-        onPinch: (event) => {
-          const zoomFactor = event.movement[0] > 1 ? 1.1 : 0.9;
-          setCurrentExtent((extent) => {
-            const extentS = extent.map((d) => d.getTime());
-            const totalLength = extentS[1] - extentS[0];
-            const centerPt =
-              extentS[0] +
-              (totalLength *
-                (event.origin[0] -
-                  topChartRef.current.getBoundingClientRect().left)) /
-                innerWidth;
-            const newExtentS = [
-              (extentS[0] - centerPt) / zoomFactor + centerPt,
-              (extentS[1] - centerPt) / zoomFactor + centerPt,
-            ];
-            return newExtentS.map((d) => new Date(d));
-          });
-        },
-        onWheel: ({ event, active, pinching }) => {
-          if (
-            // Outside of Safari, the wheel event is fired together with the pinch event
-            pinching ||
-            // currently onWheelEnd emits one final wheel event which causes 2x scale
-            // updates for the last tick. ensuring that the gesture is active avoids this
-            !active
-          ) {
-            return;
-          }
-          event.preventDefault();
-          console.log("scroll", event.initial, event.direction);
-        },
-      },
-      {
-        target: topChartRef,
-        eventOptions: { passive: false },
-        drag: { filterTaps: true },
-        pinch: { threshold: 0.1 },
-      }
-    );*/
+    const zoomAroundPoint = (point, zoom, transform0 = undefined) => {
+      if (transform0 === undefined) transform0 = transform;
+      //const { x } = topChartRef.current.getBoundingClientRect();
+      var scale = zoom * transform0.scale;
+      var scale = Math.min(Math.max(1, scale), 50);
+      var transformX =
+        transform0.x - (scale / transform0.scale - 1) * (point - transform0.x);
+      transformX = Math.min(Math.max(transformX, -innerWidth * (scale - 1)), 0);
+      setTransform({
+        scale: scale,
+        x: transformX,
+      });
+    };
+
+    const setTranslate = (translateX) =>
+      setTransform((transform) => ({
+        ...transform,
+        x: Math.min(
+          Math.max(
+            translateX(transform.x),
+            -innerWidth * (transform.scale - 1)
+          ),
+          0
+        ),
+      }));
 
     useGesture(
       {
@@ -149,37 +152,39 @@ const TimelineVisx = withTooltip(
         // onMove: ({ event }) => console.log('move', event),
         onDrag: ({ pinching, cancel, offset: [x, y], ...rest }) => {
           if (pinching) return cancel();
-          setTransform((transform) => ({ ...transform, x, y }));
+          setTranslate(() => x);
         },
-        onPinch: ({
-          origin: [ox, oy],
-          first,
-          movement: [ms],
-          offset: [s, a],
-          memo,
-        }) => {
+        onPinch: ({ origin: [ox, oy], first, movement: [ms], memo }) => {
           if (first) {
-            const { width, height, x, y } =
-              topChartRef.current.getBoundingClientRect();
-            const tx = ox - x;
-            memo = [transform.x, tx];
-            console.log("pinch", memo, ms, s, a);
+            memo = [
+              transform.x,
+              ox, //- topChartRef.current.getBoundingClientRect().x,
+              transform.scale,
+            ];
           }
-
-          const x = memo[0] - (ms - 1) * (memo[1] - memo[0]);
-          setTransform((transform) => ({ ...transform, scale: s, x }));
+          zoomAroundPoint(ox, ms, { scale: memo[2], x: memo[0] });
           return memo;
+        },
+        onWheel: ({ event, movement, active, pinching }) => {
+          if (pinching || !active) return;
+          if (
+            transform.x < 0 &&
+            transform.x > -innerWidth * (transform.scale - 1)
+          )
+            event.preventDefault();
+          setTranslate((x) => x - movement[1] / 10);
         },
       },
       {
         target: topChartRef,
-        drag: { from: () => [transform.x, transform.y] },
-        pinch: { scaleBounds: { min: 1, max: 10 }, rubberband: false },
+        drag: { from: () => [transform.x, transform.y], filterTaps: true },
+        eventOptions: { passive: false },
+        pinch: { rubberband: false },
       }
     );
 
     useEffect(() => {
-      console.log(transform);
+      //console.log(transform);
       setCurrentExtent(
         getZoomExtent({
           scaleX: transform.scale,
@@ -192,6 +197,7 @@ const TimelineVisx = withTooltip(
 
     const getZoomExtent = useCallback((zoom) => {
       const domain = statsContext.extent;
+      if (domain[0] === undefined) return domain;
       const domainS = domain.map((d) => d.getTime());
       const totalLength = domainS[1] - domainS[0];
       const zoomedLength = totalLength / zoom.scaleX;
@@ -283,23 +289,6 @@ const TimelineVisx = withTooltip(
       [currentExtent, width, height, margin]
     );
 
-    function constrain(transformMatrix, prevTransformMatrix) {
-      const newDomain = getZoomExtent(transformMatrix);
-      if (
-        newDomain[1] - newDomain[0] >
-        statsContext.extent[1] - statsContext.extent[0]
-      )
-        return prevTransformMatrix;
-      if (newDomain[0] < statsContext.extent[0])
-        return { ...transformMatrix, translateX: 0 };
-      if (newDomain[1] > statsContext.extent[1])
-        return {
-          ...transformMatrix,
-          translateX: innerWidth * (1 - transformMatrix.scaleX),
-        };
-      return transformMatrix;
-    }
-
     return (
       data.length > 0 && (
         <>
@@ -377,24 +366,71 @@ const TimelineVisx = withTooltip(
                   options={timelineSettingsVisx.timePeriods}
                   setState={statsContext.setTimelineVisx}
                 />
-                <Box width="150px" key="windowSize">
-                  <Slider
-                    {...statsContext.timelineVisx.timePeriod.averaging}
-                    slotProps={{ markLabel: { fontSize: "0.8rem" } }}
-                    sx={{ mb: 1 }}
-                    size="small"
-                    valueLabelDisplay="off"
-                    value={window} //{statsContext.timelineVisx.averaging.window}
-                    onChange={
-                      (e, v) => setWindow(v) //statsContext.setTimelineVisx({averaging: averages.movingAvg(v),})
-                    }
-                    onChangeCommitted={(e, v) =>
-                      statsContext.setTimelineVisx({
-                        averaging: averages.movingAvg(v),
-                      })
-                    }
-                  />
+                <Box key="windowSize">
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item>
+                      <FontAwesomeIcon
+                        icon="chart-column"
+                        color={theme.palette.text.primary}
+                      />
+                    </Grid>
+                    <Grid item width="100px">
+                      <Slider
+                        {...statsContext.timelineVisx.timePeriod.averaging}
+                        //slotProps={{ markLabel: { fontSize: "0.8rem" } }}
+                        //sx={{ mb: 1 }}
+                        marks={true}
+                        size="small"
+                        valueLabelDisplay="on"
+                        value={window} //{statsContext.timelineVisx.averaging.window}
+                        onChange={
+                          (e, v) => setWindow(v) //statsContext.setTimelineVisx({averaging: averages.movingAvg(v),})
+                        }
+                        onChangeCommitted={(e, v) =>
+                          statsContext.setTimelineVisx({
+                            averaging: averages.movingAvg(v),
+                          })
+                        }
+                      />
+                    </Grid>
+                    <Grid item>
+                      <FontAwesomeIcon
+                        icon="chart-area"
+                        color={theme.palette.text.primary}
+                      />
+                    </Grid>
+                  </Grid>
                 </Box>
+                <ButtonGroup size="small" key="zoom">
+                  <Button
+                    onClick={() => zoomAroundPoint(innerWidth / 2, 0.66)}
+                    disabled={transform.scale <= 1}
+                  >
+                    <ZoomOutIcon />
+                  </Button>
+                  <Button
+                    onClick={() => zoomAroundPoint(innerWidth / 2, 1.5)}
+                    disabled={transform.scale >= 50}
+                  >
+                    <ZoomInIcon />
+                  </Button>
+                </ButtonGroup>
+                <ButtonGroup size="small" key="translate">
+                  <Button
+                    disabled={transform.x >= 0}
+                    onClick={() => setTranslate((x) => x + 50)}
+                  >
+                    <ChevronLeft />
+                  </Button>
+                  <Button
+                    disabled={
+                      transform.x <= -innerWidth * (transform.scale - 1)
+                    }
+                    onClick={() => setTranslate((x) => x - 50)}
+                  >
+                    <ChevronRight />
+                  </Button>
+                </ButtonGroup>
               </TitleBox>
             </foreignObject>
             <Group key="lines" left={margin.left} top={margin.top}>
@@ -469,6 +505,13 @@ const TimelineVisx = withTooltip(
                 style={{
                   touchAction: "none",
                   cursor: isDragging ? "grabbing" : "grab",
+                }}
+                onDoubleClick={(event) => {
+                  zoomAroundPoint(
+                    event.clientX -
+                      topChartRef.current.getBoundingClientRect().x,
+                    1.5
+                  );
                 }}
               />
               {/*<rect

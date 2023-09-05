@@ -94,20 +94,6 @@ const darkTheme = createTheme({
   },
 });
 
-const Slider = styled(MuiSlider)(({ theme }) => ({
-  "& .MuiSlider-markLabel": {
-    //transform: "translateY(0.5rem)",
-    fontSize: "0.7rem",
-    top: "20px",
-  },
-  "& .MuiSlider-active": {
-    marginBottom: "0px !important",
-    marginTop: "20px",
-    cursor: "crosshair",
-    color: "green",
-  },
-}));
-
 import {
   calendarSettings,
   pieSettings,

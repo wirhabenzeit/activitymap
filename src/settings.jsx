@@ -1413,7 +1413,7 @@ const timelineSettingsVisx = {
       tick: d3t.timeYear,
       averaging: {
         disabled: true,
-        marks: [],
+        valueLabelFormat: (v) => "",
         min: 0,
         max: 0,
       },
@@ -1424,10 +1424,7 @@ const timelineSettingsVisx = {
       tick: d3t.timeMonth,
       averaging: {
         disabled: false,
-        marks: [
-          { value: 0, label: "0m" },
-          { value: 2, label: "5m" },
-        ],
+        valueLabelFormat: (v) => "±" + v + " months",
         min: 0,
         max: 2,
       },
@@ -1438,13 +1435,9 @@ const timelineSettingsVisx = {
       tick: d3t.timeMonday,
       averaging: {
         disabled: false,
-        marks: [
-          { value: 0, label: "0w" },
-          { value: 1, label: "3w" },
-          { value: 4, label: "9w" },
-        ],
+        valueLabelFormat: (v) => "±" + v + " weeks",
         min: 0,
-        max: 4,
+        max: 8,
       },
     },
     day: {
@@ -1453,13 +1446,9 @@ const timelineSettingsVisx = {
       tick: d3t.timeDay,
       averaging: {
         disabled: false,
-        marks: [
-          { value: 1, label: "3d" },
-          { value: 10, label: "3w" },
-          { value: 30, label: "2m" },
-        ],
+        valueLabelFormat: (v) => "±" + v + " days",
         min: 0,
-        max: 45,
+        max: 60,
       },
     },
   },

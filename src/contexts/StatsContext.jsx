@@ -277,6 +277,10 @@ export function StatsContextProvider({ children }) {
 
   const setTimelineVisx = (newTimeline) => {
     const timeline = { ...state.timelineVisx, ...newTimeline };
+    if ("timePeriod" in newTimeline) {
+      if (newTimeline.timePeriod == timelineSettingsVisx.timePeriods.year)
+        newTimeline.averaging = timelineSettingsVisx.averages.movingAvg(0);
+    }
     console.log("setting timeline visx", timeline);
     setState((state) => ({
       ...state,

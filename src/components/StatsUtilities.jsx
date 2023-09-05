@@ -41,6 +41,7 @@ export function TitleBox({ children }) {
         alignItems: "center",
         justifyContent: "center",
         whiteSpace: "noWrap",
+        pr: 2,
       }}
     >
       {children.map((child) =>
