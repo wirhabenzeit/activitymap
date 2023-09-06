@@ -52,6 +52,7 @@ const defaultStats = {
     group: timelineSettingsVisx.groups.sport_group,
     timePeriod: timelineSettingsVisx.timePeriods.day,
     averaging: timelineSettingsVisx.averages.gaussianAvg(30),
+    valueExtent: [undefined, undefined],
     loaded: false,
     groups: [],
     data: [],
@@ -237,7 +238,7 @@ const computeTimelineVisx = ({ data, extent, group, fun, tick, avg }) => {
     .domain(extent)
     .thresholds(tick.range(...extent))(data)
     .map((d) => {
-      const reduce = d3.rollup(d, fun, group.fun);
+      const reduce = d3.rollup(d, (v) => d3.sum(v, fun), group.fun);
       groups.forEach((g) => {
         if (!reduce.has(g)) reduce.set(g, 0);
       });
@@ -246,6 +247,8 @@ const computeTimelineVisx = ({ data, extent, group, fun, tick, avg }) => {
         values: reduce,
       };
     });
+
+  const valueExtent = d3.extent(data, fun);
 
   const movingAvg = new d3.InternMap(
     groups.map((g) => [g, avg.fun(bins.map((d) => d.values.get(g)))])
@@ -258,7 +261,7 @@ const computeTimelineVisx = ({ data, extent, group, fun, tick, avg }) => {
     d.movingAvg = iMovingAvg;
   });
 
-  return { groups: groups, data: bins, color: group.color };
+  return { groups: groups, data: bins, color: group.color, valueExtent };
 };
 
 export function StatsContextProvider({ children }) {

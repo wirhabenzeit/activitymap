@@ -1,6 +1,5 @@
 import React, {
   useContext,
-  cloneElement,
   useState,
   useCallback,
   useMemo,
@@ -13,17 +12,17 @@ import { useGesture } from "@use-gesture/react";
 import * as d3 from "d3-array";
 import * as d3f from "d3-force";
 
-import { scaleTime, scaleLinear } from "@visx/scale";
+import { scaleTime, scaleLinear, scaleSqrt } from "@visx/scale";
 
-import { PatternLines } from "@visx/pattern";
 import { LinearGradient } from "@visx/gradient";
-import { Circle, AreaStack, AreaClosed } from "@visx/shape";
+import { AreaStack, AreaClosed, Line } from "@visx/shape";
 import { curveMonotoneX } from "@visx/curve";
+import { localPoint } from "@visx/event";
 import { Group } from "@visx/group";
 import { Axis } from "@visx/axis";
 import { GridColumns, GridRows } from "@visx/grid";
 
-import { useTooltip, TooltipWithBounds, withTooltip } from "@visx/tooltip";
+import { withTooltip } from "@visx/tooltip";
 
 import { StatsContext } from "../../contexts/StatsContext";
 import { SelectionContext } from "../../contexts/SelectionContext";
@@ -33,7 +32,6 @@ import {
   Box,
   Slider as MuiSlider,
   ButtonGroup,
-  IconButton,
   Button,
   Grid,
 } from "@mui/material";
@@ -78,14 +76,14 @@ const Slider = styled(MuiSlider)(({ theme }) => ({
 
 import { timelineSettingsVisx } from "../../settings";
 
-import { TitleBox, CustomSelect, IconTooltip } from "../StatsUtilities.jsx";
+import {
+  TitleBox,
+  CustomSelect,
+  IconTooltip,
+  MultiIconTooltip,
+  symmetricDifference,
+} from "../StatsUtilities.jsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { memo } from "react";
-
-const selectedBrushStyle = {
-  fill: `url(#brush_pattern)`,
-  stroke: "#fff",
-};
 
 const TimelineVisx = withTooltip(
   ({
@@ -99,6 +97,7 @@ const TimelineVisx = withTooltip(
     tooltipTop,
   }) => {
     const statsContext = useContext(StatsContext);
+    const selectionContext = useContext(SelectionContext);
     const theme = useTheme();
 
     const groups = timelineSettingsVisx.groups;
@@ -116,7 +115,8 @@ const TimelineVisx = withTooltip(
       x: 0,
       scale: 1,
     });
-    const [memoTransform, setMemoTransform] = useState(transform);
+    const [animatedPoints, setAnimatedPoints] = useState([]);
+    const [hoverId, setHoverId] = useState(null);
 
     useEffect(() => {
       if (statsContext.extent[0] === undefined) return;
@@ -126,6 +126,19 @@ const TimelineVisx = withTooltip(
     }, [statsContext.extent]);
     const [isDragging, setIsDragging] = useState(false);
     const [brushOver, setBrushOver] = useState(false);
+
+    const handleSelection = useCallback(
+      (event) => {
+        if (hoverId !== null) {
+          if (event.metaKey)
+            selectionContext.setSelected((selected) => {
+              return symmetricDifference(selected, [hoverId]);
+            });
+          else selectionContext.setSelected([hoverId]);
+        }
+      },
+      [tooltipData]
+    );
 
     const zoomAroundPoint = (point, zoom, transform0 = undefined) => {
       if (transform0 === undefined) transform0 = transform;
@@ -152,10 +165,42 @@ const TimelineVisx = withTooltip(
         ),
       }));
 
+    const areaTooltip = ({ event }) => {
+      var { x, y } = localPoint(event);
+      const datum = data.filter(
+        ({ date }) =>
+          date.getTime() ===
+          statsContext.timelineVisx.timePeriod
+            .tick(xScale.invert(x - margin.left))
+            .getTime()
+      );
+      const tooltipData = datum.length > 0 ? datum[0] : undefined;
+      if (tooltipData) {
+        const cumSum = d3.cumsum(tooltipData.movingAvg.values());
+        tooltipData.cumMovingAvg = new d3.InternMap(
+          d3.zip([...tooltipData.movingAvg.keys()], cumSum)
+        );
+        if (yScale(cumSum[cumSum.length - 1]) + margin.top <= y)
+          showTooltip({
+            tooltipData,
+            tooltipLeft: x,
+            tooltipTop: 0,
+          });
+        else hideTooltip();
+      }
+    };
+
+    const rScale = useMemo(
+      () =>
+        scaleSqrt()
+          .domain([0, statsContext.timelineVisx.valueExtent[1]])
+          .range([1, 6]),
+      [statsContext.timelineVisx.valueExtent]
+    );
+
     useGesture(
       {
-        // onHover: ({ active, event }) => console.log('hover', event, active),
-        // onMove: ({ event }) => console.log('move', event),
+        onMove: areaTooltip,
         onDrag: ({ pinching, cancel, offset: [x, y], ...rest }) => {
           if (pinching) return cancel();
           setTranslate(() => x);
@@ -181,6 +226,7 @@ const TimelineVisx = withTooltip(
           )
             event.preventDefault();
           setTranslate((x) => x - movement[1] / 10);
+          areaTooltip({ event });
         },
       },
       {
@@ -366,6 +412,60 @@ const TimelineVisx = withTooltip(
       [currentExtent, width, height, margin]
     );
 
+    const pointData = useMemo(() => {
+      const filteredData = statsContext.data.filter(
+        (d) =>
+          d.date.getTime() >= currentExtent[0].getTime() &&
+          d.date.getTime() <= currentExtent[1].getTime()
+      );
+      if (statsContext.timelineVisx.value.sortable)
+        filteredData.sort(
+          (a, b) =>
+            statsContext.timelineVisx.value.fun(b) -
+            statsContext.timelineVisx.value.fun(a)
+        );
+      else d3.shuffle(filteredData);
+      const topData = filteredData.slice(0, 100);
+      return topData.map((d) => {
+        const prevPoint = animatedPoints.filter((p) => p.data.id === d.id);
+        return {
+          x: xScale(d.date),
+          x0: xScale(d.date),
+          y: prevPoint.length > 0 ? prevPoint[0].y : 0,
+          y0: 0,
+          data: d,
+        };
+      });
+    }, [statsContext.data, currentExtent, yScale]);
+
+    useEffect(() => {
+      const simulation = d3f
+        .forceSimulation()
+        .force(
+          "x",
+          d3f.forceX((d) => d.x0)
+        )
+        .force(
+          "y",
+          d3f.forceY((d) => 0)
+        )
+        .force(
+          "collide",
+          d3f.forceCollide(
+            (d) =>
+              rScale(statsContext.timelineVisx.value.fun(d.data)) +
+              (d.data.id == hoverId ? 4 : 1)
+          )
+        );
+      simulation.on("tick", () => {
+        setAnimatedPoints([...simulation.nodes()]);
+      });
+
+      simulation.nodes([...pointData]);
+      simulation.restart();
+      return () => simulation.stop();
+    }, [pointData, xScale, yScale, hoverId]);
+
     return (
       data.length > 0 && (
         <>
@@ -418,7 +518,7 @@ const TimelineVisx = withTooltip(
                   key="group"
                   propName="group"
                   value={statsContext.timelineVisx.group}
-                  name="Sport"
+                  name="Group"
                   options={groups}
                   setState={statsContext.setTimelineVisx}
                 />
@@ -480,8 +580,6 @@ const TimelineVisx = withTooltip(
                       <Grid item width="100px">
                         <Slider
                           {...statsContext.timelineVisx.timePeriod.averaging}
-                          //slotProps={{ markLabel: { fontSize: "0.8rem" } }}
-                          //sx={{ mb: 1 }}
                           marks={true}
                           size="small"
                           valueLabelDisplay="on"
@@ -516,6 +614,7 @@ const TimelineVisx = withTooltip(
                   fill: theme.palette.text.primary,
                   fontSize: 10,
                   textAnchor: "middle",
+                  dy: "-0.25rem",
                 }}
               />
               <Axis
@@ -555,6 +654,7 @@ const TimelineVisx = withTooltip(
                 y0={(d) => yScale(d[0])}
                 y1={(d) => yScale(d[1])}
                 key="stack"
+                curve={curveMonotoneX}
               >
                 {({ stacks, path }) =>
                   stacks.map((stack) => (
@@ -569,6 +669,32 @@ const TimelineVisx = withTooltip(
                   ))
                 }
               </AreaStack>
+              {tooltipOpen && tooltipData && "cumMovingAvg" in tooltipData && (
+                <Group>
+                  <Line
+                    from={{ x: tooltipLeft - margin.left, y: 0 }}
+                    to={{ x: tooltipLeft - margin.left, y: topChartHeight }}
+                    stroke={theme.palette.text.primary}
+                    strokeWidth={2}
+                    pointerEvents="none"
+                    strokeDasharray="5,2"
+                  />
+                  {d3.map(tooltipData.cumMovingAvg, ([key, value]) => (
+                    <circle
+                      key={key}
+                      cx={tooltipLeft - margin.left}
+                      cy={yScale(value)}
+                      r={4}
+                      fill={color(key)}
+                      fillOpacity={0.5}
+                      stroke="#fff"
+                      strokeOpacity={1}
+                      strokeWidth={1}
+                      pointerEvents="none"
+                    />
+                  ))}
+                </Group>
+              )}
               <rect
                 width={innerWidth}
                 height={topChartHeight}
@@ -585,7 +711,43 @@ const TimelineVisx = withTooltip(
                     1.5
                   );
                 }}
+                onMouseLeave={() => hideTooltip()}
               />
+              {animatedPoints.map((d) => (
+                <circle
+                  key={d.data.id}
+                  cx={d.x}
+                  cy={d.y}
+                  r={
+                    rScale(statsContext.timelineVisx.value.fun(d.data)) +
+                    (d.data.id == hoverId ? 3 : 0)
+                  }
+                  fill={statsContext.timelineVisx.group.color(
+                    statsContext.timelineVisx.group.fun(d.data)
+                  )}
+                  fillOpacity={0.5}
+                  stroke={
+                    selectionContext.selected.includes(d.data.id)
+                      ? "#000"
+                      : "#fff"
+                  }
+                  strokeOpacity={1}
+                  strokeWidth={2}
+                  onMouseOver={(event) => {
+                    setHoverId(d.data.id);
+                    showTooltip({
+                      tooltipData: { activity: d.data },
+                      tooltipLeft: d.x + margin.left,
+                      tooltipTop: d.y + margin.top,
+                    });
+                  }}
+                  onMouseOut={() => {
+                    setHoverId(null);
+                    hideTooltip();
+                  }}
+                  onClick={handleSelection}
+                />
+              ))}
             </Group>
             <Group
               key="brush"
@@ -678,15 +840,61 @@ const TimelineVisx = withTooltip(
               />
             </Group>
           </svg>
-          {tooltipOpen &&
-            tooltipData &&
-            tooltipLeft != null &&
-            tooltipTop != null && (
+          {tooltipOpen && tooltipData && "activity" in tooltipData && (
+            <div>
               <IconTooltip
                 left={tooltipLeft}
                 top={tooltipTop}
-                {...tooltipData}
+                withBounds={true}
+                icon={statsContext.timelineVisx.group.icon(
+                  statsContext.timelineVisx.group.fun(tooltipData.activity)
+                )}
+                textRight={tooltipData.activity.name}
+                color={color(
+                  statsContext.timelineVisx.group.fun(tooltipData.activity)
+                )}
               />
+            </div>
+          )}
+          {tooltipOpen &&
+            tooltipData &&
+            tooltipLeft != null &&
+            tooltipTop != null &&
+            "movingAvg" in tooltipData && (
+              <div>
+                <MultiIconTooltip
+                  left={tooltipLeft}
+                  top={tooltipTop + margin.top}
+                  withBounds={true}
+                  rows={d3.map(tooltipData.movingAvg, ([key, value]) => ({
+                    icon: statsContext.timelineVisx.group.icon(key),
+                    textLeft:
+                      statsContext.timelineVisx.value.format(value) +
+                      statsContext.timelineVisx.value.unit,
+                    color: color(key),
+                    key: key,
+                  }))}
+                />
+                <MultiIconTooltip
+                  left={tooltipLeft - 10}
+                  top={margin.top + topChartHeight - 10}
+                  style={{
+                    transform: "translate(-50%,-50%)",
+                    minWidth: "7rem",
+                  }}
+                  withBounds={false}
+                  rows={[
+                    {
+                      icon: "calendar",
+                      textRight: statsContext.timelineVisx.timePeriod.format(
+                        tooltipData.date
+                      ),
+                      color: "#666",
+                      key: "date",
+                    },
+                  ]}
+                />
+              </div>
             )}
         </>
       )

@@ -1,6 +1,6 @@
 import React, { cloneElement } from "react";
 
-import { TooltipWithBounds } from "@visx/tooltip";
+import { Tooltip, TooltipWithBounds, defaultStyles } from "@visx/tooltip";
 
 import {
   ListSubheader,
@@ -17,6 +17,10 @@ import {
   Chip,
   Typography,
   Slider,
+  Table,
+  TableCell,
+  TableBody,
+  TableRow,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
@@ -174,38 +178,112 @@ export const IconTooltip = ({
   color = "#eeeeee",
   left,
   top,
-}) => (
-  <TooltipWithBounds left={left} top={top}>
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-      }}
+  style,
+}) => {
+  return (
+    <TooltipWithBounds
+      left={left}
+      top={top}
+      style={{ ...defaultStyles, ...style }}
     >
-      {textLeft && (
-        <Typography
-          sx={{
-            mr: 1,
-            fontSize: "small",
-          }}
-        >
-          {textLeft}
-        </Typography>
-      )}
-      {icon && <FontAwesomeIcon fontSize="small" icon={icon} color={color} />}
-      {textRight && (
-        <Typography
-          sx={{
-            ml: 1,
-            fontSize: "small",
-          }}
-        >
-          {textRight}
-        </Typography>
-      )}
-    </Box>
-  </TooltipWithBounds>
-);
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        {textLeft && (
+          <Typography
+            sx={{
+              mr: 1,
+              fontSize: "small",
+            }}
+          >
+            {textLeft}
+          </Typography>
+        )}
+        {icon && <FontAwesomeIcon fontSize="small" icon={icon} color={color} />}
+        {textRight && (
+          <Typography
+            sx={{
+              ml: 1,
+              fontSize: "small",
+            }}
+          >
+            {textRight}
+          </Typography>
+        )}
+      </Box>
+    </TooltipWithBounds>
+  );
+};
+
+export const MultiIconTooltip = ({
+  rows,
+  left,
+  top,
+  style,
+  withBounds = false,
+}) => {
+  const table = (
+    <Table size="small">
+      <TableBody>
+        {rows.map(({ textLeft, textRight, icon, color, key }) => (
+          <TableRow
+            key={key}
+            sx={{ "td, th": { border: 0, px: "2px", py: 0 } }}
+          >
+            <TableCell align="right">
+              {textLeft && (
+                <Typography sx={{ fontSize: "small", color: "#666" }}>
+                  {textLeft}
+                </Typography>
+              )}
+            </TableCell>
+            <TableCell align="center">
+              {icon && (
+                <FontAwesomeIcon fontSize="small" icon={icon} color={color} />
+              )}
+            </TableCell>
+            <TableCell align="left">
+              {textRight && (
+                <Typography sx={{ fontSize: "small", color: "#666" }}>
+                  {textRight}
+                </Typography>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+  if (withBounds)
+    return (
+      <TooltipWithBounds
+        left={left}
+        top={top}
+        style={{
+          ...defaultStyles,
+          ...style,
+        }}
+      >
+        {table}
+      </TooltipWithBounds>
+    );
+  else
+    return (
+      <Tooltip
+        left={left}
+        top={top}
+        style={{
+          ...defaultStyles,
+          ...style,
+        }}
+      >
+        {table}
+      </Tooltip>
+    );
+};
 
 export const ChipTooltip = ({
   color = "#eeeeee",

@@ -1370,37 +1370,45 @@ const timelineSettingsVisx = {
   values: {
     count: {
       id: "count",
-      fun: (v) => v.length,
+      fun: (d) => 1,
+      sortable: false,
+      format: (v) => v,
       label: "Count",
       unit: "",
     },
     distance: {
       id: "distance",
-      fun: (v) => d3.sum(v, (d) => d.distance),
+      fun: (d) => d.distance,
+      sortable: true,
       format: (v) =>
         v >= 10_000_000
           ? (v / 1_000_000).toFixed() + "k"
+          : v < 10_000
+          ? (v / 1000).toFixed(1)
           : (v / 1000).toFixed(),
       label: "Distance",
       unit: "km",
     },
     elevation: {
       id: "elevation",
-      fun: (v) => d3.sum(v, (d) => d.total_elevation_gain),
+      sortable: true,
+      fun: (d) => d.total_elevation_gain,
       format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
       label: "Elevation",
       unit: "m",
     },
     time: {
       id: "time",
-      fun: (v) => d3.sum(v, (d) => d.elapsed_time),
+      sortable: true,
+      fun: (d) => d.elapsed_time,
       format: (v) => (v / 3600).toFixed(1),
       label: "Duration",
       unit: "h",
     },
     kudos_count: {
       id: "kudos_count",
-      fun: (v) => d3.sum(v, (d) => d.kudos_count),
+      sortable: true,
+      fun: (d) => d.kudos_count,
       format: (v) => v,
       label: "Kudos",
       unit: "",
@@ -1412,6 +1420,7 @@ const timelineSettingsVisx = {
       label: "Year",
       tick: d3t.timeYear,
       days: 365,
+      format: (v) => new Date(v).getFullYear(),
       averaging: {
         disabled: true,
         valueLabelFormat: (v) => "",
@@ -1424,6 +1433,7 @@ const timelineSettingsVisx = {
       label: "Month",
       tick: d3t.timeMonth,
       days: 30,
+      format: (v) => d3tf.timeFormat("%Y-%m")(new Date(v)),
       averaging: {
         disabled: false,
         valueLabelFormat: (v) => "±" + v + " months",
@@ -1436,6 +1446,7 @@ const timelineSettingsVisx = {
       label: "Week",
       tick: d3t.timeMonday,
       days: 7,
+      format: (v) => d3tf.timeFormat("%Y, %U")(new Date(v)),
       averaging: {
         disabled: false,
         valueLabelFormat: (v) => "±" + v + " weeks",
@@ -1448,6 +1459,7 @@ const timelineSettingsVisx = {
       label: "Day",
       tick: d3t.timeDay,
       days: 1,
+      format: (v) => d3tf.timeFormat("%Y-%m-%d")(new Date(v)),
       averaging: {
         disabled: false,
         valueLabelFormat: (v) => "±" + v + " days",
@@ -1459,18 +1471,18 @@ const timelineSettingsVisx = {
   groups: {
     sport_group: {
       id: "sport_group",
-      label: "Group",
+      label: "Type",
       fun: (d) => aliasMap[d.sport_type],
       color: (id) => categorySettings[id].color,
       icon: (id) => categorySettings[id].icon,
     },
-    sport_type: {
+    /*sport_type: {
       id: "sport_type",
       label: "Type",
       fun: (d) => d.sport_type,
       color: (id) => categorySettings[aliasMap[id]].color,
       icon: (id) => categorySettings[aliasMap[id]].icon,
-    },
+    },*/
     no_group: {
       id: "no_group",
       label: "All",
