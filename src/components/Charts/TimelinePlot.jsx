@@ -425,7 +425,7 @@ const TimelineVisx = withTooltip(
             statsContext.timelineVisx.value.fun(a)
         );
       else d3.shuffle(filteredData);
-      const topData = filteredData.slice(0, 100);
+      const topData = filteredData.slice(0, 30);
       return topData.map((d) => {
         const prevPoint = animatedPoints.filter((p) => p.data.id === d.id);
         return {
