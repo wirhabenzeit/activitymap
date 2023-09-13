@@ -12,6 +12,7 @@ import * as d3tf from "d3-time-format";
 import { scaleLog, scaleLinear, scaleSqrt } from "@visx/scale";
 
 import { LayerSAC } from "/src/components/LayerSAC";
+import { gaussianAvg, movingWindow } from "./components/StatsUtilities";
 
 const stravaTypes = [
   "AlpineSki",
@@ -238,11 +239,13 @@ categorySettings.misc = {
 };
 
 const colorMap = {};
+const iconMap = {};
 const aliasMap = {};
 
 Object.entries(categorySettings).forEach(([key, value]) => {
   value.alias.forEach((alias) => {
     colorMap[alias] = value.color;
+    iconMap[alias] = value.icon;
     aliasMap[alias] = key;
   });
 });
@@ -683,17 +686,9 @@ const occurrencesOfDay = (date, from, to) => {
 
 const calendarSettings = {
   values: {
-    count: {
-      id: "count",
-      fun: (v) => v.length,
-      label: "Count",
-      unit: "",
-      maxValue: 3,
-      format: (v) => v,
-    },
     distance: {
       id: "distance",
-      fun: (v) => d3.sum(v, (d) => d.distance),
+      fun: (d) => d.distance,
       format: (v) => (v / 1000).toFixed() + "km",
       label: "Distance",
       unit: "km",
@@ -701,7 +696,7 @@ const calendarSettings = {
     },
     elevation: {
       id: "elevation",
-      fun: (v) => d3.sum(v, (d) => d.total_elevation_gain),
+      fun: (d) => d.total_elevation_gain,
       format: (v) => (v / 1.0).toFixed() + "m",
       label: "Elevation",
       unit: "km",
@@ -709,7 +704,7 @@ const calendarSettings = {
     },
     time: {
       id: "time",
-      fun: (v) => d3.sum(v, (d) => d.elapsed_time),
+      fun: (d) => d.elapsed_time,
       format: (v) => (v / 3600).toFixed(1) + "h",
       label: "Duration",
       unit: "h",
@@ -1496,46 +1491,13 @@ const timelineSettingsVisx = {
       id: "movingAvg",
       label: "Moving Average",
       window: N,
-      fun: (values) => {
-        if (!values || values.length < N) {
-          return values;
-        }
-        const result = [];
-        for (let i = 0; i < values.length; i++) {
-          const start = Math.max(0, i - N);
-          const end = Math.min(values.length, i + N + 1);
-          const subArray = values.slice(start, end);
-          const sum = subArray.reduce((a, b) => a + b);
-          const average = sum / subArray.length;
-          result.push(average);
-        }
-        return result;
-      },
+      fun: movingWindow(N),
     }),
     gaussianAvg: (N) => ({
       id: "gaussianAvg",
       label: "Gaussian Average",
       window: N,
-      fun: (values) => {
-        if (!values || values.length < N) {
-          return values;
-        }
-        const result = [];
-        for (let i = 0; i < values.length; i++) {
-          const start = Math.max(0, i - N);
-          const end = Math.min(values.length, i + N + 1);
-          //const subArray = values.slice(start, end);
-          var newResult = 0;
-          var normalizer = 0;
-          for (let j = start; j < end; j++) {
-            const weight = Math.exp(-Math.pow(2 * (i - j), 2) / (1 + N * N));
-            newResult += values[j] * weight;
-            normalizer += weight;
-          }
-          result.push(newResult / normalizer);
-        }
-        return result;
-      },
+      fun: gaussianAvg(N),
     }),
   },
 };
@@ -1548,6 +1510,8 @@ export {
   binaryFilters,
   listSettings,
   aliasMap,
+  colorMap,
+  iconMap,
   timelineSettings,
   pieSettings,
   calendarSettings,

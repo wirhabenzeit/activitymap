@@ -38,9 +38,9 @@ export function TitleBox({ children, sx }) {
   return (
     <Box
       sx={{
-        height: "60px",
+        height: "70px",
         width: 1,
-        overflowX: "auto",
+        overflowX: "scroll",
         alignItems: "center",
         justifyContent: "center",
         whiteSpace: "noWrap",
@@ -223,7 +223,7 @@ export const MultiIconTooltip = ({
   left,
   top,
   style,
-  withBounds = false,
+  withBounds = true,
 }) => {
   const table = (
     <Table size="small">
@@ -354,4 +354,45 @@ export function useDimensions(ref) {
     })
   );
   return useMemo(() => JSON.parse(dimensions), [dimensions]);
+}
+
+export function movingWindow(N) {
+  return (values) => {
+    if (!values || values.length < N) {
+      return values;
+    }
+    const result = [];
+    for (let i = 0; i < values.length; i++) {
+      const start = Math.max(0, i - N);
+      const end = Math.min(values.length, i + N + 1);
+      const subArray = values.slice(start, end);
+      const sum = subArray.reduce((a, b) => a + b);
+      const average = sum / subArray.length;
+      result.push(average);
+    }
+    return result;
+  };
+}
+
+export function gaussianAvg(N) {
+  return (values) => {
+    if (!values || values.length < N) {
+      return values;
+    }
+    const result = [];
+    for (let i = 0; i < values.length; i++) {
+      const start = Math.max(0, i - N);
+      const end = Math.min(values.length, i + N + 1);
+      //const subArray = values.slice(start, end);
+      var newResult = 0;
+      var normalizer = 0;
+      for (let j = start; j < end; j++) {
+        const weight = Math.exp(-Math.pow(2 * (i - j), 2) / (1 + N * N));
+        newResult += values[j] * weight;
+        normalizer += weight;
+      }
+      result.push(newResult / normalizer);
+    }
+    return result;
+  };
 }

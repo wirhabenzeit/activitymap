@@ -11,7 +11,6 @@ import { FilterContext } from "./FilterContext";
 import { SelectionContext } from "./SelectionContext";
 import * as d3tf from "d3-time-format";
 import * as d3 from "d3-array";
-import * as d3f from "d3-force";
 import * as d3t from "d3-time";
 
 import {
@@ -57,6 +56,13 @@ const defaultStats = {
     groups: [],
     data: [],
   },
+  radialTimeline: {
+    value: timelineSettingsVisx.values.elevation,
+    averaging: timelineSettingsVisx.averages.gaussianAvg(40),
+    valueExtent: [undefined, undefined],
+    loaded: false,
+    data: new d3.InternMap(),
+  },
   pie: {
     value: pieSettings.values.elevation,
     group: pieSettings.groups.sport_group,
@@ -80,7 +86,7 @@ const defaultStats = {
     value: calendarSettings.values.elevation,
     extent: [undefined, undefined],
     loaded: false,
-    data: [],
+    data: new d3.InternMap(),
     activitiesByDate: {},
     colorScaleFn: (colors) => (value) => colors[0],
     onClick: () => {},
@@ -115,23 +121,17 @@ const updateMap = (data, map) => {
   return { data: outData, domain: domain };
 };
 
-const updateCalendar = (data, calendar, selectedDays, setSelected) => {
-  const activitiesByDate = d3.group(data, (f) =>
-    d3tf.timeFormat("%Y-%m-%d")(f.date)
+const updateCalendar = (data, calendar, selectedDays, setSelected, extent) => {
+  const activitiesByDate = d3.group(data, (f) => d3t.timeDay(f.date));
+  const rollup = d3.rollup(
+    data,
+    (v) => d3.sum(v, calendar.value.fun),
+    (d) => d3t.timeMonth(d.date),
+    (d) => d3t.timeDay(d.date)
   );
-  const outData = d3.map(activitiesByDate, ([key, value]) => ({
-    value: selectedDays.includes(key) ? "selected" : calendar.value.fun(value),
-    day: key,
-  }));
-  const onClick = (point) => {
-    const selected = activitiesByDate.get(point.day);
-    if (selected) setSelected(selected.map((f) => f.id));
-    else setSelected([]);
-  };
   return {
-    data: outData,
+    data: rollup,
     activitiesByDate: activitiesByDate,
-    onClick: onClick,
   };
 };
 
@@ -273,15 +273,6 @@ export function StatsContextProvider({ children }) {
   const setTimelineVisx = (newTimeline) => {
     const timeline = { ...state.timelineVisx, ...newTimeline };
     if ("timePeriod" in newTimeline) {
-      console.log(
-        "old window",
-        timeline.averaging.window,
-        "in days",
-        timeline.averaging.window * state.timelineVisx.timePeriod.days,
-        "new window",
-        (timeline.averaging.window * state.timelineVisx.timePeriod.days) /
-          newTimeline.timePeriod.days
-      );
       timeline.averaging = timelineSettingsVisx.averages.gaussianAvg(
         Math.round(
           (timeline.averaging.window * state.timelineVisx.timePeriod.days) /
@@ -289,7 +280,6 @@ export function StatsContextProvider({ children }) {
         )
       );
     }
-    console.log("setting timeline visx", timeline);
     setState((state) => ({
       ...state,
       timelineVisx: {
@@ -303,6 +293,39 @@ export function StatsContextProvider({ children }) {
           tick: timeline.timePeriod.tick,
           avg: timeline.averaging,
         }),
+      },
+    }));
+  };
+
+  const setRadialTimeline = (newTimeline) => {
+    const timeline = { ...state.radialTimeline, ...newTimeline };
+
+    const bins = d3
+      .bin()
+      .value((d) => d.date)
+      .domain(state.extent)
+      .thresholds(d3t.timeDay.range(...state.extent))(state.data)
+      .map((d) => {
+        const sum = d3.sum(d, timeline.value.fun);
+        return {
+          date: d3t.timeDay(d.x0),
+          value: sum,
+        };
+      });
+
+    const movingAvg = timeline.averaging.fun(bins.map((d) => d.value));
+
+    bins.forEach((d, i) => {
+      d.movingAvg = movingAvg[i];
+    });
+
+    setState((state) => ({
+      ...state,
+      radialTimeline: {
+        ...timeline,
+        data: bins,
+        valueExtent: [0, d3.max(bins, (d) => d.movingAvg)],
+        loaded: true,
       },
     }));
   };
@@ -480,7 +503,8 @@ export function StatsContextProvider({ children }) {
           10
         )
       ),
-      selectionContext.setSelected
+      selectionContext.setSelected,
+      state.extent
     );
     setState((state) => ({
       ...state,
@@ -512,6 +536,7 @@ export function StatsContextProvider({ children }) {
       setScatter({});
       setViolin({});
       setTimelineVisx({});
+      setRadialTimeline({});
     }
   }, [state.data]);
 

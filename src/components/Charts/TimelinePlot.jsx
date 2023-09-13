@@ -869,6 +869,7 @@ const TimelinePlot = ({
                       tl.value.unit,
                     textRight: tooltipData.activity.name,
                     color: color(tl.group.fun(tooltipData.activity)),
+                    key: tooltipData.activity.id,
                   },
                 ]}
               />
