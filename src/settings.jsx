@@ -12,6 +12,7 @@ import * as d3tf from "d3-time-format";
 import { scaleLog, scaleLinear, scaleSqrt } from "@visx/scale";
 
 import { LayerSAC } from "/src/components/LayerSAC";
+import { LayerQuaeldich } from "/src/components/LayerQuaeldich";
 import { gaussianAvg, movingWindow } from "./components/StatsUtilities";
 
 const stravaTypes = [
@@ -139,6 +140,12 @@ const mapSettings = {
     visible: false,
     type: "custom",
     component: LayerSAC,
+  },
+  "Quäldich Pässe": {
+    overlay: true,
+    visible: false,
+    type: "custom",
+    component: LayerQuaeldich,
   },
   "Swisstopo Ski": {
     url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/{z}/{x}/{y}.png`,
