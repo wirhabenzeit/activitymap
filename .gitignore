@@ -11,3 +11,4 @@ dist
 out*
 *seed.sql
 migrations
+*.sql

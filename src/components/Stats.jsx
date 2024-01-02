@@ -106,6 +106,7 @@ import ViolinPlot from "./Charts/ViolinPlot.jsx";
 import TimelinePlot from "./Charts/TimelinePlot.jsx";
 import ScatterPlot from "./Charts/ScatterPlot.jsx";
 import CalendarPlot from "./Charts/CalendarPlot.jsx";
+import Test from "./Charts/Test.jsx";
 
 import * as d3 from "d3-array";
 import * as d3t from "d3-time";
@@ -156,6 +157,13 @@ export default function StatsView() {
           </ParentSize>
         </Box>
       </Grid>
+      {/* <Grid>
+        <Box sx={{ height: "400px", width: "100%", position: "relative" }}>
+          <ParentSize>
+            {({ width, height }) => <Test width={width} height={height} />}
+          </ParentSize>
+        </Box>
+      </Grid> */}
     </Grid>
   );
 }
