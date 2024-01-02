@@ -12,7 +12,7 @@
     "host": "vite --host"
   },
   "dependencies": {
-    "@dwayneparton/geojson-to-gpx": "^0.0.28",
+    "@dwayneparton/geojson-to-gpx": "^0.1.0",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
     "@fortawesome/fontawesome-svg-core": "^6.5.1",
@@ -56,7 +56,7 @@
     "d3-time-format": "^4.1.0",
     "file-saver": "^2.0.5",
     "js-cookie": "^3.0.5",
-    "mapbox-gl": "^2.15.0",
+    "mapbox-gl": "^3.0.1",
     "proj4": "^2.9.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
