@@ -6,8 +6,8 @@ settings:
 
 dependencies:
   '@dwayneparton/geojson-to-gpx':
-    specifier: ^0.0.28
-    version: 0.0.28
+    specifier: ^0.1.0
+    version: 0.1.0
   '@emotion/react':
     specifier: ^11.11.3
     version: 11.11.3(@types/react@18.2.46)(react@18.2.0)
@@ -423,8 +423,8 @@ packages:
       '@babel/helper-validator-identifier': 7.22.20
       to-fast-properties: 2.0.0
 
-  /@dwayneparton/geojson-to-gpx@0.0.28:
-    resolution: {integrity: sha512-R7Xjvs8QYsumd74JxPsL+WtT/QEpPJcg9MLb6dp/YaDihyyWf7Mdwy8yl71YZwWVbCRS7wAnLylBNghMSfK61g==}
+  /@dwayneparton/geojson-to-gpx@0.1.0:
+    resolution: {integrity: sha512-HEMrs5bYZOiFMx3XCaCxbJls1kC/YRAbWwu714TYiNSntAYWg12SMIGleGiBwu3H+grvwrWtTVKr0MlxpFQ7AQ==}
     dev: false
 
   /@emotion/babel-plugin@11.11.0:
