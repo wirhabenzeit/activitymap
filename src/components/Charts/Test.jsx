@@ -1,12 +1,10 @@
-import React, { useContext, useRef, useMemo, useState } from "react";
-import { Box } from "@mui/material";
+import React, { useContext, useRef } from "react";
 import * as d3t from "d3-time";
-import * as d3 from "d3-array";
-
+import { Typography, Box } from "@mui/material";
 import * as Plot from "@observablehq/plot";
 import PlotFigure from "./../PlotFigure.jsx";
-//import "./styles.css";
-import { TitleBox, useDimensions } from "../StatsUtilities.jsx";
+import { TitleBox, useDimensions, CustomSelect } from "../StatsUtilities.jsx";
+import { calendarSettings } from "../../settings";
 
 import { StatsContext } from "../../contexts/StatsContext.jsx";
 
@@ -19,18 +17,47 @@ export default function Test() {
     statsContext.calendar.loaded && (
       <Box
         sx={{
-          height: 200,
           width: "100%",
-          position: "relative",
-          borderRadius: "20px",
+          height: "100%",
+          margin: 0,
+          padding: 0,
+          overflowY: "scroll",
+          borderRadius: 5,
         }}
         ref={ref}
       >
+        <TitleBox>
+          <Typography variant="h6" key="heading">
+            Calendar
+          </Typography>
+          <CustomSelect
+            key="value"
+            propName="value"
+            value={statsContext.calendar.value}
+            name="Value"
+            options={calendarSettings.values}
+            setState={statsContext.setCalendar}
+          />
+        </TitleBox>
         <PlotFigure
           options={{
+            height:
+              ((7 *
+                (statsContext.calendar.extent[1].getUTCFullYear() -
+                  statsContext.calendar.extent[0].getUTCFullYear() +
+                  1)) /
+                52) *
+              width,
+            width: width,
             padding: 0,
+            marginLeft: 0,
+            marginRight: 40,
             x: { axis: null },
-            y: { tickFormat: Plot.formatWeekday("en", "narrow"), tickSize: 0 },
+            y: {
+              tickFormat: (d) =>
+                Plot.formatWeekday("en", "narrow")((d + 1) % 7),
+              tickSize: 0,
+            },
             fy: { tickFormat: "" },
             color: {
               scheme: "reds",
@@ -39,22 +66,22 @@ export default function Test() {
               label: statsContext.calendar.value.label,
               tickFormat: statsContext.calendar.value.format,
               ticks: 3,
-              width: 400,
+              width: width,
             },
             marks: [
               Plot.cell(statsContext.calendar.dayTotals, {
                 x: (d) => d3t.utcWeek.count(d3t.utcYear(d.date), d.date),
-                y: (d) => (d.date.getUTCDay() + 1) % 7,
+                y: (d) => d.date.getUTCDay(),
                 fy: (d) => d.date.getUTCFullYear(),
                 fill: (d) => d.value,
-                inset: 0.5,
+                inset: 1,
                 channels: {
                   Date: (d) => d.date.toDateString(),
                   Activities: (d) =>
                     statsContext.calendar.activitiesByDate
                       .get(d.date)
                       .map((d) => d.name)
-                      .join(",\n"),
+                      .join("&"),
                 },
                 tip: {
                   format: {
@@ -62,6 +89,7 @@ export default function Test() {
                     x: null,
                     y: null,
                     fx: null,
+                    fy: null,
                   },
                 },
               }),

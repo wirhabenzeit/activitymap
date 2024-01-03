@@ -112,7 +112,6 @@ const StatsContext = createContext(defaultStats);
 const updateMap = (data, map) => {
   const filteredData = d3.filter(data, (f) => map.timeGroup.filter(f));
   const rollup = d3.rollups(filteredData, map.value.fun, (f) => f.country);
-  console.log(rollup);
   const outData = d3.map(rollup, ([key, value]) => ({
     id: key,
     value: value,
@@ -239,7 +238,6 @@ const updateTimeline = (data, timeline, setTimeline) => {
 };
 
 const computeTimelineVisx = ({ data, extent, group, fun, tick, avg }) => {
-  console.log("computing timeline", avg);
   const groups = [...d3.group(data, group.fun).keys()];
   const bins = d3
     .bin()
@@ -340,7 +338,6 @@ export function StatsContextProvider({ children }) {
   };
 
   const setTimeline = (newTimeline) => {
-    console.log("setting timeline");
     const timeline = {
       ...state.timeline,
       ...newTimeline,
@@ -557,7 +554,6 @@ export function StatsContextProvider({ children }) {
       data.forEach((feature) => {
         feature.date = new Date(feature.start_date_local);
       });
-      console.log(data);
       setState({
         ...state,
         extent: d3.extent(data, (f) => f.date),
