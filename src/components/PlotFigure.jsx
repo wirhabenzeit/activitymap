@@ -11,5 +11,5 @@ export default function PlotFigure({ options }) {
     return () => plot.remove();
   }, [options]);
 
-  return <div ref={containerRef} />;
+  return <div ref={containerRef} style={{ margin: 0 }} />;
 }

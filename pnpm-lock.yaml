@@ -113,6 +113,9 @@ dependencies:
   ParentSize:
     specifier: link:@visx/responsive/lib/components/ParentSize
     version: link:@visx/responsive/lib/components/ParentSize
+  d3:
+    specifier: ^7.8.5
+    version: 7.8.5
   d3-array:
     specifier: ^3.2.4
     version: 3.2.4
@@ -134,6 +137,9 @@ dependencies:
   file-saver:
     specifier: ^2.0.5
     version: 2.0.5
+  htl:
+    specifier: ^0.3.1
+    version: 0.3.1
   js-cookie:
     specifier: ^3.0.5
     version: 3.0.5
@@ -3513,6 +3519,11 @@ packages:
     resolution: {integrity: sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==}
     dependencies:
       react-is: 16.13.1
+    dev: false
+
+  /htl@0.3.1:
+    resolution: {integrity: sha512-1LBtd+XhSc+++jpOOt0lCcEycXs/zTQSupOISnVAUmvGBpV7DH+C2M6hwV7zWYfpTMMg9ch4NO0lHiOTAMHdVA==}
+    engines: {node: '>=12'}
     dev: false
 
   /https-proxy-agent@7.0.2:

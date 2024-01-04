@@ -1,5 +1,5 @@
-import React, { useContext, useRef } from "react";
-import * as d3 from "d3-array";
+import React, { useContext, useRef, useEffect } from "react";
+import * as d3 from "d3";
 import { Typography, Box } from "@mui/material";
 import * as Plot from "@observablehq/plot";
 import PlotFigure from "./../PlotFigure.jsx";
@@ -8,99 +8,198 @@ import { scatterSettings } from "../../settings";
 
 import { StatsContext } from "../../contexts/StatsContext.jsx";
 
-export default function Test() {
+function legendRadius(
+  scale,
+  {
+    label = scale.label,
+    ticks = 5,
+    tickFormat = (d) => d,
+    strokeWidth = 0.5,
+    strokeDasharray = [5, 4],
+    lineHeight = 8,
+    gap = 20,
+    style,
+  } = {}
+) {
+  // const s = scale.scale;
+  const s =
+    scale.type === "pow"
+      ? d3.scalePow(scale.domain, scale.range).exponent(scale.exponent)
+      : d3.scaleLinear(scale.domain, scale.range);
+
+  const r0 = scale.range[1];
+  const shiftY = label ? 10 : 0;
+
+  let h = Infinity;
+  const values = s
+    .ticks(ticks)
+    .reverse()
+    .filter((t) => h - s(t) > lineHeight / 2 && (h = s(t)));
+
+  return Plot.plot({
+    width: 2 * r0 + 90,
+    x: { type: "identity", axis: null },
+    r: { type: "identity" },
+    y: { type: "identity", axis: null },
+    marks: [
+      Plot.link(values, {
+        x1: r0 + 2,
+        y1: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
+        x2: 2 * r0 + 2 + gap,
+        y2: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
+        strokeWidth: strokeWidth / 2,
+        strokeDasharray,
+      }),
+      Plot.dot(values, {
+        r: s,
+        x: r0 + 2,
+        y: (d) => 8 + 2 * r0 - s(d) + shiftY,
+        strokeWidth,
+      }),
+      Plot.text(values, {
+        x: 2 * r0 + 2 + gap,
+        y: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
+        textAnchor: "start",
+        dx: 4,
+        text: tickFormat,
+      }),
+      Plot.text(label ? [label] : [], {
+        x: 0,
+        y: 6,
+        textAnchor: "start",
+        fontWeight: "bold",
+      }),
+    ],
+    height: 2 * r0 + 10 + shiftY,
+    style,
+  });
+}
+
+export default function ScatterPlot() {
   const statsContext = useContext(StatsContext);
   const ref = useRef(null);
+  const figureRef = useRef(null);
+  const legendRef = useRef(null);
   const { width, height } = useDimensions(ref);
+  const scatterSetting = statsContext.scatter;
+
+  useEffect(() => {
+    if (!statsContext.calendar.loaded) return;
+    const plot = Plot.plot({
+      height: height,
+      width: width,
+      padding: 0,
+      marginLeft: 50,
+      marginRight: 30,
+      x: {
+        tickFormat: scatterSetting.xValue.formatAxis,
+        grid: true,
+        ticks: 6,
+      },
+      y: {
+        tickFormat: scatterSetting.yValue.formatAxis,
+        grid: true,
+        ticks: 6,
+      },
+      r: {
+        range: [0, 10],
+        domain: d3.extent(statsContext.data, scatterSetting.size.fun),
+      },
+      marks: [
+        Plot.dot(statsContext.data, {
+          x: scatterSetting.xValue.fun,
+          y: scatterSetting.yValue.fun,
+          r: scatterSetting.size.fun,
+          fill: (d) => scatterSetting.group.color(scatterSetting.group.fun(d)),
+          fillOpacity: 0.5,
+          channels: {
+            Activity: (d) => d.name,
+            [scatterSetting.size.label]: scatterSetting.size.fun,
+            [scatterSetting.xValue.label]: scatterSetting.xValue.fun,
+            [scatterSetting.yValue.label]: scatterSetting.yValue.fun,
+          },
+          tip: {
+            format: {
+              x: null,
+              y: null,
+              r: null,
+              fill: null,
+              Activity: (x) => x,
+              [scatterSetting.size.label]: scatterSetting.size.format,
+              [scatterSetting.xValue.label]: scatterSetting.xValue.format,
+              [scatterSetting.yValue.label]: scatterSetting.yValue.format,
+            },
+          },
+        }),
+        Plot.crosshair(statsContext.data, {
+          x: scatterSetting.xValue.fun,
+          y: scatterSetting.yValue.fun,
+          color: (d) => scatterSetting.group.color(scatterSetting.group.fun(d)),
+        }),
+      ],
+    });
+    const legend = legendRadius(plot.scale("r"), {
+      ticks: 4,
+      tickFormat: scatterSetting.size.format,
+      label: scatterSetting.size.label,
+    });
+    figureRef.current.append(plot);
+    legendRef.current.append(legend);
+    return () => {
+      plot.remove();
+      legend.remove();
+    };
+  }, [statsContext.scatter, width, height]);
 
   return (
-    statsContext.loaded &&
-    statsContext.data.length > 0 && (
+    <>
       <Box
         sx={{
+          pt: 1,
+          px: 1,
+          m: 1,
+          gap: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          whiteSpace: "noWrap",
+          display: "flex",
+        }}
+      >
+        <CustomSelect
+          key="xValue"
+          propName="xValue"
+          value={statsContext.scatter.xValue}
+          name="X"
+          options={scatterSettings.values}
+          setState={statsContext.setScatter}
+        />
+        <CustomSelect
+          key="yValue"
+          propName="yValue"
+          value={statsContext.scatter.yValue}
+          name="Y"
+          options={scatterSettings.values}
+          setState={statsContext.setScatter}
+        />
+        <CustomSelect
+          key="size"
+          propName="size"
+          value={statsContext.scatter.size}
+          name="Size"
+          options={scatterSettings.values}
+          setState={statsContext.setScatter}
+        />
+        <div ref={legendRef} key="legend"></div>
+      </Box>
+      <Box
+        style={{
           width: "100%",
-          height: "100%",
-          margin: 0,
-          padding: 0,
-          borderRadius: 5,
+          flexGrow: 1,
         }}
         ref={ref}
       >
-        <TitleBox sx={{ pt: 1, pl: 1 }}>
-          <Typography variant="h6" key="heading">
-            Scatter
-          </Typography>
-          <CustomSelect
-            key="xValue"
-            propName="xValue"
-            value={statsContext.scatter.xValue}
-            name="X"
-            options={scatterSettings.values}
-            setState={statsContext.setScatter}
-          />
-          <CustomSelect
-            key="yValue"
-            propName="yValue"
-            value={statsContext.scatter.yValue}
-            name="Y"
-            options={scatterSettings.values}
-            setState={statsContext.setScatter}
-          />
-          <CustomSelect
-            key="size"
-            propName="size"
-            value={statsContext.scatter.size}
-            name="Size"
-            options={scatterSettings.values}
-            setState={statsContext.setScatter}
-          />
-        </TitleBox>
-        <PlotFigure
-          options={{
-            height: height,
-            width: width,
-            padding: 0,
-            marginLeft: 50,
-            marginRight: 30,
-            x: {
-              tickFormat: statsContext.scatter.xValue.format,
-            },
-            y: {
-              tickFormat: statsContext.scatter.yValue.format,
-            },
-            r: {
-              range: [0, 10],
-              domain: d3.extent(
-                statsContext.data,
-                statsContext.scatter.size.fun
-              ),
-              type: "sqrt",
-              legend: true,
-            },
-            marks: [
-              Plot.dot(statsContext.data, {
-                x: statsContext.scatter.xValue.fun,
-                y: statsContext.scatter.yValue.fun,
-                r: statsContext.scatter.size.fun,
-                fill: (d) =>
-                  statsContext.scatter.group.color(
-                    statsContext.scatter.group.fun(d)
-                  ),
-                fillOpacity: 0.5,
-                channels: {
-                  name: (d) => d.name,
-                },
-                tip: {
-                  format: {
-                    x: statsContext.scatter.xValue.format,
-                    y: statsContext.scatter.yValue.format,
-                  },
-                },
-              }),
-            ],
-          }}
-        />
+        <div ref={figureRef}></div>
       </Box>
-    )
+    </>
   );
 }

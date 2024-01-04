@@ -26,6 +26,7 @@ import { ActivityContext } from "/src/contexts/ActivityContext";
 import MapView from "/src/components/Map";
 import ListView from "/src/components/List";
 import StatsView from "/src/components/Stats";
+import Stats2View from "/src/components/Stats2";
 import { User } from "/src/components/AppBar";
 import {
   MultiSelect,
@@ -61,6 +62,7 @@ const drawerWidth = 250;
 const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== "open",
 })(({ theme, open }) => ({
+  height: 64,
   zIndex: theme.zIndex.drawer + 1,
   transition: theme.transitions.create(["width", "margin"], {
     easing: theme.transitions.easing.sharp,
@@ -111,7 +113,7 @@ const Drawer = styled(MuiDrawer, {
   }),
 }));
 
-const pathMap = { "/": 0, "/list": 1, "/stats": 2 };
+const pathMap = { "/": 0, "/list": 1, "/stats": 2, "/stats2": 3 };
 
 function App() {
   const { pathname, search } = useLocation();
@@ -200,6 +202,13 @@ function App() {
                     goTo("/stats");
                   }}
                 />
+                <StyledTab
+                  label="More"
+                  index={3}
+                  onClick={() => {
+                    goTo("/stats2");
+                  }}
+                />
               </Tabs>
             </Box>
             <Box sx={{ flexGrow: 1 }} />
@@ -260,17 +269,23 @@ function App() {
         sx={{
           height: "100%",
           width: "calc(100% - 33px)",
-          display: "flex",
           p: 0,
-          flexDirection: "column",
         }}
       >
         <DrawerHeader sx={{ flexGrow: 0 }} />
-        <Box sx={{ width: 1, flexGrow: 1, minHeight: 0, minWidth: 0 }}>
+        <Box
+          sx={{
+            width: 1,
+            height: "calc(100% - 64px)",
+            minHeight: 0,
+            minWidth: 0,
+          }}
+        >
           <Routes>
             <Route exact path="/" element={<MapView mapRef={mapRef} />} />
             <Route exact path="/list" element={<ListView />} />
-            <Route exact path="/stats" element={<StatsView />} />
+            <Route exact path="/stats" element={<Stats2View />} />
+            <Route exact path="/stats2" element={<StatsView />} />
           </Routes>
         </Box>
       </Box>

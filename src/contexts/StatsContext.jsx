@@ -90,6 +90,7 @@ const defaultStats = {
     activitiesByDate: {},
     colorScaleFn: (colors) => (value) => colors[0],
     onClick: () => {},
+    dayTotals: [],
   },
   scatter: {
     xValue: scatterSettings.values.date,
@@ -121,18 +122,18 @@ const updateMap = (data, map) => {
 };
 
 const updateCalendar = (data, calendar, selectedDays, setSelected, extent) => {
-  const activitiesByDate = d3.group(data, (f) => d3t.timeDay(f.date));
+  const activitiesByDate = d3.group(data, (f) => d3t.utcDay(f.date));
   const rollup = d3.rollup(
     data,
     (v) => d3.sum(v, calendar.value.fun),
     (d) => d3t.timeMonth(d.date),
-    (d) => d3t.timeDay(d.date)
+    (d) => d3t.utcDay(d.date)
   );
   const dayTotals = d3.map(
     d3.rollup(
       data,
       (v) => d3.sum(v, calendar.value.fun),
-      (d) => d3t.timeDay(d.date)
+      (d) => d3t.utcDay(d.date)
     ),
     ([key, value]) => ({ date: key, value })
   );

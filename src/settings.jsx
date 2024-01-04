@@ -227,12 +227,6 @@ var categorySettings = {
     ],
     active: true,
   },
-  /*"Alpine Ski": {
-    color: "#3FA7D6",
-    icon: "person-skiing",
-    alias: ["AlpineSki", "Snowboard"],
-    active: true,
-  },*/
 };
 
 const usedTypes = Object.values(categorySettings).flatMap((x) => x.alias);

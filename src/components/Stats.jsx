@@ -129,9 +129,9 @@ export default function StatsView() {
           <TypePie />
         </Paper>
       </Grid>*/}
-      <Grid xs={12}>
+      {/* <Grid xs={12}>
         <CalendarPlot />
-      </Grid>
+      </Grid> */}
       <Grid xs={12}>
         <TimelinePlot />
       </Grid>
@@ -140,9 +140,9 @@ export default function StatsView() {
           <ActivityCalendar />
         </Paper>
             </Grid>*/}
-      <Grid xs={12}>
+      {/* <Grid xs={12}>
         <ScatterPlot />
-      </Grid>
+      </Grid> */}
       <Grid xs={12}>
         <Box
           sx={{
@@ -154,24 +154,6 @@ export default function StatsView() {
           <ParentSize>
             {({ width, height }) => (
               <ViolinPlot width={width} height={height} />
-            )}
-          </ParentSize>
-        </Box>
-      </Grid>
-      <Grid xs={12} lg={6}>
-        <Box sx={{ height: "400px", width: "100%", position: "relative" }}>
-          <ParentSize>
-            {({ width, height }) => (
-              <CalendarPlot2 width={width} height={height} />
-            )}
-          </ParentSize>
-        </Box>
-      </Grid>
-      <Grid xs={12}>
-        <Box sx={{ height: "400px", width: "100%", position: "relative" }}>
-          <ParentSize>
-            {({ width, height }) => (
-              <ScatterPlot2 width={width} height={height} />
             )}
           </ParentSize>
         </Box>
