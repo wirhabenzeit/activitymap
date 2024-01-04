@@ -37,10 +37,10 @@ function legendRadius(
     .filter((t) => h - s(t) > lineHeight / 2 && (h = s(t)));
 
   return Plot.plot({
-    width: 2 * r0 + 90,
     x: { type: "identity", axis: null },
     r: { type: "identity" },
     y: { type: "identity", axis: null },
+    caption: "",
     marks: [
       Plot.link(values, {
         x1: r0 + 2,
@@ -70,7 +70,7 @@ function legendRadius(
         fontWeight: "bold",
       }),
     ],
-    height: 2 * r0 + 10 + shiftY,
+    width: 80,
     style,
   });
 }
@@ -143,6 +143,9 @@ export default function ScatterPlot() {
       tickFormat: scatterSetting.size.format,
       label: scatterSetting.size.label,
     });
+    Object.assign(legend, {
+      style: `height: 40px; overflow: scroll; margin: 0;`,
+    });
     figureRef.current.append(plot);
     legendRef.current.append(legend);
     return () => {
@@ -161,8 +164,11 @@ export default function ScatterPlot() {
           gap: 1,
           alignItems: "center",
           justifyContent: "center",
-          whiteSpace: "noWrap",
+          //whiteSpace: "noWrap",
+          overflowX: "auto",
+          overflowY: "hidden",
           display: "flex",
+          height: "64px",
         }}
       >
         <CustomSelect
@@ -172,6 +178,7 @@ export default function ScatterPlot() {
           name="X"
           options={scatterSettings.values}
           setState={statsContext.setScatter}
+          sx={{ minWidth: "100px" }}
         />
         <CustomSelect
           key="yValue"
@@ -180,6 +187,7 @@ export default function ScatterPlot() {
           name="Y"
           options={scatterSettings.values}
           setState={statsContext.setScatter}
+          sx={{ minWidth: "100px" }}
         />
         <CustomSelect
           key="size"
@@ -188,17 +196,19 @@ export default function ScatterPlot() {
           name="Size"
           options={scatterSettings.values}
           setState={statsContext.setScatter}
+          sx={{ minWidth: "100px" }}
         />
-        <div ref={legendRef} key="legend"></div>
+        <div ref={legendRef} key="legend" style={{ minWidth: 80 }}></div>
       </Box>
       <Box
         style={{
           width: "100%",
-          flexGrow: 1,
+          height: "100%",
+          //flexGrow: 1,
         }}
         ref={ref}
       >
-        <div ref={figureRef}></div>
+        <div ref={figureRef} style={{ height: "64px" }}></div>
       </Box>
     </>
   );

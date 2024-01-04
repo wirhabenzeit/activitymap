@@ -43,6 +43,8 @@ CustomTabPanel.propTypes = {
   value: PropTypes.number.isRequired,
 };
 
+const tabHeight = 48;
+
 export default function BasicTabs() {
   const [value, setValue] = React.useState(0);
 
@@ -55,8 +57,6 @@ export default function BasicTabs() {
       sx={{
         width: "100%",
         height: "100%", // set a specific height
-        display: "flex",
-        flexDirection: "column",
       }}
     >
       <Box sx={{ borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
@@ -65,21 +65,21 @@ export default function BasicTabs() {
           onChange={handleChange}
           aria-label="basic tabs example"
         >
-          <Tab label="Scatter" id="calendar" />
-          <Tab label="Calendar" id="scatter" />
+          <Tab label="Scatter" id="calendar" sx={{ height: tabHeight }} />
+          <Tab label="Calendar" id="scatter" sx={{ height: tabHeight }} />
         </Tabs>
       </Box>
       <CustomTabPanel
         value={value}
         index={0}
-        style={{ flexGrow: 1, overflow: "auto" }}
+        style={{ height: `calc(100% - ${tabHeight}px)`, overflowY: "auto" }}
       >
         <ScatterPlot />
       </CustomTabPanel>
       <CustomTabPanel
         value={value}
         index={1}
-        style={{ flexGrow: 1, overflow: "auto" }}
+        style={{ height: `calc(100% - ${tabHeight}px)`, overflowY: "auto" }}
       >
         <CalendarPlot />
       </CustomTabPanel>

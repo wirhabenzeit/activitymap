@@ -62,7 +62,7 @@ const drawerWidth = 250;
 const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== "open",
 })(({ theme, open }) => ({
-  height: 64,
+  height: { xs: 56, sm: 64 },
   zIndex: theme.zIndex.drawer + 1,
   transition: theme.transitions.create(["width", "margin"], {
     easing: theme.transitions.easing.sharp,
@@ -132,7 +132,7 @@ function App() {
   };
 
   return (
-    <Box sx={{ display: "flex", width: 1, height: 1 }}>
+    <Box sx={{ display: "flex", width: 1, height: 1, overflowY: "hidden" }}>
       <CssBaseline />
       <AppBar position="fixed" open={open}>
         <ThemeProvider theme={darkTheme}>
@@ -231,7 +231,7 @@ function App() {
           sx={{
             width: 1,
             height: 1,
-            overflowY: "scroll",
+            overflowY: "hidden",
           }}
         >
           <List>
@@ -276,9 +276,10 @@ function App() {
         <Box
           sx={{
             width: 1,
-            height: "calc(100% - 64px)",
+            height: { xs: "calc(100% - 56px)", sm: "calc(100% - 64px)" },
             minHeight: 0,
             minWidth: 0,
+            overflowY: "hidden",
           }}
         >
           <Routes>
