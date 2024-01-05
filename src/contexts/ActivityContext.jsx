@@ -260,6 +260,9 @@ function ActivityContextProvider({ children }) {
   };
 
   useEffect(() => {
+    if (Cookies.get("athlete") == undefined)
+      Cookies.remove("athlete", { path: "/" });
+
     if (searchParams.get("code")) setCode(searchParams.get("code"));
     else if (searchParams.get("athlete"))
       setAthlete(Number(searchParams.get("athlete")));
