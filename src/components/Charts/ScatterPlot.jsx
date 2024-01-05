@@ -1,9 +1,10 @@
 import React, { useContext, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import * as d3 from "d3";
 import * as Plot from "@observablehq/plot";
 
 import { StatsContext } from "../../contexts/StatsContext.jsx";
-import { CustomSelect, LegendPlot } from "../StatsUtilities.jsx";
+import { CustomSelect } from "../StatsUtilities.jsx";
 import { scatterSettings } from "../../settings.jsx";
 
 function legendRadius(
@@ -74,40 +75,7 @@ function legendRadius(
   });
 }
 
-function ScatterSettings() {
-  const statsContext = useContext(StatsContext);
-
-  return (
-    <>
-      <CustomSelect
-        key="xValue"
-        propName="xValue"
-        value={statsContext.scatter.xValue}
-        name="X"
-        options={scatterSettings.values}
-        setState={statsContext.setScatter}
-      />
-      <CustomSelect
-        key="yValue"
-        propName="yValue"
-        value={statsContext.scatter.yValue}
-        name="Y"
-        options={scatterSettings.values}
-        setState={statsContext.setScatter}
-      />
-      <CustomSelect
-        key="size"
-        propName="size"
-        value={statsContext.scatter.size}
-        name="Size"
-        options={scatterSettings.values}
-        setState={statsContext.setScatter}
-      />
-    </>
-  );
-}
-
-function ScatterPlot({ width, height, legendRef }) {
+export default function ScatterPlot({ width, height, settingsRef }) {
   const statsContext = useContext(StatsContext);
   const figureRef = useRef(null);
   const scatterSetting = statsContext.scatter;
@@ -115,20 +83,26 @@ function ScatterPlot({ width, height, legendRef }) {
   useEffect(() => {
     if (!statsContext.calendar.loaded) return;
     const plot = Plot.plot({
-      height: height,
-      width: width,
+      height: Math.max(height, 100),
+      width: Math.max(width, 100),
       padding: 0,
-      marginLeft: 50,
-      marginRight: 30,
+      marginLeft: 60,
+      marginRight: 60,
+      marginBottom: 30,
+      style: {
+        fontSize: 12,
+      },
       x: {
         tickFormat: scatterSetting.xValue.formatAxis,
         grid: true,
         ticks: 6,
+        axis: "top",
       },
       y: {
         tickFormat: scatterSetting.yValue.formatAxis,
         grid: true,
         ticks: 6,
+        axis: "right",
       },
       r: {
         range: [0, 10],
@@ -173,28 +147,49 @@ function ScatterPlot({ width, height, legendRef }) {
       label: scatterSetting.size.label,
     });
     Object.assign(legend, {
-      style: `height: 40px; overflow: scroll; min-width: 0px; margin: 0px;`,
+      style: `height: 40px; overflow: scroll; min-width: 100px; margin: 0px;`,
     });
     figureRef.current.append(plot);
-    legendRef.current.append(legend);
+    settingsRef.current.append(legend);
     return () => {
       plot.remove();
       legend.remove();
     };
   }, [statsContext.scatter, width, height]);
 
-  return <div ref={figureRef} style={{ height: height, width: width }} />;
-}
-
-export function Scatter({ settingsOpen }) {
-  const legendRef = useRef(null);
-
   return (
-    <LegendPlot
-      settingsOpen={settingsOpen}
-      settings={<ScatterSettings />}
-      plot={<ScatterPlot legendRef={legendRef} />}
-      legendRef={legendRef}
-    />
+    <>
+      <div ref={figureRef} style={{ height: height, width: width }} />
+      {settingsRef.current &&
+        createPortal(
+          <>
+            <CustomSelect
+              key="xValue"
+              propName="xValue"
+              value={statsContext.scatter.xValue}
+              name="X"
+              options={scatterSettings.values}
+              setState={statsContext.setScatter}
+            />
+            <CustomSelect
+              key="yValue"
+              propName="yValue"
+              value={statsContext.scatter.yValue}
+              name="Y"
+              options={scatterSettings.values}
+              setState={statsContext.setScatter}
+            />
+            <CustomSelect
+              key="size"
+              propName="size"
+              value={statsContext.scatter.size}
+              name="Size"
+              options={scatterSettings.values}
+              setState={statsContext.setScatter}
+            />
+          </>,
+          settingsRef.current
+        )}
+    </>
   );
 }

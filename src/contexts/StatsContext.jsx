@@ -23,14 +23,6 @@ import {
   timelineSettingsVisx,
 } from "../settings";
 
-const defaultTimeline = {
-  timePeriod: timelineSettings.timePeriods.week,
-  value: timelineSettings.values.time,
-  group: timelineSettings.groups.sport_group,
-  timeGroup: timelineSettings.timeGroups.byYear(2023),
-  loaded: false,
-};
-
 const defaultStats = {
   data: [],
   allData: [],
@@ -41,10 +33,11 @@ const defaultStats = {
     loaded: false,
   },
   timeline: {
-    ...defaultTimeline,
-    stat: timelineSettings.stats(defaultTimeline).cumTotal,
+    timePeriod: timelineSettings.timePeriods.week,
+    value: timelineSettings.values.elevation,
+    group: timelineSettings.groups.sport_group,
+    averaging: 10,
     loaded: false,
-    data: [],
   },
   timelineVisx: {
     value: timelineSettingsVisx.values.elevation,
@@ -342,29 +335,53 @@ export function StatsContextProvider({ children }) {
     const timeline = {
       ...state.timeline,
       ...newTimeline,
-      extent: state.extent,
     };
-    // stats depend on the other props
-    if (!("stat" in newTimeline))
-      timeline.stat = timelineSettings.stats(timeline)[timeline.stat.id];
-    // if switching from relative to absolute, reset timeGroup to all
-    if (
-      "timePeriod" in newTimeline &&
-      !newTimeline.timePeriod.relative &&
-      timeline.timeGroup.highlight
-    )
-      timeline.timeGroup = timelineSettings.timeGroups.all(
-        timeline.timeGroup.highlight
-      );
 
-    const data = updateTimeline(state.data, timeline, setTimeline);
+    const extent = d3.extent(state.data, (d) =>
+      timeline.timePeriod.tick(d.date)
+    );
+
+    const groupExtent = Array.from(new Set(state.data.map(timeline.group.fun)));
+
+    const range = timeline.timePeriod.tick.range(
+      extent[0],
+      timeline.timePeriod.tick.ceil(extent[1])
+    );
+
+    const groups = d3.group(
+      state.data,
+      (d) => timeline.timePeriod.tick(d.date),
+      timeline.group.fun
+    );
+
+    const map = d3.map(range, (date) => {
+      return groupExtent.map((type) => ({
+        date,
+        type,
+        value:
+          groups.get(date)?.get(type) != undefined
+            ? d3.sum(groups.get(date)?.get(type), timeline.value.fun)
+            : 0,
+      }));
+    });
+
     setState((state) => ({
       ...state,
       timeline: {
         ...state.timeline,
         ...timeline,
-        data: data,
+        data: map.flat().sort((a, b) => a.date - b.date),
         loaded: true,
+        extent,
+        range,
+        groups,
+        groupExtent,
+        map: new d3.InternMap(
+          map.map((arr) => [
+            arr[0].date,
+            new d3.InternMap(arr.map(({ value, type }) => [type, value])),
+          ])
+        ),
       },
     }));
   };

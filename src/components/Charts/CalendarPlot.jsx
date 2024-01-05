@@ -1,9 +1,10 @@
 import React, { useContext, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import * as d3 from "d3";
-import { Typography, Box } from "@mui/material";
+import { Typography, Box, Divider } from "@mui/material";
 import * as Plot from "@observablehq/plot";
 
-import { CustomSelect, LegendPlot } from "../StatsUtilities.jsx";
+import { CustomSelect } from "../StatsUtilities.jsx";
 import { calendarSettings } from "../../settings.jsx";
 import * as htl from "htl";
 
@@ -54,22 +55,7 @@ class MonthLine extends Plot.Mark {
   }
 }
 
-function CalendarSettings() {
-  const statsContext = useContext(StatsContext);
-
-  return (
-    <CustomSelect
-      key="value"
-      propName="value"
-      value={statsContext.calendar.value}
-      name="Value"
-      options={calendarSettings.values}
-      setState={statsContext.setCalendar}
-    />
-  );
-}
-
-function CalendarPlot({ width, height, legendRef }) {
+export default function CalendarPlot({ width, height, settingsRef }) {
   const statsContext = useContext(StatsContext);
   const figureRef = useRef(null);
 
@@ -174,12 +160,17 @@ function CalendarPlot({ width, height, legendRef }) {
       tickFormat: statsContext.calendar.value.format,
       label: statsContext.calendar.value.label,
       width: 300,
-      marginLeft: 20,
-      marginBottom: 30,
-      marginTop: 10,
+      height: 40,
+      marginLeft: 10,
+      marginRight: 10,
+      marginBottom: 20,
+      marginTop: 15,
+    });
+    Object.assign(legend, {
+      style: `height: 40px; overflow: scroll; min-width: 300px; margin: 0px;`,
     });
     figureRef.current.append(plot);
-    legendRef.current.append(legend);
+    settingsRef.current.append(legend);
     return () => {
       plot.remove();
       legend.remove();
@@ -187,29 +178,30 @@ function CalendarPlot({ width, height, legendRef }) {
   }, [statsContext.calendar]);
 
   return (
-    <Box
-      sx={{
-        height: height,
-        width: width,
-        overflowY: "scroll",
-        display: "flex",
-        justifyContent: "center",
-      }}
-    >
-      <div ref={figureRef} />
-    </Box>
-  );
-}
-
-export default function Calendar({ settingsOpen }) {
-  const legendRef = useRef(null);
-
-  return (
-    <LegendPlot
-      settingsOpen={settingsOpen}
-      settings={<CalendarSettings />}
-      plot={<CalendarPlot legendRef={legendRef} />}
-      legendRef={legendRef}
-    />
+    <>
+      <Box
+        sx={{
+          height: height,
+          width: width,
+          overflowY: "scroll",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <div ref={figureRef} />
+      </Box>
+      {settingsRef.current &&
+        createPortal(
+          <CustomSelect
+            key="value"
+            propName="value"
+            value={statsContext.calendar.value}
+            name="Value"
+            options={calendarSettings.values}
+            setState={statsContext.setCalendar}
+          />,
+          settingsRef.current
+        )}
+    </>
   );
 }

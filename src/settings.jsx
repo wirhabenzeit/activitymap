@@ -718,9 +718,9 @@ const scatterSettings = {
   values: {
     distance: {
       id: "distance",
-      fun: (d) => d.distance,
-      format: (v) => (v / 1000).toFixed() + "km",
-      formatAxis: (v) => (v / 1000).toFixed(),
+      fun: (d) => d.distance / 1000,
+      format: (v) => v.toFixed() + "km",
+      formatAxis: (v) => v.toFixed(),
       label: "Distance",
       unit: "km",
     },
@@ -734,17 +734,17 @@ const scatterSettings = {
     },
     time: {
       id: "time",
-      fun: (d) => d.elapsed_time,
-      format: (v) => (v / 3600).toFixed(1) + "h",
-      formatAxis: (v) => (v / 3600).toFixed(1),
+      fun: (d) => d.elapsed_time / 3600,
+      format: (v) => v.toFixed(1) + "h",
+      formatAxis: (v) => v.toFixed(1),
       label: "Duration",
       unit: "h",
     },
     date: {
       id: "date",
-      fun: (d) => d.start_date_local_timestamp,
-      formatAxis: (v) => d3tf.timeFormat("%b %Y")(new Date(v * 1000)),
-      format: (v) => d3tf.timeFormat("%Y-%m-%d")(new Date(v * 1000)),
+      fun: (d) => d.date,
+      formatAxis: (v) => d3tf.timeFormat("%b %Y")(v),
+      format: (v) => d3tf.timeFormat("%Y-%m-%d")(v),
       label: "Date",
       unit: "",
     },
@@ -1116,101 +1116,31 @@ const pieSettings = {
 };
 
 const timelineSettings = {
-  timePeriods: {
-    year: {
-      id: "year",
-      label: "Year",
-      format: (v) => new Date(v).getFullYear(),
-      fun: (date) => d3t.timeYear.floor(date),
-      range: (extent) =>
-        d3t.timeYear.range(
-          d3t.timeYear.floor(extent[0]),
-          d3t.timeYear.ceil(extent[1])
-        ),
-      occurrencesIn: () => 1,
-      enablePoints: true,
-    },
-    yearMonth: {
-      id: "yearMonth",
-      label: "Year/Month",
-      format: (v) => d3tf.timeFormat("%y/%m")(new Date(v)),
-      fun: (date) => d3t.timeMonth.floor(date),
-      range: (extent) =>
-        d3t.timeMonth.range(
-          d3t.timeMonth.floor(extent[0]),
-          d3t.timeMonth.ceil(extent[1])
-        ),
-      occurrencesIn: () => 1,
-      enablePoints: false,
-    },
-    month: {
-      id: "month",
-      label: "Month",
-      format: (v) => d3tf.timeFormat("%b")(new Date(v)),
-      tickValues: "every 1 month",
-      fun: (date) => {
-        const newDate = d3t.timeMonth.floor(date);
-        newDate.setFullYear(2018);
-        return newDate;
-      },
-      relative: true,
-      range: (extent) =>
-        d3t.timeMonth.range(
-          ...extent.map((date) =>
-            d3t.timeMonth.floor(new Date(d3tf.timeFormat("2018-%m-%d")(date)))
-          )
-        ),
-      occurrencesIn: (date, from, to) => occurrencesOfMonth(date, from, to),
-      enablePoints: true,
-    },
-    week: {
-      id: "week",
-      label: "Week",
-      format: (v) => d3tf.timeFormat("%b-%d")(new Date(v)),
-      tickValues: "every 1 month",
-      fun: (date) => {
-        const newDate = d3t.timeDay.floor(date);
-        newDate.setFullYear(2018);
-        return d3t.timeMonday.floor(newDate);
-      },
-      relative: true,
-      range: (extent) =>
-        d3t.timeMonday.range(
-          ...extent.map((date) =>
-            d3t.timeMonday.floor(new Date(d3tf.timeFormat("2018-%m-%d")(date)))
-          )
-        ),
-      occurrencesIn: (date, from, to) => occurrencesOfWeek(date, from, to),
-      enablePoints: false,
-    },
-    day: {
-      id: "day",
-      label: "Weekday",
-      format: (v) =>
-        new Date(v).toLocaleString("default", {
-          weekday: "short",
-        }),
-      fun: (date) => new Date(2018, 0, 1 + ((date.getDay() + 6) % 7)),
-      relative: true,
-      range: () =>
-        d3t.timeDay.range(new Date(2018, 0, 1), new Date(2018, 0, 8)),
-      occurrencesIn: (date, from, to) => occurrencesOfDay(date, from, to),
-      enablePoints: true,
-    },
-  },
   values: {
+    count: {
+      id: "count",
+      fun: (d) => 1,
+      sortable: false,
+      format: (v) => v,
+      label: "Count",
+      unit: "",
+    },
     distance: {
       id: "distance",
       fun: (d) => d.distance,
+      sortable: true,
       format: (v) =>
         v >= 10_000_000
           ? (v / 1_000_000).toFixed() + "k"
+          : v < 10_000
+          ? (v / 1000).toFixed(1)
           : (v / 1000).toFixed(),
       label: "Distance",
       unit: "km",
     },
     elevation: {
       id: "elevation",
+      sortable: true,
       fun: (d) => d.total_elevation_gain,
       format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
       label: "Elevation",
@@ -1218,6 +1148,7 @@ const timelineSettings = {
     },
     time: {
       id: "time",
+      sortable: true,
       fun: (d) => d.elapsed_time,
       format: (v) => (v / 3600).toFixed(1),
       label: "Duration",
@@ -1225,141 +1156,80 @@ const timelineSettings = {
     },
     kudos_count: {
       id: "kudos_count",
+      sortable: true,
       fun: (d) => d.kudos_count,
       format: (v) => v,
       label: "Kudos",
       unit: "",
     },
   },
+  timePeriods: {
+    year: {
+      id: "year",
+      label: "Year",
+      tick: d3t.utcYear,
+      days: 365,
+      tickFormat: "%Y",
+    },
+    month: {
+      id: "month",
+      label: "Month",
+      tick: d3t.utcMonth,
+      days: 30,
+      tickFormat: "%b %Y",
+    },
+    week: {
+      id: "week",
+      label: "Week",
+      tick: d3t.timeMonday,
+      days: 7,
+      tickFormat: "%Y-%m-%d",
+    },
+    day: {
+      id: "day",
+      label: "Day",
+      tick: d3t.timeDay,
+      days: 1,
+      tickFormat: "%Y-%m-%d",
+    },
+  },
   groups: {
     sport_group: {
       id: "sport_group",
-      label: "Group",
+      label: "Type",
       fun: (d) => aliasMap[d.sport_type],
       color: (id) => categorySettings[id].color,
       icon: (id) => categorySettings[id].icon,
     },
-    sport_type: {
+    /*sport_type: {
       id: "sport_type",
       label: "Type",
       fun: (d) => d.sport_type,
       color: (id) => categorySettings[aliasMap[id]].color,
       icon: (id) => categorySettings[aliasMap[id]].icon,
-    },
+    },*/
     no_group: {
       id: "no_group",
       label: "All",
-      fun: (d) => undefined,
+      fun: (d) => "All",
       color: (id) => "#000000",
       icon: (id) => "child-reaching",
     },
   },
-  timeGroups: {
-    all: (year) => ({
-      id: "all",
-      fun: (d) => undefined,
-      selected: year,
-      extent: (date, extent) => extent,
-      label: "Avg",
+  averages: {
+    movingAvg: (N) => ({
+      id: "movingAvg",
+      label: "Moving Average",
+      window: N,
+      fun: movingWindow(N),
     }),
-    byYear: (year) => ({
-      id: "byYear",
-      fun: (d) => d.date.getFullYear(),
-      highlight: year,
-      selected: year,
-      extent: (date, extent) => {
-        return [
-          date.getFullYear() == extent[0].getFullYear()
-            ? extent[0]
-            : new Date(date.getFullYear(), 0, 1),
-          date.getFullYear() == extent[1].getFullYear()
-            ? extent[1]
-            : new Date(date.getFullYear(), 11, 31),
-        ];
-      },
-      label: year,
+    gaussianAvg: (N) => ({
+      id: "gaussianAvg",
+      label: "Gaussian Average",
+      window: N,
+      fun: gaussianAvg(N),
     }),
   },
-  stats: (props) => ({
-    avg: {
-      id: "avg",
-      label: "Average",
-      fun: (v) => d3.mean(v, props.value.fun),
-      format: props.value.format,
-      unit: props.value.unit,
-    },
-    median: {
-      id: "median",
-      label: "Median",
-      format: props.value.format,
-      fun: (v) => d3.median(v, props.value.fun),
-      unit: props.value.unit,
-    },
-    min: {
-      id: "min",
-      label: "Min",
-      format: props.value.format,
-      fun: (v) => d3.min(v, props.value.fun),
-      unit: props.value.unit,
-    },
-    max: {
-      id: "max",
-      label: "Max",
-      format: props.value.format,
-      fun: (v) => d3.max(v, props.value.fun),
-      unit: props.value.unit,
-    },
-    count: {
-      id: "count",
-      label: "Count",
-      fun: (v) =>
-        v.length /
-        props.timePeriod.occurrencesIn(
-          v[0].date,
-          ...props.timeGroup.extent(v[0].date, props.extent)
-        ),
-      format: (v) => (props.timePeriod.relative ? v.toFixed(1) : v.toFixed()),
-      unit: "",
-    },
-    cumCount: {
-      id: "cumCount",
-      label: "Cumulative Count",
-      fun: (v) =>
-        v.length /
-        props.timePeriod.occurrencesIn(
-          v[0].date,
-          ...props.timeGroup.extent(v[0].date, props.extent)
-        ),
-      format: (v) => v.toFixed(1),
-      cumulative: true,
-      unit: "",
-    },
-    total: {
-      id: "total",
-      label: "Total",
-      format: props.value.format,
-      fun: (v) =>
-        d3.sum(v, props.value.fun) /
-        props.timePeriod.occurrencesIn(
-          v[0].date,
-          ...props.timeGroup.extent(v[0].date, props.extent)
-        ),
-      unit: props.value.unit,
-    },
-    cumTotal: {
-      id: "cumTotal",
-      label: "Cumulative Total",
-      format: props.value.format,
-      fun: (v) =>
-        d3.sum(v, props.value.fun) /
-        props.timePeriod.occurrencesIn(
-          v[0].date,
-          ...props.timeGroup.extent(v[0].date, props.extent)
-        ),
-      cumulative: true,
-      unit: props.value.unit,
-    },
-  }),
 };
 
 const timelineSettingsVisx = {

@@ -25,7 +25,7 @@ import { ActivityContext } from "/src/contexts/ActivityContext";
 
 import MapView from "/src/components/Map";
 import ListView from "/src/components/List";
-import Stats2View from "/src/components/Stats2";
+import StatsView from "/src/components/Stats";
 import { User } from "/src/components/AppBar";
 import {
   MultiSelect,
@@ -48,25 +48,30 @@ const darkTheme = createTheme({
   },
 });
 
-const DrawerHeader = styled("div")(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-end",
-  padding: theme.spacing(0, 1),
-  ...theme.mixins.toolbar,
-}));
-
+const toolbarHeight = 48;
 const drawerWidth = 250;
+
+const DrawerHeader = styled("div")(({ theme }) => {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    padding: theme.spacing(0, 1),
+    minHeight: toolbarHeight,
+  };
+});
 
 const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== "open",
 })(({ theme, open }) => ({
-  height: { xs: 56, sm: 64 },
   zIndex: theme.zIndex.drawer + 1,
   transition: theme.transitions.create(["width", "margin"], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
+  "& .MuiToolbar-root": {
+    minHeight: toolbarHeight,
+  },
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
@@ -219,12 +224,7 @@ function App() {
           </IconButton>
         </DrawerHeader>
         <Divider />
-        <Box
-          sx={{
-            width: 1,
-            height: 1,
-          }}
-        >
+        <Box>
           <List>
             {Object.keys(categorySettings).map((key) => (
               <ListItem sx={{ px: 0, py: 0 }} key={key}>
@@ -259,6 +259,8 @@ function App() {
       <Box
         sx={{
           height: "100%",
+          maxHeight: "100%",
+          overflow: "hidden",
           width: open ? "calc(100% - 250px)" : "calc(100% - 33px)",
           p: 0,
         }}
@@ -267,16 +269,17 @@ function App() {
         <Box
           sx={{
             width: 1,
-            height: { xs: "calc(100% - 56px)", sm: "calc(100% - 64px)" },
+            height: "calc(100% - 48px)",
+            maxHeight: "calc(100% - 48px)",
             minHeight: 0,
             minWidth: 0,
-            overflowY: "hidden",
+            overflow: "hidden",
           }}
         >
           <Routes>
             <Route exact path="/" element={<MapView mapRef={mapRef} />} />
             <Route exact path="/list" element={<ListView />} />
-            <Route exact path="/stats" element={<Stats2View open={open} />} />
+            <Route exact path="/stats" element={<StatsView open={open} />} />
           </Routes>
         </Box>
       </Box>
