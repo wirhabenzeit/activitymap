@@ -239,14 +239,15 @@ function ActivityContextProvider({ children }) {
       code;
     const response = await fetch(url);
     const data = await response.json();
-    console.log(data);
-    Cookies.set("athlete", data.athlete, { expires: 365 });
-    history.replaceState(
-      {},
-      "StravaMap",
-      window.location.origin + window.location.pathname
-    );
-    setAthlete(data.athlete);
+    if (data.athlete != undefined) {
+      Cookies.set("athlete", data.athlete, { expires: 365 });
+      history.replaceState(
+        {},
+        "StravaMap",
+        window.location.origin + window.location.pathname
+      );
+      setAthlete(data.athlete);
+    }
   };
 
   const setGuestMode = () => {
@@ -269,7 +270,8 @@ function ActivityContextProvider({ children }) {
           .split(",")
           .map((x) => parseInt(x))
       );
-    else if (Cookies.get("athlete")) setAthlete(Number(Cookies.get("athlete")));
+    else if (Cookies.get("athlete") != undefined)
+      setAthlete(Number(Cookies.get("athlete")));
     else setGuestMode();
   }, []);
 

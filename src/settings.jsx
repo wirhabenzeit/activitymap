@@ -1170,6 +1170,7 @@ const timelineSettings = {
       tick: d3t.utcYear,
       days: 365,
       tickFormat: "%Y",
+      averaging: { min: 0, max: 0 },
     },
     month: {
       id: "month",
@@ -1177,6 +1178,7 @@ const timelineSettings = {
       tick: d3t.utcMonth,
       days: 30,
       tickFormat: "%b %Y",
+      averaging: { min: 0, max: 3 },
     },
     week: {
       id: "week",
@@ -1184,6 +1186,7 @@ const timelineSettings = {
       tick: d3t.timeMonday,
       days: 7,
       tickFormat: "%Y-%m-%d",
+      averaging: { min: 0, max: 12 },
     },
     day: {
       id: "day",
@@ -1191,6 +1194,7 @@ const timelineSettings = {
       tick: d3t.timeDay,
       days: 1,
       tickFormat: "%Y-%m-%d",
+      averaging: { min: 0, max: 90 },
     },
   },
   groups: {
@@ -1216,19 +1220,29 @@ const timelineSettings = {
       icon: (id) => "child-reaching",
     },
   },
-  averages: {
-    movingAvg: (N) => ({
-      id: "movingAvg",
-      label: "Moving Average",
-      window: N,
-      fun: movingWindow(N),
-    }),
-    gaussianAvg: (N) => ({
-      id: "gaussianAvg",
-      label: "Gaussian Average",
-      window: N,
-      fun: gaussianAvg(N),
-    }),
+  yScales: {
+    linear: {
+      id: "linear",
+      label: "Linear",
+      prop: {
+        type: "linear",
+      },
+    },
+    sqrt: {
+      id: "sqrt",
+      label: "Sqrt",
+      prop: {
+        type: "sqrt",
+      },
+    },
+    cbrt: {
+      id: "cbrt",
+      label: "Cbrt",
+      prop: {
+        type: "pow",
+        exponent: 1 / 3,
+      },
+    },
   },
 };
 

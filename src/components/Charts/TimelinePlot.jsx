@@ -5,11 +5,12 @@ import * as Plot from "@observablehq/plot";
 
 import { BarChart, ShowChart } from "@mui/icons-material";
 
-import { Slider, Box, Stack } from "@mui/material";
+import { Slider, Box, Stack, IconButton } from "@mui/material";
 
 import { StatsContext } from "../../contexts/StatsContext.jsx";
 import { CustomSelect } from "../StatsUtilities.jsx";
 import { timelineSettings } from "../../settings.jsx";
+import { a } from "@react-spring/web";
 
 export function TimelinePlot({ width, height, settingsRef }) {
   const statsContext = useContext(StatsContext);
@@ -20,20 +21,63 @@ export function TimelinePlot({ width, height, settingsRef }) {
   const timeline = statsContext.timeline;
 
   useEffect(() => {
-    if (!statsContext.timeline.loaded) return;
+    setAveraging(statsContext.timeline.averaging);
+  }, [statsContext.timeline.averaging]);
+
+  useEffect(() => {
+    if (!statsContext.loaded || statsContext.data.length == 0) return;
+
+    const extent = d3.extent(statsContext.data, (d) =>
+      timeline.timePeriod.tick(d.date)
+    );
+
+    const groupExtent = Array.from(
+      new Set(statsContext.data.map(timeline.group.fun))
+    );
+
+    const range = timeline.timePeriod.tick.range(
+      extent[0],
+      timeline.timePeriod.tick.ceil(extent[1])
+    );
+
+    const groups = d3.group(
+      statsContext.data,
+      (d) => timeline.timePeriod.tick(d.date),
+      timeline.group.fun
+    );
+
+    const timeMap = d3.map(range, (date) => {
+      return groupExtent.map((type) => ({
+        date,
+        type,
+        value:
+          groups.get(date)?.get(type) != undefined
+            ? d3.sum(groups.get(date)?.get(type), timeline.value.fun)
+            : 0,
+      }));
+    });
+
+    const data = timeMap.flat().sort((a, b) => a.date - b.date);
+
+    const map = new d3.InternMap(
+      timeMap.map((arr) => [
+        arr[0].date,
+        new d3.InternMap(arr.map(({ value, type }) => [type, value])),
+      ])
+    );
+
     const plot = Plot.plot({
+      grid: true,
       style: {
-        fontSize: 12,
+        fontSize: 14,
       },
       y: {
         tickFormat: timeline.value.format,
         label: `${timeline.value.label} (${timeline.value.unit})`,
-        grid: true,
         ticks: 6,
+        ...timeline.yScale.prop,
       },
-      x: {
-        grid: true,
-      },
+      x: {},
       height: Math.max(height, 100),
       width: Math.max(width, 100),
       marginRight: 50,
@@ -41,18 +85,18 @@ export function TimelinePlot({ width, height, settingsRef }) {
       marginBottom: 50,
       marginTop: 20,
       marks: [
+        Plot.frame(),
         Plot.ruleY([0]),
         ...[
-          timeline.groupExtent.flatMap((type) => [
+          groupExtent.flatMap((type) => [
             Plot.text(
-              timeline.range,
+              range,
               Plot.pointerX({
                 px: (d) => d,
-                y: (d) => timeline.map.get(d).get(type),
+                y: (d) => map.get(d).get(type),
                 dx: 40,
                 frameAnchor: "right",
-                text: (d) =>
-                  timeline.value.format(timeline.map.get(d).get(type)),
+                text: (d) => timeline.value.format(map.get(d).get(type)),
                 fill: timeline.group.color(type),
                 fontSize: 12,
                 fontWeight: "bold",
@@ -63,19 +107,19 @@ export function TimelinePlot({ width, height, settingsRef }) {
               })
             ),
             Plot.dot(
-              timeline.range,
+              range,
               Plot.pointerX({
                 x: (d) => d,
-                y: (d) => timeline.map.get(d).get(type),
+                y: (d) => map.get(d).get(type),
                 opacity: 0.5,
                 fill: timeline.group.color(type),
               })
             ),
           ]),
         ],
-        Plot.ruleX(timeline.range, Plot.pointerX()),
+        Plot.ruleX(range, Plot.pointerX()),
         Plot.text(
-          timeline.range,
+          range,
           Plot.pointerX({
             text: (d) => d3.timeFormat(timeline.timePeriod.tickFormat)(d),
             x: (d) => d,
@@ -84,18 +128,18 @@ export function TimelinePlot({ width, height, settingsRef }) {
           })
         ),
         Plot.lineY(
-          timeline.data,
+          data,
           Plot.windowY({
             x: "date",
             y: "value",
-            k: averaging,
+            k: averaging + 1,
             reduce: "mean",
             stroke: (x) => timeline.group.color(x.type),
             channels: {
               Date: (d) =>
-                `${d3.timeFormat(timeline.timePeriod.tickFormat)(d.date)} ± ${
-                  averaging - 1
-                } ${timeline.timePeriod.id}s`,
+                `${d3.timeFormat(timeline.timePeriod.tickFormat)(
+                  d.date
+                )} ± ${averaging} ${timeline.timePeriod.id}s`,
             },
             tip: {
               format: {
@@ -107,7 +151,7 @@ export function TimelinePlot({ width, height, settingsRef }) {
             },
           })
         ),
-        Plot.lineY(timeline.data, {
+        Plot.lineY(data, {
           x: "date",
           y: "value",
           stroke: (x) => timeline.group.color(x.type),
@@ -120,7 +164,14 @@ export function TimelinePlot({ width, height, settingsRef }) {
     return () => {
       plot.remove();
     };
-  }, [statsContext.timeline, width, height, averaging]);
+  }, [
+    statsContext.loaded,
+    statsContext.data,
+    statsContext.timeline,
+    width,
+    height,
+    averaging,
+  ]);
 
   return (
     <>
@@ -145,21 +196,42 @@ export function TimelinePlot({ width, height, settingsRef }) {
               setState={statsContext.setTimeline}
             />
             <CustomSelect
-              key="timePeriod"
-              propName="timePeriod"
-              value={statsContext.timeline.timePeriod}
-              name="X"
-              options={timelineSettings.timePeriods}
+              key="yScale"
+              propName="yScale"
+              value={statsContext.timeline.yScale}
+              name="Scale"
+              options={timelineSettings.yScales}
               setState={statsContext.setTimeline}
             />
 
-            <Box sx={{ width: 150 }}>
-              <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <CustomSelect
+                key="timePeriod"
+                propName="timePeriod"
+                value={statsContext.timeline.timePeriod}
+                name="X"
+                options={timelineSettings.timePeriods}
+                setState={statsContext.setTimeline}
+              />
+              <IconButton
+                onClick={() =>
+                  setAveraging(statsContext.timeline.timePeriod.averaging.min)
+                }
+                disabled={
+                  averaging == statsContext.timeline.timePeriod.averaging.min
+                }
+              >
                 <BarChart fontSize="small" />
+              </IconButton>
+              <Box sx={{ width: 100 }}>
                 <Slider
-                  marks={false}
-                  min={1}
-                  max={30}
+                  disabled={
+                    statsContext.timeline.timePeriod.averaging.min ==
+                    statsContext.timeline.timePeriod.averaging.max
+                  }
+                  marks={true}
+                  min={statsContext.timeline.timePeriod.averaging.min}
+                  max={statsContext.timeline.timePeriod.averaging.max}
                   size="small"
                   value={averaging}
                   defaultValue={statsContext.timeline.averaging}
@@ -170,9 +242,18 @@ export function TimelinePlot({ width, height, settingsRef }) {
                     });
                   }}
                 />
+              </Box>
+              <IconButton
+                onClick={() =>
+                  setAveraging(statsContext.timeline.timePeriod.averaging.max)
+                }
+                disabled={
+                  averaging == statsContext.timeline.timePeriod.averaging.max
+                }
+              >
                 <ShowChart fontSize="small" />
-              </Stack>
-            </Box>
+              </IconButton>
+            </Stack>
           </>,
           settingsRef.current
         )}

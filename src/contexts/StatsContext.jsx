@@ -26,6 +26,7 @@ import {
 const defaultStats = {
   data: [],
   allData: [],
+  loaded: false,
   extent: [undefined, undefined],
   map: {
     value: mapStatSettings.values.elevation,
@@ -37,7 +38,7 @@ const defaultStats = {
     value: timelineSettings.values.elevation,
     group: timelineSettings.groups.sport_group,
     averaging: 10,
-    loaded: false,
+    yScale: timelineSettings.yScales.linear,
   },
   timelineVisx: {
     value: timelineSettingsVisx.values.elevation,
@@ -149,88 +150,6 @@ const updatePie = (data, pie) => {
   }));
 };
 
-const updateTimeline = (data, timeline, setTimeline) => {
-  const extent = d3.extent(data, (d) => d.date);
-  const years = extent.map((d) => d.getFullYear());
-  const extentInYear = (year) => [
-    year == years[0] ? extent[0] : new Date(year, 0, 1),
-    year == years[1] ? extent[1] : new Date(year, 11, 31),
-  ];
-  const rollup = d3.rollup(
-    data,
-    timeline.stat.fun,
-    (f) =>
-      JSON.stringify({
-        group: timeline.group.fun(f),
-        year: timeline.timeGroup.fun(f),
-      }),
-    (f) => timeline.timePeriod.fun(f.date)
-  );
-  const fillZeros = (data, extent) => {
-    const out = [];
-    timeline.timePeriod.range(extent).forEach((date) => {
-      const transformedDate = timeline.timePeriod.fun(date);
-      if (data.has(transformedDate)) {
-        out.push([transformedDate, data.get(transformedDate)]);
-      } else {
-        out.push([transformedDate, 0]);
-      }
-    });
-    return out;
-  };
-
-  const makeCumulative = (data) => {
-    return d3.zip(
-      data.map(([x, y]) => x),
-      d3.cumsum(data.map(([x, y]) => y))
-    );
-  };
-  const rollupData = Array.from(rollup.entries()).map(([id, data]) => {
-    id = JSON.parse(id);
-    return [
-      id,
-      timeline.stat.cumulative
-        ? makeCumulative(
-            fillZeros(
-              data,
-              timeline.timeGroup.highlight
-                ? extentInYear(id.year)
-                : timeline.timePeriod.relative
-                ? extentInYear(2018)
-                : extent
-            )
-          )
-        : fillZeros(
-            data,
-            timeline.timeGroup.highlight
-              ? extentInYear(id.year)
-              : timeline.timePeriod.relative
-              ? extentInYear(2018)
-              : extent
-          ),
-    ];
-  });
-
-  const outData = rollupData.map(([id, data]) => ({
-    id: JSON.stringify(id),
-    color: timeline.group.color(id.group),
-    icon: timeline.group.icon(id.group),
-    alpha: id.year == timeline.timeGroup.highlight ? 1 : 0.1,
-    data: data.map(([x, y]) => ({ x: d3tf.timeFormat("%Y-%m-%d")(x), y: y })),
-    xLabel: (x) =>
-      ("year" in id ? id.year + "-" : "") + timeline.timePeriod.format(x),
-    yLabel: (y) => y + timeline.stat.unit,
-    onClick: () => {
-      if ("year" in id)
-        setTimeline({
-          ...timeline,
-          timeGroup: timelineSettings.timeGroups.byYear(id.year),
-        });
-    },
-  }));
-  return outData;
-};
-
 const computeTimelineVisx = ({ data, extent, group, fun, tick, avg }) => {
   const groups = [...d3.group(data, group.fun).keys()];
   const bins = d3
@@ -332,56 +251,27 @@ export function StatsContextProvider({ children }) {
   };
 
   const setTimeline = (newTimeline) => {
-    const timeline = {
-      ...state.timeline,
-      ...newTimeline,
-    };
+    if ("timePeriod" in newTimeline) {
+      const newAveraging =
+        state.timeline.averaging /
+        (newTimeline.timePeriod.days / state.timeline.timePeriod.days);
 
-    const extent = d3.extent(state.data, (d) =>
-      timeline.timePeriod.tick(d.date)
-    );
+      newTimeline.averaging = Math.min(
+        Math.max(
+          Math.round(newAveraging),
+          newTimeline.timePeriod.averaging.min
+        ),
+        newTimeline.timePeriod.averaging.max
+      );
 
-    const groupExtent = Array.from(new Set(state.data.map(timeline.group.fun)));
-
-    const range = timeline.timePeriod.tick.range(
-      extent[0],
-      timeline.timePeriod.tick.ceil(extent[1])
-    );
-
-    const groups = d3.group(
-      state.data,
-      (d) => timeline.timePeriod.tick(d.date),
-      timeline.group.fun
-    );
-
-    const map = d3.map(range, (date) => {
-      return groupExtent.map((type) => ({
-        date,
-        type,
-        value:
-          groups.get(date)?.get(type) != undefined
-            ? d3.sum(groups.get(date)?.get(type), timeline.value.fun)
-            : 0,
-      }));
-    });
+      console.log(newTimeline);
+    }
 
     setState((state) => ({
       ...state,
       timeline: {
         ...state.timeline,
-        ...timeline,
-        data: map.flat().sort((a, b) => a.date - b.date),
-        loaded: true,
-        extent,
-        range,
-        groups,
-        groupExtent,
-        map: new d3.InternMap(
-          map.map((arr) => [
-            arr[0].date,
-            new d3.InternMap(arr.map(({ value, type }) => [type, value])),
-          ])
-        ),
+        ...newTimeline,
       },
     }));
   };
@@ -574,6 +464,7 @@ export function StatsContextProvider({ children }) {
       });
       setState({
         ...state,
+        loaded: true,
         extent: d3.extent(data, (f) => f.date),
         allData: data,
       });

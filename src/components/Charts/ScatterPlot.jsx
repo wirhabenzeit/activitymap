@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import * as d3 from "d3";
 import * as Plot from "@observablehq/plot";
 
+import { Box } from "@mui/material";
+
 import { StatsContext } from "../../contexts/StatsContext.jsx";
 import { CustomSelect } from "../StatsUtilities.jsx";
 import { scatterSettings } from "../../settings.jsx";
@@ -79,36 +81,43 @@ export default function ScatterPlot({ width, height, settingsRef }) {
   const statsContext = useContext(StatsContext);
   const figureRef = useRef(null);
   const scatterSetting = statsContext.scatter;
+  const plotWidth = Math.min(Math.max(width, 100), 1600);
+  const plotHeight = Math.max(height, 100);
 
   useEffect(() => {
     if (!statsContext.calendar.loaded) return;
     const plot = Plot.plot({
-      height: Math.max(height, 100),
-      width: Math.max(width, 100),
+      background: "#eee",
+      grid: true,
+      height: plotHeight,
+      width: plotWidth,
       padding: 0,
       marginLeft: 60,
       marginRight: 60,
       marginBottom: 30,
+      caption: "",
       style: {
-        fontSize: 12,
+        fontSize: 14,
       },
       x: {
         tickFormat: scatterSetting.xValue.formatAxis,
-        grid: true,
-        ticks: 6,
         axis: "top",
+        label: `${scatterSetting.xValue.label} (${scatterSetting.xValue.unit})`,
+        labelAnchor: "left",
       },
       y: {
         tickFormat: scatterSetting.yValue.formatAxis,
-        grid: true,
-        ticks: 6,
         axis: "right",
+        ticks: 6,
+        label: `${scatterSetting.yValue.label} (${scatterSetting.yValue.unit})`,
+        labelAnchor: "bottom",
       },
       r: {
         range: [0, 10],
         domain: d3.extent(statsContext.data, scatterSetting.size.fun),
       },
       marks: [
+        Plot.frame(),
         Plot.dot(statsContext.data, {
           x: scatterSetting.xValue.fun,
           y: scatterSetting.yValue.fun,
@@ -138,8 +147,12 @@ export default function ScatterPlot({ width, height, settingsRef }) {
           x: scatterSetting.xValue.fun,
           y: scatterSetting.yValue.fun,
           color: (d) => scatterSetting.group.color(scatterSetting.group.fun(d)),
+          textStrokeOpacity: 0,
         }),
       ],
+    });
+    Object.assign(plot, {
+      style: `width: ${plotWidth}px; overflow: scroll; margin: 0; min-width: 100px; display:block`,
     });
     const legend = legendRadius(plot.scale("r"), {
       ticks: 4,
@@ -159,7 +172,16 @@ export default function ScatterPlot({ width, height, settingsRef }) {
 
   return (
     <>
-      <div ref={figureRef} style={{ height: height, width: width }} />
+      <Box
+        sx={{
+          height: height,
+          width: width,
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <div ref={figureRef} />
+      </Box>
       {settingsRef.current &&
         createPortal(
           <>

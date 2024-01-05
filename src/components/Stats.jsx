@@ -15,7 +15,6 @@ import { TimelinePlot } from "./Charts/TimelinePlot.jsx";
 
 import ScatterPlot from "./Charts/ScatterPlot.jsx";
 
-import ViolinPlot from "./Charts/ViolinPlot.jsx";
 import { Divider } from "@mui/material";
 
 function StatTabPanel(props) {
@@ -39,10 +38,9 @@ const tabHeight = 36;
 const Tabs = styled(MuiTabs)(({ theme }) => ({
   minHeight: tabHeight,
   "& .MuiTab-root": {
-    minHeight: tabHeight,
+    minHeight: tabHeight - 2,
     paddingTop: 8,
     paddingBottom: 8,
-    fontSize: "0.75rem",
   },
 }));
 
@@ -96,6 +94,12 @@ function LegendSettingPlot({ plot, settingsOpen, legend = true }) {
   );
 }
 
+const tabs = [
+  { id: "timeline", label: "Timeline", plot: <TimelinePlot /> },
+  { id: "scatter", label: "Scatter", plot: <ScatterPlot /> },
+  { id: "calendar", label: "Calendar", plot: <CalendarPlot /> },
+];
+
 export default function BasicTabs({ open }) {
   const [value, setValue] = React.useState(0);
   const [settingsOpen, setSettingsOpen] = React.useState(true);
@@ -132,14 +136,12 @@ export default function BasicTabs({ open }) {
             width: `calc(100% - 40px)`,
           }}
         >
-          <Tab label="Scatter" id="calendar" />
-          <Tab label="Calendar" id="scatter" />
-          <Tab label="Timeline" id="timeline" />
-          <Tab label="Violin" id="violin" />
+          {tabs.map((tab) => (
+            <Tab key={tab.id} label={tab.label} />
+          ))}
         </Tabs>
         <Box
           sx={{
-            height: tabHeight,
             display: "inline-flex",
             marginLeft: "auto",
             right: 0,
@@ -157,27 +159,11 @@ export default function BasicTabs({ open }) {
           </IconButton>
         </Box>
       </Box>
-      <StatTabPanel value={value} index={0}>
-        <LegendSettingPlot plot={<ScatterPlot />} settingsOpen={settingsOpen} />
-      </StatTabPanel>
-      <StatTabPanel value={value} index={1}>
-        <LegendSettingPlot
-          plot={<CalendarPlot />}
-          settingsOpen={settingsOpen}
-        />
-      </StatTabPanel>
-      <StatTabPanel value={value} index={2}>
-        <LegendSettingPlot
-          plot={<TimelinePlot />}
-          settingsOpen={settingsOpen}
-          legend={false}
-        />
-      </StatTabPanel>
-      <StatTabPanel value={value} index={3}>
-        <ParentSize>
-          {({ width, height }) => <ViolinPlot width={width} height={height} />}
-        </ParentSize>
-      </StatTabPanel>
+      {tabs.map((tab, index) => (
+        <StatTabPanel key={tab.id} value={value} index={index}>
+          <LegendSettingPlot plot={tab.plot} settingsOpen={settingsOpen} />
+        </StatTabPanel>
+      ))}
     </Box>
   );
 }

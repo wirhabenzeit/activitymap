@@ -47,7 +47,7 @@ export function CheckboxFilter({ open, name }) {
             filterContext.setBinary(name, undefined);
           }}
         >
-          <FontAwesomeIcon fontSize="medium" icon={binaryFilters[name].icon} />
+          <FontAwesomeIcon fontSize="small" icon={binaryFilters[name].icon} />
         </IconButton>
       }
     >
