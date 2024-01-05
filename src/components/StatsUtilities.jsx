@@ -1,6 +1,9 @@
 import React, { cloneElement, useMemo, useSyncExternalStore } from "react";
 
+import { Divider } from "@mui/material";
+
 import { Tooltip, TooltipWithBounds, defaultStyles } from "@visx/tooltip";
+import { ParentSize } from "@visx/responsive";
 
 import {
   ListSubheader,
@@ -38,26 +41,85 @@ export function TitleBox({ children, sx }) {
   return (
     <Box
       sx={{
-        height: "70px",
-        width: 1,
+        height: "64px",
+        width: "100%",
         overflowX: "scroll",
+        overflowY: "hidden",
         alignItems: "center",
-        justifyContent: "center",
-        whiteSpace: "noWrap",
-        pr: 2,
+        display: "flex",
+        flexDirection: "row",
+        justifyContent: "space-around",
+        gap: 1,
+        //whiteSpace: "noWrap",
         ...sx,
       }}
     >
-      {children.map((child) =>
-        cloneElement(child, {
-          sx: {
-            ...child.sx,
-            m: 1,
-            display: "inline-flex",
-            verticalAlign: "middle",
-          },
-        })
-      )}
+      {children}
+    </Box>
+  );
+}
+
+export function LegendPlot({ plot, settings, legendRef, settingsOpen }) {
+  return (
+    <Box
+      sx={{
+        p: 0,
+        width: "100%",
+        height: "100%",
+      }}
+    >
+      <ParentSize>
+        {({ width, height }) => (
+          <>
+            {cloneElement(plot, {
+              width,
+              height: settingsOpen ? height - 60 : height,
+            })}
+            <Box
+              sx={{
+                width: "100%",
+                height: "60px",
+                display: settingsOpen ? "flex" : "none",
+                borderTop: 1,
+                borderColor: "divider",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                ref={legendRef}
+                key="legend"
+                style={{
+                  display: "inline-flex",
+                  verticalAlign: "top",
+                  height: "40px",
+                  margin: "10px",
+                }}
+              />
+              <Divider
+                orientation="vertical"
+                sx={{
+                  display: "inline-flex",
+                  verticalAlign: "top",
+                  mx: "10px",
+                }}
+              />
+              <Box
+                sx={{
+                  verticalAlign: "top",
+                  flexGrow: 1,
+                  flexDirection: "row-reverse",
+                  display: "flex",
+                  gap: "10px",
+                  py: "10px",
+                  pr: "10px",
+                }}
+              >
+                {settings}
+              </Box>
+            </Box>
+          </>
+        )}
+      </ParentSize>
     </Box>
   );
 }
@@ -87,8 +149,10 @@ export function CustomSelect({
       <InputLabel>{name}</InputLabel>
       <Select
         size="small"
+        autoWidth
         value={value.id}
-        label="Sport"
+        label={name}
+        sx={{ minWidth: "100px" }}
         onChange={(event) =>
           setState({
             [propName]: options[event.target.value],

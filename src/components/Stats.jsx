@@ -104,10 +104,10 @@ import {
 
 import ViolinPlot from "./Charts/ViolinPlot.jsx";
 import TimelinePlot from "./Charts/TimelinePlot.jsx";
-import ScatterPlot from "./Charts/ScatterPlot.jsx";
-import ScatterPlot2 from "./Charts/ScatterPlot2.jsx";
-import CalendarPlot from "./Charts/CalendarPlot.jsx";
-import CalendarPlot2 from "./Charts/Test.jsx";
+import ScatterPlot from "./Charts/ScatterPlotOld.jsx";
+import ScatterPlot2 from "./Charts/ScatterPlot.jsx";
+import CalendarPlot from "./Charts/CalendarPlotOld.jsx";
+import CalendarPlot2 from "./Charts/CalendarPlot.jsx";
 
 import * as d3 from "d3-array";
 import * as d3t from "d3-time";

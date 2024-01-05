@@ -193,7 +193,7 @@ function SettingsDialog({ open, handleClose }) {
       <Dialog open={open} onClose={handleClose}>
         <DialogTitle>User Settings</DialogTitle>
         <DialogContent>
-          <List sx={{ width: "400px", pt: 0 }}>
+          <List sx={{ width: "300px", pt: 0 }}>
             <ListItem
               disableGutters
               secondaryAction={

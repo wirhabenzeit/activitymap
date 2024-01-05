@@ -25,7 +25,6 @@ import { ActivityContext } from "/src/contexts/ActivityContext";
 
 import MapView from "/src/components/Map";
 import ListView from "/src/components/List";
-import StatsView from "/src/components/Stats";
 import Stats2View from "/src/components/Stats2";
 import { User } from "/src/components/AppBar";
 import {
@@ -202,13 +201,6 @@ function App() {
                     goTo("/stats");
                   }}
                 />
-                <StyledTab
-                  label="More"
-                  index={3}
-                  onClick={() => {
-                    goTo("/stats2");
-                  }}
-                />
               </Tabs>
             </Box>
             <Box sx={{ flexGrow: 1 }} />
@@ -231,7 +223,6 @@ function App() {
           sx={{
             width: 1,
             height: 1,
-            overflowY: "hidden",
           }}
         >
           <List>
@@ -268,7 +259,7 @@ function App() {
       <Box
         sx={{
           height: "100%",
-          width: "calc(100% - 33px)",
+          width: open ? "calc(100% - 250px)" : "calc(100% - 33px)",
           p: 0,
         }}
       >
@@ -285,8 +276,7 @@ function App() {
           <Routes>
             <Route exact path="/" element={<MapView mapRef={mapRef} />} />
             <Route exact path="/list" element={<ListView />} />
-            <Route exact path="/stats" element={<Stats2View />} />
-            <Route exact path="/stats2" element={<StatsView />} />
+            <Route exact path="/stats" element={<Stats2View open={open} />} />
           </Routes>
         </Box>
       </Box>
