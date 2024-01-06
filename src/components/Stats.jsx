@@ -1,7 +1,5 @@
 import * as React from "react";
-import { cloneElement, useRef } from "react";
-
-import { ParentSize } from "@visx/responsive";
+import { cloneElement, useRef, useLayoutEffect, useEffect } from "react";
 
 import { Tabs as MuiTabs, Stack } from "@mui/material";
 import { styled } from "@mui/material";
@@ -28,7 +26,7 @@ function StatTabPanel(props) {
       style={{ height: `calc(100% - ${tabHeight}px)`, flexDirection: "column" }}
       {...other}
     >
-      {value === index && <>{children}</>}
+      {children}
     </div>
   );
 }
@@ -44,7 +42,7 @@ const Tabs = styled(MuiTabs)(({ theme }) => ({
   },
 }));
 
-function LegendSettingPlot({ plot, settingsOpen, legend = true }) {
+function LegendSettingPlot({ plot, settingsOpen, width, height }) {
   const settingsRef = useRef(null);
 
   return (
@@ -55,54 +53,70 @@ function LegendSettingPlot({ plot, settingsOpen, legend = true }) {
         height: "100%",
       }}
     >
-      <ParentSize>
-        {({ width, height }) => (
-          <>
-            {cloneElement(plot, {
-              width,
-              height: settingsOpen ? height - 60 : height,
-              settingsRef,
-            })}
-            <Box
-              sx={{
-                width: "100%",
-                height: "60px",
-                display: settingsOpen ? "block" : "none",
-                borderTop: 1,
-                borderColor: "divider",
-                flexShrink: 0,
-                overflowY: "hidden",
-                overflowX: "scroll",
-                py: 1,
-              }}
-            >
-              <Stack
-                style={{
-                  minWidth: "min-content",
-                }}
-                direction="row"
-                justifyContent="space-evenly"
-                alignItems="center"
-                spacing={2}
-                ref={settingsRef}
-              ></Stack>
-            </Box>
-          </>
-        )}
-      </ParentSize>
+      {cloneElement(plot, {
+        settingsRef,
+        width: width,
+        height: settingsOpen ? height - 60 : height,
+      })}
+      <Box
+        sx={{
+          width: "100%",
+          height: "60px",
+          display: settingsOpen ? "block" : "none",
+          borderTop: 1,
+          borderColor: "divider",
+          flexShrink: 0,
+          overflowY: "hidden",
+          overflowX: "scroll",
+          py: 1,
+        }}
+      >
+        <Stack
+          style={{
+            minWidth: "min-content",
+          }}
+          direction="row"
+          justifyContent="space-evenly"
+          alignItems="center"
+          spacing={2}
+          ref={settingsRef}
+        ></Stack>
+      </Box>
     </Box>
   );
 }
 
 const tabs = [
   { id: "timeline", label: "Timeline", plot: <TimelinePlot /> },
-  { id: "scatter", label: "Scatter", plot: <ScatterPlot /> },
   { id: "calendar", label: "Calendar", plot: <CalendarPlot /> },
+  { id: "scatter", label: "Scatter", plot: <ScatterPlot /> },
 ];
 
 export default function BasicTabs({ open }) {
   const [value, setValue] = React.useState(0);
   const [settingsOpen, setSettingsOpen] = React.useState(true);
+  const [width, setWidth] = React.useState(0);
+  const [height, setHeight] = React.useState(0);
+  const elementRef = useRef(null);
+
+  useLayoutEffect(() => {
+    var ro = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const cr = entry.contentRect;
+        setWidth(cr.width);
+        setHeight(cr.height);
+      }
+    });
+
+    setWidth(elementRef.current.offsetWidth);
+    setHeight(elementRef.current.offsetHeight);
+
+    ro.observe(elementRef.current);
+
+    return () => {
+      ro.unobserve(elementRef.current);
+    };
+  }, []);
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
@@ -159,11 +173,21 @@ export default function BasicTabs({ open }) {
           </IconButton>
         </Box>
       </Box>
-      {tabs.map((tab, index) => (
-        <StatTabPanel key={tab.id} value={value} index={index}>
-          <LegendSettingPlot plot={tab.plot} settingsOpen={settingsOpen} />
-        </StatTabPanel>
-      ))}
+      <div
+        style={{ height: `calc(100% - ${tabHeight}px)`, width: "100%" }}
+        ref={elementRef}
+      >
+        {tabs.map((tab, index) => (
+          <StatTabPanel key={tab.id} value={value} index={index}>
+            <LegendSettingPlot
+              plot={tab.plot}
+              settingsOpen={settingsOpen}
+              width={width}
+              height={height}
+            />
+          </StatTabPanel>
+        ))}
+      </div>
     </Box>
   );
 }

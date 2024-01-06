@@ -10,7 +10,6 @@ import { Slider, Box, Stack, IconButton } from "@mui/material";
 import { StatsContext } from "../../contexts/StatsContext.jsx";
 import { CustomSelect } from "../StatsUtilities.jsx";
 import { timelineSettings } from "../../settings.jsx";
-import { a } from "@react-spring/web";
 
 export function TimelinePlot({ width, height, settingsRef }) {
   const statsContext = useContext(StatsContext);

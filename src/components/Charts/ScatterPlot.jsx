@@ -9,6 +9,39 @@ import { StatsContext } from "../../contexts/StatsContext.jsx";
 import { CustomSelect } from "../StatsUtilities.jsx";
 import { scatterSettings } from "../../settings.jsx";
 
+const usePrevious = (value, initialValue) => {
+  const ref = useRef(initialValue);
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+};
+
+const useEffectDebugger = (effectHook, dependencies, dependencyNames = []) => {
+  const previousDeps = usePrevious(dependencies, []);
+
+  const changedDeps = dependencies.reduce((accum, dependency, index) => {
+    if (dependency !== previousDeps[index]) {
+      const keyName = dependencyNames[index] || index;
+      return {
+        ...accum,
+        [keyName]: {
+          before: previousDeps[index],
+          after: dependency,
+        },
+      };
+    }
+
+    return accum;
+  }, {});
+
+  if (Object.keys(changedDeps).length) {
+    console.log("[use-effect-debugger] ", changedDeps);
+  }
+
+  useEffect(effectHook, dependencies);
+};
+
 function legendRadius(
   scale,
   {
@@ -85,7 +118,7 @@ export default function ScatterPlot({ width, height, settingsRef }) {
   const plotHeight = Math.max(height, 100);
 
   useEffect(() => {
-    if (!statsContext.calendar.loaded) return;
+    if (!statsContext.loaded) return;
     const plot = Plot.plot({
       background: "#eee",
       grid: true,

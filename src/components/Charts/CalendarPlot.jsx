@@ -1,7 +1,7 @@
 import React, { useContext, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import * as d3 from "d3";
-import { Typography, Box, Divider } from "@mui/material";
+import { Box } from "@mui/material";
 import * as Plot from "@observablehq/plot";
 
 import { CustomSelect } from "../StatsUtilities.jsx";
@@ -59,15 +59,27 @@ export default function CalendarPlot({ width, height, settingsRef }) {
   const statsContext = useContext(StatsContext);
   const figureRef = useRef(null);
 
-  const start = d3.min(statsContext.calendar.dayTotals, (d) => d.date); // exclusive
-  const end = d3.utcDay.offset(
-    d3.max(statsContext.calendar.dayTotals, (d) => d.date)
-  );
-
   const widthPlot = 1200;
 
   useEffect(() => {
-    if (!statsContext.calendar.loaded) return;
+    if (!statsContext.loaded) return;
+
+    const activitiesByDate = d3.group(statsContext.data, (f) =>
+      d3.utcDay(f.date)
+    );
+
+    const dayTotals = d3.map(
+      d3.rollup(
+        statsContext.data,
+        (v) => d3.sum(v, statsContext.calendar.value.fun),
+        (d) => d3.utcDay(d.date)
+      ),
+      ([key, value]) => ({ date: key, value })
+    );
+
+    const start = d3.min(dayTotals, (d) => d.date); // exclusive
+    const end = d3.utcDay.offset(d3.max(dayTotals, (d) => d.date));
+
     const plot = Plot.plot({
       style: { maxWidth: "1200px" },
       marginRight: 0,
@@ -80,8 +92,8 @@ export default function CalendarPlot({ width, height, settingsRef }) {
       },
       y: {
         axis: "left",
-        domain: [-1, 0, 1, 2, 3, 4, 5, 6], // hide 0 and 6 (weekends); use -1 for labels
-        ticks: [0, 1, 2, 3, 4, 5, 6], // don’t draw a tick for -1
+        domain: [-1, 0, 1, 2, 3, 4, 5, 6],
+        ticks: [0, 1, 2, 3, 4, 5, 6],
         tickSize: 0,
         tickFormat: (day) => Plot.formatWeekday()((day + 1) % 7),
       },
@@ -119,14 +131,14 @@ export default function CalendarPlot({ width, height, settingsRef }) {
           calendar({ stroke: "gray", strokeWidth: 1 })
         ),
         Plot.cell(
-          statsContext.calendar.dayTotals,
+          dayTotals,
           calendar({
             date: "date",
             fill: "value",
             channels: {
               title: (d) =>
                 `${d.date.toDateString()}\n\n${
-                  statsContext.calendar.activitiesByDate
+                  activitiesByDate
                     .get(d.date)
                     .map(
                       (a) =>
@@ -175,7 +187,7 @@ export default function CalendarPlot({ width, height, settingsRef }) {
       plot.remove();
       legend.remove();
     };
-  }, [statsContext.calendar]);
+  }, [statsContext.calendar, statsContext.data]);
 
   return (
     <>
