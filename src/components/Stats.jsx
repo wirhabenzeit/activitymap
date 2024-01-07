@@ -1,7 +1,14 @@
 import * as React from "react";
 import { cloneElement, useRef, useLayoutEffect, useEffect } from "react";
 
-import { Tabs as MuiTabs, Stack } from "@mui/material";
+import {
+  Tabs as MuiTabs,
+  Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+} from "@mui/material";
 import { styled } from "@mui/material";
 import Tab from "@mui/material/Tab";
 import Box from "@mui/material/Box";
@@ -14,6 +21,57 @@ import { TimelinePlot } from "./Charts/TimelinePlot.jsx";
 import ScatterPlot from "./Charts/ScatterPlot.jsx";
 
 import { Divider } from "@mui/material";
+
+export function CustomSelect({
+  propName,
+  name,
+  value,
+  options,
+  setState,
+  headers,
+  sx,
+  disabled,
+}) {
+  return (
+    <FormControl key={propName} sx={sx} disabled={disabled}>
+      <InputLabel>{name}</InputLabel>
+      <Select
+        size="small"
+        autoWidth
+        value={value.id}
+        label={name}
+        sx={{ minWidth: "100px" }}
+        onChange={(event) =>
+          setState({
+            [propName]: options[event.target.value],
+          })
+        }
+      >
+        {!headers &&
+          Object.entries(options).map(([key, aggregator]) => (
+            <MenuItem value={key} key={key}>
+              {aggregator.label}
+            </MenuItem>
+          ))}
+        {headers &&
+          headers.reduce(
+            (prev, header) => [
+              ...prev,
+              <ListSubheader key={header.title}>{header.title}</ListSubheader>,
+              ...Object.entries(options)
+                .filter(([key, agg]) => header.filter(agg))
+                .map(([key, aggregator]) => (
+                  <MenuItem value={key} key={key}>
+                    {aggregator.label}
+                  </MenuItem>
+                )),
+            ],
+            []
+          )}
+      </Select>
+    </FormControl>
+  );
+}
 
 function StatTabPanel(props) {
   const { children, value, index, ...other } = props;

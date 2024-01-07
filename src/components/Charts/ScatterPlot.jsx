@@ -6,41 +6,8 @@ import * as Plot from "@observablehq/plot";
 import { Box } from "@mui/material";
 
 import { StatsContext } from "../../contexts/StatsContext.jsx";
-import { CustomSelect } from "../StatsUtilities.jsx";
+import { CustomSelect } from "../Stats.jsx";
 import { scatterSettings } from "../../settings.jsx";
-
-const usePrevious = (value, initialValue) => {
-  const ref = useRef(initialValue);
-  useEffect(() => {
-    ref.current = value;
-  });
-  return ref.current;
-};
-
-const useEffectDebugger = (effectHook, dependencies, dependencyNames = []) => {
-  const previousDeps = usePrevious(dependencies, []);
-
-  const changedDeps = dependencies.reduce((accum, dependency, index) => {
-    if (dependency !== previousDeps[index]) {
-      const keyName = dependencyNames[index] || index;
-      return {
-        ...accum,
-        [keyName]: {
-          before: previousDeps[index],
-          after: dependency,
-        },
-      };
-    }
-
-    return accum;
-  }, {});
-
-  if (Object.keys(changedDeps).length) {
-    console.log("[use-effect-debugger] ", changedDeps);
-  }
-
-  useEffect(effectHook, dependencies);
-};
 
 function legendRadius(
   scale,

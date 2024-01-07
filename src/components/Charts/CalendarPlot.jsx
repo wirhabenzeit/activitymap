@@ -4,7 +4,7 @@ import * as d3 from "d3";
 import { Box } from "@mui/material";
 import * as Plot from "@observablehq/plot";
 
-import { CustomSelect } from "../StatsUtilities.jsx";
+import { CustomSelect } from "../Stats.jsx";
 import { calendarSettings } from "../../settings.jsx";
 import * as htl from "htl";
 

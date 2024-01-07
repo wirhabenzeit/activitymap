@@ -8,6 +8,7 @@ import { ListContextProvider } from "./contexts/ListContext.jsx";
 import { BrowserRouter as Router } from "react-router-dom";
 import { SelectionContextProvider } from "./contexts/SelectionContext.jsx";
 import { StatsContextProvider } from "./contexts/StatsContext.jsx";
+import { StrictMode } from "react";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <Router basename={import.meta.env.VITE_BASEPATH}>

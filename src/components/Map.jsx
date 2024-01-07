@@ -231,7 +231,6 @@ function Map({ mapRef }) {
         {...viewport}
         onMove={(evt) => setViewport(evt.viewState)}
         onMoveEnd={(evt) => {
-          console.log(evt);
           map.setPosition(mapRef.current.getMap().getBounds(), evt.viewState);
         }}
         projection="globe"

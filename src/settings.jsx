@@ -5,15 +5,10 @@ import { library } from "@fortawesome/fontawesome-svg-core";
 import { fas } from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
 
-import * as d3t from "d3-time";
-import * as d3 from "d3-array";
-import * as d3tf from "d3-time-format";
-
-import { scaleLog, scaleLinear, scaleSqrt } from "@visx/scale";
+import * as d3 from "d3";
 
 import { LayerSAC } from "/src/components/LayerSAC";
 import { LayerQuaeldich } from "/src/components/LayerQuaeldich";
-import { gaussianAvg, movingWindow } from "./components/StatsUtilities";
 
 const stravaTypes = [
   "AlpineSki",
@@ -656,35 +651,6 @@ const listSettings = (activityContext) => ({
   },
 });
 
-const occurrencesOfMonth = (date, from, to) => {
-  const month = date.getMonth();
-  return (
-    to.getFullYear() -
-    from.getFullYear() -
-    1 +
-    (to.getMonth() >= month ? 1 : 0) +
-    (from.getMonth() <= month ? 1 : 0)
-  );
-};
-const occurrencesOfWeek = (date, from, to) => {
-  const week = parseInt(d3tf.timeFormat("%W")(date));
-  return (
-    to.getFullYear() -
-    from.getFullYear() -
-    1 +
-    (parseInt(d3tf.timeFormat("%W")(from)) <= week ? 1 : 0) +
-    (parseInt(d3tf.timeFormat("%W")(to)) >= week ? 1 : 0)
-  );
-};
-const occurrencesOfDay = (date, from, to) => {
-  const day = date.getDay();
-  return (
-    d3t.timeDay.count(d3t.timeMonday.ceil(from), d3t.timeSunday.floor(to)) / 7 +
-    (day >= from.getDay() ? 1 : 0) +
-    (day <= to.getDay() ? 1 : 0)
-  );
-};
-
 const calendarSettings = {
   values: {
     distance: {
@@ -743,8 +709,8 @@ const scatterSettings = {
     date: {
       id: "date",
       fun: (d) => d.date,
-      formatAxis: (v) => d3tf.timeFormat("%b %Y")(v),
-      format: (v) => d3tf.timeFormat("%Y-%m-%d")(v),
+      formatAxis: (v) => d3.timeFormat("%b %Y")(v),
+      format: (v) => d3.timeFormat("%Y-%m-%d")(v),
       label: "Date",
       unit: "",
     },
@@ -775,344 +741,6 @@ const scatterSettings = {
     },
   },
   color: (type) => categorySettings[type].color,
-};
-
-const mapStatSettings = {
-  values: {
-    count: {
-      id: "count",
-      fun: (v) => v.length,
-      label: "Count",
-      unit: "",
-    },
-    distance: {
-      id: "distance",
-      fun: (v) => d3.sum(v, (d) => d.distance),
-      format: (v) => (v / 1000).toFixed() + "km",
-      label: "Distance",
-      unit: "km",
-    },
-    elevation: {
-      id: "elevation",
-      fun: (v) => d3.sum(v, (d) => d.total_elevation_gain),
-      format: (v) => (v / 1_000).toFixed() + "km",
-      label: "Elevation",
-      unit: "km",
-    },
-    time: {
-      id: "time",
-      fun: (v) => d3.sum(v, (d) => d.elapsed_time),
-      format: (v) => (v / 3600).toFixed() + "h",
-      label: "Duration",
-      unit: "h",
-    },
-    kudos_count: {
-      id: "kudos_count",
-      fun: (v) => d3.sum(v, (d) => d.kudos_count),
-      format: (v) => v,
-      label: "Kudos",
-      unit: "",
-    },
-  },
-  timeGroups: {
-    all: (year) => ({
-      id: "all",
-      filter: (d) => true,
-      selected: year,
-      label: "All",
-    }),
-    byYear: (year) => ({
-      id: "year",
-      filter: (d) => d.date.getFullYear() == year,
-      selected: year,
-      highlight: year,
-      label: year,
-    }),
-  },
-};
-
-const boxSettings = {
-  values: {
-    distance: {
-      id: "distance",
-      fun: (d) => d.distance,
-      format: (v) => (v / 1000).toFixed() + "km",
-      formatAxis: (v) => (v / 1000).toFixed(),
-      label: "Distance",
-      unit: "km",
-    },
-    elevation: {
-      id: "elevation",
-      fun: (d) => d.total_elevation_gain,
-      format: (v) => v.toFixed() + "m",
-      formatAxis: (v) => v.toFixed(),
-      label: "Elevation",
-      unit: "m",
-    },
-    time: {
-      id: "time",
-      fun: (d) => d.elapsed_time,
-      format: (v) => (v / 3600).toFixed() + "h",
-      formatAxis: (v) => (v / 3600).toFixed(),
-      label: "Duration",
-      unit: "h",
-    },
-    average_speed: {
-      id: "average_speed",
-      fun: (d) => d.average_speed,
-      format: (v) => (v * 3.6).toFixed(1) + "km/h",
-      formatAxis: (v) => (v * 3.6).toFixed(1),
-      label: "Avg Speed",
-      unit: "km/h",
-    },
-    kudos_count: {
-      id: "kudos_count",
-      fun: (v) => d3.sum(v, (d) => d.kudos_count),
-      format: (v) => v,
-      formatAxis: (v) => v,
-      label: "Kudos",
-      unit: "",
-    },
-  },
-  mainGroups: {
-    sport_group: {
-      id: "sport_group",
-      fun: (d) => aliasMap[d.sport_type],
-      color: (id) => categorySettings[id].color,
-      label: "Group",
-    },
-    sport_type: {
-      id: "sport_type",
-      fun: (d) => d.sport_type,
-      color: (id) => colorMap[id],
-      label: "Type",
-    },
-    no_group: {
-      id: "no_group",
-      fun: (d) => undefined,
-      color: (id) => "#eeeeee",
-      label: "All sports",
-    },
-  },
-  secondaryGroups: {
-    year: {
-      id: "year",
-      fun: (d) => d.date.getFullYear(),
-      format: (v) => v,
-      label: "Year",
-    },
-    month: {
-      id: "month",
-      fun: (d) => d.date.getMonth(),
-      format: (v) => d3tf.timeFormat("%b")(new Date(0, v)),
-      label: "Month",
-    },
-    weekday: {
-      id: "weekday",
-      fun: (d) => (d.date.getDay() + 6) % 7,
-      format: (v) => d3tf.timeFormat("%a")(new Date(2018, 0, 1 + v)),
-      label: "Weekday",
-    },
-    no_group: {
-      id: "no_group",
-      fun: (d) => undefined,
-      format: (v) => "",
-      label: "All times",
-    },
-  },
-};
-
-const violinSettings = {
-  color: (v) => colorMap[v.sport_type],
-  icon: (v) => categorySettings[aliasMap[v.sport_type]].icon,
-  values: {
-    distance: {
-      id: "distance",
-      fun: (d) => d.distance / 1000,
-      format: (v) => (v / 1.0).toFixed() + "km",
-      formatAxis: (v) => (v / 1.0).toFixed(),
-      label: "Distance",
-      unit: "km",
-      minValue: 1,
-    },
-    elevation: {
-      id: "elevation",
-      fun: (d) => d.total_elevation_gain,
-      format: (v) => v.toFixed() + "m",
-      formatAxis: (v) => v.toFixed(),
-      label: "Elevation",
-      unit: "m",
-      minValue: 10,
-    },
-    time: {
-      id: "time",
-      fun: (d) => d.elapsed_time / 3600,
-      format: (v) => (v / 1.0).toFixed(1) + "h",
-      formatAxis: (v) => (v / 1.0).toFixed(v > 1 ? 0 : 1),
-      label: "Duration",
-      unit: "h",
-      minValue: 0.2,
-    },
-    average_speed: {
-      id: "average_speed",
-      fun: (d) => d.average_speed * 3.6,
-      format: (v) => (v * 1.0).toFixed(0) + "km/h",
-      formatAxis: (v) => (v * 1.0).toFixed(0),
-      label: "Avg Speed",
-      unit: "km/h",
-      minValue: 1,
-      maxValue: 50,
-    },
-    /*kudos_count: {
-      id: "kudos_count",
-      fun: (d) => d.kudos_count + 1,
-      format: (v) => v - 1,
-      formatAxis: (v) => v - 1,
-      label: "Kudos",
-      unit: "",
-      minValue: 1,
-      tickValues: [1, 2, 3, 6, 11, 21],
-      discrete: true,
-    },*/
-  },
-  groups: {
-    sport_group: {
-      id: "sport_group",
-      fun: (d) => aliasMap[d.sport_type],
-      format: (v) => categorySettings[v].name,
-      label: "Group",
-      icon: (id) => categorySettings[id].icon,
-      color: (id) => categorySettings[id].color,
-    },
-    sport_type: {
-      id: "sport_type",
-      fun: (d) => d.sport_type,
-      format: (v) => v,
-      label: "Type",
-      icon: (id) => categorySettings[aliasMap[id]].icon,
-      color: (id) => colorMap[id],
-    },
-    year: {
-      id: "year",
-      fun: (d) => d.date.getFullYear(),
-      format: (v) => v,
-      label: "Year",
-      icon: () => "child-reaching",
-      color: () => "#eeeeee",
-    },
-    month: {
-      id: "month",
-      fun: (d) => d.date.getMonth(),
-      format: (v) => d3tf.timeFormat("%b")(new Date(0, v)),
-      label: "Month",
-      icon: () => "child-reaching",
-      color: () => "#eeeeee",
-    },
-    weekday: {
-      id: "weekday",
-      fun: (d) => (d.date.getDay() + 6) % 7,
-      format: (v) => d3tf.timeFormat("%a")(new Date(2018, 0, 1 + v)),
-      label: "Weekday",
-      icon: () => "child-reaching",
-      color: () => "#eeeeee",
-    },
-  },
-  scaleYs: {
-    log: {
-      id: "log",
-      label: "Log",
-      scale: (props) =>
-        scaleLog({ ...props, base: 10, nice: true, clamp: true }),
-      ticks: (scale) =>
-        scale.ticks().filter((d, i) => [0, 1, 4].includes(i % 9)),
-    },
-    linear: {
-      id: "linear",
-      label: "Linear",
-      scale: (props) => scaleLinear({ ...props, nice: true }),
-      ticks: (scale) => scale.ticks(),
-    },
-    sqrt: {
-      id: "sqrt",
-      label: "Sqrt",
-      scale: (props) => scaleSqrt({ ...props, nice: true }),
-      ticks: (scale) => scale.ticks(),
-    },
-  },
-};
-
-const pieSettings = {
-  values: {
-    count: {
-      id: "count",
-      fun: (v) => v.length,
-      label: "Count",
-      unit: "",
-    },
-    distance: {
-      id: "distance",
-      fun: (v) => d3.sum(v, (d) => d.distance),
-      format: (v) => (v / 1000).toFixed() + "km",
-      label: "Distance",
-      unit: "km",
-    },
-    elevation: {
-      id: "elevation",
-      fun: (v) => d3.sum(v, (d) => d.total_elevation_gain),
-      format: (v) => (v / 1_000).toFixed() + "km",
-      label: "Elevation",
-      unit: "km",
-    },
-    time: {
-      id: "time",
-      fun: (v) => d3.sum(v, (d) => d.elapsed_time),
-      format: (v) => (v / 3600).toFixed() + "h",
-      label: "Duration",
-      unit: "h",
-    },
-    kudos_count: {
-      id: "kudos_count",
-      fun: (v) => d3.sum(v, (d) => d.kudos_count),
-      format: (v) => v,
-      label: "Kudos",
-      unit: "",
-    },
-  },
-  groups: {
-    sport_group: {
-      id: "sport_group",
-      fun: (d) => aliasMap[d.sport_type],
-      color: (id) => categorySettings[id].color,
-      icon: (id) => categorySettings[id].icon,
-      label: "Group",
-      sort: (v1, v2) => d3.ascending(v1[0], v2[0]),
-    },
-    sport_type: {
-      id: "sport_type",
-      fun: (d) => d.sport_type,
-      color: (id) => colorMap[id],
-      icon: (id) => categorySettings[aliasMap[id]].icon,
-      label: "Type",
-      sort: (v1, v2) =>
-        d3.ascending(aliasMap[v1[0]], aliasMap[v2[0]]) ||
-        d3.descending(v1[1], v2[1]),
-    },
-  },
-  timeGroups: {
-    all: (year) => ({
-      id: "all",
-      filter: (d) => true,
-      selected: year,
-      label: "All",
-    }),
-    byYear: (year) => ({
-      id: "year",
-      filter: (d) => d.date.getFullYear() == year,
-      selected: year,
-      highlight: year,
-      label: year,
-    }),
-  },
 };
 
 const timelineSettings = {
@@ -1167,7 +795,7 @@ const timelineSettings = {
     year: {
       id: "year",
       label: "Year",
-      tick: d3t.utcYear,
+      tick: d3.utcYear,
       days: 365,
       tickFormat: "%Y",
       averaging: { min: 0, max: 0 },
@@ -1175,7 +803,7 @@ const timelineSettings = {
     month: {
       id: "month",
       label: "Month",
-      tick: d3t.utcMonth,
+      tick: d3.utcMonth,
       days: 30,
       tickFormat: "%b %Y",
       averaging: { min: 0, max: 3 },
@@ -1183,7 +811,7 @@ const timelineSettings = {
     week: {
       id: "week",
       label: "Week",
-      tick: d3t.timeMonday,
+      tick: d3.timeMonday,
       days: 7,
       tickFormat: "%Y-%m-%d",
       averaging: { min: 0, max: 12 },
@@ -1191,7 +819,7 @@ const timelineSettings = {
     day: {
       id: "day",
       label: "Day",
-      tick: d3t.timeDay,
+      tick: d3.timeDay,
       days: 1,
       tickFormat: "%Y-%m-%d",
       averaging: { min: 0, max: 90 },
@@ -1246,147 +874,6 @@ const timelineSettings = {
   },
 };
 
-const timelineSettingsVisx = {
-  values: {
-    count: {
-      id: "count",
-      fun: (d) => 1,
-      sortable: false,
-      format: (v) => v,
-      label: "Count",
-      unit: "",
-    },
-    distance: {
-      id: "distance",
-      fun: (d) => d.distance,
-      sortable: true,
-      format: (v) =>
-        v >= 10_000_000
-          ? (v / 1_000_000).toFixed() + "k"
-          : v < 10_000
-          ? (v / 1000).toFixed(1)
-          : (v / 1000).toFixed(),
-      label: "Distance",
-      unit: "km",
-    },
-    elevation: {
-      id: "elevation",
-      sortable: true,
-      fun: (d) => d.total_elevation_gain,
-      format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
-      label: "Elevation",
-      unit: "m",
-    },
-    time: {
-      id: "time",
-      sortable: true,
-      fun: (d) => d.elapsed_time,
-      format: (v) => (v / 3600).toFixed(1),
-      label: "Duration",
-      unit: "h",
-    },
-    kudos_count: {
-      id: "kudos_count",
-      sortable: true,
-      fun: (d) => d.kudos_count,
-      format: (v) => v,
-      label: "Kudos",
-      unit: "",
-    },
-  },
-  timePeriods: {
-    year: {
-      id: "year",
-      label: "Year",
-      tick: d3t.timeYear,
-      days: 365,
-      format: (v) => new Date(v).getFullYear(),
-      averaging: {
-        disabled: true,
-        valueLabelFormat: (v) => "",
-        min: 0,
-        max: 1,
-      },
-    },
-    month: {
-      id: "month",
-      label: "Month",
-      tick: d3t.timeMonth,
-      days: 30,
-      format: (v) => d3tf.timeFormat("%Y-%m")(new Date(v)),
-      averaging: {
-        disabled: false,
-        valueLabelFormat: (v) => "±" + v + " months",
-        min: 0,
-        max: 2,
-      },
-    },
-    week: {
-      id: "week",
-      label: "Week",
-      tick: d3t.timeMonday,
-      days: 7,
-      format: (v) => d3tf.timeFormat("%Y, %U")(new Date(v)),
-      averaging: {
-        disabled: false,
-        valueLabelFormat: (v) => "±" + v + " weeks",
-        min: 0,
-        max: 8,
-      },
-    },
-    day: {
-      id: "day",
-      label: "Day",
-      tick: d3t.timeDay,
-      days: 1,
-      format: (v) => d3tf.timeFormat("%Y-%m-%d")(new Date(v)),
-      averaging: {
-        disabled: false,
-        valueLabelFormat: (v) => "±" + v + " days",
-        min: 0,
-        max: 60,
-      },
-    },
-  },
-  groups: {
-    sport_group: {
-      id: "sport_group",
-      label: "Type",
-      fun: (d) => aliasMap[d.sport_type],
-      color: (id) => categorySettings[id].color,
-      icon: (id) => categorySettings[id].icon,
-    },
-    /*sport_type: {
-      id: "sport_type",
-      label: "Type",
-      fun: (d) => d.sport_type,
-      color: (id) => categorySettings[aliasMap[id]].color,
-      icon: (id) => categorySettings[aliasMap[id]].icon,
-    },*/
-    no_group: {
-      id: "no_group",
-      label: "All",
-      fun: (d) => "All",
-      color: (id) => "#000000",
-      icon: (id) => "child-reaching",
-    },
-  },
-  averages: {
-    movingAvg: (N) => ({
-      id: "movingAvg",
-      label: "Moving Average",
-      window: N,
-      fun: movingWindow(N),
-    }),
-    gaussianAvg: (N) => ({
-      id: "gaussianAvg",
-      label: "Gaussian Average",
-      window: N,
-      fun: gaussianAvg(N),
-    }),
-  },
-};
-
 export {
   mapSettings,
   defaultMapPosition,
@@ -1398,11 +885,6 @@ export {
   colorMap,
   iconMap,
   timelineSettings,
-  pieSettings,
   calendarSettings,
   scatterSettings,
-  mapStatSettings,
-  boxSettings,
-  violinSettings,
-  timelineSettingsVisx,
 };

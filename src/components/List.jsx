@@ -58,7 +58,10 @@ export default function List() {
   const filter = useContext(FilterContext);
   const listState = useContext(ListContext);
 
-  const rows = filter.filterIDs.map((key) => activityContext.activityDict[key]);
+  const rows = useMemo(() => {
+    return filter.filterIDs.map((key) => activityContext.activityDict[key]);
+  }, [filter.filterIDs, activityContext.activityDict]);
+
   console.log(`List render: ${rows.length} rows`);
 
   const CustomToolbar = () => {

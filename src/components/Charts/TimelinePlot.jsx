@@ -8,7 +8,7 @@ import { BarChart, ShowChart } from "@mui/icons-material";
 import { Slider, Box, Stack, IconButton } from "@mui/material";
 
 import { StatsContext } from "../../contexts/StatsContext.jsx";
-import { CustomSelect } from "../StatsUtilities.jsx";
+import { CustomSelect } from "../Stats.jsx";
 import { timelineSettings } from "../../settings.jsx";
 
 export function TimelinePlot({ width, height, settingsRef }) {

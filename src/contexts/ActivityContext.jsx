@@ -2,9 +2,7 @@ import { createContext, useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Cookies from "js-cookie";
 import { useSearchParams } from "react-router-dom";
-//import { Buffer } from "buffer";
-//import * as geocoder from "local-reverse-geocoder";
-//import country from "which-country";
+import { usePrevious } from "../App";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -59,13 +57,10 @@ const ActivityContext = createContext(defaultState);
 
 function ActivityContextProvider({ children }) {
   const [state, setState] = useState(defaultState);
+  const previousState = usePrevious(state);
   let [searchParams, setSearchParams] = useSearchParams();
 
   console.log("ActivityContextProvider render");
-
-  useEffect(() => {
-    console.log("AC state update:", state);
-  }, [state]);
 
   const getAthleteData = async (athlete) => {
     const { data, error } = await supabase
@@ -216,9 +211,7 @@ function ActivityContextProvider({ children }) {
   };
 
   const setActivityList = async (activityList) => {
-    //console.log(activityList);
     const activities = await fetchSupabase((sb) => sb.in("id", activityList));
-    //onsole.log(activities);
     setState((prevState) => ({
       ...prevState,
       loading: false,
@@ -260,22 +253,23 @@ function ActivityContextProvider({ children }) {
   };
 
   useEffect(() => {
+    console.log("ActivityContextProvider init");
     if (Cookies.get("athlete") == undefined)
       Cookies.remove("athlete", { path: "/" });
 
     if (searchParams.get("code")) setCode(searchParams.get("code"));
-    else if (searchParams.get("athlete"))
+    else if (searchParams.get("athlete")) {
       setAthlete(Number(searchParams.get("athlete")));
-    else if (searchParams.get("activities"))
+    } else if (searchParams.get("activities"))
       setActivityList(
         searchParams
           .get("activities")
           .split(",")
           .map((x) => parseInt(x))
       );
-    else if (Cookies.get("athlete") != undefined)
+    else if (Cookies.get("athlete") != undefined) {
       setAthlete(Number(Cookies.get("athlete")));
-    else setGuestMode();
+    } else setGuestMode();
   }, []);
 
   return (
