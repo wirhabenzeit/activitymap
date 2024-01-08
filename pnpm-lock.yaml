@@ -56,6 +56,9 @@ dependencies:
   mapbox-gl:
     specifier: ^3.0.1
     version: 3.0.1
+  ml-regression-simple-linear:
+    specifier: ^3.0.0
+    version: 3.0.0
   proj4:
     specifier: ^2.9.2
     version: 2.9.2
@@ -1697,6 +1700,10 @@ packages:
     resolution: {integrity: sha512-02T332h1/HTN6cDSufLP8x4JzDs2+VC+8qZ/N0kWIVPyc2xUkWwWh3B2fJxR7raXkL4Mq7k554mfuM9ofv/vGg==}
     dev: false
 
+  /cheminfo-types@1.7.2:
+    resolution: {integrity: sha512-Zz7HPnh6wB2beEK7nfsXlNSK1Tpl4O0DpYUod8L6gI/5+INpn/d5UgJLI+3ck6CYY5Qsq34ylyKhERmZ5Wks2A==}
+    dev: false
+
   /chownr@2.0.0:
     resolution: {integrity: sha512-bIomtDF5KGpdogkLd9VspvFzk9KfpyyGlS8YFVZl7TGPBHL5snIOnxeshwVgPteQ9b4Eydl+pVbIyE1DcvCWgQ==}
     engines: {node: '>=10'}
@@ -2791,6 +2798,10 @@ packages:
       binary-search-bounds: 2.0.5
     dev: false
 
+  /is-any-array@2.0.1:
+    resolution: {integrity: sha512-UtilS7hLRu++wb/WBAw9bNuP1Eg04Ivn1vERJck8zJthEvXCBEBpGR/33u/xLKWEQf95803oalHrVDptcAvFdQ==}
+    dev: false
+
   /is-array-buffer@3.0.2:
     resolution: {integrity: sha512-y+FyyR/w8vfIRq4eQcM1EYgSTnmHXPqaF+IgzgraytCFq5Xh8lllDVmAZolPJiZttZLeFSINPYMaEJ7/vWUa1w==}
     dependencies:
@@ -3187,6 +3198,20 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
     dev: true
+
+  /ml-regression-base@3.0.0:
+    resolution: {integrity: sha512-qkQWvNk8VU1LIytjid/+YHOSx8GnEU9dCUPsAQ8AzCh4saijrsni/XA6x7r+N1UrHMDHeSEUBtRZTsl2syyu/A==}
+    dependencies:
+      cheminfo-types: 1.7.2
+      is-any-array: 2.0.1
+    dev: false
+
+  /ml-regression-simple-linear@3.0.0:
+    resolution: {integrity: sha512-WHtHq8CE6PIPWS3a6JA/Ql39ppHTOAAZ0l/UoxQ7p7cMh2taOebsicnBxlqRjibUl+RGUr+6tZlBp1ppiTwMdQ==}
+    dependencies:
+      cheminfo-types: 1.7.2
+      ml-regression-base: 3.0.0
+    dev: false
 
   /ms@2.1.2:
     resolution: {integrity: sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==}

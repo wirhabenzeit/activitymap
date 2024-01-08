@@ -1,4 +1,4 @@
-import { useContext, createContext, useState, useEffect } from "react";
+import { useContext, createContext, useEffect, useReducer } from "react";
 
 import { ActivityContext } from "./ActivityContext";
 import { FilterContext } from "./FilterContext";
@@ -24,11 +24,6 @@ const defaultStats = {
   },
   calendar: {
     value: calendarSettings.values.elevation,
-    extent: [undefined, undefined],
-    loaded: false,
-    data: new d3.InternMap(),
-    activitiesByDate: {},
-    dayTotals: [],
   },
   scatter: {
     xValue: scatterSettings.values.date,
@@ -36,94 +31,56 @@ const defaultStats = {
     size: scatterSettings.values.distance,
     group: scatterSettings.groups.sport_group,
     color: scatterSettings.color,
-    loaded: false,
-    extent: {
-      x: [undefined, undefined],
-      y: [undefined, undefined],
-      size: [undefined, undefined],
-    },
-    onClick: () => {},
   },
 };
 
 const StatsContext = createContext(defaultStats);
 
-const updateCalendar = (data, calendar, selectedDays, setSelected, extent) => {
-  const activitiesByDate = d3.group(data, (f) => d3.utcDay(f.date));
-  const rollup = d3.rollup(
-    data,
-    (v) => d3.sum(v, calendar.value.fun),
-    (d) => d3.timeMonth(d.date),
-    (d) => d3.utcDay(d.date)
-  );
-  const dayTotals = d3.map(
-    d3.rollup(
-      data,
-      (v) => d3.sum(v, calendar.value.fun),
-      (d) => d3.utcDay(d.date)
-    ),
-    ([key, value]) => ({ date: key, value })
-  );
-  return {
-    data: rollup,
-    activitiesByDate: activitiesByDate,
-    dayTotals: dayTotals,
-  };
-};
+function reducer(state, action) {
+  switch (action.type) {
+    case "SET_TIMELINE":
+      if ("timePeriod" in action.payload) {
+        const newAveraging =
+          state.timeline.averaging /
+          (action.payload.timePeriod.days / state.timeline.timePeriod.days);
+
+        action.payload.averaging = Math.min(
+          Math.max(
+            Math.round(newAveraging),
+            action.payload.timePeriod.averaging.min
+          ),
+          action.payload.timePeriod.averaging.max
+        );
+      }
+      return { ...state, timeline: { ...state.timeline, ...action.payload } };
+    case "SET_CALENDAR":
+      return { ...state, calendar: { ...state.calendar, ...action.payload } };
+    case "SET_SCATTER":
+      return { ...state, scatter: { ...state.scatter, ...action.payload } };
+    case "SET_ALL_DATA":
+      return { ...state, allData: action.payload };
+    case "SET_FILTERED_DATA":
+      return {
+        ...state,
+        extent: action.payload.extent,
+        data: action.payload.data,
+        loaded: true,
+      };
+    default:
+      throw new Error();
+  }
+}
 
 export function StatsContextProvider({ children }) {
   const activityContext = useContext(ActivityContext);
   const filterContext = useContext(FilterContext);
-  const [state, setState] = useState(defaultStats);
-
-  const setTimeline = (newTimeline) => {
-    if ("timePeriod" in newTimeline) {
-      const newAveraging =
-        state.timeline.averaging /
-        (newTimeline.timePeriod.days / state.timeline.timePeriod.days);
-
-      newTimeline.averaging = Math.min(
-        Math.max(
-          Math.round(newAveraging),
-          newTimeline.timePeriod.averaging.min
-        ),
-        newTimeline.timePeriod.averaging.max
-      );
-
-      console.log(newTimeline);
-    }
-
-    setState((state) => ({
-      ...state,
-      timeline: {
-        ...state.timeline,
-        ...newTimeline,
-      },
-    }));
-  };
-
-  const setCalendar = (newCalendar) => {
-    setState((state) => ({
-      ...state,
-      calendar: { ...state.calendar, ...newCalendar },
-    }));
-  };
-
-  const setScatter = (newScatter) => {
-    setState((state) => ({
-      ...state,
-      scatter: {
-        ...state.scatter,
-        ...newScatter,
-      },
-    }));
-  };
+  const [state, dispatch] = useReducer(reducer, defaultStats);
 
   useEffect(() => {
     if (activityContext.loaded && state.data.length > 0) {
-      setTimeline({});
-      setCalendar({});
-      setScatter({});
+      dispatch({ type: "SET_TIMELINE", payload: {} });
+      dispatch({ type: "SET_CALENDAR", payload: {} });
+      dispatch({ type: "SET_SCATTER", payload: {} });
     }
   }, [state.data]);
 
@@ -132,30 +89,17 @@ export function StatsContextProvider({ children }) {
       const data = activityContext.geoJson.features.map(
         (feature) => feature.properties
       );
-      data.forEach((feature) => {
-        feature.date = new Date(feature.start_date_local);
-      });
-      setState({
-        ...state,
-        allData: data,
-      });
+      dispatch({ type: "SET_ALL_DATA", payload: data });
     }
   }, [activityContext.geoJson]);
 
   useEffect(() => {
     if (activityContext.loaded) {
-      setState((state) => {
-        const data = state.allData.filter((feature) =>
-          filterContext.filterIDs.includes(feature.id)
-        );
-        const extent = d3.extent(data, (f) => f.date);
-        return {
-          ...state,
-          extent: extent,
-          data: data,
-          loaded: true,
-        };
-      });
+      const data = state.allData.filter((feature) =>
+        filterContext.filterIDs.includes(feature.id)
+      );
+      const extent = d3.extent(data, (f) => f.date);
+      dispatch({ type: "SET_FILTERED_DATA", payload: { extent, data } });
     }
   }, [state.allData, filterContext.filterIDs]);
 
@@ -163,9 +107,9 @@ export function StatsContextProvider({ children }) {
     <StatsContext.Provider
       value={{
         ...state,
-        setTimeline: setTimeline,
-        setCalendar: setCalendar,
-        setScatter: setScatter,
+        setTimeline: (payload) => dispatch({ type: "SET_TIMELINE", payload }),
+        setCalendar: (payload) => dispatch({ type: "SET_CALENDAR", payload }),
+        setScatter: (payload) => dispatch({ type: "SET_SCATTER", payload }),
       }}
     >
       {children}

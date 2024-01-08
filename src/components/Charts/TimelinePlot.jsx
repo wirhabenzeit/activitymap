@@ -11,6 +11,45 @@ import { StatsContext } from "../../contexts/StatsContext.jsx";
 import { CustomSelect } from "../Stats.jsx";
 import { timelineSettings } from "../../settings.jsx";
 
+function computeTimeline(activities, timeline) {
+  const extent = d3.extent(activities, (d) => timeline.timePeriod.tick(d.date));
+
+  const groupExtent = Array.from(new Set(activities.map(timeline.group.fun)));
+
+  const range = timeline.timePeriod.tick.range(
+    extent[0],
+    timeline.timePeriod.tick.ceil(extent[1])
+  );
+
+  const groups = d3.group(
+    activities,
+    (d) => timeline.timePeriod.tick(d.date),
+    timeline.group.fun
+  );
+
+  const timeMap = d3.map(range, (date) => {
+    return groupExtent.map((type) => ({
+      date,
+      type,
+      value:
+        groups.get(date)?.get(type) != undefined
+          ? d3.sum(groups.get(date)?.get(type), timeline.value.fun)
+          : 0,
+    }));
+  });
+
+  const data = timeMap.flat().sort((a, b) => a.date - b.date);
+
+  const map = new d3.InternMap(
+    timeMap.map((arr) => [
+      arr[0].date,
+      new d3.InternMap(arr.map(({ value, type }) => [type, value])),
+    ])
+  );
+
+  return { extent, groupExtent, range, data, map };
+}
+
 export function TimelinePlot({ width, height, settingsRef }) {
   const statsContext = useContext(StatsContext);
   const [averaging, setAveraging] = React.useState(
@@ -26,43 +65,9 @@ export function TimelinePlot({ width, height, settingsRef }) {
   useEffect(() => {
     if (!statsContext.loaded || statsContext.data.length == 0) return;
 
-    const extent = d3.extent(statsContext.data, (d) =>
-      timeline.timePeriod.tick(d.date)
-    );
-
-    const groupExtent = Array.from(
-      new Set(statsContext.data.map(timeline.group.fun))
-    );
-
-    const range = timeline.timePeriod.tick.range(
-      extent[0],
-      timeline.timePeriod.tick.ceil(extent[1])
-    );
-
-    const groups = d3.group(
+    const { extent, groupExtent, range, data, map } = computeTimeline(
       statsContext.data,
-      (d) => timeline.timePeriod.tick(d.date),
-      timeline.group.fun
-    );
-
-    const timeMap = d3.map(range, (date) => {
-      return groupExtent.map((type) => ({
-        date,
-        type,
-        value:
-          groups.get(date)?.get(type) != undefined
-            ? d3.sum(groups.get(date)?.get(type), timeline.value.fun)
-            : 0,
-      }));
-    });
-
-    const data = timeMap.flat().sort((a, b) => a.date - b.date);
-
-    const map = new d3.InternMap(
-      timeMap.map((arr) => [
-        arr[0].date,
-        new d3.InternMap(arr.map(({ value, type }) => [type, value])),
-      ])
+      timeline
     );
 
     const plot = Plot.plot({
@@ -160,6 +165,7 @@ export function TimelinePlot({ width, height, settingsRef }) {
     });
 
     figureRef.current.append(plot);
+
     return () => {
       plot.remove();
     };

@@ -18,6 +18,7 @@ import Tune from "@mui/icons-material/Tune";
 import CalendarPlot from "./Charts/CalendarPlot.jsx";
 import { TimelinePlot } from "./Charts/TimelinePlot.jsx";
 
+import ProgressPlot from "./Charts/ProgressPlot.jsx";
 import ScatterPlot from "./Charts/ScatterPlot.jsx";
 
 import { Divider } from "@mui/material";
@@ -147,6 +148,7 @@ function LegendSettingPlot({ plot, settingsOpen, width, height }) {
 const tabs = [
   { id: "timeline", label: "Timeline", plot: <TimelinePlot /> },
   { id: "calendar", label: "Calendar", plot: <CalendarPlot /> },
+  { id: "progress", label: "Progress", plot: <ProgressPlot /> },
   { id: "scatter", label: "Scatter", plot: <ScatterPlot /> },
 ];
 

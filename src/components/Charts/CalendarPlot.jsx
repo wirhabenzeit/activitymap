@@ -55,6 +55,25 @@ class MonthLine extends Plot.Mark {
   }
 }
 
+const computeCalendar = (activities, calendar) => {
+  const activitiesByDate = d3.group(activities, (f) => d3.utcDay(f.date));
+
+  const dayTotals = d3.map(
+    d3.rollup(
+      activities,
+      (v) => d3.sum(v, calendar.value.fun),
+      (d) => d3.utcDay(d.date)
+    ),
+    ([key, value]) => ({ date: key, value })
+  );
+
+  const start = d3.min(dayTotals, (d) => d.date);
+
+  const end = d3.utcDay.offset(d3.max(dayTotals, (d) => d.date));
+
+  return { activitiesByDate, dayTotals, start, end };
+};
+
 export default function CalendarPlot({ width, height, settingsRef }) {
   const statsContext = useContext(StatsContext);
   const figureRef = useRef(null);
@@ -64,21 +83,10 @@ export default function CalendarPlot({ width, height, settingsRef }) {
   useEffect(() => {
     if (!statsContext.loaded) return;
 
-    const activitiesByDate = d3.group(statsContext.data, (f) =>
-      d3.utcDay(f.date)
+    const { activitiesByDate, dayTotals, start, end } = computeCalendar(
+      statsContext.data,
+      statsContext.calendar
     );
-
-    const dayTotals = d3.map(
-      d3.rollup(
-        statsContext.data,
-        (v) => d3.sum(v, statsContext.calendar.value.fun),
-        (d) => d3.utcDay(d.date)
-      ),
-      ([key, value]) => ({ date: key, value })
-    );
-
-    const start = d3.min(dayTotals, (d) => d.date); // exclusive
-    const end = d3.utcDay.offset(d3.max(dayTotals, (d) => d.date));
 
     const plot = Plot.plot({
       style: { maxWidth: "1200px" },

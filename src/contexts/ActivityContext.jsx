@@ -169,7 +169,7 @@ function ActivityContextProvider({ children }) {
       },
       [Infinity, Infinity, -Infinity, -Infinity]
     );
-    //feature.country = country([...feature.start_latlng].reverse());
+    feature.date = new Date(feature.start_date_local);
     const jsonFeature = {
       type: "Feature",
       geometry: feature.geometry_simplified,
