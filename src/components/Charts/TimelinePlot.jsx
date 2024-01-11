@@ -137,6 +137,7 @@ export function TimelinePlot({ width, height, settingsRef }) {
             x: "date",
             y: "value",
             k: averaging + 1,
+            curve: "monotone-x",
             reduce: "mean",
             stroke: (x) => timeline.group.color(x.type),
             channels: {
@@ -155,11 +156,16 @@ export function TimelinePlot({ width, height, settingsRef }) {
             },
           })
         ),
-        Plot.lineY(data, {
+        Plot.areaY(data, {
           x: "date",
-          y: "value",
-          stroke: (x) => timeline.group.color(x.type),
-          opacity: 0.2,
+          //x: "type",
+          y2: "value",
+          y1: 0,
+          fill: (x) => timeline.group.color(x.type),
+          opacity: 0.1,
+          //interval: timeline.timePeriod.tick,
+          //transform
+          curve: "step",
         }),
       ],
     });

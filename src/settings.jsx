@@ -672,7 +672,8 @@ const calendarSettings = {
       format: (v) => (v / 1000).toFixed() + "km",
       label: "Distance",
       unit: "km",
-      maxValue: 100_000,
+      reducer: d3.sum,
+      color: { scheme: "reds", type: "sqrt", ticks: 3 },
     },
     elevation: {
       id: "elevation",
@@ -680,7 +681,8 @@ const calendarSettings = {
       format: (v) => (v / 1.0).toFixed() + "m",
       label: "Elevation",
       unit: "km",
-      maxValue: 2_000,
+      reducer: d3.sum,
+      color: { scheme: "reds", type: "sqrt", ticks: 3 },
     },
     time: {
       id: "time",
@@ -688,7 +690,23 @@ const calendarSettings = {
       format: (v) => (v / 3600).toFixed(1) + "h",
       label: "Duration",
       unit: "h",
-      maxValue: 5 * 3600,
+      reducer: d3.sum,
+      color: { scheme: "reds", type: "sqrt", ticks: 3 },
+    },
+    type: {
+      id: "type",
+      fun: (d) => aliasMap[d.sport_type],
+      format: (l) => (l in categorySettings ? categorySettings[l].name : l),
+      label: "Sport Type",
+      unit: "",
+      reducer: (v, fun) => {
+        const set = new Set(v.map(fun));
+        return set.size > 1 ? "Multiple" : set.values().next().value;
+      },
+      color: {
+        domain: [...Object.keys(categorySettings), "Multiple"],
+        range: [...Object.values(categorySettings).map((x) => x.color), "#aaa"],
+      },
     },
   },
 };
@@ -725,14 +743,6 @@ const scatterSettings = {
       formatAxis: (v) => d3.timeFormat("%b %Y")(v),
       format: (v) => d3.timeFormat("%Y-%m-%d")(v),
       label: "Date",
-      unit: "",
-    },
-    kudos_count: {
-      id: "kudos_count",
-      fun: (d) => d.kudos_count,
-      format: (v) => v,
-      formatAxis: (v) => v,
-      label: "Kudos",
       unit: "",
     },
     average_speed: {
@@ -794,14 +804,6 @@ const timelineSettings = {
       format: (v) => (v / 3600).toFixed(1),
       label: "Duration",
       unit: "h",
-    },
-    kudos_count: {
-      id: "kudos_count",
-      sortable: true,
-      fun: (d) => d.kudos_count,
-      format: (v) => v,
-      label: "Kudos",
-      unit: "",
     },
   },
   timePeriods: {
@@ -898,13 +900,13 @@ const progressSettings = {
     },
     distance: {
       id: "distance",
-      fun: (d) => Math.round(d.distance/100)/10,
+      fun: (d) => Math.round(d.distance / 100) / 10,
       format: (v) =>
         v >= 10_000
           ? (v / 1_000).toFixed() + "k"
           : v < 10
-          ? (v).toFixed(1)
-          : (v).toFixed(),
+          ? v.toFixed(1)
+          : v.toFixed(),
       label: "Distance",
       unit: "km",
     },
@@ -919,7 +921,7 @@ const progressSettings = {
     time: {
       id: "time",
       sortable: true,
-      fun: (d) => Math.round(d.elapsed_time/360)/10,
+      fun: (d) => Math.round(d.elapsed_time / 360) / 10,
       format: (v) => v.toFixed(1),
       label: "Duration",
       unit: "h",
@@ -940,5 +942,5 @@ export {
   timelineSettings,
   calendarSettings,
   scatterSettings,
-  progressSettings
+  progressSettings,
 };

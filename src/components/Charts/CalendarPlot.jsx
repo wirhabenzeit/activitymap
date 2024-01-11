@@ -5,7 +5,7 @@ import { Box } from "@mui/material";
 import * as Plot from "@observablehq/plot";
 
 import { CustomSelect } from "../Stats.jsx";
-import { calendarSettings } from "../../settings.jsx";
+import { calendarSettings, scatterSettings } from "../../settings.jsx";
 import * as htl from "htl";
 
 import { StatsContext } from "../../contexts/StatsContext.jsx";
@@ -61,7 +61,7 @@ const computeCalendar = (activities, calendar) => {
   const dayTotals = d3.map(
     d3.rollup(
       activities,
-      (v) => d3.sum(v, calendar.value.fun),
+      (v) => calendar.value.reducer(v, calendar.value.fun),
       (d) => d3.utcDay(d.date)
     ),
     ([key, value]) => ({ date: key, value })
@@ -109,10 +109,7 @@ export default function CalendarPlot({ width, height, settingsRef }) {
         padding: 0.1,
         reverse: true,
       },
-      color: {
-        scheme: "reds",
-        type: "sqrt",
-      },
+      color: statsContext.calendar.value.color,
       marks: [
         Plot.text(
           d3.utcYears(d3.utcYear(start), end),
@@ -151,10 +148,12 @@ export default function CalendarPlot({ width, height, settingsRef }) {
                     .map(
                       (a) =>
                         a.name +
-                        ": " +
-                        statsContext.calendar.value.format(
-                          statsContext.calendar.value.fun(a)
-                        )
+                        (statsContext.calendar.value.format == null
+                          ? ""
+                          : ": " +
+                            statsContext.calendar.value.format(
+                              statsContext.calendar.value.fun(a)
+                            ))
                     )
                     ?.join("\n") ?? ""
                 }`,
@@ -176,7 +175,7 @@ export default function CalendarPlot({ width, height, settingsRef }) {
       style: `width: 1200px; overflow: scroll; margin: 0;`,
     });
     const legend = plot.legend("color", {
-      ticks: 3,
+      ...statsContext.calendar.value.color,
       tickFormat: statsContext.calendar.value.format,
       label: statsContext.calendar.value.label,
       width: 300,
