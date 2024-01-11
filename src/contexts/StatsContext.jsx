@@ -8,6 +8,7 @@ import {
   timelineSettings,
   calendarSettings,
   scatterSettings,
+  progressSettings,
 } from "../settings";
 
 const defaultStats = {
@@ -32,6 +33,9 @@ const defaultStats = {
     group: scatterSettings.groups.sport_group,
     color: scatterSettings.color,
   },
+  progress: {
+    value: progressSettings.values.elevation,
+  }
 };
 
 const StatsContext = createContext(defaultStats);
@@ -57,6 +61,8 @@ function reducer(state, action) {
       return { ...state, calendar: { ...state.calendar, ...action.payload } };
     case "SET_SCATTER":
       return { ...state, scatter: { ...state.scatter, ...action.payload } };
+    case "SET_PROGRESS":
+      return { ...state, progress: { ...state.progress, ...action.payload } };
     case "SET_ALL_DATA":
       return { ...state, allData: action.payload };
     case "SET_FILTERED_DATA":
@@ -81,6 +87,7 @@ export function StatsContextProvider({ children }) {
       dispatch({ type: "SET_TIMELINE", payload: {} });
       dispatch({ type: "SET_CALENDAR", payload: {} });
       dispatch({ type: "SET_SCATTER", payload: {} });
+      dispatch({ type: "SET_PROGRESS", payload: {} });
     }
   }, [state.data]);
 
@@ -110,6 +117,7 @@ export function StatsContextProvider({ children }) {
         setTimeline: (payload) => dispatch({ type: "SET_TIMELINE", payload }),
         setCalendar: (payload) => dispatch({ type: "SET_CALENDAR", payload }),
         setScatter: (payload) => dispatch({ type: "SET_SCATTER", payload }),
+        setProgress: (payload) => dispatch({ type: "SET_PROGRESS", payload }),
       }}
     >
       {children}

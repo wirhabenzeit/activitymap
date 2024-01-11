@@ -9,13 +9,9 @@ import { Box } from "@mui/material";
 
 import { StatsContext } from "../../contexts/StatsContext.jsx";
 import { CustomSelect } from "../Stats.jsx";
+import { progressSettings } from "../../settings.jsx";
 
-const cumData = ({
-  activities,
-  key = d3.utcYear,
-  keyName = "Year",
-  value = (x) => x.total_elevation_gain,
-}) => {
+const cumData = ({ activities, key, keyName, value }) => {
   return d3
     .groups(activities, (x) => key(x.date))
     .flatMap(([dateKey, acts]) => {
@@ -39,16 +35,17 @@ const progressPlot = ({
   scaleTick = d3.timeFormat("%Y"),
   scaleTickName = "Year",
   domain = [new Date("2024-01-01"), new Date("2024-12-31")],
-  value = (x) => x.total_elevation_gain,
-  valueName = "Elevation",
-  valueFormat = (x) => x.toFixed(0) + "m",
+  value,
+  valueName = "",
+  valueFormat = (x) => x,
+  unit = "",
   ...options
 }) => {
-  console.log(activities);
   var data = cumData({
     activities: activities,
     key,
     keyName: scaleTickName,
+    value,
   }).map((entry) => ({
     ...entry,
     virtualDate: new Date(
@@ -73,19 +70,16 @@ const progressPlot = ({
     (x) => x[scaleTickName].getTime() == keys[keys.length - 1].getTime()
   );
 
-  console.log(current);
-
   const reg = new SimpleLinearRegression(
     current.map((d) => d.virtualDate.getTime() - domain[0].getTime()),
     current.map((d) => d.cumsum)
   );
 
-  console.log(reg);
   const map = { y: "cumsum", x: "virtualDate", stroke: scaleTickName };
 
   return Plot.plot({
     ...options,
-    marginLeft: 60,
+    marginLeft: 80,
     marginRight: 60,
     width,
     height,
@@ -103,7 +97,7 @@ const progressPlot = ({
     y: { axis: "right", label: valueName, tickFormat: valueFormat, ticks: 6 },
     color: {
       type: "categorical",
-      scheme: "Blues",
+      //scheme: "Blues",
       legend: true,
       tickFormat: scaleTick,
     },
@@ -131,11 +125,11 @@ const progressPlot = ({
             x: null,
             stroke: scaleTick,
             y: null,
-            [valueName]: valueFormat,
+            [valueName]: (x) => valueFormat(x) + unit,
           },
         })
       ),
-      Plot.crosshair(data, map),
+      Plot.crosshair(data, { ...map, textStrokeOpacity: 0 }),
       Plot.linearRegressionY(
         data.filter(
           (x) =>
@@ -152,27 +146,34 @@ export default function ProgressPlot({ width, height, settingsRef }) {
   const figureRef = useRef(null);
   const figureRef2 = useRef(null);
 
-  const plotWidth = Math.min(Math.max(width, 100), 1600);
-  const plotHeight = Math.max(height, 100);
+  const plotWidth = Math.min(Math.max(width, 100), 800);
+  const plotHeight = plotWidth * 0.7;
 
   useEffect(() => {
-    console.log(statsContext.data);
     if (!statsContext.loaded) return;
 
-    const scaleTick = d3.timeFormat("%Y");
+    const commonSettings = {
+      activities: statsContext.data,
+      height: plotHeight,
+      width: plotWidth,
+      value: statsContext.progress.value.fun,
+      valueName: statsContext.progress.value.label,
+      valueFormat: statsContext.progress.value.format,
+      unit: statsContext.progress.value.unit,
+    };
 
     const yearPlot = progressPlot({
-      activities: statsContext.data,
-      height: height / 3,
-      width: width,
-      scaleTick,
+      ...commonSettings,
+      scaleTickName: "Year",
+      key: d3.utcYear,
+      scaleTick: d3.timeFormat("%Y"),
+      tick: d3.timeFormat("%b"),
+      domain: [new Date("2024-01-01"), new Date("2024-12-31 23:59:59")],
       title: "Yearly Progress",
     });
 
     const monthPlot = progressPlot({
-      activities: statsContext.data,
-      height: height / 3,
-      width: width,
+      ...commonSettings,
       scaleTickName: "Month",
       key: d3.utcMonth,
       scaleTick: d3.timeFormat("%b"),
@@ -181,13 +182,21 @@ export default function ProgressPlot({ width, height, settingsRef }) {
       title: "Monthly Progress",
     });
 
+    Object.assign(yearPlot, {
+      style: `margin: 0; width: ${plotWidth}px;`,
+    });
+
+    Object.assign(monthPlot, {
+      style: `margin: 0; width: ${plotWidth}px;`,
+    });
+
     figureRef.current.append(yearPlot);
     figureRef2.current.append(monthPlot);
     return () => {
       yearPlot.remove();
       monthPlot.remove();
     };
-  }, [width, height, statsContext.data]);
+  }, [width, height, statsContext.data, statsContext.progress]);
 
   return (
     <>
@@ -195,16 +204,30 @@ export default function ProgressPlot({ width, height, settingsRef }) {
         sx={{
           height: height,
           width: width,
-          display: "flex",
-          justifyContent: "center",
-          flexDirection: "column",
           overflow: "scroll",
         }}
       >
-        <div ref={figureRef} />
-        <div ref={figureRef2} />
+        <div
+          ref={figureRef}
+          style={{ display: "flex", justifyContent: "center", width: "100%" }}
+        />
+        <div
+          ref={figureRef2}
+          style={{ display: "flex", justifyContent: "center", width: "100%" }}
+        />
       </Box>
-      {settingsRef.current && createPortal(<></>, settingsRef.current)}
+      {settingsRef.current &&
+        createPortal(
+          <CustomSelect
+            key="value"
+            propName="value"
+            value={statsContext.progress.value}
+            name="Value"
+            options={progressSettings.values}
+            setState={statsContext.setProgress}
+          />,
+          settingsRef.current
+        )}
     </>
   );
 }

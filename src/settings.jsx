@@ -8,6 +8,7 @@ library.add(fas);
 import * as d3 from "d3";
 
 import { LayerSAC } from "/src/components/LayerSAC";
+import { LayerFriflyt } from "./components/LayerFriflyt";
 import { LayerQuaeldich } from "/src/components/LayerQuaeldich";
 
 const stravaTypes = [
@@ -130,11 +131,23 @@ const mapSettings = {
     visible: false,
     overlay: false,
   },
+  NorgesKart: {
+    url: `https://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo4&zoom={z}&x={x}&y={y}`,
+    type: "raster",
+    visible: false,
+    overlay: false,
+  },
   "SAC Tourenportal": {
     overlay: true,
     visible: false,
     type: "custom",
     component: LayerSAC,
+  },
+  "Friflyt Routes": {
+    overlay: true,
+    visible: false,
+    type: "custom",
+    component: LayerFriflyt,
   },
   "Quäldich Pässe": {
     overlay: true,
@@ -874,6 +887,46 @@ const timelineSettings = {
   },
 };
 
+const progressSettings = {
+  values: {
+    count: {
+      id: "count",
+      fun: (d) => 1,
+      format: (v) => v,
+      label: "Count",
+      unit: "",
+    },
+    distance: {
+      id: "distance",
+      fun: (d) => Math.round(d.distance/100)/10,
+      format: (v) =>
+        v >= 10_000
+          ? (v / 1_000).toFixed() + "k"
+          : v < 10
+          ? (v).toFixed(1)
+          : (v).toFixed(),
+      label: "Distance",
+      unit: "km",
+    },
+    elevation: {
+      id: "elevation",
+      sortable: true,
+      fun: (d) => Math.round(d.total_elevation_gain),
+      format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
+      label: "Elevation",
+      unit: "m",
+    },
+    time: {
+      id: "time",
+      sortable: true,
+      fun: (d) => Math.round(d.elapsed_time/360)/10,
+      format: (v) => v.toFixed(1),
+      label: "Duration",
+      unit: "h",
+    },
+  },
+};
+
 export {
   mapSettings,
   defaultMapPosition,
@@ -887,4 +940,5 @@ export {
   timelineSettings,
   calendarSettings,
   scatterSettings,
+  progressSettings
 };

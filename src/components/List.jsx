@@ -98,7 +98,6 @@ export default function List() {
           {checked ? "Selected" : "All"}
         </rootProps.slots.baseButton>
         <GridToolbarColumnsButton />
-        <GridToolbarDensitySelector />
       </GridToolbarContainer>
     );
   };
@@ -114,6 +113,7 @@ export default function List() {
         checkboxSelection
         disableColumnFilter
         slots={{ toolbar: CustomToolbar, footer: CustomFooterStatusComponent }}
+        slotProps={{ columnsPanel: { autoFocusSearchField: false } }}
         rowSelectionModel={selectionContext.selected}
         onRowSelectionModelChange={(newRowSelectionModel) => {
           selectionContext.setSelected(newRowSelectionModel);
