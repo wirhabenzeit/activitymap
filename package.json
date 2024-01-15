@@ -20,7 +20,7 @@
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@mapbox/togeojson": "^0.16.2",
     "@mui/icons-material": "^5.15.3",
-    "@mui/material": "^5.15.3",
+    "@mui/material": "^5.15.4",
     "@mui/x-data-grid": "7.0.0-alpha.7",
     "@observablehq/plot": "^0.6.13",
     "@supabase/supabase-js": "^2.39.2",
