@@ -113,8 +113,8 @@ devDependencies:
     specifier: ^15.8.1
     version: 15.8.1
   supabase:
-    specifier: ^1.127.4
-    version: 1.127.4
+    specifier: ^1.131.5
+    version: 1.131.5
   vite:
     specifier: ^5.0.11
     version: 5.0.11
@@ -4006,8 +4006,8 @@ packages:
     resolution: {integrity: sha512-Orov6g6BB1sDfYgzWfTHDOxamtX1bE/zo104Dh9e6fqJ3PooipYyfJ0pUmrZO2wAvO8YbEyeFrkV91XTsGMSrw==}
     dev: false
 
-  /supabase@1.127.4:
-    resolution: {integrity: sha512-9vxMsRkG8Qqju+gjTL++G/DaUcMyVr9YAT3jeRkNKIzbVVd0QiHUp2NHXXlqs6EByJVZzpMYJf4h55ml/H7gpg==}
+  /supabase@1.131.5:
+    resolution: {integrity: sha512-YJ9qoNac+dq521btw6kgqnJEwf6zRsegvooHM1QuxbOzVuL40eqrrNykTue3iCu3/qkVutcq3XPmdPO3TbXaiw==}
     engines: {npm: '>=8'}
     hasBin: true
     requiresBuild: true
