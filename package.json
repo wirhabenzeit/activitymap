@@ -36,7 +36,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-map-gl": "^7.1.7",
-    "react-router-dom": "^6.21.1",
+    "react-router-dom": "^6.22.0",
     "shpjs": "^4.0.4"
   },
   "devDependencies": {
