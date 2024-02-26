@@ -27,8 +27,8 @@ dependencies:
     specifier: ^0.16.2
     version: 0.16.2
   '@mui/icons-material':
-    specifier: ^5.15.3
-    version: 5.15.3(@mui/material@5.15.3)(@types/react@18.2.47)(react@18.2.0)
+    specifier: ^5.15.11
+    version: 5.15.11(@mui/material@5.15.3)(@types/react@18.2.47)(react@18.2.0)
   '@mui/material':
     specifier: ^5.15.3
     version: 5.15.3(@emotion/react@11.11.3)(@emotion/styled@11.11.0)(@types/react@18.2.47)(react-dom@18.2.0)(react@18.2.0)
@@ -311,6 +311,13 @@ packages:
 
   /@babel/runtime@7.23.7:
     resolution: {integrity: sha512-w06OXVOFso7LcbzMiDGt+3X7Rh7Ho8MmgPoWU3rarH+8upf+wSU/grlGbWzQyr3DkdN6ZeuMFjpdwW0Q+HxobA==}
+    engines: {node: '>=6.9.0'}
+    dependencies:
+      regenerator-runtime: 0.14.1
+    dev: false
+
+  /@babel/runtime@7.23.9:
+    resolution: {integrity: sha512-0CX6F+BI2s9dkUqr08KFrAIZgNFj75rdBU/DjCyYLIaV/quFjkk6T+EJ2LkZHyZTbEV4L5p97mNkUsHl2wLFAw==}
     engines: {node: '>=6.9.0'}
     dependencies:
       regenerator-runtime: 0.14.1
@@ -914,8 +921,8 @@ packages:
     resolution: {integrity: sha512-sWeihiVyxdJjpLkp8SHkTy9kt2M/o11M60G1MzwljGL2BXdM3Ktzqv5QaQHdi00y7Y1ulvtI3GOSxP2xU8mQJw==}
     dev: false
 
-  /@mui/icons-material@5.15.3(@mui/material@5.15.3)(@types/react@18.2.47)(react@18.2.0):
-    resolution: {integrity: sha512-7LEs8AnO2Se/XYH+CcJndRsGAE+M8KAExiiQHf0V11poqmPVGcbbY82Ry2IUYf9+rOilCVnWI18ErghZ625BPQ==}
+  /@mui/icons-material@5.15.11(@mui/material@5.15.3)(@types/react@18.2.47)(react@18.2.0):
+    resolution: {integrity: sha512-R5ZoQqnKpd+5Ew7mBygTFLxgYsQHPhgR3TDXSgIHYIjGzYuyPLmGLSdcPUoMdi6kxiYqHlpPj4NJxlbaFD0UHA==}
     engines: {node: '>=12.0.0'}
     peerDependencies:
       '@mui/material': ^5.0.0
@@ -925,7 +932,7 @@ packages:
       '@types/react':
         optional: true
     dependencies:
-      '@babel/runtime': 7.23.7
+      '@babel/runtime': 7.23.9
       '@mui/material': 5.15.3(@emotion/react@11.11.3)(@emotion/styled@11.11.0)(@types/react@18.2.47)(react-dom@18.2.0)(react@18.2.0)
       '@types/react': 18.2.47
       react: 18.2.0
