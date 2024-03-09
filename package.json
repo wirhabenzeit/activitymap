@@ -26,7 +26,6 @@
     "@supabase/supabase-js": "^2.39.7",
     "buffer": "^6.0.3",
     "d3": "^7.8.5",
-    "deepl": "^1.0.13",
     "file-saver": "^2.0.5",
     "htl": "^0.3.1",
     "js-cookie": "^3.0.5",
