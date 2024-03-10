@@ -1,14 +1,15 @@
 import "../init.js";
-
 import { useState, useEffect, useCallback } from "react";
-
 import { Layer, Source } from "react-map-gl";
-
 import FileSaver from "file-saver";
-
 import * as d3 from "d3";
-
 import shp from "shpjs";
+/*import { v2 } from "@google-cloud/translate";
+
+const translateClient = new v2.Translate({
+  projectId: "your-projectId-here",
+  key: "your-api-key-here",
+});*/
 
 import {
   Paper,
@@ -39,29 +40,14 @@ import {
 } from "@mui/icons-material";
 import { geo } from "@observablehq/plot";
 
-// async function translate({ targetLang = "EN", text }) {
-//   const response = await fetch("https://api-free.deepl.com/v2/translate", {
-//     method: "POST",
-//     headers: {
-//       Authorization: "DeepL-Auth-Key 9640199d-fe76-52e6-e7be-729d827026c8:fx",
-//       "Content-Type": "application/x-www-form-urlencoded",
-//     },
-//     body: new URLSearchParams({
-//       text: text,
-//       target_lang: targetLang,
-//     }),
-//   });
-//   console.log(response);
-//   const json = await response.json();
-//   console.log(text, json);
-//   return json.translations[0].text;
-// }
-
 export function LayerFriflyt({ bbox, mapRef }) {
   const [cards, setCards] = useState([]);
   const [activeStep, setActiveStep] = useState(0);
   const [selection, setSelection] = useState([]);
-  const [json, setJson] = useState({ type: "FeatureCollection", features: [] });
+  const [json, setJson] = useState({
+    type: "FeatureCollection",
+    features: [],
+  });
   const [collections, setCollections] = useState({});
 
   const onClick = (e) => {
@@ -80,7 +66,9 @@ export function LayerFriflyt({ bbox, mapRef }) {
     setCards(
       selectedFeatures.map((x) => {
         const link =
-          "link" in x.properties ? JSON.parse(x.properties.link) : {};
+          "link" in x.properties
+            ? JSON.parse(x.properties.link)
+            : {};
         const properties = {
           ...x.properties,
           title: undefined,
@@ -88,7 +76,7 @@ export function LayerFriflyt({ bbox, mapRef }) {
           ...link,
           id: x.properties.id,
         };
-        console.log(properties)
+        console.log(properties);
         return properties;
       })
     );
@@ -118,9 +106,11 @@ export function LayerFriflyt({ bbox, mapRef }) {
           `https://api.friflyt.no/api/v4/mapdata?zoom=${mapRef.current
             .getMap()
             .getZoom()
-            .toFixed(0)}&offset=0&limit=500&latBottom=${bbox._sw.lat}&latTop=${
-            bbox._ne.lat
-          }&lngLeft=${bbox._sw.lng}&lngRight=${bbox._ne.lng}`
+            .toFixed(0)}&offset=0&limit=500&latBottom=${
+            bbox._sw.lat
+          }&latTop=${bbox._ne.lat}&lngLeft=${
+            bbox._sw.lng
+          }&lngRight=${bbox._ne.lng}`
         )
     );
     const json = await response.json();
@@ -134,21 +124,26 @@ export function LayerFriflyt({ bbox, mapRef }) {
         const shpfile = await shp(arrayBuffer);
 
         const featureMap = new d3.InternMap(
-          entry.properties.map((x) => [parseInt(x.featureId), x])
+          entry.properties.map((x) => [
+            parseInt(x.featureId),
+            x,
+          ])
         );
 
         console.log(featureMap);
 
-        const features = shpfile.features.map((feature, id) => ({
-          ...feature,
-          properties: {
-            ...feature.properties,
-            ...featureMap.get(id + 1),
-            id: id + 1,
-            collection: entry.title,
-            uniqueId: entry.title + "_" + (id + 1),
-          },
-        }));
+        const features = shpfile.features.map(
+          (feature, id) => ({
+            ...feature,
+            properties: {
+              ...feature.properties,
+              ...featureMap.get(id + 1),
+              id: id + 1,
+              collection: entry.title,
+              uniqueId: entry.title + "_" + (id + 1),
+            },
+          })
+        );
 
         console.log("Added", features, entry.title);
 
@@ -162,10 +157,15 @@ export function LayerFriflyt({ bbox, mapRef }) {
 
   useEffect(() => {
     const bboxArea =
-      (bbox._ne.lat - bbox._sw.lat) * (bbox._ne.lng - bbox._sw.lng);
-    if (bboxArea < 0.02 || mapRef.current.getMap().getZoom() > 6)
+      (bbox._ne.lat - bbox._sw.lat) *
+      (bbox._ne.lng - bbox._sw.lng);
+    if (
+      bboxArea < 0.02 ||
+      mapRef.current.getMap().getZoom() > 6
+    )
       fetchGeoJSON();
-    else setJson({ type: "FeatureCollection", features: [] });
+    else
+      setJson({ type: "FeatureCollection", features: [] });
   }, [bbox]);
 
   const handleNext = () => {
@@ -178,12 +178,20 @@ export function LayerFriflyt({ bbox, mapRef }) {
 
   return (
     <>
-      <Source id="Friflyt" type="geojson" data={json} key="Friflytsource">
+      <Source
+        id="Friflyt"
+        type="geojson"
+        data={json}
+        key="Friflytsource"
+      >
         <Layer
           id="Friflyt"
           key="Friflytlayer"
           type="line"
-          layout={{ "line-cap": "round", "line-join": "round" }}
+          layout={{
+            "line-cap": "round",
+            "line-join": "round",
+          }}
           paint={{
             "line-width": 4,
             "line-opacity": 0.3,
@@ -194,13 +202,20 @@ export function LayerFriflyt({ bbox, mapRef }) {
             id="Friflytsel"
             key="Friflytsellayer"
             type="line"
-            layout={{ "line-cap": "round", "line-join": "round" }}
+            layout={{
+              "line-cap": "round",
+              "line-join": "round",
+            }}
             paint={{
               "line-color": "red",
               "line-width": 4,
               "line-opacity": 1,
             }}
-            filter={["in", "uniqueId", cards[activeStep].uniqueId]}
+            filter={[
+              "in",
+              "uniqueId",
+              cards[activeStep].uniqueId,
+            ]}
           />
         )}
       </Source>
@@ -216,19 +231,24 @@ export function LayerFriflyt({ bbox, mapRef }) {
           width: "320px",
           bottom: "10px",
           margin: "auto",
-          visibility: cards.length > 0 ? "visible" : "hidden",
+          visibility:
+            cards.length > 0 ? "visible" : "hidden",
         }}
       >
         {cards.length > 0 && (
           <>
             <Card sx={{ width: 320 }}>
-            {"image" in cards[activeStep] && (
-            <div style={{ position: "relative", width: 320, height: 200 }}>
+              {"image" in cards[activeStep] && (
+                <div
+                  style={{
+                    position: "relative",
+                    width: 320,
+                    height: 200,
+                  }}
+                >
                   <Box
                     component="img"
-                    src={
-                      cards[activeStep].image.url
-                    }
+                    src={cards[activeStep].image.url}
                     alt={cards[activeStep].image.alt}
                     sx={{
                       m: 0,
@@ -248,31 +268,46 @@ export function LayerFriflyt({ bbox, mapRef }) {
                       </Typography>
                     }
                   />
-                </div>)}
+                </div>
+              )}
               <CardContent>
-                {cards[activeStep] && cards[activeStep].title != undefined && (
-                  <Typography variant="h5" component="div">
-                    {cards[activeStep].title}
-                  </Typography>
-                )}
+                <Typography variant="h5" component="div">
+                  {cards[activeStep] &&
+                    cards[activeStep].title != undefined &&
+                    cards[activeStep].title}
+                  {cards[activeStep] &&
+                    cards[activeStep].title == undefined &&
+                    "Unnamed Tour"}
+                </Typography>
                 {cards[activeStep] && (
                   <>
                     <Chip
                       icon={<DistanceIcon />}
-                      label={(cards[activeStep].Shape_Leng/1000).toFixed(1) + "km"}
+                      label={
+                        (
+                          cards[activeStep].SHAPE_Leng /
+                          1000
+                        ).toFixed(1) + "km"
+                      }
                       size="small"
                       sx={{ mx: 0.5, px: 0.5 }}
                     />
                     <Chip
                       icon={<HashIcon />}
-                      label={cards[activeStep].collection + ("TURNUMMER" in cards[activeStep] ? cards[activeStep].TURNUMMER : cards[activeStep].TURNR)}
+                      label={
+                        cards[activeStep].collection +
+                        ("TURNUMMER" in cards[activeStep]
+                          ? cards[activeStep].TURNUMMER
+                          : cards[activeStep].TURNR)
+                      }
                       size="small"
                       sx={{ mx: 0.5 }}
                     />
                   </>
                 )}
                 {cards[activeStep] &&
-                  cards[activeStep].shortTitle != undefined && (
+                  cards[activeStep].shortTitle !=
+                    undefined && (
                     <Typography
                       variant="body2"
                       component="div"
@@ -283,27 +318,33 @@ export function LayerFriflyt({ bbox, mapRef }) {
                     </Typography>
                   )}
               </CardContent>
-              <CardActions sx={{ justifyContent: "center", p: 0 }}>
+              <CardActions
+                sx={{ justifyContent: "center", p: 0 }}
+              >
                 {cards[activeStep] && (
                   <>
-                    {"canonical" in cards[activeStep] && 
-                    <Button
-                      size="small"
-                      href={cards[activeStep].canonical}
-                      target="_blank"
-                      startIcon={<LinkIcon />}
-                    >
-                      Friflyt
-                    </Button>}
+                    {"canonical" in cards[activeStep] && (
+                      <Button
+                        size="small"
+                        href={cards[activeStep].canonical}
+                        target="_blank"
+                        startIcon={<LinkIcon />}
+                      >
+                        Friflyt
+                      </Button>
+                    )}
                     <Button
                       size="small"
                       target="_blank"
                       startIcon={<DownloadIcon />}
                       onClick={() => {
-                        const features = json.features.filter(
-                          (feature) =>
-                            feature.properties.uniqueId === cards[activeStep].uniqueId
-                        );
+                        const features =
+                          json.features.filter(
+                            (feature) =>
+                              feature.properties
+                                .uniqueId ===
+                              cards[activeStep].uniqueId
+                          );
                         console.log(features);
                         const options = {
                           metadata: {
@@ -311,23 +352,32 @@ export function LayerFriflyt({ bbox, mapRef }) {
                             author: {
                               name: "Friflyt",
                               link: {
-                                href: cards[activeStep].canonical,
+                                href: cards[activeStep]
+                                  .canonical,
                               },
                             },
                           },
                         };
                         const gpx = GeoJsonToGpx(
-                          { type: "FeatureCollection", features },
+                          {
+                            type: "FeatureCollection",
+                            features,
+                          },
                           options
                         );
                         console.log(gpx);
-                        const gpxString = new XMLSerializer().serializeToString(
-                          gpx
-                        );
+                        const gpxString =
+                          new XMLSerializer().serializeToString(
+                            gpx
+                          );
                         console.log(gpxString);
-                        const file = new File([gpxString], `${cards[activeStep].title}.gpx`, {
-                          type: "text/xml;charset=utf-8",
-                        });
+                        const file = new File(
+                          [gpxString],
+                          `${cards[activeStep].title}.gpx`,
+                          {
+                            type: "text/xml;charset=utf-8",
+                          }
+                        );
                         FileSaver.saveAs(file);
                       }}
                     >
@@ -348,7 +398,9 @@ export function LayerFriflyt({ bbox, mapRef }) {
                   <Button
                     size="small"
                     onClick={handleNext}
-                    disabled={activeStep === cards.length - 1}
+                    disabled={
+                      activeStep === cards.length - 1
+                    }
                   >
                     Next <KeyboardArrowRight />
                   </Button>
