@@ -49,6 +49,6 @@
     "eslint-plugin-react-refresh": "^0.4.5",
     "prop-types": "^15.8.1",
     "supabase": "^1.148.6",
-    "vite": "^5.1.5"
+    "vite": "^5.1.6"
   }
 }
