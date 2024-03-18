@@ -24,7 +24,7 @@
     "@mui/material": "^5.15.12",
     "@mui/x-data-grid": "6.19.6",
     "@observablehq/plot": "^0.6.13",
-    "@supabase/supabase-js": "^2.39.7",
+    "@supabase/supabase-js": "^2.39.8",
     "buffer": "^6.0.3",
     "d3": "^7.8.5",
     "file-saver": "^2.0.5",
