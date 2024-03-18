@@ -46,7 +46,7 @@
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.34.0",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5",
+    "eslint-plugin-react-refresh": "^0.4.6",
     "prop-types": "^15.8.1",
     "supabase": "^1.148.6",
     "vite": "^5.1.5"
