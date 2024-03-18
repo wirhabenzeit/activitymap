@@ -26,7 +26,7 @@
     "@observablehq/plot": "^0.6.13",
     "@supabase/supabase-js": "^2.39.7",
     "buffer": "^6.0.3",
-    "d3": "^7.8.5",
+    "d3": "^7.9.0",
     "file-saver": "^2.0.5",
     "htl": "^0.3.1",
     "js-cookie": "^3.0.5",

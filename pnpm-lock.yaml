@@ -48,8 +48,8 @@ dependencies:
     specifier: ^6.0.3
     version: 6.0.3
   d3:
-    specifier: ^7.8.5
-    version: 7.8.5
+    specifier: ^7.9.0
+    version: 7.9.0
   file-saver:
     specifier: ^2.0.5
     version: 2.0.5
@@ -1171,7 +1171,7 @@ packages:
     resolution: {integrity: sha512-ebQS4ENodOy+O3WUjhqv9jNPZENAZRQMIdO3ziOlAKfUzSf69+gaFAqqc04SGrQA6JwJjPYnbfeN3YIpNsCF/A==}
     engines: {node: '>=12'}
     dependencies:
-      d3: 7.8.5
+      d3: 7.9.0
       interval-tree-1d: 1.0.4
       isoformat: 0.2.1
     dev: false
@@ -2153,8 +2153,8 @@ packages:
       d3-transition: 3.0.1(d3-selection@3.0.0)
     dev: false
 
-  /d3@7.8.5:
-    resolution: {integrity: sha512-JgoahDG51ncUfJu6wX/1vWQEqOflgXyl4MaHqlcSruTez7yhaRKR9i8VjjcQGeS2en/jnFivXuaIMnseMMt0XA==}
+  /d3@7.9.0:
+    resolution: {integrity: sha512-e1U46jVP+w7Iut8Jt8ri1YsPOvFpg46k+K8TpCb0P+zjCkjkPnV7WzfDJzMHy1LnA+wj5pLT1wjO901gLXeEhA==}
     engines: {node: '>=12'}
     dependencies:
       d3-array: 3.2.4
