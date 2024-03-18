@@ -40,7 +40,7 @@
     "shpjs": "^4.0.4"
   },
   "devDependencies": {
-    "@types/react": "^18.2.64",
+    "@types/react": "^18.2.67",
     "@types/react-dom": "^18.2.21",
     "@vitejs/plugin-react": "^4.2.1",
     "eslint": "^8.57.0",
