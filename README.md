@@ -32,15 +32,17 @@ Map, list, and analyze of all your Strava activities.
 - Calendar heatmap
 - Timeline of total distance/elevation/time per period of time, with local averaging
 - Configurable scatter plot of all activities
-- Violin plot of elevation/distance/time per activity, grouped by period of time, or sports type
+- Progress plot per year or month
 
-![Stats](./stats.png)
+![Stats Timeline](./stats1.png)
+![Stats Calendar](./stats2.png)
 
 ## Dependencies
 
 - [strava](https://www.strava.com/)
 - [mapbox](https://www.mapbox.com/)
 - [react](https://reactjs.org/)
+- [Observable Plot](https://observablehq.com/@observablehq/plot)
 - [vite](https://vitejs.dev/)
 - [react-map-gl](https://visgl.github.io/react-map-gl/)
 - [react-router](https://reactrouter.com/)
