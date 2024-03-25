@@ -12,7 +12,7 @@
     "host": "vite --host"
   },
   "dependencies": {
-    "@dwayneparton/geojson-to-gpx": "^0.1.0",
+    "@dwayneparton/geojson-to-gpx": "^0.2.0",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@fortawesome/fontawesome-svg-core": "^6.5.1",
