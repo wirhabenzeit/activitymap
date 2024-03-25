@@ -66,8 +66,8 @@ dependencies:
     specifier: ^3.0.0
     version: 3.0.0
   proj4:
-    specifier: ^2.10.0
-    version: 2.10.0
+    specifier: ^2.11.0
+    version: 2.11.0
   react:
     specifier: ^18.2.0
     version: 18.2.0
@@ -3863,8 +3863,8 @@ packages:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
     dev: false
 
-  /proj4@2.10.0:
-    resolution: {integrity: sha512-0eyB8h1PDoWxucnq88/EZqt7UZlvjhcfbXCcINpE7hqRN0iRPWE/4mXINGulNa/FAvK+Ie7F+l2OxH/0uKV36A==}
+  /proj4@2.11.0:
+    resolution: {integrity: sha512-SasuTkAx8HnWQHfIyhkdUNJorSJqINHAN3EyMWYiQRVorftz9DHz650YraFgczwgtHOxqnfuDxSNv3C8MUnHeg==}
     dependencies:
       mgrs: 1.0.0
       wkt-parser: 1.3.3
@@ -4259,7 +4259,7 @@ packages:
       lie: 3.3.0
       lru-cache: 2.7.3
       parsedbf: 1.1.1
-      proj4: 2.10.0
+      proj4: 2.11.0
     dev: false
 
   /side-channel@1.0.6:
