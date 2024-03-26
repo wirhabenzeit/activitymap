@@ -1,4 +1,9 @@
-import { useState, useContext, useRef, useEffect } from "react";
+import {
+  useState,
+  useContext,
+  useRef,
+  useEffect,
+} from "react";
 import {
   Box,
   Tabs,
@@ -18,8 +23,17 @@ import {
   ChevronRight as ChevronRightIcon,
   Map as MapIcon,
 } from "@mui/icons-material";
-import { ThemeProvider, styled, createTheme } from "@mui/material/styles";
-import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import {
+  ThemeProvider,
+  styled,
+  createTheme,
+} from "@mui/material/styles";
+import {
+  Routes,
+  Route,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 
 import { ActivityContext } from "/src/contexts/ActivityContext";
 
@@ -34,7 +48,11 @@ import {
   CheckboxFilter,
 } from "/src/components/Drawer";
 
-import { categorySettings, binaryFilters, filterSettings } from "/src/settings";
+import {
+  categorySettings,
+  binaryFilters,
+  filterSettings,
+} from "/src/settings";
 
 export const usePrevious = (value, initialValue) => {
   const ref = useRef(initialValue);
@@ -51,20 +69,23 @@ export const useEffectDebugger = (
 ) => {
   const previousDeps = usePrevious(dependencies, []);
 
-  const changedDeps = dependencies.reduce((accum, dependency, index) => {
-    if (dependency !== previousDeps[index]) {
-      const keyName = dependencyNames[index] || index;
-      return {
-        ...accum,
-        [keyName]: {
-          before: previousDeps[index],
-          after: dependency,
-        },
-      };
-    }
+  const changedDeps = dependencies.reduce(
+    (accum, dependency, index) => {
+      if (dependency !== previousDeps[index]) {
+        const keyName = dependencyNames[index] || index;
+        return {
+          ...accum,
+          [keyName]: {
+            before: previousDeps[index],
+            after: dependency,
+          },
+        };
+      }
 
-    return accum;
-  }, {});
+      return accum;
+    },
+    {}
+  );
 
   if (Object.keys(changedDeps).length) {
     console.log("[use-effect-debugger] ", changedDeps);
@@ -73,11 +94,11 @@ export const useEffectDebugger = (
   useEffect(effectHook, dependencies);
 };
 
-const StyledTab = styled((props) => <Tab disableRipple {...props} />)(
-  ({ theme }) => ({
-    minWidth: 60,
-  })
-);
+const StyledTab = styled((props) => (
+  <Tab disableRipple {...props} />
+))(({ theme }) => ({
+  minWidth: 60,
+}));
 
 const darkTheme = createTheme({
   palette: {
@@ -102,20 +123,26 @@ const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== "open",
 })(({ theme, open }) => ({
   zIndex: theme.zIndex.drawer + 1,
-  transition: theme.transitions.create(["width", "margin"], {
-    easing: theme.transitions.easing.sharp,
-    duration: theme.transitions.duration.leavingScreen,
-  }),
+  transition: theme.transitions.create(
+    ["width", "margin"],
+    {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.leavingScreen,
+    }
+  ),
   "& .MuiToolbar-root": {
     minHeight: toolbarHeight,
   },
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
-    transition: theme.transitions.create(["width", "margin"], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
+    transition: theme.transitions.create(
+      ["width", "margin"],
+      {
+        easing: theme.transitions.easing.sharp,
+        duration: theme.transitions.duration.enteringScreen,
+      }
+    ),
   }),
 }));
 
@@ -154,7 +181,12 @@ const Drawer = styled(MuiDrawer, {
   }),
 }));
 
-const pathMap = { "/": 0, "/list": 1, "/stats": 2, "/stats2": 3 };
+const pathMap = {
+  "/": 0,
+  "/list": 1,
+  "/stats": 2,
+  "/stats2": 3,
+};
 
 function App() {
   const { pathname, search } = useLocation();
@@ -173,7 +205,14 @@ function App() {
   };
 
   return (
-    <Box sx={{ display: "flex", width: 1, height: 1, overflowY: "hidden" }}>
+    <Box
+      sx={{
+        display: "flex",
+        width: 1,
+        height: 1,
+        overflowY: "hidden",
+      }}
+    >
       <CssBaseline />
       <AppBar position="fixed" open={open}>
         <ThemeProvider theme={darkTheme}>
@@ -193,7 +232,12 @@ function App() {
             >
               <ChevronRightIcon />
             </IconButton>
-            <MapIcon sx={{ mx: 1, display: { xs: "none", sm: "flex" } }} />
+            <MapIcon
+              sx={{
+                mx: 1,
+                display: { xs: "none", sm: "flex" },
+              }}
+            />
             <Typography
               variant="h6"
               noWrap
@@ -207,7 +251,7 @@ function App() {
                 display: { xs: "none", sm: "flex" },
               }}
             >
-              StravaMap
+              ActivityMap
             </Typography>
             <Box>
               <Tabs
@@ -298,7 +342,9 @@ function App() {
           height: "100%",
           maxHeight: "100%",
           overflow: "hidden",
-          width: open ? "calc(100% - 250px)" : "calc(100% - 33px)",
+          width: open
+            ? "calc(100% - 250px)"
+            : "calc(100% - 33px)",
           p: 0,
         }}
       >
@@ -314,9 +360,21 @@ function App() {
           }}
         >
           <Routes>
-            <Route exact path="/" element={<MapView mapRef={mapRef} />} />
-            <Route exact path="/list" element={<ListView />} />
-            <Route exact path="/stats" element={<StatsView open={open} />} />
+            <Route
+              exact
+              path="/"
+              element={<MapView mapRef={mapRef} />}
+            />
+            <Route
+              exact
+              path="/list"
+              element={<ListView />}
+            />
+            <Route
+              exact
+              path="/stats"
+              element={<StatsView open={open} />}
+            />
           </Routes>
         </Box>
       </Box>
