@@ -237,7 +237,9 @@ var categorySettings = {
   },
 };
 
-const usedTypes = Object.values(categorySettings).flatMap((x) => x.alias);
+const usedTypes = Object.values(categorySettings).flatMap(
+  (x) => x.alias
+);
 
 categorySettings.misc = {
   name: "Miscellaneous",
@@ -299,7 +301,8 @@ const binaryFilters = {
 };
 
 function decFormatter(unit = "", decimals = 0) {
-  return (num) => (num == undefined ? null : num.toFixed(decimals) + unit);
+  return (num) =>
+    num == undefined ? null : num.toFixed(decimals) + unit;
 }
 
 const listSettings = (activityContext) => ({
@@ -310,15 +313,21 @@ const listSettings = (activityContext) => ({
       description: "Sport type",
       renderHeader: (params) => (
         <Tooltip title="Sport type">
-          <FontAwesomeIcon fontSize="small" icon="child-reaching" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="child-reaching"
+          />
         </Tooltip>
       ),
-      valueGetter: (params) => params.row.properties.sport_type,
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.sport_type,
       renderCell: (params) => (
         <Tooltip title={params.value}>
           <FontAwesomeIcon
             fontSize="small"
-            icon={categorySettings[aliasMap[params.value]].icon}
+            icon={
+              categorySettings[aliasMap[params.value]].icon
+            }
             color={colorMap[params.value]}
           />
         </Tooltip>
@@ -330,17 +339,18 @@ const listSettings = (activityContext) => ({
       headerName: "ID",
       flex: 1,
       minWidth: 60,
-      valueGetter: (params) => String(params.row.id),
+      valueGetter: (value, row, column, apiRef) =>
+        String(row.id),
     },
     {
       field: "name",
       headerName: "Name",
       flex: 2,
       minWidth: 150,
-      valueGetter: (params) => ({
-        name: params.row.properties.name,
-        id: params.row.id,
-        type: params.row.properties.sport_type,
+      valueGetter: (value, row, column, apiRef) => ({
+        name: row.properties.name,
+        id: row.id,
+        type: row.properties.sport_type,
       }),
       renderCell: (params) => (
         <Link
@@ -352,7 +362,12 @@ const listSettings = (activityContext) => ({
         </Link>
       ),
       sortComparator: (v1, v2, param1, param2) =>
-        gridStringOrNumberComparator(v1.name, v2.name, param1, param2),
+        gridStringOrNumberComparator(
+          v1.name,
+          v2.name,
+          param1,
+          param2
+        ),
     },
     {
       field: "start_date_local_timestamp",
@@ -361,13 +376,17 @@ const listSettings = (activityContext) => ({
       minWidth: 80,
       renderHeader: (params) => (
         <Tooltip title="Start date">
-          <FontAwesomeIcon fontSize="small" icon="calendar" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="calendar"
+          />
         </Tooltip>
       ),
       type: "number",
-      valueGetter: (params) => params.row.properties.start_date_local_timestamp,
-      valueFormatter: (params) =>
-        new Date(params.value * 1000).toLocaleDateString("de-DE", {
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.start_date_local_timestamp,
+      valueFormatter: (value, row, column, apiRef) =>
+        new Date(value * 1000).toLocaleDateString("de-DE", {
           day: "2-digit",
           month: "2-digit",
           year: "2-digit",
@@ -383,16 +402,20 @@ const listSettings = (activityContext) => ({
           <FontAwesomeIcon fontSize="small" icon="clock" />
         </Tooltip>
       ),
-      valueGetter: (params) => {
-        const date = new Date(params.row.properties.start_date_local);
+      valueGetter: (value, row, column, apiRef) => {
+        const date = new Date(
+          row.properties.start_date_local
+        );
         return (
-          date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds()
+          date.getHours() * 3600 +
+          date.getMinutes() * 60 +
+          date.getSeconds()
         );
       },
-      valueFormatter: (params) => {
-        const hours = Math.floor(params.value / 3600);
-        const minutes = Math.floor((params.value % 3600) / 60);
-        const seconds = params.value % 60;
+      valueFormatter: (value, row, column, apiRef) => {
+        const hours = Math.floor(value / 3600);
+        const minutes = Math.floor((value % 3600) / 60);
+        const seconds = value % 60;
         return (
           String(hours).padStart(2, "0") +
           ":" +
@@ -405,18 +428,21 @@ const listSettings = (activityContext) => ({
       headerName: "Elapsed time",
       renderHeader: (params) => (
         <Tooltip title="Elapsed time">
-          <FontAwesomeIcon fontSize="small" icon="stopwatch" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="stopwatch"
+          />
         </Tooltip>
       ),
       field: "elapsed_time",
       flex: 1,
       minWidth: 60,
-      valueGetter: (params) =>
-        Math.floor(params.row.properties.elapsed_time / 60),
-      valueFormatter: (params) =>
-        Math.floor(params.value / 60) +
+      valueGetter: (value, row, column, apiRef) =>
+        Math.floor(row.properties.elapsed_time / 60),
+      valueFormatter: (value, row, column, apiRef) =>
+        Math.floor(value / 60) +
         "h" +
-        String(params.value % 60).padStart(2, "0"),
+        String(value % 60).padStart(2, "0"),
       cellDataType: "number",
       type: "number",
     },
@@ -424,81 +450,107 @@ const listSettings = (activityContext) => ({
       headerName: "Moving time",
       renderHeader: (params) => (
         <Tooltip title="Moving time">
-          <FontAwesomeIcon fontSize="small" icon="stopwatch" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="stopwatch"
+          />
         </Tooltip>
       ),
       field: "moving_time",
       flex: 1,
       minWidth: 60,
-      valueGetter: (params) =>
-        Math.floor(params.row.properties.moving_time / 60),
-      valueFormatter: (params) =>
-        Math.floor(params.value / 60) +
+      valueGetter: (value, row, column, apiRef) =>
+        Math.floor(row.properties.moving_time / 60),
+      valueFormatter: (value, row, column, apiRef) =>
+        Math.floor(value / 60) +
         "h" +
-        String(params.value % 60).padStart(2, "0"),
+        String(value % 60).padStart(2, "0"),
       type: "number",
     },
     {
       field: "distance",
       renderHeader: (params) => (
         <Tooltip title="Distance">
-          <FontAwesomeIcon fontSize="small" icon="ruler-horizontal" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="ruler-horizontal"
+          />
         </Tooltip>
       ),
       headerName: "Distance",
       type: "number",
       flex: 1,
       minWidth: 80,
-      valueGetter: (params) => params.row.properties.distance / 1000,
-      valueFormatter: (params) => decFormatter("km", 1)(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.distance / 1000,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("km", 1)(value),
     },
     {
       field: "average_speed",
       renderHeader: (params) => (
         <Tooltip title="Average speed">
-          <FontAwesomeIcon fontSize="small" icon="tachometer-alt" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="tachometer-alt"
+          />
         </Tooltip>
       ),
       headerName: "Avg Speed",
       type: "number",
       flex: 1,
       minWidth: 70,
-      valueGetter: (params) => params.row.properties.average_speed,
-      valueFormatter: (params) => decFormatter("km/h", 1)(params.value * 3.6),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.average_speed,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("km/h", 1)(value * 3.6),
     },
     {
       field: "total_elevation_gain",
       renderHeader: (params) => (
         <Tooltip title="Elevation gain">
-          <FontAwesomeIcon fontSize="small" icon="mountain" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="mountain"
+          />
         </Tooltip>
       ),
       headerName: "Elev Gain",
       type: "number",
       flex: 1,
       minWidth: 70,
-      valueGetter: (params) => params.row.properties.total_elevation_gain,
-      valueFormatter: (params) => decFormatter("m", 0)(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.total_elevation_gain,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("m", 0)(value),
     },
     {
       field: "elev_high",
       renderHeader: (params) => (
         <Tooltip title="Elevation high">
-          <FontAwesomeIcon fontSize="small" icon="mountain" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="mountain"
+          />
         </Tooltip>
       ),
       headerName: "Elevation High",
       type: "number",
       flex: 1,
       minWidth: 70,
-      valueGetter: (params) => params.row.properties.elev_high,
-      valueFormatter: (params) => decFormatter("m", 0)(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.elev_high,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("m", 0)(value),
     },
     {
       field: "elev_low",
       renderHeader: (params) => (
         <Tooltip title="Elevation low">
-          <FontAwesomeIcon fontSize="small" icon="mountain" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="mountain"
+          />
           <span>:low</span>
         </Tooltip>
       ),
@@ -506,50 +558,67 @@ const listSettings = (activityContext) => ({
       type: "number",
       flex: 1,
       minWidth: 70,
-      valueGetter: (params) => params.row.properties.elev_low,
-      valueFormatter: (params) => decFormatter("m", 0)(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.elev_low,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("m", 0)(value),
     },
     {
       field: "weighted_average_watts",
       renderHeader: (params) => (
         <Tooltip title="Weighted average watts">
-          <FontAwesomeIcon fontSize="small" icon="bolt-lightning" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="bolt-lightning"
+          />
         </Tooltip>
       ),
       headerName: "Weighted Avg Watts",
       type: "number",
       flex: 1,
       minWidth: 60,
-      valueGetter: (params) => params.row.properties.weighted_average_watts,
-      valueFormatter: (params) => decFormatter("W")(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.weighted_average_watts,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("W")(value),
     },
     {
       field: "average_watts",
       renderHeader: (params) => (
         <Tooltip title="Average watts">
-          <FontAwesomeIcon fontSize="small" icon="bolt-lightning" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="bolt-lightning"
+          />
         </Tooltip>
       ),
       headerName: "Avg Watts",
       type: "number",
       flex: 1,
       minWidth: 60,
-      valueGetter: (params) => params.row.properties.average_watts,
-      valueFormatter: (params) => decFormatter("W")(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.average_watts,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("W")(value),
     },
     {
       field: "max_watts",
       renderHeader: (params) => (
         <Tooltip title="Max watts">
-          <FontAwesomeIcon fontSize="small" icon="bolt-lightning" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="bolt-lightning"
+          />
         </Tooltip>
       ),
       headerName: "Max Watts",
       type: "number",
       flex: 1,
       minWidth: 60,
-      valueGetter: (params) => params.row.properties.max_watts,
-      valueFormatter: (params) => decFormatter("W")(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.max_watts,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("W")(value),
     },
     {
       field: "average_heartrate",
@@ -562,8 +631,10 @@ const listSettings = (activityContext) => ({
       type: "number",
       flex: 1,
       minWidth: 80,
-      valueGetter: (params) => params.row.properties.average_heartrate,
-      valueFormatter: (params) => decFormatter("bpm")(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.average_heartrate,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("bpm")(value),
     },
     {
       field: "max_heartrate",
@@ -576,22 +647,29 @@ const listSettings = (activityContext) => ({
       type: "number",
       flex: 1,
       minWidth: 80,
-      valueGetter: (params) => params.row.properties.max_heartrate,
-      valueFormatter: (params) => decFormatter("bpm")(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.max_heartrate,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("bpm")(value),
     },
     {
       field: "kudos_count",
       renderHeader: (params) => (
         <Tooltip title="Kudos">
-          <FontAwesomeIcon fontSize="small" icon="thumbs-up" />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="thumbs-up"
+          />
         </Tooltip>
       ),
       headerName: "Kudos Count",
       type: "number",
       flex: 1,
       minWidth: 80,
-      valueGetter: (params) => params.row.properties.kudos_count,
-      valueFormatter: (params) => decFormatter("")(params.value),
+      valueGetter: (value, row, column, apiRef) =>
+        row.properties.kudos_count,
+      valueFormatter: (value, row, column, apiRef) =>
+        decFormatter("")(value),
     },
     {
       field: "edit",
@@ -601,7 +679,7 @@ const listSettings = (activityContext) => ({
       sortable: false,
       align: "center",
       headerAlign: "center",
-      valueGetter: (params) => params.row.id,
+      valueGetter: (value, row, column, apiRef) => row.id,
       renderHeader: (params) => (
         <Tooltip title="Edit Activity">
           <FontAwesomeIcon fontSize="small" icon="edit" />
@@ -625,7 +703,12 @@ const listSettings = (activityContext) => ({
   ],
   defaultState: {
     compact: {
-      sortModel: [{ field: "start_date_local_timestamp", sort: "desc" }],
+      sortModel: [
+        {
+          field: "start_date_local_timestamp",
+          sort: "desc",
+        },
+      ],
       columnVisibilityModel: {
         type: false,
         id: false,
@@ -645,7 +728,12 @@ const listSettings = (activityContext) => ({
       },
     },
     full: {
-      sortModel: [{ field: "start_date_local_timestamp", sort: "desc" }],
+      sortModel: [
+        {
+          field: "start_date_local_timestamp",
+          sort: "desc",
+        },
+      ],
       columnVisibilityModel: {
         id: false,
         time: false,
@@ -696,16 +784,29 @@ const calendarSettings = {
     type: {
       id: "type",
       fun: (d) => aliasMap[d.sport_type],
-      format: (l) => (l in categorySettings ? categorySettings[l].name : l),
+      format: (l) =>
+        l in categorySettings
+          ? categorySettings[l].name
+          : l,
       label: "Sport Type",
       unit: "",
       reducer: (v, fun) => {
         const set = new Set(v.map(fun));
-        return set.size > 1 ? "Multiple" : set.values().next().value;
+        return set.size > 1
+          ? "Multiple"
+          : set.values().next().value;
       },
       color: {
-        domain: [...Object.keys(categorySettings), "Multiple"],
-        range: [...Object.values(categorySettings).map((x) => x.color), "#aaa"],
+        domain: [
+          ...Object.keys(categorySettings),
+          "Multiple",
+        ],
+        range: [
+          ...Object.values(categorySettings).map(
+            (x) => x.color
+          ),
+          "#aaa",
+        ],
       },
     },
   },
@@ -793,7 +894,10 @@ const timelineSettings = {
       id: "elevation",
       sortable: true,
       fun: (d) => d.total_elevation_gain,
-      format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
+      format: (v) =>
+        v >= 10_000
+          ? (v / 1_000).toFixed() + "k"
+          : v.toFixed(),
       label: "Elevation",
       unit: "m",
     },
@@ -914,7 +1018,10 @@ const progressSettings = {
       id: "elevation",
       sortable: true,
       fun: (d) => Math.round(d.total_elevation_gain),
-      format: (v) => (v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed()),
+      format: (v) =>
+        v >= 10_000
+          ? (v / 1_000).toFixed() + "k"
+          : v.toFixed(),
       label: "Elevation",
       unit: "m",
     },
