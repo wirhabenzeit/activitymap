@@ -15,16 +15,16 @@
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
-    "@fortawesome/fontawesome-svg-core": "^6.5.1",
-    "@fortawesome/free-solid-svg-icons": "^6.5.1",
+    "@fortawesome/fontawesome-svg-core": "^6.5.2",
+    "@fortawesome/free-solid-svg-icons": "^6.5.2",
     "@fortawesome/react-fontawesome": "^0.2.0",
-    "@google-cloud/translate": "^8.1.0",
+    "@google-cloud/translate": "^8.2.0",
     "@mapbox/togeojson": "^0.16.2",
-    "@mui/icons-material": "^5.15.14",
-    "@mui/material": "^5.15.14",
+    "@mui/icons-material": "^5.15.15",
+    "@mui/material": "^5.15.15",
     "@mui/x-data-grid": "7.1.0",
     "@observablehq/plot": "^0.6.14",
-    "@supabase/supabase-js": "^2.41.1",
+    "@supabase/supabase-js": "^2.42.0",
     "buffer": "^6.0.3",
     "d3": "^7.9.0",
     "file-saver": "^2.0.5",
@@ -40,15 +40,15 @@
     "shpjs": "^5.0.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.73",
-    "@types/react-dom": "^18.2.23",
+    "@types/react": "^18.2.74",
+    "@types/react-dom": "^18.2.24",
     "@vitejs/plugin-react": "^4.2.1",
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
     "prop-types": "^15.8.1",
-    "supabase": "^1.151.1",
-    "vite": "^5.2.7"
+    "supabase": "^1.153.4",
+    "vite": "^5.2.8"
   }
 }

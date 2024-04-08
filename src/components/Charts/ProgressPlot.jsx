@@ -1,4 +1,8 @@
-import React, { useContext, useRef, useEffect } from "react";
+import React, {
+  useContext,
+  useRef,
+  useEffect,
+} from "react";
 import { createPortal } from "react-dom";
 import * as d3 from "d3";
 import * as Plot from "@observablehq/plot";
@@ -67,15 +71,23 @@ const progressPlot = ({
   );
 
   const current = data.filter(
-    (x) => x[scaleTickName].getTime() == keys[keys.length - 1].getTime()
+    (x) =>
+      x[scaleTickName].getTime() ==
+      keys[keys.length - 1].getTime()
   );
 
   const reg = new SimpleLinearRegression(
-    current.map((d) => d.virtualDate.getTime() - domain[0].getTime()),
+    current.map(
+      (d) => d.virtualDate.getTime() - domain[0].getTime()
+    ),
     current.map((d) => d.cumsum)
   );
 
-  const map = { y: "cumsum", x: "virtualDate", stroke: scaleTickName };
+  const map = {
+    y: "cumsum",
+    x: "virtualDate",
+    stroke: scaleTickName,
+  };
 
   return Plot.plot({
     ...options,
@@ -94,7 +106,12 @@ const progressPlot = ({
       label: null,
       labelAnchor: "left",
     },
-    y: { axis: "right", label: valueName, tickFormat: valueFormat, ticks: 6 },
+    y: {
+      axis: "right",
+      label: valueName,
+      tickFormat: valueFormat,
+      ticks: 6,
+    },
     color: {
       type: "categorical",
       //scheme: "Blues",
@@ -106,7 +123,8 @@ const progressPlot = ({
       Plot.line(domain, {
         x: Plot.identity,
         y: (x) =>
-          (x.getTime() - domain[0].getTime()) * reg.slope + reg.intercept,
+          (x.getTime() - domain[0].getTime()) * reg.slope +
+          reg.intercept,
         opacity: 0.1,
         stroke: (x) => key(domain[0]),
         strokeWidth: 5,
@@ -129,11 +147,15 @@ const progressPlot = ({
           },
         })
       ),
-      Plot.crosshair(data, { ...map, textStrokeOpacity: 0 }),
+      Plot.crosshair(data, {
+        ...map,
+        textStrokeOpacity: 0,
+      }),
       Plot.linearRegressionY(
         data.filter(
           (x) =>
-            key(x.start_date_local).getTime() == keys[keys.length - 1].getTime()
+            key(x.start_date_local).getTime() ==
+            keys[keys.length - 1].getTime()
         ),
         { ...map, fillOpacity: 0 }
       ),
@@ -141,13 +163,17 @@ const progressPlot = ({
   });
 };
 
-export default function ProgressPlot({ width, height, settingsRef }) {
+export default function ProgressPlot({
+  width,
+  height,
+  settingsRef,
+}) {
   const statsContext = useContext(StatsContext);
   const figureRef = useRef(null);
   const figureRef2 = useRef(null);
 
-  const plotWidth = Math.min(Math.max(width, 100), 800);
-  const plotHeight = plotWidth * 0.7;
+  const plotWidth = 0.9 * width;
+  const plotHeight = 0.87 * height;
 
   useEffect(() => {
     if (!statsContext.loaded) return;
@@ -168,7 +194,10 @@ export default function ProgressPlot({ width, height, settingsRef }) {
       key: d3.utcYear,
       scaleTick: d3.timeFormat("%Y"),
       tick: d3.timeFormat("%b"),
-      domain: [new Date("2024-01-01"), new Date("2024-12-31 23:59:59")],
+      domain: [
+        new Date("2024-01-01"),
+        new Date("2024-12-31 23:59:59"),
+      ],
       title: "Yearly Progress",
     });
 
@@ -178,7 +207,10 @@ export default function ProgressPlot({ width, height, settingsRef }) {
       key: d3.utcMonth,
       scaleTick: d3.timeFormat("%b"),
       tick: d3.timeFormat("%d"),
-      domain: [new Date("2024-01-01"), new Date("2024-01-31 23:59:59")],
+      domain: [
+        new Date("2024-01-01"),
+        new Date("2024-01-31 23:59:59"),
+      ],
       title: "Monthly Progress",
     });
 
@@ -196,7 +228,12 @@ export default function ProgressPlot({ width, height, settingsRef }) {
       yearPlot.remove();
       monthPlot.remove();
     };
-  }, [width, height, statsContext.data, statsContext.progress]);
+  }, [
+    width,
+    height,
+    statsContext.data,
+    statsContext.progress,
+  ]);
 
   return (
     <>
@@ -209,11 +246,19 @@ export default function ProgressPlot({ width, height, settingsRef }) {
       >
         <div
           ref={figureRef}
-          style={{ display: "flex", justifyContent: "center", width: "100%" }}
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            width: "100%",
+          }}
         />
         <div
           ref={figureRef2}
-          style={{ display: "flex", justifyContent: "center", width: "100%" }}
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            width: "100%",
+          }}
         />
       </Box>
       {settingsRef.current &&

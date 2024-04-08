@@ -415,7 +415,6 @@ const listSettings = (activityContext) => ({
       valueFormatter: (value, row, column, apiRef) => {
         const hours = Math.floor(value / 3600);
         const minutes = Math.floor((value % 3600) / 60);
-        const seconds = value % 60;
         return (
           String(hours).padStart(2, "0") +
           ":" +
