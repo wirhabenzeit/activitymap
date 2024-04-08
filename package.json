@@ -15,7 +15,7 @@
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
-    "@fortawesome/fontawesome-svg-core": "^6.5.1",
+    "@fortawesome/fontawesome-svg-core": "^6.5.2",
     "@fortawesome/free-solid-svg-icons": "^6.5.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@google-cloud/translate": "^8.1.0",
