@@ -18,7 +18,7 @@
     "@fortawesome/fontawesome-svg-core": "^6.5.1",
     "@fortawesome/free-solid-svg-icons": "^6.5.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
-    "@google-cloud/translate": "^8.1.0",
+    "@google-cloud/translate": "^8.2.0",
     "@mapbox/togeojson": "^0.16.2",
     "@mui/icons-material": "^5.15.14",
     "@mui/material": "^5.15.14",
