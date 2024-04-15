@@ -30,7 +30,7 @@
     "file-saver": "^2.0.5",
     "htl": "^0.3.1",
     "js-cookie": "^3.0.5",
-    "mapbox-gl": "^3.2.0",
+    "mapbox-gl": "^3.3.0",
     "ml-regression-simple-linear": "^3.0.0",
     "proj4": "^2.11.0",
     "react": "^18.2.0",
