@@ -17,6 +17,7 @@ import {
   aliasMap,
   colorMap,
 } from "./category";
+import {desc} from "drizzle-orm";
 
 function decFormatter(unit = "", decimals = 0) {
   return (num: number | undefined) =>
@@ -57,8 +58,6 @@ export const listSettings = {
       headerName: "ID",
       flex: 1,
       minWidth: 60,
-      valueGetter: (value: number, row: Activity) =>
-        String(row.id),
     },
     {
       field: "name",
@@ -91,6 +90,12 @@ export const listSettings = {
           param1,
           param2
         ),
+    },
+    {
+      field: "description",
+      headerName: "Description",
+      flex: 2,
+      minWidth: 80,
     },
     {
       field: "start_date_local_timestamp",
@@ -386,6 +391,7 @@ export const listSettings = {
       columnVisibilityModel: {
         type: false,
         id: false,
+        description: false,
         time: false,
         max_watts: false,
         moving_time: false,
@@ -411,6 +417,7 @@ export const listSettings = {
       columnVisibilityModel: {
         id: false,
         time: false,
+        description: false,
         max_watts: false,
         moving_time: false,
         elev_high: false,
