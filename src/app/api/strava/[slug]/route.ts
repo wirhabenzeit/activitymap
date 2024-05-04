@@ -1,11 +1,9 @@
 import type {NextRequest} from "next/server";
-import type {Session} from "next-auth";
 
 import {
   activities,
   type Activity,
 } from "~/server/db/schema";
-import {auth} from "~/auth";
 import {db} from "~/server/db";
 import {
   getActivity,
@@ -13,6 +11,9 @@ import {
   checkWebhook,
   requestWebhook,
   deleteWebhook,
+  updateActivity,
+  getAccessToken,
+  type UpdatableActivity,
 } from "../helpers";
 import {eq} from "drizzle-orm";
 
@@ -69,19 +70,15 @@ export async function GET(
     }
   }
 
-  const session: Session | null = await auth();
-  if (!session?.user?.id)
-    return new Response("Not authenticated", {status: 401});
-  const account = await db.query.accounts.findFirst({
-    where: (accounts, {eq}) =>
-      eq(accounts.userId, session.user!.id!),
-  });
-  if (!account)
-    return new Response("Account not found", {status: 404});
   if (!params.slug)
     return new Response(`Provide a valid slug`, {
       status: 404,
     });
+
+  const token = await getAccessToken();
+  if (!token) {
+    return new Response("No token", {status: 401});
+  }
 
   if (params.slug === "activity") {
     if (!req.nextUrl.searchParams.has("id"))
@@ -91,7 +88,7 @@ export async function GET(
     );
     try {
       const new_data = await getActivity(id, {
-        token: account.access_token!,
+        token,
         database: true,
         get_photos: true,
       });
@@ -127,7 +124,7 @@ export async function GET(
         );
       console.log(reqParams);
       const new_data = await getActivities({
-        token: account.access_token!,
+        token,
         database: true,
         ...reqParams,
       });
@@ -169,6 +166,20 @@ export async function POST(
   req: NextRequest,
   {params}: {params: {slug: string}}
 ) {
+  console.log(params.slug);
+  if (params.slug === "update") {
+    try {
+      const data = (await req.json()) as UpdatableActivity;
+      const token = await getAccessToken();
+      const updated = await updateActivity(data, {token});
+      return Response.json(updated);
+    } catch (e) {
+      console.log(e);
+      return new Response("Failed to update activity", {
+        status: 500,
+      });
+    }
+  }
   if (params.slug !== "webhook")
     return new Response("Invalid endpoint", {status: 404});
   try {

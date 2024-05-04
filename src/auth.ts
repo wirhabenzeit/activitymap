@@ -15,7 +15,6 @@ export const {handlers, signIn, signOut, auth} = NextAuth({
   adapter: DrizzleAdapter(db),
   callbacks: {
     async session({session, user}) {
-      console.log("Session");
       const strava = await db.query.accounts.findFirst({
         where: (accounts, {eq}) =>
           eq(accounts.userId, user.id),

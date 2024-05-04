@@ -32,6 +32,7 @@ export type ActivityZustand = {
   geoJson: FeatureCollection;
   loading: boolean;
   loaded: boolean;
+  updateActivity: (act: Activity) => Promise<Activity>;
   setLoading: (x: boolean) => void;
   loadFromDB: () => Promise<void>;
   loadFromStrava: ({
@@ -60,6 +61,28 @@ export const activitySlice: StateCreator<
     set((state) => {
       state.loading = x;
     });
+  },
+  updateActivity: async (act: Activity) => {
+    try {
+      const res = await fetch("/api/strava/update", {
+        method: "POST",
+        body: JSON.stringify({
+          id: act.id,
+          name: act.name,
+          description: act.description,
+        }),
+      });
+      const json = await res.json();
+      set((state) => {
+        state.activityDict[Number(act.id)].name = json.name;
+        state.activityDict[Number(act.id)].description =
+          json.description;
+      });
+      return json;
+    } catch (e) {
+      console.error(e);
+      throw new Error("Failed to update activity");
+    }
   },
   loadFromDB: async () => {
     const res = await fetch("/api/db");

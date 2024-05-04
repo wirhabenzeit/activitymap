@@ -1,9 +1,11 @@
 import {Link, Tooltip} from "@mui/material";
 import {
   type GridSortCellParams,
+  type GridRenderEditCellParams,
   gridStringOrNumberComparator,
   type GridColDef,
   type GridSortItem,
+  GridEditInputCell,
 } from "@mui/x-data-grid";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import {library} from "@fortawesome/fontawesome-svg-core";
@@ -63,6 +65,7 @@ export const listSettings = {
       field: "name",
       headerName: "Name",
       flex: 2,
+      editable: true,
       minWidth: 150,
       valueGetter: (value: number, row: Activity) => ({
         name: row.name,
@@ -78,6 +81,15 @@ export const listSettings = {
           {value.name}
         </Link>
       ),
+      renderEditCell: (
+        params: GridRenderEditCellParams
+      ) => {
+        return (
+          <GridEditInputCell
+            {...{...params, value: params.value.name}}
+          />
+        );
+      },
       sortComparator: (
         v1: {name: string},
         v2: {name: string},
@@ -95,6 +107,7 @@ export const listSettings = {
       field: "description",
       headerName: "Description",
       flex: 2,
+      editable: true,
       minWidth: 80,
     },
     {

@@ -8,6 +8,21 @@ import {
 import {decode} from "@mapbox/polyline";
 
 import {db} from "~/server/db";
+import {Session} from "next-auth";
+import {auth} from "~/auth";
+
+export async function getAccessToken() {
+  const session: Session | null = await auth();
+  if (!session?.user?.id)
+    throw new Error("No user session found");
+  const account = await db.query.accounts.findFirst({
+    where: (accounts, {eq}) =>
+      eq(accounts.userId, session.user!.id!),
+  });
+  if (!account || !account.access_token)
+    throw new Error("No account found");
+  return account.access_token;
+}
 
 async function get(
   path: string,
@@ -41,7 +56,10 @@ async function get(
 export async function post(
   path: string,
   body: Record<string, unknown>,
-  token?: string
+  {
+    token,
+    method = "POST",
+  }: {token?: string; method?: string}
 ) {
   const headers =
     token === undefined
@@ -52,16 +70,23 @@ export async function post(
         };
   const res = await fetch(
     `https://www.strava.com/api/v3/${path}`,
-    {method: "POST", headers, body: JSON.stringify(body)}
+    {method: method, headers, body: JSON.stringify(body)}
   );
-  console.log("POST", path, res.status, res.statusText);
+  console.log(
+    method,
+    `https://www.strava.com/api/v3/${path}`,
+    headers,
+    JSON.stringify(body),
+    res.status,
+    res.statusText
+  );
   if (!res.ok) {
     console.log(await res.text());
     throw new Error(
       `Failed to post ${path}: ${res.status}, ${res.statusText}`
     );
   }
-  const json: unknown = await res.json();
+  const json: Record<string, unknown> = await res.json();
   if (!json) {
     throw new Error(`Failed to post ${path}`);
   }
@@ -89,12 +114,16 @@ export async function checkWebhook() {
 }
 
 export async function requestWebhook(url: string) {
-  const json = await post(`push_subscriptions`, {
-    callback_url: url,
-    verify_token: "STRAVA",
-    client_id: process.env.AUTH_STRAVA_ID,
-    client_secret: process.env.AUTH_STRAVA_SECRET,
-  });
+  const json = await post(
+    `push_subscriptions`,
+    {
+      callback_url: url,
+      verify_token: "STRAVA",
+      client_id: process.env.AUTH_STRAVA_ID,
+      client_secret: process.env.AUTH_STRAVA_SECRET,
+    },
+    {}
+  );
   return json;
 }
 
@@ -108,6 +137,38 @@ export async function deleteWebhook(id: number) {
   } catch (e) {
     console.error(e);
     throw new Error(`Failed to delete webhook`);
+  }
+}
+
+export type UpdatableActivity = {
+  id: number;
+  name?: string;
+  description?: string;
+};
+
+export async function updateActivity(
+  act: UpdatableActivity,
+  {token}: {token: string}
+) {
+  try {
+    const {id, ...update} = act;
+    console.log("Updating activity", id, update);
+    const json = await post(
+      `activities/${act.id}`,
+      update,
+      {
+        token,
+        method: "PUT",
+      }
+    );
+    console.log("Updated activity");
+    const parsedActivity: Activity = parseActivity(
+      json as Record<string, unknown>
+    );
+    return parsedActivity;
+  } catch (e) {
+    console.log(e);
+    throw new Error(`Failed to update activity`);
   }
 }
 

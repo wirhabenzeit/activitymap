@@ -28,6 +28,7 @@ import type {
 } from "@mui/x-data-grid";
 
 import {useStore} from "~/contexts/Zustand";
+import {Activity} from "~/server/db/schema";
 
 export function LoadMoreButton() {
   const [disabled, setDisabled] = useState(false);
@@ -77,6 +78,7 @@ export default function List() {
     fullList,
     setSortModel,
     setColumnVisibilityModel,
+    updateActivity,
   } = useStore((state) => ({
     activityDict: state.activityDict,
     filterIDs: state.filterIDs,
@@ -85,6 +87,7 @@ export default function List() {
     fullList: state.fullList,
     setSortModel: state.setSortModel,
     setColumnVisibilityModel: state.setColumnModel,
+    updateActivity: state.updateActivity,
   }));
   const rows = filterIDs.map((key) => activityDict[key]);
 
@@ -140,6 +143,21 @@ export default function List() {
             : rows.length > 0
             ? rows
             : []
+        }
+        editMode="row"
+        processRowUpdate={async (updatedRow: Activity) => {
+          const verifiedActivity = await updateActivity({
+            ...updatedRow,
+            name: updateActivity.name.name,
+          });
+          console.log(
+            "Returning activity",
+            verifiedActivity
+          );
+          return verifiedActivity;
+        }}
+        onProcessRowUpdateError={(error) =>
+          console.error(error)
         }
         columns={listSettings.columns}
         disableColumnMenu

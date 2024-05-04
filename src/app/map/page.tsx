@@ -37,6 +37,8 @@ import {listSettings} from "~/settings/list";
 import {DownloadControl} from "~/components/Map/DownloadControl";
 import {SelectionControl} from "~/components/Map/SelectionControl";
 import {LayerSwitcher} from "~/components/Map/LayerSwitcher";
+import type {Activity} from "~/server/db/schema";
+import {updateActivity} from "../api/strava/helpers";
 
 function Download({position}: {position: ControlPosition}) {
   useControl(() => new DownloadControl(), {position});
@@ -360,6 +362,23 @@ function Map() {
                   : "hidden !important",
             },
           }}
+          editMode="row"
+          processRowUpdate={async (
+            updatedRow: Activity
+          ) => {
+            const verifiedActivity = await updateActivity({
+              ...updatedRow,
+              name: updateActivity.name.name,
+            });
+            console.log(
+              "Returning activity",
+              verifiedActivity
+            );
+            return verifiedActivity;
+          }}
+          onProcessRowUpdateError={(error) =>
+            console.error(error)
+          }
           rowHeight={35}
           disableColumnMenu={true}
           rows={selected.map((key) => activityDict[key])}
