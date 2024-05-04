@@ -16,7 +16,7 @@ export const env = createEnv({
     POSTGRES_DATABASE: z.string(),
     POSTGRES_PASSWORD: z.string(),
     AUTH_SECRET: z.string(),
-    AUTH_STRAVA_ID: z.number(),
+    AUTH_STRAVA_ID: z.string(),
     AUTH_STRAVA_SECRET: z.string(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
