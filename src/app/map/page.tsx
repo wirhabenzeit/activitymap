@@ -38,7 +38,6 @@ import {DownloadControl} from "~/components/Map/DownloadControl";
 import {SelectionControl} from "~/components/Map/SelectionControl";
 import {LayerSwitcher} from "~/components/Map/LayerSwitcher";
 import type {Activity} from "~/server/db/schema";
-import {updateActivity} from "../api/strava/helpers";
 
 function Download({position}: {position: ControlPosition}) {
   useControl(() => new DownloadControl(), {position});
@@ -193,6 +192,7 @@ function Map() {
     overlays,
     mapPosition,
     setPosition,
+    updateActivity,
   } = useStore((state) => ({
     selected: state.selected,
     setHighlighted: state.setHighlighted,
@@ -204,6 +204,7 @@ function Map() {
     overlays: state.overlayMaps,
     mapPosition: state.position,
     setPosition: state.setPosition,
+    updateActivity: state.updateActivity,
   }));
 
   const mapRefLoc = createRef<MapRef>();

@@ -1,16 +1,9 @@
 "use client";
 
 import {listSettings} from "~/settings/list";
-
 import {useState} from "react";
 
-import {
-  Box,
-  Button,
-  IconButton,
-  Tooltip,
-  sliderClasses,
-} from "@mui/material";
+import {Box, IconButton, Tooltip} from "@mui/material";
 import {
   CheckBoxOutlineBlank,
   CheckBox,
