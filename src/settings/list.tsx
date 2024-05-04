@@ -19,7 +19,6 @@ import {
   aliasMap,
   colorMap,
 } from "./category";
-import {desc} from "drizzle-orm";
 
 function decFormatter(unit = "", decimals = 0) {
   return (num: number | undefined) =>

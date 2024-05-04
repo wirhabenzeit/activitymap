@@ -104,6 +104,7 @@ export async function GET(
       const reqParams = {} as {
         get_photos?: boolean;
         page?: number;
+        ids: number[];
         after?: number;
         before?: number;
       };
@@ -122,6 +123,11 @@ export async function GET(
         reqParams.before = parseInt(
           req.nextUrl.searchParams.get("before")!
         );
+      if (req.nextUrl.searchParams.has("ids"))
+        reqParams.ids = req.nextUrl.searchParams
+          .get("ids")!
+          .split(",")
+          .map((id) => parseInt(id));
       console.log(reqParams);
       const new_data = await getActivities({
         token,

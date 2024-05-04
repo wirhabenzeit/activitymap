@@ -297,6 +297,7 @@ export async function getActivities({
   database = true,
   get_photos = false,
   page = 1,
+  ids,
   per_page = 200,
   after = undefined,
   before = undefined,
@@ -304,8 +305,8 @@ export async function getActivities({
   token: string;
   database?: boolean;
   get_photos?: boolean;
-
   page?: number;
+  ids?: number[];
   per_page?: number;
   after?: number;
   before?: number;
@@ -321,8 +322,13 @@ export async function getActivities({
         }).filter(([, v]) => v !== undefined)
       )
     );
-    const new_activities: Record<string, unknown>[] =
-      (await get(
+    let new_activities: Record<string, unknown>[] = [];
+    if (ids !== undefined)
+      new_activities = (await Promise.all(
+        ids.map((id) => get(`activities/${id}`, {token}))
+      )) as Record<string, unknown>[];
+    else
+      new_activities = (await get(
         `athlete/activities?${params.toString()}`,
         {token}
       )) as Record<string, unknown>[];

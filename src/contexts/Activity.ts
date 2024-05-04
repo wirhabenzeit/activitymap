@@ -38,9 +38,11 @@ export type ActivityZustand = {
   loadFromStrava: ({
     photos,
     before,
+    ids,
   }: {
     photos?: boolean;
     before?: number;
+    ids?: number[];
   }) => Promise<number>;
 };
 
@@ -100,7 +102,7 @@ export const activitySlice: StateCreator<
       });
     });
   },
-  loadFromStrava: async ({photos, before}) => {
+  loadFromStrava: async ({photos, before, ids}) => {
     set((state) => {
       state.loading = true;
     });
@@ -109,6 +111,7 @@ export const activitySlice: StateCreator<
         Object.entries({
           photos,
           before,
+          ids: ids?.join(","),
           page: 1,
         }).filter(([, v]) => v !== undefined)
       )

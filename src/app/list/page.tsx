@@ -4,10 +4,17 @@ import {listSettings} from "~/settings/list";
 
 import {useState} from "react";
 
-import {Box, Button} from "@mui/material";
+import {
+  Box,
+  Button,
+  IconButton,
+  Tooltip,
+  sliderClasses,
+} from "@mui/material";
 import {
   CheckBoxOutlineBlank,
   CheckBox,
+  Refresh,
 } from "@mui/icons-material";
 import {
   DataGrid,
@@ -30,24 +37,23 @@ import type {
 import {useStore} from "~/contexts/Zustand";
 import {Activity} from "~/server/db/schema";
 
-export function LoadMoreButton() {
-  const [disabled, setDisabled] = useState(false);
-  const loadMore = useStore(
-    (state) => state.loadFromStrava
-  );
+export function RefreshButton() {
+  const {selected, loadFromStrava} = useStore((state) => ({
+    selected: state.selected,
+    loadFromStrava: state.loadFromStrava,
+  }));
 
   return (
-    <Button
-      onClick={async () => {
-        const newActivities = await loadMore({
-          photos: false,
-        });
-        setDisabled(newActivities === 0);
-      }}
-      disabled={disabled}
-    >
-      Reload
-    </Button>
+    <Tooltip title="Refresh Selected Activities">
+      <span>
+        <IconButton
+          disabled={selected.length == 0}
+          onClick={() => loadFromStrava({ids: selected})}
+        >
+          <Refresh fontSize="small" />
+        </IconButton>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -130,6 +136,8 @@ export default function List() {
           {checked ? "Selected" : "All"}
         </rootProps.slots.baseButton>
         <GridToolbarColumnsButton />
+        <Box sx={{flexGrow: 1}} />
+        <RefreshButton />
       </GridToolbarContainer>
     );
   };
