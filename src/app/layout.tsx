@@ -62,7 +62,9 @@ export default async function RootLayout({
                 account={account}
               />
               <SideBar />
-              <MainContainer>{children}</MainContainer>
+              <MainContainer account={account}>
+                {children}
+              </MainContainer>
             </Box>
           </ThemeProvider>
         </AppRouterCacheProvider>

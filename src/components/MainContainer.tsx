@@ -4,6 +4,7 @@ import {useEffect} from "react";
 import {Box} from "@mui/material";
 import {styled} from "@mui/material/styles";
 import {useStore} from "~/contexts/Zustand";
+import type {Account} from "~/server/db/schema";
 
 const DrawerHeader = styled("div")(({theme}) => {
   return {
@@ -16,19 +17,28 @@ const DrawerHeader = styled("div")(({theme}) => {
 });
 
 export default function MainContainer({
+  account,
   children,
 }: {
   children: React.ReactNode;
+  account?: Account;
 }) {
-  const {open, loadFromDB, updateFilters, setFilterRanges} =
-    useStore((state) => ({
-      open: state.drawerOpen,
-      loadFromDB: state.loadFromDB,
-      updateFilters: state.updateFilters,
-      setFilterRanges: state.setFilterRanges,
-    }));
+  const {
+    open,
+    loadFromDB,
+    updateFilters,
+    setFilterRanges,
+    setAccount,
+  } = useStore((state) => ({
+    open: state.drawerOpen,
+    loadFromDB: state.loadFromDB,
+    updateFilters: state.updateFilters,
+    setFilterRanges: state.setFilterRanges,
+    setAccount: state.setAccount,
+  }));
 
   useEffect(() => {
+    if (account) setAccount(account);
     async function load() {
       await loadFromDB();
     }
