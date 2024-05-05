@@ -52,7 +52,7 @@ export const statsSlice: StateCreator<
     yScale: timelineSettings.yScales.linear,
   },
   calendar: {
-    value: calendarSettings.values.elevation,
+    value: calendarSettings.values.type,
   },
   scatter: {
     xValue: scatterSettings.values.date,

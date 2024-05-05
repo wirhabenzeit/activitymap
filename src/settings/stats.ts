@@ -1,25 +1,11 @@
-import {Link, Tooltip} from "@mui/material";
-import {
-  type GridSortCellParams,
-  gridStringOrNumberComparator,
-  type GridColDef,
-  type GridSortItem,
-} from "@mui/x-data-grid";
-import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import {library} from "@fortawesome/fontawesome-svg-core";
 import {fas} from "@fortawesome/free-solid-svg-icons";
 
 library.add(fas);
-
-import {type IconProp} from "@fortawesome/fontawesome-svg-core";
 import * as d3 from "d3";
 
-import {LayerSAC} from "~/components/Map/LayerSAC";
-import {LayerFriflyt} from "~/components/Map/LayerFriflyt";
-import {LayerQuaeldich} from "~/components/Map/LayerQuaeldich";
 import {type Activity} from "~/server/db/schema";
 import {categorySettings, aliasMap} from "./category";
-import {LngLatBounds} from "mapbox-gl";
 
 export const calendarSettings = {
   values: {

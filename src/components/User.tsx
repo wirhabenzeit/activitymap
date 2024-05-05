@@ -33,6 +33,12 @@ import {useStore} from "~/contexts/Zustand";
 import type {Account, User} from "~/server/db/schema";
 import type {Activity} from "~/server/db/schema";
 
+import {
+  checkWebhook,
+  requestWebhook,
+  deleteWebhook,
+} from "~/server/strava/actions";
+
 export function LoginButton() {
   return (
     <IconButton
@@ -99,55 +105,6 @@ export function UserSettings({
   );
 }
 
-const checkWebhook = async () => {
-  const res = await fetch("/api/strava/checkwebhook");
-  try {
-    const json = (await res.json()) as {
-      id: number;
-      callback_url: string;
-    }[];
-    console.log(window.location.origin, json);
-    if (!Array.isArray(json)) {
-      throw new Error("Invalid response");
-    }
-    if (json.length === 0) {
-      return false;
-    }
-    if (json.length > 1) {
-      throw new Error("Multiple subscriptions found");
-    }
-    if (
-      json[0]!.callback_url ==
-      `${window.location.origin}/api/strava/webhook`
-    )
-      return true;
-    console.log("Found foreign subscription", json[0]);
-    return json[0]!.id;
-  } catch (e) {
-    console.error(e);
-    throw new Error("Failed to fetch subscriptions");
-  }
-};
-
-const requestWebhook = async (url: string, id?: number) => {
-  if (id) {
-    const res = await fetch(
-      `/api/strava/deletewebhook?id=${id}`
-    );
-    if (!res.ok) {
-      throw new Error("Failed to delete webhook");
-    }
-    console.log("Deleted webhook", id);
-  }
-  const res = await fetch(
-    `/api/strava/requestwebhook?url=${url}`
-  );
-  if (!res.ok) {
-    throw new Error("Failed to request webhook");
-  }
-  return await res.text();
-};
-
 function WebhookStatus() {
   const [webhookStatus, setWebhookStatus] = useState<
     undefined | boolean
@@ -169,13 +126,17 @@ function WebhookStatus() {
             onClick={async () => {
               setLoading(true);
               try {
-                const status: boolean | number =
-                  await checkWebhook();
-                if (typeof status === "number") {
+                const status = await checkWebhook();
+                if (status.length === 0) {
                   setWebhookStatus(false);
-                  setId(status);
+                } else if (
+                  status[0]?.callback_url ===
+                  `${window.location.origin}/api/strava/webhook`
+                ) {
+                  setWebhookStatus(true);
                 } else {
-                  setWebhookStatus(status);
+                  setWebhookStatus(false);
+                  setId(status[0]!.id);
                 }
               } catch (e) {
                 console.error(e);
@@ -203,9 +164,11 @@ function WebhookStatus() {
             onClick={async () => {
               setLoading(true);
               try {
+                if (id) {
+                  await deleteWebhook(id);
+                }
                 const response = await requestWebhook(
-                  `${window.location.origin}/api/strava/webhook`,
-                  id
+                  `${window.location.origin}/api/strava/webhook`
                 );
                 console.log(response);
                 setWebhookStatus(true);

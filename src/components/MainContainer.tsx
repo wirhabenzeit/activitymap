@@ -17,17 +17,16 @@ const DrawerHeader = styled("div")(({theme}) => {
 
 export default function MainContainer({
   children,
-}: { 
+}: {
   children: React.ReactNode;
 }) {
-  const open = useStore((state) => state.drawerOpen);
-  const loadFromDB = useStore((state) => state.loadFromDB);
-  const updateFilters = useStore(
-    (state) => state.updateFilters
-  );
-  const setFilterRanges = useStore(
-    (state) => state.setFilterRanges
-  );
+  const {open, loadFromDB, updateFilters, setFilterRanges} =
+    useStore((state) => ({
+      open: state.drawerOpen,
+      loadFromDB: state.loadFromDB,
+      updateFilters: state.updateFilters,
+      setFilterRanges: state.setFilterRanges,
+    }));
 
   useEffect(() => {
     async function load() {

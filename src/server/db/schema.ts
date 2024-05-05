@@ -208,12 +208,11 @@ export const activities = pgTable("activities", {
   id: bigint("id", {mode: "bigint"}).primaryKey().unique(),
   upload_id: bigint("upload_id", {mode: "bigint"}),
   external_id: text("external_id"),
-  athlete: integer("athlete").references(
-    () => accounts.providerAccountId,
-    {
+  athlete: integer("athlete")
+    .references(() => accounts.providerAccountId, {
       onDelete: "cascade",
-    }
-  ),
+    })
+    .notNull(),
   name: text("name").notNull(),
   description: text("description"),
   type: activityTypeEnum("type"),

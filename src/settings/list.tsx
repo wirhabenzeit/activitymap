@@ -114,6 +114,7 @@ export const listSettings = {
       headerName: "Day",
       flex: 1,
       minWidth: 80,
+      valueGetter: (value: bigint) => Number(value),
       renderHeader: () => (
         <Tooltip title="Start date">
           <FontAwesomeIcon

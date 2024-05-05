@@ -1,11 +1,19 @@
-import {type Activity} from "~/server/db/schema";
-import {type StateCreator} from "zustand";
+import type {Account, Activity} from "~/server/db/schema";
+import type {StateCreator} from "zustand";
 import {decode} from "@mapbox/polyline";
-import {type TotalZustand} from "./Zustand";
+import type {TotalZustand} from "./Zustand";
 import {
   type FeatureCollection,
   type Feature,
 } from "geojson";
+
+import {getActivities as getDBActivities} from "~/server/db/actions";
+import {
+  UpdatableActivity,
+  getActivities as getStravaActivities,
+  updateActivity as updateStravaActivity,
+} from "~/server/strava/actions";
+import {WritableDraft} from "immer";
 
 const FeatureFromActivity = (act: Activity): Feature => {
   if (!act.map) throw new Error("No map data");
@@ -32,6 +40,8 @@ export type ActivityZustand = {
   geoJson: FeatureCollection;
   loading: boolean;
   loaded: boolean;
+  account?: Account;
+  setAccount: (acc: Account) => void;
   updateActivity: (act: Activity) => Promise<Activity>;
   setLoading: (x: boolean) => void;
   loadFromDB: () => Promise<void>;
@@ -46,12 +56,27 @@ export type ActivityZustand = {
   }) => Promise<number>;
 };
 
+const setActivities =
+  (acts: Activity[]) =>
+  (state: WritableDraft<TotalZustand>) => {
+    state.loading = false;
+    state.loaded = true;
+    acts.forEach((act) => {
+      state.activityDict[Number(act.id)] = act;
+    });
+    if (state.geoJson) {
+      const features = state.geoJson.features;
+      if (features)
+        features.push(...acts.map(FeatureFromActivity));
+    }
+  };
+
 export const activitySlice: StateCreator<
   TotalZustand,
   [["zustand/immer", never]],
   [],
   ActivityZustand
-> = (set) => ({
+> = (set, get) => ({
   activityDict: {},
   geoJson: {
     type: "FeatureCollection",
@@ -59,77 +84,71 @@ export const activitySlice: StateCreator<
   },
   loading: true,
   loaded: false,
+  setAccount: (account: Account) =>
+    set((state) => {
+      state.account = account;
+    }),
   setLoading: (x: boolean) => {
     set((state) => {
       state.loading = x;
     });
   },
-  updateActivity: async (act: Activity) => {
+  updateActivity: async (activity: UpdatableActivity) => {
     try {
-      const res = await fetch("/api/strava/update", {
-        method: "POST",
-        body: JSON.stringify({
-          id: act.id,
-          name: act.name,
-          description: act.description,
-        }),
-      });
-      const json = await res.json();
+      const athlete = get().account;
+      const updatedActivity = await updateStravaActivity(
+        activity,
+        {
+          access_token: athlete?.access_token
+            ? athlete?.access_token
+            : undefined,
+        }
+      );
       set((state) => {
-        state.activityDict[Number(act.id)].name = json.name;
-        state.activityDict[Number(act.id)].description =
-          json.description;
+        state.activityDict[Number(updatedActivity.id)] =
+          updatedActivity;
       });
-      return json;
+      return updatedActivity;
     } catch (e) {
       console.error(e);
       throw new Error("Failed to update activity");
     }
   },
   loadFromDB: async () => {
-    const res = await fetch("/api/db");
-    const data = (await res.json()) as Activity[];
-    return set((state) => {
-      state.loading = false;
-      state.loaded = true;
-      if (state.geoJson) {
-        const features = state.geoJson.features;
-        if (features)
-          features.push(...data.map(FeatureFromActivity));
-      }
-      data.forEach((act) => {
-        state.activityDict[Number(act.id)] = act;
-      });
+    set((state) => {
+      state.loading = true;
     });
+    try {
+      const athlete = get().account;
+      const acts = await getDBActivities({
+        athlete_id: athlete?.providerAccountId,
+      });
+      set(setActivities(acts));
+    } catch (e) {
+      console.error(e);
+      throw new Error("Failed to fetch activities");
+    }
   },
   loadFromStrava: async ({photos, before, ids}) => {
     set((state) => {
       state.loading = true;
     });
-    const params = new URLSearchParams(
-      Object.fromEntries(
-        Object.entries({
-          photos,
-          before,
-          ids: ids?.join(","),
-          page: 1,
-        }).filter(([, v]) => v !== undefined)
-      )
-    );
-    const res = await fetch(
-      `/api/strava/activities?${params.toString()}`
-    );
-    const data = (await res.json()) as Activity[];
-    set((state) => {
-      state.loading = false;
-      state.loaded = true;
-      state.geoJson.features.push(
-        ...data.map(FeatureFromActivity)
-      );
-      data.forEach((act) => {
-        state.activityDict[Number(act.id)] = act;
+    try {
+      const athlete = get().account;
+      const {activities: acts} = await getStravaActivities({
+        get_photos: photos,
+        before,
+        ids,
+        access_token: athlete?.access_token
+          ? athlete?.access_token
+          : undefined,
+        athlete_id: athlete?.providerAccountId,
       });
-    });
-    return data.length;
+      set(setActivities(acts));
+      return acts.length;
+    } catch (e) {
+      console.error(e);
+      throw new Error("Failed to fetch activities");
+    }
   },
 });

@@ -1,4 +1,5 @@
 import {type StateCreator} from "zustand";
+import * as d3 from "d3";
 
 import {categorySettings} from "~/settings/category";
 
@@ -174,7 +175,10 @@ export const filterSlice: StateCreator<
             .filter((v): v is number => v != null);
           return [
             key as ValueColumn,
-            [Math.min(...values), Math.max(...values)],
+            d3.extent(values).map(Number) as [
+              number,
+              number
+            ],
           ];
         })
       ) as Record<ValueColumn, [number, number]>;

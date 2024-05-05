@@ -29,15 +29,6 @@ const StatsContext = createContext(defaultStatsContext);
 
 const tabHeight = 36;
 
-const Tabs = styled(MuiTabs)(() => ({
-  minHeight: tabHeight,
-  "& .MuiTab-root": {
-    minHeight: tabHeight - 2,
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-}));
-
 const tabs = {
   "/stats/timeline": {
     label: "Timeline",

@@ -1,3 +1,5 @@
+"use server";
+
 import {
   activities,
   photos,
@@ -8,20 +10,27 @@ import {
 import {decode} from "@mapbox/polyline";
 
 import {db} from "~/server/db";
-import {Session} from "next-auth";
-import {auth} from "~/auth";
+import {getAccount} from "~/auth";
 
-export async function getAccessToken() {
-  const session: Session | null = await auth();
-  if (!session?.user?.id)
-    throw new Error("No user session found");
-  const account = await db.query.accounts.findFirst({
-    where: (accounts, {eq}) =>
-      eq(accounts.userId, session.user!.id!),
-  });
-  if (!account || !account.access_token)
-    throw new Error("No account found");
-  return account.access_token;
+type Subscription = {
+  id: number;
+  resource_state: number;
+  callback_url: string;
+  application_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UpdatableActivity = {
+  id: BigInt;
+  athlete: number;
+  name: string | null;
+  description: string | null;
+};
+
+interface IDandLoc {
+  id: bigint;
+  location: number[] | null;
 }
 
 async function get(
@@ -74,7 +83,7 @@ export async function post(
   );
   console.log(
     method,
-    `https://www.strava.com/api/v3/${path}`,
+    path,
     headers,
     JSON.stringify(body),
     res.status,
@@ -92,15 +101,6 @@ export async function post(
   }
   return json;
 }
-
-type Subscription = {
-  id: number;
-  resource_state: number;
-  callback_url: string;
-  application_id: number;
-  created_at: string;
-  updated_at: string;
-};
 
 export async function checkWebhook() {
   const json = (await get(
@@ -140,24 +140,24 @@ export async function deleteWebhook(id: number) {
   }
 }
 
-export type UpdatableActivity = {
-  id: number;
-  name?: string;
-  description?: string;
-};
-
 export async function updateActivity(
   act: UpdatableActivity,
-  {token}: {token: string}
+  {access_token}: {access_token?: string}
 ) {
   try {
+    if (!access_token) {
+      const account = await getAccount({
+        providerID: act.athlete,
+      });
+      access_token = account.access_token!;
+    }
     const {id, ...update} = act;
     console.log("Updating activity", id, update);
     const json = await post(
       `activities/${act.id}`,
       update,
       {
-        token,
+        token: access_token,
         method: "PUT",
       }
     );
@@ -172,7 +172,7 @@ export async function updateActivity(
   }
 }
 
-export function parseActivity(
+function parseActivity(
   json: Record<string, unknown>
 ): Activity {
   const tableKeys = Object.keys(activities);
@@ -200,9 +200,8 @@ export function parseActivity(
   );
   filteredInput.start_date = start_date;
   filteredInput.start_date_local = local_date;
-  filteredInput.start_date_local_timestamp = BigInt(
-    local_date.getTime() / 1000
-  );
+  filteredInput.start_date_local_timestamp =
+    local_date.getTime() / 1000;
   filteredInput.detailed_activity =
     "description" in filteredInput;
   if (
@@ -233,7 +232,7 @@ export function parseActivity(
   return filteredInput as Activity;
 }
 
-export function parsePhoto(
+function parsePhoto(
   json: Record<string, unknown>,
   {location = null}: {location: number[] | null | undefined}
 ): Photo {
@@ -251,11 +250,6 @@ export function parsePhoto(
   if (!filteredInput.location && location)
     filteredInput.location = location;
   return filteredInput as Photo;
-}
-
-interface IDandLoc {
-  id: bigint;
-  location: number[] | null;
 }
 
 export async function getPhotos(
@@ -293,7 +287,8 @@ export async function getPhotos(
 }
 
 export async function getActivities({
-  token,
+  access_token,
+  athlete_id,
   database = true,
   get_photos = false,
   page = 1,
@@ -302,7 +297,8 @@ export async function getActivities({
   after = undefined,
   before = undefined,
 }: {
-  token: string;
+  access_token?: string;
+  athlete_id?: number;
   database?: boolean;
   get_photos?: boolean;
   page?: number;
@@ -311,29 +307,43 @@ export async function getActivities({
   after?: number;
   before?: number;
 }) {
+  if (!access_token) {
+    try {
+      access_token = (
+        await getAccount({providerID: athlete_id})
+      ).access_token!;
+    } catch (e) {
+      console.error(e);
+      throw new Error(`Failed to fetch account`);
+    }
+  }
   try {
-    const params = new URLSearchParams(
-      Object.fromEntries(
-        Object.entries({
-          page,
-          per_page,
-          after,
-          before,
-        }).filter(([, v]) => v !== undefined)
-      )
-    );
     let new_activities: Record<string, unknown>[] = [];
     if (ids !== undefined)
       new_activities = (await Promise.all(
-        ids.map((id) => get(`activities/${id}`, {token}))
+        ids.map((id) =>
+          get(`activities/${id}`, {token: access_token})
+        )
       )) as Record<string, unknown>[];
-    else
+    else {
+      const params = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries({
+            page,
+            per_page,
+            after,
+            before,
+          }).filter(([, v]) => v !== undefined)
+        )
+      );
       new_activities = (await get(
         `athlete/activities?${params.toString()}`,
-        {token}
+        {token: access_token}
       )) as Record<string, unknown>[];
+    }
     const parsedActivities: Activity[] =
       new_activities.map(parseActivity);
+    console.log(parsedActivities);
     const new_photos: Photo[] = get_photos
       ? await getPhotos(
           parsedActivities
@@ -343,7 +353,7 @@ export async function getActivities({
               location,
             })),
           {
-            token,
+            token: access_token,
           }
         )
       : [];
@@ -365,63 +375,5 @@ export async function getActivities({
   } catch (e) {
     console.error(e);
     throw new Error(`Failed to fetch activities`);
-  }
-}
-
-export async function getActivity(
-  id: number,
-  {
-    token,
-    database = true,
-    get_photos = true,
-  }: {
-    token: string;
-    database?: boolean;
-    get_photos?: boolean;
-  }
-) {
-  try {
-    const activity = (await get(`activities/${id}`, {
-      token,
-    })) as Record<string, unknown>;
-    const parsedActivity = parseActivity(activity);
-    const new_photos: Photo[] =
-      get_photos &&
-      "photos" in activity &&
-      typeof activity.photos === "object" &&
-      activity.photos &&
-      "count" in activity.photos &&
-      activity.photos.count
-        ? await getPhotos(
-            {
-              id: parsedActivity.id,
-              location: parsedActivity.start_latlng,
-            },
-            {
-              token,
-            }
-          )
-        : [];
-    if (database) {
-      await db
-        .insert(activities)
-        .values(parsedActivity)
-        .onConflictDoUpdate({
-          target: activities.id,
-          set: parsedActivity,
-        });
-      if (new_photos.length > 0)
-        await db
-          .insert(photos)
-          .values(new_photos)
-          .onConflictDoNothing();
-    }
-    return {
-      activities: [parsedActivity],
-      photos: new_photos,
-    };
-  } catch (e) {
-    console.error(e);
-    throw new Error(`Failed to fetch activity`);
   }
 }
