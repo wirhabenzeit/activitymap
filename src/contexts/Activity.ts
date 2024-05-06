@@ -93,11 +93,16 @@ export const activitySlice: StateCreator<
       state.loading = x;
     });
   },
-  updateActivity: async (activity: UpdatableActivity) => {
+  updateActivity: async (activity: Activity) => {
     try {
       const athlete = get().account;
       const updatedActivity = await updateStravaActivity(
-        activity,
+        {
+          name: activity.name,
+          id: activity.id,
+          description: activity.description,
+          athlete: activity.athlete,
+        },
         {
           access_token: athlete?.access_token
             ? athlete?.access_token

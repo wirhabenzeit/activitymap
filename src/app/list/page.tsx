@@ -163,13 +163,9 @@ export default function List() {
         }
         editMode="row"
         processRowUpdate={async (updatedRow: Activity) => {
-          const verifiedActivity = await updateActivity({
-            ...updatedRow,
-            name: updateActivity.name.name,
-          });
-          console.log(
-            "Returning activity",
-            verifiedActivity
+          console.log("Updating activity", updatedRow);
+          const verifiedActivity = await updateActivity(
+            updatedRow
           );
           return verifiedActivity;
         }}

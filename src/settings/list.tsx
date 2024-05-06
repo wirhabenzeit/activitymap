@@ -1,4 +1,4 @@
-import {Link, Tooltip} from "@mui/material";
+import {Link, TextField, Tooltip} from "@mui/material";
 import {
   type GridSortCellParams,
   type GridRenderEditCellParams,
@@ -6,6 +6,7 @@ import {
   type GridColDef,
   type GridSortItem,
   GridEditInputCell,
+  useGridApiContext,
 } from "@mui/x-data-grid";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import {library} from "@fortawesome/fontawesome-svg-core";
@@ -19,11 +20,59 @@ import {
   aliasMap,
   colorMap,
 } from "./category";
+import React, {useEffect} from "react";
 
 function decFormatter(unit = "", decimals = 0) {
   return (num: number | undefined) =>
     num == undefined ? null : num.toFixed(decimals) + unit;
 }
+
+function CustomEditComponent(
+  props: GridRenderEditCellParams
+) {
+  const apiRef = useGridApiContext();
+  const ref = React.useRef(null);
+  const {id, value: valueProp, field} = props;
+  const [value, setValue] = React.useState(valueProp.name);
+
+  useEffect(() => {
+    apiRef.current.setEditCellValue({
+      id,
+      field,
+      value: valueProp.name,
+    });
+  }, []);
+
+  const handleValueChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    console.log(event.target.value);
+    const newValue = event.target.value; // The new value entered by the user
+    apiRef.current.setEditCellValue({
+      id,
+      field,
+      value: newValue,
+      debounceMs: 200,
+    });
+    setValue(newValue);
+  };
+
+  return (
+    <input
+      style={{border: 0}}
+      ref={ref}
+      type="text"
+      value={value}
+      onChange={handleValueChange}
+    />
+  );
+}
+
+const renderNameEditInputCell: GridColDef["renderCell"] = (
+  params
+) => {
+  return <CustomEditComponent {...params} />;
+};
 
 export const listSettings = {
   columns: [
@@ -80,15 +129,7 @@ export const listSettings = {
           {value.name}
         </Link>
       ),
-      renderEditCell: (
-        params: GridRenderEditCellParams
-      ) => {
-        return (
-          <GridEditInputCell
-            {...{...params, value: params.value.name}}
-          />
-        );
-      },
+      renderEditCell: renderNameEditInputCell,
       sortComparator: (
         v1: {name: string},
         v2: {name: string},
