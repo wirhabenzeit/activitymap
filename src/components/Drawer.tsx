@@ -120,7 +120,9 @@ export function MultiSelect({
       open: state.drawerOpen,
     }));
 
-  const selectChange = (event: SelectChangeEvent) => {
+  const selectChange = (
+    event: SelectChangeEvent<string[]>
+  ) => {
     const {value} = event.target;
     event.stopPropagation();
     console.log(value);
@@ -171,7 +173,9 @@ export function MultiSelect({
         <Select
           multiple
           value={categories[name].filter}
-          onChange={() => selectChange}
+          onChange={(event: SelectChangeEvent<string[]>) =>
+            selectChange(event)
+          }
           renderValue={(selected: string[]) =>
             selected.join(", ")
           }

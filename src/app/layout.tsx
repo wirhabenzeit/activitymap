@@ -1,8 +1,8 @@
+import "./global.css";
+
 import {AppRouterCacheProvider} from "@mui/material-nextjs/v13-appRouter";
 import {ThemeProvider} from "@mui/material/styles";
 import {Box, CssBaseline} from "@mui/material";
-
-import "~/styles/globals.css";
 import theme from "../theme";
 import SideBar from "~/components/SideBar";
 import MainContainer from "~/components/MainContainer";
@@ -50,10 +50,8 @@ export default async function RootLayout({
           <ThemeProvider theme={theme}>
             <Box
               sx={{
-                display: "flex",
-                width: 1,
-                height: 1,
-                overflowY: "hidden",
+                width: "100vw",
+                height: "100vh",
               }}
             >
               <CssBaseline />
@@ -61,10 +59,17 @@ export default async function RootLayout({
                 user={user ? user : undefined}
                 account={account}
               />
-              <SideBar />
-              <MainContainer account={account}>
-                {children}
-              </MainContainer>
+              <Box
+                sx={{
+                  width: "100vw",
+                  height: "100vh",
+                }}
+              >
+                <SideBar />
+                <MainContainer account={account}>
+                  {children}
+                </MainContainer>
+              </Box>
             </Box>
           </ThemeProvider>
         </AppRouterCacheProvider>

@@ -68,21 +68,21 @@ export default function MainContainer({
   return (
     <Box
       sx={{
-        height: "100%",
-        maxHeight: "100%",
+        height: "100vh",
         overflow: "hidden",
         width: open
-          ? "calc(100% - 250px)"
-          : "calc(100% - 33px)",
+          ? "calc(100vw - 250px)"
+          : "calc(100vw - 33px)",
         p: 0,
+        left: open ? "250px" : "33px",
+        position: "fixed",
       }}
     >
       <DrawerHeader sx={{flexGrow: 0}} />
       <Box
         sx={{
-          width: 1,
-          height: "calc(100% - 48px)",
-          maxHeight: "calc(100% - 48px)",
+          width: "100%",
+          height: "100%",
           minHeight: 0,
           minWidth: 0,
           overflow: "hidden",
