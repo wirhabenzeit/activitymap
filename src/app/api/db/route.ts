@@ -2,16 +2,6 @@ import type {Session} from "next-auth";
 import {auth} from "~/auth";
 import {db} from "~/server/db";
 
-declare global {
-  interface BigInt {
-    toJSON(): number;
-  }
-}
-
-BigInt.prototype.toJSON = function () {
-  return Number(this);
-};
-
 export async function GET() {
   const session: Session | null = await auth();
   if (!session?.user?.id)

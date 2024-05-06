@@ -37,11 +37,27 @@ export function RefreshButton() {
   }));
 
   return (
-    <Tooltip title="Refresh Selected Activities">
+    <Tooltip
+      title={
+        selected
+          ? "Refresh selected activities"
+          : "Check for new activities"
+      }
+    >
       <span>
         <IconButton
-          disabled={selected.length == 0}
-          onClick={() => loadFromStrava({ids: selected})}
+          color={
+            selected.length == 0 ? "inherit" : "primary"
+          }
+          onClick={async () => {
+            const newAct =
+              selected.length > 0
+                ? await loadFromStrava({
+                    ids: selected,
+                    photos: true,
+                  })
+                : await loadFromStrava({photos: true});
+          }}
         >
           <Refresh fontSize="small" />
         </IconButton>

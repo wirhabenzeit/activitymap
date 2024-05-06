@@ -114,7 +114,6 @@ export const listSettings = {
       headerName: "Day",
       flex: 1,
       minWidth: 80,
-      valueGetter: (value: bigint) => Number(value),
       renderHeader: () => (
         <Tooltip title="Start date">
           <FontAwesomeIcon
@@ -392,6 +391,21 @@ export const listSettings = {
       valueFormatter: (value: number) =>
         decFormatter("")(value),
     },
+    {
+      field: "detailed_activity",
+      renderHeader: () => (
+        <Tooltip title="Detailed activity">
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="info-circle"
+          />
+        </Tooltip>
+      ),
+      headerName: "Detailed Activity",
+      type: "boolean",
+      flex: 1,
+      minWidth: 80,
+    },
   ] as GridColDef[],
   defaultState: {
     compact: {
@@ -418,6 +432,7 @@ export const listSettings = {
         edit: false,
         kudos_count: false,
         average_speed: false,
+        detailed_activity: false,
       },
     },
     full: {
@@ -441,6 +456,7 @@ export const listSettings = {
         edit: false,
         kudos_count: false,
         average_speed: false,
+        detailed_activity: false,
       },
     },
   },

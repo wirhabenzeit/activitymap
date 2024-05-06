@@ -18,7 +18,7 @@ export async function getActivities({
     acts = await db
       .select()
       .from(activities)
-      .where(inArray(activities.id, ids.map(BigInt)));
+      .where(inArray(activities.id, ids));
   else {
     if (athlete_id == undefined) {
       const session = await auth();

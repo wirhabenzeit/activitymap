@@ -5,6 +5,7 @@ import {Box} from "@mui/material";
 import {styled} from "@mui/material/styles";
 import {useStore} from "~/contexts/Zustand";
 import type {Account} from "~/server/db/schema";
+import {geo} from "@observablehq/plot";
 
 const DrawerHeader = styled("div")(({theme}) => {
   return {
@@ -29,18 +30,21 @@ export default function MainContainer({
     updateFilters,
     setFilterRanges,
     setAccount,
+    toggleUserSettings,
   } = useStore((state) => ({
     open: state.drawerOpen,
     loadFromDB: state.loadFromDB,
     updateFilters: state.updateFilters,
     setFilterRanges: state.setFilterRanges,
     setAccount: state.setAccount,
+    toggleUserSettings: state.toggleUserSettings,
   }));
 
   useEffect(() => {
     if (account) setAccount(account);
     async function load() {
-      await loadFromDB();
+      const nActivities = await loadFromDB();
+      if (nActivities === 0) toggleUserSettings();
     }
     const unsub = useStore.subscribe((state, prevState) => {
       if (

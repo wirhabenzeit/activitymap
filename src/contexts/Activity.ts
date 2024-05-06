@@ -44,7 +44,7 @@ export type ActivityZustand = {
   setAccount: (acc: Account) => void;
   updateActivity: (act: Activity) => Promise<Activity>;
   setLoading: (x: boolean) => void;
-  loadFromDB: () => Promise<void>;
+  loadFromDB: () => Promise<number>;
   loadFromStrava: ({
     photos,
     before,
@@ -124,6 +124,7 @@ export const activitySlice: StateCreator<
         athlete_id: athlete?.providerAccountId,
       });
       set(setActivities(acts));
+      return acts.length;
     } catch (e) {
       console.error(e);
       throw new Error("Failed to fetch activities");
@@ -135,6 +136,15 @@ export const activitySlice: StateCreator<
     });
     try {
       const athlete = get().account;
+      console.log("getAct", {
+        get_photos: photos,
+        before,
+        ids,
+        access_token: athlete?.access_token
+          ? athlete?.access_token
+          : undefined,
+        athlete_id: athlete?.providerAccountId,
+      });
       const {activities: acts} = await getStravaActivities({
         get_photos: photos,
         before,
@@ -144,6 +154,7 @@ export const activitySlice: StateCreator<
           : undefined,
         athlete_id: athlete?.providerAccountId,
       });
+      console.log(acts);
       set(setActivities(acts));
       return acts.length;
     } catch (e) {

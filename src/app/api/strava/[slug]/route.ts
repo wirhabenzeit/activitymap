@@ -65,7 +65,7 @@ export async function POST(
       if (data.aspect_type === "delete") {
         await db
           .delete(activities)
-          .where(eq(activities.id, BigInt(data.object_id)));
+          .where(eq(activities.id, data.object_id));
         return new Response(
           `Deleted activity ${data.object_id}`
         );

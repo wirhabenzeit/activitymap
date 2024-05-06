@@ -11,6 +11,8 @@ import {decode} from "@mapbox/polyline";
 
 import {db} from "~/server/db";
 import {getAccount} from "~/auth";
+import {getTableColumns, sql} from "drizzle-orm";
+import {PgTable} from "drizzle-orm/pg-core";
 
 type Subscription = {
   id: number;
@@ -22,16 +24,11 @@ type Subscription = {
 };
 
 export type UpdatableActivity = {
-  id: BigInt;
+  id: number;
   athlete: number;
   name: string | null;
   description: string | null;
 };
-
-interface IDandLoc {
-  id: bigint;
-  location: number[] | null;
-}
 
 async function get(
   path: string,
@@ -233,7 +230,7 @@ function parseActivity(
 }
 
 function parsePhoto(
-  json: Record<string, unknown>,
+  json: Record<keyof Photo, unknown>,
   {location = null}: {location: number[] | null | undefined}
 ): Photo {
   const tableKeys = Object.keys(photos);
@@ -253,38 +250,73 @@ function parsePhoto(
 }
 
 export async function getPhotos(
-  idLocs: IDandLoc[] | IDandLoc,
+  locations: Record<number, [number, number] | null>,
   {
     token,
+    sizes = [2048],
   }: {
     token: string;
+    sizes: number[];
   }
 ): Promise<Photo[]> {
   try {
-    const idLocsArr = Array.isArray(idLocs)
-      ? idLocs
-      : [idLocs];
-    const promises = idLocsArr.map(({id}) =>
-      get(`activities/${id}/photos`, {token})
-    );
-    const activityPhotos = (await Promise.all(
-      promises
-    )) as Record<string, unknown>[][];
-    return activityPhotos
-      .map((x: Record<string, unknown>[], i): Photo[] =>
-        x.map(
-          (y: Record<string, unknown>): Photo =>
-            parsePhoto(y, {
-              location: idLocsArr[i]?.location,
-            })
+    const promises = sizes
+      .map((size) =>
+        Object.keys(locations).map((id) =>
+          get(
+            `activities/${id}/photos?size=${size}&photo_sources=true`,
+            {token}
+          )
         )
       )
       .flat();
+    const activityPhotos = (
+      await Promise.all(promises)
+    ).flat() as Record<keyof Photo, unknown>[];
+    const photoDictionary: Record<string, Photo> =
+      activityPhotos.reduce(
+        (acc: Record<string, Photo>, photo: Photo) => {
+          if (!acc[photo.unique_id])
+            acc[photo.unique_id] = parsePhoto(photo, {
+              location:
+                locations[photo.activity_id!] || null,
+            });
+          if (acc[photo.unique_id]) {
+            acc[photo.unique_id].sizes = {
+              ...acc[photo.unique_id].sizes,
+              ...photo.sizes,
+            };
+            acc[photo.unique_id].urls = {
+              ...acc[photo.unique_id].urls,
+              ...photo.urls,
+            };
+          }
+          return acc;
+        },
+        {} as Record<string, Photo>
+      );
+    return Object.values(photoDictionary);
   } catch (e) {
     console.error(e);
     throw new Error(`Failed to fetch photos`);
   }
 }
+
+const buildConflictUpdateColumns = <
+  T extends PgTable,
+  Q extends keyof T["_"]["columns"]
+>(
+  table: T,
+  filter: (column: string) => boolean = () => true
+) =>
+  Object.fromEntries(
+    Object.keys(getTableColumns(table))
+      .filter(filter)
+      .map((column) => [
+        column as Q,
+        sql.raw(`excluded.${column}`),
+      ])
+  );
 
 export async function getActivities({
   access_token,
@@ -294,8 +326,8 @@ export async function getActivities({
   page = 1,
   ids,
   per_page = 200,
-  after = undefined,
-  before = undefined,
+  after,
+  before,
 }: {
   access_token?: string;
   athlete_id?: number;
@@ -336,6 +368,7 @@ export async function getActivities({
           }).filter(([, v]) => v !== undefined)
         )
       );
+      console.log(params.toString());
       new_activities = (await get(
         `athlete/activities?${params.toString()}`,
         {token: access_token}
@@ -343,30 +376,53 @@ export async function getActivities({
     }
     const parsedActivities: Activity[] =
       new_activities.map(parseActivity);
-    console.log(parsedActivities);
     const new_photos: Photo[] = get_photos
       ? await getPhotos(
-          parsedActivities
-            .filter((x) => x.total_photo_count)
-            .map(({id, start_latlng: location}) => ({
-              id,
-              location,
-            })),
+          Object.fromEntries(
+            parsedActivities
+              .filter((x) => x.total_photo_count > 0)
+              .map(({id, start_latlng: location}) => [
+                id,
+                location,
+              ])
+          ),
           {
             token: access_token,
+            sizes: [256, 2048],
           }
         )
       : [];
     if (database) {
-      await db
+      const insertedActivities = await db
         .insert(activities)
         .values(parsedActivities)
-        .onConflictDoNothing();
-      if (new_photos.length > 0)
-        await db
-          .insert(photos)
-          .values(new_photos)
-          .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: activities.id,
+          set: buildConflictUpdateColumns(
+            activities,
+            (column) =>
+              ids != undefined ||
+              (column != "description" &&
+                column != "map" &&
+                column != "detailed_activity")
+          ),
+        })
+        .returning();
+      const insertedPhotos =
+        new_photos.length > 0
+          ? await db
+              .insert(photos)
+              .values(new_photos)
+              .onConflictDoUpdate({
+                target: [photos.unique_id],
+                set: buildConflictUpdateColumns(photos),
+              })
+              .returning()
+          : [];
+      return {
+        activities: insertedActivities,
+        photos: insertedPhotos,
+      };
     }
     return {
       activities: parsedActivities,

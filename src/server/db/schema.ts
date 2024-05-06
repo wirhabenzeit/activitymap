@@ -1,5 +1,6 @@
 import {
   index,
+  bigint,
   pgTable,
   text,
   primaryKey,
@@ -8,7 +9,6 @@ import {
   json,
   pgEnum,
   integer,
-  bigint,
   real,
 } from "drizzle-orm/pg-core";
 
@@ -174,7 +174,7 @@ const valueColumns = {
   elev_low: real("elev_low"),
   start_date_local_timestamp: bigint(
     "start_date_local_timestamp",
-    {mode: "bigint"}
+    {mode: "number"}
   ),
   achievement_count: integer("achievement_count"),
   kudos_count: integer("kudos_count"),
@@ -205,8 +205,8 @@ const booleanColumns = {
 export const activities = pgTable("activities", {
   ...valueColumns,
   ...booleanColumns,
-  id: bigint("id", {mode: "bigint"}).primaryKey().unique(),
-  upload_id: bigint("upload_id", {mode: "bigint"}),
+  id: bigint("id", {mode: "number"}).primaryKey().unique(),
+  upload_id: bigint("upload_id", {mode: "number"}),
   external_id: text("external_id"),
   athlete: integer("athlete")
     .references(() => accounts.providerAccountId, {
@@ -243,10 +243,10 @@ export const photos = pgTable("photos", {
     () => accounts.providerAccountId
   ),
   activity_id: bigint("activity_id", {
-    mode: "bigint",
+    mode: "number",
   }).references(() => activities.id),
   activity_name: text("activity_name"),
-  post_id: integer("post_id"),
+  post_id: bigint("post_id", {mode: "number"}),
   resource_state: integer("resource_state"),
   caption: text("caption"),
   type: integer("type"),
