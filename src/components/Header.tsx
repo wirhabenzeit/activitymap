@@ -142,18 +142,21 @@ export default function Header({
               component={Link}
               href="/map"
               key="/map"
+              sx={{minWidth: 50}}
             />
             <Tab
               label="List"
               component={Link}
               href="/list"
               key="/list"
+              sx={{minWidth: 50}}
             />
             <Tab
               label="Stats"
               component={Link}
               href={activeStatsTab}
               key="/stats"
+              style={{minWidth: 50}}
             />
           </Tabs>
         </Box>

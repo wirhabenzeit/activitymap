@@ -7,6 +7,7 @@ import theme from "../theme";
 import SideBar from "~/components/SideBar";
 import MainContainer from "~/components/MainContainer";
 import Header from "~/components/Header";
+import {DrawerHeader} from "~/components/Drawer";
 import {auth} from "~/auth";
 import {db} from "~/server/db";
 
@@ -50,8 +51,10 @@ export default async function RootLayout({
           <ThemeProvider theme={theme}>
             <Box
               sx={{
-                width: "100vw",
-                height: "100vh",
+                width: "100dvw",
+                height: "100dvh",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
               <CssBaseline />
@@ -61,14 +64,38 @@ export default async function RootLayout({
               />
               <Box
                 sx={{
-                  width: "100vw",
-                  height: "100vh",
+                  width: "100dvw",
+                  flexGrow: 1,
+                  display: "flex",
+                  flexDirection: "row",
                 }}
               >
                 <SideBar />
-                <MainContainer account={account}>
-                  {children}
-                </MainContainer>
+                <Box
+                  sx={{
+                    overflow: "hidden",
+                    flexGrow: 1,
+                    p: 0,
+                    height: "100dvh",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <DrawerHeader />
+                  <Box
+                    sx={{
+                      width: "100%",
+                      minHeight: 0,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      flexGrow: 1,
+                    }}
+                  >
+                    <MainContainer>
+                      {children}
+                    </MainContainer>
+                  </Box>
+                </Box>
               </Box>
             </Box>
           </ThemeProvider>

@@ -1,21 +1,8 @@
 "use client";
 
 import {useEffect} from "react";
-import {Box} from "@mui/material";
-import {styled} from "@mui/material/styles";
 import {useStore} from "~/contexts/Zustand";
 import type {Account} from "~/server/db/schema";
-import {geo} from "@observablehq/plot";
-
-const DrawerHeader = styled("div")(({theme}) => {
-  return {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    padding: theme.spacing(0, 1),
-    minHeight: theme.customValues.toolbarHeight,
-  };
-});
 
 export default function MainContainer({
   account,
@@ -25,14 +12,12 @@ export default function MainContainer({
   account?: Account;
 }) {
   const {
-    open,
     loadFromDB,
     updateFilters,
     setFilterRanges,
     setAccount,
     toggleUserSettings,
   } = useStore((state) => ({
-    open: state.drawerOpen,
     loadFromDB: state.loadFromDB,
     updateFilters: state.updateFilters,
     setFilterRanges: state.setFilterRanges,
@@ -65,31 +50,5 @@ export default function MainContainer({
     return unsub;
   }, []);
 
-  return (
-    <Box
-      sx={{
-        height: "100vh",
-        overflow: "hidden",
-        width: open
-          ? "calc(100vw - 250px)"
-          : "calc(100vw - 33px)",
-        p: 0,
-        left: open ? "250px" : "33px",
-        position: "fixed",
-      }}
-    >
-      <DrawerHeader sx={{flexGrow: 0}} />
-      <Box
-        sx={{
-          width: "100%",
-          height: "100%",
-          minHeight: 0,
-          minWidth: 0,
-          overflow: "hidden",
-        }}
-      >
-        {children}
-      </Box>
-    </Box>
-  );
+  return <>{children}</>;
 }

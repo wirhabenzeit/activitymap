@@ -123,10 +123,11 @@ export default function Stats({
       sx={{
         width: "100%",
         height: "100%",
-        maxHeight: "100%",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
+        flexWrap: "nowrap",
+        minHeight: 0,
       }}
     >
       <Box
@@ -176,12 +177,13 @@ export default function Stats({
           </IconButton>
         </Box>
       </Box>
-      <Box ref={elementRef} sx={{flexGrow: 1}}>
+      <Box
+        ref={elementRef}
+        sx={{flexGrow: 1, minHeight: 0, width: "100%"}}
+      >
         <StatsContext.Provider
           value={{
-            height: settingsOpen
-              ? state.height - 60
-              : state.height,
+            height: state.height,
             width: state.width,
             settingsRef,
           }}
@@ -199,12 +201,11 @@ export default function Stats({
           zIndex: 1,
           boxShadow: 1,
           borderColor: "divider",
-          flexShrink: 0,
           overflowY: "hidden",
           overflowX: "scroll",
           py: 1,
-          position: "absolute",
-          bottom: 0,
+          //position: "absolute",
+          //bottom: "0px",
         }}
       >
         <Stack

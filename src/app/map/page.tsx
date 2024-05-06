@@ -295,7 +295,7 @@ function Map() {
             );
           }
         }}
-        projection={{name: "mercator"}}
+        projection="globe"
         mapStyle={
           mapSettingBase.type === "vector"
             ? mapSettingBase.url
