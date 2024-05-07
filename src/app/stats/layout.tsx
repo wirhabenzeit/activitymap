@@ -3,8 +3,7 @@
 import React, {createContext, useState} from "react";
 import {useRef, useLayoutEffect, createRef} from "react";
 
-import {Tabs as MuiTabs, Stack} from "@mui/material";
-import {styled} from "@mui/material";
+import {Tabs as MuiTabs, Paper, Stack} from "@mui/material";
 import Tab from "@mui/material/Tab";
 import Box from "@mui/material/Box";
 
@@ -26,8 +25,6 @@ const defaultStatsContext = {
 };
 
 const StatsContext = createContext(defaultStatsContext);
-
-const tabHeight = 36;
 
 const tabs = {
   "/stats/timeline": {
@@ -191,7 +188,7 @@ export default function Stats({
           {children}
         </StatsContext.Provider>
       </Box>
-      <Box
+      <Paper
         sx={{
           width: "100%",
           backgroundColor: "background.paper",
@@ -203,22 +200,21 @@ export default function Stats({
           borderColor: "divider",
           overflowY: "hidden",
           overflowX: "scroll",
-          py: 1,
-          //position: "absolute",
-          //bottom: "0px",
         }}
       >
         <Stack
           style={{
-            minWidth: "min-content",
+            minWidth: "max-content",
           }}
           direction="row"
           justifyContent="space-evenly"
           alignItems="center"
           spacing={2}
+          flexWrap={"nowrap"}
           ref={settingsRef}
+          sx={{m: 1}}
         ></Stack>
-      </Box>
+      </Paper>
     </Box>
   );
 }

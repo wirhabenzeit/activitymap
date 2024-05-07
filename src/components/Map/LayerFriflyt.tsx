@@ -25,7 +25,6 @@ import {
   KeyboardArrowLeft,
   KeyboardArrowRight,
   Straighten as DistanceIcon,
-  Copyright as CopyrightIcon,
   Link as LinkIcon,
   Download as DownloadIcon,
 } from "@mui/icons-material";

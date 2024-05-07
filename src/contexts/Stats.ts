@@ -63,14 +63,15 @@ export const statsSlice: StateCreator<
   },
   progress: {
     value: progressSettings.values.elevation,
+    by: progressSettings.by.year,
   },
   setCalendar: (val) =>
     set((state) => {
       state.calendar.value = val;
     }),
-  setProgress: (val) =>
+  setProgress: (prog) =>
     set((state) => {
-      state.progress.value = val;
+      state.progress = prog;
     }),
   setTimeline: ({
     value,

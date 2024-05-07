@@ -233,7 +233,7 @@ export default function CalendarPlot() {
       marginTop: 15,
     });
     Object.assign(legend, {
-      style: `height: 40px; overflow: scroll; min-width: 300px; margin: 0px;`,
+      style: `min-height: 0; display: block;`,
     });
     figureRef.current.append(plot);
     settingsRef.current.append(legend);

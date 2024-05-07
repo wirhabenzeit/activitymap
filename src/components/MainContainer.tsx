@@ -28,7 +28,6 @@ export default function MainContainer({
   }));
 
   useEffect(() => {
-    console.log("MainContainer useEffect", account);
     if (account) setAccount(account);
     async function load() {
       const nActivities = await loadFromDB();

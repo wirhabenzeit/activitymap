@@ -175,7 +175,7 @@ export default function ScatterPlot() {
       label: scatter.size.label,
     });
     Object.assign(legend, {
-      style: `height: 40px; overflow: scroll; min-width: 100px; margin: 0px;`,
+      style: `display: block; `,
     });
     figureRef.current.append(plot);
     settingsRef.current.append(legend);

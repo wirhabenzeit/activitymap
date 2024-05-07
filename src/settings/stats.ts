@@ -306,4 +306,42 @@ export const progressSettings = {
       unit: "h",
     },
   },
+  by: {
+    year: {
+      id: "year",
+      label: "Year",
+      tick: d3.utcYear,
+      legendFormat: "%Y",
+      tickFormat: "%b",
+      nTicks: 6,
+      domain: [
+        new Date("2024-01-01"),
+        new Date("2024-12-31 23:59:59"),
+      ],
+    },
+    month: {
+      id: "month",
+      label: "Month",
+      tick: d3.utcMonth,
+      legendFormat: "%b %Y",
+      tickFormat: "%d",
+      nTicks: 6,
+      domain: [
+        new Date("2024-01-01"),
+        new Date("2024-01-31 23:59:59"),
+      ],
+    },
+    week: {
+      id: "week",
+      label: "Week",
+      tick: d3.timeMonday,
+      tickFormat: "%a",
+      nTicks: 7,
+      legendFormat: "%Y-%m-%d",
+      domain: [
+        new Date("2024-01-01"),
+        new Date("2024-01-07 23:59:59"),
+      ],
+    },
+  },
 };

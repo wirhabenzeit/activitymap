@@ -36,7 +36,6 @@ export function CustomSelect({
         id={propName}
         value={value.id}
         label={name}
-        sx={{minWidth: "100px"}}
         onChange={(event: SelectChangeEvent) => {
           const value = options[event.target.value];
           if (value && value != undefined) setState(value);

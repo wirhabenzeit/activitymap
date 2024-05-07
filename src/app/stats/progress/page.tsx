@@ -1,5 +1,6 @@
 "use client";
 
+import type {Activity} from "~/server/db/schema";
 import React, {useRef, useEffect, useContext} from "react";
 import {StatsContext} from "../layout";
 import {createPortal} from "react-dom";
@@ -15,7 +16,119 @@ import {progressSettings} from "~/settings/stats";
 
 import {useStore} from "~/contexts/Zustand";
 
-const cumData = ({activities, key, keyName, value}) => {
+export default function ProgressPlot() {
+  const {width, height, settingsRef} =
+    useContext(StatsContext);
+  const {loaded, progress, activityDict, setProgress} =
+    useStore((state) => ({
+      loaded: state.loaded,
+      progress: state.progress,
+      setProgress: state.setProgress,
+      activityDict: state.activityDict,
+    }));
+  const figureRef = useRef(null);
+
+  const plotWidth = width;
+  const plotHeight = height;
+
+  useEffect(() => {
+    if (!loaded) return;
+
+    const plot = progressPlot({
+      activities: Object.values(activityDict),
+      height: plotHeight,
+      width: plotWidth,
+      value: progress.value.fun,
+      valueName: progress.value.label,
+      valueFormat: progress.value.format,
+      unit: progress.value.unit,
+      scaleTickName: progress.by.label,
+      key: progress.by.tick,
+      scaleTick: d3.timeFormat(progress.by.legendFormat),
+      tick: d3.timeFormat(progress.by.tickFormat),
+      domain: progress.by.domain,
+      nTicks: progress.by.nTicks,
+    });
+
+    Object.assign(plot, {
+      style: `margin: 0; width: ${plotWidth}px;`,
+    });
+
+    figureRef.current.append(plot);
+    const legend = plot.legend("color", {
+      width: 300,
+      height: 40,
+      marginLeft: 10,
+      marginRight: 10,
+      marginBottom: 20,
+      marginTop: 15,
+    });
+    Object.assign(legend, {
+      style: `min-height: 0; display: block;`,
+    });
+    settingsRef.current.append(legend);
+
+    return () => {
+      plot.remove();
+      legend.remove();
+    };
+  }, [width, height, activityDict, progress]);
+
+  return (
+    <>
+      <Box
+        sx={{
+          height: height,
+          width: width,
+          overflowY: "scroll",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <div ref={figureRef} />
+      </Box>
+      {settingsRef.current &&
+        createPortal(
+          <>
+            <CustomSelect
+              key="by"
+              propName="by"
+              value={progress.by}
+              name="By"
+              options={progressSettings.by}
+              setState={(x) =>
+                setProgress({...progress, by: x})
+              }
+            />
+            ,
+            <CustomSelect
+              key="value"
+              propName="value"
+              value={progress.value}
+              name="Value"
+              options={progressSettings.values}
+              setState={(x) =>
+                setProgress({...progress, value: x})
+              }
+            />
+          </>,
+          settingsRef.current
+        )}
+    </>
+  );
+}
+
+const cumData = ({
+  activities,
+  key,
+  keyName,
+  value,
+}: {
+  activities: Activity;
+  key: unknown;
+  keyName: string;
+  value: unknown;
+}) => {
   const cumulative = d3
     .groups(activities, (x) =>
       key(new Date(x.start_date_local))
@@ -23,9 +136,10 @@ const cumData = ({activities, key, keyName, value}) => {
     .flatMap(([dateKey, acts]) => {
       acts = acts.sort(
         (a, b) =>
-          a.start_date_local_timetamp -
-          b.start_date_local_timetamp
+          a.start_date_local_timestamp -
+          b.start_date_local_timestamp
       );
+      console.log(acts);
       const cumsum = d3.cumsum(acts, value);
       return d3.zip(acts, cumsum).map(([act, sum]) => ({
         ...act,
@@ -45,15 +159,16 @@ const progressPlot = ({
   activities,
   width,
   height,
-  key = d3.utcYear,
-  tick = d3.timeFormat("%b"),
-  scaleTick = d3.timeFormat("%Y"),
-  scaleTickName = "Year",
-  domain = [new Date("2024-01-01"), new Date("2024-12-31")],
+  key,
+  tick,
+  scaleTick,
+  scaleTickName,
+  domain,
   value,
-  valueName = "",
-  valueFormat = (x) => x,
-  unit = "",
+  valueName,
+  valueFormat,
+  unit,
+  nTicks,
   ...options
 }) => {
   var data = cumData({
@@ -102,8 +217,8 @@ const progressPlot = ({
 
   return Plot.plot({
     ...options,
-    marginLeft: 80,
     marginRight: 60,
+    marginTop: 30,
     width,
     height,
     grid: true,
@@ -116,6 +231,7 @@ const progressPlot = ({
       domain,
       label: null,
       labelAnchor: "left",
+      ticks: nTicks,
     },
     y: {
       axis: "right",
@@ -126,7 +242,7 @@ const progressPlot = ({
     color: {
       type: "categorical",
       //scheme: "Blues",
-      legend: true,
+      legend: false,
       tickFormat: scaleTick,
     },
     marks: [
@@ -141,7 +257,7 @@ const progressPlot = ({
         strokeWidth: 5,
       }),
       Plot.line(data, {
-        stroke: (x) => key(x.start_date_local),
+        //stroke: (x) => key(x.start_date_local),
         ...map,
         curve: "step-after",
       }),
@@ -173,116 +289,3 @@ const progressPlot = ({
     ],
   });
 };
-
-export default function ProgressPlot() {
-  const {width, height, settingsRef} =
-    useContext(StatsContext);
-  const {loaded, progress, activityDict, setProgress} =
-    useStore((state) => ({
-      loaded: state.loaded,
-      progress: state.progress,
-      setProgress: state.setProgress,
-      activityDict: state.activityDict,
-    }));
-  const figureRef = useRef(null);
-  const figureRef2 = useRef(null);
-
-  const plotWidth = 0.9 * width;
-  const plotHeight = 0.87 * height;
-
-  useEffect(() => {
-    if (!loaded) return;
-
-    const commonSettings = {
-      activities: Object.values(activityDict),
-      height: plotHeight,
-      width: plotWidth,
-      value: progress.value.fun,
-      valueName: progress.value.label,
-      valueFormat: progress.value.format,
-      unit: progress.value.unit,
-    };
-
-    const yearPlot = progressPlot({
-      ...commonSettings,
-      scaleTickName: "Year",
-      key: d3.utcYear,
-      scaleTick: d3.timeFormat("%Y"),
-      tick: d3.timeFormat("%b"),
-      domain: [
-        new Date("2024-01-01"),
-        new Date("2024-12-31 23:59:59"),
-      ],
-      title: "Yearly Progress",
-    });
-
-    const monthPlot = progressPlot({
-      ...commonSettings,
-      scaleTickName: "Month",
-      key: d3.utcMonth,
-      scaleTick: d3.timeFormat("%b"),
-      tick: d3.timeFormat("%d"),
-      domain: [
-        new Date("2024-01-01"),
-        new Date("2024-01-31 23:59:59"),
-      ],
-      title: "Monthly Progress",
-    });
-
-    Object.assign(yearPlot, {
-      style: `margin: 0; width: ${plotWidth}px;`,
-    });
-
-    Object.assign(monthPlot, {
-      style: `margin: 0; width: ${plotWidth}px;`,
-    });
-
-    figureRef.current.append(yearPlot);
-    figureRef2.current.append(monthPlot);
-    return () => {
-      yearPlot.remove();
-      monthPlot.remove();
-    };
-  }, [width, height, activityDict, progress]);
-
-  return (
-    <>
-      <Box
-        sx={{
-          height: height,
-          width: width,
-          overflow: "scroll",
-        }}
-      >
-        <div
-          ref={figureRef}
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            width: "100%",
-          }}
-        />
-        <div
-          ref={figureRef2}
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            width: "100%",
-          }}
-        />
-      </Box>
-      {settingsRef.current &&
-        createPortal(
-          <CustomSelect
-            key="value"
-            propName="value"
-            value={progress.value}
-            name="Value"
-            options={progressSettings.values}
-            setState={setProgress}
-          />,
-          settingsRef.current
-        )}
-    </>
-  );
-}
