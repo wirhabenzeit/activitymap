@@ -313,6 +313,8 @@ export const progressSettings = {
       tick: d3.utcYear,
       legendFormat: "%Y",
       tickFormat: "%b",
+      curve: "step-after",
+      dots: false,
       nTicks: 6,
       domain: [
         new Date("2024-01-01"),
@@ -325,6 +327,8 @@ export const progressSettings = {
       tick: d3.utcMonth,
       legendFormat: "%b %Y",
       tickFormat: "%d",
+      curve: "basis",
+      dots: true,
       nTicks: 6,
       domain: [
         new Date("2024-01-01"),
@@ -336,6 +340,8 @@ export const progressSettings = {
       label: "Week",
       tick: d3.timeMonday,
       tickFormat: "%a",
+      curve: "basis",
+      dots: true.valueOf,
       nTicks: 7,
       legendFormat: "%Y-%m-%d",
       domain: [

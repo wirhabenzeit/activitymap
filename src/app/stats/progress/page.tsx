@@ -35,6 +35,7 @@ export default function ProgressPlot() {
     if (!loaded) return;
 
     const plot = progressPlot({
+      dots: progress.by.dots,
       activities: Object.values(activityDict),
       height: plotHeight,
       width: plotWidth,
@@ -48,6 +49,7 @@ export default function ProgressPlot() {
       tick: d3.timeFormat(progress.by.tickFormat),
       domain: progress.by.domain,
       nTicks: progress.by.nTicks,
+      curve: progress.by.curve,
     });
 
     Object.assign(plot, {
@@ -100,7 +102,6 @@ export default function ProgressPlot() {
                 setProgress({...progress, by: x})
               }
             />
-            ,
             <CustomSelect
               key="value"
               propName="value"
@@ -139,24 +140,32 @@ const cumData = ({
           a.start_date_local_timestamp -
           b.start_date_local_timestamp
       );
-      console.log(acts);
       const cumsum = d3.cumsum(acts, value);
-      return d3.zip(acts, cumsum).map(([act, sum]) => ({
-        ...act,
-        [keyName]: dateKey,
-        cumsum: sum,
-      }));
-    })
-    .sort(
+      return [
+        {
+          start_date_local: key(acts[0].start_date_local),
+          [keyName]: dateKey,
+          cumsum: 0,
+        },
+        ...d3.zip(acts, cumsum).map(([act, sum]) => ({
+          ...act,
+          [keyName]: dateKey,
+          cumsum: sum,
+        })),
+      ];
+    });
+  /*.sort(
       (a, b) =>
         a.start_date_local_timestamp -
         b.start_date_local_timestamp
-    );
+    );*/
+  console.log(cumulative);
   return cumulative;
 };
 
 const progressPlot = ({
   activities,
+  dots,
   width,
   height,
   key,
@@ -169,6 +178,7 @@ const progressPlot = ({
   valueFormat,
   unit,
   nTicks,
+  curve,
   ...options
 }) => {
   var data = cumData({
@@ -247,7 +257,7 @@ const progressPlot = ({
     },
     marks: [
       Plot.frame(),
-      Plot.line(domain, {
+      /*Plot.line(domain, {
         x: Plot.identity,
         y: (x) =>
           (x.getTime() - domain[0].getTime()) * reg.slope +
@@ -255,12 +265,19 @@ const progressPlot = ({
         opacity: 0.1,
         stroke: (x) => key(domain[0]),
         strokeWidth: 5,
-      }),
+      }),*/
       Plot.line(data, {
         //stroke: (x) => key(x.start_date_local),
         ...map,
-        curve: "step-after",
+        curve: curve,
       }),
+      ...(dots
+        ? [
+            Plot.dot(data, {
+              ...map,
+            }),
+          ]
+        : []),
       Plot.tip(
         data,
         Plot.pointer({
