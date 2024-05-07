@@ -257,7 +257,7 @@ export const photos = pgTable("photos", {
   urls: json("urls"),
   sizes: json("sizes"),
   default_photo: boolean("default_photo"),
-  location: json("location").$type<number[]>(),
+  location: json("location").$type<[number, number]>(),
 });
 
 export type Activity = typeof activities.$inferSelect;

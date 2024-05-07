@@ -1,4 +1,7 @@
-import { Point } from "mapbox-gl";
+"use client";
+
+import {MapMouseEvent, Point, PointLike} from "mapbox-gl";
+import {MapContextValue} from "react-map-gl/dist/esm/components/map";
 
 const styles = `
 .boxdraw {
@@ -13,71 +16,111 @@ const styles = `
 `;
 
 export class SelectionControl {
-  constructor(props) {
+  layers: string[];
+  source: string;
+  selectionHandler: (
+    ids: (number | string | undefined)[]
+  ) => void;
+  context: MapContextValue;
+  canvas?: HTMLElement;
+  map?: mapboxgl.Map;
+  start?: Point;
+  current?: Point;
+  box?: HTMLDivElement;
+  rect?: DOMRect;
+  _container: HTMLElement;
+
+  constructor({
+    layers,
+    source,
+    selectionHandler,
+    context,
+  }: {
+    layers: string[];
+    source: string;
+    selectionHandler: (
+      ids: (number | string | undefined)[]
+    ) => void;
+    context: MapContextValue;
+  }) {
     const styleSheet = document.createElement("style");
     styleSheet.innerText = styles;
     document.head.appendChild(styleSheet);
 
-    this.mapRef = props.mapRef;
-    this.canvas;
-    this.layers = props.layers;
-    this.source = props.source;
-    this.selectionHandler = props.selectionHandler;
-    this.start;
-    this.current;
-    this.box = null;
+    this.layers = layers;
+    this.source = source;
+    this.selectionHandler = selectionHandler;
+    this.context = context;
+    this._container = document.createElement("div");
   }
 
   onChange() {
     return;
   }
 
-  onAdd(map) {
-    this.canvas = this.mapRef.current.getCanvasContainer();
-    this._container = document.createElement("div");
-
-    map.on("click", (e) => {
-      const bbox = [
-        [e.point.x - 5, e.point.y - 5],
-        [e.point.x + 5, e.point.y + 5],
-      ];
-      const selectedFeatures = map.queryRenderedFeatures(bbox, {
-        layers: this.layers,
-      });
-      this.selectionHandler(selectedFeatures.map((feature) => feature.id));
-    });
-
-    this.canvas.addEventListener("mousedown", this.mouseDown, true);
-    return this._container;
-  }
-
-  mousePos = (e) => {
-    const rect = this.canvas.getBoundingClientRect();
+  mousePos = (e: MapMouseEvent) => {
+    if (!this.rect || !this.canvas) return new Point(0, 0);
     return new Point(
-      e.clientX - rect.left - this.canvas.clientLeft,
-      e.clientY - rect.top - this.canvas.clientTop
+      e.originalEvent.clientX -
+        this.rect.left -
+        this.canvas.clientLeft,
+      e.originalEvent.clientY -
+        this.rect.top -
+        this.canvas.clientTop
     );
   };
 
-  mouseDown = (e) => {
-    if (!(e.shiftKey && e.button === 0)) return;
+  click = (e: MapMouseEvent) => {
+    if (!this.map) return;
 
-    this.mapRef.current.getMap().dragPan.disable();
+    const bbox: [PointLike, PointLike] = [
+      [e.point.x - 5, e.point.y - 5],
+      [e.point.x + 5, e.point.y + 5],
+    ];
+    const selectedFeatures = this.map.queryRenderedFeatures(
+      bbox,
+      {
+        layers: this.layers,
+      }
+    );
+    this.selectionHandler(
+      selectedFeatures.map((feature) => feature.id)
+    );
+  };
 
-    document.addEventListener("mousemove", this.onMouseMove);
-    document.addEventListener("mouseup", this.onMouseUp);
-    document.addEventListener("keydown", this.onKeyDown);
+  onAdd(map: mapboxgl.Map) {
+    this.map = map;
+    this.canvas = map.getCanvasContainer();
+    this.rect = this.canvas.getBoundingClientRect();
 
+    map.on("mousedown", this.mouseDown);
+    map.on("click", this.click);
+
+    return this._container;
+  }
+
+  mouseDown = (e: MapMouseEvent) => {
+    if (
+      !(
+        e.originalEvent.shiftKey &&
+        e.originalEvent.button === 0
+      )
+    )
+      return;
+
+    this.map?.dragPan.disable();
+    this.map?.on("mousemove", this.onMouseMove);
+    this.map?.on("mouseup", this.onMouseUp);
     this.start = this.mousePos(e);
   };
 
-  onMouseMove = (e) => {
+  onMouseMove = (e: MapMouseEvent) => {
     this.current = this.mousePos(e);
 
     if (!this.box) {
       this.box = document.createElement("div");
       this.box.classList.add("boxdraw");
-      this.canvas.appendChild(this.box);
+      this.canvas?.appendChild(this.box);
     }
 
     const minX = Math.min(this.start.x, this.current.x),
@@ -85,43 +128,45 @@ export class SelectionControl {
       minY = Math.min(this.start.y, this.current.y),
       maxY = Math.max(this.start.y, this.current.y);
 
-    // Adjust width and xy position of the box element ongoing
     const pos = `translate(${minX}px, ${minY}px)`;
     this.box.style.transform = pos;
     this.box.style.width = maxX - minX + "px";
     this.box.style.height = maxY - minY + "px";
   };
 
-  onMouseUp = (e) => {
+  onMouseUp = (e: MapMouseEvent) => {
     this.finish([this.start, this.mousePos(e)]);
   };
 
-  onKeyDown = (e) => {
-    if (e.keyCode === 27) finish();
-  };
-
-  finish = (bbox) => {
+  finish = (bbox: [PointLike, PointLike]) => {
     // Remove these events now that finish has been called.
-    document.removeEventListener("mousemove", this.onMouseMove);
-    document.removeEventListener("keydown", this.onKeyDown);
-    document.removeEventListener("mouseup", this.onMouseUp);
+    this.map?.off("mousemove", this.onMouseMove);
+    this.map?.off("mouseup", this.onMouseUp);
 
-    if (this.box) {
+    if (this.box && this.box.parentNode) {
       this.box.parentNode.removeChild(this.box);
-      this.box = null;
+      this.box = undefined;
     }
 
     // If bbox exists. use this value as the argument for `queryRenderedFeatures`
     if (bbox) {
-      const selectedFeatures = this.mapRef.current.queryRenderedFeatures(bbox, {
-        layers: this.layers,
-      });
-      this.selectionHandler(selectedFeatures.map((feature) => feature.id));
+      const selectedFeatures =
+        this.map?.queryRenderedFeatures(bbox, {
+          layers: this.layers,
+        });
+      this.selectionHandler(
+        selectedFeatures.map((feature) => feature.id)
+      );
     }
-    this.mapRef.current.getMap().dragPan.enable();
+    this.map?.dragPan.enable();
   };
 
-  onRemove() {
-    this._container.parentNode.removeChild(this._container);
+  onRemove(map: mapboxgl.Map) {
+    console.log("onRemove", map);
+    map.off("mousedown", this.mouseDown);
+    map.off("click", this.click);
+    this._container.parentNode?.removeChild(
+      this._container
+    );
   }
 }

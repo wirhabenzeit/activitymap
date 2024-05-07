@@ -126,7 +126,7 @@ export default function List() {
       });
     };
     return (
-      <GridToolbarContainer>
+      <GridToolbarContainer sx={{flexWrap: "nowrap"}}>
         <rootProps.slots.baseButton
           disabled={selected.length === 0}
           id="selectedOnly"

@@ -91,7 +91,7 @@ export default async function RootLayout({
                       flexGrow: 1,
                     }}
                   >
-                    <MainContainer>
+                    <MainContainer account={account}>
                       {children}
                     </MainContainer>
                   </Box>

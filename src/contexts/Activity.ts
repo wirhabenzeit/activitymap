@@ -1,4 +1,8 @@
-import type {Account, Activity} from "~/server/db/schema";
+import type {
+  Account,
+  Activity,
+  Photo,
+} from "~/server/db/schema";
 import type {StateCreator} from "zustand";
 import {decode} from "@mapbox/polyline";
 import type {TotalZustand} from "./Zustand";
@@ -7,9 +11,11 @@ import {
   type Feature,
 } from "geojson";
 
-import {getActivities as getDBActivities} from "~/server/db/actions";
 import {
-  UpdatableActivity,
+  getActivities as getDBActivities,
+  getPhotos,
+} from "~/server/db/actions";
+import {
   getActivities as getStravaActivities,
   updateActivity as updateStravaActivity,
 } from "~/server/strava/actions";
@@ -40,8 +46,10 @@ export type ActivityZustand = {
   geoJson: FeatureCollection;
   loading: boolean;
   loaded: boolean;
+  photos: Photo[];
   account?: Account;
   setAccount: (acc: Account) => void;
+  loadPhotos: () => Promise<void>;
   updateActivity: (act: Activity) => Promise<Activity>;
   setLoading: (x: boolean) => void;
   loadFromDB: () => Promise<number>;
@@ -78,12 +86,22 @@ export const activitySlice: StateCreator<
   ActivityZustand
 > = (set, get) => ({
   activityDict: {},
+  photos: [],
   geoJson: {
     type: "FeatureCollection",
     features: [],
   },
   loading: true,
   loaded: false,
+  loadPhotos: async () => {
+    const athlete = get().account;
+    const photos = await getPhotos(
+      athlete?.providerAccountId
+    );
+    set((state) => {
+      state.photos = photos;
+    });
+  },
   setAccount: (account: Account) =>
     set((state) => {
       state.account = account;
@@ -141,6 +159,7 @@ export const activitySlice: StateCreator<
     });
     try {
       const athlete = get().account;
+      console.log("getAct", get().account);
       console.log("getAct", {
         get_photos: photos,
         before,

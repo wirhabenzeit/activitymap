@@ -2,7 +2,7 @@
 
 import {inArray, eq} from "drizzle-orm";
 import {auth} from "~/auth";
-import {type Activity, activities} from "./schema";
+import {type Activity, activities, photos} from "./schema";
 import {db} from "./index";
 import {getAccount} from "~/auth";
 
@@ -36,4 +36,12 @@ export async function getActivities({
       .where(eq(activities.athlete, athlete_id));
   }
   return acts;
+}
+
+export async function getPhotos(athlete_id: number) {
+  const phts = await db
+    .select()
+    .from(photos)
+    .where(eq(photos.athlete_id, athlete_id));
+  return phts;
 }

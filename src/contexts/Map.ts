@@ -17,6 +17,8 @@ export type MapZustand = {
   position: ViewState;
   bbox: LngLatBoundsLike;
   threeDim: boolean;
+  showPhotos: boolean;
+  togglePhotos: () => void;
   setBaseMap: (key: keyof typeof mapSettings) => void;
   toggleOverlayMap: (key: keyof typeof mapSettings) => void;
   toggleThreeDim: () => void;
@@ -41,6 +43,11 @@ export const mapSlice: StateCreator<
   position: defaultMapPosition,
   bbox: defaultMapBounds,
   threeDim: false,
+  showPhotos: false,
+  togglePhotos: () =>
+    set((state) => {
+      state.showPhotos = !state.showPhotos;
+    }),
   setBaseMap: (key) =>
     set((state) => {
       state.baseMap = key;

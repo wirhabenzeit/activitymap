@@ -1,8 +1,4 @@
-import {
-  useState,
-  type MutableRefObject,
-  type MouseEvent,
-} from "react";
+import {useState, type MouseEvent} from "react";
 import {
   MenuItem,
   Box,
@@ -19,20 +15,13 @@ import {
   Check as CheckIcon,
   ThreeDRotation as ThreeDimIcon,
 } from "@mui/icons-material";
-import type {SxProps, Theme} from "@mui/material/styles";
 
 import {useStore} from "~/contexts/Zustand";
 
 import {mapSettings} from "~/settings/map";
-import {type MapRef} from "react-map-gl";
+import {useMap} from "react-map-gl";
 
-export function LayerSwitcher({
-  sx,
-  mapRef,
-}: {
-  sx: SxProps<Theme>;
-  mapRef: MutableRefObject<MapRef | null>;
-}) {
+export function LayerSwitcher() {
   const {
     threeDim,
     toggleThreeDim,
@@ -49,7 +38,9 @@ export function LayerSwitcher({
     setBaseMap: state.setBaseMap,
   }));
 
-  const [anchorEl, setAnchorEl] = useState(null);
+  const map = useMap();
+  const [anchorEl, setAnchorEl] =
+    useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const handleClick = (
     event: MouseEvent<HTMLAnchorElement, MouseEvent>
@@ -67,24 +58,28 @@ export function LayerSwitcher({
           p: 0,
           width: "30px",
           borderRadius: 1,
-          ...sx,
         }}
         elevation={1}
       >
-        <IconButton onClick={handleClick} sx={{p: "3px"}}>
-          <MapIcon fontSize="medium" />
+        <IconButton
+          onClick={(event) =>
+            setAnchorEl(event.currentTarget)
+          }
+          sx={{p: "3px"}}
+        >
+          <MapIcon fontSize="small" />
         </IconButton>
         <Divider />
         <IconButton
           sx={{p: "3px"}}
           onClick={() => {
             if (threeDim)
-              mapRef.current?.easeTo({
+              map.current?.easeTo({
                 pitch: 0,
                 duration: 1000,
               });
             else
-              mapRef.current?.easeTo({
+              map.current?.easeTo({
                 pitch: 60,
                 duration: 1000,
               });
@@ -92,7 +87,7 @@ export function LayerSwitcher({
           }}
         >
           <ThreeDimIcon
-            fontSize="medium"
+            fontSize="small"
             color={threeDim ? "primary" : "disabled"}
           />
         </IconButton>

@@ -9,7 +9,7 @@ import {
   createRef,
 } from "react";
 
-import {Paper} from "@mui/material";
+import {IconButton, Paper} from "@mui/material";
 import {DataGrid} from "@mui/x-data-grid";
 import {useTheme} from "@mui/material/styles";
 
@@ -22,7 +22,11 @@ import ReactMapGL, {
   Source,
   type ControlPosition,
   type MapRef,
+  useMap,
 } from "react-map-gl";
+
+import Overlay from "~/components/Map/Overlay";
+
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import {useStore} from "~/contexts/Zustand";
@@ -38,21 +42,28 @@ import {DownloadControl} from "~/components/Map/DownloadControl";
 import {SelectionControl} from "~/components/Map/SelectionControl";
 import {LayerSwitcher} from "~/components/Map/LayerSwitcher";
 import type {Activity} from "~/server/db/schema";
+import {MapContextValue} from "react-map-gl/dist/esm/components/map";
+import PhotoLayer from "~/components/Map/Photo";
+import {
+  Camera,
+  CameraAlt,
+  CameraFront,
+} from "@mui/icons-material";
 
 function Download({position}: {position: ControlPosition}) {
   useControl(() => new DownloadControl(), {position});
   return null;
 }
 
-function Selection({mapRef}: {mapRef: RefObject<MapRef>}) {
+function Selection() {
   const {setSelected} = useStore((state) => ({
     setSelected: state.setSelected,
   }));
 
   useControl(
-    () =>
+    (context: MapContextValue) =>
       new SelectionControl({
-        mapRef: mapRef,
+        context,
         layers: ["routeLayerBG", "routeLayerBGsel"],
         source: "routeSource",
         selectionHandler: (sel: number[]) => {
@@ -193,6 +204,9 @@ function Map() {
     mapPosition,
     setPosition,
     updateActivity,
+    threeDim,
+    showPhotos,
+    togglePhotos,
   } = useStore((state) => ({
     selected: state.selected,
     setHighlighted: state.setHighlighted,
@@ -205,33 +219,15 @@ function Map() {
     mapPosition: state.position,
     setPosition: state.setPosition,
     updateActivity: state.updateActivity,
+    threeDim: state.threeDim,
+    showPhotos: state.showPhotos,
+    togglePhotos: state.togglePhotos,
   }));
 
   const mapRefLoc = createRef<MapRef>();
 
   const loaded = useStore((state) => state.loaded);
   const [viewport, setViewport] = useState(mapPosition);
-
-  const controls = useMemo(
-    () => (
-      <>
-        <NavigationControl position="top-right" />
-        <GeolocateControl position="top-right" />
-        <FullscreenControl position="top-right" />
-        <Download position="top-right" />
-        <Selection mapRef={mapRefLoc} />
-        <LayerSwitcher
-          sx={{
-            position: "absolute",
-            top: 10,
-            left: 10,
-          }}
-          mapRef={mapRefLoc}
-        />
-      </>
-    ),
-    [mapRefLoc]
-  );
 
   const overlayMaps = useMemo(
     () => (
@@ -281,7 +277,7 @@ function Map() {
   return (
     <>
       <ReactMapGL
-        reuseMaps
+        reuseMaps={true}
         ref={mapRefLoc}
         styleDiffing={false}
         boxZoom={false}
@@ -301,6 +297,10 @@ function Map() {
             ? mapSettingBase.url
             : undefined
         }
+        terrain={{
+          source: "mapbox-dem",
+          exaggeration: threeDim ? 1.5 : 0,
+        }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={
@@ -327,9 +327,44 @@ function Map() {
               />
             </Source>
           )}
-        {controls}
+        <Source
+          id="mapbox-dem"
+          type="raster-dem"
+          url="mapbox://mapbox.mapbox-terrain-dem-v1"
+          tileSize={512}
+          maxzoom={14}
+        />
+        <NavigationControl position="top-right" />
+        <GeolocateControl position="top-right" />
+        <FullscreenControl position="top-right" />
+        <Download position="top-right" />
+        <Selection />
+        <Overlay position="top-left">
+          <LayerSwitcher />
+        </Overlay>
+        <Overlay position="top-left">
+          <Paper
+            sx={{
+              p: 0,
+              width: "30px",
+              borderRadius: 1,
+            }}
+            elevation={1}
+          >
+            <IconButton
+              onClick={togglePhotos}
+              sx={{p: "3px"}}
+            >
+              <CameraAlt
+                fontSize="small"
+                color={showPhotos ? "primary" : "inherit"}
+              />
+            </IconButton>
+          </Paper>
+        </Overlay>
         {overlayMaps}
         {loaded && <RouteLayer />}
+        {loaded && showPhotos && <PhotoLayer />}
       </ReactMapGL>
       <Paper
         elevation={3}
@@ -367,13 +402,9 @@ function Map() {
           processRowUpdate={async (
             updatedRow: Activity
           ) => {
-            const verifiedActivity = await updateActivity({
-              ...updatedRow,
-              name: updateActivity.name.name,
-            });
-            console.log(
-              "Returning activity",
-              verifiedActivity
+            console.log("Updating activity", updatedRow);
+            const verifiedActivity = await updateActivity(
+              updatedRow
             );
             return verifiedActivity;
           }}

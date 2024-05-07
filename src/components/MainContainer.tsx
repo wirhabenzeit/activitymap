@@ -13,6 +13,7 @@ export default function MainContainer({
 }) {
   const {
     loadFromDB,
+    loadPhotos,
     updateFilters,
     setFilterRanges,
     setAccount,
@@ -23,12 +24,15 @@ export default function MainContainer({
     setFilterRanges: state.setFilterRanges,
     setAccount: state.setAccount,
     toggleUserSettings: state.toggleUserSettings,
+    loadPhotos: state.loadPhotos,
   }));
 
   useEffect(() => {
+    console.log("MainContainer useEffect", account);
     if (account) setAccount(account);
     async function load() {
       const nActivities = await loadFromDB();
+      await loadPhotos();
       if (nActivities === 0) toggleUserSettings();
     }
     const unsub = useStore.subscribe((state, prevState) => {
