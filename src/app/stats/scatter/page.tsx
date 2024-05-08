@@ -85,37 +85,48 @@ function legendRadius(
 export default function ScatterPlot() {
   const {width, height, settingsRef} =
     useContext(StatsContext);
-  const {scatter, setScatter, activityDict, loaded} =
-    useStore((state) => ({
-      scatter: state.scatter,
-      setScatter: state.setScatter,
-      activityDict: state.activityDict,
-      loaded: state.loaded,
-    }));
-  const data = Object.values(activityDict);
+  const {
+    scatter,
+    setScatter,
+    activityDict,
+    loaded,
+    filterIDs,
+  } = useStore((state) => ({
+    scatter: state.scatter,
+    setScatter: state.setScatter,
+    activityDict: state.activityDict,
+    loaded: state.loaded,
+    filterIDs: state.filterIDs,
+  }));
   const figureRef = useRef(null);
   const plotWidth = Math.min(Math.max(width, 100), 1600);
   const plotHeight = Math.max(height, 100);
 
   useEffect(() => {
     if (!loaded) return;
+    const data = filterIDs.map((id) => activityDict[id]);
     const plot = Plot.plot({
-      background: "#eee",
+      //background: "#eee",
       grid: true,
       height: plotHeight,
       width: plotWidth,
-      padding: 0,
-      marginLeft: 60,
+      //padding: 20,
+      marginLeft: 50,
       marginRight: 60,
       marginBottom: 30,
-      caption: "",
+      figure: true,
       style: {
-        fontSize: 14,
+        fontSize: "10pt",
       },
       x: {
         tickFormat: scatter.xValue.formatAxis,
         axis: "top",
-        label: `${scatter.xValue.label} (${scatter.xValue.unit})`,
+        ticks: width > 800 ? 8 : 5,
+        label: `${scatter.xValue.label} ${
+          scatter.xValue.unit != ""
+            ? `(${scatter.xValue.unit})`
+            : ""
+        }`,
         labelAnchor: "left",
       },
       y: {
@@ -135,9 +146,9 @@ export default function ScatterPlot() {
           x: scatter.xValue.fun,
           y: scatter.yValue.fun,
           r: scatter.size.fun,
-          fill: (d) =>
+          stroke: (d) =>
             scatter.group.color(scatter.group.fun(d)),
-          fillOpacity: 0.5,
+          //fillOpacity: 0.5,
           channels: {
             Activity: (d) => d.name,
             [scatter.size.label]: scatter.size.fun,
@@ -149,7 +160,7 @@ export default function ScatterPlot() {
               x: null,
               y: null,
               r: null,
-              fill: null,
+              stroke: null,
               Activity: (x) => x,
               [scatter.size.label]: scatter.size.format,
               [scatter.xValue.label]: scatter.xValue.format,
@@ -162,7 +173,7 @@ export default function ScatterPlot() {
           y: scatter.yValue.fun,
           color: (d) =>
             scatter.group.color(scatter.group.fun(d)),
-          textStrokeOpacity: 0,
+          //textStrokeOpacity: 1,
         }),
       ],
     });
@@ -183,7 +194,7 @@ export default function ScatterPlot() {
       plot.remove();
       legend.remove();
     };
-  }, [scatter, width, height, data]);
+  }, [scatter, width, height, activityDict, filterIDs]);
 
   return (
     <>

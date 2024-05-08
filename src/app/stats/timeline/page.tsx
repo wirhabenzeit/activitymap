@@ -107,7 +107,7 @@ export default function TimelinePlot() {
     const plot = Plot.plot({
       grid: true,
       style: {
-        fontSize: 14,
+        fontSize: "10pt",
       },
       y: {
         tickFormat: timeline.value.format,

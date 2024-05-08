@@ -175,7 +175,7 @@ const valueColumns = {
   start_date_local_timestamp: bigint(
     "start_date_local_timestamp",
     {mode: "number"}
-  ),
+  ).notNull(),
   achievement_count: integer("achievement_count"),
   kudos_count: integer("kudos_count"),
   comment_count: integer("comment_count"),
@@ -220,7 +220,7 @@ export const activities = pgTable("activities", {
   start_date: timestamp("start_date", {mode: "date"}),
   start_date_local: timestamp("start_date_local", {
     mode: "date",
-  }),
+  }).notNull(),
   timezone: text("timezone"),
   upload_id_str: text("upload_id_str"),
   start_latlng: json("start_latlng").$type<number[]>(),

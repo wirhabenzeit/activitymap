@@ -325,7 +325,7 @@ export function ValueSlider({
 
   useEffect(
     () => setValue(filterRanges[name]),
-    [filterRanges, name, value]
+    [filterRanges, name]
   );
 
   return (

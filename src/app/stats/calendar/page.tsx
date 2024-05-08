@@ -132,8 +132,11 @@ export default function CalendarPlot() {
           5.8;
 
     const plot = Plot.plot({
-      style: {maxWidth: "1100px"},
+      figure: true,
+      style: {fontSize: "10pt"},
       marginRight: 0,
+      marginLeft: 50,
+      marginTop: 20,
       width: widthPlot,
       height: heightPlot,
       axis: null,
@@ -159,6 +162,7 @@ export default function CalendarPlot() {
           d3.utcYears(d3.utcYear(start), end),
           makeCalendar({
             text: d3.utcFormat("%Y"),
+            fontWeight: "bold",
             frameAnchor: "right",
             x: 0,
             y: -1,
@@ -214,12 +218,15 @@ export default function CalendarPlot() {
 
         Plot.text(
           d3.utcDays(start, end),
-          makeCalendar({text: d3.utcFormat("%-d")})
+          makeCalendar({
+            text: d3.utcFormat("%-d"),
+            fontSize: 10,
+          })
         ),
       ],
     });
     Object.assign(plot, {
-      style: `width: 1200px; overflow: scroll; margin: 0;`,
+      style: `width: 1000px; margin: 0; max-width: 100%;`,
     });
     const legend = plot.legend("color", {
       ...calendar.value.color,
@@ -246,16 +253,15 @@ export default function CalendarPlot() {
   return (
     <>
       <Box
+        ref={figureRef}
         sx={{
           height: height,
           width: width,
-          overflowY: "scroll",
+          overflow: "scroll",
           display: "flex",
           justifyContent: "center",
         }}
-      >
-        <div ref={figureRef} />
-      </Box>
+      />
       {settingsRef.current &&
         createPortal(
           <CustomSelect

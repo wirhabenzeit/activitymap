@@ -7,8 +7,6 @@ import {createPortal} from "react-dom";
 import * as d3 from "d3";
 import * as Plot from "@observablehq/plot";
 
-import {SimpleLinearRegression} from "ml-regression-simple-linear";
-
 import {Box} from "@mui/material";
 
 import {CustomSelect} from "~/app/stats/ChartHelpers";
@@ -16,16 +14,185 @@ import {progressSettings} from "~/settings/stats";
 
 import {useStore} from "~/contexts/Zustand";
 
+type ProgressBy = {
+  id: string;
+  label: string;
+  tick: (date: Date) => Date;
+  legendFormat: (date: Date) => string;
+  tickFormat: (date: Date) => string;
+  curve: Plot.Curve;
+  dots: boolean;
+  nTicks: number;
+  domain: [Date, Date];
+};
+
+type ProgressValue = {
+  id: string;
+  fun: (d: Activity) => number;
+  format: (v: number) => string;
+  label: string;
+  unit: string;
+};
+
+const progressPlot =
+  ({by, value}: {by: ProgressBy; value: ProgressValue}) =>
+  ({
+    activities,
+    width,
+    height,
+  }: {
+    activities: Activity[];
+    width: number;
+    height: number;
+  }) => {
+    const showCrosshair = width > 500;
+
+    const cumulative = d3
+      .groups(activities, (x) =>
+        by.tick(new Date(x.start_date_local))
+      )
+      .flatMap(([dateKey, acts]) => {
+        acts = acts.sort(
+          (a, b) =>
+            a.start_date_local_timestamp -
+            b.start_date_local_timestamp
+        );
+        const cumsum = d3.cumsum(acts, value.fun);
+        return [
+          {
+            start_date_local: by.tick(
+              acts[0].start_date_local
+            ),
+            [by.label]: dateKey,
+            cumsum: 0,
+          },
+          ...d3.zip(acts, cumsum).map(([act, sum]) => ({
+            ...act,
+            [by.label]: dateKey,
+            cumsum: sum,
+          })),
+        ];
+      });
+
+    let data = cumulative.map((entry) => ({
+      ...entry,
+      virtualDate: new Date(
+        new Date("2024-01-01").getTime() +
+          new Date(entry.start_date_local).getTime() -
+          by
+            .tick(new Date(entry.start_date_local))
+            .getTime()
+      ),
+    }));
+
+    const keys = Array.from(
+      new d3.InternSet(
+        data.map((x) => by.tick(x[by.label]))
+      )
+    ).sort((a, b) => a - b);
+
+    data = data.filter((x) =>
+      keys
+        .slice(-5)
+        .map((y) => y.getTime())
+        .includes(x[by.label].getTime())
+    );
+
+    return Plot.plot({
+      marginRight: 70,
+      marginTop: 40,
+      ...(showCrosshair
+        ? {marginBottom: 40, marginLeft: 70}
+        : {marginBottom: 20, marginLeft: 30}),
+      width,
+      height,
+      grid: true,
+      style: {
+        fontSize: "10pt",
+      },
+      figure: true,
+      x: {
+        tickFormat: by.tickFormat,
+        axis: "top",
+        domain: by.domain,
+        label: null,
+        ticks: by.nTicks,
+      },
+      y: {
+        axis: "right",
+        label: null,
+        tickFormat: value.format,
+        ticks: 6,
+      },
+      color: {
+        type: "categorical",
+        legend: false,
+        tickFormat: by.legendFormat,
+      },
+      marks: [
+        Plot.frame(),
+        Plot.line(data, {
+          y: "cumsum",
+          x: "virtualDate",
+          stroke: by.label,
+          curve: by.curve,
+        }),
+        ...(by.dots
+          ? [
+              Plot.dot(data, {
+                y: "cumsum",
+                x: "virtualDate",
+                stroke: by.label,
+              }),
+            ]
+          : []),
+        Plot.tip(
+          data,
+          Plot.pointer({
+            y: "cumsum",
+            x: "virtualDate",
+            stroke: by.label,
+            channels: {
+              Name: "name",
+              [value.label]: value.fun,
+            },
+            format: {
+              x: undefined,
+              stroke: by.legendFormat,
+              y: undefined,
+              [value.label]: (x) => value.format(x),
+            },
+          })
+        ),
+        ...(showCrosshair
+          ? [
+              Plot.crosshair(data, {
+                y: "cumsum",
+                x: "virtualDate",
+                color: by.label,
+              }),
+            ]
+          : []),
+      ],
+    });
+  };
+
 export default function ProgressPlot() {
   const {width, height, settingsRef} =
     useContext(StatsContext);
-  const {loaded, progress, activityDict, setProgress} =
-    useStore((state) => ({
-      loaded: state.loaded,
-      progress: state.progress,
-      setProgress: state.setProgress,
-      activityDict: state.activityDict,
-    }));
+  const {
+    loaded,
+    progress,
+    activityDict,
+    setProgress,
+    filterIDs,
+  } = useStore((state) => ({
+    loaded: state.loaded,
+    progress: state.progress,
+    setProgress: state.setProgress,
+    activityDict: state.activityDict,
+    filterIDs: state.filterIDs,
+  }));
   const figureRef = useRef(null);
 
   const plotWidth = width;
@@ -34,37 +201,20 @@ export default function ProgressPlot() {
   useEffect(() => {
     if (!loaded) return;
 
-    const plot = progressPlot({
-      dots: progress.by.dots,
-      activities: Object.values(activityDict),
+    const plot = progressPlot(progress)({
+      activities: filterIDs
+        .filter((id) => activityDict[id] != undefined)
+        .map((id) => activityDict[id]),
       height: plotHeight,
       width: plotWidth,
-      value: progress.value.fun,
-      valueName: progress.value.label,
-      valueFormat: progress.value.format,
-      unit: progress.value.unit,
-      scaleTickName: progress.by.label,
-      key: progress.by.tick,
-      scaleTick: d3.timeFormat(progress.by.legendFormat),
-      tick: d3.timeFormat(progress.by.tickFormat),
-      domain: progress.by.domain,
-      nTicks: progress.by.nTicks,
-      curve: progress.by.curve,
     });
 
     Object.assign(plot, {
-      style: `margin: 0; width: ${plotWidth}px;`,
+      style: `margin: 0;`,
     });
 
     figureRef.current.append(plot);
-    const legend = plot.legend("color", {
-      width: 300,
-      height: 40,
-      marginLeft: 10,
-      marginRight: 10,
-      marginBottom: 20,
-      marginTop: 15,
-    });
+    const legend = plot.legend("color");
     Object.assign(legend, {
       style: `min-height: 0; display: block;`,
     });
@@ -82,13 +232,10 @@ export default function ProgressPlot() {
         sx={{
           height: height,
           width: width,
-          overflowY: "scroll",
-          display: "flex",
-          justifyContent: "center",
+          overflow: "hidden",
         }}
-      >
-        <div ref={figureRef} />
-      </Box>
+        ref={figureRef}
+      />
       {settingsRef.current &&
         createPortal(
           <>
@@ -118,191 +265,3 @@ export default function ProgressPlot() {
     </>
   );
 }
-
-const cumData = ({
-  activities,
-  key,
-  keyName,
-  value,
-}: {
-  activities: Activity;
-  key: unknown;
-  keyName: string;
-  value: unknown;
-}) => {
-  const cumulative = d3
-    .groups(activities, (x) =>
-      key(new Date(x.start_date_local))
-    )
-    .flatMap(([dateKey, acts]) => {
-      acts = acts.sort(
-        (a, b) =>
-          a.start_date_local_timestamp -
-          b.start_date_local_timestamp
-      );
-      const cumsum = d3.cumsum(acts, value);
-      return [
-        {
-          start_date_local: key(acts[0].start_date_local),
-          [keyName]: dateKey,
-          cumsum: 0,
-        },
-        ...d3.zip(acts, cumsum).map(([act, sum]) => ({
-          ...act,
-          [keyName]: dateKey,
-          cumsum: sum,
-        })),
-      ];
-    });
-  /*.sort(
-      (a, b) =>
-        a.start_date_local_timestamp -
-        b.start_date_local_timestamp
-    );*/
-  console.log(cumulative);
-  return cumulative;
-};
-
-const progressPlot = ({
-  activities,
-  dots,
-  width,
-  height,
-  key,
-  tick,
-  scaleTick,
-  scaleTickName,
-  domain,
-  value,
-  valueName,
-  valueFormat,
-  unit,
-  nTicks,
-  curve,
-  ...options
-}) => {
-  var data = cumData({
-    activities: activities,
-    key,
-    keyName: scaleTickName,
-    value,
-  }).map((entry) => ({
-    ...entry,
-    virtualDate: new Date(
-      new Date("2024-01-01").getTime() +
-        new Date(entry.start_date_local).getTime() -
-        key(new Date(entry.start_date_local)).getTime()
-    ),
-  }));
-
-  const keys = Array.from(
-    new d3.InternSet(data.map((x) => key(x[scaleTickName])))
-  ).sort((a, b) => a - b);
-
-  data = data.filter((x) =>
-    keys
-      .slice(-5)
-      .map((y) => y.getTime())
-      .includes(x[scaleTickName].getTime())
-  );
-
-  const current = data.filter(
-    (x) =>
-      x[scaleTickName].getTime() ==
-      keys[keys.length - 1].getTime()
-  );
-
-  const reg = new SimpleLinearRegression(
-    current.map(
-      (d) => d.virtualDate.getTime() - domain[0].getTime()
-    ),
-    current.map((d) => d.cumsum)
-  );
-
-  const map = {
-    y: "cumsum",
-    x: "virtualDate",
-    stroke: scaleTickName,
-  };
-
-  return Plot.plot({
-    ...options,
-    marginRight: 60,
-    marginTop: 30,
-    width,
-    height,
-    grid: true,
-    style: {
-      fontSize: 14,
-    },
-    x: {
-      tickFormat: tick,
-      axis: "top",
-      domain,
-      label: null,
-      labelAnchor: "left",
-      ticks: nTicks,
-    },
-    y: {
-      axis: "right",
-      label: valueName,
-      tickFormat: valueFormat,
-      ticks: 6,
-    },
-    color: {
-      type: "categorical",
-      //scheme: "Blues",
-      legend: false,
-      tickFormat: scaleTick,
-    },
-    marks: [
-      Plot.frame(),
-      /*Plot.line(domain, {
-        x: Plot.identity,
-        y: (x) =>
-          (x.getTime() - domain[0].getTime()) * reg.slope +
-          reg.intercept,
-        opacity: 0.1,
-        stroke: (x) => key(domain[0]),
-        strokeWidth: 5,
-      }),*/
-      Plot.line(data, {
-        //stroke: (x) => key(x.start_date_local),
-        ...map,
-        curve: curve,
-      }),
-      ...(dots
-        ? [
-            Plot.dot(data, {
-              ...map,
-            }),
-          ]
-        : []),
-      Plot.tip(
-        data,
-        Plot.pointer({
-          ...map,
-          channels: {Name: "name", [valueName]: value},
-          format: {
-            x: null,
-            stroke: scaleTick,
-            y: null,
-            [valueName]: (x) => valueFormat(x) + unit,
-          },
-        })
-      ),
-      Plot.crosshair(data, {
-        ...map,
-        textStrokeOpacity: 0,
-      }),
-      Plot.linearRegressionY(
-        data.filter(
-          (x) =>
-            key(x.start_date_local).getTime() ==
-            keys[keys.length - 1].getTime()
-        ),
-        {...map, fillOpacity: 0}
-      ),
-    ],
-  });
-};

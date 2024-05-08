@@ -281,7 +281,7 @@ export const progressSettings = {
           : v < 10
           ? v.toFixed(1)
           : v.toFixed(),
-      label: "Distance",
+      label: "Distance (km)",
       unit: "km",
     },
     elevation: {
@@ -293,7 +293,7 @@ export const progressSettings = {
         v >= 10_000
           ? (v / 1_000).toFixed() + "k"
           : v.toFixed(),
-      label: "Elevation",
+      label: "Elevation (m)",
       unit: "m",
     },
     time: {
@@ -301,8 +301,8 @@ export const progressSettings = {
       sortable: true,
       fun: (d: Activity) =>
         Math.round(d.elapsed_time! / 360) / 10,
-      format: (v: number) => v.toFixed(1),
-      label: "Duration",
+      format: (v: number) => v.toFixed(0),
+      label: "Duration (h)",
       unit: "h",
     },
   },
@@ -311,8 +311,8 @@ export const progressSettings = {
       id: "year",
       label: "Year",
       tick: d3.utcYear,
-      legendFormat: "%Y",
-      tickFormat: "%b",
+      legendFormat: d3.timeFormat("%Y"),
+      tickFormat: d3.timeFormat("%b"),
       curve: "step-after",
       dots: false,
       nTicks: 6,
@@ -325,8 +325,8 @@ export const progressSettings = {
       id: "month",
       label: "Month",
       tick: d3.utcMonth,
-      legendFormat: "%b %Y",
-      tickFormat: "%d",
+      legendFormat: d3.timeFormat("%b %Y"),
+      tickFormat: d3.timeFormat("%d"),
       curve: "basis",
       dots: true,
       nTicks: 6,
@@ -339,11 +339,11 @@ export const progressSettings = {
       id: "week",
       label: "Week",
       tick: d3.timeMonday,
-      tickFormat: "%a",
+      tickFormat: d3.timeFormat("%a"),
       curve: "basis",
       dots: true.valueOf,
       nTicks: 7,
-      legendFormat: "%Y-%m-%d",
+      legendFormat: d3.timeFormat("%Y-%m-%d"),
       domain: [
         new Date("2024-01-01"),
         new Date("2024-01-07 23:59:59"),
