@@ -4,9 +4,9 @@ import statsPlots from "~/stats";
 
 import Plot from "~/components/Plot";
 
-export function generateStaticParams() {
+/*export function generateStaticParams() {
   return Object.keys(statsPlots);
-}
+}*/
 
 export default async function Page({
   params,
