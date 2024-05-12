@@ -1,6 +1,6 @@
 import statsPlots from "~/stats";
 
-export const dynamicParams = false;
+//export const dynamicParams = false;
 
 import Plot from "~/components/Plot";
 
