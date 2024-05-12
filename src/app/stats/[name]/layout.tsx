@@ -16,6 +16,8 @@ import {Divider} from "@mui/material";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 
+import statsPlots from "~/stats";
+
 const settingsRef = createRef<HTMLDivElement>();
 
 const defaultStatsContext = {
@@ -26,7 +28,13 @@ const defaultStatsContext = {
 
 const StatsContext = createContext(defaultStatsContext);
 
-const tabs = {
+const tabs = Object.fromEntries(
+  Object.keys(statsPlots).map((name, index) => [
+    `/stats/${name}`,
+    {label: name, index},
+  ])
+);
+/*{
   "/stats/timeline": {
     label: "Timeline",
     index: 0,
@@ -43,7 +51,7 @@ const tabs = {
     label: "Scatter",
     index: 3,
   },
-};
+};*/
 
 export default function Stats({
   children,

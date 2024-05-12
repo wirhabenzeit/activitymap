@@ -29,7 +29,7 @@ export const uiSlice: StateCreator<
   UIZustand
 > = (set) => ({
   drawerOpen: false,
-  activeStatsTab: "/stats/calendar",
+  activeStatsTab: "/stats/progress",
   statsSettingsOpen: true,
   userSettingsOpen: false,
   toggleUserSettings: () =>
