@@ -1,17 +1,17 @@
 import statsPlots from "~/stats";
-
-//export const dynamicParams = false;
+import {notFound} from "next/navigation";
 
 import Plot from "~/components/Plot";
-
-/*export function generateStaticParams() {
-  return Object.keys(statsPlots);
-}*/
 
 export default async function Page({
   params,
 }: {
   params: {name: string};
 }) {
-  return <Plot name={params.name} />;
+  if (Object.keys(statsPlots).includes(params.name)) {
+    return (
+      <Plot name={params.name as keyof typeof statsPlots} />
+    );
+  }
+  return notFound();
 }

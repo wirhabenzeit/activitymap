@@ -38,7 +38,7 @@ import {
 import {categorySettings} from "~/settings/category";
 import {listSettings} from "~/settings/list";
 
-import {DownloadControl} from "~/components/Map/DownloadControl";
+import {Download} from "~/components/Map/DownloadControl";
 import {SelectionControl} from "~/components/Map/SelectionControl";
 import {LayerSwitcher} from "~/components/Map/LayerSwitcher";
 import type {Activity} from "~/server/db/schema";
@@ -49,11 +49,7 @@ import {
   CameraAlt,
   CameraFront,
 } from "@mui/icons-material";
-
-function Download({position}: {position: ControlPosition}) {
-  useControl(() => new DownloadControl(), {position});
-  return null;
-}
+import mapboxgl from "mapbox-gl";
 
 function Selection() {
   const {setSelected} = useStore((state) => ({
@@ -273,6 +269,9 @@ function Map() {
   );
 
   const mapSettingBase = mapSettings[baseMap]!;
+  const rows = selected
+    .map((key) => activityDict[key])
+    .filter((x) => x != undefined) as Activity[];
 
   return (
     <>
@@ -291,7 +290,9 @@ function Map() {
             );
           }
         }}
-        projection="globe"
+        projection={
+          "globe" as unknown as mapboxgl.Projection
+        }
         mapStyle={
           mapSettingBase.type === "vector"
             ? mapSettingBase.url
@@ -337,7 +338,9 @@ function Map() {
         <NavigationControl position="top-right" />
         <GeolocateControl position="top-right" />
         <FullscreenControl position="top-right" />
-        <Download position="top-right" />
+        <Overlay position="top-right">
+          <Download />
+        </Overlay>
         <Selection />
         <Overlay position="top-left">
           <LayerSwitcher />
@@ -413,7 +416,7 @@ function Map() {
           }
           rowHeight={35}
           disableColumnMenu={true}
-          rows={selected.map((key) => activityDict[key])}
+          rows={rows}
           autoHeight={selected.length <= 7}
           initialState={{
             pagination: {paginationModel: {pageSize: 100}},

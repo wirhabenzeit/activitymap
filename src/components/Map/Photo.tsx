@@ -1,54 +1,30 @@
-import {Marker, useMap} from "react-map-gl";
+import {Marker} from "react-map-gl";
 import {useStore} from "~/contexts/Zustand";
 import {Avatar} from "@mui/material";
 import {useMemo, useState} from "react";
-
-import * as d3 from "d3-hexbin";
-import {z} from "zod";
-import {
-  Circle,
-  PhotoCameraRounded,
-} from "@mui/icons-material";
+import type {Photo} from "~/server/db/schema";
 
 export default function PhotoLayer() {
   const {photos, bbox, position} = useStore((state) => ({
-    photos: state.photos,
+    photos: state.photos as Photo[],
     bbox: state.bbox,
     position: state.position,
   }));
   if (!bbox) return null;
 
   const displayPhotos = useMemo(() => {
-    const width = bbox.getEast() - bbox.getWest();
-    const height = bbox.getNorth() - bbox.getSouth();
-
-    /*const hexbin = d3
-      .hexbin()
-      .radius(Math.min(width, height) / 5)
-      .x((d) => d.location[1])
-      .y((d) => d.location[0])
-      .extent([
-        [bbox.getWest(), bbox.getSouth()],
-        [bbox.getEast(), bbox.getNorth()],
-      ]);
-
-    console.log(
-      bbox.getEast() - bbox.getWest(),
-      bbox.getNorth() - bbox.getSouth(),
-      position.zoom
-    );*/
-
     return photos.filter((photo) => {
-      if (!photo.location) return false;
+      if (
+        !photo.location ||
+        !photo.location[0] ||
+        !photo.location[1]
+      )
+        return false;
       return bbox.contains([
         photo.location[1],
         photo.location[0],
       ]);
     });
-
-    /*const selectedPhotos = hexbin(photosInBounds).map(
-      (photos) => photos[0]
-    );*/
   }, [photos, bbox]);
 
   return (
@@ -56,15 +32,15 @@ export default function PhotoLayer() {
       <>
         {displayPhotos.map((photo) => (
           <PhotoMarker
-            longitude={photo.location[1]}
-            latitude={photo.location[0]}
+            longitude={photo.location![1]}
+            latitude={photo.location![0]}
+            key={photo.unique_id}
+            zoom={position.zoom}
             urls={photo.urls}
             sizes={photo.sizes}
-            activity_id={photo.activity_id}
-            activity_name={photo.activity_name}
-            key={photo.unique_id}
-            caption={photo.caption}
-            zoom={position.zoom}
+            activity_name={photo.activity_name!}
+            activity_id={photo.activity_id!}
+            caption={photo.caption || undefined}
           />
         ))}
       </>
@@ -88,7 +64,7 @@ function PhotoMarker({
   latitude: number;
   activity_name: string;
   activity_id: number;
-  caption: string;
+  caption?: string;
   zoom: number;
 }) {
   const photoUrl = Object.values(urls)[0];

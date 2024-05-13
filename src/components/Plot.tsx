@@ -134,8 +134,6 @@ export const SelectFormElement = <K extends string, T>({
   value: K;
   setter: (value: K) => void;
 }) => {
-  //console.log(setting, value, setter);
-
   return (
     <FormControl>
       <InputLabel>{setting.label}</InputLabel>
@@ -279,7 +277,13 @@ export default function ObsPlot({
       plot.remove();
       if (legend) legend.remove();
     };
-  }, [width, height, activityDict, statsSettings[name]]);
+  }, [
+    width,
+    height,
+    activityDict,
+    statsSettings[name],
+    filterIDs,
+  ]);
 
   return (
     <>

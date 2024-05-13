@@ -40,43 +40,50 @@ const DrawerHeader = styled("div")(({theme}) => {
   };
 });
 
-const openedMixin = (theme: Theme) => ({
-  width: theme.customValues.drawerWidth,
-  transition: theme.transitions.create("width", {
-    easing: theme.transitions.easing.sharp,
-    duration: theme.transitions.duration.enteringScreen,
-  }),
-  overflowX: "hidden",
-});
-
-const closedMixin = (theme: Theme) => ({
-  transition: theme.transitions.create("width", {
-    easing: theme.transitions.easing.sharp,
-    duration: theme.transitions.duration.leavingScreen,
-  }),
-  overflowX: "hidden",
-  width: `calc(${theme.spacing(4)} + 1px)`,
-});
-
-const Drawer = styled(MuiDrawer, {
-  shouldForwardProp: () => true,
-})<DrawerProps>(({theme}) => {
+const Drawer = styled(MuiDrawer)(({theme}) => {
   const {open} = useStore((state) => ({
     open: state.drawerOpen,
   }));
+
   return {
     width: theme.customValues.drawerWidth,
     flexShrink: 0,
     whiteSpace: "nowrap",
     boxSizing: "border-box",
+    overflowX: "hidden",
     ...(open && {
-      ...openedMixin(theme),
-      "& .MuiDrawer-paper": openedMixin(theme),
+      width: theme.customValues.drawerWidth,
+      transition: theme.transitions.create("width", {
+        easing: theme.transitions.easing.sharp,
+        duration: theme.transitions.duration.enteringScreen,
+      }),
     }),
     ...(!open && {
-      ...closedMixin(theme),
-      "& .MuiDrawer-paper": closedMixin(theme),
+      width: `calc(${theme.spacing(4)} + 1px)`,
+      transition: theme.transitions.create("width", {
+        easing: theme.transitions.easing.sharp,
+        duration: theme.transitions.duration.leavingScreen,
+      }),
     }),
+    "& .MuiDrawer-paper": {
+      overflowX: "hidden",
+      ...(open && {
+        width: theme.customValues.drawerWidth,
+        transition: theme.transitions.create("width", {
+          easing: theme.transitions.easing.sharp,
+          duration:
+            theme.transitions.duration.enteringScreen,
+        }),
+      }),
+      ...(!open && {
+        width: `calc(${theme.spacing(4)} + 1px)`,
+        transition: theme.transitions.create("width", {
+          easing: theme.transitions.easing.sharp,
+          duration:
+            theme.transitions.duration.leavingScreen,
+        }),
+      }),
+    },
   };
 });
 

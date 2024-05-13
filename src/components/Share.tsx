@@ -24,6 +24,7 @@ import {fas} from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
 
 import {useStore} from "~/contexts/Zustand";
+import {User} from "~/server/db/schema";
 
 export function Share() {
   const [open, setOpen] = useState(false);
@@ -31,7 +32,13 @@ export function Share() {
   const handleClickOpen = () => {
     setOpen(true);
   };
+  const {selected, user, guest} = useStore((state) => ({
+    selected: state.selected,
+    user: state.user,
+    guest: state.guest,
+  }));
 
+  if (!user || guest) return null;
   return (
     <>
       <IconButton sx={{mx: 2}} onClick={handleClickOpen}>
@@ -40,6 +47,8 @@ export function Share() {
       <ShareDialog
         shareOpen={open}
         setShareOpen={setOpen}
+        selected={selected}
+        user={user}
       />
     </>
   );
@@ -48,13 +57,14 @@ export function Share() {
 function ShareDialog({
   shareOpen,
   setShareOpen,
+  selected,
+  user,
 }: {
   shareOpen: boolean;
   setShareOpen: (open: boolean) => void;
+  selected: number[];
+  user: User;
 }) {
-  const {selected} = useStore((state) => ({
-    selected: state.selected,
-  }));
   const [mapValue, setMapValue] = useState(true);
   const [selectedValue, setSelectedValue] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -80,7 +90,13 @@ function ShareDialog({
     </IconButton>
   );
 
-  const shareUrl = "https://strava.com/";
+  const shareUrl = new URL(window.location.href);
+  if (selectedValue)
+    shareUrl.searchParams.append(
+      "activities",
+      selected.join(",")
+    );
+  else shareUrl.searchParams.append("user", user.id);
 
   return (
     <>

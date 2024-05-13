@@ -6,16 +6,13 @@ import {
   defaultMapPosition,
   defaultMapBounds,
 } from "~/settings/map";
-import type {
-  ViewState,
-  LngLatBoundsLike,
-} from "react-map-gl";
+import type {ViewState, LngLatBounds} from "react-map-gl";
 
 export type MapZustand = {
   baseMap: keyof typeof mapSettings;
   overlayMaps: (keyof typeof mapSettings)[];
   position: ViewState;
-  bbox: LngLatBoundsLike;
+  bbox: LngLatBounds;
   threeDim: boolean;
   showPhotos: boolean;
   togglePhotos: () => void;
@@ -24,7 +21,7 @@ export type MapZustand = {
   toggleThreeDim: () => void;
   setPosition: (
     position: ViewState,
-    bbox: LngLatBoundsLike
+    bbox: LngLatBounds
   ) => void;
 };
 
@@ -36,7 +33,7 @@ export const mapSlice: StateCreator<
 > = (set) => ({
   baseMap: Object.entries(mapSettings).find(
     ([, map]) => map.visible && !map.overlay
-  )[0],
+  )![0],
   overlayMaps: Object.entries(mapSettings)
     .filter(([, map]) => map.visible && map.overlay)
     .map(([key]) => key),

@@ -42,11 +42,6 @@ export function LayerSwitcher() {
   const [anchorEl, setAnchorEl] =
     useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
-  const handleClick = (
-    event: MouseEvent<HTMLAnchorElement, MouseEvent>
-  ) => {
-    setAnchorEl(event.currentTarget);
-  };
   const handleClose = () => {
     setAnchorEl(null);
   };

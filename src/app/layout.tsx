@@ -10,6 +10,7 @@ import Header from "~/components/Header";
 import {DrawerHeader} from "~/components/Drawer";
 import {auth} from "~/auth";
 import {db} from "~/server/db";
+import type {User} from "~/server/db/schema";
 
 export const metadata = {
   title: "Activity Map",
@@ -58,10 +59,7 @@ export default async function RootLayout({
               }}
             >
               <CssBaseline />
-              <Header
-                user={user ? user : undefined}
-                account={account}
-              />
+              <Header />
               <Box
                 sx={{
                   width: "100dvw",
@@ -91,7 +89,10 @@ export default async function RootLayout({
                       flexGrow: 1,
                     }}
                   >
-                    <MainContainer account={account}>
+                    <MainContainer
+                      account={account}
+                      user={user as User}
+                    >
                       {children}
                     </MainContainer>
                   </Box>

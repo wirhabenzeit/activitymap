@@ -20,7 +20,7 @@ const valueOptions = {
     fun: (d: Activity) => d.distance! / 1000,
     format: (v: number) => v.toFixed() + "km",
     formatAxis: (v: number) => v.toFixed(),
-    label: "Distance",
+    label: "Distance (km)",
     unit: "km",
   },
   elevation: {
@@ -28,15 +28,15 @@ const valueOptions = {
     fun: (d: Activity) => d.total_elevation_gain,
     format: (v: number) => (v / 1.0).toFixed() + "m",
     formatAxis: (v: number) => (v / 1.0).toFixed(),
-    label: "Elevation",
-    unit: "km",
+    label: "Elevation (m)",
+    unit: "m",
   },
   duration: {
     id: "duration",
     fun: (d: Activity) => d.elapsed_time! / 3600,
     format: (v: number) => v.toFixed(1) + "h",
     formatAxis: (v: number) => v.toFixed(1),
-    label: "Duration",
+    label: "Duration (h)",
     unit: "h",
   },
   date: {
@@ -52,7 +52,7 @@ const valueOptions = {
     fun: (d: Activity) => d.average_speed,
     format: (v: number) => (v * 3.6).toFixed(1) + "km/h",
     formatAxis: (v: number) => (v * 3.6).toFixed(1),
-    label: "Avg Speed",
+    label: "Avg Speed (km/h)",
     unit: "km/h",
   },
 } as const;
@@ -150,7 +150,7 @@ export const plot =
       x: {
         tickFormat: xValue.formatAxis,
         axis: "top",
-        ticks: width > 800 ? 8 : 5,
+        ticks: width > 1000 ? 8 : 4,
       },
       y: {
         tickFormat: yValue.formatAxis,

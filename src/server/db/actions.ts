@@ -6,6 +6,16 @@ import {type Activity, activities, photos} from "./schema";
 import {db} from "./index";
 import {getAccount} from "~/auth";
 
+export async function getUserAccount(id: string) {
+  const account = await db.query.accounts.findFirst({
+    where: (accounts, {eq}) => eq(accounts.userId, id),
+  });
+  const user = await db.query.users.findFirst({
+    where: (users, {eq}) => eq(users.id, id),
+  });
+  return {account, user};
+}
+
 export async function getActivities({
   ids,
   athlete_id,

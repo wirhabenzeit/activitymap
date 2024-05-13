@@ -4,6 +4,7 @@ import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
 
 import {commonSettings} from "~/stats";
+import {X} from "@mui/icons-material";
 
 type ProgressSetting = {
   value: keyof typeof settings.value.options;
@@ -129,21 +130,6 @@ const setter =
     return {...progress, [name]: value};
   };
 
-/*{
-  by: (
-    value: keyof typeof settings.by.options,
-    draft: WritableDraft<ProgressSetting>
-  ) => {
-    draft.by = value;
-  },
-  value: (
-    value: keyof typeof settings.value.options,
-    draft: WritableDraft<ProgressSetting>
-  ) => {
-    draft.value = value;
-  },
-};*/
-
 export const plot =
   (setting: ProgressSetting) =>
   ({
@@ -238,7 +224,9 @@ export const plot =
       },
       color: {
         //type: "categorical",
-        scheme: "Viridis",
+        scheme: "viridis",
+        reverse: true,
+        type: "ordinal",
         legend: false,
         tickFormat: by.legendFormat,
       },
@@ -249,7 +237,8 @@ export const plot =
           x: "virtualDate",
           stroke: by.label,
           curve: by.curve,
-          opacity: (x) => (x.currentPeriod ? 1 : 0.5),
+          opacity: 0.3,
+          strokeWidth: (X) => (X.currentPeriod ? 4 : 2),
         }),
         ...(by.dots
           ? [

@@ -254,8 +254,12 @@ export const photos = pgTable("photos", {
   status: integer("status"),
   uploaded_at: timestamp("uploaded_at", {mode: "date"}),
   created_at: timestamp("created_at", {mode: "date"}),
-  urls: json("urls"),
-  sizes: json("sizes"),
+  urls: json("urls")
+    .$type<Record<number, string>>()
+    .notNull(),
+  sizes: json("sizes")
+    .$type<Record<number, [number, number]>>()
+    .notNull(),
   default_photo: boolean("default_photo"),
   location: json("location").$type<[number, number]>(),
 });

@@ -60,20 +60,22 @@ const tabs = {
   "/stats": {label: "Stats", index: 2},
 };
 
-export default function Header({
-  user,
-  account,
-}: {
-  user?: User;
-  account?: Account;
-}) {
-  const {open, setOpen, activeStatsTab} = useStore(
-    (state) => ({
-      open: state.drawerOpen,
-      setOpen: state.toggleDrawer,
-      activeStatsTab: state.activeStatsTab,
-    })
-  );
+export default function Header() {
+  const {
+    open,
+    setOpen,
+    activeStatsTab,
+    user,
+    account,
+    guest,
+  } = useStore((state) => ({
+    open: state.drawerOpen,
+    setOpen: state.toggleDrawer,
+    activeStatsTab: state.activeStatsTab,
+    user: state.user,
+    guest: state.guest,
+    account: state.account,
+  }));
   const pathname = usePathname();
   const parts = pathname.split("/");
   const valueKey = parts.length > 1 ? `/${parts[1]}` : "";
@@ -161,13 +163,13 @@ export default function Header({
           </Tabs>
         </Box>
         <Box sx={{flexGrow: 1}} />
-        {user && "image" in user && (
+        {user && "image" in user && !guest && (
           <>
             <Share />
             <UserSettings user={user} account={account} />
           </>
         )}{" "}
-        {!user && <LoginButton />}
+        {!user && !guest && <LoginButton />}
       </Toolbar>
     </AppBar>
   );

@@ -104,7 +104,9 @@ export default function List() {
     setColumnVisibilityModel: state.setColumnModel,
     updateActivity: state.updateActivity,
   }));
-  const rows = filterIDs.map((key) => activityDict[key]);
+  const rows = filterIDs
+    .map((key) => activityDict[key])
+    .filter((x) => x != undefined) as Activity[];
 
   const CustomToolbar = () => {
     const rootProps = useGridRootProps();
@@ -154,13 +156,7 @@ export default function List() {
   return (
     <>
       <DataGrid
-        rows={
-          rows == undefined
-            ? []
-            : rows.length > 0
-            ? rows
-            : []
-        }
+        rows={rows}
         editMode="row"
         processRowUpdate={async (updatedRow: Activity) => {
           console.log("Updating activity", updatedRow);

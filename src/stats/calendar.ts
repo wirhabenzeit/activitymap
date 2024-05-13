@@ -192,8 +192,6 @@ export const plot =
 
     const widthPlot = 1000;
 
-    console.log(value);
-
     const dayTotals = d3.map(
       d3.rollup(
         activities,
@@ -254,7 +252,6 @@ export const plot =
             dx: -20,
           })
         ),
-
         Plot.text(
           d3
             .utcMonths(d3.utcMonth(start), end)

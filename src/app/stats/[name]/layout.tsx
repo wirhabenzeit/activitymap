@@ -28,30 +28,24 @@ const defaultStatsContext = {
 
 const StatsContext = createContext(defaultStatsContext);
 
-const tabs = Object.fromEntries(
-  Object.keys(statsPlots).map((name, index) => [
-    `/stats/${name}`,
-    {label: name, index},
-  ])
-);
-/*{
-  "/stats/timeline": {
-    label: "Timeline",
-    index: 0,
-  },
-  "/stats/calendar": {
-    label: "Calendar",
-    index: 1,
-  },
-  "/stats/progress": {
-    label: "Progress",
-    index: 2,
-  },
-  "/stats/scatter": {
-    label: "Scatter",
-    index: 3,
-  },
-};*/
+type StatsPlotsKeys = keyof typeof statsPlots;
+type TabKeys = `/stats/${StatsPlotsKeys}`;
+type TabValue = {label: string; index: number};
+const tabEntries: [TabKeys, TabValue][] = (
+  Object.keys(statsPlots) as (keyof typeof statsPlots)[]
+).map((name, index) => [
+  `/stats/${name}` as TabKeys,
+  {label: name, index},
+]);
+
+const tabs: Record<TabKeys, TabValue> = {} as Record<
+  TabKeys,
+  TabValue
+>;
+
+for (const [key, value] of tabEntries) {
+  tabs[key] = value;
+}
 
 export default function Stats({
   children,
@@ -74,15 +68,17 @@ export default function Stats({
 
   const pathname = usePathname();
   const [value, setValue] = React.useState(
-    pathname in tabs
-      ? tabs[pathname as keyof typeof tabs].index
-      : tabs[activeStatsTab].index
+    pathname in tabs && tabs[pathname as TabKeys]
+      ? tabs[pathname as TabKeys]!.index
+      : tabs[activeStatsTab]!.index
   );
   const handleChange = (
     event: React.SyntheticEvent,
     newValue: number
   ) => {
-    const tabKey = Object.keys(tabs)[newValue];
+    const tabKey = Object.keys(tabs)[
+      newValue
+    ] as keyof typeof tabs;
     if (tabKey && tabKey in tabs) {
       setValue(newValue);
       setActiveStatsTab(tabKey as keyof typeof tabs);

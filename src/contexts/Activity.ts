@@ -2,6 +2,7 @@ import type {
   Account,
   Activity,
   Photo,
+  User,
 } from "~/server/db/schema";
 import type {StateCreator} from "zustand";
 import {decode} from "@mapbox/polyline";
@@ -48,11 +49,15 @@ export type ActivityZustand = {
   loaded: boolean;
   photos: Photo[];
   account?: Account;
+  user?: User;
+  guest?: boolean;
+  setGuest: (x: boolean) => void;
   setAccount: (acc: Account) => void;
+  setUser: (user: User) => void;
   loadPhotos: () => Promise<void>;
   updateActivity: (act: Activity) => Promise<Activity>;
   setLoading: (x: boolean) => void;
-  loadFromDB: () => Promise<number>;
+  loadFromDB: (ids?: number[]) => Promise<number>;
   loadFromStrava: ({
     photos,
     before,
@@ -93,8 +98,14 @@ export const activitySlice: StateCreator<
   },
   loading: true,
   loaded: false,
+  guest: false,
+  setGuest: (x: boolean) =>
+    set((state) => {
+      state.guest = x;
+    }),
   loadPhotos: async () => {
     const athlete = get().account;
+    if (!athlete) return;
     const photos = await getPhotos(
       athlete?.providerAccountId
     );
@@ -106,12 +117,21 @@ export const activitySlice: StateCreator<
     set((state) => {
       state.account = account;
     }),
+  setUser: (user: User) =>
+    set((state) => {
+      state.user = user;
+    }),
   setLoading: (x: boolean) => {
     set((state) => {
       state.loading = x;
     });
   },
   updateActivity: async (activity: Activity) => {
+    const guest = get().guest;
+    if (guest) {
+      console.error("Guests cannot update activities");
+      return activity;
+    }
     try {
       const athlete = get().account;
       const updatedActivity = await updateStravaActivity(
@@ -137,15 +157,19 @@ export const activitySlice: StateCreator<
       throw new Error("Failed to update activity");
     }
   },
-  loadFromDB: async () => {
+  loadFromDB: async (ids) => {
+    console.log("loadFromDB");
     set((state) => {
       state.loading = true;
     });
+    let acts = [] as Activity[];
     try {
-      const athlete = get().account;
-      const acts = await getDBActivities({
-        athlete_id: athlete?.providerAccountId,
-      });
+      if (!ids) {
+        const athlete = get().account;
+        acts = await getDBActivities({
+          athlete_id: athlete?.providerAccountId,
+        });
+      } else acts = await getDBActivities({ids});
       set(setActivities(acts));
       return acts.length;
     } catch (e) {

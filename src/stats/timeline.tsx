@@ -43,7 +43,7 @@ export const settings = {
             : v < 10_000
             ? (v / 1000).toFixed(1)
             : (v / 1000).toFixed(),
-        label: "Distance",
+        label: "Distance (km)",
         unit: "km",
       },
       elevation: {
@@ -54,7 +54,7 @@ export const settings = {
           v >= 10_000
             ? (v / 1_000).toFixed() + "k"
             : v.toFixed(),
-        label: "Elevation",
+        label: "Elevation (m)",
         unit: "m",
       },
       time: {
@@ -62,7 +62,7 @@ export const settings = {
         sortable: true,
         fun: (d: Activity) => d.elapsed_time,
         format: (v: number) => (v / 3600).toFixed(1),
-        label: "Duration",
+        label: "Duration (h)",
         unit: "h",
       },
     },

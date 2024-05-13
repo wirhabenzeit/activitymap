@@ -18,9 +18,7 @@ const styles = `
 export class SelectionControl {
   layers: string[];
   source: string;
-  selectionHandler: (
-    ids: (number | string | undefined)[]
-  ) => void;
+  selectionHandler: (ids: number[]) => void;
   context: MapContextValue;
   canvas?: HTMLElement;
   map?: mapboxgl.Map;
@@ -38,9 +36,7 @@ export class SelectionControl {
   }: {
     layers: string[];
     source: string;
-    selectionHandler: (
-      ids: (number | string | undefined)[]
-    ) => void;
+    selectionHandler: (ids: number[]) => void;
     context: MapContextValue;
   }) {
     const styleSheet = document.createElement("style");
@@ -84,7 +80,9 @@ export class SelectionControl {
       }
     );
     this.selectionHandler(
-      selectedFeatures.map((feature) => feature.id)
+      selectedFeatures.map(
+        (feature) => feature.id as number
+      )
     );
   };
 
@@ -123,10 +121,10 @@ export class SelectionControl {
       this.canvas?.appendChild(this.box);
     }
 
-    const minX = Math.min(this.start.x, this.current.x),
-      maxX = Math.max(this.start.x, this.current.x),
-      minY = Math.min(this.start.y, this.current.y),
-      maxY = Math.max(this.start.y, this.current.y);
+    const minX = Math.min(this.start!.x, this.current.x),
+      maxX = Math.max(this.start!.x, this.current.x),
+      minY = Math.min(this.start!.y, this.current.y),
+      maxY = Math.max(this.start!.y, this.current.y);
 
     const pos = `translate(${minX}px, ${minY}px)`;
     this.box.style.transform = pos;
@@ -135,7 +133,7 @@ export class SelectionControl {
   };
 
   onMouseUp = (e: MapMouseEvent) => {
-    this.finish([this.start, this.mousePos(e)]);
+    this.finish([this.start!, this.mousePos(e)]);
   };
 
   finish = (bbox: [PointLike, PointLike]) => {
@@ -154,9 +152,12 @@ export class SelectionControl {
         this.map?.queryRenderedFeatures(bbox, {
           layers: this.layers,
         });
-      this.selectionHandler(
-        selectedFeatures.map((feature) => feature.id)
-      );
+      if (selectedFeatures)
+        this.selectionHandler(
+          selectedFeatures.map(
+            (feature) => feature.id as number
+          )
+        );
     }
     this.map?.dragPan.enable();
   };
