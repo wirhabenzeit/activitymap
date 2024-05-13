@@ -32,7 +32,7 @@ export async function GET(
           b.start_date_local_timestamp -
           a.start_date_local_timestamp
       )
-      .slice(0, 15);
+      .slice(0, 50);
     console.log(
       "UPDATING",
       newest15.map((a) => [a.name, a.id, a.athlete])
