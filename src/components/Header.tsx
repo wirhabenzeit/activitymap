@@ -21,7 +21,6 @@ import {styled} from "@mui/material/styles";
 import {LoginButton, UserSettings} from "~/components/User";
 import {Share} from "~/components/Share";
 import {useStore} from "~/contexts/Zustand";
-import type {Account, User} from "~/server/db/schema";
 
 const AppBar = styled(MuiAppBar)(({theme}) => {
   const {open} = useStore((state) => ({
@@ -61,21 +60,14 @@ const tabs = {
 };
 
 export default function Header() {
-  const {
-    open,
-    setOpen,
-    activeStatsTab,
-    user,
-    account,
-    guest,
-  } = useStore((state) => ({
-    open: state.drawerOpen,
-    setOpen: state.toggleDrawer,
-    activeStatsTab: state.activeStatsTab,
-    user: state.user,
-    guest: state.guest,
-    account: state.account,
-  }));
+  const {open, setOpen, activeStatsTab, user, guest} =
+    useStore((state) => ({
+      open: state.drawerOpen,
+      setOpen: state.toggleDrawer,
+      activeStatsTab: state.activeStatsTab,
+      user: state.user,
+      guest: state.guest,
+    }));
   const pathname = usePathname();
   const parts = pathname.split("/");
   const valueKey = parts.length > 1 ? `/${parts[1]}` : "";
@@ -166,7 +158,7 @@ export default function Header() {
         {user && "image" in user && !guest && (
           <>
             <Share />
-            <UserSettings user={user} account={account} />
+            <UserSettings user={user} />
           </>
         )}{" "}
         {!user && !guest && <LoginButton />}

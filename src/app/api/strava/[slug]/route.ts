@@ -23,6 +23,10 @@ export async function GET(
     });
   }
 
+  if (params.slug === "cron") {
+    return new Response("OK");
+  }
+
   return new Response(`Invalid endpoint`, {status: 404});
 }
 
@@ -78,7 +82,6 @@ export async function POST(
           ids: [data.object_id],
           database: true,
           get_photos: true,
-          athlete_id: data.owner_id,
         });
         return new Response(
           `Created/updated activity ${data.object_id}`

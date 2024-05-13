@@ -30,7 +30,7 @@ import {fas} from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
 
 import {useStore} from "~/contexts/Zustand";
-import type {Account, User} from "~/server/db/schema";
+import type {User} from "~/server/db/schema";
 import type {Activity} from "~/server/db/schema";
 
 import {
@@ -56,13 +56,7 @@ export function LoginButton() {
   );
 }
 
-export function UserSettings({
-  user,
-  account,
-}: {
-  user?: User;
-  account?: Account;
-}) {
+export function UserSettings({user}: {user?: User}) {
   const {toggleUserSettings, loading} = useStore(
     (state) => ({
       toggleUserSettings: state.toggleUserSettings,
@@ -71,8 +65,7 @@ export function UserSettings({
   );
 
   return (
-    user &&
-    account && (
+    user && (
       <>
         <Box sx={{flexGrow: 0}}>
           <IconButton

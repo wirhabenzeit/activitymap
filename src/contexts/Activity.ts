@@ -1,5 +1,4 @@
 import type {
-  Account,
   Activity,
   Photo,
   User,
@@ -29,9 +28,11 @@ const FeatureFromActivity = (act: Activity): Feature => {
     id: Number(act.id),
     geometry: {
       type: "LineString",
-      coordinates: decode(act.map.summary_polyline).map(
-        ([lat, lon]) => [lon, lat]
-      ),
+      coordinates: decode(
+        act.map.polyline
+          ? act.map.polyline
+          : act.map.summary_polyline
+      ).map(([lat, lon]) => [lon, lat]),
     },
     properties: {
       id: Number(act.id),
@@ -48,16 +49,20 @@ export type ActivityZustand = {
   loading: boolean;
   loaded: boolean;
   photos: Photo[];
-  account?: Account;
   user?: User;
   guest?: boolean;
   setGuest: (x: boolean) => void;
-  setAccount: (acc: Account) => void;
   setUser: (user: User) => void;
   loadPhotos: () => Promise<void>;
   updateActivity: (act: Activity) => Promise<Activity>;
   setLoading: (x: boolean) => void;
-  loadFromDB: (ids?: number[]) => Promise<number>;
+  loadFromDB: ({
+    ids,
+    athleteId,
+  }: {
+    ids?: number[];
+    athleteId?: number;
+  }) => Promise<number>;
   loadFromStrava: ({
     photos,
     before,
@@ -104,19 +109,11 @@ export const activitySlice: StateCreator<
       state.guest = x;
     }),
   loadPhotos: async () => {
-    const athlete = get().account;
-    if (!athlete) return;
-    const photos = await getPhotos(
-      athlete?.providerAccountId
-    );
+    const photos = await getPhotos();
     set((state) => {
       state.photos = photos;
     });
   },
-  setAccount: (account: Account) =>
-    set((state) => {
-      state.account = account;
-    }),
   setUser: (user: User) =>
     set((state) => {
       state.user = user;
@@ -133,20 +130,12 @@ export const activitySlice: StateCreator<
       return activity;
     }
     try {
-      const athlete = get().account;
-      const updatedActivity = await updateStravaActivity(
-        {
-          name: activity.name,
-          id: activity.id,
-          description: activity.description,
-          athlete: activity.athlete,
-        },
-        {
-          access_token: athlete?.access_token
-            ? athlete?.access_token
-            : undefined,
-        }
-      );
+      const updatedActivity = await updateStravaActivity({
+        name: activity.name,
+        id: activity.id,
+        description: activity.description,
+        athlete: activity.athlete,
+      });
       set((state) => {
         state.activityDict[Number(updatedActivity.id)] =
           updatedActivity;
@@ -157,17 +146,15 @@ export const activitySlice: StateCreator<
       throw new Error("Failed to update activity");
     }
   },
-  loadFromDB: async (ids) => {
-    console.log("loadFromDB");
+  loadFromDB: async ({ids, athleteId}) => {
     set((state) => {
       state.loading = true;
     });
     let acts = [] as Activity[];
     try {
       if (!ids) {
-        const athlete = get().account;
         acts = await getDBActivities({
-          athlete_id: athlete?.providerAccountId,
+          athlete_id: athleteId,
         });
       } else acts = await getDBActivities({ids});
       set(setActivities(acts));
@@ -182,25 +169,10 @@ export const activitySlice: StateCreator<
       state.loading = true;
     });
     try {
-      const athlete = get().account;
-      console.log("getAct", get().account);
-      console.log("getAct", {
-        get_photos: photos,
-        before,
-        ids,
-        access_token: athlete?.access_token
-          ? athlete?.access_token
-          : undefined,
-        athlete_id: athlete?.providerAccountId,
-      });
       const {activities: acts} = await getStravaActivities({
         get_photos: photos,
         before,
         ids,
-        access_token: athlete?.access_token
-          ? athlete?.access_token
-          : undefined,
-        athlete_id: athlete?.providerAccountId,
       });
       console.log(acts);
       set(setActivities(acts));

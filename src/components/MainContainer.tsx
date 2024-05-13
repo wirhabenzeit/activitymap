@@ -1,20 +1,16 @@
 "use client";
 
 import {useSearchParams} from "next/navigation";
-import {parse} from "path";
 import {useEffect} from "react";
 import {useStore} from "~/contexts/Zustand";
-import {db} from "~/server/db";
-import {getUserAccount} from "~/server/db/actions";
-import type {Account, User} from "~/server/db/schema";
+import {getUser} from "~/server/db/actions";
+import type {User} from "~/server/db/schema";
 
 export default function MainContainer({
-  account,
   user,
   children,
 }: {
   children: React.ReactNode;
-  account?: Account;
   user?: User;
 }) {
   const {
@@ -22,7 +18,6 @@ export default function MainContainer({
     loadPhotos,
     updateFilters,
     setFilterRanges,
-    setAccount,
     toggleUserSettings,
     setUser,
     setGuest,
@@ -30,7 +25,6 @@ export default function MainContainer({
     loadFromDB: state.loadFromDB,
     updateFilters: state.updateFilters,
     setFilterRanges: state.setFilterRanges,
-    setAccount: state.setAccount,
     toggleUserSettings: state.toggleUserSettings,
     loadPhotos: state.loadPhotos,
     setUser: state.setUser,
@@ -40,28 +34,24 @@ export default function MainContainer({
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (account != undefined && user != undefined) {
-      setAccount(account);
+    if (user != undefined) {
       setUser(user);
       load().then(console.log).catch(console.error);
     } else if (searchParams.has("user")) {
-      async function getUser() {
-        const {user, account} = await getUserAccount(
+      async function getUserFromDB() {
+        const user = await getUser(
           searchParams.get("user")!
         );
-        if (account && user) {
-          console.log(
-            "setting account user",
-            account,
-            user
-          );
-          setAccount(account);
+        if (user) {
+          console.log("setting user", user);
           setUser(user);
           setGuest(true);
           load().then(console.log).catch(console.error);
         }
       }
-      getUser().then(console.log).catch(console.error);
+      getUserFromDB()
+        .then(console.log)
+        .catch(console.error);
     } else if (searchParams.has("activities")) {
       console.log(searchParams.get("activities"));
       setGuest(true);
@@ -77,7 +67,9 @@ export default function MainContainer({
 
     async function load(activities?: number[]) {
       console.log("loading activities");
-      const nActivities = await loadFromDB(activities);
+      const nActivities = await loadFromDB({
+        ids: activities,
+      });
       await loadPhotos();
       if (nActivities === 0) toggleUserSettings();
     }

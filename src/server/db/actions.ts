@@ -1,20 +1,90 @@
 "use server";
 
 import {inArray, eq} from "drizzle-orm";
-import {auth} from "~/auth";
-import {type Activity, activities, photos} from "./schema";
+import {
+  type Activity,
+  activities,
+  photos,
+  accounts,
+} from "./schema";
 import {db} from "./index";
-import {getAccount} from "~/auth";
+import {auth} from "~/auth";
 
-export async function getUserAccount(id: string) {
-  const account = await db.query.accounts.findFirst({
-    where: (accounts, {eq}) => eq(accounts.userId, id),
-  });
+export const getUser = async (id?: string) => {
+  if (!id) {
+    const session = await auth();
+    if (!session?.user?.id)
+      throw new Error("Not authenticated");
+    id = session.user!.id!;
+  }
   const user = await db.query.users.findFirst({
     where: (users, {eq}) => eq(users.id, id),
   });
-  return {account, user};
-}
+  if (!user) throw new Error("User not found");
+  return user;
+};
+
+export const getAccount = async (userID?: string) => {
+  if (!userID) {
+    const user = await getUser();
+    userID = user!.id!;
+  }
+  const account = await db.query.accounts.findFirst({
+    where: (accounts, {eq}) => eq(accounts.userId, userID!),
+  });
+  if (!account) throw new Error("Account not found");
+  if (
+    account.expires_at &&
+    account.expires_at * 1000 < Date.now()
+  ) {
+    try {
+      const response = await fetch(
+        "https://www.strava.com/api/v3/oauth/token",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            client_id: process.env.AUTH_STRAVA_ID,
+            client_secret: process.env.AUTH_STRAVA_SECRET,
+            grant_type: "refresh_token",
+            refresh_token: account.refresh_token,
+          }),
+        }
+      );
+
+      const tokens = (await response.json()) as Record<
+        string,
+        unknown
+      >;
+
+      console.log("Refreshed access token", tokens);
+
+      if (!response.ok) throw tokens;
+
+      account.access_token = tokens.access_token as string;
+      account.expires_at = Math.floor(
+        Date.now() / 1000 + (tokens.expires_in as number)
+      );
+      account.refresh_token =
+        (tokens.refresh_token as string) ??
+        account.refresh_token;
+
+      await db
+        .insert(accounts)
+        .values(account)
+        .onConflictDoUpdate({
+          target: accounts.providerAccountId,
+          set: account,
+        });
+    } catch (error) {
+      console.error("Error refreshing access token", error);
+      throw new Error("Failed to refresh access token");
+    }
+  }
+  return account;
+};
 
 export async function getActivities({
   ids,
@@ -31,14 +101,8 @@ export async function getActivities({
       .where(inArray(activities.id, ids));
   else {
     if (athlete_id == undefined) {
-      const session = await auth();
-      if (!session?.user?.id)
-        throw new Error("Not authenticated");
-      const account = await getAccount({
-        userID: session.user!.id!,
-      });
-      if (!account) throw new Error("Account not found");
-      athlete_id = account.providerAccountId;
+      const athlete = await getAccount();
+      athlete_id = athlete.providerAccountId;
     }
     acts = await db
       .select()
@@ -48,10 +112,14 @@ export async function getActivities({
   return acts;
 }
 
-export async function getPhotos(athlete_id: number) {
+export async function getPhotos() {
+  const athlete = await getAccount();
+
   const phts = await db
     .select()
     .from(photos)
-    .where(eq(photos.athlete_id, athlete_id));
+    .where(
+      eq(photos.athlete_id, athlete.providerAccountId)
+    );
   return phts;
 }

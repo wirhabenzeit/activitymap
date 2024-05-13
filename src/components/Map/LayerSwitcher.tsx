@@ -51,7 +51,7 @@ export function LayerSwitcher() {
       <Paper
         sx={{
           p: 0,
-          width: "30px",
+          width: "29px",
           borderRadius: 1,
         }}
         elevation={1}
@@ -60,13 +60,11 @@ export function LayerSwitcher() {
           onClick={(event) =>
             setAnchorEl(event.currentTarget)
           }
-          sx={{p: "3px"}}
         >
-          <MapIcon fontSize="small" />
+          <MapIcon fontSize="small" sx={{mt: "3px"}} />
         </IconButton>
         <Divider />
         <IconButton
-          sx={{p: "3px"}}
           onClick={() => {
             if (threeDim)
               map.current?.easeTo({
@@ -83,6 +81,7 @@ export function LayerSwitcher() {
         >
           <ThreeDimIcon
             fontSize="small"
+            sx={{mt: "3px"}}
             color={threeDim ? "primary" : "disabled"}
           />
         </IconButton>

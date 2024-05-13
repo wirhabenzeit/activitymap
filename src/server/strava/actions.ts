@@ -10,7 +10,7 @@ import {
 import {decode} from "@mapbox/polyline";
 
 import {db} from "~/server/db";
-import {getAccount} from "~/auth";
+import {getAccount} from "~/server/db/actions";
 import {getTableColumns, sql} from "drizzle-orm";
 import {PgTable} from "drizzle-orm/pg-core";
 
@@ -138,16 +138,11 @@ export async function deleteWebhook(id: number) {
 }
 
 export async function updateActivity(
-  act: UpdatableActivity,
-  {access_token}: {access_token?: string}
+  act: UpdatableActivity
 ) {
   try {
-    if (!access_token) {
-      const account = await getAccount({
-        providerID: act.athlete,
-      });
-      access_token = account.access_token!;
-    }
+    const account = await getAccount();
+    const access_token = account.access_token!;
     const {id, ...update} = act;
     console.log("Updating activity", id, update);
     const json = await post(
@@ -319,8 +314,6 @@ const buildConflictUpdateColumns = <
   );
 
 export async function getActivities({
-  access_token,
-  athlete_id,
   database = true,
   get_photos = false,
   page = 1,
@@ -329,8 +322,6 @@ export async function getActivities({
   after,
   before,
 }: {
-  access_token?: string;
-  athlete_id?: number;
   database?: boolean;
   get_photos?: boolean;
   page?: number;
@@ -339,17 +330,8 @@ export async function getActivities({
   after?: number;
   before?: number;
 }) {
-  if (!access_token) {
-    try {
-      access_token = (
-        await getAccount({providerID: athlete_id})
-      ).access_token!;
-    } catch (e) {
-      console.error(e);
-      throw new Error(`Failed to fetch account`);
-    }
-  }
   try {
+    const access_token = (await getAccount()).access_token!;
     let new_activities: Record<string, unknown>[] = [];
     if (ids !== undefined)
       new_activities = (await Promise.all(

@@ -1,9 +1,15 @@
 "use client";
 
 import {listSettings} from "~/settings/list";
-import {useState} from "react";
+import React, {useState} from "react";
 
-import {Box, IconButton, Tooltip} from "@mui/material";
+import {
+  Box,
+  IconButton,
+  Menu,
+  MenuItem,
+  Tooltip,
+} from "@mui/material";
 import {
   CheckBoxOutlineBlank,
   CheckBox,
@@ -84,6 +90,49 @@ function CustomFooterStatusComponent() {
   );
 }
 
+const CustomToolbar = () => {
+  const rootProps = useGridRootProps();
+  const apiRef = useGridApiContext();
+  const [checked, setChecked] = useState(false);
+
+  const selected = useStore((state) => state.selected);
+
+  const switchHandler = () => {
+    setChecked((checked) => !checked);
+    apiRef.current.setFilterModel({
+      items: checked
+        ? []
+        : [
+            {
+              field: "id",
+              operator: "isAnyOf",
+              value: selected.map((id) => id.toString()),
+            },
+          ],
+    });
+  };
+  return (
+    <GridToolbarContainer sx={{flexWrap: "nowrap"}}>
+      <rootProps.slots.baseButton
+        disabled={selected.length === 0}
+        id="selectedOnly"
+        size="small"
+        aria-label="Show Selected Only"
+        startIcon={
+          checked ? <CheckBox /> : <CheckBoxOutlineBlank />
+        }
+        onClick={switchHandler}
+        {...rootProps.slotProps?.baseButton}
+      >
+        {checked ? "Selected" : "All"}
+      </rootProps.slots.baseButton>
+      <GridToolbarColumnsButton />
+      <Box sx={{flexGrow: 1}} />
+      <RefreshButton />
+    </GridToolbarContainer>
+  );
+};
+
 export default function List() {
   const {
     activityDict,
@@ -94,6 +143,7 @@ export default function List() {
     setSortModel,
     setColumnVisibilityModel,
     updateActivity,
+    loadFromStrava,
   } = useStore((state) => ({
     activityDict: state.activityDict,
     filterIDs: state.filterIDs,
@@ -103,54 +153,43 @@ export default function List() {
     setSortModel: state.setSortModel,
     setColumnVisibilityModel: state.setColumnModel,
     updateActivity: state.updateActivity,
+    loadFromStrava: state.loadFromStrava,
   }));
   const rows = filterIDs
     .map((key) => activityDict[key])
     .filter((x) => x != undefined) as Activity[];
 
-  const CustomToolbar = () => {
-    const rootProps = useGridRootProps();
-    const apiRef = useGridApiContext();
-    const [checked, setChecked] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    id: number;
+  } | null>(null);
 
-    const switchHandler = () => {
-      setChecked((checked) => !checked);
-      apiRef.current.setFilterModel({
-        items: checked
-          ? []
-          : [
-              {
-                field: "id",
-                operator: "isAnyOf",
-                value: selected.map((id) => id.toString()),
-              },
-            ],
-      });
-    };
-    return (
-      <GridToolbarContainer sx={{flexWrap: "nowrap"}}>
-        <rootProps.slots.baseButton
-          disabled={selected.length === 0}
-          id="selectedOnly"
-          size="small"
-          aria-label="Show Selected Only"
-          startIcon={
-            checked ? (
-              <CheckBox />
-            ) : (
-              <CheckBoxOutlineBlank />
-            )
+  const handleContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault();
+    const id = event.currentTarget.getAttribute("data-id");
+    setContextMenu(
+      contextMenu === null
+        ? {
+            mouseX: event.clientX - 2,
+            mouseY: event.clientY - 4,
+            id: Number(id),
           }
-          onClick={switchHandler}
-          {...rootProps.slotProps?.baseButton}
-        >
-          {checked ? "Selected" : "All"}
-        </rootProps.slots.baseButton>
-        <GridToolbarColumnsButton />
-        <Box sx={{flexGrow: 1}} />
-        <RefreshButton />
-      </GridToolbarContainer>
+        : null
     );
+  };
+
+  const handleClose = () => {
+    setContextMenu(null);
+  };
+
+  const refreshActivity = (id: number) => {
+    loadFromStrava({
+      ids: [id],
+      photos: true,
+    })
+      .then(() => handleClose())
+      .catch(console.error);
   };
 
   return (
@@ -182,6 +221,9 @@ export default function List() {
           columnsManagement: {
             autoFocusSearchField: false,
           },
+          row: {
+            onContextMenu: handleContextMenu,
+          },
         }}
         rowSelectionModel={selected}
         onRowSelectionModelChange={(
@@ -198,6 +240,37 @@ export default function List() {
           newModel: GridColumnVisibilityModel
         ) => setColumnVisibilityModel("full", newModel)}
       />
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleClose}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? {
+                top: contextMenu.mouseY,
+                left: contextMenu.mouseX,
+              }
+            : undefined
+        }
+        slotProps={{
+          root: {
+            onContextMenu: (e) => {
+              e.preventDefault();
+              handleClose();
+            },
+          },
+        }}
+      >
+        <MenuItem
+          onClick={() =>
+            contextMenu?.id
+              ? refreshActivity(contextMenu.id)
+              : null
+          }
+        >
+          Refresh
+        </MenuItem>
+      </Menu>
     </>
   );
 }

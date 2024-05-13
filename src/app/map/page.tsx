@@ -349,17 +349,15 @@ function Map() {
           <Paper
             sx={{
               p: 0,
-              width: "30px",
+              width: "29px",
               borderRadius: 1,
             }}
             elevation={1}
           >
-            <IconButton
-              onClick={togglePhotos}
-              sx={{p: "3px"}}
-            >
+            <IconButton onClick={togglePhotos}>
               <CameraAlt
                 fontSize="small"
+                sx={{mt: "2px"}}
                 color={showPhotos ? "primary" : "inherit"}
               />
             </IconButton>
@@ -415,7 +413,7 @@ function Map() {
             console.error(error)
           }
           rowHeight={35}
-          disableColumnMenu={true}
+          disableColumnMenu={false}
           rows={rows}
           autoHeight={selected.length <= 7}
           initialState={{
