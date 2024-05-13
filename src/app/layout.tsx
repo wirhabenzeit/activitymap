@@ -11,6 +11,8 @@ import {DrawerHeader} from "~/components/Drawer";
 import {auth} from "~/auth";
 import {db} from "~/server/db";
 import type {User} from "~/server/db/schema";
+import {Analytics} from "@vercel/analytics/react";
+import {SpeedInsights} from "@vercel/speed-insights/next";
 
 export const metadata = {
   title: "Activity Map",
@@ -46,6 +48,8 @@ export default async function RootLayout({
           content="#1976d2"
         />
         <link rel="manifest" href="/site.webmanifest" />
+        <Analytics />
+        <SpeedInsights />
       </head>
       <body>
         <AppRouterCacheProvider>

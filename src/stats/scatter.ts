@@ -41,7 +41,7 @@ const valueOptions = {
   },
   date: {
     id: "date",
-    fun: (d: Activity) => new Date(d.start_date_local!),
+    fun: (d: Activity) => d.start_date_local,
     formatAxis: (v: Date) => d3.timeFormat("%b %Y")(v),
     format: (v: Date) => d3.timeFormat("%Y-%m-%d")(v),
     label: "Date",
@@ -79,7 +79,10 @@ export const settings = {
     options: {
       sport_group: {
         id: "sport_group",
-        fun: (d: Activity) => aliasMap[d.sport_type],
+        fun: (d: Activity) =>
+          aliasMap[
+            d.sport_type
+          ] as keyof typeof categorySettings,
         color: (id: keyof typeof categorySettings) =>
           categorySettings[id].color,
         icon: (id: keyof typeof categorySettings) =>
@@ -160,7 +163,9 @@ export const plot =
       },
       r: {
         range: [0, 10],
-        domain: d3.extent(activities, rValue.fun),
+        domain: d3.extent(activities, (act: Activity) =>
+          rValue.fun(act)
+        ),
       },
       marks: [
         Plot.frame(),
@@ -177,10 +182,10 @@ export const plot =
           },
           tip: {
             format: {
-              x: null,
-              y: null,
-              r: null,
-              stroke: null,
+              x: false,
+              y: false,
+              r: false,
+              stroke: false,
               Activity: (x) => x,
               [rValue.label]: rValue.format,
               [xValue.label]: xValue.format,
@@ -200,10 +205,80 @@ export const plot =
 export const legend =
   (setting: ScatterSetting) => (plot: Plot.Plot) => {
     const {rValue} = getter(setting);
-    return legendRadius(plot.scale("r"), {
-      ticks: 4,
-      tickFormat: rValue.format,
-      label: rValue.label,
+    const scale = plot.scale("r");
+    if (
+      !scale ||
+      !scale.domain ||
+      !scale.range ||
+      !Array.isArray(scale.range) ||
+      scale.range.length < 2
+    )
+      return null;
+    const ticks = 4;
+    const tickFormat = rValue.format;
+    const label = rValue.label;
+    const strokeWidth = 0.5;
+    const strokeDasharray = "5,4";
+    const lineHeight = 8;
+    const gap = 20;
+    const r0 = scale.range[1];
+
+    let s;
+    if (
+      scale.type === "pow" &&
+      scale.exponent !== undefined
+    ) {
+      s = d3
+        .scalePow(scale.domain, scale.range)
+        .exponent(scale.exponent);
+    } else s = d3.scaleLinear(scale.domain, scale.range);
+
+    const shiftY = label ? 10 : 0;
+
+    let h = Infinity;
+    const values = s
+      .ticks(ticks)
+      .reverse()
+      .filter(
+        (t) => h - s(t) > lineHeight / 2 && (h = s(t))
+      );
+
+    return Plot.plot({
+      x: {type: "identity", axis: null},
+      r: {type: "identity"},
+      y: {type: "identity", axis: null},
+      caption: "",
+      marks: [
+        Plot.link(values, {
+          x1: r0 + 2,
+          y1: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
+          x2: 2 * r0 + 2 + gap,
+          y2: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
+          strokeWidth: strokeWidth / 2,
+          strokeDasharray,
+        }),
+        Plot.dot(values, {
+          r: s,
+          x: r0 + 2,
+          y: (d) => 8 + 2 * r0 - s(d) + shiftY,
+          strokeWidth,
+        }),
+        Plot.text(values, {
+          x: 2 * r0 + 2 + gap,
+          y: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
+          textAnchor: "start",
+          dx: 4,
+          text: tickFormat,
+        }),
+        Plot.text(label ? [label] : [], {
+          x: 0,
+          y: 6,
+          textAnchor: "start",
+          fontWeight: "bold",
+        }),
+      ],
+      width: 100,
+      height: 40,
     });
   };
 
@@ -215,73 +290,3 @@ export default {
   getter,
   setter,
 };
-
-function legendRadius(
-  scale,
-  {
-    label = scale.label,
-    ticks = 5,
-    tickFormat = (d) => d,
-    strokeWidth = 0.5,
-    strokeDasharray = [5, 4],
-    lineHeight = 8,
-    gap = 20,
-    style,
-  } = {}
-) {
-  // const s = scale.scale;
-  const s =
-    scale.type === "pow"
-      ? d3
-          .scalePow(scale.domain, scale.range)
-          .exponent(scale.exponent)
-      : d3.scaleLinear(scale.domain, scale.range);
-
-  const r0 = scale.range[1];
-  const shiftY = label ? 10 : 0;
-
-  let h = Infinity;
-  const values = s
-    .ticks(ticks)
-    .reverse()
-    .filter((t) => h - s(t) > lineHeight / 2 && (h = s(t)));
-
-  return Plot.plot({
-    x: {type: "identity", axis: null},
-    r: {type: "identity"},
-    y: {type: "identity", axis: null},
-    caption: "",
-    marks: [
-      Plot.link(values, {
-        x1: r0 + 2,
-        y1: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
-        x2: 2 * r0 + 2 + gap,
-        y2: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
-        strokeWidth: strokeWidth / 2,
-        strokeDasharray,
-      }),
-      Plot.dot(values, {
-        r: s,
-        x: r0 + 2,
-        y: (d) => 8 + 2 * r0 - s(d) + shiftY,
-        strokeWidth,
-      }),
-      Plot.text(values, {
-        x: 2 * r0 + 2 + gap,
-        y: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
-        textAnchor: "start",
-        dx: 4,
-        text: tickFormat,
-      }),
-      Plot.text(label ? [label] : [], {
-        x: 0,
-        y: 6,
-        textAnchor: "start",
-        fontWeight: "bold",
-      }),
-    ],
-    width: 100,
-    height: 40,
-    style,
-  });
-}

@@ -134,6 +134,7 @@ export const SelectFormElement = <K extends string, T>({
   value: K;
   setter: (value: K) => void;
 }) => {
+  if (Object.keys(setting.options).length == 1) return null;
   return (
     <FormControl>
       <InputLabel>{setting.label}</InputLabel>

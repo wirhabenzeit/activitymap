@@ -4,7 +4,6 @@ import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
 
 import {commonSettings} from "~/stats";
-import {X} from "@mui/icons-material";
 
 type ProgressSetting = {
   value: keyof typeof settings.value.options;
@@ -175,10 +174,8 @@ export const plot =
       ...entry,
       virtualDate: new Date(
         new Date("2024-01-01").getTime() +
-          new Date(entry.start_date_local).getTime() -
-          by
-            .tick(new Date(entry.start_date_local))
-            .getTime()
+          entry.start_date_local!.getTime() -
+          by.tick(entry.start_date_local).getTime()
       ),
     }));
 
