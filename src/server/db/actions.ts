@@ -3,6 +3,7 @@
 import {inArray, eq} from "drizzle-orm";
 import {
   type Activity,
+  type Account,
   activities,
   photos,
   accounts,
@@ -24,14 +25,22 @@ export const getUser = async (id?: string) => {
   return user;
 };
 
-export const getAccount = async (userID?: string) => {
-  if (!userID) {
+export const getAccount = async (
+  providerAccountId?: number
+) => {
+  let account: Account;
+  if (!providerAccountId) {
     const user = await getUser();
-    userID = user!.id!;
+    account = (await db.query.accounts.findFirst({
+      where: (accounts, {eq}) =>
+        eq(accounts.userId, user!.id!),
+    })) as Account;
+  } else {
+    account = (await db.query.accounts.findFirst({
+      where: (accounts, {eq}) =>
+        eq(accounts.providerAccountId, providerAccountId),
+    })) as Account;
   }
-  const account = await db.query.accounts.findFirst({
-    where: (accounts, {eq}) => eq(accounts.userId, userID!),
-  });
   if (!account) throw new Error("Account not found");
   if (
     account.expires_at &&
@@ -89,12 +98,19 @@ export const getAccount = async (userID?: string) => {
 export async function getActivities({
   ids,
   athlete_id,
+  summary = false,
 }: {
   ids?: number[];
   athlete_id?: number;
+  summary?: boolean;
 }) {
   let acts: Activity[];
-  if (ids !== undefined)
+  if (summary) {
+    acts = await db
+      .select()
+      .from(activities)
+      .where(eq(activities.detailed_activity, false));
+  } else if (ids !== undefined)
     acts = await db
       .select()
       .from(activities)

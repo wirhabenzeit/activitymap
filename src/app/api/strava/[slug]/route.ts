@@ -5,7 +5,8 @@ import {
   type Activity,
 } from "~/server/db/schema";
 import {db} from "~/server/db";
-import {getActivities} from "~/server/strava/actions";
+import {getActivities as getStravaActivities} from "~/server/strava/actions";
+import {getActivities as getDBActivities} from "~/server/db/actions";
 import {eq} from "drizzle-orm";
 
 export async function GET(
@@ -24,7 +25,35 @@ export async function GET(
   }
 
   if (params.slug === "cron") {
-    return new Response("OK");
+    const acts = await getDBActivities({summary: true});
+    const newest15 = acts
+      .sort(
+        (a, b) =>
+          b.start_date_local_timestamp -
+          a.start_date_local_timestamp
+      )
+      .slice(0, 15);
+    console.log(
+      "UPDATING",
+      newest15.map((a) => [a.name, a.id, a.athlete])
+    );
+    const detailedActs = await getStravaActivities({
+      activities: newest15.map(({id, athlete}) => ({
+        id,
+        athlete,
+      })),
+      database: true,
+      get_photos: true,
+    });
+    return new Response(
+      `Found ${
+        acts.length
+      } activities with missing details, updated ${
+        detailedActs.activities.length
+      } activities: ${detailedActs.activities
+        .map((a) => a.name)
+        .join(", ")}`
+    );
   }
 
   return new Response(`Invalid endpoint`, {status: 404});
@@ -78,8 +107,10 @@ export async function POST(
         data.aspect_type === "create" ||
         data.aspect_type === "update"
       ) {
-        await getActivities({
-          ids: [data.object_id],
+        await getStravaActivities({
+          activities: [
+            {id: data.object_id, athlete: data.owner_id},
+          ],
           database: true,
           get_photos: true,
         });

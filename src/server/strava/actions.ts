@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  activities,
+  activities as activitySchema,
   photos,
   type Activity,
   type Photo,
@@ -167,7 +167,7 @@ export async function updateActivity(
 function parseActivity(
   json: Record<string, unknown>
 ): Activity {
-  const tableKeys = Object.keys(activities);
+  const tableKeys = Object.keys(activitySchema);
   const filteredInput = Object.fromEntries(
     Object.entries(json).filter(([key]) =>
       tableKeys.includes(key)
@@ -317,29 +317,37 @@ export async function getActivities({
   database = true,
   get_photos = false,
   page = 1,
-  ids,
+  activities,
   per_page = 200,
   after,
   before,
+  access_token,
 }: {
   database?: boolean;
   get_photos?: boolean;
   page?: number;
-  ids?: number[];
+  activities?: {id: number; athlete?: number}[];
   per_page?: number;
   after?: number;
   before?: number;
+  access_token?: string;
 }) {
   try {
-    const access_token = (await getAccount()).access_token!;
+    if (!access_token)
+      access_token = (await getAccount()).access_token!;
     let new_activities: Record<string, unknown>[] = [];
-    if (ids !== undefined)
+    if (activities !== undefined) {
+      const tokens = (
+        await Promise.all(
+          activities.map(({athlete}) => getAccount(athlete))
+        )
+      ).map(({access_token}) => access_token);
       new_activities = (await Promise.all(
-        ids.map((id) =>
-          get(`activities/${id}`, {token: access_token})
+        activities.map(({id}, i) =>
+          get(`activities/${id}`, {token: tokens[i]!})
         )
       )) as Record<string, unknown>[];
-    else {
+    } else {
       const params = new URLSearchParams(
         Object.fromEntries(
           Object.entries({
@@ -376,14 +384,14 @@ export async function getActivities({
       : [];
     if (database) {
       const insertedActivities = await db
-        .insert(activities)
+        .insert(activitySchema)
         .values(parsedActivities)
         .onConflictDoUpdate({
-          target: activities.id,
+          target: activitySchema.id,
           set: buildConflictUpdateColumns(
-            activities,
+            activitySchema,
             (column) =>
-              ids != undefined ||
+              activities != undefined ||
               (column != "description" &&
                 column != "map" &&
                 column != "detailed_activity")

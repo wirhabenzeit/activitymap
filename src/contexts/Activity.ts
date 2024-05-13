@@ -12,6 +12,7 @@ import {
 } from "geojson";
 
 import {
+  getAccount,
   getActivities as getDBActivities,
   getPhotos,
 } from "~/server/db/actions";
@@ -67,10 +68,12 @@ export type ActivityZustand = {
     photos,
     before,
     ids,
+    athleteId,
   }: {
     photos?: boolean;
     before?: number;
     ids?: number[];
+    athleteId?: number;
   }) => Promise<number>;
 };
 
@@ -164,15 +167,22 @@ export const activitySlice: StateCreator<
       throw new Error("Failed to fetch activities");
     }
   },
-  loadFromStrava: async ({photos, before, ids}) => {
+  loadFromStrava: async ({
+    photos,
+    before,
+    ids,
+    athleteId,
+  }) => {
     set((state) => {
       state.loading = true;
     });
     try {
+      if (!athleteId)
+        athleteId = (await getAccount()).providerAccountId;
       const {activities: acts} = await getStravaActivities({
         get_photos: photos,
         before,
-        ids,
+        activities: ids?.map((id) => ({id, athleteId})),
       });
       console.log(acts);
       set(setActivities(acts));
