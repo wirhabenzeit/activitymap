@@ -73,8 +73,6 @@ export default function MainContainer({
       load(activities)
         .then(console.log)
         .catch(console.error);
-    } else {
-      setGuest(true);
     }
 
     async function load(activities?: number[]) {
