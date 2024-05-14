@@ -13,6 +13,7 @@ jobs:
         with:
           method: "GET"
           url: "https://activitymap.dominik.page/api/strava/cron"
+          timeout: 10000
       - name: Show Response
         run: |
           echo ${{ steps.myRequest.outputs.response }}

@@ -202,7 +202,11 @@ export const plot =
     return Plot.plot({
       ...commonSettings,
       ...(showCrosshair
-        ? {marginBottom: 40, marginLeft: 70}
+        ? {
+            marginBottom: 40,
+            marginLeft: 70,
+            marginRight: 70,
+          }
         : {}),
       width,
       height,
@@ -217,7 +221,8 @@ export const plot =
         axis: "right",
         label: null,
         tickFormat: value.format,
-        ticks: 6,
+        ...(showCrosshair ? {} : {tickRotate: -60}),
+        tickSpacing: 60,
       },
       color: {
         //type: "categorical",
