@@ -21,6 +21,7 @@ export default function MainContainer({
     toggleUserSettings,
     setUser,
     setGuest,
+    setLoading,
   } = useStore((state) => ({
     loadFromDB: state.loadFromDB,
     updateFilters: state.updateFilters,
@@ -29,6 +30,7 @@ export default function MainContainer({
     loadPhotos: state.loadPhotos,
     setUser: state.setUser,
     setGuest: state.setGuest,
+    setLoading: state.setLoading,
   }));
 
   const searchParams = useSearchParams();
@@ -63,6 +65,8 @@ export default function MainContainer({
       load(activities)
         .then(console.log)
         .catch(console.error);
+    } else {
+      setLoading(false);
     }
 
     async function load(activities?: number[]) {

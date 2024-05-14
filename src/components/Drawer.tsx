@@ -2,8 +2,10 @@
 import {
   useRef,
   useState,
+  useCallback,
   useEffect,
   type ReactElement,
+  use,
 } from "react";
 
 import {
@@ -207,12 +209,70 @@ export function MultiSelect({
   );
 }
 
+function debounce<T>(
+  func: (...param: T[]) => void,
+  timeout = 3000
+) {
+  let timer: number;
+
+  return (...args: T[]) => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(func, timeout, ...args);
+  };
+}
+
+const TextFieldDebounced: React.FC<{
+  debounceMs?: number;
+  onChange: (p: string) => void;
+  value: string;
+}> = ({debounceMs = 300, onChange, value = ""}) => {
+  const debouncedChangeHandler = useCallback(
+    debounce(onChange, debounceMs),
+    []
+  );
+
+  const handleChange = ({
+    target,
+  }: React.ChangeEvent<HTMLInputElement>) => {
+    debouncedChangeHandler(target.value);
+  };
+
+  return (
+    <TextField value={value} onChange={handleChange} />
+  );
+};
+
+const useDebounce = (value: string, delay = 500) => {
+  const [debouncedValue, setDebouncedValue] = useState("");
+  const timerRef = useRef<NodeJS.Timeout | null>();
+
+  useEffect(() => {
+    timerRef.current = setTimeout(
+      () => setDebouncedValue(value),
+      delay
+    );
+
+    return () => {
+      if (timerRef.current !== null)
+        clearTimeout(timerRef.current);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 export function SearchBox() {
   const [openSearch, setOpenSearch] = useState(false);
   const {search, setSearch} = useStore((state) => ({
     search: state.search,
     setSearch: state.setSearch,
   }));
+
+  const [text, setText] = useState(search);
+  const debouncedSearch = useDebounce(text, 300);
+  useEffect(() => {
+    setSearch(debouncedSearch);
+  }, [debouncedSearch]);
 
   return (
     <SidebarButton
@@ -240,10 +300,10 @@ export function SearchBox() {
         sx={{width: "200px", mr: 1, mt: 0.5}}
         margin="none"
         size="small"
-        label="Activity Title"
-        value={search}
+        label="Title/Description"
+        value={text}
         onChange={(event) => {
-          setSearch(event.target.value);
+          setText(event.target.value);
         }}
       />
     </SidebarButton>

@@ -133,6 +133,9 @@ export const filterSlice: StateCreator<
           state.search &&
           !row.name
             .toLowerCase()
+            .includes(state.search.toLowerCase()) &&
+          !row.description
+            ?.toLowerCase()
             .includes(state.search.toLowerCase())
         ) {
           return false;
