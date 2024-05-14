@@ -13,6 +13,7 @@ import {
 } from "~/settings/category";
 
 import {commonSettings} from "~/stats";
+import {title} from "process";
 
 export const settings = {
   averaging: {
@@ -112,6 +113,8 @@ export const settings = {
       sport_group: {
         id: "sport_group",
         label: "Type",
+        format: (id: keyof typeof categorySettings) =>
+          categorySettings[id].name,
         fun: (d: Activity) => aliasMap[d.sport_type],
         color: (id: keyof typeof categorySettings) =>
           categorySettings[id].color,
@@ -128,6 +131,7 @@ export const settings = {
       no_group: {
         id: "no_group",
         label: "All",
+        format: () => "All",
         fun: () => "All",
         color: () => "#000000",
         icon: () => "child-reaching",
@@ -324,7 +328,7 @@ export const plot =
         tickFormat: timeline.value.format,
         ticks: 6,
         ...timeline.yScale.prop,
-        label: "",
+        label: null,
         axis: "right",
       },
       x: {axis: "top"},
@@ -400,18 +404,16 @@ export const plot =
               channels: {
                 Date: "date",
                 Type: "type",
-                [timeline.value.label]: "value",
               },
               format: {
-                y: false,
-                x: false,
-                stroke: false,
-                z: false,
-                Type: (x) => categorySettings[x].name,
-                [timeline.value.label]: (x) =>
+                y: (x) =>
                   `${timeline.value.format(x)}${
                     timeline.value.unit
                   }`,
+                Type: (x) => timeline.group.format(x),
+                x: false,
+                stroke: false,
+                z: false,
               },
             },
           })

@@ -61,7 +61,6 @@ export default function MainContainer({
         .get("activities")
         ?.split(",")
         .map(Number);
-      console.log("loading activities", activities);
       load(activities)
         .then(console.log)
         .catch(console.error);
@@ -70,7 +69,6 @@ export default function MainContainer({
     }
 
     async function load(activities?: number[]) {
-      console.log("loading activities");
       const nActivities = await loadFromDB({
         ids: activities,
       });

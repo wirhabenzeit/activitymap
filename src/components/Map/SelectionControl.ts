@@ -2,6 +2,8 @@
 
 import {MapMouseEvent, Point, PointLike} from "mapbox-gl";
 import {MapContextValue} from "react-map-gl/dist/esm/components/map";
+import {useControl} from "react-map-gl";
+import {useStore} from "~/contexts/Zustand";
 
 const styles = `
 .boxdraw {
@@ -14,6 +16,25 @@ const styles = `
     height: 0;
 }
 `;
+
+export function Selection() {
+  const {setSelected} = useStore((state) => ({
+    setSelected: state.setSelected,
+  }));
+
+  useControl(
+    (context: MapContextValue) =>
+      new SelectionControl({
+        context,
+        layers: ["routeLayerBG", "routeLayerBGsel"],
+        source: "routeSource",
+        selectionHandler: (sel: number[]) => {
+          setSelected(Array.from(new Set(sel)));
+        },
+      })
+  );
+  return null;
+}
 
 export class SelectionControl {
   layers: string[];
@@ -163,7 +184,6 @@ export class SelectionControl {
   };
 
   onRemove(map: mapboxgl.Map) {
-    console.log("onRemove", map);
     map.off("mousedown", this.mouseDown);
     map.off("click", this.click);
     this._container.parentNode?.removeChild(

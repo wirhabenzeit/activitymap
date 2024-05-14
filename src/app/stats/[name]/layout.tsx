@@ -151,6 +151,7 @@ export default function Stats({
           sx={{
             display: "inline-flex",
             width: `calc(100% - 40px)`,
+            minHeight: "40px",
           }}
         >
           {Object.entries(tabs).map(([url, tab]) => (
@@ -159,6 +160,11 @@ export default function Stats({
               label={tab.label}
               component={Link}
               href={url}
+              sx={{
+                minHeight: "40px",
+                py: "8px",
+                fontSize: "0.8rem",
+              }}
             />
           ))}
         </MuiTabs>
@@ -199,7 +205,7 @@ export default function Stats({
           height: "60px",
           display: settingsOpen ? "block" : "none",
           borderTop: 1,
-          zIndex: 1,
+          //zIndex: 1,
           boxShadow: 1,
           borderColor: "divider",
           overflowY: "hidden",

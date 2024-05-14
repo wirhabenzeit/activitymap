@@ -136,10 +136,9 @@ export const SelectFormElement = <K extends string, T>({
 }) => {
   if (Object.keys(setting.options).length == 1) return null;
   return (
-    <FormControl>
-      <InputLabel>{setting.label}</InputLabel>
+    <FormControl variant="outlined" size="small">
+      <InputLabel id="test">{setting.label}</InputLabel>
       <Select
-        size="small"
         autoWidth
         value={value}
         onChange={(event: SelectChangeEvent) =>

@@ -413,7 +413,7 @@ export async function getActivities({
           }
         )
       : [];
-    if (database) {
+    if (database && parsedActivities.length > 0) {
       const insertedActivities = await db
         .insert(activitySchema)
         .values(parsedActivities)

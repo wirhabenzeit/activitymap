@@ -39,6 +39,9 @@ export function LayerSwitcher() {
   }));
 
   const map = useMap();
+
+  if (map.current == undefined) return;
+
   const [anchorEl, setAnchorEl] =
     useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);

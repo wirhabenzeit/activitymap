@@ -7,6 +7,7 @@ import {
   type FC,
   type RefObject,
   createRef,
+  useEffect,
 } from "react";
 
 import {IconButton, Paper} from "@mui/material";
@@ -17,13 +18,21 @@ import ReactMapGL, {
   NavigationControl,
   GeolocateControl,
   FullscreenControl,
-  useControl,
   Layer,
   Source,
-  type ControlPosition,
   type MapRef,
-  useMap,
+  type SkyLayer,
 } from "react-map-gl";
+
+const skyLayer: SkyLayer = {
+  id: "sky",
+  type: "sky",
+  paint: {
+    "sky-type": "atmosphere",
+    "sky-atmosphere-sun": [0.0, 0.0],
+    "sky-atmosphere-sun-intensity": 15,
+  },
+};
 
 import Overlay from "~/components/Map/Overlay";
 
@@ -39,36 +48,13 @@ import {categorySettings} from "~/settings/category";
 import {listSettings} from "~/settings/list";
 
 import {Download} from "~/components/Map/DownloadControl";
-import {SelectionControl} from "~/components/Map/SelectionControl";
+import {Selection} from "~/components/Map/SelectionControl";
 import {LayerSwitcher} from "~/components/Map/LayerSwitcher";
 import type {Activity} from "~/server/db/schema";
 import {MapContextValue} from "react-map-gl/dist/esm/components/map";
 import PhotoLayer from "~/components/Map/Photo";
-import {
-  Camera,
-  CameraAlt,
-  CameraFront,
-} from "@mui/icons-material";
-import mapboxgl from "mapbox-gl";
-
-function Selection() {
-  const {setSelected} = useStore((state) => ({
-    setSelected: state.setSelected,
-  }));
-
-  useControl(
-    (context: MapContextValue) =>
-      new SelectionControl({
-        context,
-        layers: ["routeLayerBG", "routeLayerBGsel"],
-        source: "routeSource",
-        selectionHandler: (sel: number[]) => {
-          setSelected(Array.from(new Set(sel)));
-        },
-      })
-  );
-  return null;
-}
+import {CameraAlt} from "@mui/icons-material";
+import mapboxgl, {MapboxEvent} from "mapbox-gl";
 
 function RouteLayer() {
   const {filterIDs} = useStore((state) => ({
@@ -223,6 +209,7 @@ function Map() {
   const mapRefLoc = createRef<MapRef>();
 
   const loaded = useStore((state) => state.loaded);
+  const [terrain, setTerrain] = useState(false);
   const [viewport, setViewport] = useState(mapPosition);
 
   const overlayMaps = useMemo(
@@ -290,6 +277,8 @@ function Map() {
             );
           }
         }}
+        optimizeForTerrain={true}
+        onLoad={(event: MapboxEvent) => console.log(event)}
         projection={
           "globe" as unknown as mapboxgl.Projection
         }
@@ -335,6 +324,7 @@ function Map() {
           tileSize={512}
           maxzoom={14}
         />
+        <Layer {...skyLayer} />
         <NavigationControl position="top-right" />
         <GeolocateControl position="top-right" />
         <FullscreenControl position="top-right" />
