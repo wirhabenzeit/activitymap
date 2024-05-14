@@ -11,6 +11,7 @@ jobs:
         id: myRequest
         uses: fjogeleit/http-request-action@v1
         with:
+          method: "GET"
           url: "https://activitymap.dominik.page/api/strava/cron"
       - name: Show Response
         run: |

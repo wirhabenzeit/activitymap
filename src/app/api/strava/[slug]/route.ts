@@ -43,7 +43,7 @@ export async function GET(
         athlete,
       })),
       database: true,
-      get_photos: true,
+      get_photos: false,
     });
     return new Response(
       `Found ${
