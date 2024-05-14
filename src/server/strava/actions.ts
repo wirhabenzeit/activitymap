@@ -245,19 +245,20 @@ function parsePhoto(
 }
 
 export async function getPhotos(
-  locations: Record<number, [number, number] | null>,
+  phts: Record<
+    number,
+    {loc?: [number, number]; token: string}
+  >,
   {
-    token,
     sizes = [2048],
   }: {
-    token: string;
     sizes: number[];
   }
 ): Promise<Photo[]> {
   try {
     const promises = sizes
       .map((size) =>
-        Object.keys(locations).map((id) =>
+        Object.entries(phts).map(([id, {token}]) =>
           get(
             `activities/${id}/photos?size=${size}&photo_sources=true`,
             {token}
@@ -274,7 +275,7 @@ export async function getPhotos(
           if (!acc[photo.unique_id])
             acc[photo.unique_id] = parsePhoto(photo, {
               location:
-                locations[photo.activity_id!] || null,
+                phts[photo.activity_id!]?.loc || null,
             });
           if (acc[photo.unique_id]) {
             acc[photo.unique_id].sizes = {
@@ -326,28 +327,40 @@ export async function getActivities({
   database?: boolean;
   get_photos?: boolean;
   page?: number;
-  activities?: {id: number; athlete?: number}[];
+  activities?: {id: number; athlete: number}[];
   per_page?: number;
   after?: number;
   before?: number;
   access_token?: string;
 }) {
   try {
-    if (!access_token)
-      access_token = (await getAccount()).access_token!;
     let new_activities: Record<string, unknown>[] = [];
+    let tokens = {} as Record<number, string>;
     if (activities !== undefined) {
-      const tokens = (
-        await Promise.all(
-          activities.map(({athlete}) => getAccount(athlete))
+      const athlete_ids = activities.map(
+        ({athlete}) => athlete
+      );
+      const athlete_tokens = await Promise.all(
+        athlete_ids.map((id) => getAccount(id))
+      );
+      tokens = Object.fromEntries(
+        athlete_tokens.map(
+          ({providerAccountId, access_token}) => [
+            providerAccountId,
+            access_token!,
+          ]
         )
-      ).map(({access_token}) => access_token);
+      );
       new_activities = (await Promise.all(
-        activities.map(({id}, i) =>
-          get(`activities/${id}`, {token: tokens[i]!})
+        activities.map(({id, athlete}) =>
+          get(`activities/${id}`, {token: tokens[athlete!]})
         )
       )) as Record<string, unknown>[];
     } else {
+      if (!access_token) {
+        const account = await getAccount();
+        access_token = account.access_token!;
+      }
       const params = new URLSearchParams(
         Object.fromEntries(
           Object.entries({
@@ -363,6 +376,11 @@ export async function getActivities({
         `athlete/activities?${params.toString()}`,
         {token: access_token}
       )) as Record<string, unknown>[];
+      if (new_activities.length > 0) {
+        const athlete_id = new_activities[0]
+          ?.athlete_id as number;
+        if (athlete_id) tokens[athlete_id] = access_token;
+      }
     }
     const parsedActivities: Activity[] =
       new_activities.map(parseActivity);
@@ -371,13 +389,14 @@ export async function getActivities({
           Object.fromEntries(
             parsedActivities
               .filter((x) => x.total_photo_count > 0)
-              .map(({id, start_latlng: location}) => [
-                id,
-                location,
-              ])
+              .map(
+                ({id, start_latlng: location, athlete}) => [
+                  id,
+                  {loc: location, token: tokens[athlete]!},
+                ]
+              )
           ),
           {
-            token: access_token,
             sizes: [256, 2048],
           }
         )

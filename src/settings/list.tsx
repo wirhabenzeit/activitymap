@@ -147,6 +147,14 @@ export const listSettings = {
       field: "description",
       headerName: "Description",
       flex: 2,
+      renderHeader: () => (
+        <Tooltip title="Start date">
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="file-lines"
+          />
+        </Tooltip>
+      ),
       editable: true,
       minWidth: 80,
     },
@@ -459,7 +467,7 @@ export const listSettings = {
       columnVisibilityModel: {
         type: false,
         id: false,
-        description: false,
+        description: true,
         time: false,
         max_watts: false,
         moving_time: false,
@@ -486,7 +494,7 @@ export const listSettings = {
       columnVisibilityModel: {
         id: false,
         time: false,
-        description: false,
+        description: true,
         max_watts: false,
         moving_time: false,
         elev_high: false,

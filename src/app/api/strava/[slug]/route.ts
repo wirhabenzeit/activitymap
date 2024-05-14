@@ -26,19 +26,19 @@ export async function GET(
 
   if (params.slug === "cron") {
     const acts = await getDBActivities({summary: true});
-    const newest15 = acts
+    const newest = acts
       .sort(
         (a, b) =>
           b.start_date_local_timestamp -
           a.start_date_local_timestamp
       )
-      .slice(0, 50);
+      .slice(0, 30);
     console.log(
       "UPDATING",
-      newest15.map((a) => [a.name, a.id, a.athlete])
+      newest.map((a) => [a.name, a.id, a.athlete])
     );
     const detailedActs = await getStravaActivities({
-      activities: newest15.map(({id, athlete}) => ({
+      activities: newest.map(({id, athlete}) => ({
         id,
         athlete,
       })),
