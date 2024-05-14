@@ -377,13 +377,25 @@ export async function getActivities({
         {token: access_token}
       )) as Record<string, unknown>[];
       if (new_activities.length > 0) {
-        const athlete_id = new_activities[0]
-          ?.athlete_id as number;
-        if (athlete_id) tokens[athlete_id] = access_token;
+        console.log("new activities", new_activities[0]);
+        const athlete_id = new_activities[0]!.athlete!
+          .id as number;
+        console.log("athlete id", athlete_id);
+        if (athlete_id) {
+          tokens[athlete_id] = access_token;
+          console.log("token", tokens[athlete_id]);
+        }
+        console.log(tokens);
       }
     }
     const parsedActivities: Activity[] =
       new_activities.map(parseActivity);
+    console.log(
+      "Fetched activities",
+      parsedActivities.length,
+      "now fetching photos",
+      tokens
+    );
     const new_photos: Photo[] = get_photos
       ? await getPhotos(
           Object.fromEntries(

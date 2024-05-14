@@ -179,14 +179,21 @@ export const activitySlice: StateCreator<
     try {
       if (!athleteId)
         athleteId = (await getAccount()).providerAccountId;
-      const {activities: acts} = await getStravaActivities({
-        get_photos: photos,
-        before,
-        activities: ids?.map((id) => ({id, athleteId})),
-      });
-      console.log(acts);
-      set(setActivities(acts));
-      return acts.length;
+      if (athleteId != undefined) {
+        const {activities: acts} =
+          await getStravaActivities({
+            get_photos: photos,
+            before,
+            activities: ids?.map((id) => ({
+              id,
+              athlete: athleteId!,
+            })),
+          });
+        console.log(acts);
+        set(setActivities(acts));
+        return acts.length;
+      }
+      return 0;
     } catch (e) {
       console.error(e);
       throw new Error("Failed to fetch activities");
