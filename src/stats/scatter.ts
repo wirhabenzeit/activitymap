@@ -12,15 +12,14 @@ import {
   aliasMap,
 } from "~/settings/category";
 
-import {commonSettings} from "~/stats";
-import {act} from "react";
+import {commonSettings, prepend} from "~/stats";
 
 const valueOptions = {
   distance: {
     id: "distance",
     fun: (d: Activity) => d.distance! / 1000,
     format: (v: number) => v.toFixed() + "km",
-    formatAxis: (v: number) => v.toFixed(),
+    tickFormat: (v: number) => v.toFixed(),
     label: "Distance (km)",
     unit: "km",
   },
@@ -28,7 +27,7 @@ const valueOptions = {
     id: "elevation",
     fun: (d: Activity) => d.total_elevation_gain,
     format: (v: number) => (v / 1.0).toFixed() + "m",
-    formatAxis: (v: number) => (v / 1.0).toFixed(),
+    tickFormat: (v: number) => (v / 1.0).toFixed(),
     label: "Elevation (m)",
     unit: "m",
   },
@@ -36,15 +35,15 @@ const valueOptions = {
     id: "duration",
     fun: (d: Activity) => d.elapsed_time! / 3600,
     format: (v: number) => v.toFixed(1) + "h",
-    formatAxis: (v: number) => v.toFixed(0),
+    tickFormat: (v: number) => v.toFixed(0),
     label: "Duration (h)",
     unit: "h",
   },
   date: {
     id: "date",
     fun: (d: Activity) => d.start_date_local,
-    formatAxis: (v: Date) => d3.timeFormat("%Y")(v),
-    format: (v: Date) => d3.timeFormat("%Y-%m-%d")(v),
+    tickFormatShort: d3.timeFormat("'%y"),
+    format: d3.timeFormat("%Y-%m-%d"),
     label: "Date",
     unit: "",
   },
@@ -52,7 +51,7 @@ const valueOptions = {
     id: "average_speed",
     fun: (d: Activity) => (d.average_speed || 0) * 3.6,
     format: (v: number) => v.toFixed(1) + "km/h",
-    formatAxis: (v: number) => v.toFixed(1),
+    tickFormat: (v: number) => v.toFixed(1),
     label: "Avg Speed (km/h)",
     unit: "km/h",
   },
@@ -149,7 +148,7 @@ export const plot =
       ...(bigPlot
         ? {
             marginLeft: 70,
-            marginTop: 40,
+            marginTop: 50,
           }
         : {}),
       height: height,
@@ -162,20 +161,26 @@ export const plot =
       },
       marks: [
         Plot.axisY({
-          tickFormat: yValue.formatAxis,
           ticks: 6,
           label: null,
           anchor: "left",
           tickSize: 12,
           ...(bigPlot
-            ? {}
+            ? {
+                tickFormat:
+                  "tickFormat" in yValue
+                    ? yValue.tickFormat
+                    : undefined,
+              }
             : {
                 tickRotate: -90,
-                tickFormat: (x) =>
-                  ` ${yValue.formatAxis(x)}`,
                 textAnchor: "start",
                 tickSize: 14,
                 tickPadding: -10,
+                tickFormat:
+                  "tickFormatShort" in yValue
+                    ? prepend(" ", yValue.tickFormatShort)
+                    : prepend(" ", yValue.tickFormat),
               }),
         }),
         Plot.axisX({
@@ -184,12 +189,19 @@ export const plot =
           tickSize: 12,
           ...(!bigPlot
             ? {
-                tickFormat: (x) =>
-                  ` ${xValue.formatAxis(x)}`,
+                tickFormat:
+                  "tickFormatShort" in xValue
+                    ? prepend(" ", xValue.tickFormatShort)
+                    : prepend(" ", xValue.tickFormat),
                 textAnchor: "start",
                 tickPadding: -10,
               }
-            : {tickFormat: xValue.formatAxis}),
+            : {
+                tickFormat:
+                  "tickFormat" in xValue
+                    ? xValue.tickFormat
+                    : undefined,
+              }),
         }),
         Plot.dot(activities, {
           x: xValue.fun,

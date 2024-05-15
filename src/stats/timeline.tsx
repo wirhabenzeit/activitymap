@@ -12,7 +12,7 @@ import {
   aliasMap,
 } from "~/settings/category";
 
-import {commonSettings} from "~/stats";
+import {commonSettings, prepend} from "~/stats";
 
 export const settings = {
   averaging: {
@@ -265,8 +265,15 @@ export const plot =
       timeline.timePeriod.tick(new Date(d.start_date_local))
     );
 
+    if (extent[0] == undefined || extent[1] == undefined)
+      return null;
+
     const groupExtent = Array.from(
-      new Set(activities.map(timeline.group.fun))
+      new Set(
+        activities.map(timeline.group.fun) as Array<
+          keyof typeof categorySettings
+        >
+      )
     );
 
     const range = timeline.timePeriod.tick.range(
@@ -290,7 +297,7 @@ export const plot =
         value:
           groups.get(date)?.get(type) != undefined
             ? d3.sum(
-                groups.get(date)?.get(type),
+                groups.get(date)?.get(type)!,
                 timeline.value.fun
               )
             : 0,
@@ -299,19 +306,17 @@ export const plot =
 
     const data = timeMap
       .flat()
-      .sort(
-        (a, b) =>
-          a.start_date_local_timestamp -
-          b.start_date_local_timestamp
-      );
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
 
     const map = new d3.InternMap(
-      timeMap.map((arr) => [
-        arr[0].date,
-        new d3.InternMap(
-          arr.map(({value, type}) => [type, value])
-        ),
-      ])
+      timeMap.map((arr) => {
+        return [
+          arr[0]!.date,
+          new d3.InternMap(
+            arr.map(({value, type}) => [type, value])
+          ),
+        ];
+      })
     );
 
     const bigPlot = width > 500;
@@ -321,7 +326,7 @@ export const plot =
       ...(bigPlot
         ? {
             marginLeft: 70,
-            marginTop: 40,
+            marginTop: 50,
             marginRight: 60,
           }
         : {}),
@@ -341,8 +346,10 @@ export const plot =
             ? {}
             : {
                 tickRotate: -90,
-                tickFormat: (x) =>
-                  ` ${timeline.value.format(x)}`,
+                tickFormat: prepend(
+                  " ",
+                  timeline.value.format
+                ),
                 textAnchor: "start",
                 tickSize: 14,
                 tickPadding: -10,
@@ -354,7 +361,6 @@ export const plot =
         Plot.axisX({
           anchor: "top",
           label: null,
-          tickFormat: d3.timeFormat("%Y"),
           tickSize: 12,
           ...(!bigPlot
             ? {
@@ -375,12 +381,12 @@ export const plot =
                     Plot.pointerX({
                       textAnchor: "start",
                       px: (d) => d,
-                      y: (d) => map.get(d).get(type),
+                      y: (d) => map.get(d)!.get(type),
                       dx: 8,
                       frameAnchor: "right",
                       text: (d) =>
                         timeline.value.format(
-                          map.get(d)?.get(type)
+                          map.get(d)!.get(type)!
                         ),
                       fill: timeline.group.color(type),
                       fontSize: 12,

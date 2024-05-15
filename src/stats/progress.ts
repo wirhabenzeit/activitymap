@@ -3,7 +3,7 @@ import type {Activity} from "~/server/db/schema";
 import * as Plot from "@observablehq/plot";
 import * as d3 from "d3";
 
-import {commonSettings} from "~/stats";
+import {commonSettings, prepend} from "~/stats";
 
 type ProgressSetting = {
   value: keyof typeof settings.value.options;
@@ -156,19 +156,20 @@ export const plot =
             a.start_date_local_timestamp -
             b.start_date_local_timestamp
         );
+        if (acts.length == 0) return [];
         const cumsum = d3.cumsum(acts, value.fun);
         return [
           {
             start_date_local: by.tick(
-              acts[0].start_date_local
+              acts[0]!.start_date_local
             ),
-            [by.label]: dateKey,
+            by: dateKey,
             cumsum: 0,
           },
-          ...d3.zip(acts, cumsum).map(([act, sum]) => ({
+          ...acts.map((act, i) => ({
             ...act,
-            [by.label]: dateKey,
-            cumsum: sum,
+            by: dateKey,
+            cumsum: cumsum[i],
           })),
         ];
       });
@@ -183,23 +184,23 @@ export const plot =
     }));
 
     const keys = Array.from(
-      new d3.InternSet(
-        data.map((x) => by.tick(x[by.label]))
-      )
-    ).sort((a, b) => a - b);
+      new d3.InternSet(data.map((x) => by.tick(x.by)))
+    ).sort((a, b) => a.getTime() - b.getTime());
+
+    if (keys.length == 0) return Plot.plot({});
 
     data = data
       .filter((x) =>
         keys
           .slice(-5)
           .map((y) => y.getTime())
-          .includes(x[by.label].getTime())
+          .includes(x.by.getTime())
       )
       .map((x) => ({
         ...x,
         currentPeriod:
-          x[by.label].getTime() ==
-          keys[keys.length - 1].getTime(),
+          x.by.getTime() ==
+          keys[keys.length - 1]!.getTime(),
       }));
 
     return Plot.plot({
@@ -231,7 +232,7 @@ export const plot =
           tickSize: 12,
           ...(!bigPlot
             ? {
-                tickFormat: (x) => ` ${by.tickFormat(x)}`,
+                tickFormat: prepend(" ", by.tickFormat),
                 textAnchor: "start",
                 tickPadding: -10,
               }
@@ -247,7 +248,7 @@ export const plot =
             ? {}
             : {
                 tickRotate: -90,
-                tickFormat: (x) => ` ${value.format(x)}`,
+                tickFormat: prepend(" ", value.format),
                 textAnchor: "start",
                 tickSize: 14,
                 tickPadding: -10,
@@ -261,7 +262,7 @@ export const plot =
           Plot.pointer({
             px: "virtualDate",
             y: "cumsum",
-            stroke: by.label,
+            stroke: "by",
           })
         ),
         Plot.ruleX(
@@ -269,7 +270,7 @@ export const plot =
           Plot.pointer({
             x: "virtualDate",
             py: "cumsum",
-            stroke: by.label,
+            stroke: "by",
           })
         ),
         Plot.gridX({
@@ -278,7 +279,7 @@ export const plot =
         Plot.line(data, {
           y: "cumsum",
           x: "virtualDate",
-          stroke: by.label,
+          stroke: "by",
           curve: by.curve,
           opacity: 0.3,
           strokeWidth: (X) => (X.currentPeriod ? 4 : 2),
@@ -288,7 +289,7 @@ export const plot =
               Plot.dot(data, {
                 y: "cumsum",
                 x: "virtualDate",
-                stroke: by.label,
+                stroke: "by",
                 opacity: (x) => (x.currentPeriod ? 1 : 0.5),
               }),
             ]
@@ -298,7 +299,7 @@ export const plot =
           Plot.pointer({
             y: "cumsum",
             x: "virtualDate",
-            fill: by.label,
+            fill: "by",
           })
         ),
         Plot.tip(
@@ -306,7 +307,7 @@ export const plot =
           Plot.pointer({
             y: "cumsum",
             x: "virtualDate",
-            stroke: by.label,
+            stroke: "by",
             channels: {
               Date: "start_date_local",
               Name: "name",
@@ -321,15 +322,6 @@ export const plot =
             },
           })
         ),
-        /*...(bigPlot
-          ? [
-              Plot.crosshair(data, {
-                y: "cumsum",
-                x: "virtualDate",
-                color: by.label,
-              }),
-            ]
-          : []),*/
       ],
     });
   };
