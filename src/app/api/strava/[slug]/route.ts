@@ -25,6 +25,8 @@ export async function GET(
   }
 
   if (params.slug === "cron") {
+    const numberToFetch =
+      req.nextUrl.searchParams.get("number");
     const acts = await getDBActivities({summary: true});
     const newest = acts
       .sort(
@@ -32,7 +34,10 @@ export async function GET(
           b.start_date_local_timestamp -
           a.start_date_local_timestamp
       )
-      .slice(0, 30);
+      .slice(
+        0,
+        numberToFetch ? parseInt(numberToFetch) : 30
+      );
     console.log(
       "UPDATING",
       newest.map((a) => [a.name, a.id, a.athlete])
