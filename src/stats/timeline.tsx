@@ -13,7 +13,6 @@ import {
 } from "~/settings/category";
 
 import {commonSettings} from "~/stats";
-import {title} from "process";
 
 export const settings = {
   averaging: {
@@ -41,8 +40,6 @@ export const settings = {
         format: (v: number) =>
           v >= 10_000_000
             ? (v / 1_000_000).toFixed() + "k"
-            : v < 10_000
-            ? (v / 1000).toFixed(1)
             : (v / 1000).toFixed(),
         label: "Distance (km)",
         unit: "km",
@@ -61,8 +58,8 @@ export const settings = {
       time: {
         id: "time",
         sortable: true,
-        fun: (d: Activity) => d.elapsed_time,
-        format: (v: number) => (v / 3600).toFixed(1),
+        fun: (d: Activity) => (d.elapsed_time || 0) / 3600,
+        format: (v: number) => v.toFixed(0),
         label: "Duration (h)",
         unit: "h",
       },
@@ -166,7 +163,7 @@ export const settings = {
       },
     },
   },
-};
+} as const;
 
 export const defaultSettings: TimelineSetting = {
   averaging: {value: 1, domain: [0, 3]},
@@ -317,38 +314,71 @@ export const plot =
       ])
     );
 
-    const showCrosshair = width > 500;
+    const bigPlot = width > 500;
 
     return Plot.plot({
       ...commonSettings,
-      ...(showCrosshair
-        ? {marginBottom: 40, marginLeft: 70}
+      ...(bigPlot
+        ? {
+            marginBottom: 40,
+            marginLeft: 70,
+            marginTop: 40,
+            marginRight: 60,
+          }
         : {}),
-      y: {
-        tickFormat: timeline.value.format,
-        ticks: 6,
-        ...timeline.yScale.prop,
-        label: null,
-        axis: "right",
-      },
-      x: {axis: "top"},
       height: Math.max(height, 100),
       width: Math.max(width, 100),
+      y: {...timeline.yScale.prop},
       marks: [
-        Plot.frame(),
         Plot.ruleY([0]),
+        Plot.axisY({
+          tickFormat: timeline.value.format,
+          ticks: 6,
+          ...timeline.yScale.prop,
+          label: null,
+          anchor: "left",
+          tickSize: 12,
+          ...(bigPlot
+            ? {}
+            : {
+                tickRotate: -90,
+                tickFormat: (x) =>
+                  ` ${timeline.value.format(x)}`,
+                textAnchor: "start",
+                tickSize: 14,
+                tickPadding: -10,
+              }),
+        }),
+        Plot.gridX({
+          ticks: "year",
+        }),
+        Plot.axisX({
+          anchor: "top",
+          label: null,
+          tickFormat: d3.timeFormat("%Y"),
+          tickSize: 12,
+          ...(!bigPlot
+            ? {
+                //tickFormat: (x) =>
+                //  ` ${timeline.timePeriod.tickFormat(x)}`,
+                textAnchor: "start",
+                tickPadding: -10,
+                tickFormat: d3.timeFormat(" '%y"),
+              }
+            : {}),
+        }),
         ...[
           groupExtent.flatMap((type) => [
-            ...(showCrosshair
+            ...(bigPlot
               ? [
                   Plot.text(
                     range,
                     Plot.pointerX({
-                      textAnchor: "end",
+                      textAnchor: "start",
                       px: (d) => d,
                       y: (d) => map.get(d).get(type),
-                      dx: -15,
-                      frameAnchor: "left",
+                      dx: 8,
+                      frameAnchor: "right",
                       text: (d) =>
                         timeline.value.format(
                           map.get(d)?.get(type)
@@ -361,17 +391,17 @@ export const plot =
               : []),
             Plot.dot(
               range,
-              Plot.pointer({
+              Plot.pointerX({
                 x: (d) => d,
                 y: (d) => map.get(d)?.get(type),
-                opacity: 0.5,
+                //opacity: 1,
                 fill: timeline.group.color(type),
               })
             ),
           ]),
         ],
         Plot.ruleX(range, Plot.pointerX({})),
-        Plot.text(
+        /*Plot.text(
           range,
           Plot.pointerX({
             text: (d) =>
@@ -382,7 +412,7 @@ export const plot =
             frameAnchor: "bottom",
             dy: 20,
           })
-        ),
+        ),*/
         Plot.lineY(
           data,
           Plot.windowY({

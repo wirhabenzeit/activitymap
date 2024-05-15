@@ -13,6 +13,7 @@ import {
 } from "~/settings/category";
 
 import {commonSettings} from "~/stats";
+import {act} from "react";
 
 const valueOptions = {
   distance: {
@@ -35,23 +36,23 @@ const valueOptions = {
     id: "duration",
     fun: (d: Activity) => d.elapsed_time! / 3600,
     format: (v: number) => v.toFixed(1) + "h",
-    formatAxis: (v: number) => v.toFixed(1),
+    formatAxis: (v: number) => v.toFixed(0),
     label: "Duration (h)",
     unit: "h",
   },
   date: {
     id: "date",
     fun: (d: Activity) => d.start_date_local,
-    formatAxis: (v: Date) => d3.timeFormat("%b %Y")(v),
+    formatAxis: (v: Date) => d3.timeFormat("%Y")(v),
     format: (v: Date) => d3.timeFormat("%Y-%m-%d")(v),
     label: "Date",
     unit: "",
   },
   average_speed: {
     id: "average_speed",
-    fun: (d: Activity) => d.average_speed,
-    format: (v: number) => (v * 3.6).toFixed(1) + "km/h",
-    formatAxis: (v: number) => (v * 3.6).toFixed(1),
+    fun: (d: Activity) => (d.average_speed || 0) * 3.6,
+    format: (v: number) => v.toFixed(1) + "km/h",
+    formatAxis: (v: number) => v.toFixed(1),
     label: "Avg Speed (km/h)",
     unit: "km/h",
   },
@@ -141,26 +142,18 @@ export const plot =
     width: number;
     height: number;
   }) => {
+    const bigPlot = width > 500;
     const {xValue, yValue, rValue, group} = getter(setting);
-    const showCrosshair = width > 500;
     return Plot.plot({
       ...commonSettings,
+      ...(bigPlot
+        ? {
+            marginLeft: 70,
+            marginTop: 40,
+          }
+        : {}),
       height: height,
       width: width,
-      ...(showCrosshair
-        ? {marginBottom: 40, marginLeft: 70}
-        : {}),
-      x: {
-        tickFormat: xValue.formatAxis,
-        axis: "top",
-        ticks: width > 1000 ? 8 : 4,
-      },
-      y: {
-        tickFormat: yValue.formatAxis,
-        axis: "right",
-        ticks: 6,
-        label: null,
-      },
       r: {
         range: [0, 10],
         domain: d3.extent(activities, (act: Activity) =>
@@ -168,12 +161,42 @@ export const plot =
         ),
       },
       marks: [
-        Plot.frame(),
+        Plot.axisY({
+          tickFormat: yValue.formatAxis,
+          ticks: 6,
+          label: null,
+          anchor: "left",
+          tickSize: 12,
+          ...(bigPlot
+            ? {}
+            : {
+                tickRotate: -90,
+                tickFormat: (x) =>
+                  ` ${yValue.formatAxis(x)}`,
+                textAnchor: "start",
+                tickSize: 14,
+                tickPadding: -10,
+              }),
+        }),
+        Plot.axisX({
+          anchor: "top",
+          label: null,
+          tickSize: 12,
+          ...(!bigPlot
+            ? {
+                tickFormat: (x) =>
+                  ` ${xValue.formatAxis(x)}`,
+                textAnchor: "start",
+                tickPadding: -10,
+              }
+            : {tickFormat: xValue.formatAxis}),
+        }),
         Plot.dot(activities, {
           x: xValue.fun,
           y: yValue.fun,
           r: rValue.fun,
           stroke: (d) => group.color(group.fun(d)),
+          opacity: 0.7,
           channels: {
             Activity: (d) => d.name,
             [rValue.label]: rValue.fun,
@@ -193,11 +216,27 @@ export const plot =
             },
           },
         }),
-        Plot.crosshair(activities, {
+        Plot.ruleY(
+          activities,
+          Plot.pointer({
+            px: xValue.fun,
+            y: yValue.fun,
+            stroke: (d) => group.color(group.fun(d)),
+          })
+        ),
+        Plot.ruleX(
+          activities,
+          Plot.pointer({
+            x: xValue.fun,
+            py: yValue.fun,
+            stroke: (d) => group.color(group.fun(d)),
+          })
+        ),
+        /*Plot.crosshair(activities, {
           x: xValue.fun,
           y: yValue.fun,
           color: (d) => group.color(group.fun(d)),
-        }),
+        }),*/
       ],
     });
   };

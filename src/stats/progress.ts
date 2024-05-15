@@ -23,7 +23,7 @@ export const settings = {
       count: {
         id: "count",
         fun: () => 1,
-        format: (v: number) => v,
+        format: (v: number) => `${v}`,
         label: "Count",
         unit: "",
       },
@@ -72,7 +72,8 @@ export const settings = {
         tickFormat: d3.timeFormat("%b"),
         curve: "step-after",
         dots: false,
-        nTicks: 6,
+        ticks: "month",
+        gridTicks: "month",
         domain: [
           new Date("2024-01-01"),
           new Date("2024-12-31 23:59:59"),
@@ -86,7 +87,8 @@ export const settings = {
         tickFormat: d3.timeFormat("%d"),
         curve: "basis",
         dots: true,
-        nTicks: 6,
+        gridTicks: "day",
+        ticks: "week",
         domain: [
           new Date("2024-01-01"),
           new Date("2024-01-31 23:59:59"),
@@ -99,7 +101,8 @@ export const settings = {
         tickFormat: d3.timeFormat("%a"),
         curve: "basis",
         dots: true.valueOf,
-        nTicks: 7,
+        ticks: "day",
+        gridTicks: "day",
         legendFormat: d3.timeFormat("%Y-%m-%d"),
         domain: [
           new Date("2024-01-01"),
@@ -141,7 +144,7 @@ export const plot =
     height: number;
   }) => {
     const {by, value} = getter(setting);
-    const showCrosshair = width > 500;
+    const bigPlot = width > 500;
 
     const cumulative = d3
       .groups(activities, (x) =>
@@ -201,29 +204,15 @@ export const plot =
 
     return Plot.plot({
       ...commonSettings,
-      ...(showCrosshair
+      ...(bigPlot
         ? {
             marginBottom: 40,
             marginLeft: 70,
-            marginRight: 70,
+            marginTop: 40,
           }
         : {}),
       width,
       height,
-      x: {
-        tickFormat: by.tickFormat,
-        axis: "top",
-        domain: by.domain,
-        label: null,
-        ticks: by.nTicks,
-      },
-      y: {
-        axis: "right",
-        label: null,
-        tickFormat: value.format,
-        ...(showCrosshair ? {} : {tickRotate: -60}),
-        tickSpacing: 60,
-      },
       color: {
         //type: "categorical",
         scheme: "viridis",
@@ -232,8 +221,60 @@ export const plot =
         legend: false,
         tickFormat: by.legendFormat,
       },
+      x: {domain: by.domain},
       marks: [
-        Plot.frame(),
+        //Plot.frame(),
+        Plot.axisX({
+          anchor: "top",
+          label: null,
+          ticks: by.ticks,
+          tickSize: 12,
+          ...(!bigPlot
+            ? {
+                tickFormat: (x) => ` ${by.tickFormat(x)}`,
+                textAnchor: "start",
+                tickPadding: -10,
+              }
+            : {tickFormat: by.tickFormat}),
+        }),
+        Plot.axisY({
+          label: null,
+          tickFormat: value.format,
+          tickSize: 12,
+          tickSpacing: 120,
+          //anchor: "right",
+          ...(bigPlot
+            ? {}
+            : {
+                tickRotate: -90,
+                tickFormat: (x) => ` ${value.format(x)}`,
+                textAnchor: "start",
+                tickSize: 14,
+                tickPadding: -10,
+              }),
+          //tickSpacing: 60,
+        }),
+        //Plot.ruleY([0]),
+        //Plot.ruleX([by.domain[0]]),
+        Plot.ruleY(
+          data,
+          Plot.pointer({
+            px: "virtualDate",
+            y: "cumsum",
+            stroke: by.label,
+          })
+        ),
+        Plot.ruleX(
+          data,
+          Plot.pointer({
+            x: "virtualDate",
+            py: "cumsum",
+            stroke: by.label,
+          })
+        ),
+        Plot.gridX({
+          ticks: by.gridTicks,
+        }),
         Plot.line(data, {
           y: "cumsum",
           x: "virtualDate",
@@ -252,6 +293,14 @@ export const plot =
               }),
             ]
           : []),
+        Plot.dot(
+          data,
+          Plot.pointer({
+            y: "cumsum",
+            x: "virtualDate",
+            fill: by.label,
+          })
+        ),
         Plot.tip(
           data,
           Plot.pointer({
@@ -265,13 +314,14 @@ export const plot =
             },
             format: {
               x: false,
-              stroke: by.legendFormat,
+              stroke: false,
               y: false,
-              [value.label]: (x) => value.format(x),
+              [value.label]: value.format,
+              Date: (x) => d3.timeFormat("%Y-%m-%d")(x),
             },
           })
         ),
-        ...(showCrosshair
+        /*...(bigPlot
           ? [
               Plot.crosshair(data, {
                 y: "cumsum",
@@ -279,7 +329,7 @@ export const plot =
                 color: by.label,
               }),
             ]
-          : []),
+          : []),*/
       ],
     });
   };

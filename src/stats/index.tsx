@@ -50,8 +50,8 @@ export const commonSettings = {
     fontSize: "10pt",
   },
   figure: true,
-  marginRight: 40,
-  marginTop: 40,
+  marginRight: 20,
+  marginTop: 30,
   marginBottom: 20,
   marginLeft: 30,
 };
