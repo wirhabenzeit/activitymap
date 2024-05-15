@@ -320,7 +320,6 @@ export const plot =
       ...commonSettings,
       ...(bigPlot
         ? {
-            marginBottom: 40,
             marginLeft: 70,
             marginTop: 40,
             marginRight: 60,

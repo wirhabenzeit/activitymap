@@ -31,21 +31,16 @@ const StatsContext = createContext(defaultStatsContext);
 type StatsPlotsKeys = keyof typeof statsPlots;
 type TabKeys = `/stats/${StatsPlotsKeys}`;
 type TabValue = {label: string; index: number};
-const tabEntries: [TabKeys, TabValue][] = (
+
+const tabs = (
   Object.keys(statsPlots) as (keyof typeof statsPlots)[]
-).map((name, index) => [
-  `/stats/${name}` as TabKeys,
-  {label: name, index},
-]);
-
-const tabs: Record<TabKeys, TabValue> = {} as Record<
-  TabKeys,
-  TabValue
->;
-
-for (const [key, value] of tabEntries) {
-  tabs[key] = value;
-}
+).reduce(
+  (acc, name, index) => ({
+    ...acc,
+    [`/stats/${name}`]: {label: name, index},
+  }),
+  {} as Record<TabKeys, TabValue>
+);
 
 export default function Stats({
   children,

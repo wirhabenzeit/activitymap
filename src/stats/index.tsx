@@ -4,10 +4,10 @@ import calendar from "./calendar";
 import timeline from "./timeline";
 
 const statsPlots = {
-  progress,
-  scatter,
   calendar,
   timeline,
+  progress,
+  scatter,
 } as const;
 
 export type StatsSetting = {
@@ -19,21 +19,13 @@ export type StatsSettings = {
 };
 
 export const defaultStatsSettings: StatsSetting = {
+  calendar: calendar.defaultSettings,
   timeline: timeline.defaultSettings,
   progress: progress.defaultSettings,
   scatter: scatter.defaultSettings,
-  calendar: calendar.defaultSettings,
 };
 
 export type StatsSetter = {
-  progress: <K extends keyof StatsSetting["progress"]>(
-    name: K,
-    value: StatsSetting["progress"][K]
-  ) => void;
-  scatter: <K extends keyof StatsSetting["scatter"]>(
-    name: K,
-    value: StatsSetting["scatter"][K]
-  ) => void;
   calendar: <K extends keyof StatsSetting["calendar"]>(
     name: K,
     value: StatsSetting["calendar"][K]
@@ -41,6 +33,14 @@ export type StatsSetter = {
   timeline: <K extends keyof StatsSetting["timeline"]>(
     name: K,
     value: StatsSetting["timeline"][K]
+  ) => void;
+  progress: <K extends keyof StatsSetting["progress"]>(
+    name: K,
+    value: StatsSetting["progress"][K]
+  ) => void;
+  scatter: <K extends keyof StatsSetting["scatter"]>(
+    name: K,
+    value: StatsSetting["scatter"][K]
   ) => void;
 };
 

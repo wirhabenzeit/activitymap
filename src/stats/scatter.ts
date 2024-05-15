@@ -196,7 +196,7 @@ export const plot =
           y: yValue.fun,
           r: rValue.fun,
           stroke: (d) => group.color(group.fun(d)),
-          opacity: 0.7,
+          opacity: 0.5,
           channels: {
             Activity: (d) => d.name,
             [rValue.label]: rValue.fun,
