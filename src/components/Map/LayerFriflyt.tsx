@@ -260,8 +260,7 @@ export const LayerFriflyt: React.FC<CustomLayerProps> = ({
               )}
               <CardContent>
                 <Typography variant="h5" component="div">
-                  {cards[activeStep] &&
-                    cards[activeStep].title != undefined &&
+                  {cards[activeStep]?.title != undefined &&
                     cards[activeStep].title}
                   {cards[activeStep] &&
                     cards[activeStep].title == undefined &&
@@ -293,9 +292,7 @@ export const LayerFriflyt: React.FC<CustomLayerProps> = ({
                     />
                   </>
                 )}
-                {cards[activeStep] &&
-                  cards[activeStep].shortTitle !=
-                    undefined && (
+                {cards[activeStep]?.shortTitle != undefined && (
                     <Typography
                       variant="body2"
                       component="div"

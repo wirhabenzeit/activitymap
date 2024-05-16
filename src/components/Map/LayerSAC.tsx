@@ -38,7 +38,7 @@ import {
   Link as LinkIcon,
   Download as DownloadIcon,
 } from "@mui/icons-material";
-import {CustomLayerProps} from "~/settings/map";
+import {type CustomLayerProps} from "~/settings/map";
 import {useStore} from "~/contexts/Zustand";
 
 const epsgCH =

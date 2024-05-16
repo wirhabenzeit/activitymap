@@ -50,7 +50,7 @@ import {
 } from "@mui/icons-material";
 import {BBox} from "geojson";
 import {useStore} from "~/contexts/Zustand";
-import {CustomLayerProps} from "~/settings/map";
+import {type CustomLayerProps} from "~/settings/map";
 
 function MapImage() {
   const {current: map} = useMap();
@@ -110,13 +110,13 @@ export const LayerQuaeldich: React.FC<CustomLayerProps> = ({
   const getRoute = async (url, id) => {
     const response = await fetch(url);
     const data = await response.text();
-    var dom = new DOMParser().parseFromString(
+    const dom = new DOMParser().parseFromString(
       data,
       "text/xml"
     );
     const geojson = togeojson.kml(dom);
-    var regExp = /\(([^)]+)\)/;
-    var matches = regExp.exec(
+    const regExp = /\(([^)]+)\)/;
+    const matches = regExp.exec(
       geojson.features[0].properties.name
     );
     setCard((card) => ({

@@ -7,7 +7,7 @@ import mapboxgl from "mapbox-gl";
 import {useMap} from "react-map-gl";
 
 mapboxgl.accessToken = process.env
-  .NEXT_PUBLIC_MAPBOX_TOKEN as string;
+  .NEXT_PUBLIC_MAPBOX_TOKEN!;
 
 export function Download() {
   const map = useMap();
@@ -15,13 +15,13 @@ export function Download() {
   const download = () => {
     if (map.current == undefined) return;
     console.log(map);
-    var actualPixelRatio = window.devicePixelRatio;
+    const actualPixelRatio = window.devicePixelRatio;
     Object.defineProperty(window, "devicePixelRatio", {
       get: function () {
         return 450 / 96;
       },
     });
-    var hidden = document.createElement("div");
+    const hidden = document.createElement("div");
     Object.assign(hidden.style, {
       width: "0",
       height: "0",
@@ -31,12 +31,12 @@ export function Download() {
       visibility: "hidden",
     });
     document.body.appendChild(hidden);
-    var container = document.createElement("div");
+    const container = document.createElement("div");
     container.style.width = `${window.innerWidth}px`;
     container.style.height = `${window.innerHeight}px`;
     hidden.appendChild(container);
 
-    var renderMap = new mapboxgl.Map({
+    const renderMap = new mapboxgl.Map({
       container: container,
       center: map.current.getCenter(),
       zoom: map.current.getZoom(),

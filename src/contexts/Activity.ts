@@ -20,7 +20,7 @@ import {
   getActivities as getStravaActivities,
   updateActivity as updateStravaActivity,
 } from "~/server/strava/actions";
-import {WritableDraft} from "immer";
+import {type WritableDraft} from "immer";
 
 const FeatureFromActivity = (act: Activity): Feature => {
   if (!act.map) throw new Error("No map data");

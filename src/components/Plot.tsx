@@ -25,8 +25,8 @@ import {
   Stack,
   type SelectChangeEvent,
 } from "@mui/material";
-import {Activity} from "~/server/db/schema";
-import Plot from "@observablehq/plot";
+import {type Activity} from "~/server/db/schema";
+import type Plot from "@observablehq/plot";
 
 type Stats<K extends keyof StatsSetting> = {
   settings: StatsSettings[K];

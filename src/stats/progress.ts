@@ -30,13 +30,13 @@ export const settings = {
       },
       distance: {
         id: "distance",
-        fun: (d: Activity) => (d.distance || 0) / 1000,
+        fun: (d: Activity) => (d.distance ?? 0) / 1000,
         tickFormat: (v: number) =>
           v >= 10_000
             ? (v / 1_000).toFixed() + "k"
             : v < 10
-            ? v.toFixed(1)
-            : v.toFixed(),
+              ? v.toFixed(1)
+              : v.toFixed(),
         format: (v: number) => v.toFixed(1),
         label: "Distance (km)",
       },
@@ -109,7 +109,7 @@ export const settings = {
         tick: d3.timeMonday,
         tickFormat: d3.timeFormat("%a"),
         curve: "basis",
-        dots: true.valueOf,
+        dots: true,
         ticks: "day",
         gridTicks: "day",
         legendFormat: d3.timeFormat("%Y-%m-%d"),
@@ -187,7 +187,7 @@ export const plot =
       ...entry,
       virtualDate: new Date(
         new Date("2024-01-01").getTime() +
-          entry.start_date_local!.getTime() -
+          entry.start_date_local.getTime() -
           by.tick(entry.start_date_local).getTime()
       ),
     }));
@@ -291,7 +291,8 @@ export const plot =
           stroke: "by",
           curve: by.curve,
           opacity: 0.3,
-          strokeWidth: (X) => (X.currentPeriod ? 4 : 2),
+          strokeWidth: (X: {currentPeriod: number}) =>
+            X.currentPeriod ? 4 : 2,
         }),
         ...(by.dots
           ? [
@@ -299,7 +300,8 @@ export const plot =
                 y: "cumsum",
                 x: "virtualDate",
                 stroke: "by",
-                opacity: (x) => (x.currentPeriod ? 1 : 0.5),
+                opacity: (x: {currentPeriod: number}) =>
+                  x.currentPeriod ? 1 : 0.5,
               }),
             ]
           : []),
@@ -327,7 +329,8 @@ export const plot =
               stroke: false,
               y: false,
               [value.label]: value.format,
-              Date: (x) => d3.timeFormat("%Y-%m-%d")(x),
+              Date: (x: Date) =>
+                d3.timeFormat("%Y-%m-%d")(x),
             },
           })
         ),
@@ -338,7 +341,7 @@ export const plot =
 export const legend = () => (plot: Plot.Plot) =>
   plot.legend("color");
 
-export default {
+const config = {
   settings,
   defaultSettings,
   plot,
@@ -346,3 +349,5 @@ export default {
   getter,
   setter,
 };
+
+export default config;

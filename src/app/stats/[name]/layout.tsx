@@ -1,11 +1,6 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-} from "react";
-import {useRef, useLayoutEffect, createRef} from "react";
+import React, {useContext} from "react";
 
 import {Tabs as MuiTabs, Paper, Stack} from "@mui/material";
 import Tab from "@mui/material/Tab";
@@ -57,8 +52,8 @@ export default function Stats({
   const pathname = usePathname();
   const [value, setValue] = React.useState(
     pathname in tabs && tabs[pathname as TabKeys]
-      ? tabs[pathname as TabKeys]!.index
-      : tabs[activeStatsTab]!.index
+      ? tabs[pathname as TabKeys].index
+      : tabs[activeStatsTab].index
   );
   const handleChange = (
     event: React.SyntheticEvent,
@@ -69,7 +64,7 @@ export default function Stats({
     ] as keyof typeof tabs;
     if (tabKey && tabKey in tabs) {
       setValue(newValue);
-      setActiveStatsTab(tabKey as keyof typeof tabs);
+      setActiveStatsTab(tabKey);
     }
   };
 

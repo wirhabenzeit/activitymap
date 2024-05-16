@@ -16,7 +16,7 @@ export const getUser = async (id?: string) => {
     const session = await auth();
     if (!session?.user?.id)
       throw new Error("Not authenticated");
-    id = session.user!.id!;
+    id = session.user.id!;
   }
   const user = await db.query.users.findFirst({
     where: (users, {eq}) => eq(users.id, id),
@@ -33,7 +33,7 @@ export const getAccount = async (
     const user = await getUser();
     account = (await db.query.accounts.findFirst({
       where: (accounts, {eq}) =>
-        eq(accounts.userId, user!.id!),
+        eq(accounts.userId, user.id),
     })) as Account;
   } else {
     account = (await db.query.accounts.findFirst({

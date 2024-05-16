@@ -58,7 +58,7 @@ export const settings = {
       time: {
         id: "time",
         sortable: true,
-        fun: (d: Activity) => (d.elapsed_time || 0) / 3600,
+        fun: (d: Activity) => (d.elapsed_time ?? 0) / 3600,
         format: (v: number) => v.toFixed(0),
         label: "Duration (h)",
         unit: "h",
@@ -118,13 +118,6 @@ export const settings = {
         icon: (id: keyof typeof categorySettings) =>
           categorySettings[id].icon,
       },
-      /*sport_type: {
-      id: "sport_type",
-      label: "Type",
-      fun: (d: Activity) => d.sport_type,
-      color: (id) => categorySettings[aliasMap[id]].color,
-      icon: (id) => categorySettings[aliasMap[id]].icon,
-    },*/
       no_group: {
         id: "no_group",
         label: "All",
@@ -297,7 +290,7 @@ export const plot =
         value:
           groups.get(date)?.get(type) != undefined
             ? d3.sum(
-                groups.get(date)?.get(type)!,
+                groups.get(date)!.get(type)!,
                 timeline.value.fun
               )
             : 0,
@@ -388,11 +381,11 @@ export const plot =
                     range,
                     Plot.pointerX({
                       textAnchor: "start",
-                      px: (d) => d,
-                      y: (d) => map.get(d)!.get(type),
+                      px: (d: Date) => d,
+                      y: (d: Date) => map.get(d)!.get(type),
                       dx: 8,
                       frameAnchor: "right",
-                      text: (d) =>
+                      text: (d: Date) =>
                         timeline.value.format(
                           map.get(d)!.get(type)!
                         ),
@@ -405,8 +398,8 @@ export const plot =
             Plot.dot(
               range,
               Plot.pointerX({
-                x: (d) => d,
-                y: (d) => map.get(d)?.get(type),
+                x: (d: Date) => d,
+                y: (d: Date) => map.get(d)?.get(type),
                 //opacity: 1,
                 fill: timeline.group.color(type),
               })
@@ -451,7 +444,7 @@ export const plot =
           x: "date",
           y2: "value",
           y1: 0,
-          fill: (x) => timeline.group.color(x.type),
+          fill: (x: Data) => timeline.group.color(x.type),
           opacity: 0.1,
           curve: "step",
         }),
@@ -459,9 +452,9 @@ export const plot =
     });
   };
 
-export const legend = () => (plot: Plot.Plot) => null;
+export const legend = () => () => null;
 
-export default {
+const config = {
   plot,
   settings,
   defaultSettings,
@@ -469,3 +462,5 @@ export default {
   getter,
   setter,
 };
+
+export default config;

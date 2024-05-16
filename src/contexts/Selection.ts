@@ -1,5 +1,5 @@
-import {StateCreator} from "zustand";
-import {TotalZustand} from "./Zustand";
+import {type StateCreator} from "zustand";
+import {type TotalZustand} from "./Zustand";
 
 export type SelectionZustand = {
   selected: number[];

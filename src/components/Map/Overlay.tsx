@@ -1,9 +1,9 @@
-import {ReactElement, cloneElement, memo} from "react";
+import {type ReactElement, cloneElement, memo} from "react";
 import {createPortal} from "react-dom";
 import {
-  ControlPosition,
-  IControl,
-  MapboxMap,
+  type ControlPosition,
+  type IControl,
+  type MapboxMap,
   useControl,
 } from "react-map-gl";
 

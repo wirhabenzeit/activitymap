@@ -34,7 +34,7 @@ import type {
 } from "@mui/x-data-grid";
 
 import {useStore} from "~/contexts/Zustand";
-import {Activity} from "~/server/db/schema";
+import {type Activity} from "~/server/db/schema";
 
 function RefreshButton() {
   const {selected, loadFromStrava} = useStore((state) => ({
@@ -56,13 +56,12 @@ function RefreshButton() {
             selected.length == 0 ? "inherit" : "primary"
           }
           onClick={async () => {
-            const newAct =
-              selected.length > 0
-                ? await loadFromStrava({
-                    ids: selected,
-                    photos: true,
-                  })
-                : await loadFromStrava({photos: true});
+            selected.length > 0
+              ? await loadFromStrava({
+                  ids: selected,
+                  photos: true,
+                })
+              : await loadFromStrava({photos: true});
           }}
         >
           <Refresh fontSize="small" />
@@ -199,9 +198,8 @@ export default function List() {
         editMode="row"
         processRowUpdate={async (updatedRow: Activity) => {
           console.log("Updating activity", updatedRow);
-          const verifiedActivity = await updateActivity(
-            updatedRow
-          );
+          const verifiedActivity =
+            await updateActivity(updatedRow);
           return verifiedActivity;
         }}
         onProcessRowUpdateError={(error) =>

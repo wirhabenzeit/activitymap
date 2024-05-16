@@ -54,7 +54,8 @@ import type {Activity} from "~/server/db/schema";
 import {MapContextValue} from "react-map-gl/dist/esm/components/map";
 import PhotoLayer from "~/components/Map/Photo";
 import {CameraAlt} from "@mui/icons-material";
-import mapboxgl, {MapboxEvent} from "mapbox-gl";
+import {type MapboxEvent} from "mapbox-gl";
+import type mapboxgl from "mapbox-gl";
 
 function RouteLayer() {
   const {filterIDs} = useStore((state) => ({

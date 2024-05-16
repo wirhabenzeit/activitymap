@@ -24,7 +24,7 @@ import {fas} from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
 
 import {useStore} from "~/contexts/Zustand";
-import {User} from "~/server/db/schema";
+import {type User} from "~/server/db/schema";
 
 export function Share() {
   const [open, setOpen] = useState(false);

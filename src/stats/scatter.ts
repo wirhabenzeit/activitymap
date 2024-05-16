@@ -49,7 +49,7 @@ const valueOptions = {
   },
   average_speed: {
     id: "average_speed",
-    fun: (d: Activity) => (d.average_speed || 0) * 3.6,
+    fun: (d: Activity) => (d.average_speed ?? 0) * 3.6,
     format: (v: number) => v.toFixed(1) + "km/h",
     tickFormat: (v: number) => v.toFixed(1),
     label: "Avg Speed (km/h)",
@@ -79,10 +79,7 @@ export const settings = {
     options: {
       sport_group: {
         id: "sport_group",
-        fun: (d: Activity) =>
-          aliasMap[
-            d.sport_type
-          ] as keyof typeof categorySettings,
+        fun: (d: Activity) => aliasMap[d.sport_type]!,
         color: (id: keyof typeof categorySettings) =>
           categorySettings[id].color,
         icon: (id: keyof typeof categorySettings) =>
@@ -209,17 +206,19 @@ export const plot =
             x: xValue.fun,
             y: yValue.fun,
             r: rValue.fun,
-            fill: (d) => group.color(group.fun(d)),
+            fill: (d: Activity) =>
+              group.color(group.fun(d)),
           })
         ),
         Plot.dot(activities, {
           x: xValue.fun,
           y: yValue.fun,
           r: rValue.fun,
-          stroke: (d) => group.color(group.fun(d)),
+          stroke: (d: Activity) =>
+            group.color(group.fun(d)),
           opacity: 0.5,
           channels: {
-            Activity: (d) => d.name,
+            Activity: (d: Activity) => d.name,
             [rValue.label]: rValue.fun,
             [xValue.label]: xValue.fun,
             [yValue.label]: yValue.fun,
@@ -230,7 +229,6 @@ export const plot =
               y: false,
               r: false,
               stroke: false,
-              Activity: (x) => x,
               [rValue.label]: rValue.format,
               [xValue.label]: xValue.format,
               [yValue.label]: yValue.format,
@@ -242,7 +240,8 @@ export const plot =
           Plot.pointer({
             px: xValue.fun,
             y: yValue.fun,
-            stroke: (d) => group.color(group.fun(d)),
+            stroke: (d: Activity) =>
+              group.color(group.fun(d)),
           })
         ),
         Plot.ruleX(
@@ -250,7 +249,8 @@ export const plot =
           Plot.pointer({
             x: xValue.fun,
             py: yValue.fun,
-            stroke: (d) => group.color(group.fun(d)),
+            stroke: (d: Activity) =>
+              group.color(group.fun(d)),
           })
         ),
         /*Plot.crosshair(activities, {
@@ -267,8 +267,7 @@ export const legend =
     const {rValue} = getter(setting);
     const scale = plot.scale("r");
     if (
-      !scale ||
-      !scale.domain ||
+      !scale?.domain ||
       !scale.range ||
       !Array.isArray(scale.range) ||
       scale.range.length < 2
@@ -281,6 +280,7 @@ export const legend =
     const strokeDasharray = "5,4";
     const lineHeight = 8;
     const gap = 20;
+
     const r0 = scale.range[1];
 
     let s;
@@ -342,7 +342,7 @@ export const legend =
     });
   };
 
-export default {
+const config = {
   plot,
   settings,
   defaultSettings,
@@ -350,3 +350,5 @@ export default {
   getter,
   setter,
 };
+
+export default config;

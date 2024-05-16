@@ -181,7 +181,7 @@ const valueColumns = {
   comment_count: integer("comment_count"),
   athlete_count: integer("athlete_count"),
   photo_count: integer("photo_count"),
-  total_photo_count: integer("total_photo_count"),
+  total_photo_count: integer("total_photo_count").notNull(),
   average_speed: real("average_speed"),
   max_speed: real("max_speed"),
   kilojoules: real("kilojoules"),

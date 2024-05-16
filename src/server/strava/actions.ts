@@ -12,7 +12,7 @@ import {decode} from "@mapbox/polyline";
 import {db} from "~/server/db";
 import {getAccount} from "~/server/db/actions";
 import {getTableColumns, sql} from "drizzle-orm";
-import {PgTable} from "drizzle-orm/pg-core";
+import {type PgTable} from "drizzle-orm/pg-core";
 
 type Subscription = {
   id: number;
@@ -155,7 +155,7 @@ export async function updateActivity(
     );
     console.log("Updated activity");
     const parsedActivity: Activity = parseActivity(
-      json as Record<string, unknown>
+      json
     );
     return parsedActivity;
   } catch (e) {
@@ -300,7 +300,7 @@ export async function getPhotos(
 
 const buildConflictUpdateColumns = <
   T extends PgTable,
-  Q extends keyof T["_"]["columns"]
+  Q extends keyof T["_"]["columns"],
 >(
   table: T,
   filter: (column: string) => boolean = () => true
@@ -353,7 +353,7 @@ export async function getActivities({
       );
       new_activities = (await Promise.all(
         activities.map(({id, athlete}) =>
-          get(`activities/${id}`, {token: tokens[athlete!]})
+          get(`activities/${id}`, {token: tokens[athlete]})
         )
       )) as Record<string, unknown>[];
     } else {

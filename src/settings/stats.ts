@@ -104,7 +104,7 @@ export const scatterSettings = {
     },
     date: {
       id: "date",
-      fun: (d: Activity) => new Date(d.start_date_local!),
+      fun: (d: Activity) => new Date(d.start_date_local),
       formatAxis: (v: Date) => d3.timeFormat("%b %Y")(v),
       format: (v: Date) => d3.timeFormat("%Y-%m-%d")(v),
       label: "Date",
@@ -152,8 +152,8 @@ export const timelineSettings = {
         v >= 10_000_000
           ? (v / 1_000_000).toFixed() + "k"
           : v < 10_000
-          ? (v / 1000).toFixed(1)
-          : (v / 1000).toFixed(),
+            ? (v / 1000).toFixed(1)
+            : (v / 1000).toFixed(),
       label: "Distance",
       unit: "km",
     },
@@ -279,8 +279,8 @@ export const progressSettings = {
         v >= 10_000
           ? (v / 1_000).toFixed() + "k"
           : v < 10
-          ? v.toFixed(1)
-          : v.toFixed(),
+            ? v.toFixed(1)
+            : v.toFixed(),
       label: "Distance (km)",
       unit: "km",
     },
@@ -341,7 +341,7 @@ export const progressSettings = {
       tick: d3.timeMonday,
       tickFormat: d3.timeFormat("%a"),
       curve: "basis",
-      dots: true.valueOf,
+      dots: true,
       nTicks: 7,
       legendFormat: d3.timeFormat("%Y-%m-%d"),
       domain: [

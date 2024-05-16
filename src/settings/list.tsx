@@ -1,11 +1,10 @@
-import {Link, TextField, Tooltip} from "@mui/material";
+import {Link, Tooltip} from "@mui/material";
 import {
   type GridSortCellParams,
   type GridRenderEditCellParams,
   gridStringOrNumberComparator,
   type GridColDef,
   type GridSortItem,
-  GridEditInputCell,
   useGridApiContext,
 } from "@mui/x-data-grid";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
@@ -32,14 +31,16 @@ function CustomEditComponent(
 ) {
   const apiRef = useGridApiContext();
   const ref = React.useRef(null);
-  const {id, value: valueProp, field} = props;
-  const [value, setValue] = React.useState(valueProp.name);
+  const {id, field} = props;
+  const [value, setValue] = React.useState(
+    props.value.name as string
+  );
 
   useEffect(() => {
     apiRef.current.setEditCellValue({
       id,
       field,
-      value: valueProp.name,
+      value: props.value.name,
     });
   }, []);
 
@@ -190,7 +191,7 @@ export const listSettings = {
         </Tooltip>
       ),
       valueGetter: (value: string, row: Activity) => {
-        const date = new Date(row.start_date_local!);
+        const date = new Date(row.start_date_local);
         return (
           date.getHours() * 3600 +
           date.getMinutes() * 60 +

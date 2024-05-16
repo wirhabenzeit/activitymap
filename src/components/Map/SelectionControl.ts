@@ -1,7 +1,7 @@
 "use client";
 
-import {MapMouseEvent, Point, PointLike} from "mapbox-gl";
-import {MapContextValue} from "react-map-gl/dist/esm/components/map";
+import {type MapMouseEvent, Point, type PointLike} from "mapbox-gl";
+import {type MapContextValue} from "react-map-gl/dist/esm/components/map";
 import {useControl} from "react-map-gl";
 import {useStore} from "~/contexts/Zustand";
 
@@ -162,7 +162,7 @@ export class SelectionControl {
     this.map?.off("mousemove", this.onMouseMove);
     this.map?.off("mouseup", this.onMouseUp);
 
-    if (this.box && this.box.parentNode) {
+    if (this.box?.parentNode) {
       this.box.parentNode.removeChild(this.box);
       this.box = undefined;
     }

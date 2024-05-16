@@ -39,6 +39,7 @@
     "d3": "^7.9.0",
     "d3-hexbin": "^0.2.2",
     "drizzle-orm": "^0.30.10",
+    "eslint-plugin-next": "^0.0.0",
     "file-saver": "^2.0.5",
     "htl": "^0.3.1",
     "immer": "^10.1.1",
@@ -48,6 +49,7 @@
     "next": "^14.2.3",
     "next-auth": "5.0.0-beta.16",
     "postgres": "^3.4.4",
+    "prettier": "^3.2.5",
     "proj4": "^2.11.0",
     "pwa-asset-generator": "^6.3.1",
     "react": "18.3.1",
@@ -67,6 +69,7 @@
     "drizzle-kit": "^0.21.2",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.3",
+    "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-drizzle": "^0.2.3",
     "pg": "^8.11.5",
     "typescript": "^5.4.5"

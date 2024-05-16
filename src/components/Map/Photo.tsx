@@ -7,7 +7,7 @@ import type {Photo} from "~/server/db/schema";
 export default function PhotoLayer() {
   const {photos, bbox, position, filterIDs} = useStore(
     (state) => ({
-      photos: state.photos as Photo[],
+      photos: state.photos,
       bbox: state.bbox,
       position: state.position,
       filterIDs: state.filterIDs,
@@ -18,8 +18,7 @@ export default function PhotoLayer() {
   const displayPhotos = useMemo(() => {
     return photos.filter((photo) => {
       if (
-        !photo.location ||
-        !photo.location[0] ||
+        !photo.location?.[0] ||
         !photo.location[1]
       )
         return false;

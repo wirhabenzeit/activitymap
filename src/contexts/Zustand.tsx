@@ -47,6 +47,6 @@ export const useStore = create<TotalZustand>()(
   {fireImmediately: true}
 );*/
 
-useStore.subscribe((state, prevState) => {
+/*useStore.subscribe((state, prevState) => {
   return;
-});
+});*/
