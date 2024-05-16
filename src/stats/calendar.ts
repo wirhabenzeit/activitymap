@@ -116,21 +116,21 @@ function makeCalendar({
   inset = 1.5,
   ...options
 } = {}) {
-  let D;
+  let D: Date[] | null;
   return {
     fy: {
-      transform: (data) =>
-        (D = Plot.valueof(data, date, Array)).map((d) =>
+      transform: (data: Plot.Data) =>
+        (D = Plot.valueof(data, date, Array))?.map((d) =>
           d.getUTCFullYear()
         ),
     },
     x: {
       transform: () =>
-        D.map((d) => d3.utcMonday.count(d3.utcYear(d), d)),
+        D?.map((d) => d3.utcMonday.count(d3.utcYear(d), d)),
     },
     y: {
       transform: () =>
-        D.map((d) => (d.getUTCDay() + 6) % 7),
+        D?.map((d) => (d.getUTCDay() + 6) % 7),
     },
     inset,
     ...options,
@@ -142,7 +142,7 @@ class MonthLine extends Plot.Mark {
     stroke: "black",
     strokeWidth: 1,
   };
-  constructor(data, options = {}) {
+  constructor(data: Plot.Data, options = {}) {
     const {x, y} = options;
     super(
       data,
@@ -154,7 +154,12 @@ class MonthLine extends Plot.Mark {
       MonthLine.defaults
     );
   }
-  render(index, {x, y}, {x: X, y: Y}, dimensions) {
+  render(
+    index: number[],
+    {x, y}: Plot.ScaleFunctions,
+    {x: X, y: Y}: Plot.ChannelValues,
+    dimensions: Plot.Dimensions
+  ): Plot.RenderFunction {
     const {marginTop, marginBottom, height} = dimensions;
     const dx = x.bandwidth(),
       dy = y.bandwidth();
@@ -174,11 +179,40 @@ class MonthLine extends Plot.Mark {
   }
 }
 
+/*function on(mark, listeners = {}) {
+  const render = mark.render;
+  mark.render = function () {
+    const data = this.data;
+
+    const g = render.apply(this, arguments);
+    g.style.cursor = "pointer";
+    const r = d3.select(g).selectChildren();
+    for (const [type, callback] of Object.entries(
+      listeners
+    )) {
+      r.on(type, function (event, i) {
+        const p = d3.pointer(event, g);
+        callback(event, {
+          type,
+          p,
+          datum: data[i],
+          i,
+          data,
+        });
+      });
+    }
+    return g;
+  };
+  return mark;
+}*/
+
 export const plot =
   (calendarSetting: CalendarSetting) =>
   ({
     activities,
     width,
+    setSelected,
+    selected,
     height,
   }: {
     activities: Activity[];
@@ -295,14 +329,23 @@ export const plot =
             rx: 2,
           })
         ),
-
+        //on(
         Plot.text(
           d3.utcDays(start, end),
           makeCalendar({
             text: d3.utcFormat("%-d"),
-            fontSize: 10,
+            fontSize: 11,
           })
         ),
+        /*{
+            click: (e, {datum}) =>
+              setSelected(
+                activitiesByDate
+                  .get(datum)
+                  ?.map((activity) => activity.id)
+              ),
+          }
+        ),*/
       ],
     });
   };

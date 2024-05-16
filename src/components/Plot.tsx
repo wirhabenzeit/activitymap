@@ -217,12 +217,16 @@ export default function ObsPlot({
     activityDict,
     setStats,
     filterIDs,
+    selected,
+    setSelected,
   } = useStore((state) => ({
     loaded: state.loaded,
     activityDict: state.activityDict,
     filterIDs: state.filterIDs,
     statsSettings: state.statsSettings,
     setStats: state.setStatsSettings,
+    selected: state.selected,
+    setSelected: state.setSelected,
   }));
 
   const figureRef = useRef<HTMLDivElement>(null);
@@ -256,6 +260,8 @@ export default function ObsPlot({
 
     const plot = makePlot(stats[name])({
       activities: filterIDs.map((id) => activityDict[id]!),
+      selected: selected,
+      setSelected: setSelected,
       height,
       width,
     });
@@ -283,6 +289,7 @@ export default function ObsPlot({
     activityDict,
     statsSettings[name],
     filterIDs,
+    selected,
   ]);
 
   return (

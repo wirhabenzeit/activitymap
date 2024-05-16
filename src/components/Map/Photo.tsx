@@ -5,11 +5,14 @@ import {useMemo, useState} from "react";
 import type {Photo} from "~/server/db/schema";
 
 export default function PhotoLayer() {
-  const {photos, bbox, position} = useStore((state) => ({
-    photos: state.photos as Photo[],
-    bbox: state.bbox,
-    position: state.position,
-  }));
+  const {photos, bbox, position, filterIDs} = useStore(
+    (state) => ({
+      photos: state.photos as Photo[],
+      bbox: state.bbox,
+      position: state.position,
+      filterIDs: state.filterIDs,
+    })
+  );
   if (!bbox) return null;
 
   const displayPhotos = useMemo(() => {
@@ -20,12 +23,9 @@ export default function PhotoLayer() {
         !photo.location[1]
       )
         return false;
-      return bbox.contains([
-        photo.location[1],
-        photo.location[0],
-      ]);
+      return filterIDs.includes(photo.activity_id!);
     });
-  }, [photos, bbox]);
+  }, [photos, filterIDs]);
 
   return (
     position.zoom > 8 && (
