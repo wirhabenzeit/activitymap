@@ -36,7 +36,7 @@ import type {
 import {useStore} from "~/contexts/Zustand";
 import {Activity} from "~/server/db/schema";
 
-export function RefreshButton() {
+function RefreshButton() {
   const {selected, loadFromStrava} = useStore((state) => ({
     selected: state.selected,
     loadFromStrava: state.loadFromStrava,

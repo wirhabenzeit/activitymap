@@ -1,6 +1,10 @@
 "use client";
 
-import React, {createContext, useState} from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+} from "react";
 import {useRef, useLayoutEffect, createRef} from "react";
 
 import {Tabs as MuiTabs, Paper, Stack} from "@mui/material";
@@ -17,16 +21,7 @@ import Link from "next/link";
 import {usePathname} from "next/navigation";
 
 import statsPlots from "~/stats";
-
-const settingsRef = createRef<HTMLDivElement>();
-
-const defaultStatsContext = {
-  settingsRef,
-  width: 0,
-  height: 0,
-};
-
-const StatsContext = createContext(defaultStatsContext);
+import {StatsContext, StatsProvider} from "./StatsContext";
 
 type StatsPlotsKeys = keyof typeof statsPlots;
 type TabKeys = `/stats/${StatsPlotsKeys}`;
@@ -59,8 +54,6 @@ export default function Stats({
     activeStatsTab: state.activeStatsTab,
   }));
 
-  const [state, setState] = useState(defaultStatsContext);
-
   const pathname = usePathname();
   const [value, setValue] = React.useState(
     pathname in tabs && tabs[pathname as TabKeys]
@@ -80,39 +73,8 @@ export default function Stats({
     }
   };
 
-  const elementRef = useRef(
-    null
-  ) as React.MutableRefObject<HTMLElement | null>;
-
-  useLayoutEffect(() => {
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const cr = entry.contentRect;
-        setState((state) => ({
-          ...state,
-          width: cr.width,
-          height: cr.height,
-        }));
-      }
-    });
-
-    setState((state) => {
-      if (elementRef?.current === null) {
-        return state;
-      }
-      return {
-        ...state,
-        width: elementRef.current.offsetWidth,
-        height: elementRef.current.offsetHeight,
-      };
-    });
-
-    if (elementRef.current) ro.observe(elementRef.current);
-    return () => {
-      if (elementRef.current)
-        ro.unobserve(elementRef.current);
-    };
-  }, []);
+  const {settingsRef, elementRef} =
+    useContext(StatsContext);
 
   return (
     <Box
@@ -126,102 +88,94 @@ export default function Stats({
         minHeight: 0,
       }}
     >
-      <Box
-        sx={{
-          borderBottom: 1,
-          borderColor: "divider",
-          flexShrink: 0,
-          width: 1,
-          display: "flex",
-          alignItems: "stretch",
-          overflow: "hidden",
-        }}
-      >
-        <MuiTabs
-          value={value}
-          onChange={handleChange}
-          aria-label="stats tabs"
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{
-            display: "inline-flex",
-            width: `calc(100% - 40px)`,
-            minHeight: "40px",
-          }}
-        >
-          {Object.entries(tabs).map(([url, tab]) => (
-            <Tab
-              key={url}
-              label={tab.label}
-              component={Link}
-              href={url}
-              sx={{
-                minHeight: "40px",
-                py: "8px",
-                fontSize: "0.8rem",
-              }}
-            />
-          ))}
-        </MuiTabs>
+      <StatsProvider>
         <Box
           sx={{
-            display: "inline-flex",
-            marginLeft: "auto",
-            right: 0,
+            borderBottom: 1,
+            borderColor: "divider",
+            flexShrink: 0,
+            width: 1,
+            display: "flex",
+            alignItems: "stretch",
+            overflow: "hidden",
           }}
         >
-          <Divider orientation="vertical" flexItem />
-          <IconButton
-            onClick={toggleStatsSettings}
-            color={settingsOpen ? "primary" : "inherit"}
+          <MuiTabs
+            value={value}
+            onChange={handleChange}
+            aria-label="stats tabs"
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              display: "inline-flex",
+              width: `calc(100% - 40px)`,
+              minHeight: "40px",
+            }}
           >
-            <Tune fontSize="small" />
-          </IconButton>
+            {Object.entries(tabs).map(([url, tab]) => (
+              <Tab
+                key={url}
+                label={tab.label}
+                component={Link}
+                href={url}
+                sx={{
+                  minHeight: "40px",
+                  py: "8px",
+                  fontSize: "0.8rem",
+                }}
+              />
+            ))}
+          </MuiTabs>
+          <Box
+            sx={{
+              display: "inline-flex",
+              marginLeft: "auto",
+              right: 0,
+            }}
+          >
+            <Divider orientation="vertical" flexItem />
+            <IconButton
+              onClick={toggleStatsSettings}
+              color={settingsOpen ? "primary" : "inherit"}
+            >
+              <Tune fontSize="small" />
+            </IconButton>
+          </Box>
         </Box>
-      </Box>
-      <Box
-        ref={elementRef}
-        sx={{flexGrow: 1, minHeight: 0, width: "100%"}}
-      >
-        <StatsContext.Provider
-          value={{
-            height: state.height,
-            width: state.width,
-            settingsRef,
-          }}
+        <Box
+          ref={elementRef}
+          sx={{flexGrow: 1, minHeight: 0, width: "100%"}}
         >
           {children}
-        </StatsContext.Provider>
-      </Box>
-      <Paper
-        sx={{
-          width: "100%",
-          backgroundColor: "background.paper",
-          height: "60px",
-          display: settingsOpen ? "block" : "none",
-          borderTop: 1,
-          //zIndex: 1,
-          boxShadow: 1,
-          borderColor: "divider",
-          overflowY: "hidden",
-          overflowX: "scroll",
-        }}
-      >
-        <Stack
-          style={{
-            minWidth: "max-content",
+        </Box>
+        <Paper
+          sx={{
+            width: "100%",
+            backgroundColor: "background.paper",
+            height: "60px",
+            display: settingsOpen ? "block" : "none",
+            borderTop: 1,
+            //zIndex: 1,
+            boxShadow: 1,
+            borderColor: "divider",
+            overflowY: "hidden",
+            overflowX: "scroll",
           }}
-          direction="row"
-          justifyContent="space-evenly"
-          alignItems="center"
-          spacing={2}
-          flexWrap={"nowrap"}
-          ref={settingsRef}
-          sx={{m: 1}}
-        ></Stack>
-      </Paper>
+        >
+          <Stack
+            style={{
+              minWidth: "max-content",
+            }}
+            direction="row"
+            justifyContent="space-evenly"
+            alignItems="center"
+            spacing={2}
+            flexWrap={"nowrap"}
+            ref={settingsRef}
+            sx={{m: 1}}
+          ></Stack>
+        </Paper>
+      </StatsProvider>
     </Box>
   );
 }
-
-export {StatsContext};

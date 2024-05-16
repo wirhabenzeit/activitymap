@@ -5,7 +5,7 @@ import {createPortal} from "react-dom";
 
 import {useStore} from "~/contexts/Zustand";
 import {useContext} from "react";
-import {StatsContext} from "~/app/stats/[name]/layout";
+import {StatsContext} from "~/app/stats/[name]/StatsContext";
 import statsPlots, {
   type StatsSetter,
   type StatsSetting,
