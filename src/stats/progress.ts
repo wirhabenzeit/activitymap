@@ -23,20 +23,21 @@ export const settings = {
       count: {
         id: "count",
         fun: () => 1,
-        format: (v: number) => `${v}`,
+        format: (v: number) => v.toFixed(),
+        tickFormat: (v: number) => v.toFixed(),
         label: "Count",
         unit: "",
       },
       distance: {
         id: "distance",
-        fun: (d: Activity) =>
-          Math.round(d.distance! / 100) / 10,
-        format: (v: number) =>
+        fun: (d: Activity) => (d.distance || 0) / 1000,
+        tickFormat: (v: number) =>
           v >= 10_000
             ? (v / 1_000).toFixed() + "k"
             : v < 10
             ? v.toFixed(1)
             : v.toFixed(),
+        format: (v: number) => v.toFixed(1),
         label: "Distance (km)",
       },
       elevation: {
@@ -44,10 +45,11 @@ export const settings = {
         sortable: true,
         fun: (d: Activity) =>
           Math.round(d.total_elevation_gain!),
-        format: (v: number) =>
+        tickFormat: (v: number) =>
           v >= 10_000
             ? (v / 1_000).toFixed() + "k"
             : v.toFixed(),
+        format: (v: number) => v.toFixed(),
         label: "Elevation (m)",
       },
       time: {
@@ -55,7 +57,14 @@ export const settings = {
         sortable: true,
         fun: (d: Activity) =>
           Math.round(d.elapsed_time! / 360) / 10,
-        format: (v: number) => v.toFixed(0),
+        format: (v: number) => {
+          const hours = Math.floor(v);
+          const minutes = Math.round((v - hours) * 60);
+          return `${hours}h${minutes
+            .toString()
+            .padStart(2, "0")}`;
+        },
+        tickFormat: (v: number) => v.toFixed(0),
         label: "Duration (h)",
       },
     },
@@ -240,7 +249,7 @@ export const plot =
         }),
         Plot.axisY({
           label: null,
-          tickFormat: value.format,
+          tickFormat: value.tickFormat,
           tickSize: 12,
           tickSpacing: 120,
           //anchor: "right",
@@ -248,7 +257,7 @@ export const plot =
             ? {}
             : {
                 tickRotate: -90,
-                tickFormat: prepend(" ", value.format),
+                tickFormat: prepend(" ", value.tickFormat),
                 textAnchor: "start",
                 tickSize: 14,
                 tickPadding: -10,

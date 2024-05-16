@@ -22,7 +22,8 @@ export const settings = {
         format: (v: number) => (v / 1000).toFixed() + "km",
         label: "Distance",
         unit: "km",
-        reducer: d3.sum,
+        reduce: (v: Activity[]): number =>
+          d3.sum(v, (d) => d.distance),
         color: {scheme: "reds", type: "sqrt", ticks: 3},
       },
       elevation: {
@@ -31,7 +32,8 @@ export const settings = {
         format: (v: number) => (v / 1.0).toFixed() + "m",
         label: "Elevation",
         unit: "km",
-        reducer: d3.sum,
+        reduce: (v: Activity[]): number =>
+          d3.sum(v, (d) => d.total_elevation_gain),
         color: {scheme: "reds", type: "sqrt", ticks: 3},
       },
       time: {
@@ -40,7 +42,8 @@ export const settings = {
         format: (v: number) => (v / 3600).toFixed(1) + "h",
         label: "Duration",
         unit: "h",
-        reducer: d3.sum,
+        reduce: (v: Activity[]): number =>
+          d3.sum(v, (d) => d.elapsed_time),
         color: {scheme: "reds", type: "sqrt", ticks: 3},
       },
       type: {
@@ -58,13 +61,10 @@ export const settings = {
         },
         label: "Sport Type",
         unit: "",
-        reducer: (
-          v: Activity[],
-          fun: (
-            d: Activity
-          ) => keyof typeof categorySettings
-        ): string => {
-          const set = new Set(v.map(fun));
+        reduce: (v: Activity[]): string => {
+          const set = new Set(
+            v.map((d) => aliasMap[d.sport_type])
+          );
           return set.size > 1
             ? "Multiple"
             : (set.values().next().value as string);
@@ -84,7 +84,7 @@ export const settings = {
       },
     },
   },
-};
+} as const;
 
 type CalendarSetting = {
   value: keyof typeof settings.value.options;
@@ -113,7 +113,7 @@ const setter =
 
 function makeCalendar({
   date = Plot.identity,
-  inset = 1.5,
+  inset = 0.5,
   ...options
 } = {}) {
   let D: Date[] | null;
@@ -139,10 +139,10 @@ function makeCalendar({
 
 class MonthLine extends Plot.Mark {
   static defaults = {
-    stroke: "black",
-    strokeWidth: 1,
+    stroke: "currentColor",
+    strokeWidth: 2,
   };
-  constructor(data: Plot.Data, options = {}) {
+  constructor(data, options = {}) {
     const {x, y} = options;
     super(
       data,
@@ -154,20 +154,15 @@ class MonthLine extends Plot.Mark {
       MonthLine.defaults
     );
   }
-  render(
-    index: number[],
-    {x, y}: Plot.ScaleFunctions,
-    {x: X, y: Y}: Plot.ChannelValues,
-    dimensions: Plot.Dimensions
-  ): Plot.RenderFunction {
+  render(index, {x, y}, {x: X, y: Y}, dimensions) {
     const {marginTop, marginBottom, height} = dimensions;
     const dx = x.bandwidth(),
       dy = y.bandwidth();
-    return htl.svg`<path opacity=${
-      this.opacity
-    } fill=none stroke=${
+    return htl.svg`<path fill=none stroke=${
       this.stroke
-    } stroke-width=1 d=${Array.from(
+    } stroke-width=${
+      this.strokeWidth
+    } stroke-linecap="round" d=${Array.from(
       index,
       (i) =>
         `${
@@ -218,6 +213,8 @@ export const plot =
     activities: Activity[];
     width: number;
     height: number;
+    setSelected: (ids: number[]) => void;
+    selected: number[];
   }) => {
     const {value} = getter(calendarSetting);
     const activitiesByDate = d3.group(activities, (f) =>
@@ -229,16 +226,20 @@ export const plot =
     const dayTotals = d3.map(
       d3.rollup(
         activities,
-        (v) => value.reducer(v, value.fun),
+        value.reduce as (
+          acts: Activity[]
+        ) => number | string,
         (d) => d3.utcDay(new Date(d.start_date_local))
       ),
       ([key, value]) => ({date: key, value})
     );
 
+    if (dayTotals.length == 0) return null;
+
     const start = d3.min(dayTotals, (d) => d.date);
 
     const end = d3.utcDay.offset(
-      d3.max(dayTotals, (d) => d.date)
+      d3.max(dayTotals, (d) => d.date)!
     );
 
     const heightPlot =
@@ -297,10 +298,6 @@ export const plot =
             dx: -5,
           })
         ),
-        new MonthLine(
-          d3.utcMonths(d3.utcMonth(start), end),
-          makeCalendar({opacity: 0.3, strokeWidth: 1})
-        ),
         Plot.cell(
           dayTotals,
           makeCalendar({
@@ -326,15 +323,23 @@ export const plot =
             tip: {
               fontSize: 12,
             },
-            rx: 2,
+            rx: 1,
           })
         ),
         //on(
         Plot.text(
-          d3.utcDays(start, end),
+          d3.utcDays(start!, end),
           makeCalendar({
             text: d3.utcFormat("%-d"),
             fontSize: 11,
+          })
+        ),
+        new MonthLine(
+          d3.utcMonths(d3.utcMonth(start), end),
+          makeCalendar({
+            opacity: 1,
+            strokeWidth: 4,
+            stroke: "white",
           })
         ),
         /*{

@@ -7,12 +7,12 @@ await import("./src/env.js");
 /** @type {import("next").NextConfig} */
 const config = {
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
-  reactStrictMode: false,
+  reactStrictMode: true,
   async redirects() {
     return [
       {source: "/", destination: "/map", permanent: true},

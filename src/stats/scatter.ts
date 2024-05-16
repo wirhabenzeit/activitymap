@@ -203,6 +203,15 @@ export const plot =
                     : undefined,
               }),
         }),
+        Plot.dot(
+          activities,
+          Plot.pointer({
+            x: xValue.fun,
+            y: yValue.fun,
+            r: rValue.fun,
+            fill: (d) => group.color(group.fun(d)),
+          })
+        ),
         Plot.dot(activities, {
           x: xValue.fun,
           y: yValue.fun,

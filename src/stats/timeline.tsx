@@ -29,7 +29,7 @@ export const settings = {
         id: "count",
         fun: () => 1,
         sortable: false,
-        format: (v: number) => v,
+        format: (v: number) => v.toFixed(0),
         label: "Count",
         unit: "",
       },
@@ -304,9 +304,19 @@ export const plot =
       }));
     });
 
-    const data = timeMap
+    interface Data {
+      date: Date;
+      value: number;
+      type: keyof typeof categorySettings;
+    }
+
+    const data: Data[] = timeMap
       .flat()
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .map((d) => ({
+        ...d,
+        [timeline.value.label]: d.value,
+      }));
 
     const map = new d3.InternMap(
       timeMap.map((arr) => {
@@ -364,8 +374,6 @@ export const plot =
           tickSize: 12,
           ...(!bigPlot
             ? {
-                //tickFormat: (x) =>
-                //  ` ${timeline.timePeriod.tickFormat(x)}`,
                 textAnchor: "start",
                 tickPadding: -10,
                 tickFormat: d3.timeFormat(" '%y"),
@@ -406,29 +414,18 @@ export const plot =
           ]),
         ],
         Plot.ruleX(range, Plot.pointerX({})),
-        /*Plot.text(
-          range,
-          Plot.pointerX({
-            text: (d) =>
-              d3.timeFormat(timeline.timePeriod.tickFormat)(
-                d
-              ),
-            x: (d) => d,
-            frameAnchor: "bottom",
-            dy: 20,
-          })
-        ),*/
         Plot.lineY(
           data,
           Plot.windowY({
             x: "date",
-            y: "value",
+            y: timeline.value.label,
             k: timeline.averaging + 1,
             curve: "monotone-x",
             reduce: "mean",
-            stroke: (x) => timeline.group.color(x.type),
+            stroke: (x: Data) =>
+              timeline.group.color(x.type),
             channels: {
-              Date: (d) =>
+              Date: (d: Data) =>
                 `${d3.timeFormat(
                   timeline.timePeriod.tickFormat
                 )(d.date)} ± ${timeline.averaging} ${
@@ -441,11 +438,8 @@ export const plot =
                 Type: "type",
               },
               format: {
-                y: (x) =>
-                  `${timeline.value.format(x)}${
-                    timeline.value.unit
-                  }`,
-                Type: (x) => timeline.group.format(x),
+                y: timeline.value.format,
+                Type: timeline.group.format,
                 x: false,
                 stroke: false,
                 z: false,
