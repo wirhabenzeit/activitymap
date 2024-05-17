@@ -5,9 +5,7 @@ import {
   useCallback,
   useMemo,
   type FC,
-  type RefObject,
   createRef,
-  useEffect,
 } from "react";
 
 import {IconButton, Paper} from "@mui/material";
@@ -51,7 +49,6 @@ import {Download} from "~/components/Map/DownloadControl";
 import {Selection} from "~/components/Map/SelectionControl";
 import {LayerSwitcher} from "~/components/Map/LayerSwitcher";
 import type {Activity} from "~/server/db/schema";
-import {MapContextValue} from "react-map-gl/dist/esm/components/map";
 import PhotoLayer from "~/components/Map/Photo";
 import {CameraAlt} from "@mui/icons-material";
 import {type MapboxEvent} from "mapbox-gl";
@@ -210,7 +207,6 @@ function Map() {
   const mapRefLoc = createRef<MapRef>();
 
   const loaded = useStore((state) => state.loaded);
-  const [terrain, setTerrain] = useState(false);
   const [viewport, setViewport] = useState(mapPosition);
 
   const overlayMaps = useMemo(
@@ -395,9 +391,8 @@ function Map() {
             updatedRow: Activity
           ) => {
             console.log("Updating activity", updatedRow);
-            const verifiedActivity = await updateActivity(
-              updatedRow
-            );
+            const verifiedActivity =
+              await updateActivity(updatedRow);
             return verifiedActivity;
           }}
           onProcessRowUpdateError={(error) =>

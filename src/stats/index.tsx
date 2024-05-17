@@ -56,11 +56,13 @@ export const commonSettings = {
   marginLeft: 30,
 };
 
-type ArgType<T> = T extends (arg: infer U) => any
+type ArgType<T> = T extends (arg: infer U) => string
   ? U
   : never;
 
-export const prepend = <T extends (...args: any[]) => any>(
+export const prepend = <
+  T extends (...args: unknown[]) => string,
+>(
   text: string,
   func: T
 ) =>

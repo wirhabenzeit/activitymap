@@ -262,6 +262,18 @@ export const plot =
     });
   };
 
+function isIterableNumberValue(
+  iterable: Iterable<unknown>
+): iterable is Iterable<d3.NumberValue> {
+  for (const value of iterable) {
+    const numberValue = Number(value);
+    if (isNaN(numberValue)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export const legend =
   (setting: ScatterSetting) => (plot: Plot.Plot) => {
     const {rValue} = getter(setting);
@@ -270,7 +282,8 @@ export const legend =
       !scale?.domain ||
       !scale.range ||
       !Array.isArray(scale.range) ||
-      scale.range.length < 2
+      scale.range.length < 2 ||
+      !isIterableNumberValue(scale.domain)
     )
       return null;
     const ticks = 4;
@@ -281,7 +294,7 @@ export const legend =
     const lineHeight = 8;
     const gap = 20;
 
-    const r0 = scale.range[1];
+    const r0 = scale.range[1] as number;
 
     let s;
     if (
@@ -300,7 +313,8 @@ export const legend =
       .ticks(ticks)
       .reverse()
       .filter(
-        (t) => h - s(t) > lineHeight / 2 && (h = s(t))
+        (t: number) =>
+          h - s(t) > lineHeight / 2 && (h = s(t) as number)
       );
 
     return Plot.plot({
@@ -311,21 +325,21 @@ export const legend =
       marks: [
         Plot.link(values, {
           x1: r0 + 2,
-          y1: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
+          y1: (d: number) => 8 + 2 * r0 - 2 * s(d) + shiftY,
           x2: 2 * r0 + 2 + gap,
-          y2: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
+          y2: (d: number) => 8 + 2 * r0 - 2 * s(d) + shiftY,
           strokeWidth: strokeWidth / 2,
           strokeDasharray,
         }),
         Plot.dot(values, {
           r: s,
           x: r0 + 2,
-          y: (d) => 8 + 2 * r0 - s(d) + shiftY,
+          y: (d: number) => 8 + 2 * r0 - s(d) + shiftY,
           strokeWidth,
         }),
         Plot.text(values, {
           x: 2 * r0 + 2 + gap,
-          y: (d) => 8 + 2 * r0 - 2 * s(d) + shiftY,
+          y: (d: number) => 8 + 2 * r0 - 2 * s(d) + shiftY,
           textAnchor: "start",
           dx: 4,
           text: tickFormat,

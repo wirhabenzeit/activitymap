@@ -1,13 +1,6 @@
 import {type StateCreator} from "zustand";
 import {type Activity} from "~/server/db/schema";
 
-import {
-  timelineSettings,
-  scatterSettings,
-  progressSettings,
-  calendarSettings,
-} from "~/settings/stats";
-
 import statsPlots, {
   defaultStatsSettings,
   type StatsSetting,
@@ -39,7 +32,7 @@ export type StatsZustand = {
 type SetterFunctions = {
   [P in keyof typeof statsPlots]: <
     K extends keyof StatsSetting[P],
-    S extends StatsSetting[P]
+    S extends StatsSetting[P],
   >(
     name: K,
     value: S[K]
@@ -61,21 +54,21 @@ export const statsSlice: StateCreator<
         ...acc,
         [plotName]: <
           K extends keyof StatsSetting[typeof plotName],
-          V extends StatsSetting[typeof plotName][K]
+          V extends StatsSetting[typeof plotName][K],
         >(
           name: K,
           value: V
         ) =>
           set((state) => {
-            const plot = statsPlots[plotName];
-            if (plot) {
-              const setter = plot.setter as (
-                setting: StatsSetting[typeof plotName]
-              ) => any;
-              state.statsSettings[plotName] = setter(
-                get().statsSettings[plotName]
-              )(name, value);
-            }
+            if (!(plotName in state.statsSettings)) return;
+
+            const setter = statsPlots[plotName].setter(
+              get().statsSettings[plotName]
+            );
+            state.statsSettings[plotName] = setter(
+              name,
+              value
+            );
           }),
       }),
       {} as SetterFunctions

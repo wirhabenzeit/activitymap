@@ -2,10 +2,8 @@
 import {
   useRef,
   useState,
-  useCallback,
   useEffect,
   type ReactElement,
-  use,
 } from "react";
 
 import {
@@ -73,8 +71,8 @@ export function CheckboxFilter({
             binary[name] === undefined
               ? "default"
               : binary[name]
-              ? "info"
-              : "error"
+                ? "info"
+                : "error"
           }
           onClick={onClick}
           sx={{
@@ -209,39 +207,6 @@ export function MultiSelect({
   );
 }
 
-function debounce<T>(
-  func: (...param: T[]) => void,
-  timeout = 3000
-) {
-  let timer: number;
-
-  return (...args: T[]) => {
-    window.clearTimeout(timer);
-    timer = window.setTimeout(func, timeout, ...args);
-  };
-}
-
-const TextFieldDebounced: React.FC<{
-  debounceMs?: number;
-  onChange: (p: string) => void;
-  value: string;
-}> = ({debounceMs = 300, onChange, value = ""}) => {
-  const debouncedChangeHandler = useCallback(
-    debounce(onChange, debounceMs),
-    []
-  );
-
-  const handleChange = ({
-    target,
-  }: React.ChangeEvent<HTMLInputElement>) => {
-    debouncedChangeHandler(target.value);
-  };
-
-  return (
-    <TextField value={value} onChange={handleChange} />
-  );
-};
-
 const useDebounce = (value: string, delay = 500) => {
   const [debouncedValue, setDebouncedValue] = useState("");
   const timerRef = useRef<NodeJS.Timeout | null>();
@@ -270,8 +235,10 @@ export function SearchBox() {
 
   const [text, setText] = useState(search);
   const debouncedSearch = useDebounce(text, 300);
+
   useEffect(() => {
     setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
   return (

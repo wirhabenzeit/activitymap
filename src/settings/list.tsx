@@ -19,48 +19,50 @@ import {
   aliasMap,
   colorMap,
 } from "./category";
-import React, {useEffect} from "react";
+import React, {useEffect, useState} from "react";
 
 function decFormatter(unit = "", decimals = 0) {
   return (num: number | undefined) =>
     num == undefined ? null : num.toFixed(decimals) + unit;
 }
 
-function CustomEditComponent(
-  props: GridRenderEditCellParams
+function CustomNameEditComponent(
+  props: GridRenderEditCellParams<
+    Activity,
+    {name: string; id: number; type: string}
+  >
 ) {
   const apiRef = useGridApiContext();
   const ref = React.useRef(null);
   const {id, field} = props;
-  const [value, setValue] = React.useState(
-    props.value.name as string
-  );
+  console.log(props.value);
+  const [value, setValue] = useState(props.value?.name);
 
   useEffect(() => {
-    apiRef.current.setEditCellValue({
+    void apiRef.current.setEditCellValue({
       id,
       field,
-      value: props.value.name,
+      value: props.value?.name,
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleValueChange = (
+  const handleValueChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    console.log(event.target.value);
     const newValue = event.target.value; // The new value entered by the user
-    apiRef.current.setEditCellValue({
+    setValue(newValue);
+    void apiRef.current.setEditCellValue({
       id,
       field,
       value: newValue,
       debounceMs: 200,
     });
-    setValue(newValue);
   };
 
   return (
     <input
-      style={{border: 0}}
+      style={{border: 0, width: "100%"}}
       ref={ref}
       type="text"
       value={value}
@@ -72,7 +74,7 @@ function CustomEditComponent(
 const renderNameEditInputCell: GridColDef["renderCell"] = (
   params
 ) => {
-  return <CustomEditComponent {...params} />;
+  return <CustomNameEditComponent {...params} />;
 };
 
 export const listSettings = {
@@ -510,4 +512,6 @@ export const listSettings = {
       },
     },
   },
-};
+} as const;
+
+listSettings.columns;

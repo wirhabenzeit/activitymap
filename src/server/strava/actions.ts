@@ -154,9 +154,7 @@ export async function updateActivity(
       }
     );
     console.log("Updated activity");
-    const parsedActivity: Activity = parseActivity(
-      json
-    );
+    const parsedActivity: Activity = parseActivity(json);
     return parsedActivity;
   } catch (e) {
     console.log(e);
@@ -230,7 +228,7 @@ function parsePhoto(
 ): Photo {
   const tableKeys = Object.keys(photos);
   const filteredInput = Object.fromEntries(
-    Object.entries(json).filter(([key, value]) =>
+    Object.entries(json).filter(([key]) =>
       tableKeys.includes(key)
     )
   );

@@ -2,25 +2,19 @@ import {Marker} from "react-map-gl";
 import {useStore} from "~/contexts/Zustand";
 import {Avatar} from "@mui/material";
 import {useMemo, useState} from "react";
-import type {Photo} from "~/server/db/schema";
 
 export default function PhotoLayer() {
-  const {photos, bbox, position, filterIDs} = useStore(
+  const {photos, position, filterIDs} = useStore(
     (state) => ({
       photos: state.photos,
-      bbox: state.bbox,
       position: state.position,
       filterIDs: state.filterIDs,
     })
   );
-  if (!bbox) return null;
 
   const displayPhotos = useMemo(() => {
     return photos.filter((photo) => {
-      if (
-        !photo.location?.[0] ||
-        !photo.location[1]
-      )
+      if (!photo.location?.[0] || !photo.location[1])
         return false;
       return filterIDs.includes(photo.activity_id!);
     });
@@ -39,7 +33,7 @@ export default function PhotoLayer() {
             sizes={photo.sizes}
             activity_name={photo.activity_name!}
             activity_id={photo.activity_id!}
-            caption={photo.caption || undefined}
+            caption={photo.caption ?? undefined}
           />
         ))}
       </>
@@ -49,7 +43,6 @@ export default function PhotoLayer() {
 
 function PhotoMarker({
   urls,
-  sizes,
   longitude,
   latitude,
   activity_name,
@@ -87,7 +80,7 @@ function PhotoMarker({
       <Avatar
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        alt={caption || activity_name}
+        alt={caption ?? activity_name}
         src={photoUrl}
         sx={{
           width: `${Math.min(80, Math.pow(2, zoom - 5))}px`,
