@@ -29,6 +29,7 @@ export async function GET(
       req.nextUrl.searchParams.get("number");
     const acts = await getDBActivities({summary: true});
     const newest = acts
+      .filter((a) => a.id !== 443702470) // remove buggy activity
       .sort(
         (a, b) =>
           b.start_date_local_timestamp -
