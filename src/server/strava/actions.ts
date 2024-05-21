@@ -56,6 +56,7 @@ async function get(
   if (!json) {
     throw new Error(`Failed to fetch ${path}`);
   }
+  console.log(json);
   return json;
 }
 
@@ -349,6 +350,7 @@ export async function getActivities({
           ]
         )
       );
+      console.log(activities, tokens);
       new_activities = (await Promise.all(
         activities.map(({id, athlete}) =>
           get(`activities/${id}`, {token: tokens[athlete]})

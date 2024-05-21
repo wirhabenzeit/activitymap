@@ -21,6 +21,7 @@ import {styled} from "@mui/material/styles";
 import {LoginButton, UserSettings} from "~/components/User";
 import {Share} from "~/components/Share";
 import {useStore} from "~/contexts/Zustand";
+import {ChatBot} from "./ChatBot";
 
 const AppBar = styled(MuiAppBar)(({theme}) => {
   const {open} = useStore((state) => ({
@@ -164,6 +165,7 @@ export default function Header() {
         <Box sx={{flexGrow: 1}} />
         {user && "image" in user && !guest && (
           <>
+            <ChatBot />
             <Share />
             <UserSettings user={user} />
           </>
