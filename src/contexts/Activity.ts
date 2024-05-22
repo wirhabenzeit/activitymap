@@ -2,6 +2,7 @@ import type {
   Activity,
   Photo,
   User,
+  Session,
 } from "~/server/db/schema";
 import type {StateCreator} from "zustand";
 import {decode} from "@mapbox/polyline";
@@ -51,8 +52,10 @@ export type ActivityZustand = {
   loaded: boolean;
   photos: Photo[];
   user?: User;
+  session?: Session;
   guest?: boolean;
   setGuest: (x: boolean) => void;
+  setSession: (x: Session) => void;
   setUser: (user: User) => void;
   loadPhotos: () => Promise<void>;
   updateActivity: (act: Activity) => Promise<Activity>;
@@ -120,6 +123,10 @@ export const activitySlice: StateCreator<
   setUser: (user: User) =>
     set((state) => {
       state.user = user;
+    }),
+  setSession: (session: Session) =>
+    set((state) => {
+      state.session = session;
     }),
   setLoading: (x: boolean) => {
     set((state) => {

@@ -4,13 +4,15 @@ import {useSearchParams} from "next/navigation";
 import {useEffect} from "react";
 import {useStore} from "~/contexts/Zustand";
 import {getUser} from "~/server/db/actions";
-import type {User} from "~/server/db/schema";
+import type {User, Session} from "~/server/db/schema";
 
 export default function MainContainer({
   user,
+  session,
   children,
 }: {
   children: React.ReactNode;
+  session?: Session;
   user?: User;
 }) {
   const {
@@ -22,6 +24,7 @@ export default function MainContainer({
     setUser,
     setGuest,
     setLoading,
+    setSession,
   } = useStore((state) => ({
     loadFromDB: state.loadFromDB,
     updateFilters: state.updateFilters,
@@ -31,11 +34,13 @@ export default function MainContainer({
     setUser: state.setUser,
     setGuest: state.setGuest,
     setLoading: state.setLoading,
+    setSession: state.setSession,
   }));
 
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    if (session !== undefined) setSession(session);
     if (user != undefined) {
       setUser(user);
       load().then(console.log).catch(console.error);

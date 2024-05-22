@@ -1,77 +1,64 @@
 "use client";
 
-import {type CoreMessage} from "ai";
-
 import {OpenAI} from "openai";
-//import {continueConversation} from "~/server/ai/actions";
 import Markdown from "react-markdown";
-//import {readStreamableValue} from "ai/rsc";
+import SyntaxHighlighter from "react-syntax-highlighter";
+import {
+  docco,
+  dark,
+} from "react-syntax-highlighter/dist/esm/styles/hljs";
 
 import {AssistantStream} from "openai/lib/AssistantStream";
-import {
-  AiOutlineUser,
-  AiOutlineRobot,
-  AiOutlineSend,
-} from "react-icons/ai";
 
-import {useEffect, useState, useRef} from "react";
+import {useEffect, useState, useRef, use} from "react";
 import {
   IconButton,
   TextField,
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   DialogTitle,
-  Switch,
   FormGroup,
-  Button,
-  FormControlLabel,
-  Snackbar,
-  type SnackbarCloseReason,
   List,
   ListItem,
   Grid,
   ListItemText,
-  FormControl,
-  Input,
   CircularProgress,
 } from "@mui/material";
-import {
-  IosShare as ShareIcon,
-  Link as LinkIcon,
-  Close as CloseIcon,
-  Insights,
-  SendOutlined,
-} from "@mui/icons-material";
+import {Insights, SendOutlined} from "@mui/icons-material";
 import {library} from "@fortawesome/fontawesome-svg-core";
 import {fas} from "@fortawesome/free-solid-svg-icons";
 library.add(fas);
 
 import {useStore} from "~/contexts/Zustand";
 import {type User} from "~/server/db/schema";
+import Image from "next/image";
 
 export function ChatBot() {
   const [open, setOpen] = useState(false);
+  const {selected, user, guest, session} = useStore(
+    (state) => ({
+      selected: state.selected,
+      user: state.user,
+      session: state.session,
+      guest: state.guest,
+    })
+  );
+
+  if (!user || !session || guest) return null;
 
   const handleClickOpen = () => {
     setOpen(true);
   };
-  const {selected, user, guest} = useStore((state) => ({
-    selected: state.selected,
-    user: state.user,
-    guest: state.guest,
-  }));
 
-  if (!user || guest) return null;
   return (
     <>
       <IconButton sx={{mx: 2}} onClick={handleClickOpen}>
         <Insights sx={{color: "white", opacity: 0.9}} />
       </IconButton>
       <ChatBotDialog
-        dialogOpen={open}
-        setDialogOpen={setOpen}
+        open={open}
+        onClose={() => setOpen(false)}
         selected={selected}
         user={user}
       />
@@ -79,34 +66,30 @@ export function ChatBot() {
   );
 }
 
-import {
-  createThread,
-  createMessage,
-} from "~/server/ai/actions";
-import {ne} from "drizzle-orm";
-
-function ChatBotDialog({
-  dialogOpen,
-  setDialogOpen,
-  selected,
-  user,
-}: {
-  dialogOpen: boolean;
-  setDialogOpen: (open: boolean) => void;
+interface ChatBotDialogProps {
+  open: boolean;
+  onClose: () => void;
   selected: number[];
   user: User;
-}) {
+}
+
+function ChatBotDialog({
+  open,
+  onClose,
+  selected,
+  user,
+}: ChatBotDialogProps) {
   return (
     <Dialog
-      open={dialogOpen}
-      fullWidth={true}
+      open={open}
+      fullWidth
       maxWidth="md"
-      onClose={() => setDialogOpen(false)}
-      slotProps={{backdrop: {style: {opacity: 0.1}}}}
+      onClose={onClose}
     >
+      <DialogTitle>Chat</DialogTitle>
       <OpenAIAssistant
         assistantId="asst_iMT1VRPZZNotIsd5NtXvjUAr"
-        greeting="HELLO MR RIPLEY"
+        greeting="What do you want to know about your activities?"
       />
     </Dialog>
   );
@@ -119,68 +102,123 @@ interface Message {
   createdAt: Date;
 }
 
-interface CodeInterpreterInput {
-  type: "code_interpreter";
-  index: number;
-  code_interpreter: {input: string; outputs?: unknown[]};
+interface OpenAIAssistantProps {
+  assistantId: string;
+  greeting: string;
 }
 
-export default function OpenAIAssistant({
-  assistantId = "",
-  greeting = "I am a helpful chat assistant. How can I help you?",
-}) {
-  const streamingCodeRef = useRef(null);
+type FileAPIResponse = {
+  object: "file";
+  id: string;
+  purpose: string;
+  filename: string;
+  bytes: number;
+  created_at: number;
+  status: string;
+  status_details: null;
+};
 
-  const [isLoading, setIsLoading] = useState(false);
+function OpenAIAssistant({
+  assistantId,
+  greeting,
+}: OpenAIAssistantProps) {
+  const streamingCodeRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [threadId, setThreadId] = useState<string | null>(
     null
   );
   const [prompt, setPrompt] = useState("");
-  const [messages, setMessages] = useState<
-    (
-      | OpenAI.Beta.Threads.Messages.Message
-      | OpenAI.Beta.Threads.Runs.Steps.ToolCall
-    )[]
-  >([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [streamingMessage, setStreamingMessage] =
-    useState<Message>({
-      id: "Thinking...",
-      role: "assistant",
-      content: "_Thinking..._",
-      createdAt: new Date(),
-    });
+    useState<Message | null>(null);
   const [streamingCode, setStreamingCode] =
     useState<OpenAI.Beta.Threads.Runs.Steps.ToolCall | null>(
       null
     );
-
   const messageId = useRef(0);
+  const endOfMessagesRef = useRef(null);
 
-  // set default greeting Message
-  const greetingMessage = {
+  const greetingMessage: Message = {
     id: "greeting",
     role: "assistant",
     content: greeting,
     createdAt: new Date(),
   };
 
-  async function handleSubmit(
-    e: React.FormEvent<HTMLFormElement>
-  ) {
-    e.preventDefault();
+  const session = useStore((state) => state.session);
 
-    // clear streaming message
+  const uploadFile = async () => {
+    if (!session) return;
+    const sessionToken = session.sessionToken;
+    const fileResponse = await fetch(
+      `/api/ai/file?session=${sessionToken}`,
+      {
+        method: "POST",
+      }
+    );
+    const file =
+      (await fileResponse.json()) as FileAPIResponse;
+    const fileID = file.id;
+    const response = await fetch("/api/ai/message", {
+      method: "POST",
+      body: JSON.stringify({
+        assistantId,
+        threadId,
+        content:
+          "This is the CSV containing all my activity data. Do not reply yet, wait for me to ask a question.",
+        attachments: [
+          {
+            file_id: fileID,
+            tools: [{type: "code_interpreter"}],
+          },
+        ],
+      }),
+    });
+    console.log(response);
+    if (!response.body) return;
+    const runner = AssistantStream.fromReadableStream(
+      response.body
+    );
+    runner.on("messageCreated", (message) => {
+      setThreadId(message.thread_id);
+      setIsLoading(false);
+    });
+  };
+
+  useEffect(() => {
+    // upload a file to OpenAI
+    void uploadFile();
+  }, []);
+
+  useEffect(() => {
+    endOfMessagesRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }, [
+    messages,
+    isLoading,
+    streamingMessage,
+    streamingCode,
+  ]);
+
+  const handlePromptChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setPrompt(e.target.value);
+  };
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
     setStreamingMessage({
       id: "Thinking...",
       role: "assistant",
       content: "_Thinking..._",
       createdAt: new Date(),
     });
-
-    // add busy indicator
     setIsLoading(true);
 
-    // add user message to list of messages
     messageId.current++;
     setMessages((prev) => [
       ...prev,
@@ -191,172 +229,128 @@ export default function OpenAIAssistant({
         createdAt: new Date(),
       },
     ]);
-    setPrompt("");
 
-    // post new message to server and stream OpenAI Assistant response
-    const response = await fetch("/api/ai", {
+    const response = await fetch("/api/ai/message", {
       method: "POST",
       body: JSON.stringify({
-        assistantId: assistantId,
-        threadId: threadId,
+        assistantId,
+        threadId,
         content: prompt,
       }),
     });
 
-    if (!response.body) {
-      return;
-    }
+    setPrompt("");
+
+    if (!response.body) return;
 
     const runner = AssistantStream.fromReadableStream(
       response.body
     );
-
-    runner.on("messageCreated", (message) => {
-      setThreadId(message.thread_id);
-    });
-
-    runner.on("textDelta", (_delta, contentSnapshot) => {
-      const newStreamingMessage = {
+    runner.on("messageCreated", (message) =>
+      setThreadId(message.thread_id)
+    );
+    runner.on("textDelta", (_delta, contentSnapshot) =>
+      setStreamingMessage({
         ...streamingMessage,
         content: contentSnapshot.value,
-      };
-      setStreamingMessage(newStreamingMessage);
-    });
-
+      })
+    );
     runner.on("messageDone", (message) => {
-      // get final message content
       const finalContent =
-        message.content[0].type == "text"
+        message.content[0].type === "text"
           ? message.content[0].text.value
           : "";
-
-      // add assistant message to list of messages
       messageId.current++;
-      console.log({
+      const newMessage = {
         id: messageId.current.toString(),
         role: "assistant",
         content: finalContent,
         createdAt: new Date(),
-      });
-      console.log("adding msg", {
-        id: messageId.current.toString(),
-        role: "assistant",
-        content: finalContent,
-        createdAt: new Date(),
-      });
+      };
+      console.log("new Message", newMessage);
       setMessages((prevMessages) => [
         ...prevMessages,
-        {
-          id: messageId.current.toString(),
-          role: "assistant",
-          content: finalContent,
-          createdAt: new Date(),
-        },
+        newMessage,
       ]);
       setIsLoading(false);
     });
 
     runner.on("toolCallCreated", (toolCall) => {
-      console.log(toolCall);
       if (toolCall.type === "code_interpreter")
         setStreamingCode(toolCall);
     });
 
     runner.on("toolCallDelta", (delta) => {
       if (delta.type !== "code_interpreter") return;
-      setStreamingCode((toolcall) => {
-        let input, outputs;
-        if (toolcall) {
-          input = toolcall.code_interpreter.input;
-          outputs = toolcall.code_interpreter.outputs;
-        } else {
-          input = "";
-          outputs = [];
-        }
-        if ("input" in delta.code_interpreter)
+      setStreamingCode((toolCall) => {
+        let input = toolCall
+          ? toolCall.code_interpreter.input
+          : "";
+        let outputs = toolCall
+          ? toolCall.code_interpreter.outputs
+          : [];
+        if (delta.code_interpreter.input)
           input += delta.code_interpreter.input;
-        if ("outputs" in delta.code_interpreter)
+        if (delta.code_interpreter.outputs)
           outputs = outputs.concat(
             delta.code_interpreter.outputs
           );
         const newStreamingCode = {
           ...delta,
-          code_interpreter: {
-            input,
-            outputs,
-          },
+          code_interpreter: {input, outputs},
         };
         streamingCodeRef.current = newStreamingCode;
         return newStreamingCode;
       });
     });
 
-    runner.on(
-      "toolCallDone",
-      (
-        toolCall: OpenAI.Beta.Threads.Runs.Steps.ToolCall
-      ) => {
-        if (toolCall.type === "code_interpreter") {
-          messageId.current++;
-          console.log(
-            "adding msg",
-            streamingCodeRef.current
-          );
-          setMessages((prevMessages) => [
-            ...prevMessages,
-            {
-              ...streamingCodeRef.current,
-              id: messageId.current.toString(),
-            },
-          ]);
-          setStreamingCode(null);
-          streamingCodeRef.current = null;
-        }
+    runner.on("toolCallDone", (toolCall) => {
+      if (toolCall.type === "code_interpreter") {
+        messageId.current++;
+        const newMessage = {
+          ...streamingCodeRef.current,
+          id: messageId.current.toString(),
+        };
+        console.log("new Code", newMessage);
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          newMessage,
+        ]);
+        setStreamingCode(null);
+        streamingCodeRef.current = null;
       }
-    );
-
-    runner.on("error", (error) => {
-      console.error(error);
     });
-  }
 
-  // handles changes to the prompt input field
-  function handlePromptChange(
-    e: React.ChangeEvent<HTMLInputElement>
-  ) {
-    setPrompt(e.target.value);
-  }
+    runner.on("error", (error) => console.error(error));
+  };
 
   return (
     <>
-      <DialogTitle>Chat</DialogTitle>
-      <DialogContent dividers={true}>
+      <DialogContent dividers>
         <List>
           <OpenAIAssistantMessage
             message={greetingMessage}
           />
-          {messages.map((m, i) => (
-            <ListItem key={i}>
-              <OpenAIAssistantMessage
-                key={m.id}
-                message={m}
-              />
+          {messages.map((m) => (
+            <ListItem key={m.id}>
+              <OpenAIAssistantMessage message={m} />
             </ListItem>
           ))}
-          {isLoading && (
+          {isLoading && streamingMessage && (
             <ListItem key="streamingMessage">
-              {streamingMessage !== null && (
-                <OpenAIAssistantMessage
-                  message={streamingMessage}
-                />
-              )}
-              {streamingCode !== null && (
-                <OpenAIAssistantMessage
-                  message={streamingCode}
-                />
-              )}
+              <OpenAIAssistantMessage
+                message={streamingMessage}
+              />
             </ListItem>
           )}
+          {isLoading && streamingCode && (
+            <ListItem key="streamingCode">
+              <OpenAIAssistantMessage
+                message={streamingCode}
+              />
+            </ListItem>
+          )}
+          <div ref={endOfMessagesRef} />
         </List>
       </DialogContent>
       <DialogActions>
@@ -381,23 +375,18 @@ export default function OpenAIAssistant({
               sx={{flexGrow: 1}}
               placeholder="What would you like to know?"
             />
-            {isLoading ? (
-              <IconButton
-                disabled
-                variant="contained"
-                color="primary"
-              >
+            <IconButton
+              disabled={isLoading || prompt.length === 0}
+              variant="contained"
+              color="primary"
+              type="submit"
+            >
+              {isLoading ? (
                 <CircularProgress />
-              </IconButton>
-            ) : (
-              <IconButton
-                disabled={prompt.length === 0}
-                variant="contained"
-                color="primary"
-              >
+              ) : (
                 <SendOutlined />
-              </IconButton>
-            )}
+              )}
+            </IconButton>
           </FormGroup>
         </form>
       </DialogActions>
@@ -405,14 +394,7 @@ export default function OpenAIAssistant({
   );
 }
 
-export function OpenAIAssistantMessage({
-  message,
-}: {
-  message:
-    | OpenAI.Beta.Threads.Messages.Message
-    | OpenAI.Beta.Threads.Runs.Steps.ToolCall;
-}) {
-  //console.log(message);
+function OpenAIAssistantMessage({message}) {
   return (
     <Grid container>
       {"role" in message && (
@@ -423,7 +405,7 @@ export function OpenAIAssistantMessage({
             }
             primary={<Markdown>{message.content}</Markdown>}
             secondary={message.createdAt.toLocaleTimeString()}
-          ></ListItemText>
+          />
         </Grid>
       )}
       {"type" in message &&
@@ -432,12 +414,49 @@ export function OpenAIAssistantMessage({
             <ListItemText
               align="left"
               primary={
-                <Markdown>
-                  {`\`\`\`python\n${message.code_interpreter.input}\n\`\`\``}
-                </Markdown>
+                <SyntaxHighlighter
+                  language="python"
+                  style={dark}
+                  customStyle={{fontSize: ".8rem"}}
+                >
+                  {message.code_interpreter.input}
+                </SyntaxHighlighter>
               }
-            ></ListItemText>
+            />
           </Grid>
+        )}
+      {"type" in message &&
+        message.type === "code_interpreter" &&
+        message.code_interpreter.outputs.map((output, i) =>
+          output.type === "logs" ? (
+            <Grid item xs={12} key={i}>
+              <ListItemText
+                align="left"
+                primary={
+                  <SyntaxHighlighter
+                    language="shell"
+                    style={docco}
+                    customStyle={{fontSize: ".8rem"}}
+                  >
+                    {output.logs}
+                  </SyntaxHighlighter>
+                }
+              />
+            </Grid>
+          ) : output.type === "image" ? (
+            <Grid item xs={12} key={i}>
+              <ListItemText
+                align="left"
+                primary={
+                  <img
+                    src={`/api/ai/image?fileID=${output.image.file_id}`}
+                    alt="AI generated image"
+                    style={{maxWidth: "100%"}}
+                  />
+                }
+              />
+            </Grid>
+          ) : null
         )}
     </Grid>
   );

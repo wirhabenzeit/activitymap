@@ -268,5 +268,6 @@ export type Activity = typeof activities.$inferSelect;
 export type Photo = typeof photos.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
+export type Session = typeof sessions.$inferSelect;
 export type ValueColumn = keyof typeof valueColumns;
 export type BooleanColumn = keyof typeof booleanColumns;

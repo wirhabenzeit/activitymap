@@ -265,7 +265,10 @@ export default async function RootLayout({
                       flexGrow: 1,
                     }}
                   >
-                    <MainContainer user={user as User}>
+                    <MainContainer
+                      user={user as User}
+                      session={session}
+                    >
                       {children}
                     </MainContainer>
                   </Box>
