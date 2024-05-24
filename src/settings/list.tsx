@@ -97,11 +97,7 @@ export const listSettings = {
       field: "sport_type",
       headerName: "Type",
       description: "Sport type",
-      renderHeader: () => (
-        <Tooltip title="Sport type">
-          <FaStrava />
-        </Tooltip>
-      ),
+      renderHeader: () => <FaStrava />,
       renderCell: ({
         value,
         row,
@@ -168,11 +164,7 @@ export const listSettings = {
       field: "description",
       headerName: "Description",
       flex: 2,
-      renderHeader: () => (
-        <Tooltip title="Start date">
-          <FaFileLines />
-        </Tooltip>
-      ),
+      renderHeader: () => <FaFileLines />,
       editable: true,
       minWidth: 80,
     },
@@ -181,11 +173,7 @@ export const listSettings = {
       headerName: "Day",
       flex: 1,
       minWidth: 80,
-      renderHeader: () => (
-        <Tooltip title="Start date">
-          <FaCalendar />
-        </Tooltip>
-      ),
+      renderHeader: () => <FaCalendar />,
       type: "number",
       valueFormatter: (value: number) =>
         new Date(value * 1000).toLocaleDateString("de-DE", {
@@ -199,11 +187,7 @@ export const listSettings = {
       headerName: "Start time",
       flex: 1,
       minWidth: 60,
-      renderHeader: () => (
-        <Tooltip title="Start time">
-          <FaClock />
-        </Tooltip>
-      ),
+      renderHeader: () => <FaClock />,
       valueGetter: (value: string, row: Activity) => {
         const date = new Date(row.start_date_local);
         return (
@@ -226,9 +210,7 @@ export const listSettings = {
     {
       headerName: "Elapsed time",
       renderHeader: () => (
-        <Tooltip title="Elapsed time">
-          <FaStopwatch />
-        </Tooltip>
+        <FaStopwatch title="Elapsed time" />
       ),
       field: "elapsed_time",
       flex: 1,
@@ -245,9 +227,7 @@ export const listSettings = {
     {
       headerName: "Moving time",
       renderHeader: () => (
-        <Tooltip title="Moving time">
-          <FaStopwatch />
-        </Tooltip>
+        <FaStopwatch title="Moving time" />
       ),
       field: "moving_time",
       flex: 1,
@@ -263,9 +243,7 @@ export const listSettings = {
     {
       field: "distance",
       renderHeader: () => (
-        <Tooltip title="Distance">
-          <FaRulerHorizontal />
-        </Tooltip>
+        <FaRulerHorizontal title="Distance" />
       ),
       headerName: "Distance",
       type: "number",
@@ -277,11 +255,7 @@ export const listSettings = {
     },
     {
       field: "average_speed",
-      renderHeader: () => (
-        <Tooltip title="Average speed">
-          <FaGauge />
-        </Tooltip>
-      ),
+      renderHeader: () => <FaGauge title="Average speed" />,
       headerName: "Avg Speed",
       type: "number",
       flex: 1,
@@ -292,9 +266,7 @@ export const listSettings = {
     {
       field: "total_elevation_gain",
       renderHeader: () => (
-        <Tooltip title="Elevation gain">
-          <FaMountain />
-        </Tooltip>
+        <FaMountain title="Elevation gain" />
       ),
       headerName: "Elev Gain",
       type: "number",
@@ -306,12 +278,10 @@ export const listSettings = {
     {
       field: "elev_high",
       renderHeader: () => (
-        <Tooltip title="Elevation high">
-          <div>
-            <span>max</span>
-            <FaMountain />
-          </div>
-        </Tooltip>
+        <div>
+          <span>max</span>
+          <FaMountain title="altitude" />
+        </div>
       ),
       headerName: "Elevation High",
       type: "number",
@@ -324,12 +294,10 @@ export const listSettings = {
     {
       field: "elev_low",
       renderHeader: () => (
-        <Tooltip title="Elevation low">
-          <div>
-            <span>min</span>
-            <FaMountain />
-          </div>
-        </Tooltip>
+        <div>
+          <span>min</span>
+          <FaMountain title="altitude" />
+        </div>
       ),
       headerName: "Elevation Low",
       type: "number",
@@ -341,9 +309,7 @@ export const listSettings = {
     {
       field: "weighted_average_watts",
       renderHeader: () => (
-        <Tooltip title="Weighted average watts">
-          <FaBoltLightning />
-        </Tooltip>
+        <FaBoltLightning title="Weighted average watts" />
       ),
       headerName: "Weighted Avg Watts",
       type: "number",
@@ -355,9 +321,7 @@ export const listSettings = {
     {
       field: "average_watts",
       renderHeader: () => (
-        <Tooltip title="Average watts">
-          <FaBoltLightning />
-        </Tooltip>
+        <FaBoltLightning title="Average watts" />
       ),
       headerName: "Avg Watts",
       type: "number",
@@ -369,9 +333,7 @@ export const listSettings = {
     {
       field: "max_watts",
       renderHeader: () => (
-        <Tooltip title="Max watts">
-          <FaBoltLightning />
-        </Tooltip>
+        <FaBoltLightning title="Max watts" />
       ),
       headerName: "Max Watts",
       type: "number",
@@ -383,9 +345,7 @@ export const listSettings = {
     {
       field: "average_heartrate",
       renderHeader: () => (
-        <Tooltip title="Average heartrate">
-          <FaHeart />
-        </Tooltip>
+        <FaHeart title="Average heartrate" />
       ),
       headerName: "Avg Heartrate",
       type: "number",
@@ -396,11 +356,7 @@ export const listSettings = {
     },
     {
       field: "max_heartrate",
-      renderHeader: () => (
-        <Tooltip title="Max heartrate">
-          <FaHeart />
-        </Tooltip>
-      ),
+      renderHeader: () => <FaHeart title="Max heartrate" />,
       headerName: "Max Heartrate",
       type: "number",
       flex: 1,
@@ -410,11 +366,7 @@ export const listSettings = {
     },
     {
       field: "kudos_count",
-      renderHeader: () => (
-        <Tooltip title="Kudos">
-          <FaThumbsUp />
-        </Tooltip>
-      ),
+      renderHeader: () => <FaThumbsUp title="Kudos" />,
       headerName: "Kudos Count",
       type: "number",
       flex: 1,
@@ -425,9 +377,7 @@ export const listSettings = {
     {
       field: "detailed_activity",
       renderHeader: () => (
-        <Tooltip title="Detailed activity">
-          <FaInfo />
-        </Tooltip>
+        <FaInfo title="Detailed activity" />
       ),
       headerName: "Detailed Activity",
       type: "boolean",
