@@ -1,9 +1,4 @@
-import {
-  Icon,
-  IconButton,
-  Link,
-  Tooltip,
-} from "@mui/material";
+import {Link, Tooltip} from "@mui/material";
 import {
   type GridSortCellParams,
   type GridRenderEditCellParams,
@@ -12,6 +7,11 @@ import {
   type GridSortItem,
   useGridApiContext,
 } from "@mui/x-data-grid";
+import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
+import {library} from "@fortawesome/fontawesome-svg-core";
+import {fas} from "@fortawesome/free-solid-svg-icons";
+
+library.add(fas);
 
 import {type Activity} from "~/server/db/schema";
 import {
@@ -20,20 +20,6 @@ import {
   colorMap,
 } from "./category";
 import React, {useEffect, useState} from "react";
-import {
-  FaBoltLightning,
-  FaCalendar,
-  FaClock,
-  FaFileLines,
-  FaGauge,
-  FaHeart,
-  FaInfo,
-  FaMountain,
-  FaRulerHorizontal,
-  FaStopwatch,
-  FaStrava,
-  FaThumbsUp,
-} from "react-icons/fa6";
 
 function decFormatter(unit = "", decimals = 0) {
   return (num: number | undefined) =>
@@ -99,27 +85,23 @@ export const listSettings = {
       description: "Sport type",
       renderHeader: () => (
         <Tooltip title="Sport type">
-          <FaStrava />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="child-reaching"
+          />
         </Tooltip>
       ),
       renderCell: ({
         value,
-        row,
       }: {
         value: Activity["sport_type"];
-        row: Activity;
       }) => (
-        <Tooltip title={`View ${value} on Strava`}>
-          <IconButton
-            size="small"
-            sx={{
-              color:
-                categorySettings[aliasMap[value]!].color,
-            }}
-            href={`https://www.strava.com/activities/${row.id}`}
-          >
-            {categorySettings[aliasMap[value]!].icon}
-          </IconButton>
+        <Tooltip title={value}>
+          <FontAwesomeIcon
+            fontSize="small"
+            icon={categorySettings[aliasMap[value]!].icon}
+            color={colorMap[value]}
+          />
         </Tooltip>
       ),
       width: 60,
@@ -136,7 +118,7 @@ export const listSettings = {
       flex: 2,
       editable: true,
       minWidth: 150,
-      /*valueGetter: (value: number, row: Activity) => ({
+      valueGetter: (value: number, row: Activity) => ({
         name: row.name,
         id: row.id,
         type: row.sport_type,
@@ -162,7 +144,7 @@ export const listSettings = {
           v2.name,
           param1,
           param2
-        ),*/
+        ),
     },
     {
       field: "description",
@@ -170,7 +152,10 @@ export const listSettings = {
       flex: 2,
       renderHeader: () => (
         <Tooltip title="Start date">
-          <FaFileLines />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="file-lines"
+          />
         </Tooltip>
       ),
       editable: true,
@@ -183,7 +168,10 @@ export const listSettings = {
       minWidth: 80,
       renderHeader: () => (
         <Tooltip title="Start date">
-          <FaCalendar />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="calendar"
+          />
         </Tooltip>
       ),
       type: "number",
@@ -201,7 +189,7 @@ export const listSettings = {
       minWidth: 60,
       renderHeader: () => (
         <Tooltip title="Start time">
-          <FaClock />
+          <FontAwesomeIcon fontSize="small" icon="clock" />
         </Tooltip>
       ),
       valueGetter: (value: string, row: Activity) => {
@@ -227,7 +215,10 @@ export const listSettings = {
       headerName: "Elapsed time",
       renderHeader: () => (
         <Tooltip title="Elapsed time">
-          <FaStopwatch />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="stopwatch"
+          />
         </Tooltip>
       ),
       field: "elapsed_time",
@@ -246,7 +237,10 @@ export const listSettings = {
       headerName: "Moving time",
       renderHeader: () => (
         <Tooltip title="Moving time">
-          <FaStopwatch />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="stopwatch"
+          />
         </Tooltip>
       ),
       field: "moving_time",
@@ -264,7 +258,10 @@ export const listSettings = {
       field: "distance",
       renderHeader: () => (
         <Tooltip title="Distance">
-          <FaRulerHorizontal />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="ruler-horizontal"
+          />
         </Tooltip>
       ),
       headerName: "Distance",
@@ -279,7 +276,10 @@ export const listSettings = {
       field: "average_speed",
       renderHeader: () => (
         <Tooltip title="Average speed">
-          <FaGauge />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="tachometer-alt"
+          />
         </Tooltip>
       ),
       headerName: "Avg Speed",
@@ -293,7 +293,10 @@ export const listSettings = {
       field: "total_elevation_gain",
       renderHeader: () => (
         <Tooltip title="Elevation gain">
-          <FaMountain />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="mountain"
+          />
         </Tooltip>
       ),
       headerName: "Elev Gain",
@@ -309,7 +312,10 @@ export const listSettings = {
         <Tooltip title="Elevation high">
           <div>
             <span>max</span>
-            <FaMountain />
+            <FontAwesomeIcon
+              fontSize="small"
+              icon="mountain"
+            />
           </div>
         </Tooltip>
       ),
@@ -327,7 +333,10 @@ export const listSettings = {
         <Tooltip title="Elevation low">
           <div>
             <span>min</span>
-            <FaMountain />
+            <FontAwesomeIcon
+              fontSize="small"
+              icon="mountain"
+            />
           </div>
         </Tooltip>
       ),
@@ -342,7 +351,10 @@ export const listSettings = {
       field: "weighted_average_watts",
       renderHeader: () => (
         <Tooltip title="Weighted average watts">
-          <FaBoltLightning />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="bolt-lightning"
+          />
         </Tooltip>
       ),
       headerName: "Weighted Avg Watts",
@@ -356,7 +368,10 @@ export const listSettings = {
       field: "average_watts",
       renderHeader: () => (
         <Tooltip title="Average watts">
-          <FaBoltLightning />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="bolt-lightning"
+          />
         </Tooltip>
       ),
       headerName: "Avg Watts",
@@ -370,7 +385,10 @@ export const listSettings = {
       field: "max_watts",
       renderHeader: () => (
         <Tooltip title="Max watts">
-          <FaBoltLightning />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="bolt-lightning"
+          />
         </Tooltip>
       ),
       headerName: "Max Watts",
@@ -384,7 +402,7 @@ export const listSettings = {
       field: "average_heartrate",
       renderHeader: () => (
         <Tooltip title="Average heartrate">
-          <FaHeart />
+          <FontAwesomeIcon fontSize="small" icon="heart" />
         </Tooltip>
       ),
       headerName: "Avg Heartrate",
@@ -398,7 +416,7 @@ export const listSettings = {
       field: "max_heartrate",
       renderHeader: () => (
         <Tooltip title="Max heartrate">
-          <FaHeart />
+          <FontAwesomeIcon fontSize="small" icon="heart" />
         </Tooltip>
       ),
       headerName: "Max Heartrate",
@@ -412,7 +430,10 @@ export const listSettings = {
       field: "kudos_count",
       renderHeader: () => (
         <Tooltip title="Kudos">
-          <FaThumbsUp />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="thumbs-up"
+          />
         </Tooltip>
       ),
       headerName: "Kudos Count",
@@ -426,7 +447,10 @@ export const listSettings = {
       field: "detailed_activity",
       renderHeader: () => (
         <Tooltip title="Detailed activity">
-          <FaInfo />
+          <FontAwesomeIcon
+            fontSize="small"
+            icon="info-circle"
+          />
         </Tooltip>
       ),
       headerName: "Detailed Activity",

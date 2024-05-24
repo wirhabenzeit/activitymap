@@ -4,12 +4,7 @@ const config = {
   parserOptions: {
     project: true,
   },
-  plugins: [
-    "@typescript-eslint",
-    "drizzle",
-    "react",
-    "eslint-plugin-react-compiler",
-  ],
+  plugins: ["@typescript-eslint", "drizzle", "react"],
   extends: [
     "next/core-web-vitals",
     "prettier",
@@ -19,7 +14,6 @@ const config = {
   rules: {
     "@typescript-eslint/array-type": "off",
     "@typescript-eslint/consistent-type-definitions": "off",
-    "react-compiler/react-compiler": "error",
     "@typescript-eslint/consistent-type-imports": [
       "warn",
       {

@@ -1,5 +1,8 @@
+import {library} from "@fortawesome/fontawesome-svg-core";
+import {fas} from "@fortawesome/free-solid-svg-icons";
 import * as Plot from "@observablehq/plot";
 import * as htl from "htl";
+library.add(fas);
 import * as d3 from "d3";
 
 import {type Activity} from "~/server/db/schema";

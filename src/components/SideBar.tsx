@@ -8,6 +8,8 @@ import {
   ListItem,
   IconButton,
   Drawer as MuiDrawer,
+  type DrawerProps,
+  type Theme,
 } from "@mui/material";
 import {ChevronLeft as ChevronLeftIcon} from "@mui/icons-material";
 import {styled} from "@mui/material/styles";

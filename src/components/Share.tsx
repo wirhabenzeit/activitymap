@@ -19,6 +19,9 @@ import {
   Link as LinkIcon,
   Close as CloseIcon,
 } from "@mui/icons-material";
+import {library} from "@fortawesome/fontawesome-svg-core";
+import {fas} from "@fortawesome/free-solid-svg-icons";
+library.add(fas);
 
 import {useStore} from "~/contexts/Zustand";
 import {type User} from "~/server/db/schema";
@@ -38,11 +41,7 @@ export function Share() {
   if (!user || guest) return null;
   return (
     <>
-      <IconButton
-        sx={{mx: 1}}
-        onClick={handleClickOpen}
-        size="small"
-      >
+      <IconButton sx={{mx: 0}} onClick={handleClickOpen}>
         <ShareIcon sx={{color: "white", opacity: 0.9}} />
       </IconButton>
       <ShareDialog
