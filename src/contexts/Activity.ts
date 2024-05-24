@@ -163,13 +163,15 @@ export const activitySlice: StateCreator<
     });
     try {
       if (!ids) {
-        const acts = await getDBActivities({
+        /*const acts = await getDBActivities({
           athlete_id: athleteId,
         });
         set(setActivities(acts));
-        /*const promises = await getActivitiesPaged({
+        return acts.length;*/
+        //return 0;
+        const promises = await getActivitiesPaged({
           athlete_id: athleteId,
-          pageSize: 1500,
+          pageSize: 200,
         });
         console.log("promises", promises);
         for (const promise of promises) {
@@ -180,8 +182,7 @@ export const activitySlice: StateCreator<
             console.error(e);
           }
         }
-        return promises.length;*/
-        return acts.length;
+        return promises.length;
       } else {
         const acts = await getDBActivities({ids});
         set(setActivities(acts));
