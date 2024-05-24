@@ -1,6 +1,3 @@
-import {library} from "@fortawesome/fontawesome-svg-core";
-import {fas} from "@fortawesome/free-solid-svg-icons";
-library.add(fas);
 import {LayerSAC} from "~/components/Map/LayerSAC";
 import {LayerFriflyt} from "~/components/Map/LayerFriflyt";
 import {LayerQuaeldich} from "~/components/Map/LayerQuaeldich";

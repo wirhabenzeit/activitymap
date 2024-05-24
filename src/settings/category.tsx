@@ -1,18 +1,20 @@
-import {library} from "@fortawesome/fontawesome-svg-core";
-import {fas} from "@fortawesome/free-solid-svg-icons";
-
-library.add(fas);
-
-import {type IconProp} from "@fortawesome/fontawesome-svg-core";
+import {
+  FaPersonSkiingNordic,
+  FaPersonWalking,
+  FaPersonRunning,
+  FaPersonBiking,
+  FaPersonCircleQuestion,
+} from "react-icons/fa6";
 
 import {type Activity} from "~/server/db/schema";
+import {ReactElement} from "react";
 
 export type CategorySetting = Record<
   "bcXcSki" | "trailHike" | "run" | "ride" | "misc",
   {
     name: string;
     color: string;
-    icon: IconProp;
+    icon: ReactElement;
     alias: Activity["sport_type"][];
     active: boolean;
   }
@@ -22,28 +24,28 @@ export const categorySettings: CategorySetting = {
   bcXcSki: {
     name: "BC & XC Ski",
     color: "#1982C4",
-    icon: "skiing-nordic",
+    icon: <FaPersonSkiingNordic />,
     alias: ["BackcountrySki", "NordicSki", "RollerSki"],
     active: true,
   },
   trailHike: {
     name: "Trail / Hike",
     color: "#FF595E",
-    icon: "walking",
+    icon: <FaPersonWalking />,
     alias: ["Hike", "TrailRun", "RockClimbing", "Snowshoe"],
     active: true,
   },
   run: {
     name: "Run",
     color: "#FFCA3A",
-    icon: "running",
+    icon: <FaPersonRunning />,
     alias: ["Run", "VirtualRun"],
     active: true,
   },
   ride: {
     name: "Ride",
     color: "#8AC926",
-    icon: "biking",
+    icon: <FaPersonBiking />,
     alias: [
       "Ride",
       "VirtualRide",
@@ -59,7 +61,7 @@ export const categorySettings: CategorySetting = {
   misc: {
     name: "Miscellaneous",
     color: "#6A4C93",
-    icon: "person-circle-question",
+    icon: <FaPersonCircleQuestion />,
     active: true,
     alias: [
       "AlpineSki",
@@ -104,7 +106,7 @@ const colorMap: Partial<
 > = {};
 
 const iconMap: Partial<
-  Record<Activity["sport_type"], IconProp>
+  Record<Activity["sport_type"], ReactElement>
 > = {};
 
 const aliasMap: Partial<

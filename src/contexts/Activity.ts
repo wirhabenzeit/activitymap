@@ -163,11 +163,11 @@ export const activitySlice: StateCreator<
     });
     try {
       if (!ids) {
-        /*acts = await getDBActivities({
+        const acts = await getDBActivities({
           athlete_id: athleteId,
         });
-        set(setActivities(acts));*/
-        const promises = await getActivitiesPaged({
+        set(setActivities(acts));
+        /*const promises = await getActivitiesPaged({
           athlete_id: athleteId,
           pageSize: 1500,
         });
@@ -180,7 +180,8 @@ export const activitySlice: StateCreator<
             console.error(e);
           }
         }
-        return promises.length;
+        return promises.length;*/
+        return acts.length;
       } else {
         const acts = await getDBActivities({ids});
         set(setActivities(acts));

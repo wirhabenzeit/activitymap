@@ -21,13 +21,13 @@ import {
 } from "@mui/material";
 import {
   Add as AddIcon,
+  CheckBox,
+  Clear,
+  DirectionsWalk,
   Logout as LogoutIcon,
   QuestionMark as QuestionMarkIcon,
+  Refresh,
 } from "@mui/icons-material";
-import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
-import {library} from "@fortawesome/fontawesome-svg-core";
-import {fas} from "@fortawesome/free-solid-svg-icons";
-library.add(fas);
 
 import {useStore} from "~/contexts/Zustand";
 import type {User} from "~/server/db/schema";
@@ -144,10 +144,7 @@ function WebhookStatus() {
       {webhookStatus === true && (
         <Tooltip title="Deactivate Webhook">
           <IconButton>
-            <FontAwesomeIcon
-              fontSize="large"
-              icon="check"
-            />
+            <CheckBox />
           </IconButton>
         </Tooltip>
       )}
@@ -171,10 +168,7 @@ function WebhookStatus() {
               setLoading(false);
             }}
           >
-            <FontAwesomeIcon
-              fontSize="large"
-              icon="times"
-            />
+            <Clear />
           </IconButton>
         </Tooltip>
       )}
@@ -279,10 +273,7 @@ function SettingsDialog({user}: {user: User}) {
               secondaryAction={<LoadMore />}
             >
               <ListItemIcon>
-                <FontAwesomeIcon
-                  fontSize="large"
-                  icon="child-reaching"
-                />
+                <DirectionsWalk />
               </ListItemIcon>
               <Tooltip title="Strava only allows to download 200 activities at a time">
                 <ListItemText
@@ -296,10 +287,7 @@ function SettingsDialog({user}: {user: User}) {
               secondaryAction={<WebhookStatus />}
             >
               <ListItemIcon>
-                <FontAwesomeIcon
-                  fontSize="large"
-                  icon="refresh"
-                />
+                <Refresh />
               </ListItemIcon>
               <ListItemText
                 primary="Activity Webhook"

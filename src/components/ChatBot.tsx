@@ -26,13 +26,9 @@ import {
   CircularProgress,
 } from "@mui/material";
 import {Insights, SendOutlined} from "@mui/icons-material";
-import {library} from "@fortawesome/fontawesome-svg-core";
-import {fas} from "@fortawesome/free-solid-svg-icons";
-library.add(fas);
 
 import {useStore} from "~/contexts/Zustand";
 import {type User} from "~/server/db/schema";
-import Image from "next/image";
 
 export function ChatBot() {
   const [open, setOpen] = useState(false);
@@ -53,7 +49,11 @@ export function ChatBot() {
 
   return (
     <>
-      <IconButton sx={{mx: 0}} onClick={handleClickOpen}>
+      <IconButton
+        sx={{mx: 0}}
+        onClick={handleClickOpen}
+        size="small"
+      >
         <Insights sx={{color: "white", opacity: 0.9}} />
       </IconButton>
       <ChatBotDialog
