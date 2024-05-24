@@ -41,7 +41,7 @@ export function Share() {
   if (!user || guest) return null;
   return (
     <>
-      <IconButton sx={{mx: 0}} onClick={handleClickOpen}>
+      <IconButton sx={{mx: 2}} onClick={handleClickOpen}>
         <ShareIcon sx={{color: "white", opacity: 0.9}} />
       </IconButton>
       <ShareDialog
@@ -65,6 +65,7 @@ function ShareDialog({
   selected: number[];
   user: User;
 }) {
+  const [mapValue, setMapValue] = useState(true);
   const [selectedValue, setSelectedValue] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
 
@@ -123,6 +124,18 @@ function ShareDialog({
             activities.
           </DialogContentText>
           <FormGroup>
+            <FormControlLabel
+              control={
+                <Switch
+                  value={mapValue}
+                  onChange={(e) =>
+                    setMapValue(e.target.checked)
+                  }
+                  defaultChecked
+                />
+              }
+              label="Share current map settings"
+            />
             <FormControlLabel
               disabled={selected.length === 0}
               control={
