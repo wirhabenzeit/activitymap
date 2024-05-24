@@ -1,6 +1,6 @@
 "use server";
 
-import {inArray, eq, count, desc} from "drizzle-orm";
+import {inArray, eq, count} from "drizzle-orm";
 import {
   type Activity,
   type Account,
@@ -106,12 +106,6 @@ export async function getActivities({
   summary?: boolean;
 }) {
   let acts: Activity[];
-  console.log(
-    "getting activities",
-    ids,
-    athlete_id,
-    summary
-  );
   if (summary) {
     acts = await db
       .select()
@@ -125,18 +119,12 @@ export async function getActivities({
   else {
     if (athlete_id == undefined) {
       const athlete = await getAccount();
-      console.log("athlete", athlete);
       athlete_id = athlete.providerAccountId;
     }
     acts = await db
       .select()
       .from(activities)
-      .where(eq(activities.athlete, athlete_id))
-      .limit(250)
-      .orderBy(desc(activities.start_date_local_timestamp));
-    //console.log("acts", acts);
-    //acts = await db.select().from(activities);
-    //.where(eq(activities.athlete, athlete_id))
+      .where(eq(activities.athlete, athlete_id));
   }
   return acts;
 }
@@ -165,7 +153,6 @@ export async function getActivitiesPaged({
       .select()
       .from(activities)
       .where(eq(activities.athlete, athlete_id))
-      .orderBy(desc(activities.start_date_local_timestamp))
       .limit(pageSize)
       .offset(pageNumber * pageSize)
   );
