@@ -1,6 +1,6 @@
 "use server";
 
-import {inArray, eq} from "drizzle-orm";
+import {inArray, eq, count} from "drizzle-orm";
 import {
   type Activity,
   type Account,
@@ -10,6 +10,7 @@ import {
 } from "./schema";
 import {db} from "./index";
 import {auth} from "~/auth";
+import {range} from "d3";
 
 export const getUser = async (id?: string) => {
   if (!id) {
@@ -126,6 +127,36 @@ export async function getActivities({
       .where(eq(activities.athlete, athlete_id));
   }
   return acts;
+}
+
+export async function getActivitiesPaged({
+  athlete_id,
+  pageSize = 100,
+}: {
+  athlete_id?: number;
+  pageSize: number;
+}) {
+  if (athlete_id == undefined) {
+    const athlete = await getAccount();
+    athlete_id = athlete.providerAccountId;
+  }
+  const actCount =
+    (
+      await db
+        .select({count: count()})
+        .from(activities)
+        .where(eq(activities.athlete, athlete_id))
+    )[0]?.count ?? 0;
+  const pages = Math.ceil(actCount / pageSize);
+  const promises = range(pages).map((pageNumber) =>
+    db
+      .select()
+      .from(activities)
+      .where(eq(activities.athlete, athlete_id))
+      .limit(pageSize)
+      .offset(pageNumber * pageSize)
+  );
+  return promises;
 }
 
 export async function getPhotos() {

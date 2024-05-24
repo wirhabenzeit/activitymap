@@ -15,6 +15,7 @@ import {
 import {
   getAccount,
   getActivities as getDBActivities,
+  getActivitiesPaged,
   getPhotos,
 } from "~/server/db/actions";
 import {
@@ -160,15 +161,31 @@ export const activitySlice: StateCreator<
     set((state) => {
       state.loading = true;
     });
-    let acts = [] as Activity[];
     try {
       if (!ids) {
-        acts = await getDBActivities({
+        /*acts = await getDBActivities({
           athlete_id: athleteId,
         });
-      } else acts = await getDBActivities({ids});
-      set(setActivities(acts));
-      return acts.length;
+        set(setActivities(acts));*/
+        const promises = await getActivitiesPaged({
+          athlete_id: athleteId,
+          pageSize: 1000,
+        });
+        console.log("promises", promises);
+        for (const promise of promises) {
+          try {
+            const data = await promise;
+            set(setActivities(data));
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        return promises.length;
+      } else {
+        const acts = await getDBActivities({ids});
+        set(setActivities(acts));
+        return acts.length;
+      }
     } catch (e) {
       console.error(e);
       throw new Error("Failed to fetch activities");

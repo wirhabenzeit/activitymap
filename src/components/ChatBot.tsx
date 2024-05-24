@@ -53,7 +53,7 @@ export function ChatBot() {
 
   return (
     <>
-      <IconButton sx={{mx: 2}} onClick={handleClickOpen}>
+      <IconButton sx={{mx: 0}} onClick={handleClickOpen}>
         <Insights sx={{color: "white", opacity: 0.9}} />
       </IconButton>
       <ChatBotDialog
