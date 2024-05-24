@@ -28,10 +28,7 @@ import {
 } from "@mui/icons-material";
 import {useTheme, styled} from "@mui/material/styles";
 
-import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
-import {library} from "@fortawesome/fontawesome-svg-core";
-import {fas} from "@fortawesome/free-solid-svg-icons";
-library.add(fas);
+import {FaMagnifyingGlass} from "react-icons/fa6";
 
 import {
   filterSettings,
@@ -67,6 +64,7 @@ export function CheckboxFilter({
       setContentOpen={setOpenContent}
       button={
         <IconButton
+          size="small"
           color={
             binary[name] === undefined
               ? "default"
@@ -80,10 +78,7 @@ export function CheckboxFilter({
             mx: "1px",
           }}
         >
-          <FontAwesomeIcon
-            fontSize="small"
-            icon={binaryFilters[name].icon}
-          />
+          {binaryFilters[name].icon}
         </IconButton>
       }
     >
@@ -150,11 +145,9 @@ export function MultiSelect({
               ? categorySettings[name].color
               : "text.disabled",
           }}
+          size="small"
         >
-          <FontAwesomeIcon
-            fontSize="medium"
-            icon={categorySettings[name].icon}
-          />
+          {categorySettings[name].icon}
         </IconButton>
       }
     >
@@ -252,14 +245,12 @@ export function SearchBox() {
             width: "30px",
             mx: "1px",
           }}
+          size="small"
           onClick={() => {
             setSearch("");
           }}
         >
-          <FontAwesomeIcon
-            fontSize="medium"
-            icon="magnifying-glass"
-          />
+          <FaMagnifyingGlass />
         </IconButton>
       }
     >
@@ -368,6 +359,7 @@ export function ValueSlider({
               ? "default"
               : "primary"
           }
+          size="small"
           sx={{
             width: "30px",
             mx: "1px",
@@ -380,10 +372,7 @@ export function ValueSlider({
             );
           }}
         >
-          <FontAwesomeIcon
-            fontSize="medium"
-            icon={filterSettings[name].icon}
-          />
+          {filterSettings[name].icon}
         </IconButton>
       }
     >

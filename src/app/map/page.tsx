@@ -274,7 +274,7 @@ function Map() {
             );
           }
         }}
-        optimizeForTerrain={true}
+        //optimizeForTerrain={true}
         onLoad={(event: MapboxEvent) => console.log(event)}
         projection={
           "globe" as unknown as mapboxgl.Projection
@@ -284,10 +284,10 @@ function Map() {
             ? mapSettingBase.url
             : undefined
         }
-        terrain={{
+        /*terrain={{
           source: "mapbox-dem",
           exaggeration: threeDim ? 1.5 : 0,
-        }}
+        }}*/
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={
