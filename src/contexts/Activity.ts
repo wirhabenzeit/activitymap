@@ -169,7 +169,7 @@ export const activitySlice: StateCreator<
         set(setActivities(acts));*/
         const promises = await getActivitiesPaged({
           athlete_id: athleteId,
-          pageSize: 1500,
+          pageSize: 1000,
         });
         console.log("promises", promises);
         for (const promise of promises) {
