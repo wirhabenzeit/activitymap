@@ -26,15 +26,22 @@ export const getUser = async (id?: string) => {
   return user;
 };
 
-export const getAccount = async (
-  providerAccountId?: number
-) => {
+export const getAccount = async ({
+  providerAccountId,
+  userId,
+}: {
+  providerAccountId?: number;
+  userId?: string;
+}) => {
   let account: Account;
   if (!providerAccountId) {
-    const user = await getUser();
+    if (!userId) {
+      const user = await getUser();
+      userId = user.id;
+    }
     account = (await db.query.accounts.findFirst({
       where: (accounts, {eq}) =>
-        eq(accounts.userId, user.id),
+        eq(accounts.userId, userId!),
     })) as Account;
   } else {
     account = (await db.query.accounts.findFirst({
@@ -124,7 +131,7 @@ export async function getActivities({
       .where(inArray(activities.id, ids));
   else {
     if (athlete_id == undefined) {
-      const athlete = await getAccount();
+      const athlete = await getAccount({});
       console.log("athlete", athlete);
       athlete_id = athlete.providerAccountId;
     }
@@ -132,8 +139,9 @@ export async function getActivities({
       .select()
       .from(activities)
       .where(eq(activities.athlete, athlete_id))
-      .limit(250)
       .orderBy(desc(activities.start_date_local_timestamp));
+    //.limit(250)
+    //.offset(500);
     //console.log("acts", acts);
     //acts = await db.select().from(activities);
     //.where(eq(activities.athlete, athlete_id))
@@ -149,7 +157,7 @@ export async function getActivitiesPaged({
   pageSize: number;
 }) {
   if (athlete_id == undefined) {
-    const athlete = await getAccount();
+    const athlete = await getAccount({});
     athlete_id = athlete.providerAccountId;
   }
   const actCount =
@@ -173,7 +181,7 @@ export async function getActivitiesPaged({
 }
 
 export async function getPhotos() {
-  const athlete = await getAccount();
+  const athlete = await getAccount({});
 
   const phts = await db
     .select()

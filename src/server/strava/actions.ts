@@ -142,7 +142,7 @@ export async function updateActivity(
   act: UpdatableActivity
 ) {
   try {
-    const account = await getAccount();
+    const account = await getAccount({});
     const access_token = account.access_token!;
     const {id, ...update} = act;
     console.log("Updating activity", id, update);
@@ -340,7 +340,9 @@ export async function getActivities({
         ({athlete}) => athlete
       );
       const athlete_tokens = await Promise.all(
-        athlete_ids.map((id) => getAccount(id))
+        athlete_ids.map((id) =>
+          getAccount({providerAccountId: id})
+        )
       );
       tokens = Object.fromEntries(
         athlete_tokens.map(
@@ -358,7 +360,7 @@ export async function getActivities({
       )) as Record<string, unknown>[];
     } else {
       if (!access_token) {
-        const account = await getAccount();
+        const account = await getAccount({});
         access_token = account.access_token!;
       }
       const params = new URLSearchParams(

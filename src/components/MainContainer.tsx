@@ -3,7 +3,7 @@
 import {useSearchParams} from "next/navigation";
 import {useEffect} from "react";
 import {useStore} from "~/contexts/Zustand";
-import {getUser} from "~/server/db/actions";
+import {getAccount, getUser} from "~/server/db/actions";
 import type {User, Session} from "~/server/db/schema";
 
 export default function MainContainer({
@@ -43,7 +43,7 @@ export default function MainContainer({
     if (session !== undefined) setSession(session);
     if (user != undefined) {
       setUser(user);
-      load().then(console.log).catch(console.error);
+      load({}).then(console.log).catch(console.error);
     } else if (searchParams.has("user")) {
       async function getUserFromDB() {
         const user = await getUser(
@@ -52,8 +52,15 @@ export default function MainContainer({
         if (user) {
           console.log("setting user", user);
           setUser(user);
+          const account = await getAccount({
+            userId: user.id,
+          });
           setGuest(true);
-          load().then(console.log).catch(console.error);
+          load({
+            providerAccountId: account.providerAccountId,
+          })
+            .then(console.log)
+            .catch(console.error);
         }
       }
       getUserFromDB()
@@ -66,16 +73,23 @@ export default function MainContainer({
         .get("activities")
         ?.split(",")
         .map(Number);
-      load(activities)
+      load({activities})
         .then(console.log)
         .catch(console.error);
     } else {
       setLoading(false);
     }
 
-    async function load(activities?: number[]) {
+    async function load({
+      activities,
+      providerAccountId,
+    }: {
+      activities?: number[];
+      providerAccountId?: number;
+    }) {
       const nActivities = await loadFromDB({
         ids: activities,
+        athleteId: providerAccountId,
       });
       await loadPhotos();
       if (nActivities === 0) toggleUserSettings();

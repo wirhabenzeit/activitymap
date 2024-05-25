@@ -12,6 +12,8 @@ import {
   type Feature,
 } from "geojson";
 
+import * as geosimplify from "@mapbox/geosimplify-js";
+
 import {
   getAccount,
   getActivities as getDBActivities,
@@ -26,16 +28,21 @@ import {type WritableDraft} from "immer";
 
 const FeatureFromActivity = (act: Activity): Feature => {
   if (!act.map) throw new Error("No map data");
+  const coordinates = decode(
+    "polyline" in act.map
+      ? act.map.polyline
+      : act.map.summary_polyline,
+    5
+  ).map(([lat, lon]) => [lon, lat]);
   const feature: Feature = {
     type: "Feature",
     id: Number(act.id),
     geometry: {
       type: "LineString",
-      coordinates: decode(
-        act.map.polyline
-          ? act.map.polyline
-          : act.map.summary_polyline
-      ).map(([lat, lon]) => [lon, lat]),
+      coordinates:
+        coordinates.length > 100
+          ? geosimplify(coordinates, 20, 200)
+          : coordinates,
     },
     properties: {
       id: Number(act.id),
@@ -87,7 +94,10 @@ const setActivities =
     state.loading = false;
     state.loaded = true;
     acts.forEach((act) => {
-      state.activityDict[Number(act.id)] = act;
+      state.activityDict[Number(act.id)] = {
+        ...act,
+        map: undefined,
+      };
     });
     if (state.geoJson) {
       const features = state.geoJson.features;
@@ -163,17 +173,17 @@ export const activitySlice: StateCreator<
     });
     try {
       if (!ids) {
-        /*const acts = await getDBActivities({
+        const acts = await getDBActivities({
           athlete_id: athleteId,
         });
         set(setActivities(acts));
-        return acts.length;*/
+        return acts.length;
         //return 0;
-        const promises = await getActivitiesPaged({
+        /*const promises = await getActivitiesPaged({
           athlete_id: athleteId,
           pageSize: 100,
         });
-        const acts = (await Promise.all(promises)).flat();
+        const acts = (await Promise.all(promises)).flat();*/
         /*for (const promise of promises) {
           try {
             const data = await promise;
@@ -205,7 +215,8 @@ export const activitySlice: StateCreator<
     });
     try {
       if (!athleteId)
-        athleteId = (await getAccount()).providerAccountId;
+        athleteId = (await getAccount({}))
+          .providerAccountId;
       if (athleteId != undefined) {
         const {activities: acts} =
           await getStravaActivities({

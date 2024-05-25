@@ -17,6 +17,7 @@
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
     "@emotion/cache": "^11.11.0",
     "@emotion/styled": "^11.11.5",
+    "@mapbox/geosimplify-js": "^0.1.0",
     "@mapbox/polyline": "^1.2.1",
     "@mapbox/togeojson": "^0.16.2",
     "@mui/icons-material": "^5.15.18",
