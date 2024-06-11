@@ -1,25 +1,12 @@
+import {IconButton, Tooltip} from "@mui/material";
 import {
-  Icon,
-  IconButton,
-  Link,
-  Tooltip,
-} from "@mui/material";
-import {
-  type GridSortCellParams,
-  type GridRenderEditCellParams,
-  gridStringOrNumberComparator,
   type GridColDef,
   type GridSortItem,
-  useGridApiContext,
 } from "@mui/x-data-grid";
 
 import {type Activity} from "~/server/db/schema";
-import {
-  categorySettings,
-  aliasMap,
-  colorMap,
-} from "./category";
-import React, {useEffect, useState} from "react";
+import {categorySettings, aliasMap} from "./category";
+import React from "react";
 import {
   FaBoltLightning,
   FaCalendar,
@@ -39,57 +26,6 @@ function decFormatter(unit = "", decimals = 0) {
   return (num: number | undefined) =>
     num == undefined ? null : num.toFixed(decimals) + unit;
 }
-
-function CustomNameEditComponent(
-  props: GridRenderEditCellParams<
-    Activity,
-    {name: string; id: number; type: string}
-  >
-) {
-  const apiRef = useGridApiContext();
-  const ref = React.useRef(null);
-  const {id, field} = props;
-  console.log(props.value);
-  const [value, setValue] = useState(props.value?.name);
-
-  useEffect(() => {
-    void apiRef.current.setEditCellValue({
-      id,
-      field,
-      value: props.value?.name,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleValueChange = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const newValue = event.target.value; // The new value entered by the user
-    setValue(newValue);
-    void apiRef.current.setEditCellValue({
-      id,
-      field,
-      value: newValue,
-      debounceMs: 200,
-    });
-  };
-
-  return (
-    <input
-      style={{border: 0, width: "100%"}}
-      ref={ref}
-      type="text"
-      value={value}
-      onChange={handleValueChange}
-    />
-  );
-}
-
-const renderNameEditInputCell: GridColDef["renderCell"] = (
-  params
-) => {
-  return <CustomNameEditComponent {...params} />;
-};
 
 export const listSettings = {
   columns: [
@@ -132,33 +68,6 @@ export const listSettings = {
       flex: 2,
       editable: true,
       minWidth: 150,
-      /*valueGetter: (value: number, row: Activity) => ({
-        name: row.name,
-        id: row.id,
-        type: row.sport_type,
-      }),
-      renderCell: ({value}: {value: Activity}) => (
-        <Link
-          href={`https://www.strava.com/activities/${value.id}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          {value.name}
-        </Link>
-      ),
-      renderEditCell: renderNameEditInputCell,
-      sortComparator: (
-        v1: {name: string},
-        v2: {name: string},
-        param1: GridSortCellParams<string>,
-        param2: GridSortCellParams<string>
-      ) =>
-        gridStringOrNumberComparator(
-          v1.name,
-          v2.name,
-          param1,
-          param2
-        ),*/
     },
     {
       field: "description",

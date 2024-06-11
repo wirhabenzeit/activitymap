@@ -156,7 +156,7 @@ export default function List() {
   }));
   const rows = filterIDs
     .map((key) => activityDict[key])
-    .filter((x) => x != undefined) as Activity[];
+    .filter((x) => x != undefined);
 
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;

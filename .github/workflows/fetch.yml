@@ -1,7 +1,3 @@
-on:
-  schedule:
-    - cron: "0 * * * *"
-
 jobs:
   fetch_strava:
     name: Fetch Strava

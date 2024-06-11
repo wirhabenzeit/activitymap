@@ -255,7 +255,7 @@ function Map() {
   const mapSettingBase = mapSettings[baseMap]!;
   const rows = selected
     .map((key) => activityDict[key])
-    .filter((x) => x != undefined) as Activity[];
+    .filter((x) => x != undefined);
 
   return (
     <>
@@ -284,10 +284,10 @@ function Map() {
             ? mapSettingBase.url
             : undefined
         }
-        /*terrain={{
+        terrain={{
           source: "mapbox-dem",
           exaggeration: threeDim ? 1.5 : 0,
-        }}*/
+        }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={

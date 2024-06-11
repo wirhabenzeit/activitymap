@@ -185,7 +185,9 @@ export const activitySlice: StateCreator<
         });
         //const acts = (await Promise.all(promises)).flat();*/
         for (const promise of promises) {
-          promise.then((data) => set(setActivities(data)));
+          promise
+            .then((data) => set(setActivities(data)))
+            .catch(console.error);
         }
         //set(setActivities(acts));
         return promises.length;

@@ -71,10 +71,10 @@ export async function post(
   const headers =
     token === undefined
       ? {"Content-Type": "application/json"}
-      : {
+      : ({
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
-        };
+        } as Record<string, string>);
   const res = await fetch(
     `https://www.strava.com/api/v3/${path}`,
     {method: method, headers, body: JSON.stringify(body)}
@@ -93,7 +93,10 @@ export async function post(
       `Failed to post ${path}: ${res.status}, ${res.statusText}`
     );
   }
-  const json: Record<string, unknown> = await res.json();
+  const json = (await res.json()) as Record<
+    string,
+    unknown
+  >;
   if (!json) {
     throw new Error(`Failed to post ${path}`);
   }
