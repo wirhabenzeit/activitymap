@@ -9,6 +9,7 @@ const config = {
     "drizzle",
     "react",
     "eslint-plugin-react-compiler",
+    "react-compiler",
   ],
   extends: [
     "next/core-web-vitals",

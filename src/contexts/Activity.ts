@@ -173,27 +173,22 @@ export const activitySlice: StateCreator<
     });
     try {
       if (!ids) {
-        const acts = await getDBActivities({
+        /*const acts = await getDBActivities({
           athlete_id: athleteId,
         });
-        set(setActivities(acts));
-        return acts.length;
+        set(setActivities(acts));*/
+        //return acts.length;
         //return 0;
-        /*const promises = await getActivitiesPaged({
+        const promises = await getActivitiesPaged({
           athlete_id: athleteId,
-          pageSize: 100,
+          pageSize: 200,
         });
-        const acts = (await Promise.all(promises)).flat();*/
-        /*for (const promise of promises) {
-          try {
-            const data = await promise;
-            set(setActivities(data));
-          } catch (e) {
-            console.error(e);
-          }
-        }*/
-        set(setActivities(acts));
-        return acts.length;
+        //const acts = (await Promise.all(promises)).flat();*/
+        for (const promise of promises) {
+          promise.then((data) => set(setActivities(data)));
+        }
+        //set(setActivities(acts));
+        return promises.length;
       } else {
         const acts = await getDBActivities({ids});
         set(setActivities(acts));
