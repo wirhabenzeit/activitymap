@@ -87,6 +87,7 @@ export default function MainContainer({
       activities?: number[];
       providerAccountId?: number;
     }) {
+      console.log("calling load");
       const nActivities = await loadFromDB({
         ids: activities,
         athleteId: providerAccountId,

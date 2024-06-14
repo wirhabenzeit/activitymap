@@ -49,6 +49,7 @@ export const listSettings = {
                 categorySettings[aliasMap[value]!].color,
             }}
             href={`https://www.strava.com/activities/${row.id}`}
+            target="_blank"
           >
             {categorySettings[aliasMap[value]!].icon}
           </IconButton>

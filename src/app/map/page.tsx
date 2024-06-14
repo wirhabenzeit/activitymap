@@ -275,7 +275,7 @@ function Map() {
           }
         }}
         //optimizeForTerrain={true}
-        onLoad={(event: MapboxEvent) => console.log(event)}
+        //onLoad={(event: MapboxEvent) => console.log(event)}
         projection={
           "globe" as unknown as mapboxgl.Projection
         }

@@ -173,23 +173,19 @@ export const activitySlice: StateCreator<
     });
     try {
       if (!ids) {
-        /*const acts = await getDBActivities({
-          athlete_id: athleteId,
-        });
-        set(setActivities(acts));*/
-        //return acts.length;
-        //return 0;
         const promises = await getActivitiesPaged({
           athlete_id: athleteId,
-          pageSize: 200,
+          pageSize: 500,
         });
-        //const acts = (await Promise.all(promises)).flat();*/
-        for (const promise of promises) {
-          promise
-            .then((data) => set(setActivities(data)))
-            .catch(console.error);
-        }
-        //set(setActivities(acts));
+
+        await Promise.all(
+          promises.map((promise) =>
+            Promise.resolve(promise)
+              .then((data) => set(setActivities(data)))
+              .catch(console.error)
+          )
+        );
+
         return promises.length;
       } else {
         const acts = await getDBActivities({ids});
