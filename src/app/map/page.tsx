@@ -366,8 +366,9 @@ function Map() {
           width: "calc(100% - 50px)",
           bottom: "30px",
           margin: "auto",
-          visibility:
-            selected.length > 0 ? "visible" : "hidden",
+          display: selected.length > 0 ? "block" : "none",
+          //visibility:
+          //  selected.length > 0 ? "visible" : "hidden",
         }}
       >
         <DataGrid

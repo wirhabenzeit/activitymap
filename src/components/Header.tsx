@@ -21,7 +21,7 @@ import {styled} from "@mui/material/styles";
 import {LoginButton, UserSettings} from "~/components/User";
 import {Share} from "~/components/Share";
 import {useStore} from "~/contexts/Zustand";
-import {ChatBot} from "./ChatBot";
+import {ChatBot} from "./ChatBox";
 
 const AppBar = styled(MuiAppBar)(({theme}) => {
   const {open} = useStore((state) => ({
