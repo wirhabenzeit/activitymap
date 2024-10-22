@@ -9,10 +9,8 @@ import {getActivities as getStravaActivities} from "~/server/strava/actions";
 import {getActivities as getDBActivities} from "~/server/db/actions";
 import {eq} from "drizzle-orm";
 
-export async function GET(
-  req: NextRequest,
-  {params}: {params: {slug: string}}
-) {
+export async function GET(req: NextRequest, props: {params: Promise<{slug: string}>}) {
+  const params = await props.params;
   if (params.slug === "webhook") {
     if (!req.nextUrl.searchParams.has("hub.challenge"))
       return new Response("Missing challenge", {
@@ -87,10 +85,8 @@ type WebhookRequest =
   | WebhookRequestActivity
   | WebhookRequestAthlete;
 
-export async function POST(
-  req: NextRequest,
-  {params}: {params: {slug: string}}
-) {
+export async function POST(req: NextRequest, props: {params: Promise<{slug: string}>}) {
+  const params = await props.params;
   console.log(params.slug);
   if (params.slug !== "webhook")
     return new Response("Invalid endpoint", {status: 404});

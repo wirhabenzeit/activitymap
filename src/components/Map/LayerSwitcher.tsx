@@ -20,6 +20,7 @@ import {useStore} from "~/contexts/Zustand";
 
 import {mapSettings} from "~/settings/map";
 import {useMap} from "react-map-gl";
+import {useShallow} from "zustand/shallow";
 
 export function LayerSwitcher() {
   const {
@@ -29,14 +30,16 @@ export function LayerSwitcher() {
     baseMap,
     toggleOverlayMap,
     setBaseMap,
-  } = useStore((state) => ({
-    threeDim: state.threeDim,
-    toggleThreeDim: state.toggleThreeDim,
-    overlayMaps: state.overlayMaps,
-    baseMap: state.baseMap,
-    toggleOverlayMap: state.toggleOverlayMap,
-    setBaseMap: state.setBaseMap,
-  }));
+  } = useStore(
+    useShallow((state) => ({
+      threeDim: state.threeDim,
+      toggleThreeDim: state.toggleThreeDim,
+      overlayMaps: state.overlayMaps,
+      baseMap: state.baseMap,
+      toggleOverlayMap: state.toggleOverlayMap,
+      setBaseMap: state.setBaseMap,
+    }))
+  );
 
   const map = useMap();
 

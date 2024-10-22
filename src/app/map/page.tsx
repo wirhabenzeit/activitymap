@@ -31,6 +31,7 @@ const skyLayer: SkyLayer = {
     "sky-atmosphere-sun-intensity": 15,
   },
 };
+import {useShallow} from "zustand/shallow";
 
 import Overlay from "~/components/Map/Overlay";
 
@@ -55,15 +56,17 @@ import {type MapboxEvent} from "mapbox-gl";
 import type mapboxgl from "mapbox-gl";
 
 function RouteLayer() {
-  const {filterIDs} = useStore((state) => ({
-    filterIDs: state.filterIDs,
-  }));
+  const {filterIDs} = useStore(
+    useShallow((state) => ({
+      filterIDs: state.filterIDs,
+    }))
+  );
   const {selected, highlighted, geoJson} = useStore(
-    (state) => ({
+    useShallow((state) => ({
       selected: state.selected,
       highlighted: state.highlighted,
       geoJson: state.geoJson,
-    })
+    }))
   );
 
   const theme = useTheme();
@@ -187,26 +190,30 @@ function Map() {
     threeDim,
     showPhotos,
     togglePhotos,
-  } = useStore((state) => ({
-    selected: state.selected,
-    setHighlighted: state.setHighlighted,
-    activityDict: state.activityDict,
-    compactList: state.compactList,
-    setSortModel: state.setSortModel,
-    setColumnVisibilityModel: state.setColumnModel,
-    baseMap: state.baseMap,
-    overlays: state.overlayMaps,
-    mapPosition: state.position,
-    setPosition: state.setPosition,
-    updateActivity: state.updateActivity,
-    threeDim: state.threeDim,
-    showPhotos: state.showPhotos,
-    togglePhotos: state.togglePhotos,
-  }));
+  } = useStore(
+    useShallow((state) => ({
+      selected: state.selected,
+      setHighlighted: state.setHighlighted,
+      activityDict: state.activityDict,
+      compactList: state.compactList,
+      setSortModel: state.setSortModel,
+      setColumnVisibilityModel: state.setColumnModel,
+      baseMap: state.baseMap,
+      overlays: state.overlayMaps,
+      mapPosition: state.position,
+      setPosition: state.setPosition,
+      updateActivity: state.updateActivity,
+      threeDim: state.threeDim,
+      showPhotos: state.showPhotos,
+      togglePhotos: state.togglePhotos,
+    }))
+  );
 
   const mapRefLoc = createRef<MapRef>();
 
-  const loaded = useStore((state) => state.loaded);
+  const loaded = useStore(
+    useShallow((state) => state.loaded)
+  );
   const [viewport, setViewport] = useState(mapPosition);
 
   const overlayMaps = useMemo(

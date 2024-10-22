@@ -13,6 +13,7 @@ import {ChevronLeft as ChevronLeftIcon} from "@mui/icons-material";
 import {styled} from "@mui/material/styles";
 
 import {useStore} from "~/contexts/Zustand";
+import {useShallow} from "zustand/shallow";
 
 import {
   MultiSelect,
@@ -39,9 +40,7 @@ const DrawerHeader = styled("div")(({theme}) => {
 });
 
 const Drawer = styled(MuiDrawer)(({theme}) => {
-  const {open} = useStore((state) => ({
-    open: state.drawerOpen,
-  }));
+  const open = useStore((state) => state.drawerOpen);
 
   return {
     width: theme.customValues.drawerWidth,
@@ -86,10 +85,12 @@ const Drawer = styled(MuiDrawer)(({theme}) => {
 });
 
 export default function SideBar() {
-  const {open, setOpen} = useStore((state) => ({
-    setOpen: state.toggleDrawer,
-    open: state.drawerOpen,
-  }));
+  const {open, setOpen} = useStore(
+    useShallow((state) => ({
+      setOpen: state.toggleDrawer,
+      open: state.drawerOpen,
+    }))
+  );
 
   return (
     <Drawer variant="permanent" open={open}>

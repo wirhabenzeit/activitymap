@@ -1,9 +1,11 @@
 "use client";
 
-import {useEffect, useRef} from "react";
+import { useEffect, useRef, type JSX } from "react";
 import {createPortal} from "react-dom";
 
 import {useStore} from "~/contexts/Zustand";
+import {useShallow} from "zustand/shallow";
+
 import {useContext} from "react";
 import {StatsContext} from "~/app/stats/[name]/StatsContext";
 import statsPlots, {
@@ -219,15 +221,17 @@ export default function ObsPlot({
     filterIDs,
     selected,
     setSelected,
-  } = useStore((state) => ({
-    loaded: state.loaded,
-    activityDict: state.activityDict,
-    filterIDs: state.filterIDs,
-    statsSettings: state.statsSettings,
-    setStats: state.setStatsSettings,
-    selected: state.selected,
-    setSelected: state.setSelected,
-  }));
+  } = useStore(
+    useShallow((state) => ({
+      loaded: state.loaded,
+      activityDict: state.activityDict,
+      filterIDs: state.filterIDs,
+      statsSettings: state.statsSettings,
+      setStats: state.setStatsSettings,
+      selected: state.selected,
+      setSelected: state.setSelected,
+    }))
+  );
 
   const figureRef = useRef<HTMLDivElement>(null);
   const {width, height, settingsRef} =

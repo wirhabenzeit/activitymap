@@ -7,10 +7,8 @@ import OpenAI from "openai";
 export const runtime = "edge";
 
 // post a new message and stream OpenAI Assistant response
-export async function POST(
-  request: NextRequest,
-  {params}: {params: {slug: string}}
-) {
+export async function POST(request: NextRequest, props: {params: Promise<{slug: string}>}) {
+  const params = await props.params;
   const openai = new OpenAI();
   if (params.slug == "message") {
     const newMessage = await request.json();
@@ -72,10 +70,8 @@ export async function POST(
   }
 }
 
-export async function GET(
-  request: NextRequest,
-  {params}: {params: {slug: string}}
-) {
+export async function GET(request: NextRequest, props: {params: Promise<{slug: string}>}) {
+  const params = await props.params;
   const openai = new OpenAI();
   if (params.slug == "image") {
     if (!request.nextUrl.searchParams.has("fileID"))

@@ -21,6 +21,8 @@ import {
 } from "@mui/icons-material";
 
 import {useStore} from "~/contexts/Zustand";
+import {useShallow} from "zustand/shallow";
+
 import {type User} from "~/server/db/schema";
 
 export function Share() {
@@ -29,11 +31,13 @@ export function Share() {
   const handleClickOpen = () => {
     setOpen(true);
   };
-  const {selected, user, guest} = useStore((state) => ({
-    selected: state.selected,
-    user: state.user,
-    guest: state.guest,
-  }));
+  const {selected, user, guest} = useStore(
+    useShallow((state) => ({
+      selected: state.selected,
+      user: state.user,
+      guest: state.guest,
+    }))
+  );
 
   if (!user || guest) return null;
   return (

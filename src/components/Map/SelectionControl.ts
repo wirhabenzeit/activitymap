@@ -1,9 +1,14 @@
 "use client";
 
-import {type MapMouseEvent, Point, type PointLike} from "mapbox-gl";
+import {
+  type MapMouseEvent,
+  Point,
+  type PointLike,
+} from "mapbox-gl";
 import {type MapContextValue} from "react-map-gl/dist/esm/components/map";
 import {useControl} from "react-map-gl";
 import {useStore} from "~/contexts/Zustand";
+import {useShallow} from "zustand/shallow";
 
 const styles = `
 .boxdraw {
@@ -18,9 +23,11 @@ const styles = `
 `;
 
 export function Selection() {
-  const {setSelected} = useStore((state) => ({
-    setSelected: state.setSelected,
-  }));
+  const {setSelected} = useStore(
+    useShallow((state) => ({
+      setSelected: state.setSelected,
+    }))
+  );
 
   useControl(
     (context: MapContextValue) =>

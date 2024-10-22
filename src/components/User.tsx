@@ -32,6 +32,7 @@ import {
 import {useStore} from "~/contexts/Zustand";
 import type {User} from "~/server/db/schema";
 import type {Activity} from "~/server/db/schema";
+import {useShallow} from "zustand/shallow";
 
 import {
   checkWebhook,
@@ -58,10 +59,10 @@ export function LoginButton() {
 
 export function UserSettings({user}: {user?: User}) {
   const {toggleUserSettings, loading} = useStore(
-    (state) => ({
+    useShallow((state) => ({
       toggleUserSettings: state.toggleUserSettings,
       loading: state.loading,
-    })
+    }))
   );
 
   return (
@@ -107,9 +108,7 @@ function WebhookStatus() {
     undefined
   );
 
-  const {setLoading} = useStore((state) => ({
-    setLoading: state.setLoading,
-  }));
+  const setLoading = useStore((state) => state.setLoading);
 
   return (
     <>
@@ -181,10 +180,10 @@ function LoadMore() {
   const [disabled, setDisabled] = useState(false);
 
   const {activityDict, loadFromStrava} = useStore(
-    (state) => ({
+    useShallow((state) => ({
       activityDict: state.activityDict,
       loadFromStrava: state.loadFromStrava,
-    })
+    }))
   );
 
   return (
@@ -228,11 +227,13 @@ function SettingsDialog({user}: {user: User}) {
     userSettingsOpen,
     toggleUserSettings,
     activityDict,
-  } = useStore((state) => ({
-    userSettingsOpen: state.userSettingsOpen,
-    toggleUserSettings: state.toggleUserSettings,
-    activityDict: state.activityDict,
-  }));
+  } = useStore(
+    useShallow((state) => ({
+      userSettingsOpen: state.userSettingsOpen,
+      toggleUserSettings: state.toggleUserSettings,
+      activityDict: state.activityDict,
+    }))
+  );
 
   const nActivities = Object.keys(activityDict).length;
 

@@ -21,12 +21,12 @@ import {styled} from "@mui/material/styles";
 import {LoginButton, UserSettings} from "~/components/User";
 import {Share} from "~/components/Share";
 import {useStore} from "~/contexts/Zustand";
+import {useShallow} from "zustand/shallow";
+
 import {ChatBot} from "./ChatBox";
 
 const AppBar = styled(MuiAppBar)(({theme}) => {
-  const {open} = useStore((state) => ({
-    open: state.drawerOpen,
-  }));
+  const open = useStore((state) => state.drawerOpen);
   return {
     zIndex: theme.zIndex.drawer + 1,
     transition: theme.transitions.create(
@@ -68,14 +68,16 @@ export default function Header() {
     user,
     guest,
     loading,
-  } = useStore((state) => ({
-    open: state.drawerOpen,
-    setOpen: state.toggleDrawer,
-    activeStatsTab: state.activeStatsTab,
-    user: state.user,
-    guest: state.guest,
-    loading: state.loading,
-  }));
+  } = useStore(
+    useShallow((state) => ({
+      open: state.drawerOpen,
+      setOpen: state.toggleDrawer,
+      activeStatsTab: state.activeStatsTab,
+      user: state.user,
+      guest: state.guest,
+      loading: state.loading,
+    }))
+  );
   const pathname = usePathname();
   const parts = pathname.split("/");
   const valueKey = parts.length > 1 ? `/${parts[1]}` : "";

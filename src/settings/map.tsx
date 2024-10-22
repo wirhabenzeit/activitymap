@@ -21,7 +21,7 @@ type VectorMapSetting = {
 };
 
 export type CustomLayerProps = {
-  mapRef: RefObject<MapRef>;
+  mapRef: RefObject<MapRef | null>;
 };
 
 type CustomMapSetting = {

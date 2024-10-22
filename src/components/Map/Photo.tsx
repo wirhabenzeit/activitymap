@@ -2,14 +2,15 @@ import {Marker} from "react-map-gl";
 import {useStore} from "~/contexts/Zustand";
 import {Avatar} from "@mui/material";
 import {useMemo, useState} from "react";
+import {useShallow} from "zustand/shallow";
 
 export default function PhotoLayer() {
   const {photos, position, filterIDs} = useStore(
-    (state) => ({
+    useShallow((state) => ({
       photos: state.photos,
       position: state.position,
       filterIDs: state.filterIDs,
-    })
+    }))
   );
 
   const displayPhotos = useMemo(() => {
@@ -62,9 +63,11 @@ function PhotoMarker({
   const photoUrl = Object.values(urls)[0];
   const [hover, setHover] = useState(false);
 
-  const {setSelected} = useStore((state) => ({
-    setSelected: state.setSelected,
-  }));
+  const {setSelected} = useStore(
+    useShallow((state) => ({
+      setSelected: state.setSelected,
+    }))
+  );
 
   return (
     <Marker

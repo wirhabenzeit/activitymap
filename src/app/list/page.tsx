@@ -34,13 +34,16 @@ import type {
 } from "@mui/x-data-grid";
 
 import {useStore} from "~/contexts/Zustand";
+import {useShallow} from "zustand/shallow";
 import {type Activity} from "~/server/db/schema";
 
 function RefreshButton() {
-  const {selected, loadFromStrava} = useStore((state) => ({
-    selected: state.selected,
-    loadFromStrava: state.loadFromStrava,
-  }));
+  const {selected, loadFromStrava} = useStore(
+    useShallow((state) => ({
+      selected: state.selected,
+      loadFromStrava: state.loadFromStrava,
+    }))
+  );
 
   return (
     <Tooltip
@@ -143,17 +146,19 @@ export default function List() {
     setColumnVisibilityModel,
     updateActivity,
     loadFromStrava,
-  } = useStore((state) => ({
-    activityDict: state.activityDict,
-    filterIDs: state.filterIDs,
-    selected: state.selected,
-    setSelected: state.setSelected,
-    fullList: state.fullList,
-    setSortModel: state.setSortModel,
-    setColumnVisibilityModel: state.setColumnModel,
-    updateActivity: state.updateActivity,
-    loadFromStrava: state.loadFromStrava,
-  }));
+  } = useStore(
+    useShallow((state) => ({
+      activityDict: state.activityDict,
+      filterIDs: state.filterIDs,
+      selected: state.selected,
+      setSelected: state.setSelected,
+      fullList: state.fullList,
+      setSortModel: state.setSortModel,
+      setColumnVisibilityModel: state.setColumnModel,
+      updateActivity: state.updateActivity,
+      loadFromStrava: state.loadFromStrava,
+    }))
+  );
   const rows = filterIDs
     .map((key) => activityDict[key])
     .filter((x) => x != undefined);

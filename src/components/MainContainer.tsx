@@ -5,6 +5,7 @@ import {useEffect} from "react";
 import {useStore} from "~/contexts/Zustand";
 import {getAccount, getUser} from "~/server/db/actions";
 import type {User, Session} from "~/server/db/schema";
+import {useShallow} from "zustand/shallow";
 
 export default function MainContainer({
   user,
@@ -25,17 +26,19 @@ export default function MainContainer({
     setGuest,
     setLoading,
     setSession,
-  } = useStore((state) => ({
-    loadFromDB: state.loadFromDB,
-    updateFilters: state.updateFilters,
-    setFilterRanges: state.setFilterRanges,
-    toggleUserSettings: state.toggleUserSettings,
-    loadPhotos: state.loadPhotos,
-    setUser: state.setUser,
-    setGuest: state.setGuest,
-    setLoading: state.setLoading,
-    setSession: state.setSession,
-  }));
+  } = useStore(
+    useShallow((state) => ({
+      loadFromDB: state.loadFromDB,
+      updateFilters: state.updateFilters,
+      setFilterRanges: state.setFilterRanges,
+      toggleUserSettings: state.toggleUserSettings,
+      loadPhotos: state.loadPhotos,
+      setUser: state.setUser,
+      setGuest: state.setGuest,
+      setLoading: state.setLoading,
+      setSession: state.setSession,
+    }))
+  );
 
   const searchParams = useSearchParams();
 

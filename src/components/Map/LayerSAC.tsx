@@ -40,6 +40,7 @@ import {
 } from "@mui/icons-material";
 import {type CustomLayerProps} from "~/settings/map";
 import {useStore} from "~/contexts/Zustand";
+import {useShallow} from "zustand/shallow";
 
 const epsgCH =
   "+proj=somerc +lat_0=46.95240555555556 +lon_0=7.439583333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +towgs84=674.374,15.056,405.346,0,0,0,0 +units=m +no_defs";
@@ -71,9 +72,11 @@ const lineDashArray = [
 export const LayerSAC: React.FC<CustomLayerProps> = ({
   mapRef,
 }) => {
-  const {bbox} = useStore((state) => ({
-    bbox: state.bbox,
-  }));
+  const {bbox} = useStore(
+    useShallow((state) => ({
+      bbox: state.bbox,
+    }))
+  );
   const [cards, setCards] = useState([]);
   const [selection, setSelection] = useState([]);
   const [json, setJson] = useState({

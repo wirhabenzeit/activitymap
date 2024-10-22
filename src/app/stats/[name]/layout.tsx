@@ -14,6 +14,7 @@ import {useStore} from "~/contexts/Zustand";
 import {Divider} from "@mui/material";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
+import {useShallow} from "zustand/shallow";
 
 import statsPlots from "~/stats";
 import {StatsContext, StatsProvider} from "./StatsContext";
@@ -42,12 +43,14 @@ export default function Stats({
     toggleStatsSettings: toggleStatsSettings,
     setActiveStatsTab,
     activeStatsTab,
-  } = useStore((state) => ({
-    settingsOpen: state.statsSettingsOpen,
-    toggleStatsSettings: state.toggleStatsSettings,
-    setActiveStatsTab: state.setActiveStatsTab,
-    activeStatsTab: state.activeStatsTab,
-  }));
+  } = useStore(
+    useShallow((state) => ({
+      settingsOpen: state.statsSettingsOpen,
+      toggleStatsSettings: state.toggleStatsSettings,
+      setActiveStatsTab: state.setActiveStatsTab,
+      activeStatsTab: state.activeStatsTab,
+    }))
+  );
 
   const pathname = usePathname();
   const [value, setValue] = React.useState(

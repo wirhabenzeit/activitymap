@@ -36,6 +36,7 @@ import {
 } from "~/settings/filter";
 import {categorySettings} from "~/settings/category";
 import {useStore} from "~/contexts/Zustand";
+import {useShallow} from "zustand/shallow";
 
 export function CheckboxFilter({
   name,
@@ -43,10 +44,12 @@ export function CheckboxFilter({
   name: keyof typeof binaryFilters;
 }) {
   const [openContent, setOpenContent] = useState(false);
-  const {binary, setBinary} = useStore((state) => ({
-    binary: state.binary,
-    setBinary: state.setBinary,
-  }));
+  const {binary, setBinary} = useStore(
+    useShallow((state) => ({
+      binary: state.binary,
+      setBinary: state.setBinary,
+    }))
+  );
 
   const onClick = () => {
     if (binary[name] === undefined) {
@@ -108,12 +111,13 @@ export function MultiSelect({
   name: keyof typeof categorySettings;
 }) {
   const {updateCategory, toggleCategory, categories} =
-    useStore((state) => ({
-      updateCategory: state.updateCategory,
-      toggleCategory: state.toggleCategory,
-      categories: state.categories,
-      open: state.drawerOpen,
-    }));
+    useStore(
+      useShallow((state) => ({
+        updateCategory: state.updateCategory,
+        toggleCategory: state.toggleCategory,
+        categories: state.categories,
+      }))
+    );
 
   const selectChange = (
     event: SelectChangeEvent<string[]>
@@ -202,7 +206,7 @@ export function MultiSelect({
 
 const useDebounce = (value: string, delay = 500) => {
   const [debouncedValue, setDebouncedValue] = useState("");
-  const timerRef = useRef<NodeJS.Timeout | null>();
+  const timerRef = useRef<NodeJS.Timeout | null>(undefined);
 
   useEffect(() => {
     timerRef.current = setTimeout(
@@ -221,10 +225,12 @@ const useDebounce = (value: string, delay = 500) => {
 
 export function SearchBox() {
   const [openSearch, setOpenSearch] = useState(false);
-  const {search, setSearch} = useStore((state) => ({
-    search: state.search,
-    setSearch: state.setSearch,
-  }));
+  const {search, setSearch} = useStore(
+    useShallow((state) => ({
+      search: state.search,
+      setSearch: state.setSearch,
+    }))
+  );
 
   const [text, setText] = useState(search);
   const debouncedSearch = useDebounce(text, 300);
@@ -306,11 +312,11 @@ export function ValueSlider({
 }) {
   const [openSlider, setOpenSlider] = useState(false);
   const {values, setValueFilter, filterRanges} = useStore(
-    (state) => ({
+    useShallow((state) => ({
       values: state.values,
       setValueFilter: state.setValueFilter,
       filterRanges: state.filterRanges,
-    })
+    }))
   );
   const [value, setValue] = useState(values[name]);
 
@@ -421,9 +427,7 @@ const SidebarButton = ({
 }) => {
   const buttonRef = useRef(null);
   const theme = useTheme();
-  const {open} = useStore((state) => ({
-    open: state.drawerOpen,
-  }));
+  const open = useStore((state) => state.drawerOpen);
   const [delayOpen, setDelayOpen] = useState(open);
 
   useEffect(() => {

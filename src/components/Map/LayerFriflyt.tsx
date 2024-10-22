@@ -29,14 +29,18 @@ import {
   Download as DownloadIcon,
 } from "@mui/icons-material";
 import {useStore} from "~/contexts/Zustand";
+import {useShallow} from "zustand/shallow";
+
 import {type CustomLayerProps} from "~/settings/map";
 
 export const LayerFriflyt: React.FC<CustomLayerProps> = ({
   mapRef,
 }) => {
-  const {bbox} = useStore((state) => ({
-    bbox: state.bbox,
-  }));
+  const {bbox} = useStore(
+    useShallow((state) => ({
+      bbox: state.bbox,
+    }))
+  );
   const [cards, setCards] = useState([]);
   const [activeStep, setActiveStep] = useState(0);
   const [selection, setSelection] = useState([]);
@@ -292,16 +296,17 @@ export const LayerFriflyt: React.FC<CustomLayerProps> = ({
                     />
                   </>
                 )}
-                {cards[activeStep]?.shortTitle != undefined && (
-                    <Typography
-                      variant="body2"
-                      component="div"
-                      color="text.secondary"
-                      sx={{mt: 0.5}}
-                    >
-                      {cards[activeStep].shortTitle}
-                    </Typography>
-                  )}
+                {cards[activeStep]?.shortTitle !=
+                  undefined && (
+                  <Typography
+                    variant="body2"
+                    component="div"
+                    color="text.secondary"
+                    sx={{mt: 0.5}}
+                  >
+                    {cards[activeStep].shortTitle}
+                  </Typography>
+                )}
               </CardContent>
               <CardActions
                 sx={{justifyContent: "center", p: 0}}

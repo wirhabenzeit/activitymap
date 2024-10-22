@@ -10,7 +10,7 @@ import {
 
 import {AssistantStream} from "openai/lib/AssistantStream";
 
-import {useEffect, useState, useRef, use} from "react";
+import {useEffect, useState, useRef} from "react";
 import {
   IconButton,
   TextField,
@@ -29,16 +29,17 @@ import {Insights, SendOutlined} from "@mui/icons-material";
 
 import {useStore} from "~/contexts/Zustand";
 import {type User} from "~/server/db/schema";
+import {useShallow} from "zustand/shallow";
 
 export function ChatBot() {
   const [open, setOpen] = useState(false);
   const {selected, user, guest, session} = useStore(
-    (state) => ({
+    useShallow((state) => ({
       selected: state.selected,
       user: state.user,
       session: state.session,
       guest: state.guest,
-    })
+    }))
   );
 
   if (!user || !session || guest) return null;
