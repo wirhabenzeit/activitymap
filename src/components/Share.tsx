@@ -1,166 +1,77 @@
 "use client";
 
-import {useState} from "react";
+import { useState } from "react";
+
+import { Share as ShareIcon, Copy } from "lucide-react";
+
+import { useStore } from "~/contexts/Zustand";
+import { useShallow } from "zustand/shallow";
+
+import { type User } from "~/server/db/schema";
+import { Switch } from "~/components/ui/switch";
+import { Button } from "~/components/ui/button";
 import {
-  IconButton,
-  TextField,
   Dialog,
   DialogContent,
-  DialogContentText,
+  DialogDescription,
+  DialogHeader,
   DialogTitle,
-  Switch,
-  FormGroup,
-  FormControlLabel,
-  Snackbar,
-  type SnackbarCloseReason,
-} from "@mui/material";
-import {
-  IosShare as ShareIcon,
-  Link as LinkIcon,
-  Close as CloseIcon,
-} from "@mui/icons-material";
+  DialogTrigger,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 
-import {useStore} from "~/contexts/Zustand";
-import {useShallow} from "zustand/shallow";
-
-import {type User} from "~/server/db/schema";
-
-export function Share() {
-  const [open, setOpen] = useState(false);
-
-  const handleClickOpen = () => {
-    setOpen(true);
-  };
-  const {selected, user, guest} = useStore(
+export function ShareButton() {
+  const { selected, user, guest } = useStore(
     useShallow((state) => ({
       selected: state.selected,
       user: state.user,
       guest: state.guest,
-    }))
+    })),
   );
-
-  if (!user || guest) return null;
-  return (
-    <>
-      <IconButton
-        sx={{mx: 1}}
-        onClick={handleClickOpen}
-        size="small"
-      >
-        <ShareIcon sx={{color: "white", opacity: 0.9}} />
-      </IconButton>
-      <ShareDialog
-        shareOpen={open}
-        setShareOpen={setOpen}
-        selected={selected}
-        user={user}
-      />
-    </>
-  );
-}
-
-function ShareDialog({
-  shareOpen,
-  setShareOpen,
-  selected,
-  user,
-}: {
-  shareOpen: boolean;
-  setShareOpen: (open: boolean) => void;
-  selected: number[];
-  user: User;
-}) {
   const [selectedValue, setSelectedValue] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false);
+  const shareUrl = new URL("https://activitymap.dominik.page");
 
-  const handleInfoClose = (
-    event: React.SyntheticEvent | Event,
-    reason: SnackbarCloseReason
-  ) => {
-    if (reason === "clickaway") {
-      return;
-    }
-    setInfoOpen(false);
-  };
-
-  const action = (
-    <IconButton
-      size="small"
-      aria-label="close"
-      color="inherit"
-      onClick={() => setInfoOpen(true)}
-    >
-      <CloseIcon fontSize="small" />
-    </IconButton>
-  );
-
-  const shareUrl = new URL(window.location.href);
   if (selectedValue)
-    shareUrl.searchParams.append(
-      "activities",
-      selected.join(",")
-    );
-  else shareUrl.searchParams.append("user", user.id);
+    shareUrl.searchParams.append("activities", selected.join(","));
 
   return (
-    <>
-      <Snackbar
-        open={infoOpen}
-        anchorOrigin={{
-          vertical: "top",
-          horizontal: "center",
-        }}
-        autoHideDuration={1000}
-        onClose={handleInfoClose}
-        message="Copied to clipboard"
-        action={action}
-      />
-      <Dialog
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        slotProps={{backdrop: {style: {opacity: 0.1}}}}
-      >
-        <DialogTitle>Share Link</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Create a shareable link to this page, which will
-            include either all or the currently selected
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 px-0">
+          <ShareIcon className="h-4 w-4" />
+          <span className="sr-only">Share</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Share Link</DialogTitle>
+          <DialogDescription>
+            Create a shareable link to this map, displaying the selected
             activities.
-          </DialogContentText>
-          <FormGroup>
-            <FormControlLabel
-              disabled={selected.length === 0}
-              control={
-                <Switch
-                  value={selectedValue}
-                  onChange={(e) =>
-                    setSelectedValue(e.target.checked)
-                  }
-                />
-              }
-              label="Include only selected activities"
-            />
-          </FormGroup>
-          <TextField
-            margin="dense"
-            id="url"
-            value={shareUrl}
-            name="Link"
-            fullWidth
-            InputProps={{
-              endAdornment: (
-                <IconButton
-                  onClick={() => {
-                    setInfoOpen(true);
-                  }}
-                >
-                  <LinkIcon />
-                </IconButton>
-              ),
-            }}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="selected-mode"
+            checked={selectedValue}
+            onCheckedChange={setSelectedValue}
           />
-        </DialogContent>
-      </Dialog>
-    </>
+          <Label htmlFor="selected-mode">Include Selected</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="grid flex-1 gap-2">
+            <Label htmlFor="link" className="sr-only">
+              Link
+            </Label>
+            <Input id="link" value={shareUrl.toString()} readOnly />
+          </div>
+          <Button type="submit" size="sm" className="px-3">
+            <span className="sr-only">Copy</span>
+            <Copy />
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

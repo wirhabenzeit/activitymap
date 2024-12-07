@@ -1,22 +1,21 @@
-import {Marker} from "react-map-gl";
-import {useStore} from "~/contexts/Zustand";
-import {Avatar} from "@mui/material";
-import {useMemo, useState} from "react";
-import {useShallow} from "zustand/shallow";
+import { Marker } from "react-map-gl";
+import { useStore } from "~/contexts/Zustand";
+import { Avatar, AvatarImage } from "../ui/avatar";
+import { useMemo, useState } from "react";
+import { useShallow } from "zustand/shallow";
 
 export default function PhotoLayer() {
-  const {photos, position, filterIDs} = useStore(
+  const { photos, position, filterIDs } = useStore(
     useShallow((state) => ({
       photos: state.photos,
       position: state.position,
       filterIDs: state.filterIDs,
-    }))
+    })),
   );
 
   const displayPhotos = useMemo(() => {
     return photos.filter((photo) => {
-      if (!photo.location?.[0] || !photo.location[1])
-        return false;
+      if (!photo.location?.[0] || !photo.location[1]) return false;
       return filterIDs.includes(photo.activity_id!);
     });
   }, [photos, filterIDs]);
@@ -63,10 +62,10 @@ function PhotoMarker({
   const photoUrl = Object.values(urls)[0];
   const [hover, setHover] = useState(false);
 
-  const {setSelected} = useStore(
+  const { setSelected } = useStore(
     useShallow((state) => ({
       setSelected: state.setSelected,
-    }))
+    })),
   );
 
   return (
@@ -74,7 +73,7 @@ function PhotoMarker({
       longitude={longitude}
       latitude={latitude}
       anchor="center"
-      style={{zIndex: hover ? 3 : 2, cursor: "pointer"}}
+      style={{ zIndex: hover ? 3 : 2, cursor: "pointer" }}
       onClick={(e) => {
         e.originalEvent.stopPropagation();
         setSelected([activity_id]);
@@ -83,23 +82,10 @@ function PhotoMarker({
       <Avatar
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        alt={caption ?? activity_name}
-        src={photoUrl}
-        sx={{
-          width: `${Math.min(80, Math.pow(2, zoom - 5))}px`,
-          height: `${Math.min(
-            80,
-            Math.pow(2, zoom - 5)
-          )}px`,
-          //transform: "translate(0, 50%)",
-          border: "2px solid white",
-          "&:hover": {
-            width: "100px",
-            height: "100px",
-          },
-          transition: "all 0.2s",
-        }}
-      ></Avatar>
+        className="size-8 border-2 border-white transition-all hover:size-32"
+      >
+        <AvatarImage src={photoUrl} alt={caption ?? activity_name} />
+      </Avatar>
     </Marker>
   );
 }

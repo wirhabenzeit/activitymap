@@ -1,29 +1,21 @@
-import {type StateCreator} from "zustand";
-import {type TotalZustand} from "./Zustand";
-import {listSettings} from "~/settings/list";
-import type {
-  GridSortItem,
-  GridColumnVisibilityModel,
-  GridSortModel,
-} from "@mui/x-data-grid";
+import { type StateCreator } from "zustand";
+import { type TotalZustand } from "./Zustand";
+import { listSettings } from "~/settings/list";
+import { SortingState, VisibilityState, Updater } from "@tanstack/react-table";
 
 export type ListZustand = {
   compactList: {
-    sortModel: GridSortItem[];
-    columnVisibilityModel: GridColumnVisibilityModel;
+    sorting: SortingState;
+    setSorting: (updater: Updater<SortingState>) => void;
+    columnVisibility: VisibilityState;
+    setColumnVisibility: (update: Updater<VisibilityState>) => void;
   };
   fullList: {
-    sortModel: GridSortItem[];
-    columnVisibilityModel: GridColumnVisibilityModel;
+    sorting: SortingState;
+    setSorting: (updater: Updater<SortingState>) => void;
+    columnVisibility: VisibilityState;
+    setColumnVisibility: (update: Updater<VisibilityState>) => void;
   };
-  setSortModel: (
-    key: "compact" | "full",
-    sortModel: GridSortModel
-  ) => void;
-  setColumnModel: (
-    key: "compact" | "full",
-    columnModel: GridColumnVisibilityModel
-  ) => void;
 };
 
 export const listSlice: StateCreator<
@@ -32,20 +24,30 @@ export const listSlice: StateCreator<
   [],
   ListZustand
 > = (set) => ({
-  compactList: listSettings.defaultState.compact,
-  fullList: listSettings.defaultState.full,
-  setSortModel: (key, sortModel) =>
-    set((state) => {
-      if (key == "compact")
-        state.compactList.sortModel = sortModel;
-      else state.fullList.sortModel = sortModel;
-    }),
-  setColumnModel: (key, columnModel) =>
-    set((state) => {
-      if (key == "compact")
-        state.compactList.columnVisibilityModel =
-          columnModel;
-      else
-        state.fullList.columnVisibilityModel = columnModel;
-    }),
+  compactList: {
+    ...listSettings.defaultState.compact,
+    setSorting: (updater) =>
+      set((state) => {
+        state.compactList.sorting = updater(state.compactList.sorting);
+      }),
+    setColumnVisibility: (updater) =>
+      set((state) => {
+        state.compactList.columnVisibility = updater(
+          state.compactList.columnVisibility,
+        );
+      }),
+  },
+  fullList: {
+    ...listSettings.defaultState.full,
+    setSorting: (updater) =>
+      set((state) => {
+        state.fullList.sorting = updater(state.fullList.sorting);
+      }),
+    setColumnVisibility: (updater) =>
+      set((state) => {
+        state.fullList.columnVisibility = updater(
+          state.fullList.columnVisibility,
+        );
+      }),
+  },
 });

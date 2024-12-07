@@ -6,15 +6,16 @@ import {
   FaPersonCircleQuestion,
 } from "react-icons/fa6";
 
-import {type Activity} from "~/server/db/schema";
-import {ReactElement} from "react";
+import { type Activity } from "~/server/db/schema";
+import { ReactElement } from "react";
+import { IconType } from "react-icons/lib";
 
 export type CategorySetting = Record<
   "bcXcSki" | "trailHike" | "run" | "ride" | "misc",
   {
     name: string;
     color: string;
-    icon: ReactElement;
+    icon: IconType;
     alias: Activity["sport_type"][];
     active: boolean;
   }
@@ -24,28 +25,28 @@ export const categorySettings: CategorySetting = {
   bcXcSki: {
     name: "BC & XC Ski",
     color: "#1982C4",
-    icon: <FaPersonSkiingNordic />,
+    icon: FaPersonSkiingNordic,
     alias: ["BackcountrySki", "NordicSki", "RollerSki"],
     active: true,
   },
   trailHike: {
     name: "Trail / Hike",
     color: "#FF595E",
-    icon: <FaPersonWalking />,
+    icon: FaPersonWalking,
     alias: ["Hike", "TrailRun", "RockClimbing", "Snowshoe"],
     active: true,
   },
   run: {
     name: "Run",
     color: "#FFCA3A",
-    icon: <FaPersonRunning />,
+    icon: FaPersonRunning,
     alias: ["Run", "VirtualRun"],
     active: true,
   },
   ride: {
     name: "Ride",
     color: "#8AC926",
-    icon: <FaPersonBiking />,
+    icon: FaPersonBiking,
     alias: [
       "Ride",
       "VirtualRide",
@@ -61,7 +62,7 @@ export const categorySettings: CategorySetting = {
   misc: {
     name: "Miscellaneous",
     color: "#6A4C93",
-    icon: <FaPersonCircleQuestion />,
+    icon: FaPersonCircleQuestion,
     active: true,
     alias: [
       "AlpineSki",
@@ -101,19 +102,12 @@ export const categorySettings: CategorySetting = {
   },
 };
 
-const colorMap: Partial<
-  Record<Activity["sport_type"], string>
-> = {};
+const colorMap: Partial<Record<Activity["sport_type"], string>> = {};
 
-const iconMap: Partial<
-  Record<Activity["sport_type"], ReactElement>
-> = {};
+const iconMap: Partial<Record<Activity["sport_type"], ReactElement>> = {};
 
 const aliasMap: Partial<
-  Record<
-    Activity["sport_type"],
-    keyof typeof categorySettings
-  >
+  Record<Activity["sport_type"], keyof typeof categorySettings>
 > = {};
 
 Object.entries(categorySettings).forEach(([key, value]) => {
@@ -124,4 +118,4 @@ Object.entries(categorySettings).forEach(([key, value]) => {
   });
 });
 
-export {aliasMap, colorMap, iconMap};
+export { aliasMap, colorMap, iconMap };

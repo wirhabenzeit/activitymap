@@ -1,179 +1,95 @@
 "use client";
 
-import React, {useContext} from "react";
+import React, { useContext } from "react";
 
-import {Tabs as MuiTabs, Paper, Stack} from "@mui/material";
-import Tab from "@mui/material/Tab";
-import Box from "@mui/material/Box";
+import { Settings } from "lucide-react";
 
-import IconButton from "@mui/material/IconButton";
-import Tune from "@mui/icons-material/Tune";
+import { useStore } from "~/contexts/Zustand";
 
-import {useStore} from "~/contexts/Zustand";
+import { Separator } from "~/components/ui/separator";
 
-import {Divider} from "@mui/material";
 import Link from "next/link";
-import {usePathname} from "next/navigation";
-import {useShallow} from "zustand/shallow";
+import { usePathname } from "next/navigation";
+import { useShallow } from "zustand/shallow";
 
 import statsPlots from "~/stats";
-import {StatsContext, StatsProvider} from "./StatsContext";
+import { StatsContext, StatsProvider } from "./StatsContext";
+import { Button } from "~/components/ui/button";
+import { cn } from "~/lib/utils";
 
 type StatsPlotsKeys = keyof typeof statsPlots;
 type TabKeys = `/stats/${StatsPlotsKeys}`;
-type TabValue = {label: string; index: number};
+type TabValue = { label: string; index: number };
 
-const tabs = (
-  Object.keys(statsPlots) as (keyof typeof statsPlots)[]
-).reduce(
+const tabs = (Object.keys(statsPlots) as (keyof typeof statsPlots)[]).reduce(
   (acc, name, index) => ({
     ...acc,
-    [`/stats/${name}`]: {label: name, index},
+    [`/stats/${name}`]: { label: name, index },
   }),
-  {} as Record<TabKeys, TabValue>
+  {} as Record<TabKeys, TabValue>,
 );
 
-export default function Stats({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const {
-    settingsOpen,
-    toggleStatsSettings: toggleStatsSettings,
-    setActiveStatsTab,
-    activeStatsTab,
-  } = useStore(
+export default function Stats({ children }: { children: React.ReactNode }) {
+  const { settingsOpen, toggleStatsSettings: toggleStatsSettings } = useStore(
     useShallow((state) => ({
       settingsOpen: state.statsSettingsOpen,
       toggleStatsSettings: state.toggleStatsSettings,
       setActiveStatsTab: state.setActiveStatsTab,
       activeStatsTab: state.activeStatsTab,
-    }))
+    })),
   );
 
   const pathname = usePathname();
-  const [value, setValue] = React.useState(
-    pathname in tabs && tabs[pathname as TabKeys]
-      ? tabs[pathname as TabKeys].index
-      : tabs[activeStatsTab].index
-  );
-  const handleChange = (
-    event: React.SyntheticEvent,
-    newValue: number
-  ) => {
-    const tabKey = Object.keys(tabs)[
-      newValue
-    ] as keyof typeof tabs;
-    if (tabKey && tabKey in tabs) {
-      setValue(newValue);
-      setActiveStatsTab(tabKey);
-    }
-  };
 
-  const {settingsRef, elementRef} =
-    useContext(StatsContext);
+  const { settingsRef, elementRef } = useContext(StatsContext);
 
   return (
-    <Box
-      sx={{
-        width: "100%",
-        height: "100%",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        flexWrap: "nowrap",
-        minHeight: 0,
-      }}
-    >
+    <div className="flex h-full min-h-0 w-full flex-col flex-nowrap overflow-hidden">
       <StatsProvider>
-        <Box
-          sx={{
-            borderBottom: 1,
-            borderColor: "divider",
-            flexShrink: 0,
-            width: 1,
-            display: "flex",
-            alignItems: "stretch",
-            overflow: "hidden",
-          }}
-        >
-          <MuiTabs
-            value={value}
-            onChange={handleChange}
-            aria-label="stats tabs"
-            variant="scrollable"
-            scrollButtons="auto"
-            sx={{
-              display: "inline-flex",
-              width: `calc(100% - 40px)`,
-              minHeight: "40px",
-            }}
-          >
+        <div className="flex w-full flex-shrink-0 items-stretch overflow-hidden border-b-2 border-muted">
+          <div className="flex-1">
             {Object.entries(tabs).map(([url, tab]) => (
-              <Tab
+              <Button
+                variant="link"
                 key={url}
-                label={tab.label}
-                component={Link}
-                href={url}
-                sx={{
-                  minHeight: "40px",
-                  py: "8px",
-                  fontSize: "0.8rem",
-                }}
-              />
+                className={
+                  pathname === url
+                    ? "capitalize text-header-background underline"
+                    : "capitalize"
+                }
+              >
+                <Link href={url}>{tab.label}</Link>
+              </Button>
             ))}
-          </MuiTabs>
-          <Box
-            sx={{
-              display: "inline-flex",
-              marginLeft: "auto",
-              right: 0,
-            }}
-          >
-            <Divider orientation="vertical" flexItem />
-            <IconButton
+          </div>
+          <div className="m-l-auto right-0 inline-flex">
+            <Separator orientation="vertical" />
+            <Button
+              variant="ghost"
               onClick={toggleStatsSettings}
-              color={settingsOpen ? "primary" : "inherit"}
+              className="p-2"
             >
-              <Tune fontSize="small" />
-            </IconButton>
-          </Box>
-        </Box>
-        <Box
-          ref={elementRef}
-          sx={{flexGrow: 1, minHeight: 0, width: "100%"}}
-        >
+              <Settings
+                className={settingsOpen ? "text-header-background" : ""}
+              />
+            </Button>
+          </div>
+        </div>
+        <div ref={elementRef} className="min-h-0 w-full flex-grow">
           {children}
-        </Box>
-        <Paper
-          sx={{
-            width: "100%",
-            backgroundColor: "background.paper",
-            height: "60px",
-            display: settingsOpen ? "block" : "none",
-            borderTop: 1,
-            //zIndex: 1,
-            boxShadow: 1,
-            borderColor: "divider",
-            overflowY: "hidden",
-            overflowX: "scroll",
-          }}
+        </div>
+        <div
+          className={cn(
+            "h-[60px] w-full overflow-y-hidden overflow-x-scroll border-t-2 border-muted",
+            settingsOpen ? "block" : "hidden",
+          )}
         >
-          <Stack
-            style={{
-              minWidth: "max-content",
-            }}
-            direction="row"
-            justifyContent="space-evenly"
-            alignItems="center"
-            spacing={2}
-            flexWrap={"nowrap"}
+          <div
+            className="m-2 flex min-w-max flex-row flex-nowrap items-center justify-evenly space-x-2"
             ref={settingsRef}
-            sx={{m: 1}}
-          ></Stack>
-        </Paper>
+          ></div>
+        </div>
       </StatsProvider>
-    </Box>
+    </div>
   );
 }

@@ -1,157 +1,92 @@
-import {useState} from "react";
-import {
-  MenuItem,
-  Box,
-  IconButton,
-  Menu,
-  ListItemText,
-  MenuList,
-  Divider,
-  Paper,
-  ListItemIcon,
-} from "@mui/material";
-import {
-  Map as MapIcon,
-  Check as CheckIcon,
-  ThreeDRotation as ThreeDimIcon,
-} from "@mui/icons-material";
+import { useState } from "react";
 
-import {useStore} from "~/contexts/Zustand";
+import { Map } from "lucide-react";
 
-import {mapSettings} from "~/settings/map";
-import {useMap} from "react-map-gl";
-import {useShallow} from "zustand/shallow";
+import { useStore } from "~/contexts/Zustand";
+
+import { mapSettings } from "~/settings/map";
+import { useShallow } from "zustand/shallow";
+
+import { Button } from "~/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+
+export function DropdownMenuRadioGroupDemo() {
+  const [position, setPosition] = useState("bottom");
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline">Open</Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56">
+        <DropdownMenuLabel>Panel Position</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup value={position} onValueChange={setPosition}>
+          <DropdownMenuRadioItem value="top">Top</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="bottom">Bottom</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="right">Right</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function LayerSwitcher() {
-  const {
-    threeDim,
-    toggleThreeDim,
-    overlayMaps,
-    baseMap,
-    toggleOverlayMap,
-    setBaseMap,
-  } = useStore(
+  const { overlayMaps, baseMap, toggleOverlayMap, setBaseMap } = useStore(
     useShallow((state) => ({
-      threeDim: state.threeDim,
-      toggleThreeDim: state.toggleThreeDim,
       overlayMaps: state.overlayMaps,
       baseMap: state.baseMap,
       toggleOverlayMap: state.toggleOverlayMap,
       setBaseMap: state.setBaseMap,
-    }))
+    })),
   );
 
-  const map = useMap();
-
-  const [anchorEl, setAnchorEl] =
-    useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
   return (
-    <Box>
-      <Paper
-        sx={{
-          p: 0,
-          width: "29px",
-          borderRadius: 1,
-        }}
-        elevation={1}
-      >
-        <IconButton
-          onClick={(event) =>
-            setAnchorEl(event.currentTarget)
-          }
-        >
-          <MapIcon fontSize="small" sx={{mt: "3px"}} />
-        </IconButton>
-        <Divider />
-        <IconButton
-          onClick={() => {
-            if (threeDim)
-              map.current?.easeTo({
-                pitch: 0,
-                duration: 1000,
-              });
-            else
-              map.current?.easeTo({
-                pitch: 60,
-                duration: 1000,
-              });
-            toggleThreeDim();
-          }}
-        >
-          <ThreeDimIcon
-            fontSize="small"
-            sx={{mt: "3px"}}
-            color={threeDim ? "primary" : "disabled"}
-          />
-        </IconButton>
-      </Paper>
-      <Menu
-        anchorEl={anchorEl}
-        open={open}
-        onClose={handleClose}
-        anchorOrigin={{
-          vertical: "top",
-          horizontal: "right",
-        }}
-        transformOrigin={{
-          vertical: "top",
-          horizontal: "left",
-        }}
-        sx={{
-          "&& .MuiList-root": {py: 0.5},
-        }}
-      >
-        <MenuList dense>
-          {Object.entries(mapSettings)
-            .filter(([, val]) => val.overlay === false)
-            .map(([key]) => (
-              <MenuItem
-                key={key}
-                value={key}
-                onClick={() => setBaseMap(key)}
-              >
-                {baseMap !== key && (
-                  <ListItemText inset> {key} </ListItemText>
-                )}
-                {baseMap === key && (
-                  <>
-                    <ListItemIcon>
-                      <CheckIcon />
-                    </ListItemIcon>
-                    {key}
-                  </>
-                )}
-              </MenuItem>
-            ))}
-          <Divider />
+    <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" className="[&_svg]:size-5">
+            <Map className="mx-auto" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56">
+          <DropdownMenuLabel>Base Map</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuRadioGroup value={baseMap} onValueChange={setBaseMap}>
+            {Object.entries(mapSettings)
+              .filter(([, val]) => val.overlay === false)
+              .map(([key]) => (
+                <DropdownMenuRadioItem value={key} key={key}>
+                  {key}
+                </DropdownMenuRadioItem>
+              ))}
+          </DropdownMenuRadioGroup>
+          <DropdownMenuLabel>Overlays</DropdownMenuLabel>
+          <DropdownMenuSeparator />
           {Object.entries(mapSettings)
             .filter(([, val]) => val.overlay === true)
             .map(([key]) => (
-              <MenuItem
+              <DropdownMenuCheckboxItem
                 key={key}
-                value={key}
-                onClick={() => toggleOverlayMap(key)}
+                checked={overlayMaps.includes(key)}
+                onClick={(e) => {
+                  toggleOverlayMap(key);
+                }}
               >
-                {!overlayMaps.includes(key) && (
-                  <ListItemText inset> {key} </ListItemText>
-                )}
-                {overlayMaps.includes(key) && (
-                  <>
-                    <ListItemIcon>
-                      <CheckIcon />
-                    </ListItemIcon>
-                    {key}
-                  </>
-                )}
-              </MenuItem>
+                {key}
+              </DropdownMenuCheckboxItem>
             ))}
-        </MenuList>
-      </Menu>
-    </Box>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

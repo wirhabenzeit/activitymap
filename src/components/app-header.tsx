@@ -1,0 +1,63 @@
+"use client";
+
+import { MainNav } from "./main-nav";
+import { SidebarTrigger } from "./ui/sidebar";
+import { Separator } from "./ui/separator";
+
+import * as React from "react";
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+
+import { Button } from "~/components/ui/button";
+import { ShareButton } from "./Share";
+
+export function ModeToggle() {
+  const { setTheme, theme } = useTheme();
+  const themeMap = { undefined: "light", dark: "light", light: "dark" };
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(themeMap[theme])}
+    >
+      <Sun className="rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+    </Button>
+  );
+}
+
+export const AppHeader = () => {
+  return (
+    <header className="fixed inset-x-0 top-0 z-30 border-border/40 bg-header-background px-2 text-header-foreground">
+      <div className="flex h-14 items-center">
+        <SidebarTrigger className="h-8 w-8" />
+        <Separator
+          orientation="vertical"
+          color="white"
+          className="mx-2 h-8 bg-header-foreground"
+        />
+        <MainNav />
+        <div className="flex flex-1 items-center justify-end space-x-2">
+          <nav className="flex items-center text-header-foreground">
+            <ShareButton />
+            {/* <a href="https://" target="_blank" rel="noreferrer">
+              <div
+                className={cn(
+                  buttonVariants({
+                    variant: "ghost",
+                  }),
+                  "h-8 w-8 px-0",
+                )}
+              >
+                <Calendar className="h-4 w-4" />
+                <span className="sr-only">GitHub</span>
+              </div>
+            </a> */}
+            <ModeToggle />
+          </nav>
+        </div>
+      </div>
+    </header>
+  );
+};

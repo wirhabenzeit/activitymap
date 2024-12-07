@@ -1,22 +1,19 @@
 import * as Plot from "@observablehq/plot";
-import {BarChart, ShowChart} from "@mui/icons-material";
 
+import { ChartLine, ChartColumn } from "lucide-react";
 import * as d3 from "d3";
 
-import {type Activity} from "~/server/db/schema";
-import {
-  categorySettings,
-  aliasMap,
-} from "~/settings/category";
+import { type Activity } from "~/server/db/schema";
+import { categorySettings, aliasMap } from "~/settings/category";
 
-import {commonSettings, prepend} from "~/stats";
+import { commonSettings, prepend } from "~/stats";
 
 export const settings = {
   averaging: {
     type: "number",
     label: "Averaging",
-    minIcon: <BarChart />,
-    maxIcon: <ShowChart />,
+    minIcon: <ChartColumn />,
+    maxIcon: <ChartLine />,
   },
   value: {
     type: "categorical",
@@ -46,9 +43,7 @@ export const settings = {
         sortable: true,
         fun: (d: Activity) => d.total_elevation_gain,
         format: (v: number) =>
-          v >= 10_000
-            ? (v / 1_000).toFixed() + "k"
-            : v.toFixed(),
+          v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed(),
         label: "Elevation (m)",
         unit: "m",
       },
@@ -112,8 +107,7 @@ export const settings = {
         fun: (d: Activity) => aliasMap[d.sport_type],
         color: (id: keyof typeof categorySettings) =>
           categorySettings[id].color,
-        icon: (id: keyof typeof categorySettings) =>
-          categorySettings[id].icon,
+        icon: (id: keyof typeof categorySettings) => categorySettings[id].icon,
       },
       no_group: {
         id: "no_group",
@@ -156,7 +150,7 @@ export const settings = {
 } as const;
 
 export const defaultSettings: TimelineSetting = {
-  averaging: {value: 1, domain: [0, 3]},
+  averaging: { value: 1, domain: [0, 3] },
   value: "distance",
   timePeriod: "month",
   group: "sport_group",
@@ -164,7 +158,7 @@ export const defaultSettings: TimelineSetting = {
 };
 
 type TimelineSetting = {
-  averaging: {value: number; domain: [number, number]};
+  averaging: { value: number; domain: [number, number] };
   yScale: keyof typeof settings.yScale.options;
   value: keyof typeof settings.value.options;
   timePeriod: keyof typeof settings.timePeriod.options;
@@ -183,19 +177,15 @@ export const getter = (setting: TimelineSetting): Spec => ({
   averaging: setting.averaging.value,
   yScale: settings.yScale.options[setting.yScale],
   value: settings.value.options[setting.value],
-  timePeriod:
-    settings.timePeriod.options[setting.timePeriod],
+  timePeriod: settings.timePeriod.options[setting.timePeriod],
   group: settings.group.options[setting.group],
 });
 
 export const setter =
   (timeline: TimelineSetting) =>
-  <K extends keyof TimelineSetting>(
-    name: K,
-    value: TimelineSetting[K]
-  ) => {
+  <K extends keyof TimelineSetting>(name: K, value: TimelineSetting[K]) => {
     if (["value", "group", "yScale"].includes(name)) {
-      const newTimeline = {...timeline, [name]: value};
+      const newTimeline = { ...timeline, [name]: value };
       return newTimeline;
     }
     if (name === "averaging") {
@@ -209,17 +199,13 @@ export const setter =
     }
     if (name === "timePeriod") {
       {
-        const oldDays =
-          settings.timePeriod.options[timeline.timePeriod]
-            .days;
+        const oldDays = settings.timePeriod.options[timeline.timePeriod].days;
         const newDays =
           settings.timePeriod.options[
             value as keyof typeof settings.timePeriod.options
           ].days;
         const oldValue = timeline.averaging.value;
-        const newValue = Math.round(
-          (oldValue * oldDays) / newDays
-        );
+        const newValue = Math.round((oldValue * oldDays) / newDays);
         const newTimeline = {
           ...timeline,
           timePeriod: value,
@@ -252,32 +238,28 @@ export const plot =
     const timeline = getter(setting);
 
     const extent = d3.extent(activities, (d) =>
-      timeline.timePeriod.tick(new Date(d.start_date_local))
+      timeline.timePeriod.tick(new Date(d.start_date_local)),
     );
 
-    if (extent[0] == undefined || extent[1] == undefined)
-      return null;
+    if (extent[0] == undefined || extent[1] == undefined) return null;
 
     const groupExtent = Array.from(
       new Set(
         activities.map(timeline.group.fun) as Array<
           keyof typeof categorySettings
-        >
-      )
+        >,
+      ),
     );
 
     const range = timeline.timePeriod.tick.range(
       extent[0],
-      timeline.timePeriod.tick.ceil(extent[1])
+      timeline.timePeriod.tick.ceil(extent[1]),
     );
 
     const groups = d3.group(
       activities,
-      (d) =>
-        timeline.timePeriod.tick(
-          new Date(d.start_date_local)
-        ),
-      timeline.group.fun
+      (d) => timeline.timePeriod.tick(new Date(d.start_date_local)),
+      timeline.group.fun,
     );
 
     const timeMap = d3.map(range, (date) => {
@@ -286,10 +268,7 @@ export const plot =
         type,
         value:
           groups.get(date)?.get(type) != undefined
-            ? d3.sum(
-                groups.get(date)!.get(type)!,
-                timeline.value.fun
-              )
+            ? d3.sum(groups.get(date)!.get(type)!, timeline.value.fun)
             : 0,
       }));
     });
@@ -312,11 +291,9 @@ export const plot =
       timeMap.map((arr) => {
         return [
           arr[0]!.date,
-          new d3.InternMap(
-            arr.map(({value, type}) => [type, value])
-          ),
+          new d3.InternMap(arr.map(({ value, type }) => [type, value])),
         ];
-      })
+      }),
     );
 
     const bigPlot = width > 500;
@@ -332,7 +309,7 @@ export const plot =
         : {}),
       height: Math.max(height, 100),
       width: Math.max(width, 100),
-      y: {...timeline.yScale.prop},
+      y: { ...timeline.yScale.prop },
       marks: [
         Plot.ruleY([0]),
         Plot.axisY({
@@ -346,10 +323,7 @@ export const plot =
             ? {}
             : {
                 tickRotate: -90,
-                tickFormat: prepend(
-                  " ",
-                  timeline.value.format
-                ),
+                tickFormat: prepend(" ", timeline.value.format),
                 textAnchor: "start",
                 tickSize: 14,
                 tickPadding: -10,
@@ -383,12 +357,10 @@ export const plot =
                       dx: 8,
                       frameAnchor: "right",
                       text: (d: Date) =>
-                        timeline.value.format(
-                          map.get(d)!.get(type)!
-                        ),
+                        timeline.value.format(map.get(d)!.get(type)!),
                       fill: timeline.group.color(type),
                       fontSize: 12,
-                    })
+                    }),
                   ),
                 ]
               : []),
@@ -399,7 +371,7 @@ export const plot =
                 y: (d: Date) => map.get(d)?.get(type),
                 //opacity: 1,
                 fill: timeline.group.color(type),
-              })
+              }),
             ),
           ]),
         ],
@@ -412,15 +384,12 @@ export const plot =
             k: timeline.averaging + 1,
             curve: "monotone-x",
             reduce: "mean",
-            stroke: (x: Data) =>
-              timeline.group.color(x.type),
+            stroke: (x: Data) => timeline.group.color(x.type),
             channels: {
               Date: (d: Data) =>
-                `${d3.timeFormat(
-                  timeline.timePeriod.tickFormat
-                )(d.date)} ± ${timeline.averaging} ${
-                  timeline.timePeriod.id
-                }s`,
+                `${d3.timeFormat(timeline.timePeriod.tickFormat)(
+                  d.date,
+                )} ± ${timeline.averaging} ${timeline.timePeriod.id}s`,
             },
             tip: {
               channels: {
@@ -435,7 +404,7 @@ export const plot =
                 z: false,
               },
             },
-          })
+          }),
         ),
         Plot.areaY(data, {
           x: "date",

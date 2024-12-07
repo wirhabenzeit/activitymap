@@ -1,9 +1,9 @@
-import {LayerSAC} from "~/components/Map/LayerSAC";
-import {LayerFriflyt} from "~/components/Map/LayerFriflyt";
-import {LayerQuaeldich} from "~/components/Map/LayerQuaeldich";
-import {LngLatBounds} from "mapbox-gl";
-import type {RefObject} from "react";
-import type {MapRef} from "react-map-gl";
+import { LayerSAC } from "~/components/Map/LayerSAC";
+import { LayerFriflyt } from "~/components/Map/LayerFriflyt";
+import { LayerQuaeldich } from "~/components/Map/LayerQuaeldich";
+import { LngLatBounds } from "mapbox-gl";
+import type { RefObject } from "react";
+import type { MapRef } from "react-map-gl";
 
 type RasterMapSetting = {
   url: string;
@@ -31,10 +31,7 @@ type CustomMapSetting = {
   component: React.FC<CustomLayerProps>;
 };
 
-type MapSetting =
-  | RasterMapSetting
-  | VectorMapSetting
-  | CustomMapSetting;
+type MapSetting = RasterMapSetting | VectorMapSetting | CustomMapSetting;
 
 export const mapSettings: Record<string, MapSetting> = {
   "Mapbox Street": {
@@ -109,24 +106,24 @@ export const mapSettings: Record<string, MapSetting> = {
     visible: false,
     overlay: false,
   },
-  "SAC Tourenportal": {
-    overlay: true,
-    visible: false,
-    type: "custom",
-    component: LayerSAC,
-  },
-  "Friflyt Routes": {
-    overlay: true,
-    visible: false,
-    type: "custom",
-    component: LayerFriflyt,
-  },
-  "Quäldich Pässe": {
-    overlay: true,
-    visible: false,
-    type: "custom",
-    component: LayerQuaeldich,
-  },
+  // "SAC Tourenportal": {
+  //   overlay: true,
+  //   visible: false,
+  //   type: "custom",
+  //   component: LayerSAC,
+  // },
+  // "Friflyt Routes": {
+  //   overlay: true,
+  //   visible: false,
+  //   type: "custom",
+  //   component: LayerFriflyt,
+  // },
+  // "Quäldich Pässe": {
+  //   overlay: true,
+  //   visible: false,
+  //   type: "custom",
+  //   component: LayerQuaeldich,
+  // },
   "Swisstopo Ski": {
     url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/{z}/{x}/{y}.png`,
     type: "raster",
@@ -163,10 +160,10 @@ export const defaultMapPosition = {
   latitude: 46.8,
   pitch: 0,
   bearing: 0,
-  padding: {top: 0, right: 0, bottom: 0, left: 0},
+  padding: { top: 0, right: 0, bottom: 0, left: 0 },
 };
 
 export const defaultMapBounds = new LngLatBounds([
-  {lng: 5.3, lat: 45.9},
-  {lng: 11.1, lat: 47.8},
+  { lng: 5.3, lat: 45.9 },
+  { lng: 11.1, lat: 47.8 },
 ]);

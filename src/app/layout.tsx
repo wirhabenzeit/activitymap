@@ -1,22 +1,20 @@
-import "./global.css";
+import "~/styles/globals.css";
 
-import {AppRouterCacheProvider} from "@mui/material-nextjs/v13-appRouter";
-import {ThemeProvider} from "@mui/material/styles";
-import {Box, CssBaseline} from "@mui/material";
-import theme from "../theme";
-import SideBar from "~/components/SideBar";
+import { SidebarProvider } from "~/components/ui/sidebar";
+import { ThemeProvider } from "~/components/theme-provider";
+import { AppSidebar } from "~/components/app-sidebar";
+import { AppHeader } from "~/components/app-header";
+
 import MainContainer from "~/components/MainContainer";
-import Header from "~/components/Header";
-import {DrawerHeader} from "~/components/Drawer";
-import {auth} from "~/auth";
-import type {User} from "~/server/db/schema";
-import {Analytics} from "@vercel/analytics/react";
-import {SpeedInsights} from "@vercel/speed-insights/next";
+import { auth } from "~/auth";
+import type { User } from "~/server/db/schema";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata = {
   title: "Activity Map",
   description: "A map of Strava activities",
-  icons: [{rel: "icon", url: "/favicon.ico"}],
+  icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
 export default async function RootLayout({
@@ -25,30 +23,21 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const user =
-    session && "user" in session ? session.user : undefined;
+  const user = session && "user" in session ? session.user : undefined;
 
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      style={{ width: "100dvw", height: "100dvh" }}
+      suppressHydrationWarning
+    >
       <head>
-        <meta
-          name="apple-mobile-web-app-capable"
-          content="yes"
-        />
-        <meta
-          name="apple-mobile-web-app-status-bar-style"
-          content="#1976d2"
-        />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-status-bar-style" content="#1976d2" />
         <link rel="manifest" href="/site.webmanifest" />
-        <link
-          rel="apple-touch-icon"
-          href="/apple-icon-180.png"
-        />
+        <link rel="apple-touch-icon" href="/apple-icon-180.png" />
 
-        <meta
-          name="apple-mobile-web-app-capable"
-          content="yes"
-        />
+        <meta name="mobile-web-app-capable" content="yes" />
 
         <link
           rel="apple-touch-startup-image"
@@ -223,60 +212,26 @@ export default async function RootLayout({
         <Analytics />
         <SpeedInsights />
       </head>
-      <body>
-        <AppRouterCacheProvider>
-          <ThemeProvider theme={theme}>
-            <Box
-              sx={{
-                width: "100dvw",
-                height: "100dvh",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <CssBaseline />
-              <Header />
-              <Box
-                sx={{
-                  width: "100dvw",
-                  flexGrow: 1,
-                  display: "flex",
-                  flexDirection: "row",
-                }}
-              >
-                <SideBar />
-                <Box
-                  sx={{
-                    overflow: "hidden",
-                    flexGrow: 1,
-                    p: 0,
-                    height: "100dvh",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                >
-                  <DrawerHeader />
-                  <Box
-                    sx={{
-                      width: "100%",
-                      minHeight: 0,
-                      minWidth: 0,
-                      overflow: "hidden",
-                      flexGrow: 1,
-                    }}
-                  >
-                    <MainContainer
-                      user={user as User}
-                      session={session}
-                    >
-                      {children}
-                    </MainContainer>
-                  </Box>
-                </Box>
-              </Box>
-            </Box>
-          </ThemeProvider>
-        </AppRouterCacheProvider>
+      <body style={{ width: "100dvw", height: "100dvh" }} className="font-sans">
+        <ThemeProvider attribute="class">
+          <SidebarProvider
+            className="flex h-dvh flex-col"
+            style={{ height: "100dvh" }}
+          >
+            <AppHeader />
+            <div className="flex min-h-0 flex-1">
+              <AppSidebar />
+              <main className="flex min-w-0 flex-1 flex-col">
+                <div className="h-14 w-full" />
+                <div className="min-h-0 w-full flex-1">
+                  <MainContainer user={user} session={session}>
+                    {children}
+                  </MainContainer>
+                </div>
+              </main>
+            </div>
+          </SidebarProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

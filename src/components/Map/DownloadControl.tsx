@@ -1,13 +1,12 @@
 "use client";
 
-import {DownloadOutlined} from "@mui/icons-material";
-import {IconButton, Paper} from "@mui/material";
+import { Button } from "../ui/button";
+import { Download as DownloadIcon } from "lucide-react";
 import FileSaver from "file-saver";
 import mapboxgl from "mapbox-gl";
-import {useMap} from "react-map-gl";
+import { useMap } from "react-map-gl";
 
-mapboxgl.accessToken = process.env
-  .NEXT_PUBLIC_MAPBOX_TOKEN!;
+mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
 export function Download() {
   const map = useMap();
@@ -55,7 +54,7 @@ export function Download() {
           FileSaver.saveAs(blob, "map.jpg");
         },
         "image/jpeg",
-        0.8
+        0.8,
       );
 
       renderMap.remove();
@@ -69,28 +68,10 @@ export function Download() {
   };
 
   return (
-    <Paper
-      sx={{
-        p: 0,
-        width: "29px",
-        height: "29px",
-        borderRadius: 1,
-      }}
-      elevation={1}
-    >
-      <IconButton
-        onClick={download}
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <DownloadOutlined
-          fontSize="medium"
-          sx={{color: "black", mt: "2px"}}
-        />
-      </IconButton>
-    </Paper>
+    <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
+      <Button onClick={download} className="[&_svg]:size-5">
+        <DownloadIcon className="mx-auto" color="black" />
+      </Button>
+    </div>
   );
 }

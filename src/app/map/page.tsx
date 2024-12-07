@@ -1,16 +1,9 @@
 "use client";
 
-import {
-  useState,
-  useCallback,
-  useMemo,
-  type FC,
-  createRef,
-} from "react";
+import { useState, useCallback, useMemo, type FC, createRef } from "react";
 
-import {IconButton, Paper} from "@mui/material";
-import {DataGrid} from "@mui/x-data-grid";
-import {useTheme} from "@mui/material/styles";
+import { Camera, Globe } from "lucide-react";
+import { Button } from "~/components/ui/button";
 
 import ReactMapGL, {
   NavigationControl,
@@ -31,50 +24,39 @@ const skyLayer: SkyLayer = {
     "sky-atmosphere-sun-intensity": 15,
   },
 };
-import {useShallow} from "zustand/shallow";
+import { useShallow } from "zustand/shallow";
 
 import Overlay from "~/components/Map/Overlay";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
-import {useStore} from "~/contexts/Zustand";
+import { useStore } from "~/contexts/Zustand";
 
-import {
-  type CustomLayerProps,
-  mapSettings,
-} from "~/settings/map";
-import {categorySettings} from "~/settings/category";
-import {listSettings} from "~/settings/list";
+import { type CustomLayerProps, mapSettings } from "~/settings/map";
+import { categorySettings } from "~/settings/category";
+import { listSettings } from "~/settings/list";
 
-import {Download} from "~/components/Map/DownloadControl";
-import {Selection} from "~/components/Map/SelectionControl";
-import {LayerSwitcher} from "~/components/Map/LayerSwitcher";
-import type {Activity} from "~/server/db/schema";
+import { Download } from "~/components/Map/DownloadControl";
+import { Selection } from "~/components/Map/SelectionControl";
+import { LayerSwitcher } from "~/components/Map/LayerSwitcher";
+import type { Activity } from "~/server/db/schema";
 import PhotoLayer from "~/components/Map/Photo";
-import {CameraAlt} from "@mui/icons-material";
-import {type MapboxEvent} from "mapbox-gl";
-import type mapboxgl from "mapbox-gl";
 
 function RouteLayer() {
-  const {filterIDs} = useStore(
+  const { filterIDs } = useStore(
     useShallow((state) => ({
       filterIDs: state.filterIDs,
-    }))
+    })),
   );
-  const {selected, highlighted, geoJson} = useStore(
+  const { selected, highlighted, geoJson } = useStore(
     useShallow((state) => ({
       selected: state.selected,
       highlighted: state.highlighted,
       geoJson: state.geoJson,
-    }))
+    })),
   );
 
-  const theme = useTheme();
-
-  const color: mapboxgl.Expression = [
-    "match",
-    ["get", "sport_type"],
-  ];
+  const color: mapboxgl.Expression = ["match", ["get", "sport_type"]];
   Object.entries(categorySettings).forEach(([, value]) => {
     value.alias.forEach((alias) => {
       color.push(alias, value.color);
@@ -94,7 +76,7 @@ function RouteLayer() {
         source="routeSource"
         id="routeLayerBG"
         type="line"
-        paint={{"line-color": "black", "line-width": 4}}
+        paint={{ "line-color": "black", "line-width": 4 }}
         layout={{
           "line-join": "round",
           "line-cap": "round",
@@ -105,7 +87,7 @@ function RouteLayer() {
         source="routeSource"
         id="routeLayerFG"
         type="line"
-        paint={{"line-color": color, "line-width": 2}}
+        paint={{ "line-color": color, "line-width": 2 }}
         layout={{
           "line-join": "round",
           "line-cap": "round",
@@ -116,7 +98,7 @@ function RouteLayer() {
         source="routeSource"
         id="routeLayerBGsel"
         type="line"
-        paint={{"line-color": "black", "line-width": 6}}
+        paint={{ "line-color": "black", "line-width": 6 }}
         layout={{
           "line-join": "round",
           "line-cap": "round",
@@ -127,7 +109,7 @@ function RouteLayer() {
         source="routeSource"
         id="routeLayerMIDsel"
         type="line"
-        paint={{"line-color": color, "line-width": 4}}
+        paint={{ "line-color": color, "line-width": 4 }}
         layout={{
           "line-join": "round",
           "line-cap": "round",
@@ -138,7 +120,7 @@ function RouteLayer() {
         source="routeSource"
         id="routeLayerFGsel"
         type="line"
-        paint={{"line-color": "white", "line-width": 2}}
+        paint={{ "line-color": "white", "line-width": 2 }}
         layout={{
           "line-join": "round",
           "line-cap": "round",
@@ -150,7 +132,7 @@ function RouteLayer() {
         id="routeLayerHigh"
         type="line"
         paint={{
-          "line-color": theme.palette.primary.light,
+          "line-color": "white",
           "line-width": 6,
           "line-opacity": 0.4,
         }}
@@ -166,14 +148,8 @@ function RouteLayer() {
 
 function Map() {
   const [cursor, setCursor] = useState("auto");
-  const onMouseEnter = useCallback(
-    () => setCursor("pointer"),
-    []
-  );
-  const onMouseLeave = useCallback(
-    () => setCursor("auto"),
-    []
-  );
+  const onMouseEnter = useCallback(() => setCursor("pointer"), []);
+  const onMouseLeave = useCallback(() => setCursor("auto"), []);
 
   const {
     selected,
@@ -188,6 +164,7 @@ function Map() {
     setPosition,
     updateActivity,
     threeDim,
+    toggleThreeDim,
     showPhotos,
     togglePhotos,
   } = useStore(
@@ -206,14 +183,13 @@ function Map() {
       threeDim: state.threeDim,
       showPhotos: state.showPhotos,
       togglePhotos: state.togglePhotos,
-    }))
+      toggleThreeDim: state.toggleThreeDim,
+    })),
   );
 
   const mapRefLoc = createRef<MapRef>();
 
-  const loaded = useStore(
-    useShallow((state) => state.loaded)
-  );
+  const loaded = useStore(useShallow((state) => state.loaded));
   const [viewport, setViewport] = useState(mapPosition);
 
   const overlayMaps = useMemo(
@@ -223,14 +199,8 @@ function Map() {
           const mapSetting = mapSettings[mapName];
           if (mapSetting == undefined) return;
           if (mapSetting.type == "custom") {
-            const CustomLayer: FC<CustomLayerProps> =
-              mapSetting.component;
-            return (
-              <CustomLayer
-                key={mapName}
-                mapRef={mapRefLoc}
-              />
-            );
+            const CustomLayer: FC<CustomLayerProps> = mapSetting.component;
+            return <CustomLayer key={mapName} mapRef={mapRefLoc} />;
           } else
             return (
               <Source
@@ -246,9 +216,7 @@ function Map() {
                   type="raster"
                   paint={{
                     "raster-opacity":
-                      "opacity" in mapSetting
-                        ? mapSetting.opacity!
-                        : 1,
+                      "opacity" in mapSetting ? mapSetting.opacity! : 1,
                   }}
                 />
               </Source>
@@ -256,7 +224,7 @@ function Map() {
         })}
       </>
     ),
-    [overlays, mapRefLoc]
+    [overlays, mapRefLoc],
   );
 
   const mapSettingBase = mapSettings[baseMap]!;
@@ -272,55 +240,33 @@ function Map() {
         styleDiffing={false}
         boxZoom={false}
         {...viewport}
-        onMove={({viewState}) => setViewport(viewState)}
-        onMoveEnd={({viewState}) => {
+        onMove={({ viewState }) => setViewport(viewState)}
+        onMoveEnd={({ viewState }) => {
           if (mapRefLoc.current) {
-            setPosition(
-              viewState,
-              mapRefLoc.current.getMap().getBounds()
-            );
+            setPosition(viewState, mapRefLoc.current.getMap().getBounds());
           }
         }}
         //optimizeForTerrain={true}
         //onLoad={(event: MapboxEvent) => console.log(event)}
-        projection={
-          "globe" as unknown as mapboxgl.Projection
-        }
+        projection={"globe" as unknown as mapboxgl.Projection}
         mapStyle={
-          mapSettingBase.type === "vector"
-            ? mapSettingBase.url
-            : undefined
+          mapSettingBase.type === "vector" ? mapSettingBase.url : undefined
         }
-        terrain={{
-          source: "mapbox-dem",
-          exaggeration: threeDim ? 1.5 : 0,
-        }}
+        // terrain={{
+        //   source: "mapbox-dem",
+        //   exaggeration: threeDim ? 1.5 : 0,
+        // }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        mapboxAccessToken={
-          process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-        }
+        mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         cursor={cursor}
-        interactiveLayerIds={[
-          "routeLayerBG",
-          "routeLayerBGsel",
-          "SAC",
-        ]}
+        interactiveLayerIds={["routeLayerBG", "routeLayerBGsel"]}
       >
-        {mapSettingBase != undefined &&
-          mapSettingBase.type == "raster" && (
-            <Source
-              type="raster"
-              tiles={[mapSettingBase.url]}
-              tileSize={256}
-            >
-              <Layer
-                id="baseMap"
-                type="raster"
-                paint={{"raster-opacity": 1}}
-              />
-            </Source>
-          )}
+        {mapSettingBase != undefined && mapSettingBase.type == "raster" && (
+          <Source type="raster" tiles={[mapSettingBase.url]} tileSize={256}>
+            <Layer id="baseMap" type="raster" paint={{ "raster-opacity": 1 }} />
+          </Source>
+        )}
         <Source
           id="mapbox-dem"
           type="raster-dem"
@@ -340,103 +286,29 @@ function Map() {
           <LayerSwitcher />
         </Overlay>
         <Overlay position="top-left">
-          <Paper
-            sx={{
-              p: 0,
-              width: "29px",
-              borderRadius: 1,
-            }}
-            elevation={1}
-          >
-            <IconButton onClick={togglePhotos}>
-              <CameraAlt
-                fontSize="small"
-                sx={{mt: "2px"}}
-                color={showPhotos ? "primary" : "inherit"}
+          <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
+            <Button onClick={toggleThreeDim} className="[&_svg]:size-5">
+              <Globe
+                className="mx-auto"
+                color={threeDim ? "hsl(var(--header-background))" : "gray"}
               />
-            </IconButton>
-          </Paper>
+            </Button>
+          </div>
+        </Overlay>
+        <Overlay position="top-left">
+          <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
+            <Button onClick={togglePhotos} className="[&_svg]:size-5">
+              <Camera
+                className="mx-auto"
+                color={showPhotos ? "hsl(var(--header-background))" : "gray"}
+              />
+            </Button>
+          </div>
         </Overlay>
         {overlayMaps}
         {loaded && <RouteLayer />}
         {loaded && showPhotos && <PhotoLayer />}
       </ReactMapGL>
-      <Paper
-        elevation={3}
-        sx={{
-          zIndex: 2,
-          position: "absolute",
-          left: "40px",
-          maxWidth: "800px",
-          height: selected.length > 7 ? "210px" : "auto",
-          right: "10px",
-          width: "calc(100% - 50px)",
-          bottom: "30px",
-          margin: "auto",
-          display: selected.length > 0 ? "block" : "none",
-          //visibility:
-          //  selected.length > 0 ? "visible" : "hidden",
-        }}
-      >
-        <DataGrid
-          hideFooter={true}
-          sx={{
-            ".MuiDataGrid-iconButtonContainer": {
-              visibility:
-                selected.length > 0
-                  ? "inherit"
-                  : "hidden !important",
-            },
-            ".MuiDataGrid-columnSeparator": {
-              visibility:
-                selected.length > 0
-                  ? "inherit"
-                  : "hidden !important",
-            },
-          }}
-          editMode="row"
-          processRowUpdate={async (
-            updatedRow: Activity
-          ) => {
-            console.log("Updating activity", updatedRow);
-            const verifiedActivity =
-              await updateActivity(updatedRow);
-            return verifiedActivity;
-          }}
-          onProcessRowUpdateError={(error) =>
-            console.error(error)
-          }
-          rowHeight={35}
-          disableColumnMenu={false}
-          rows={rows}
-          autoHeight={selected.length <= 7}
-          initialState={{
-            pagination: {paginationModel: {pageSize: 100}},
-          }}
-          columns={listSettings.columns}
-          disableColumnFilter
-          density="compact"
-          sortModel={compactList.sortModel}
-          onSortModelChange={(model) =>
-            setSortModel("compact", model)
-          }
-          columnVisibilityModel={
-            compactList.columnVisibilityModel
-          }
-          onColumnVisibilityModelChange={(newModel) =>
-            setColumnVisibilityModel("compact", newModel)
-          }
-          onRowClick={(row) => {
-            const id = row.id as number;
-            setHighlighted(id);
-            const map = activityDict[id]?.map;
-            if (!map) return;
-            mapRefLoc.current?.fitBounds(map.bbox, {
-              padding: 100,
-            });
-          }}
-        />
-      </Paper>
     </>
   );
 }

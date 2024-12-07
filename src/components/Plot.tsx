@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, type JSX } from "react";
-import {createPortal} from "react-dom";
+import { createPortal } from "react-dom";
 
-import {useStore} from "~/contexts/Zustand";
-import {useShallow} from "zustand/shallow";
+import { useStore } from "~/contexts/Zustand";
+import { useShallow } from "zustand/shallow";
 
-import {useContext} from "react";
-import {StatsContext} from "~/app/stats/[name]/StatsContext";
+import { useContext } from "react";
+import { StatsContext } from "~/app/stats/[name]/StatsContext";
 import statsPlots, {
   type StatsSetter,
   type StatsSetting,
@@ -17,25 +17,25 @@ import statsPlots, {
 import * as React from "react";
 
 import {
-  FormControl,
-  InputLabel,
   Select,
-  MenuItem,
-  Box,
-  Slider,
-  IconButton,
-  Stack,
-  type SelectChangeEvent,
-} from "@mui/material";
-import {type Activity} from "~/server/db/schema";
-import type Plot from "@observablehq/plot";
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+
+import { Slider } from "~/components/ui/slider";
+
+import { type Activity } from "~/server/db/schema";
+import { Button } from "~/components/ui/button";
+import { Plot } from "@observablehq/plot";
 
 type Stats<K extends keyof StatsSetting> = {
   settings: StatsSettings[K];
   setting: StatsSetting[K];
   setter: StatsSetter[K];
   plot: (
-    setting: StatsSetting[K]
+    setting: StatsSetting[K],
   ) => ({
     activities,
     width,
@@ -46,7 +46,7 @@ type Stats<K extends keyof StatsSetting> = {
     height: number;
   }) => Plot.Plot & HTMLElement;
   legend: (
-    setting: StatsSetting[K]
+    setting: StatsSetting[K],
   ) => (plot: Plot.Plot) => Plot.Plot & HTMLElement;
   kind: K;
 };
@@ -70,8 +70,7 @@ function FormElement<T extends keyof StatsSetting>({
 }: FormElementProps<T>) {
   const setting = stat.settings[propName];
   const value = stat.setting[propName];
-  const setter = (value: StatsSetting[T]) =>
-    stat.setter(propName, value);
+  const setter = (value: StatsSetting[T]) => stat.setter(propName, value);
 
   switch (setting.type) {
     case "categorical":
@@ -97,20 +96,12 @@ function FormElement<T extends keyof StatsSetting>({
   }
 }
 
-function Form<T extends keyof StatsSetting>(
-  stat: Stats<T>
-) {
+function Form<T extends keyof StatsSetting>(stat: Stats<T>) {
   return (
     <>
-      {(Object.keys(stat.settings) as T[]).map(
-        (propName) => (
-          <FormElement
-            key={propName}
-            propName={propName}
-            stat={stat}
-          />
-        )
-      )}
+      {(Object.keys(stat.settings) as T[]).map((propName) => (
+        <FormElement key={propName} propName={propName} stat={stat} />
+      ))}
     </>
   );
 }
@@ -132,30 +123,26 @@ export const SelectFormElement = <K extends string, T>({
   value,
   setter,
 }: {
+  key: string;
+  keyName: string;
   setting: CategoricalSetting<K, T>;
   value: K;
   setter: (value: K) => void;
 }) => {
   if (Object.keys(setting.options).length == 1) return null;
   return (
-    <FormControl variant="outlined" size="small">
-      <InputLabel id="test">{setting.label}</InputLabel>
-      <Select
-        autoWidth
-        value={value}
-        onChange={(event: SelectChangeEvent) =>
-          setter(event.target.value as K)
-        }
-      >
-        {(Object.keys(setting.options) as K[]).map(
-          (key) => (
-            <MenuItem value={key} key={key}>
-              {setting.options[key].label}
-            </MenuItem>
-          )
-        )}
-      </Select>
-    </FormControl>
+    <Select value={value} onValueChange={(val) => setter(val as K)}>
+      <SelectTrigger className="w-[140px]">
+        <SelectValue placeholder="Theme" />
+      </SelectTrigger>
+      <SelectContent>
+        {(Object.keys(setting.options) as K[]).map((key) => (
+          <SelectItem value={key} key={key}>
+            {setting.options[key].label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 };
 
@@ -173,46 +160,43 @@ export const SliderFormElement = ({
   setter,
 }: {
   setting: ValueSetting;
-  value: {value: number; domain: [number, number]};
+  value: { value: number; domain: [number, number] };
   setter: (value: number) => void;
 }) => {
-  //console.log(setting, value);
   return (
-    <Stack direction="row" spacing={2} alignItems="center">
-      <IconButton
+    <div className="flex items-center space-x-1">
+      <Button
         onClick={() => setter(value.domain[0])}
         disabled={value.value == value.domain[0]}
+        variant="ghost"
+        className="p-2"
       >
         {setting.minIcon}
-      </IconButton>
-      <Box sx={{width: 100}}>
-        <Slider
-          disabled={value.domain[0] == value.domain[1]}
-          marks={true}
-          min={value.domain[0]}
-          max={value.domain[1]}
-          size="small"
-          value={value.value}
-          onChange={(e, v) => setter(v as number)}
-        />
-      </Box>
-      <IconButton
+      </Button>
+      <Slider
+        className="w-20"
+        value={[value.value]}
+        min={value.domain[0]}
+        max={value.domain[1]}
+        onValueChange={(v) => {
+          if (v && v[0]) setter(v[0]);
+        }}
+      />
+      <Button
         onClick={() => setter(value.domain[1])}
         disabled={value.value == value.domain[1]}
+        variant="ghost"
+        className="p-2"
       >
         {setting.maxIcon}
-      </IconButton>
-    </Stack>
+      </Button>
+    </div>
   );
 };
 
 type Setting = CategoricalSetting<any, any> | ValueSetting;
 
-export default function ObsPlot({
-  name,
-}: {
-  name: keyof StatsSetting;
-}) {
+export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
   const {
     loaded,
     statsSettings,
@@ -230,16 +214,13 @@ export default function ObsPlot({
       setStats: state.setStatsSettings,
       selected: state.selected,
       setSelected: state.setSelected,
-    }))
+    })),
   );
 
   const figureRef = useRef<HTMLDivElement>(null);
-  const {width, height, settingsRef} =
-    useContext(StatsContext);
+  const { width, height, settingsRef } = useContext(StatsContext);
 
-  const stats = (
-    Object.keys(statsPlots) as (keyof StatsSetting)[]
-  ).reduce(
+  const stats = (Object.keys(statsPlots) as (keyof StatsSetting)[]).reduce(
     (acc, key) => ({
       ...acc,
       [key]: {
@@ -251,10 +232,7 @@ export default function ObsPlot({
         setter: setStats[key],
       },
     }),
-    {} as Record<
-      keyof StatsSetting,
-      Stats<keyof StatsSetting>
-    >
+    {} as Record<keyof StatsSetting, Stats<keyof StatsSetting>>,
   );
 
   useEffect(() => {
@@ -287,37 +265,20 @@ export default function ObsPlot({
       plot.remove();
       if (legend) legend.remove();
     };
-  }, [
-    width,
-    height,
-    activityDict,
-    statsSettings[name],
-    filterIDs,
-    selected,
-  ]);
+  }, [width, height, activityDict, statsSettings[name], filterIDs, selected]);
 
   return (
     <>
-      <Box
-        /*sx={{
+      <div
+        className="felx justify-center overflow-scroll"
+        style={{
           height: height,
           width: width,
-          overflow: "hidden",
-        }}*/
-        sx={{
-          height: height,
-          width: width,
-          overflow: "scroll",
-          display: "flex",
-          justifyContent: "center",
         }}
         ref={figureRef}
       />
       {settingsRef.current &&
-        createPortal(
-          Form<typeof name>(stats[name]),
-          settingsRef.current
-        )}
+        createPortal(Form<typeof name>(stats[name]), settingsRef.current)}
     </>
   );
 }
