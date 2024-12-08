@@ -2,11 +2,8 @@ import * as Plot from "@observablehq/plot";
 import * as htl from "htl";
 import * as d3 from "d3";
 
-import {type Activity} from "~/server/db/schema";
-import {
-  categorySettings,
-  aliasMap,
-} from "~/settings/category";
+import { type Activity } from "~/server/db/schema";
+import { categorySettings, aliasMap } from "~/settings/category";
 
 export const settings = {
   value: {
@@ -19,9 +16,8 @@ export const settings = {
         format: (v: number) => (v / 1000).toFixed() + "km",
         label: "Distance",
         unit: "km",
-        reduce: (v: Activity[]): number =>
-          d3.sum(v, (d) => d.distance),
-        color: {scheme: "reds", type: "sqrt", ticks: 3},
+        reduce: (v: Activity[]): number => d3.sum(v, (d) => d.distance),
+        color: { scheme: "reds", type: "sqrt", ticks: 3 },
       },
       elevation: {
         id: "elevation",
@@ -31,7 +27,7 @@ export const settings = {
         unit: "km",
         reduce: (v: Activity[]): number =>
           d3.sum(v, (d) => d.total_elevation_gain),
-        color: {scheme: "reds", type: "sqrt", ticks: 3},
+        color: { scheme: "reds", type: "sqrt", ticks: 3 },
       },
       time: {
         id: "time",
@@ -39,18 +35,13 @@ export const settings = {
         format: (v: number) => (v / 3600).toFixed(1) + "h",
         label: "Duration",
         unit: "h",
-        reduce: (v: Activity[]): number =>
-          d3.sum(v, (d) => d.elapsed_time),
-        color: {scheme: "reds", type: "sqrt", ticks: 3},
+        reduce: (v: Activity[]): number => d3.sum(v, (d) => d.elapsed_time),
+        color: { scheme: "reds", type: "sqrt", ticks: 3 },
       },
       type: {
         id: "type",
         fun: (d: Activity) => aliasMap[d.sport_type],
-        format: (
-          groupName:
-            | keyof typeof categorySettings
-            | "Multiple"
-        ) => {
+        format: (groupName: keyof typeof categorySettings | "Multiple") => {
           if (groupName === "Multiple") {
             return "Multiple";
           }
@@ -59,22 +50,15 @@ export const settings = {
         label: "Sport Type",
         unit: "",
         reduce: (v: Activity[]): string => {
-          const set = new Set(
-            v.map((d) => aliasMap[d.sport_type])
-          );
+          const set = new Set(v.map((d) => aliasMap[d.sport_type]));
           return set.size > 1
             ? "Multiple"
             : (set.values().next().value as string);
         },
         color: {
-          domain: [
-            ...Object.keys(categorySettings),
-            "Multiple",
-          ],
+          domain: [...Object.keys(categorySettings), "Multiple"],
           range: [
-            ...Object.values(categorySettings).map(
-              (x) => x.color
-            ),
+            ...Object.values(categorySettings).map((x) => x.color),
             "#aaa",
           ],
         },
@@ -101,33 +85,22 @@ const getter = (setting: CalendarSetting): Spec => ({
 
 const setter =
   (calendar: CalendarSetting) =>
-  <K extends keyof CalendarSetting>(
-    name: K,
-    value: CalendarSetting[K]
-  ) => {
-    return {...calendar, [name]: value};
+  <K extends keyof CalendarSetting>(name: K, value: CalendarSetting[K]) => {
+    return { ...calendar, [name]: value };
   };
 
-function makeCalendar({
-  date = Plot.identity,
-  inset = 0.5,
-  ...options
-} = {}) {
+function makeCalendar({ date = Plot.identity, inset = 0.5, ...options } = {}) {
   let D: Date[] | null;
   return {
     fy: {
       transform: (data: Plot.Data) =>
-        (D = Plot.valueof(data, date, Array))?.map((d) =>
-          d.getUTCFullYear()
-        ),
+        (D = Plot.valueof(data, date, Array))?.map((d) => d.getUTCFullYear()),
     },
     x: {
-      transform: () =>
-        D?.map((d) => d3.utcMonday.count(d3.utcYear(d), d)),
+      transform: () => D?.map((d) => d3.utcMonday.count(d3.utcYear(d), d)),
     },
     y: {
-      transform: () =>
-        D?.map((d) => (d.getUTCDay() + 6) % 7),
+      transform: () => D?.map((d) => (d.getUTCDay() + 6) % 7),
     },
     inset,
     ...options,
@@ -140,24 +113,22 @@ class MonthLine extends Plot.Mark {
     strokeWidth: 2,
   };
   constructor(data, options = {}) {
-    const {x, y} = options;
+    const { x, y } = options;
     super(
       data,
       {
-        x: {value: x, scale: "x"},
-        y: {value: y, scale: "y"},
+        x: { value: x, scale: "x" },
+        y: { value: y, scale: "y" },
       },
       options,
-      MonthLine.defaults
+      MonthLine.defaults,
     );
   }
-  render(index, {x, y}, {x: X, y: Y}, dimensions) {
-    const {marginTop, marginBottom, height} = dimensions;
+  render(index, { x, y }, { x: X, y: Y }, dimensions) {
+    const { marginTop, marginBottom, height } = dimensions;
     const dx = x.bandwidth(),
       dy = y.bandwidth();
-    return htl.svg`<path fill=none stroke=${
-      this.stroke
-    } stroke-width=${
+    return htl.svg`<path fill=none stroke=${this.stroke} stroke-width=${
       this.strokeWidth
     } stroke-linecap="round" d=${Array.from(
       index,
@@ -166,7 +137,7 @@ class MonthLine extends Plot.Mark {
           Y[i] > marginTop + dy * 1.5 // is the first day a Monday?
             ? `M${X[i] + dx},${marginTop}V${Y[i]}h${-dx}`
             : `M${X[i]},${marginTop}`
-        }V${height - marginBottom}`
+        }V${height - marginBottom}`,
     ).join("")}>`;
   }
 }
@@ -202,20 +173,14 @@ export const plot =
   (calendarSetting: CalendarSetting) =>
   ({
     activities,
-    width,
-    setSelected,
-    selected,
-    height,
+    theme,
   }: {
     activities: Activity[];
-    width: number;
-    height: number;
-    setSelected: (ids: number[]) => void;
-    selected: number[];
+    theme: "light" | "dark";
   }) => {
-    const {value} = getter(calendarSetting);
+    const { value } = getter(calendarSetting);
     const activitiesByDate = d3.group(activities, (f) =>
-      d3.utcDay(new Date(f.start_date_local))
+      d3.utcDay(new Date(f.start_date_local)),
     );
 
     const widthPlot = 1000;
@@ -223,32 +188,26 @@ export const plot =
     const dayTotals = d3.map(
       d3.rollup(
         activities,
-        value.reduce as (
-          acts: Activity[]
-        ) => number | string,
-        (d) => d3.utcDay(new Date(d.start_date_local))
+        value.reduce as (acts: Activity[]) => number | string,
+        (d) => d3.utcDay(new Date(d.start_date_local)),
       ),
-      ([key, value]) => ({date: key, value})
+      ([key, value]) => ({ date: key, value }),
     );
 
     if (dayTotals.length == 0) return null;
 
     const start = d3.min(dayTotals, (d) => d.date);
 
-    const end = d3.utcDay.offset(
-      d3.max(dayTotals, (d) => d.date)!
-    );
+    const end = d3.utcDay.offset(d3.max(dayTotals, (d) => d.date)!);
 
     const heightPlot =
       start == undefined || end == undefined
         ? 800
-        : ((end.getFullYear() - start.getFullYear() + 1) *
-            widthPlot) /
-          5.8;
+        : ((end.getFullYear() - start.getFullYear() + 1) * widthPlot) / 5.8;
 
     return Plot.plot({
       figure: true,
-      style: {fontSize: "10pt"},
+      style: { fontSize: "10pt" },
       marginRight: 0,
       marginLeft: 50,
       marginTop: 20,
@@ -264,8 +223,7 @@ export const plot =
         domain: [-1, 0, 1, 2, 3, 4, 5, 6],
         ticks: [0, 1, 2, 3, 4, 5, 6],
         tickSize: 0,
-        tickFormat: (day) =>
-          Plot.formatWeekday()((day + 1) % 7),
+        tickFormat: (day) => Plot.formatWeekday()((day + 1) % 7),
       },
       fy: {
         padding: 0.1,
@@ -282,24 +240,25 @@ export const plot =
             x: 0,
             y: -1,
             dx: -20,
-          })
+          }),
         ),
         Plot.text(
-          d3
-            .utcMonths(d3.utcMonth(start), end)
-            .map(d3.utcMonday.ceil),
+          d3.utcMonths(d3.utcMonth(start), end).map(d3.utcMonday.ceil),
           makeCalendar({
             text: d3.utcFormat("%b"),
             frameAnchor: "left",
             y: -1,
             dx: -5,
-          })
+          }),
         ),
         Plot.cell(
           dayTotals,
           makeCalendar({
             date: "date",
             fill: "value",
+            opacity: 0.5,
+            rx: 1,
+            tip: true,
             channels: {
               title: (d) =>
                 `${d.date.toDateString()}\n\n${
@@ -310,18 +269,12 @@ export const plot =
                         a.name +
                         (value.format == null
                           ? ""
-                          : ": " +
-                            value.format(value.fun(a)))
+                          : ": " + value.format(value.fun(a))),
                     )
                     ?.join("\n") ?? ""
                 }`,
             },
-            opacity: 0.5,
-            tip: {
-              fontSize: 12,
-            },
-            rx: 1,
-          })
+          }),
         ),
         //on(
         Plot.text(
@@ -329,15 +282,15 @@ export const plot =
           makeCalendar({
             text: d3.utcFormat("%-d"),
             fontSize: 11,
-          })
+          }),
         ),
         new MonthLine(
           d3.utcMonths(d3.utcMonth(start), end),
           makeCalendar({
             opacity: 1,
             strokeWidth: 4,
-            stroke: "white",
-          })
+            stroke: theme == "dark" ? "black" : "white",
+          }),
         ),
         /*{
             click: (e, {datum}) =>
@@ -353,9 +306,8 @@ export const plot =
   };
 
 export const legend =
-  (calendarSetting: CalendarSetting) =>
-  (plot: Plot.Plot) => {
-    const {value} = getter(calendarSetting);
+  (calendarSetting: CalendarSetting) => (plot: Plot.Plot) => {
+    const { value } = getter(calendarSetting);
     return plot.legend("color", {
       ...value.color,
       tickFormat: value.format,

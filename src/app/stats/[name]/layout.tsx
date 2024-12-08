@@ -80,7 +80,7 @@ export default function Stats({ children }: { children: React.ReactNode }) {
         </div>
         <div
           className={cn(
-            "h-[60px] w-full overflow-y-hidden overflow-x-scroll border-t-2 border-muted",
+            "w-full overflow-y-hidden overflow-x-scroll border-t-2 border-muted",
             settingsOpen ? "block" : "hidden",
           )}
         >

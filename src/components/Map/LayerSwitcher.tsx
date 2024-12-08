@@ -55,7 +55,7 @@ export function LayerSwitcher() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="[&_svg]:size-5">
-            <Map className="mx-auto" />
+            <Map className="mx-auto" color="black" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56">

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type JSX } from "react";
 import { createPortal } from "react-dom";
-
+import { useTheme } from "next-themes";
 import { useStore } from "~/contexts/Zustand";
 import { useShallow } from "zustand/shallow";
 
@@ -216,6 +216,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
       setSelected: state.setSelected,
     })),
   );
+  const { theme } = useTheme();
 
   const figureRef = useRef<HTMLDivElement>(null);
   const { width, height, settingsRef } = useContext(StatsContext);
@@ -246,6 +247,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
       setSelected: setSelected,
       height,
       width,
+      theme,
     });
 
     Object.assign(plot, {
@@ -256,7 +258,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
     const legend = makeLegend(stats[name])(plot);
     if (legend) {
       Object.assign(legend, {
-        style: `min-height: 0; display: block;`,
+        style: `min-height: 0; display: block; margin-bottom: 0 !important;`,
       });
       settingsRef.current.append(legend);
     }
@@ -265,12 +267,20 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
       plot.remove();
       if (legend) legend.remove();
     };
-  }, [width, height, activityDict, statsSettings[name], filterIDs, selected]);
+  }, [
+    width,
+    height,
+    activityDict,
+    statsSettings[name],
+    filterIDs,
+    selected,
+    theme,
+  ]);
 
   return (
     <>
       <div
-        className="felx justify-center overflow-scroll"
+        className="flex justify-evenly overflow-scroll"
         style={{
           height: height,
           width: width,
