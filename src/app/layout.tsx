@@ -32,6 +32,10 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1 viewport-fit=cover"
+        />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-status-bar-style" content="#1976d2" />
         <link rel="manifest" href="/site.webmanifest" />

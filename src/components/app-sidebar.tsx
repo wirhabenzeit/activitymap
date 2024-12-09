@@ -1,25 +1,6 @@
 "use client";
 
-import { ComponentType } from "react";
-
-import {
-  LucideProps,
-  Calendar,
-  Home,
-  Inbox,
-  Search,
-  Settings,
-  ChevronsUpDown,
-  ChevronRight,
-  LogOut,
-  Sparkles,
-  BadgeCheck,
-  CreditCard,
-  CalendarIcon,
-  Bell,
-  MoreHorizontal,
-  Magnet,
-} from "lucide-react";
+import { Home, ChevronsUpDown, LogOut, CalendarIcon, Bell } from "lucide-react";
 
 import { signIn, signOut } from "next-auth/react";
 
@@ -38,9 +19,6 @@ import {
   SidebarHeader,
   useSidebar,
   SidebarFooter,
-  SidebarMenuSub,
-  SidebarMenuSkeleton,
-  SidebarMenuAction,
 } from "~/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -50,7 +28,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuCheckboxItem,
 } from "./ui/dropdown-menu";
 
 import { Button } from "./ui/button";
@@ -134,14 +111,6 @@ export function InequalityFilter() {
     </SidebarMenuItem>
   );
 }
-
-const data = {
-  user: {
-    name: "wirhabenzeit",
-    email: "m@example.com",
-    avatar: "/large.jpg",
-  },
-};
 
 function UserSettings() {
   const { user, guest, loading } = useStore(

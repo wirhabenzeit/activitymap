@@ -16,6 +16,7 @@ import statsPlots from "~/stats";
 import { StatsContext, StatsProvider } from "./StatsContext";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
+import { TabsTrigger, TabsList, Tabs } from "~/components/ui/tabs";
 
 type StatsPlotsKeys = keyof typeof statsPlots;
 type TabKeys = `/stats/${StatsPlotsKeys}`;
@@ -27,6 +28,16 @@ const tabs = (Object.keys(statsPlots) as (keyof typeof statsPlots)[]).reduce(
     [`/stats/${name}`]: { label: name, index },
   }),
   {} as Record<TabKeys, TabValue>,
+);
+
+const TabsLinkTrigger: React.FC<{
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+}> = ({ href, children, className }) => (
+  <TabsTrigger value={href} asChild className={className ? className : ""}>
+    <Link href={href}>{children}</Link>
+  </TabsTrigger>
 );
 
 export default function Stats({ children }: { children: React.ReactNode }) {
@@ -46,28 +57,26 @@ export default function Stats({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full min-h-0 w-full flex-col flex-nowrap overflow-hidden">
       <StatsProvider>
-        <div className="flex w-full flex-shrink-0 items-stretch overflow-hidden border-b-2 border-muted">
-          <div className="flex-1">
-            {Object.entries(tabs).map(([url, tab]) => (
-              <Button
-                variant="link"
-                key={url}
-                className={
-                  pathname === url
-                    ? "capitalize text-header-background underline"
-                    : "capitalize"
-                }
-              >
-                <Link href={url}>{tab.label}</Link>
-              </Button>
-            ))}
-          </div>
+        <div className="flex w-full flex-shrink-0 items-stretch overflow-hidden">
+          <Tabs defaultValue={pathname} className="flex-1">
+            <TabsList className="inline-flex h-9 w-full items-center justify-start rounded-none border-b bg-transparent p-0 text-muted-foreground">
+              {Object.entries(tabs).map(([url, tab]) => (
+                <TabsLinkTrigger
+                  href={url}
+                  key={url}
+                  className="relative inline-flex h-9 items-center justify-center whitespace-nowrap rounded-none border-b-2 border-b-transparent bg-transparent px-4 py-1 pb-2 pt-2 text-sm font-semibold text-muted-foreground shadow-none ring-offset-background transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-b-primary data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                >
+                  <span className="capitalize">{tab.label}</span>
+                </TabsLinkTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
           <div className="m-l-auto right-0 inline-flex">
             <Separator orientation="vertical" />
             <Button
-              variant="ghost"
+              variant="link"
               onClick={toggleStatsSettings}
-              className="p-2"
+              className="rounded-none border-b p-2"
             >
               <Settings
                 className={settingsOpen ? "text-header-background" : ""}

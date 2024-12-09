@@ -27,6 +27,7 @@ export const listSettings = {
       sorting: [{ id: "id", desc: true }],
       columnVisibility: {
         id: false,
+        time: false,
         sport_type: false,
         moving_time: false,
         elev_high: false,

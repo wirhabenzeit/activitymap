@@ -1,7 +1,14 @@
 "use client";
 
-import { useState, useCallback, useMemo, type FC, createRef } from "react";
-
+import {
+  useState,
+  useCallback,
+  useMemo,
+  type FC,
+  createRef,
+  useEffect,
+} from "react";
+import { useSidebar } from "~/components/ui/sidebar";
 import { Camera, Globe } from "lucide-react";
 import { Button } from "~/components/ui/button";
 
@@ -186,8 +193,15 @@ function Map() {
       toggleThreeDim: state.toggleThreeDim,
     })),
   );
-
+  const { open } = useSidebar();
   const mapRefLoc = createRef<MapRef>();
+
+  useEffect(() => {
+    const map = mapRefLoc.current?.getMap();
+    if (map) {
+      setTimeout(() => map.resize(), 200);
+    }
+  }, [open]);
 
   const loaded = useStore(useShallow((state) => state.loaded));
   const [viewport, setViewport] = useState(mapPosition);
