@@ -13,7 +13,7 @@ import {
   Column,
   Table as TableType,
 } from "@tanstack/react-table";
-
+import Link from "next/link";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -94,7 +94,12 @@ const duration = (seconds: number) => {
   return Math.floor(minutes / 60) + "h" + String(minutes % 60).padStart(2, "0");
 };
 
-export function ActivityCard({ className, row, ...props }: CardProps) {
+export function ActivityCard({
+  className,
+  row,
+  setSelected,
+  ...props
+}: CardProps) {
   const date = new Date(row.getValue("date") * 1000);
   const stats = [
     {
@@ -166,14 +171,17 @@ export function ActivityCard({ className, row, ...props }: CardProps) {
           ))}
         </div>
       </CardContent>
-      <CardFooter>
-        <Button className="w-full" asChild>
+      <CardFooter className="flex gap-x-2">
+        <Button className="flex-1" asChild>
           <a
             href={`https://strava.com/activities/${row.getValue("id")}`}
             target="_blank"
           >
-            View on Strava
+            Strava
           </a>
+        </Button>
+        <Button className="flex-1" onClick={() => row.toggleSelected(true)}>
+          <Link href="/map">Map</Link>
         </Button>
       </CardFooter>
     </Card>
@@ -506,7 +514,11 @@ export function DataTable<TData, TValue>({
                     </TableRow>
                   </PopoverTrigger>
                   <PopoverContent asChild>
-                    <ActivityCard className="w-400 p-0" row={row} />
+                    <ActivityCard
+                      className="w-400 p-0"
+                      row={row}
+                      setSelected={setSelected}
+                    />
                   </PopoverContent>
                 </Popover>
               ))

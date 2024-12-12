@@ -1,42 +1,24 @@
-import {
-  FaStopwatch,
-  FaCalendarDays,
-  FaRulerHorizontal,
-  FaRulerVertical,
-  FaBriefcase,
-} from "react-icons/fa6";
+import { FaBriefcase } from "react-icons/fa6";
+import { RulerHorizontalIcon, StopwatchIcon } from "@radix-ui/react-icons";
+import { Mountain } from "lucide-react";
 
-import {ReactElement} from "react";
+import { ReactElement } from "react";
 
-export const filterSettings = {
-  start_date_local_timestamp: {
-    icon: <FaCalendarDays />,
-    tooltip: (value: number) =>
-      new Date(value * 1000).toLocaleDateString("de-DE", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "2-digit",
-      }),
-    scale: (x: number) => 2 * x - x ** 2,
-  },
+export const inequalityFilters = {
   distance: {
-    icon: <FaRulerHorizontal />,
-    tooltip: (value: number) =>
-      `${Math.round(value / 1000)}km`,
-    scale: (x: number) => x ** 2,
+    icon: <RulerHorizontalIcon />,
+    transform: (value: number) => value * 1000,
+    unit: "km",
   },
   total_elevation_gain: {
-    icon: <FaRulerVertical />,
-    tooltip: (value: number) => `${Math.round(value)}m`,
-    scale: (x: number) => x ** 2,
+    icon: <Mountain />,
+    transform: (value: number) => value,
+    unit: "m",
   },
   elapsed_time: {
-    icon: <FaStopwatch />,
-    tooltip: (value: number) => {
-      const date = new Date(value * 1000);
-      return `${date.getUTCHours()}h${date.getUTCMinutes()}`;
-    },
-    scale: (x: number) => x ** 2,
+    icon: <StopwatchIcon />,
+    unit: "h",
+    transform: (value: number) => value * 3600,
   },
 } as const;
 

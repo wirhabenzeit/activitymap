@@ -40,12 +40,14 @@ import { format } from "date-fns/format";
 import * as React from "react";
 import { useState } from "react";
 import { cn } from "~/lib/utils";
-import { DropdownMenuCheckboxItemProps } from "@radix-ui/react-dropdown-menu";
 import { CategoryFilter } from "./category-filter";
 import Image from "next/image";
+import { inequalityFilters } from "~/settings/filter";
 
-export function RangePicker() {
-  const [dates, setDates] = React.useState<{ start: Date; end: Date }>();
+export function MonthPicker() {
+  const [dates, setDates] = useStore(
+    useShallow((state) => [state.dateRange, state.setDateRange]),
+  );
 
   return (
     <SidebarMenuItem>
@@ -71,7 +73,7 @@ export function RangePicker() {
   );
 }
 
-export function InequalityFilter() {
+export function InequalityFilter({ name }: { name: string }) {
   const [greater, setGreater] = useState(true);
   const [input, setInput] = useState("");
   const [value, setValue] = useState(0.0);
@@ -85,11 +87,26 @@ export function InequalityFilter() {
     }
   };
 
+  const [setValueFilter, values, filterRanges] = useStore(
+    useShallow((state) => [
+      state.setValueFilter,
+      state.values,
+      state.filterRanges,
+    ]),
+  );
+
+  React.useEffect(() => {
+    if (!filterRanges[name]) return;
+    const transformed = inequalityFilters[name].transform(value);
+    if (greater) setValueFilter(name, [transformed, filterRanges[name][1]]);
+    else setValueFilter(name, [filterRanges[name][0], transformed]);
+  }, [greater, value]);
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild className="pr-0">
         <div>
-          <Home />
+          {inequalityFilters[name].icon}
           <span className="relative flex w-full items-center">
             <Button
               className="absolute left-1 h-6 w-6 px-1 py-1 text-foreground/60"
@@ -104,7 +121,9 @@ export function InequalityFilter() {
               onChange={(event) => validateInput(event.target.value)}
               className="h-8 w-full pl-8 pr-8 text-right focus-visible:bg-background focus-visible:ring-0"
             />
-            <span className="absolute right-2 py-1 text-foreground/60">km</span>
+            <span className="absolute right-2 py-1 text-foreground/60">
+              {inequalityFilters[name].unit}
+            </span>
           </span>
         </div>
       </SidebarMenuButton>
@@ -219,8 +238,10 @@ export function AppSidebar() {
           <SidebarGroupLabel>Filter</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <RangePicker />
-              <InequalityFilter />
+              <MonthPicker />
+              <InequalityFilter name="distance" />
+              <InequalityFilter name="total_elevation_gain" />
+              <InequalityFilter name="elapsed_time" />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

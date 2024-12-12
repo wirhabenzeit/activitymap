@@ -48,7 +48,7 @@ export const columns: ColumnDef<ActivityColumn>[] = [
   {
     id: "select",
     accessorKey: "sport_type",
-    size: 48,
+    size: 28,
     header: ({ table }) => (
       <Checkbox
         className="h-6 w-6"
@@ -102,29 +102,6 @@ export const columns: ColumnDef<ActivityColumn>[] = [
           </Link>
         </Button>
       </div>
-    ),
-  },
-  {
-    accessorKey: "description",
-    header: ({ column, table }) => (
-      <DataTableColumnHeader
-        table={table}
-        column={column}
-        title="Description"
-      />
-    ),
-    enableResizing: true,
-    size: 200,
-    cell: ({ row, getValue }) => (
-      <Popover>
-        <PopoverTrigger asChild>
-          <div className="w-full truncate italic">{getValue()}</div>
-        </PopoverTrigger>
-        <PopoverContent>
-          <div className="text-sm">{row.getValue("name")}</div>
-          <span className="text-sm italic">{getValue()}</span>
-        </PopoverContent>
-      </Popover>
     ),
   },
   {
@@ -323,5 +300,28 @@ export const columns: ColumnDef<ActivityColumn>[] = [
       />
     ),
     cell: ({ row }) => decFormatter("bpm")(row.getValue("max_heartrate")),
+  },
+  {
+    accessorKey: "description",
+    header: ({ column, table }) => (
+      <DataTableColumnHeader
+        table={table}
+        column={column}
+        title="Description"
+      />
+    ),
+    enableResizing: true,
+    size: 200,
+    cell: ({ row, getValue }) => (
+      <Popover>
+        <PopoverTrigger asChild>
+          <div className="w-full truncate italic">{getValue()}</div>
+        </PopoverTrigger>
+        <PopoverContent>
+          <div className="text-sm">{row.getValue("name")}</div>
+          <span className="text-sm italic">{getValue()}</span>
+        </PopoverContent>
+      </Popover>
+    ),
   },
 ];

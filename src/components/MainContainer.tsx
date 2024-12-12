@@ -1,11 +1,11 @@
 "use client";
 
-import {useSearchParams} from "next/navigation";
-import {useEffect} from "react";
-import {useStore} from "~/contexts/Zustand";
-import {getAccount, getUser} from "~/server/db/actions";
-import type {User, Session} from "~/server/db/schema";
-import {useShallow} from "zustand/shallow";
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import { useStore } from "~/contexts/Zustand";
+import { getAccount, getUser } from "~/server/db/actions";
+import type { User, Session } from "~/server/db/schema";
+import { useShallow } from "zustand/shallow";
 
 export default function MainContainer({
   user,
@@ -37,7 +37,7 @@ export default function MainContainer({
       setGuest: state.setGuest,
       setLoading: state.setLoading,
       setSession: state.setSession,
-    }))
+    })),
   );
 
   const searchParams = useSearchParams();
@@ -49,9 +49,7 @@ export default function MainContainer({
       load({}).then(console.log).catch(console.error);
     } else if (searchParams.has("user")) {
       async function getUserFromDB() {
-        const user = await getUser(
-          searchParams.get("user")!
-        );
+        const user = await getUser(searchParams.get("user")!);
         if (user) {
           console.log("setting user", user);
           setUser(user);
@@ -66,19 +64,12 @@ export default function MainContainer({
             .catch(console.error);
         }
       }
-      getUserFromDB()
-        .then(console.log)
-        .catch(console.error);
+      getUserFromDB().then(console.log).catch(console.error);
     } else if (searchParams.has("activities")) {
       console.log(searchParams.get("activities"));
       setGuest(true);
-      const activities = searchParams
-        .get("activities")
-        ?.split(",")
-        .map(Number);
-      load({activities})
-        .then(console.log)
-        .catch(console.error);
+      const activities = searchParams.get("activities")?.split(",").map(Number);
+      load({ activities }).then(console.log).catch(console.error);
     } else {
       setLoading(false);
     }
@@ -104,12 +95,11 @@ export default function MainContainer({
         state.categories !== prevState.categories ||
         state.binary !== prevState.binary ||
         state.search !== prevState.search ||
-        state.values !== prevState.values
+        state.values !== prevState.values ||
+        state.dateRange !== prevState.dateRange
       ) {
         updateFilters();
-      } else if (
-        state.activityDict !== prevState.activityDict
-      ) {
+      } else if (state.activityDict !== prevState.activityDict) {
         setFilterRanges();
         updateFilters();
       }

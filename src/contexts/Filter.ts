@@ -1,13 +1,10 @@
-import {type StateCreator} from "zustand";
+import { type StateCreator } from "zustand";
 import * as d3 from "d3";
 
-import {categorySettings} from "~/settings/category";
+import { categorySettings } from "~/settings/category";
 
-import {type CategorySetting} from "~/settings/category";
-import {
-  filterSettings,
-  binaryFilters,
-} from "~/settings/filter";
+import { type CategorySetting } from "~/settings/category";
+import { inequalityFilters, binaryFilters } from "~/settings/filter";
 import {
   type BooleanColumn,
   type SportType,
@@ -15,38 +12,28 @@ import {
   type ValueColumn,
 } from "~/server/db/schema";
 
-import {type TotalZustand} from "./Zustand";
+import { type TotalZustand } from "./Zustand";
 
 type CategoryGroup = keyof CategorySetting;
 
 export type FilterZustand = {
-  categories: Record<
-    CategoryGroup,
-    {active: boolean; filter: string[]}
-  >;
+  categories: Record<CategoryGroup, { active: boolean; filter: string[] }>;
+  dateRange: { start: Date; end: Date } | undefined;
   values: Record<ValueColumn, [number, number] | undefined>;
   search: string;
   binary: Record<keyof Activity, boolean | undefined>;
-  filterRanges: Record<
-    ValueColumn,
-    [number, number] | undefined
-  >;
+  filterRanges: Record<ValueColumn, [number, number] | undefined>;
   filterRangesSet: boolean;
   filterIDs: number[];
   toggleCategory: (group: CategoryGroup) => void;
-  updateCategory: (
-    group: CategoryGroup,
-    category: string[]
-  ) => void;
+  updateCategory: (group: CategoryGroup, category: string[]) => void;
+  setDateRange: (range: { start: Date; end: Date }) => void;
   setValueFilter: (
     id: ValueColumn,
-    value: [number, number] | undefined
+    value: [number, number] | undefined,
   ) => void;
   setSearch: (search: string) => void;
-  setBinary: (
-    id: BooleanColumn,
-    value: boolean | undefined
-  ) => void;
+  setBinary: (id: BooleanColumn, value: boolean | undefined) => void;
   updateFilters: () => void;
   setFilterRanges: () => void;
 };
@@ -58,45 +45,38 @@ export const filterSlice: StateCreator<
   FilterZustand
 > = (set) => ({
   categories: Object.fromEntries(
-    Object.entries(categorySettings).map(
-      ([key, {active, alias}]) => [
-        key as CategoryGroup,
-        {active, filter: active ? alias : []},
-      ]
-    )
-  ) as Record<
-    CategoryGroup,
-    {active: boolean; filter: string[]}
-  >,
+    Object.entries(categorySettings).map(([key, { active, alias }]) => [
+      key as CategoryGroup,
+      { active, filter: active ? alias : [] },
+    ]),
+  ) as Record<CategoryGroup, { active: boolean; filter: string[] }>,
+  dateRange: undefined,
   values: Object.fromEntries(
-    Object.keys(filterSettings).map((key) => [
-      key,
-      undefined,
-    ])
+    Object.keys(inequalityFilters).map((key) => [key, undefined]),
   ) as Record<ValueColumn, [number, number] | undefined>,
   search: "",
   binary: Object.fromEntries(
-    Object.entries(binaryFilters).map(
-      ([key, {defaultValue}]) => [key, defaultValue]
-    )
+    Object.entries(binaryFilters).map(([key, { defaultValue }]) => [
+      key,
+      defaultValue,
+    ]),
   ) as Record<keyof Activity, boolean | undefined>,
   filterRanges: Object.fromEntries(
-    Object.keys(filterSettings).map((key) => [
-      key,
-      undefined,
-    ])
+    Object.keys(inequalityFilters).map((key) => [key, undefined]),
   ) as Record<ValueColumn, [number, number] | undefined>,
   filterRangesSet: false,
   filterIDs: [],
+  setDateRange: (range: { start: Date; end: Date }) => {
+    set((state) => {
+      state.dateRange = range;
+    });
+  },
   toggleCategory: (group) =>
     set((state) => {
-      state.categories[group].filter = state.categories[
-        group
-      ].active
+      state.categories[group].filter = state.categories[group].active
         ? []
         : (categorySettings[group].alias as string[]);
-      state.categories[group].active =
-        !state.categories[group].active;
+      state.categories[group].active = !state.categories[group].active;
     }),
   setBinary: (id, value) =>
     set((state) => {
@@ -119,46 +99,42 @@ export const filterSlice: StateCreator<
     set((state) => {
       const filter = (row: Activity) => {
         const activeCat = [] as SportType[];
-        Object.entries(state.categories).forEach(
-          ([, value]) => {
-            activeCat.push(
-              ...(value.filter as SportType[])
-            );
-          }
-        );
+        Object.entries(state.categories).forEach(([, value]) => {
+          activeCat.push(...(value.filter as SportType[]));
+        });
         if (!activeCat.includes(row.sport_type)) {
           return false;
         }
         if (
+          state.dateRange &&
+          (row.start_date_local_timestamp <
+            state.dateRange.start.getTime() / 1000 ||
+            row.start_date_local_timestamp >
+              state.dateRange.end.getTime() / 1000)
+        )
+          return false;
+        if (
           state.search &&
-          !row.name
-            .toLowerCase()
-            .includes(state.search.toLowerCase()) &&
-          !row.description
-            ?.toLowerCase()
-            .includes(state.search.toLowerCase())
+          !row.name.toLowerCase().includes(state.search.toLowerCase()) &&
+          !row.description?.toLowerCase().includes(state.search.toLowerCase())
         ) {
           return false;
         }
         if (
-          Object.entries(state.values).some(
-            ([key, value]) => {
-              const columnValue = row[key as ValueColumn];
-              return (
-                value !== undefined &&
-                columnValue !== null &&
-                (columnValue < value[0] ||
-                  columnValue > value[1])
-              );
-            }
-          )
+          Object.entries(state.values).some(([key, value]) => {
+            const columnValue = row[key as ValueColumn];
+            return (
+              value !== undefined &&
+              columnValue !== null &&
+              (columnValue < value[0] || columnValue > value[1])
+            );
+          })
         )
           return false;
         if (
           Object.entries(state.binary).some(
             ([key, value]) =>
-              value !== undefined &&
-              row[key as BooleanColumn] != value
+              value !== undefined && row[key as BooleanColumn] != value,
           )
         ) {
           return false;
@@ -172,18 +148,15 @@ export const filterSlice: StateCreator<
   setFilterRanges: () =>
     set((state) => {
       const filterRanges = Object.fromEntries(
-        Object.entries(filterSettings).map(([key]) => {
+        Object.entries(inequalityFilters).map(([key]) => {
           const values = Object.values(state.activityDict)
             .map((feature) => feature[key as ValueColumn])
             .filter((v): v is number => v != null);
           return [
             key as ValueColumn,
-            d3.extent(values).map(Number) as [
-              number,
-              number
-            ],
+            d3.extent(values).map(Number) as [number, number],
           ];
-        })
+        }),
       ) as Record<ValueColumn, [number, number]>;
       state.filterRanges = filterRanges;
       state.filterRangesSet = true;

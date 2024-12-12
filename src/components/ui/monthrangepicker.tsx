@@ -67,18 +67,18 @@ type QuickSelector = {
 
 const QUICK_SELECTORS: QuickSelector[] = [
   {
+    label: "Reset",
+    startMonth: new Date(new Date().getFullYear() - 20, 0),
+    endMonth: new Date(),
+  },
+  {
     label: "This year",
     startMonth: new Date(new Date().getFullYear(), 0),
     endMonth: new Date(new Date().getFullYear(), 11),
   },
   {
-    label: "Last year",
-    startMonth: new Date(new Date().getFullYear() - 1, 0),
-    endMonth: new Date(new Date().getFullYear() - 1, 11),
-  },
-  {
-    label: "Last 6 months",
-    startMonth: new Date(addMonths(new Date(), -6)),
+    label: "Last month",
+    startMonth: new Date(addMonths(new Date(), -1)),
     endMonth: new Date(),
   },
   {
@@ -172,23 +172,39 @@ function MonthRangeCal({
   onYearBackward,
   onYearForward,
 }: MonthRangeCalProps) {
-  const [startYear, setStartYear] = React.useState<number>(
-    selectedMonthRange?.start.getFullYear() ?? new Date().getFullYear(),
-  );
-  const [startMonth, setStartMonth] = React.useState<number>(
-    selectedMonthRange?.start?.getMonth() ?? new Date().getMonth(),
-  );
-  const [endYear, setEndYear] = React.useState<number>(
-    selectedMonthRange?.end?.getFullYear() ?? new Date().getFullYear() + 1,
-  );
-  const [endMonth, setEndMonth] = React.useState<number>(
-    selectedMonthRange?.end?.getMonth() ?? new Date().getMonth(),
-  );
+  const initialStartYear =
+    selectedMonthRange?.start.getFullYear() ?? new Date().getFullYear();
+  const initialStartMonth =
+    selectedMonthRange?.start?.getMonth() ?? new Date().getMonth();
+  const initialEndYear =
+    selectedMonthRange?.end?.getFullYear() ?? new Date().getFullYear() + 1;
+  const initialEndMonth =
+    selectedMonthRange?.end?.getMonth() ?? new Date().getMonth();
+
+  const [startYear, setStartYear] = React.useState<number>(initialStartYear);
+  const [startMonth, setStartMonth] = React.useState<number>(initialStartMonth);
+  const [endYear, setEndYear] = React.useState<number>(initialEndYear);
+  const [endMonth, setEndMonth] = React.useState<number>(initialEndMonth);
   const [rangePending, setRangePending] = React.useState<boolean>(false);
   const [endLocked, setEndLocked] = React.useState<boolean>(true);
   const [menuYear, setMenuYear] = React.useState<number>(startYear);
 
   if (minDate && maxDate && minDate > maxDate) minDate = maxDate;
+
+  const handleReset = () => {
+    setStartYear(initialStartYear);
+    setStartMonth(initialStartMonth);
+    setEndYear(initialEndYear);
+    setEndMonth(initialEndMonth);
+    setRangePending(false);
+    setEndLocked(true);
+    if (onMonthRangeSelect) {
+      onMonthRangeSelect({
+        start: new Date(initialStartYear, initialStartMonth),
+        end: new Date(initialEndYear, initialEndMonth),
+      });
+    }
+  };
 
   return (
     <div className="flex gap-4">
