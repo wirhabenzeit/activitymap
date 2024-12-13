@@ -1,3 +1,6 @@
+on:
+  schedule:
+    - cron: "0 5,17 * * *" # every day at 5am and 5pm
 jobs:
   fetch_strava:
     name: Fetch Strava
