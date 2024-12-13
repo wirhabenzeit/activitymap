@@ -207,7 +207,7 @@ function MonthRangeCal({
   };
 
   return (
-    <div className="flex gap-4">
+    <div className="flex flex-col gap-4 sm:flex-row">
       <div className="min-w-[350px] space-y-4">
         <div className="relative flex items-center justify-evenly pt-1">
           <div className="text-xs font-medium">

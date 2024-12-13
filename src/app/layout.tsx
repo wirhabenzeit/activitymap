@@ -34,7 +34,7 @@ export default async function RootLayout({
       <head>
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1 viewport-fit=cover"
+          content="width=device-width, initial-scale=1 viewport-fit=cover, maximum-scale=1"
         />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-status-bar-style" content="#1976d2" />

@@ -78,7 +78,9 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
     --plot-background: 0 0% 100%;
   }
-  .dark svg { --plot-background: black; }
+  .dark svg {
+    --plot-background: black;
+  }
 }
 
 @layer base {
@@ -87,6 +89,6 @@
   }
   body {
     @apply bg-background font-sans text-foreground;
+    touch-action: pan-x pan-y;
   }
 }
-
