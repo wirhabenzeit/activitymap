@@ -1,7 +1,7 @@
-import statsPlots from "~/stats";
-import { notFound } from "next/navigation";
+import statsPlots from '~/stats';
+import { notFound } from 'next/navigation';
 
-import Plot from "~/components/plot";
+import Plot from '~/components/stats/plot';
 
 export default async function Page(props: {
   params: Promise<{ name: string }>;
