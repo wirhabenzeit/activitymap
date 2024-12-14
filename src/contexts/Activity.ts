@@ -2,15 +2,13 @@ import type {
   Activity,
   Photo,
   User,
+  Account,
   Session,
 } from "~/server/db/schema";
-import type {StateCreator} from "zustand";
-import {decode} from "@mapbox/polyline";
-import type {TotalZustand} from "./Zustand";
-import {
-  type FeatureCollection,
-  type Feature,
-} from "geojson";
+import type { StateCreator } from "zustand";
+import { decode } from "@mapbox/polyline";
+import type { TotalZustand } from "./Zustand";
+import { type FeatureCollection, type Feature } from "geojson";
 
 import * as geosimplify from "@mapbox/geosimplify-js";
 
@@ -24,15 +22,13 @@ import {
   getActivities as getStravaActivities,
   updateActivity as updateStravaActivity,
 } from "~/server/strava/actions";
-import {type WritableDraft} from "immer";
+import { type WritableDraft } from "immer";
 
 const FeatureFromActivity = (act: Activity): Feature => {
   if (!act.map) throw new Error("No map data");
   const coordinates = decode(
-    "polyline" in act.map
-      ? act.map.polyline
-      : act.map.summary_polyline,
-    5
+    "polyline" in act.map ? act.map.polyline : act.map.summary_polyline,
+    5,
   ).map(([lat, lon]) => [lon, lat]);
   const feature: Feature = {
     type: "Feature",
@@ -61,10 +57,12 @@ export type ActivityZustand = {
   photos: Photo[];
   user?: User;
   session?: Session;
+  account?: Account;
   guest?: boolean;
   setGuest: (x: boolean) => void;
   setSession: (x: Session) => void;
   setUser: (user: User) => void;
+  setAccount: (account: Account) => void;
   loadPhotos: () => Promise<void>;
   updateActivity: (act: Activity) => Promise<Activity>;
   setLoading: (x: boolean) => void;
@@ -89,8 +87,7 @@ export type ActivityZustand = {
 };
 
 const setActivities =
-  (acts: Activity[]) =>
-  (state: WritableDraft<TotalZustand>) => {
+  (acts: Activity[]) => (state: WritableDraft<TotalZustand>) => {
     state.loading = false;
     state.loaded = true;
     acts.forEach((act) => {
@@ -101,8 +98,7 @@ const setActivities =
     });
     if (state.geoJson) {
       const features = state.geoJson.features;
-      if (features)
-        features.push(...acts.map(FeatureFromActivity));
+      if (features) features.push(...acts.map(FeatureFromActivity));
     }
   };
 
@@ -135,6 +131,10 @@ export const activitySlice: StateCreator<
     set((state) => {
       state.user = user;
     }),
+  setAccount: (account: Account) =>
+    set((state) => {
+      state.account = account;
+    }),
   setSession: (session: Session) =>
     set((state) => {
       state.session = session;
@@ -158,8 +158,7 @@ export const activitySlice: StateCreator<
         athlete: activity.athlete,
       });
       set((state) => {
-        state.activityDict[Number(updatedActivity.id)] =
-          updatedActivity;
+        state.activityDict[Number(updatedActivity.id)] = updatedActivity;
       });
       return updatedActivity;
     } catch (e) {
@@ -167,7 +166,7 @@ export const activitySlice: StateCreator<
       throw new Error("Failed to update activity");
     }
   },
-  loadFromDB: async ({ids, athleteId}) => {
+  loadFromDB: async ({ ids, athleteId }) => {
     set((state) => {
       state.loading = true;
     });
@@ -182,13 +181,13 @@ export const activitySlice: StateCreator<
           promises.map((promise) =>
             Promise.resolve(promise)
               .then((data) => set(setActivities(data)))
-              .catch(console.error)
-          )
+              .catch(console.error),
+          ),
         );
 
         return promises.length;
       } else {
-        const acts = await getDBActivities({ids});
+        const acts = await getDBActivities({ ids });
         set(setActivities(acts));
         return acts.length;
       }
@@ -197,29 +196,21 @@ export const activitySlice: StateCreator<
       throw new Error("Failed to fetch activities");
     }
   },
-  loadFromStrava: async ({
-    photos,
-    before,
-    ids,
-    athleteId,
-  }) => {
+  loadFromStrava: async ({ photos, before, ids, athleteId }) => {
     set((state) => {
       state.loading = true;
     });
     try {
-      if (!athleteId)
-        athleteId = (await getAccount({}))
-          .providerAccountId;
+      if (!athleteId) athleteId = (await getAccount({})).providerAccountId;
       if (athleteId != undefined) {
-        const {activities: acts} =
-          await getStravaActivities({
-            get_photos: photos,
-            before,
-            activities: ids?.map((id) => ({
-              id,
-              athlete: athleteId!,
-            })),
-          });
+        const { activities: acts } = await getStravaActivities({
+          get_photos: photos,
+          before,
+          activities: ids?.map((id) => ({
+            id,
+            athlete: athleteId!,
+          })),
+        });
         console.log(acts);
         set(setActivities(acts));
         return acts.length;

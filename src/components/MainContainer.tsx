@@ -23,6 +23,7 @@ export default function MainContainer({
     setFilterRanges,
     toggleUserSettings,
     setUser,
+    setAccount,
     setGuest,
     setLoading,
     setSession,
@@ -34,6 +35,7 @@ export default function MainContainer({
       toggleUserSettings: state.toggleUserSettings,
       loadPhotos: state.loadPhotos,
       setUser: state.setUser,
+      setAccount: state.setAccount,
       setGuest: state.setGuest,
       setLoading: state.setLoading,
       setSession: state.setSession,
@@ -46,6 +48,12 @@ export default function MainContainer({
     if (session !== undefined) setSession(session);
     if (user != undefined) {
       setUser(user);
+
+      getAccount({
+        userId: user.id,
+      }).then((account) => {
+        if (account) setAccount(account);
+      });
       load({}).then(console.log).catch(console.error);
     } else if (searchParams.has("user")) {
       async function getUserFromDB() {
@@ -66,7 +74,6 @@ export default function MainContainer({
       }
       getUserFromDB().then(console.log).catch(console.error);
     } else if (searchParams.has("activities")) {
-      console.log(searchParams.get("activities"));
       setGuest(true);
       const activities = searchParams.get("activities")?.split(",").map(Number);
       load({ activities }).then(console.log).catch(console.error);
@@ -81,7 +88,6 @@ export default function MainContainer({
       activities?: number[];
       providerAccountId?: number;
     }) {
-      console.log("calling load");
       const nActivities = await loadFromDB({
         ids: activities,
         athleteId: providerAccountId,

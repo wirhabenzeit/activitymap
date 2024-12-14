@@ -1,20 +1,19 @@
-import "~/styles/globals.css";
+import '~/styles/globals.css';
 
-import { SidebarProvider } from "~/components/ui/sidebar";
-import { ThemeProvider } from "~/components/theme-provider";
-import { AppSidebar } from "~/components/app-sidebar";
-import { AppHeader } from "~/components/app-header";
+import { SidebarProvider } from '~/components/ui/sidebar';
+import { ThemeProvider } from '~/components/theme-provider';
+import { AppSidebar } from '~/components/app-sidebar';
+import { AppHeader } from '~/components/app-header';
 
-import MainContainer from "~/components/MainContainer";
-import { auth } from "~/auth";
-import type { User } from "~/server/db/schema";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import MainContainer from '~/components/MainContainer';
+import { auth } from '~/auth';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata = {
-  title: "Activity Map",
-  description: "A map of Strava activities",
-  icons: [{ rel: "icon", url: "/favicon.ico" }],
+  title: 'Activity Map',
+  description: 'A map of Strava activities',
+  icons: [{ rel: 'icon', url: '/favicon.ico' }],
 };
 
 export default async function RootLayout({
@@ -23,12 +22,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const user = session && "user" in session ? session.user : undefined;
+  const user = session && 'user' in session ? session.user : undefined;
 
   return (
     <html
       lang="en"
-      style={{ width: "100dvw", height: "100dvh" }}
+      style={{ width: '100dvw', height: '100dvh' }}
       suppressHydrationWarning
     >
       <head>
@@ -216,11 +215,11 @@ export default async function RootLayout({
         <Analytics />
         <SpeedInsights />
       </head>
-      <body style={{ width: "100dvw", height: "100dvh" }} className="font-sans">
+      <body style={{ width: '100dvw', height: '100dvh' }} className="font-sans">
         <ThemeProvider attribute="class">
           <SidebarProvider
             className="flex h-dvh flex-col"
-            style={{ height: "100dvh" }}
+            style={{ height: '100dvh' }}
           >
             <AppHeader />
             <div className="flex min-h-0 flex-1">
