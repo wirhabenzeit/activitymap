@@ -177,13 +177,29 @@ export const activitySlice: StateCreator<
           pageSize: 500,
         });
 
-        await Promise.all(
-          promises.map((promise) =>
-            Promise.resolve(promise)
-              .then((data) => set(setActivities(data)))
-              .catch(console.error),
-          ),
-        );
+        if (promises.length == 0) {
+          try {
+            const athleteId = (await getAccount({})).providerAccountId;
+            if (athleteId != undefined) {
+              const { activities: acts } = await getStravaActivities({
+                get_photos: false,
+              });
+              console.log(acts);
+              set(setActivities(acts));
+            }
+          } catch (e) {
+            console.error(e);
+            throw new Error('Failed to fetch activities');
+          }
+        } else {
+          await Promise.all(
+            promises.map((promise) =>
+              Promise.resolve(promise)
+                .then((data) => set(setActivities(data)))
+                .catch(console.error),
+            ),
+          );
+        }
 
         return promises.length;
       } else {
