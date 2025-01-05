@@ -1,14 +1,20 @@
-"use client";
+'use client';
 
-import { ChevronsUpDown, LogOut } from "lucide-react";
+import {
+  ChevronsUpDown,
+  LogOut,
+  CircleArrowLeft,
+  Loader,
+  Loader2,
+} from 'lucide-react';
 
-import Link from "next/link";
-import { signIn, signOut } from "next-auth/react";
+import Link from 'next/link';
+import { signIn, signOut } from 'next-auth/react';
 
-import { useStore } from "~/contexts/Zustand";
-import { useShallow } from "zustand/shallow";
+import { useStore } from '~/contexts/Zustand';
+import { useShallow } from 'zustand/shallow';
 
-import { SidebarMenuButton, SidebarMenuItem } from "~/components/ui/sidebar";
+import { SidebarMenuButton, SidebarMenuItem } from '~/components/ui/sidebar';
 import {
   DropdownMenu,
   DropdownMenuLabel,
@@ -16,20 +22,23 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from "~/components/ui/dropdown-menu";
+} from '~/components/ui/dropdown-menu';
 
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 
-import * as React from "react";
-import Image from "next/image";
+import * as React from 'react';
+import Image from 'next/image';
+import { cn } from '~/lib/utils';
 
 export function UserSettings() {
-  const { user, guest, loading, account } = useStore(
+  const { user, guest, loading, account, loadFromStrava } = useStore(
     useShallow((state) => ({
       user: state.user,
       account: state.account,
       guest: state.guest,
       loading: state.loading,
+      activityDict: state.activityDict,
+      loadFromStrava: state.loadFromStrava,
     })),
   );
 
@@ -44,6 +53,14 @@ export function UserSettings() {
             >
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage src={user.image!} alt={user.name} />
+                <Loader2
+                  className={cn(
+                    'absolute inset-0 m-auto size-8 text-white animate-spin',
+                    {
+                      hidden: !loading,
+                    },
+                  )}
+                />
                 <AvatarFallback className="rounded-lg">CN</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -88,6 +105,10 @@ export function UserSettings() {
                 Strava Profile
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => loadFromStrava({})}>
+              <CircleArrowLeft />
+              Get Activities
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut()}>
               <LogOut />
@@ -98,7 +119,7 @@ export function UserSettings() {
       )}
       {!user && !loading && (
         <SidebarMenuButton
-          onClick={() => signIn("strava")}
+          onClick={() => signIn('strava')}
           size="lg"
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >

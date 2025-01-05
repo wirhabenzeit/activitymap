@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { Payment, columns } from "./columns";
-import { DataTable, DataTablePagination } from "./data-table";
+import { columns } from './columns';
+import { DataTable, DataTablePagination } from './data-table';
 
-import { useStore } from "~/contexts/Zustand";
-import { useShallow } from "zustand/shallow";
+import { useStore } from '~/contexts/Zustand';
+import { useShallow } from 'zustand/shallow';
 
 export default function DemoPage() {
   const { activityDict, filterIDs, selected, setSelected } = useStore(

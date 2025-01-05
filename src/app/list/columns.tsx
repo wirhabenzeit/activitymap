@@ -1,24 +1,24 @@
-"use client";
+'use client';
 
-import { ColumnDef } from "@tanstack/react-table";
-import { Calendar, Clock, Gauge, Mountain, Heart, Zap } from "lucide-react";
+import { ColumnDef } from '@tanstack/react-table';
+import { Calendar, Clock, Gauge, Mountain, Heart, Zap } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "~/components/ui/popover";
-import { Checkbox } from "~/components/ui/checkbox";
+} from '~/components/ui/popover';
+import { Checkbox } from '~/components/ui/checkbox';
 
-import { Activity, SportType } from "~/server/db/schema";
-import { categorySettings } from "~/settings/category";
-import { Button } from "~/components/ui/button";
+import { SportType } from '~/server/db/schema';
+import { categorySettings } from '~/settings/category';
+import { Button } from '~/components/ui/button';
 
-import { DataTableColumnHeader } from "./data-table";
-import { aliasMap } from "~/settings/category";
-import Link from "next/link";
-import { RulerHorizontalIcon, StopwatchIcon } from "@radix-ui/react-icons";
+import { DataTableColumnHeader } from './data-table';
+import { aliasMap } from '~/settings/category';
+import Link from 'next/link';
+import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
 
-function decFormatter(unit = "", decimals = 0) {
+function decFormatter(unit = '', decimals = 0) {
   return (num: number | undefined) =>
     num == undefined ? null : num.toFixed(decimals) + unit;
 }
@@ -46,32 +46,33 @@ export type ActivityColumn = {
 
 export const columns: ColumnDef<ActivityColumn>[] = [
   {
-    id: "select",
-    accessorKey: "sport_type",
+    id: 'select',
+    accessorKey: 'sport_type',
     size: 28,
     header: ({ table }) => (
       <Checkbox
         className="h-6 w-6"
         checked={
           table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
+          (table.getIsSomePageRowsSelected() && 'indeterminate')
         }
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         aria-label="Select all"
       />
     ),
-    cell: ({ row, getValue }) => {
-      const value = getValue() as SportType;
-      const Icon = categorySettings[aliasMap[value]].icon;
+    cell: ({ row }) => {
+      const sport_type = row.original.sport_type;
+      const sport_group = aliasMap[sport_type]!;
+      const Icon = categorySettings[sport_group].icon;
       return (
         <Button
-          variant={row.getIsSelected() ? "outline" : "secondary"}
+          variant={row.getIsSelected() ? 'outline' : 'secondary'}
           size="sm"
           className="h-6 w-6"
           onClick={() => row.toggleSelected()}
           aria-label="Select row"
         >
-          <Icon color={categorySettings[aliasMap[value]!].color} />
+          <Icon color={categorySettings[sport_group].color} />
         </Button>
       );
     },
@@ -79,14 +80,14 @@ export const columns: ColumnDef<ActivityColumn>[] = [
     enableHiding: false,
   },
   {
-    id: "id",
-    accessorKey: "id",
+    id: 'id',
+    accessorKey: 'id',
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title="ID" />
     ),
   },
   {
-    accessorKey: "name",
+    accessorKey: 'name',
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title="Name" />
     ),
@@ -95,19 +96,19 @@ export const columns: ColumnDef<ActivityColumn>[] = [
       <div className="truncate text-left">
         <Button asChild variant="link" className="px-0" size="sm">
           <Link
-            href={`https://strava.com/activities/${row.getValue("id")}`}
+            href={`https://strava.com/activities/${row.getValue('id')}`}
             target="_blank"
           >
-            {row.getValue("name")}
+            {row.getValue('name')}
           </Link>
         </Button>
       </div>
     ),
   },
   {
-    id: "date",
+    id: 'date',
     size: 60,
-    accessorKey: "start_date_local_timestamp",
+    accessorKey: 'start_date_local_timestamp',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -118,35 +119,37 @@ export const columns: ColumnDef<ActivityColumn>[] = [
     cell: ({ row, getValue }) => {
       return (
         <div className="text-right">
-          {new Date(getValue() * 1000).toLocaleDateString("en-US", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "2-digit",
+          {new Date(
+            row.original.start_date_local_timestamp * 1000,
+          ).toLocaleDateString('en-US', {
+            day: '2-digit',
+            month: '2-digit',
+            year: '2-digit',
           })}
         </div>
       );
     },
   },
   {
-    id: "time",
+    id: 'time',
     size: 60,
-    accessorKey: "start_date_local_timestamp",
+    accessorKey: 'start_date_local_timestamp',
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title={<Clock />} />
     ),
     cell: ({ row, getValue }) => {
-      const date = new Date(getValue() * 1000);
+      const date = new Date(row.original.start_date_local_timestamp * 1000);
       return (
         <div className="text-right">
-          {String(date.getHours()).padStart(2, "0") +
-            ":" +
-            String(date.getMinutes()).padStart(2, "0")}
+          {String(date.getHours()).padStart(2, '0') +
+            ':' +
+            String(date.getMinutes()).padStart(2, '0')}
         </div>
       );
     },
   },
   {
-    accessorKey: "elapsed_time",
+    accessorKey: 'elapsed_time',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -155,19 +158,19 @@ export const columns: ColumnDef<ActivityColumn>[] = [
       />
     ),
     size: 60,
-    cell: ({ getValue }) => {
-      const minutes = Math.floor(getValue() / 60);
+    cell: ({ getValue, row }) => {
+      const minutes = Math.floor(row.original.elapsed_time / 60);
       return (
         <div className="text-right">
           {Math.floor(minutes / 60) +
-            "h" +
-            String(minutes % 60).padStart(2, "0")}
+            'h' +
+            String(minutes % 60).padStart(2, '0')}
         </div>
       );
     },
   },
   {
-    accessorKey: "moving_time",
+    accessorKey: 'moving_time',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -175,19 +178,19 @@ export const columns: ColumnDef<ActivityColumn>[] = [
         title="Moving Time"
       />
     ),
-    cell: ({ getValue }) => {
-      const minutes = Math.floor(getValue() / 60);
+    cell: ({ row }) => {
+      const minutes = Math.floor(row.original.moving_time / 60);
       return (
         <div className="text-right">
           {Math.floor(minutes / 60) +
-            "h" +
-            String(minutes % 60).padStart(2, "0")}
+            'h' +
+            String(minutes % 60).padStart(2, '0')}
         </div>
       );
     },
   },
   {
-    accessorKey: "distance",
+    accessorKey: 'distance',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -196,26 +199,26 @@ export const columns: ColumnDef<ActivityColumn>[] = [
       />
     ),
     size: 60,
-    cell: ({ getValue }) => (
+    cell: ({ row }) => (
       <div className="text-right">
-        {decFormatter("km", 1)(getValue() / 1000)}
+        {decFormatter('km', 1)(row.original.distance / 1000)}
       </div>
     ),
   },
   {
-    accessorKey: "average_speed",
+    accessorKey: 'average_speed',
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title={<Gauge />} />
     ),
     size: 80,
-    cell: ({ getValue }) => (
+    cell: ({ row }) => (
       <div className="text-right">
-        {decFormatter("km/h", 1)(getValue() * 3.6)}
+        {decFormatter('km/h', 1)(row.original.average_speed * 3.6)}
       </div>
     ),
   },
   {
-    accessorKey: "total_elevation_gain",
+    accessorKey: 'total_elevation_gain',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -225,12 +228,14 @@ export const columns: ColumnDef<ActivityColumn>[] = [
       />
     ),
     size: 60,
-    cell: ({ getValue }) => (
-      <div className="text-right">{decFormatter("m", 0)(getValue())} </div>
+    cell: ({ row }) => (
+      <div className="text-right">
+        {decFormatter('m', 0)(row.original.total_elevation_gain)}{' '}
+      </div>
     ),
   },
   {
-    accessorKey: "elev_high",
+    accessorKey: 'elev_high',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -238,10 +243,10 @@ export const columns: ColumnDef<ActivityColumn>[] = [
         title="Elevation High"
       />
     ),
-    cell: ({ row }) => decFormatter("m", 0)(row.getValue("elev_high")),
+    cell: ({ row }) => decFormatter('m', 0)(row.getValue('elev_high')),
   },
   {
-    accessorKey: "elev_low",
+    accessorKey: 'elev_low',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -249,10 +254,10 @@ export const columns: ColumnDef<ActivityColumn>[] = [
         title="Elevation Low"
       />
     ),
-    cell: ({ row }) => decFormatter("m", 0)(row.getValue("elev_low")),
+    cell: ({ row }) => decFormatter('m', 0)(row.getValue('elev_low')),
   },
   {
-    accessorKey: "weighted_average_watts",
+    accessorKey: 'weighted_average_watts',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -261,37 +266,41 @@ export const columns: ColumnDef<ActivityColumn>[] = [
       />
     ),
     cell: ({ row }) =>
-      decFormatter("W")(row.getValue("weighted_average_watts")),
+      decFormatter('W')(row.getValue('weighted_average_watts')),
   },
   {
-    accessorKey: "average_watts",
+    accessorKey: 'average_watts',
     size: 60,
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title={<Zap />} />
     ),
-    cell: ({ getValue }) => (
-      <div className="text-right">{decFormatter("W")(getValue())}</div>
+    cell: ({ row }) => (
+      <div className="text-right">
+        {decFormatter('W')(row.original.average_watts)}
+      </div>
     ),
   },
   {
-    accessorKey: "max_watts",
+    accessorKey: 'max_watts',
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title="Max Watts" />
     ),
-    cell: ({ row }) => decFormatter("W")(row.getValue("max_watts")),
+    cell: ({ row }) => decFormatter('W')(row.getValue('max_watts')),
   },
   {
-    accessorKey: "average_heartrate",
+    accessorKey: 'average_heartrate',
     size: 80,
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title={<Heart />} />
     ),
-    cell: ({ getValue }) => (
-      <div className="text-right">{decFormatter("bpm")(getValue())}</div>
+    cell: ({ row }) => (
+      <div className="text-right">
+        {decFormatter('bpm')(row.original.average_heartrate)}
+      </div>
     ),
   },
   {
-    accessorKey: "max_heartrate",
+    accessorKey: 'max_heartrate',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -299,10 +308,10 @@ export const columns: ColumnDef<ActivityColumn>[] = [
         title="Max Heartrate"
       />
     ),
-    cell: ({ row }) => decFormatter("bpm")(row.getValue("max_heartrate")),
+    cell: ({ row }) => decFormatter('bpm')(row.getValue('max_heartrate')),
   },
   {
-    accessorKey: "description",
+    accessorKey: 'description',
     header: ({ column, table }) => (
       <DataTableColumnHeader
         table={table}
@@ -315,11 +324,13 @@ export const columns: ColumnDef<ActivityColumn>[] = [
     cell: ({ row, getValue }) => (
       <Popover>
         <PopoverTrigger asChild>
-          <div className="w-full truncate italic">{getValue()}</div>
+          <div className="w-full truncate italic">
+            {row.original.description}
+          </div>
         </PopoverTrigger>
         <PopoverContent>
-          <div className="text-sm">{row.getValue("name")}</div>
-          <span className="text-sm italic">{getValue()}</span>
+          <div className="text-sm">{row.getValue('name')}</div>
+          <span className="text-sm italic">{row.original.description}</span>
         </PopoverContent>
       </Popover>
     ),

@@ -1,5 +1,5 @@
-"use client";
-import * as React from "react";
+'use client';
+import * as React from 'react';
 
 import {
   ColumnDef,
@@ -12,13 +12,14 @@ import {
   VisibilityState,
   Column,
   Table as TableType,
-} from "@tanstack/react-table";
-import Link from "next/link";
+} from '@tanstack/react-table';
+import Link from 'next/link';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
   CaretSortIcon,
-} from "@radix-ui/react-icons";
+} from '@radix-ui/react-icons';
+import { type Row } from '@tanstack/react-table';
 
 import {
   DropdownMenu,
@@ -28,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuLabel,
-} from "~/components/ui/dropdown-menu";
+} from '~/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -36,13 +37,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "~/components/ui/table";
+} from '~/components/ui/table';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "~/components/ui/popover";
-import { ScrollArea } from "~/components/ui/scroll-area";
+} from '~/components/ui/popover';
+import { ScrollArea } from '~/components/ui/scroll-area';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -55,7 +56,7 @@ import {
   DoubleArrowLeftIcon,
   DoubleArrowRightIcon,
   MixerHorizontalIcon,
-} from "@radix-ui/react-icons";
+} from '@radix-ui/react-icons';
 
 import {
   Select,
@@ -63,15 +64,15 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
-import { ActivityColumn } from "./columns";
-import { useStore } from "~/contexts/Zustand";
-import { useShallow } from "zustand/shallow";
+} from '~/components/ui/select';
+import { ActivityColumn } from './columns';
+import { useStore } from '~/contexts/Zustand';
+import { useShallow } from 'zustand/shallow';
 
-import { BellRing, Check } from "lucide-react";
+import { BellRing, Check } from 'lucide-react';
 
-import { cn } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
+import { cn } from '~/lib/utils';
+import { Button } from '~/components/ui/button';
 import {
   Card,
   CardContent,
@@ -79,79 +80,84 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "~/components/ui/card";
-import { set } from "zod";
+} from '~/components/ui/card';
+import { set } from 'zod';
 
-type CardProps = React.ComponentProps<typeof Card>;
-
-function decFormatter(unit = "", decimals = 0) {
+function decFormatter(unit = '', decimals = 0) {
   return (num: number | undefined) =>
     num == undefined ? null : num.toFixed(decimals) + unit;
 }
 
 const duration = (seconds: number) => {
   const minutes = Math.floor(seconds / 60);
-  return Math.floor(minutes / 60) + "h" + String(minutes % 60).padStart(2, "0");
+  return Math.floor(minutes / 60) + 'h' + String(minutes % 60).padStart(2, '0');
 };
+
+type CardProps = React.ComponentProps<typeof Card>;
+
+interface ActivityCardProps extends CardProps {
+  row: Row<ActivityColumn>;
+  setSelected: (value: any) => void; // Replace 'any' with the appropriate type for 'setSelected'
+}
 
 export function ActivityCard({
   className,
   row,
   setSelected,
   ...props
-}: CardProps) {
-  const date = new Date(row.getValue("date") * 1000);
+}: ActivityCardProps) {
+  const date = new Date(row.original.start_date_local_timestamp * 1000);
   const stats = [
     {
-      title: "When?",
-      description: date.toLocaleString("en-US"),
+      title: 'When?',
+      description: date.toLocaleString('en-US'),
     },
     {
-      title: "How long?",
-      description: `Moving: ${duration(row.getValue("moving_time"))}, Elapsed: ${duration(
-        row.getValue("elapsed_time"),
+      title: 'How long?',
+      description: `Moving: ${duration(row.getValue('moving_time'))}, Elapsed: ${duration(
+        row.getValue('elapsed_time'),
       )}`,
     },
     {
-      title: "How far?",
-      description: decFormatter("km", 1)(row.getValue("distance") / 1000),
+      title: 'How far?',
+      description: decFormatter('km', 1)(row.original.distance / 1000),
     },
     {
-      title: "How high?",
-      description: `Gain: ${decFormatter("m", 0)(row.getValue("total_elevation_gain"))}, High: ${decFormatter(
-        "m",
+      title: 'How high?',
+      description: `Gain: ${decFormatter('m', 0)(row.getValue('total_elevation_gain'))}, High: ${decFormatter(
+        'm',
         0,
-      )(row.getValue("elev_high"))}`,
+      )(row.getValue('elev_high'))}`,
     },
-    ...(row.getValue("average_heartrate")
+    ...(row.getValue('average_heartrate')
       ? [
           {
-            title: "How hard?",
-            description: `Avg: ${decFormatter("bpm", 0)(row.getValue("average_heartrate"))}, Max: ${decFormatter(
-              "bpm",
+            title: 'How hard?',
+            description: `Avg: ${decFormatter('bpm', 0)(row.getValue('average_heartrate'))}, Max: ${decFormatter(
+              'bpm',
               0,
-            )(row.getValue("max_heartrate"))}`,
+            )(row.getValue('max_heartrate'))}`,
           },
         ]
       : []),
-    ...(row.getValue("weighted_average_watts")
+    ...(row.getValue('weighted_average_watts')
       ? [
           {
-            title: "How strong?",
-            description: `Normalized: ${decFormatter("W", 0)(row.getValue("weighted_average_watts"))} Avg: ${decFormatter("W", 0)(row.getValue("average_watts"))}, Max: ${decFormatter(
-              "W",
+            title: 'How strong?',
+            description: `Normalized: ${decFormatter('W', 0)(row.getValue('weighted_average_watts'))} Avg: ${decFormatter('W', 0)(row.getValue('average_watts'))}, Max: ${decFormatter(
+              'W',
               0,
-            )(row.getValue("max_watts"))}`,
+            )(row.getValue('max_watts'))}`,
           },
         ]
       : []),
   ];
 
   return (
-    <Card className={cn("w-[380px]", className)} {...props}>
+    <Card className={cn('w-[380px]', className)} {...props}>
       <CardHeader>
-        <CardTitle>{row.getValue("name")}</CardTitle>
-        <CardDescription>{row.getValue("description")}</CardDescription>
+        <CardTitle>{row.getValue('name')}</CardTitle>
+        <CardDescription>{row.getValue('description')}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div>
@@ -174,7 +180,7 @@ export function ActivityCard({
       <CardFooter className="flex gap-x-2">
         <Button className="flex-1" asChild>
           <a
-            href={`https://strava.com/activities/${row.getValue("id")}`}
+            href={`https://strava.com/activities/${row.getValue('id')}`}
             target="_blank"
           >
             Strava
@@ -214,7 +220,7 @@ export function DataTableViewOptions<TData>({
           .getAllColumns()
           .filter(
             (column) =>
-              typeof column.accessorFn !== "undefined" && column.getCanHide(),
+              typeof column.accessorFn !== 'undefined' && column.getCanHide(),
           )
           .map((column) => {
             return (
@@ -244,13 +250,13 @@ export function DataTablePagination<TData>({
   return (
     <div
       className={cn(
-        "flex items-center justify-between bg-secondary px-2 py-1 text-xs",
+        'flex items-center justify-between bg-secondary px-2 py-1 text-xs',
         className,
       )}
     >
       <div className="flex-1 text-muted-foreground">
         <span className="hidden md:inline">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
+          {table.getFilteredSelectedRowModel().rows.length} of{' '}
           {table.getFilteredRowModel().rows.length} activities selected.
         </span>
       </div>
@@ -276,7 +282,7 @@ export function DataTablePagination<TData>({
           </Select>
         </div>
         <div className="flex w-[100px] items-center justify-center font-medium">
-          Page {table.getState().pagination.pageIndex + 1} of{" "}
+          Page {table.getState().pagination.pageIndex + 1} of{' '}
           {table.getPageCount()}
         </div>
         <div className="flex items-center space-x-2">
@@ -323,9 +329,9 @@ export function DataTablePagination<TData>({
 }
 
 interface DataTableColumnHeaderProps<TData, TValue>
-  extends React.HTMLAttributes<HTMLDivElement> {
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   column: Column<TData, TValue>;
-  title: string;
+  title: React.ReactNode | string;
   table: TableType<ActivityColumn>;
 }
 
@@ -340,7 +346,7 @@ export function DataTableColumnHeader<TData, TValue>({
   }
 
   return (
-    <div className={cn("flex items-center space-x-2", className)}>
+    <div className={cn('flex items-center space-x-2', className)}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild className="flex-1">
           <Button
@@ -375,9 +381,9 @@ export function DataTableColumnHeader<TData, TValue>({
         className="h-8 w-4 px-0 data-[state=open]:bg-accent"
         onClick={() => column.toggleSorting()}
       >
-        {column.getIsSorted() === "desc" ? (
+        {column.getIsSorted() === 'desc' ? (
           <ArrowDownIcon className="h-4 w-4" />
-        ) : column.getIsSorted() === "asc" ? (
+        ) : column.getIsSorted() === 'asc' ? (
           <ArrowUpIcon className="h-4 w-4" />
         ) : (
           <CaretSortIcon className="h-4 w-4" />
@@ -426,13 +432,6 @@ export function DataTable<TData, TValue>({
     })),
   );
 
-  const onRowSelection = (updater) => {
-    const updatedIDs = updater(
-      Object.fromEntries(selected.map((id) => [id, true])),
-    );
-    setSelected(Object.keys(updatedIDs).map(Number));
-  };
-
   const table = useReactTable({
     data,
     columns,
@@ -442,7 +441,12 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: onRowSelection,
+    onRowSelectionChange: (updater) => {
+      const updatedIDs = updater(
+        Object.fromEntries(selected.map((id) => [id, true])),
+      );
+      setSelected(Object.keys(updatedIDs).map(Number));
+    },
     initialState: {
       pagination: {
         pageSize: 50,
@@ -493,7 +497,7 @@ export function DataTable<TData, TValue>({
                   <PopoverTrigger asChild>
                     <TableRow
                       key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
+                      data-state={row.getIsSelected() && 'selected'}
                     >
                       {row.getVisibleCells().map((cell) => (
                         <TableCell

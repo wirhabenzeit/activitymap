@@ -1,18 +1,18 @@
-"use server";
+'use server';
 
 import {
   activities as activitySchema,
   photos,
   type Activity,
   type Photo,
-} from "~/server/db/schema";
+} from '~/server/db/schema';
 
-import {decode} from "@mapbox/polyline";
+import { decode } from '@mapbox/polyline';
 
-import {db} from "~/server/db";
-import {getAccount} from "~/server/db/actions";
-import {getTableColumns, sql} from "drizzle-orm";
-import {type PgTable} from "drizzle-orm/pg-core";
+import { db } from '~/server/db';
+import { getAccount } from '~/server/db/actions';
+import { getTableColumns, sql } from 'drizzle-orm';
+import { type PgTable } from 'drizzle-orm/pg-core';
 
 type Subscription = {
   id: number;
@@ -32,25 +32,20 @@ export type UpdatableActivity = {
 
 async function get(
   path: string,
-  {token, method = "GET"}: {token?: string; method?: string}
+  { token, method = 'GET' }: { token?: string; method?: string },
 ) {
   const options =
     token === undefined
-      ? {method}
+      ? { method }
       : {
           method,
-          headers: {Authorization: `Bearer ${token}`},
+          headers: { Authorization: `Bearer ${token}` },
         };
-  const res = await fetch(
-    `https://www.strava.com/api/v3/${path}`,
-    options
-  );
-  console.log("GET", path, res.status, res.statusText);
+  const res = await fetch(`https://www.strava.com/api/v3/${path}`, options);
+  console.log('GET', path, res.status, res.statusText);
   if (res.status == 204) return;
   if (!res.ok) {
-    throw new Error(
-      `Failed to fetch ${path}: ${res.status}`
-    );
+    throw new Error(`Failed to fetch ${path}: ${res.status}`);
   }
   const json: unknown = await res.json();
   if (!json) {
@@ -63,40 +58,33 @@ async function get(
 export async function post(
   path: string,
   body: Record<string, unknown>,
-  {
-    token,
-    method = "POST",
-  }: {token?: string; method?: string}
+  { token, method = 'POST' }: { token?: string; method?: string },
 ) {
   const headers =
     token === undefined
-      ? {"Content-Type": "application/json"}
+      ? { 'Content-Type': 'application/json' }
       : ({
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         } as Record<string, string>);
-  const res = await fetch(
-    `https://www.strava.com/api/v3/${path}`,
-    {method: method, headers, body: JSON.stringify(body)}
-  );
+  const res = await fetch(`https://www.strava.com/api/v3/${path}`, {
+    method: method,
+    headers,
+    body: JSON.stringify(body),
+  });
   console.log(
     method,
     path,
     headers,
     JSON.stringify(body),
     res.status,
-    res.statusText
+    res.statusText,
   );
   if (!res.ok) {
     console.log(await res.text());
-    throw new Error(
-      `Failed to post ${path}: ${res.status}, ${res.statusText}`
-    );
+    throw new Error(`Failed to post ${path}: ${res.status}, ${res.statusText}`);
   }
-  const json = (await res.json()) as Record<
-    string,
-    unknown
-  >;
+  const json = (await res.json()) as Record<string, unknown>;
   if (!json) {
     throw new Error(`Failed to post ${path}`);
   }
@@ -106,9 +94,9 @@ export async function post(
 export async function checkWebhook() {
   const json = (await get(
     `push_subscriptions?client_id=${process.env.AUTH_STRAVA_ID}&client_secret=${process.env.AUTH_STRAVA_SECRET}`,
-    {}
+    {},
   )) as Subscription[];
-  return json.map(({id, callback_url}) => ({
+  return json.map(({ id, callback_url }) => ({
     id,
     callback_url,
   }));
@@ -119,11 +107,11 @@ export async function requestWebhook(url: string) {
     `push_subscriptions`,
     {
       callback_url: url,
-      verify_token: "STRAVA",
+      verify_token: 'STRAVA',
       client_id: process.env.AUTH_STRAVA_ID,
       client_secret: process.env.AUTH_STRAVA_SECRET,
     },
-    {}
+    {},
   );
   return json;
 }
@@ -132,7 +120,7 @@ export async function deleteWebhook(id: number) {
   try {
     await get(
       `push_subscriptions/${id}?client_id=${process.env.AUTH_STRAVA_ID}&client_secret=${process.env.AUTH_STRAVA_SECRET}`,
-      {method: "DELETE"}
+      { method: 'DELETE' },
     );
     return;
   } catch (e) {
@@ -141,23 +129,17 @@ export async function deleteWebhook(id: number) {
   }
 }
 
-export async function updateActivity(
-  act: UpdatableActivity
-) {
+export async function updateActivity(act: UpdatableActivity) {
   try {
     const account = await getAccount({});
     const access_token = account.access_token!;
-    const {id, ...update} = act;
-    console.log("Updating activity", id, update);
-    const json = await post(
-      `activities/${act.id}`,
-      update,
-      {
-        token: access_token,
-        method: "PUT",
-      }
-    );
-    console.log("Updated activity");
+    const { id, ...update } = act;
+    console.log('Updating activity', id, update);
+    const json = await post(`activities/${act.id}`, update, {
+      token: access_token,
+      method: 'PUT',
+    });
+    console.log('Updated activity');
     const parsedActivity: Activity = parseActivity(json);
     return parsedActivity;
   } catch (e) {
@@ -166,47 +148,37 @@ export async function updateActivity(
   }
 }
 
-function parseActivity(
-  json: Record<string, unknown>
-): Activity {
+function parseActivity(json: Record<string, unknown>): Activity {
   const tableKeys = Object.keys(activitySchema);
   const filteredInput = Object.fromEntries(
-    Object.entries(json).filter(([key]) =>
-      tableKeys.includes(key)
-    )
+    Object.entries(json).filter(([key]) => tableKeys.includes(key)),
   );
   if (
-    "athlete" in filteredInput &&
-    typeof filteredInput.athlete === "object" &&
+    'athlete' in filteredInput &&
+    typeof filteredInput.athlete === 'object' &&
     filteredInput.athlete !== null &&
-    "id" in filteredInput.athlete
+    'id' in filteredInput.athlete
   )
     filteredInput.athlete = filteredInput.athlete.id;
-  const start_date = new Date(
-    filteredInput.start_date as string
-  );
+  const start_date = new Date(filteredInput.start_date as string);
   const local_date = new Date(
-    start_date.toLocaleString("en-US", {
-      timeZone: (filteredInput.timezone as string)
-        .split(" ")
-        .pop(),
-    })
+    start_date.toLocaleString('en-US', {
+      timeZone: (filteredInput.timezone as string).split(' ').pop(),
+    }),
   );
   filteredInput.start_date = start_date;
   filteredInput.start_date_local = local_date;
-  filteredInput.start_date_local_timestamp =
-    local_date.getTime() / 1000;
-  filteredInput.detailed_activity =
-    "description" in filteredInput;
+  filteredInput.start_date_local_timestamp = local_date.getTime() / 1000;
+  filteredInput.detailed_activity = 'description' in filteredInput;
   if (
     filteredInput.map &&
-    typeof filteredInput.map == "object" &&
-    "summary_polyline" in filteredInput.map &&
-    typeof filteredInput.map.summary_polyline == "string"
+    typeof filteredInput.map == 'object' &&
+    'summary_polyline' in filteredInput.map &&
+    typeof filteredInput.map.summary_polyline == 'string'
   ) {
-    const coordinates = decode(
-      filteredInput.map.summary_polyline
-    ).map(([lat, lon]) => [lon, lat]);
+    const coordinates = decode(filteredInput.map.summary_polyline).map(
+      ([lat, lon]) => [lon, lat],
+    );
     filteredInput.map = {
       ...filteredInput.map,
       bbox: coordinates.reduce(
@@ -218,7 +190,7 @@ function parseActivity(
             Math.max(acc[3]!, coord[1]!),
           ];
         },
-        [Infinity, Infinity, -Infinity, -Infinity]
+        [Infinity, Infinity, -Infinity, -Infinity],
       ),
     };
   }
@@ -228,71 +200,61 @@ function parseActivity(
 
 function parsePhoto(
   json: Record<keyof Photo, unknown>,
-  {location = null}: {location: number[] | null | undefined}
+  { location = null }: { location: number[] | null | undefined },
 ): Photo {
   const tableKeys = Object.keys(photos);
   const filteredInput = Object.fromEntries(
-    Object.entries(json).filter(([key]) =>
-      tableKeys.includes(key)
-    )
+    Object.entries(json).filter(([key]) => tableKeys.includes(key)),
   );
-  for (const key of ["uploaded_at", "created_at"])
+  for (const key of ['uploaded_at', 'created_at'])
     if (filteredInput[key])
-      filteredInput[key] = new Date(
-        filteredInput[key] as string
-      );
-  if (!filteredInput.location && location)
-    filteredInput.location = location;
+      filteredInput[key] = new Date(filteredInput[key] as string);
+  if (!filteredInput.location && location) filteredInput.location = location;
   return filteredInput as Photo;
 }
 
 export async function getPhotos(
-  phts: Record<
-    number,
-    {loc?: [number, number]; token: string}
-  >,
+  phts: Record<number, { loc?: [number, number]; token: string }>,
   {
     sizes = [2048],
   }: {
     sizes: number[];
-  }
+  },
 ): Promise<Photo[]> {
   try {
     const promises = sizes
       .map((size) =>
-        Object.entries(phts).map(([id, {token}]) =>
-          get(
-            `activities/${id}/photos?size=${size}&photo_sources=true`,
-            {token}
-          )
-        )
+        Object.entries(phts).map(([id, { token }]) =>
+          get(`activities/${id}/photos?size=${size}&photo_sources=true`, {
+            token,
+          }),
+        ),
       )
       .flat();
-    const activityPhotos = (
-      await Promise.all(promises)
-    ).flat() as Record<keyof Photo, unknown>[];
-    const photoDictionary: Record<string, Photo> =
-      activityPhotos.reduce(
-        (acc: Record<string, Photo>, photo: Photo) => {
-          if (!acc[photo.unique_id])
-            acc[photo.unique_id] = parsePhoto(photo, {
-              location:
-                phts[photo.activity_id!]?.loc || null,
-            });
-          if (acc[photo.unique_id]) {
-            acc[photo.unique_id].sizes = {
-              ...acc[photo.unique_id].sizes,
-              ...photo.sizes,
-            };
-            acc[photo.unique_id].urls = {
-              ...acc[photo.unique_id].urls,
-              ...photo.urls,
-            };
-          }
-          return acc;
-        },
-        {} as Record<string, Photo>
-      );
+    const activityPhotos = (await Promise.all(promises)).flat() as Record<
+      keyof Photo,
+      unknown
+    >[];
+    const photoDictionary: Record<string, Photo> = activityPhotos.reduce(
+      (acc: Record<string, Photo>, photo: Photo) => {
+        if (!acc[photo.unique_id])
+          acc[photo.unique_id] = parsePhoto(photo, {
+            location: phts[photo.activity_id!]?.loc || null,
+          });
+        if (acc[photo.unique_id]) {
+          acc[photo.unique_id].sizes = {
+            ...acc[photo.unique_id].sizes,
+            ...photo.sizes,
+          };
+          acc[photo.unique_id].urls = {
+            ...acc[photo.unique_id].urls,
+            ...photo.urls,
+          };
+        }
+        return acc;
+      },
+      {} as Record<string, Photo>,
+    );
     return Object.values(photoDictionary);
   } catch (e) {
     console.error(e);
@@ -302,19 +264,39 @@ export async function getPhotos(
 
 const buildConflictUpdateColumns = <
   T extends PgTable,
-  Q extends keyof T["_"]["columns"],
+  Q extends keyof T['_']['columns'],
 >(
   table: T,
-  filter: (column: string) => boolean = () => true
+  filter: (column: string) => boolean = () => true,
 ) =>
   Object.fromEntries(
     Object.keys(getTableColumns(table))
       .filter(filter)
-      .map((column) => [
-        column as Q,
-        sql.raw(`excluded.${column}`),
-      ])
+      .map((column) => [column as Q, sql.raw(`excluded.${column}`)]),
   );
+
+export async function getAllActivities({
+  per_page = 200,
+  get_photos = false,
+}: {
+  per_page: number;
+  get_photos: boolean;
+}) {
+  const oldestActivity = await db
+    .select()
+    .from(activitySchema)
+    .orderBy(activitySchema.start_date)
+    .limit(1);
+
+  if (oldestActivity && oldestActivity.length > 0) {
+    const timestamp = Date.parse(oldestActivity[0]!.start_date);
+    return getActivities({
+      per_page,
+      get_photos,
+      before: timestamp / 1000,
+    });
+  }
+}
 
 export async function getActivities({
   database = true,
@@ -329,7 +311,7 @@ export async function getActivities({
   database?: boolean;
   get_photos?: boolean;
   page?: number;
-  activities?: {id: number; athlete: number}[];
+  activities?: { id: number; athlete: number }[];
   per_page?: number;
   after?: number;
   before?: number;
@@ -339,33 +321,40 @@ export async function getActivities({
     let new_activities: Record<string, unknown>[] = [];
     let tokens = {} as Record<number, string>;
     if (activities !== undefined) {
-      const athlete_ids = activities.map(
-        ({athlete}) => athlete
-      );
+      const athlete_ids = activities.map(({ athlete }) => athlete);
       const athlete_tokens = await Promise.all(
-        athlete_ids.map((id) =>
-          getAccount({providerAccountId: id})
-        )
+        athlete_ids.map((id) => getAccount({ providerAccountId: id })),
       );
       tokens = Object.fromEntries(
-        athlete_tokens.map(
-          ({providerAccountId, access_token}) => [
-            providerAccountId,
-            access_token!,
-          ]
-        )
+        athlete_tokens.map(({ providerAccountId, access_token }) => [
+          providerAccountId,
+          access_token!,
+        ]),
       );
       console.log(activities, tokens);
       new_activities = (await Promise.all(
-        activities.map(({id, athlete}) =>
-          get(`activities/${id}`, {token: tokens[athlete]})
-        )
+        activities.map(({ id, athlete }) =>
+          get(`activities/${id}`, { token: tokens[athlete] }),
+        ),
       )) as Record<string, unknown>[];
     } else {
       if (!access_token) {
         const account = await getAccount({});
         access_token = account.access_token!;
       }
+
+      if (!before) {
+        const oldestActivity = await db
+          .select()
+          .from(activitySchema)
+          .orderBy(activitySchema.start_date)
+          .limit(1);
+
+        if (oldestActivity && oldestActivity.length > 0) {
+          before = Date.parse(oldestActivity[0]!.start_date) / 1000;
+        }
+      }
+
       const params = new URLSearchParams(
         Object.fromEntries(
           Object.entries({
@@ -373,49 +362,44 @@ export async function getActivities({
             per_page,
             after,
             before,
-          }).filter(([, v]) => v !== undefined)
-        )
+          }).filter(([, v]) => v !== undefined),
+        ),
       );
       console.log(params.toString());
-      new_activities = (await get(
-        `athlete/activities?${params.toString()}`,
-        {token: access_token}
-      )) as Record<string, unknown>[];
+      new_activities = (await get(`athlete/activities?${params.toString()}`, {
+        token: access_token,
+      })) as Record<string, unknown>[];
       if (new_activities.length > 0) {
-        console.log("new activities", new_activities[0]);
-        const athlete_id = new_activities[0]!.athlete!
-          .id as number;
-        console.log("athlete id", athlete_id);
+        console.log('new activities', new_activities[0]);
+        const athlete_id = new_activities[0]!.athlete!.id as number;
+        console.log('athlete id', athlete_id);
         if (athlete_id) {
           tokens[athlete_id] = access_token;
-          console.log("token", tokens[athlete_id]);
+          console.log('token', tokens[athlete_id]);
         }
         console.log(tokens);
       }
     }
-    const parsedActivities: Activity[] =
-      new_activities.map(parseActivity);
+    const parsedActivities: Activity[] = new_activities.map(parseActivity);
     console.log(
-      "Fetched activities",
+      'Fetched activities',
       parsedActivities.length,
-      "now fetching photos",
-      tokens
+      'now fetching photos',
+      tokens,
     );
     const new_photos: Photo[] = get_photos
       ? await getPhotos(
           Object.fromEntries(
             parsedActivities
               .filter((x) => x.total_photo_count > 0)
-              .map(
-                ({id, start_latlng: location, athlete}) => [
-                  id,
-                  {loc: location, token: tokens[athlete]!},
-                ]
-              )
+              .map(({ id, start_latlng: location, athlete }) => [
+                id,
+                { loc: location, token: tokens[athlete]! },
+              ]),
           ),
           {
             sizes: [256, 2048],
-          }
+          },
         )
       : [];
     if (database && parsedActivities.length > 0) {
@@ -428,9 +412,9 @@ export async function getActivities({
             activitySchema,
             (column) =>
               activities != undefined ||
-              (column != "description" &&
-                column != "map" &&
-                column != "detailed_activity")
+              (column != 'description' &&
+                column != 'map' &&
+                column != 'detailed_activity'),
           ),
         })
         .returning();

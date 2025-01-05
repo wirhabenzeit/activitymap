@@ -4,37 +4,37 @@ import type {
   User,
   Account,
   Session,
-} from "~/server/db/schema";
-import type { StateCreator } from "zustand";
-import { decode } from "@mapbox/polyline";
-import type { TotalZustand } from "./Zustand";
-import { type FeatureCollection, type Feature } from "geojson";
+} from '~/server/db/schema';
+import type { StateCreator } from 'zustand';
+import { decode } from '@mapbox/polyline';
+import type { TotalZustand } from './Zustand';
+import { type FeatureCollection, type Feature } from 'geojson';
 
-import * as geosimplify from "@mapbox/geosimplify-js";
+import * as geosimplify from '@mapbox/geosimplify-js';
 
 import {
   getAccount,
   getActivities as getDBActivities,
   getActivitiesPaged,
   getPhotos,
-} from "~/server/db/actions";
+} from '~/server/db/actions';
 import {
   getActivities as getStravaActivities,
   updateActivity as updateStravaActivity,
-} from "~/server/strava/actions";
-import { type WritableDraft } from "immer";
+} from '~/server/strava/actions';
+import { type WritableDraft } from 'immer';
 
 const FeatureFromActivity = (act: Activity): Feature => {
-  if (!act.map) throw new Error("No map data");
+  if (!act.map) throw new Error('No map data');
   const coordinates = decode(
-    "polyline" in act.map ? act.map.polyline : act.map.summary_polyline,
+    'polyline' in act.map ? act.map.polyline : act.map.summary_polyline,
     5,
   ).map(([lat, lon]) => [lon, lat]);
   const feature: Feature = {
-    type: "Feature",
+    type: 'Feature',
     id: Number(act.id),
     geometry: {
-      type: "LineString",
+      type: 'LineString',
       coordinates:
         coordinates.length > 100
           ? geosimplify(coordinates, 20, 200)
@@ -104,14 +104,14 @@ const setActivities =
 
 export const activitySlice: StateCreator<
   TotalZustand,
-  [["zustand/immer", never]],
+  [['zustand/immer', never]],
   [],
   ActivityZustand
 > = (set, get) => ({
   activityDict: {},
   photos: [],
   geoJson: {
-    type: "FeatureCollection",
+    type: 'FeatureCollection',
     features: [],
   },
   loading: true,
@@ -147,7 +147,7 @@ export const activitySlice: StateCreator<
   updateActivity: async (activity: Activity) => {
     const guest = get().guest;
     if (guest) {
-      console.error("Guests cannot update activities");
+      console.error('Guests cannot update activities');
       return activity;
     }
     try {
@@ -163,7 +163,7 @@ export const activitySlice: StateCreator<
       return updatedActivity;
     } catch (e) {
       console.error(e);
-      throw new Error("Failed to update activity");
+      throw new Error('Failed to update activity');
     }
   },
   loadFromDB: async ({ ids, athleteId }) => {
@@ -193,19 +193,18 @@ export const activitySlice: StateCreator<
       }
     } catch (e) {
       console.error(e);
-      throw new Error("Failed to fetch activities");
+      throw new Error('Failed to fetch activities');
     }
   },
-  loadFromStrava: async ({ photos, before, ids, athleteId }) => {
+  loadFromStrava: async ({ photos, ids }) => {
     set((state) => {
       state.loading = true;
     });
     try {
-      if (!athleteId) athleteId = (await getAccount({})).providerAccountId;
+      const athleteId = (await getAccount({})).providerAccountId;
       if (athleteId != undefined) {
         const { activities: acts } = await getStravaActivities({
           get_photos: photos,
-          before,
           activities: ids?.map((id) => ({
             id,
             athlete: athleteId!,
@@ -218,7 +217,7 @@ export const activitySlice: StateCreator<
       return 0;
     } catch (e) {
       console.error(e);
-      throw new Error("Failed to fetch activities");
+      throw new Error('Failed to fetch activities');
     }
   },
 });
