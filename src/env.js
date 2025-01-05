@@ -7,10 +7,17 @@ export const env = createEnv({
    * isn't built with invalid env vars.
    */
   server: {
+    DATABASE_URL: z.string().url(),
+    DATABASE_URL_UNPOOLED: z.string().url(),
+    PGHOST: z.string(),
+    PGHOST_UNPOOLED: z.string(),
+    PGUSER: z.string(),
+    PGDATABASE: z.string(),
+    PGPASSWORD: z.string(),
     POSTGRES_URL: z.string().url(),
-    POSTGRES_PRISMA_URL: z.string().url(),
     POSTGRES_URL_NO_SSL: z.string().url(),
     POSTGRES_URL_NON_POOLING: z.string().url(),
+    POSTGRES_PRISMA_URL : z.string().url(),
     POSTGRES_USER: z.string(),
     POSTGRES_HOST: z.string(),
     POSTGRES_DATABASE: z.string(),
@@ -38,6 +45,13 @@ export const env = createEnv({
    */
   runtimeEnv: {
     POSTGRES_URL: process.env.POSTGRES_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_URL_UNPOOLED: process.env.DATABASE_URL_UNPOOLED,
+    PGHOST: process.env.PGHOST,
+    PGHOST_UNPOOLED: process.env.PGHOST_UNPOOLED,
+    PGUSER: process.env.PGUSER,
+    PGDATABASE: process.env.PGDATABASE,
+    PGPASSWORD: process.env.PGPASSWORD,
     NODE_ENV: process.env.NODE_ENV,
     POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
     POSTGRES_USER: process.env.POSTGRES_USER,
