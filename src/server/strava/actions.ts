@@ -11,8 +11,9 @@ import { decode } from '@mapbox/polyline';
 
 import { db } from '~/server/db';
 import { getAccount } from '~/server/db/actions';
-import { getTableColumns, sql } from 'drizzle-orm';
+import { getTableColumns, sql, eq } from 'drizzle-orm';
 import { type PgTable } from 'drizzle-orm/pg-core';
+import { account } from 'drizzle/schema';
 
 type Subscription = {
   id: number;
@@ -275,29 +276,6 @@ const buildConflictUpdateColumns = <
       .map((column) => [column as Q, sql.raw(`excluded.${column}`)]),
   );
 
-export async function getAllActivities({
-  per_page = 200,
-  get_photos = false,
-}: {
-  per_page: number;
-  get_photos: boolean;
-}) {
-  const oldestActivity = await db
-    .select()
-    .from(activitySchema)
-    .orderBy(activitySchema.start_date)
-    .limit(1);
-
-  if (oldestActivity && oldestActivity.length > 0) {
-    const timestamp = Date.parse(oldestActivity[0]!.start_date);
-    return getActivities({
-      per_page,
-      get_photos,
-      before: timestamp / 1000,
-    });
-  }
-}
-
 export async function getActivities({
   database = true,
   get_photos = false,
@@ -347,6 +325,7 @@ export async function getActivities({
         const oldestActivity = await db
           .select()
           .from(activitySchema)
+          .where(eq(activitySchema.athlete, account.providerAccountId))
           .orderBy(activitySchema.start_date)
           .limit(1);
 
