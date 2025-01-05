@@ -2,7 +2,9 @@
 
 import {
   activities as activitySchema,
+  accounts as accountSchema,
   photos,
+  users,
   type Activity,
   type Photo,
 } from '~/server/db/schema';
@@ -11,9 +13,8 @@ import { decode } from '@mapbox/polyline';
 
 import { db } from '~/server/db';
 import { getAccount } from '~/server/db/actions';
-import { getTableColumns, sql, eq } from 'drizzle-orm';
+import { getTableColumns, sql, eq, desc } from 'drizzle-orm';
 import { type PgTable } from 'drizzle-orm/pg-core';
-import { account } from 'drizzle/schema';
 
 type Subscription = {
   id: number;
@@ -284,7 +285,6 @@ export async function getActivities({
   per_page = 200,
   after,
   before,
-  access_token,
 }: {
   database?: boolean;
   get_photos?: boolean;
@@ -293,7 +293,6 @@ export async function getActivities({
   per_page?: number;
   after?: number;
   before?: number;
-  access_token?: string;
 }) {
   try {
     let new_activities: Record<string, unknown>[] = [];
@@ -316,10 +315,8 @@ export async function getActivities({
         ),
       )) as Record<string, unknown>[];
     } else {
-      if (!access_token) {
-        const account = await getAccount({});
-        access_token = account.access_token!;
-      }
+      const account = await getAccount({});
+      const access_token = account.access_token!;
 
       if (!before) {
         const oldestActivity = await db
@@ -357,6 +354,12 @@ export async function getActivities({
           console.log('token', tokens[athlete_id]);
         }
         console.log(tokens);
+      } else {
+        const userID = account.userId;
+        console.log('no new activities, setting complete', userID);
+        if (userID) {
+          db.update(users).set({ complete: true }).where(eq(users.id, userID));
+        }
       }
     }
     const parsedActivities: Activity[] = new_activities.map(parseActivity);
