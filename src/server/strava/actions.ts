@@ -2,7 +2,6 @@
 
 import {
   activities as activitySchema,
-  accounts as accountSchema,
   photos,
   users,
   type Activity,
@@ -43,18 +42,24 @@ async function get(
           method,
           headers: { Authorization: `Bearer ${token}` },
         };
-  const res = await fetch(`https://www.strava.com/api/v3/${path}`, options);
-  console.log('GET', path, res.status, res.statusText);
-  if (res.status == 204) return;
-  if (!res.ok) {
-    throw new Error(`Failed to fetch ${path}: ${res.status}`);
+  try {
+    console.log('GET', path);
+    const res = await fetch(`https://www.strava.com/api/v3/${path}`, options);
+    console.log('GET', path, res.status, res.statusText);
+    if (res.status == 204) return;
+    if (!res.ok) {
+      throw new Error(`Failed to fetch ${path}: ${res.status}`);
+    }
+    const json: unknown = await res.json();
+    if (!json) {
+      throw new Error(`Failed to fetch ${path}`);
+    }
+    //console.log(json);
+    return json;
+  } catch (e) {
+    console.error(e);
+    return;
   }
-  const json: unknown = await res.json();
-  if (!json) {
-    throw new Error(`Failed to fetch ${path}`);
-  }
-  console.log(json);
-  return json;
 }
 
 export async function post(
@@ -278,6 +283,7 @@ const buildConflictUpdateColumns = <
   );
 
 export async function getActivities({
+  athlete_id,
   database = true,
   get_photos = false,
   page = 1,
@@ -286,6 +292,7 @@ export async function getActivities({
   after,
   before,
 }: {
+  athlete_id?: number;
   database?: boolean;
   get_photos?: boolean;
   page?: number;
@@ -308,14 +315,16 @@ export async function getActivities({
           access_token!,
         ]),
       );
-      console.log(activities, tokens);
+      //console.log(activities, tokens);
       new_activities = (await Promise.all(
         activities.map(({ id, athlete }) =>
           get(`activities/${id}`, { token: tokens[athlete] }),
         ),
       )) as Record<string, unknown>[];
     } else {
-      const account = await getAccount({});
+      const account = athlete_id
+        ? await getAccount({ providerAccountId: athlete_id })
+        : await getAccount({});
       const access_token = account.access_token!;
 
       if (!before) {
@@ -346,12 +355,12 @@ export async function getActivities({
         token: access_token,
       })) as Record<string, unknown>[];
       if (new_activities.length > 0) {
-        console.log('new activities', new_activities[0]);
+        //console.log('new activities', new_activities[0]);
         const athlete_id = new_activities[0]!.athlete!.id as number;
         console.log('athlete id', athlete_id);
         if (athlete_id) {
           tokens[athlete_id] = access_token;
-          console.log('token', tokens[athlete_id]);
+          //console.log('token', tokens[athlete_id]);
         }
         console.log(tokens);
       } else {

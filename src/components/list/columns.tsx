@@ -26,7 +26,7 @@ function decFormatter(unit = '', decimals = 0) {
 export type ActivityColumn = {
   id: number;
   name: string;
-  description: string;
+  description: string | null;
   sport_type: SportType;
   start_date_local_timestamp: number;
   elapsed_time: number;
@@ -49,17 +49,28 @@ export const columns: ColumnDef<ActivityColumn>[] = [
     id: 'select',
     accessorKey: 'sport_type',
     size: 28,
-    header: ({ table }) => (
-      <Checkbox
-        className="h-6 w-6"
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && 'indeterminate')
+    header: ({ table, column }) => (
+      <DataTableColumnHeader
+        table={table}
+        dropdown={false}
+        title={
+          <Checkbox
+            className="h-6 w-6"
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && 'indeterminate')
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+            aria-label="Select all"
+          />
         }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
+        column={column}
       />
     ),
+    sortingFn: (rowA, rowB, columnID) =>
+      rowA.getIsSelected() ? 1 : rowB.getIsSelected() ? -1 : 0,
     cell: ({ row }) => {
       const sport_type = row.original.sport_type;
       const sport_group = aliasMap[sport_type]!;
@@ -76,7 +87,6 @@ export const columns: ColumnDef<ActivityColumn>[] = [
         </Button>
       );
     },
-    enableSorting: true,
     enableHiding: false,
   },
   {
@@ -116,7 +126,7 @@ export const columns: ColumnDef<ActivityColumn>[] = [
         title={<Calendar />}
       />
     ),
-    cell: ({ row, getValue }) => {
+    cell: ({ row }) => {
       return (
         <div className="text-right">
           {new Date(
@@ -137,7 +147,7 @@ export const columns: ColumnDef<ActivityColumn>[] = [
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title={<Clock />} />
     ),
-    cell: ({ row, getValue }) => {
+    cell: ({ row }) => {
       const date = new Date(row.original.start_date_local_timestamp * 1000);
       return (
         <div className="text-right">
@@ -158,7 +168,7 @@ export const columns: ColumnDef<ActivityColumn>[] = [
       />
     ),
     size: 60,
-    cell: ({ getValue, row }) => {
+    cell: ({ row }) => {
       const minutes = Math.floor(row.original.elapsed_time / 60);
       return (
         <div className="text-right">
@@ -321,7 +331,7 @@ export const columns: ColumnDef<ActivityColumn>[] = [
     ),
     enableResizing: true,
     size: 200,
-    cell: ({ row, getValue }) => (
+    cell: ({ row }) => (
       <Popover>
         <PopoverTrigger asChild>
           <div className="w-full truncate italic">

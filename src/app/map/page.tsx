@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   useState,
@@ -7,10 +7,11 @@ import {
   type FC,
   createRef,
   useEffect,
-} from "react";
-import { useSidebar } from "~/components/ui/sidebar";
-import { Camera, Globe } from "lucide-react";
-import { Button } from "~/components/ui/button";
+} from 'react';
+import { useSidebar } from '~/components/ui/sidebar';
+import { Camera, Globe } from 'lucide-react';
+import { Button } from '~/components/ui/button';
+import { columns } from '~/components/list/columns';
 
 import ReactMapGL, {
   NavigationControl,
@@ -20,34 +21,35 @@ import ReactMapGL, {
   Source,
   type MapRef,
   type SkyLayer,
-} from "react-map-gl";
+} from 'react-map-gl';
+
+import { DataTable } from '~/components/list/data-table';
 
 const skyLayer: SkyLayer = {
-  id: "sky",
-  type: "sky",
+  id: 'sky',
+  type: 'sky',
   paint: {
-    "sky-type": "atmosphere",
-    "sky-atmosphere-sun": [0.0, 0.0],
-    "sky-atmosphere-sun-intensity": 15,
+    'sky-type': 'atmosphere',
+    'sky-atmosphere-sun': [0.0, 0.0],
+    'sky-atmosphere-sun-intensity': 15,
   },
 };
-import { useShallow } from "zustand/shallow";
+import { useShallow } from 'zustand/shallow';
 
-import Overlay from "~/components/Map/Overlay";
+import Overlay from '~/components/map/Overlay';
 
-import "mapbox-gl/dist/mapbox-gl.css";
+import 'mapbox-gl/dist/mapbox-gl.css';
 
-import { useStore } from "~/contexts/Zustand";
+import { useStore } from '~/contexts/Zustand';
 
-import { type CustomLayerProps, mapSettings } from "~/settings/map";
-import { categorySettings } from "~/settings/category";
-import { listSettings } from "~/settings/list";
+import { type CustomLayerProps, mapSettings } from '~/settings/map';
+import { categorySettings } from '~/settings/category';
 
-import { Download } from "~/components/Map/DownloadControl";
-import { Selection } from "~/components/Map/SelectionControl";
-import { LayerSwitcher } from "~/components/Map/LayerSwitcher";
-import type { Activity } from "~/server/db/schema";
-import PhotoLayer from "~/components/Map/Photo";
+import { Download } from '~/components/map/DownloadControl';
+import { Selection } from '~/components/map/SelectionControl';
+import { LayerSwitcher } from '~/components/map/LayerSwitcher';
+import PhotoLayer from '~/components/map/Photo';
+import { cn } from '~/lib/utils';
 
 function RouteLayer() {
   const { filterIDs } = useStore(
@@ -63,30 +65,30 @@ function RouteLayer() {
     })),
   );
 
-  const color: mapboxgl.Expression = ["match", ["get", "sport_type"]];
+  const color: mapboxgl.Expression = ['match', ['get', 'sport_type']];
   Object.entries(categorySettings).forEach(([, value]) => {
     value.alias.forEach((alias) => {
       color.push(alias, value.color);
     });
   });
-  color.push("#000000");
+  color.push('#000000');
 
-  const filter = ["in", "id", ...filterIDs];
-  const selectedFilter = ["in", "id", ...selected];
-  const unselectedFilter = ["!in", "id", ...selected];
-  const filterAll = ["all", filter, unselectedFilter];
-  const filterSel = ["all", filter, selectedFilter];
-  const filterHigh = ["==", "id", highlighted];
+  const filter = ['in', 'id', ...filterIDs];
+  const selectedFilter = ['in', 'id', ...selected];
+  const unselectedFilter = ['!in', 'id', ...selected];
+  const filterAll = ['all', filter, unselectedFilter];
+  const filterSel = ['all', filter, selectedFilter];
+  const filterHigh = ['==', 'id', highlighted];
   return (
     <Source data={geoJson} id="routeSource" type="geojson">
       <Layer
         source="routeSource"
         id="routeLayerBG"
         type="line"
-        paint={{ "line-color": "black", "line-width": 4 }}
+        paint={{ 'line-color': 'black', 'line-width': 4 }}
         layout={{
-          "line-join": "round",
-          "line-cap": "round",
+          'line-join': 'round',
+          'line-cap': 'round',
         }}
         filter={filterAll}
       />
@@ -94,10 +96,10 @@ function RouteLayer() {
         source="routeSource"
         id="routeLayerFG"
         type="line"
-        paint={{ "line-color": color, "line-width": 2 }}
+        paint={{ 'line-color': color, 'line-width': 2 }}
         layout={{
-          "line-join": "round",
-          "line-cap": "round",
+          'line-join': 'round',
+          'line-cap': 'round',
         }}
         filter={filterAll}
       />
@@ -105,10 +107,10 @@ function RouteLayer() {
         source="routeSource"
         id="routeLayerBGsel"
         type="line"
-        paint={{ "line-color": "black", "line-width": 6 }}
+        paint={{ 'line-color': 'black', 'line-width': 6 }}
         layout={{
-          "line-join": "round",
-          "line-cap": "round",
+          'line-join': 'round',
+          'line-cap': 'round',
         }}
         filter={filterSel}
       />
@@ -116,10 +118,10 @@ function RouteLayer() {
         source="routeSource"
         id="routeLayerMIDsel"
         type="line"
-        paint={{ "line-color": color, "line-width": 4 }}
+        paint={{ 'line-color': color, 'line-width': 4 }}
         layout={{
-          "line-join": "round",
-          "line-cap": "round",
+          'line-join': 'round',
+          'line-cap': 'round',
         }}
         filter={filterSel}
       />
@@ -127,10 +129,10 @@ function RouteLayer() {
         source="routeSource"
         id="routeLayerFGsel"
         type="line"
-        paint={{ "line-color": "white", "line-width": 2 }}
+        paint={{ 'line-color': 'white', 'line-width': 2 }}
         layout={{
-          "line-join": "round",
-          "line-cap": "round",
+          'line-join': 'round',
+          'line-cap': 'round',
         }}
         filter={filterSel}
       />
@@ -139,13 +141,13 @@ function RouteLayer() {
         id="routeLayerHigh"
         type="line"
         paint={{
-          "line-color": "white",
-          "line-width": 6,
-          "line-opacity": 0.4,
+          'line-color': 'white',
+          'line-width': 6,
+          'line-opacity': 0.4,
         }}
         layout={{
-          "line-join": "round",
-          "line-cap": "round",
+          'line-join': 'round',
+          'line-cap': 'round',
         }}
         filter={filterHigh}
       />
@@ -154,16 +156,18 @@ function RouteLayer() {
 }
 
 function Map() {
-  const [cursor, setCursor] = useState("auto");
-  const onMouseEnter = useCallback(() => setCursor("pointer"), []);
-  const onMouseLeave = useCallback(() => setCursor("auto"), []);
+  const [cursor, setCursor] = useState('auto');
+  const onMouseEnter = useCallback(() => setCursor('pointer'), []);
+  const onMouseLeave = useCallback(() => setCursor('auto'), []);
 
   const {
     selected,
     setHighlighted,
     activityDict,
     compactList,
-    setSortModel,
+    setSorting,
+    filterIDs,
+    setSelected,
     setColumnVisibilityModel,
     baseMap,
     overlays,
@@ -180,8 +184,10 @@ function Map() {
       setHighlighted: state.setHighlighted,
       activityDict: state.activityDict,
       compactList: state.compactList,
-      setSortModel: state.setSortModel,
-      setColumnVisibilityModel: state.setColumnModel,
+      setSorting: state.compactList.setSorting,
+      setSelected: state.setSelected,
+      filterIDs: state.filterIDs,
+      setColumnVisibilityModel: state.compactList.setColumnVisibility,
       baseMap: state.baseMap,
       overlays: state.overlayMaps,
       mapPosition: state.position,
@@ -212,25 +218,25 @@ function Map() {
         {overlays.map((mapName) => {
           const mapSetting = mapSettings[mapName];
           if (mapSetting == undefined) return;
-          if (mapSetting.type == "custom") {
+          if (mapSetting.type == 'custom') {
             const CustomLayer: FC<CustomLayerProps> = mapSetting.component;
             return <CustomLayer key={mapName} mapRef={mapRefLoc} />;
           } else
             return (
               <Source
-                key={mapName + "source"}
+                key={mapName + 'source'}
                 id={mapName}
                 type="raster"
                 tiles={[mapSetting.url]}
                 tileSize={256}
               >
                 <Layer
-                  key={mapName + "layer"}
+                  key={mapName + 'layer'}
                   id={mapName}
                   type="raster"
                   paint={{
-                    "raster-opacity":
-                      "opacity" in mapSetting ? mapSetting.opacity! : 1,
+                    'raster-opacity':
+                      'opacity' in mapSetting ? mapSetting.opacity! : 1,
                   }}
                 />
               </Source>
@@ -247,7 +253,7 @@ function Map() {
     .filter((x) => x != undefined);
 
   return (
-    <>
+    <div className="relative h-full w-full">
       <ReactMapGL
         reuseMaps={true}
         ref={mapRefLoc}
@@ -262,9 +268,9 @@ function Map() {
         }}
         //optimizeForTerrain={true}
         //onLoad={(event: MapboxEvent) => console.log(event)}
-        projection={"globe" as unknown as mapboxgl.Projection}
+        projection={'globe' as unknown as mapboxgl.Projection}
         mapStyle={
-          mapSettingBase.type === "vector" ? mapSettingBase.url : undefined
+          mapSettingBase.type === 'vector' ? mapSettingBase.url : undefined
         }
         // terrain={{
         //   source: "mapbox-dem",
@@ -274,11 +280,11 @@ function Map() {
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         cursor={cursor}
-        interactiveLayerIds={["routeLayerBG", "routeLayerBGsel"]}
+        interactiveLayerIds={['routeLayerBG', 'routeLayerBGsel']}
       >
-        {mapSettingBase != undefined && mapSettingBase.type == "raster" && (
+        {mapSettingBase != undefined && mapSettingBase.type == 'raster' && (
           <Source type="raster" tiles={[mapSettingBase.url]} tileSize={256}>
-            <Layer id="baseMap" type="raster" paint={{ "raster-opacity": 1 }} />
+            <Layer id="baseMap" type="raster" paint={{ 'raster-opacity': 1 }} />
           </Source>
         )}
         <Source
@@ -304,7 +310,7 @@ function Map() {
             <Button onClick={toggleThreeDim} className="[&_svg]:size-5">
               <Globe
                 className="mx-auto"
-                color={threeDim ? "hsl(var(--header-background))" : "gray"}
+                color={threeDim ? 'hsl(var(--header-background))' : 'gray'}
               />
             </Button>
           </div>
@@ -314,7 +320,7 @@ function Map() {
             <Button onClick={togglePhotos} className="[&_svg]:size-5">
               <Camera
                 className="mx-auto"
-                color={showPhotos ? "hsl(var(--header-background))" : "gray"}
+                color={showPhotos ? 'hsl(var(--header-background))' : 'gray'}
               />
             </Button>
           </div>
@@ -323,7 +329,25 @@ function Map() {
         {loaded && <RouteLayer />}
         {loaded && showPhotos && <PhotoLayer />}
       </ReactMapGL>
-    </>
+      <div
+        className={cn(
+          'z-10 absolute max-h-[40%] w-[80%] left-[10%] right-[10%] bottom-0 bg-background mb-10 rounded-sm shadow-md overflow-y-scroll',
+          { hidden: rows.length == 0 },
+        )}
+      >
+        <DataTable
+          columns={columns}
+          data={rows}
+          setSorting={setSorting}
+          sorting={compactList.sorting}
+          selected={selected}
+          setSelected={setSelected}
+          columnVisibility={compactList.columnVisibility}
+          setColumnVisibility={compactList.setColumnVisibility}
+          paginationControl={false}
+        />
+      </div>
+    </div>
   );
 }
 

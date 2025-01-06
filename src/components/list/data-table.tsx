@@ -333,12 +333,14 @@ interface DataTableColumnHeaderProps<TData, TValue>
   column: Column<TData, TValue>;
   title: React.ReactNode | string;
   table: TableType<ActivityColumn>;
+  dropdown?: boolean;
 }
 
 export function DataTableColumnHeader<TData, TValue>({
   column,
   title,
   className,
+  dropdown = true,
   table,
 }: DataTableColumnHeaderProps<TData, TValue>) {
   if (!column.getCanSort()) {
@@ -347,34 +349,40 @@ export function DataTableColumnHeader<TData, TValue>({
 
   return (
     <div className={cn('flex items-center space-x-2', className)}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild className="flex-1">
-          <Button
-            variant="link"
-            size="sm"
-            className="h-8 justify-center px-0 data-[state=open]:bg-accent"
-          >
-            {title}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          {table
-            .getAllColumns()
-            .filter((column) => column.getCanHide())
-            .map((column) => {
-              return (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="capitalize"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                >
-                  {column.id}
-                </DropdownMenuCheckboxItem>
-              );
-            })}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {dropdown ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild className="flex-1">
+            <Button
+              variant="link"
+              size="sm"
+              className="h-8 justify-center px-0 data-[state=open]:bg-accent"
+            >
+              {title}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {column.id}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <span>{title}</span>
+      )}
       <Button
         variant="ghost"
         size="sm"
@@ -396,42 +404,14 @@ export function DataTableColumnHeader<TData, TValue>({
 export function DataTable<TData, TValue>({
   columns,
   data,
+  columnVisibility,
+  sorting,
+  setSorting,
+  setColumnVisibility,
+  selected,
+  setSelected,
+  paginationControl = true,
 }: DataTableProps<TData, TValue>) {
-  // const [sorting, setSorting] = React.useState<SortingState>([
-  //   { id: "id", desc: true },
-  // ]);
-  // const [columnVisibility, setColumnVisibility] =
-  //   React.useState<VisibilityState>({
-  //     id: false,
-  //     sport_type: false,
-  //     moving_time: false,
-  //     elev_high: false,
-  //     elev_low: false,
-  //     weighted_average_watts: false,
-  //     max_watts: false,
-  //     max_heartrate: false,
-  //     kudos_count: false,
-  //     average_heartrate: false,
-  //   });
-
-  const {
-    selected,
-    setSelected,
-    sorting,
-    setSorting,
-    columnVisibility,
-    setColumnVisibility,
-  } = useStore(
-    useShallow((state) => ({
-      selected: state.selected,
-      setSelected: state.setSelected,
-      sorting: state.fullList.sorting,
-      columnVisibility: state.fullList.columnVisibility,
-      setSorting: state.fullList.setSorting,
-      setColumnVisibility: state.fullList.setColumnVisibility,
-    })),
-  );
-
   const table = useReactTable({
     data,
     columns,
@@ -539,7 +519,7 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </ScrollArea>
-      <DataTablePagination table={table} className="" />
+      {paginationControl && <DataTablePagination table={table} className="" />}
     </div>
   );
 }

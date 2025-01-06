@@ -33,7 +33,7 @@ export default async function RootLayout({
       <head>
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1 viewport-fit=cover, maximum-scale=1"
+          content="width=device-width, initial-scale=1 viewport-fit=cover, maximum-scale=1, height=device-height"
         />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-status-bar-style" content="#1976d2" />
@@ -215,18 +215,21 @@ export default async function RootLayout({
         <Analytics />
         <SpeedInsights />
       </head>
-      <body style={{ width: '100dvw', height: '100dvh' }} className="font-sans">
+      <body
+        style={{ width: '100dvw', height: '100dvh', overflow: 'hidden' }}
+        className="font-sans"
+      >
         <ThemeProvider attribute="class">
           <SidebarProvider
             className="flex h-dvh flex-col"
             style={{ height: '100dvh' }}
           >
             <AppHeader />
-            <div className="flex min-h-0 flex-1">
+            <div className="flex min-h-0 flex-1 overflow-hidden">
               <AppSidebar />
-              <main className="flex min-w-0 flex-1 flex-col">
+              <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 <div className="h-14 w-full" />
-                <div className="min-h-0 w-full flex-1">
+                <div className="min-h-0 w-full flex-1 overflow-hidden">
                   <MainContainer user={user} session={session}>
                     {children}
                   </MainContainer>
