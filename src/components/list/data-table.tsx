@@ -402,6 +402,7 @@ export function DataTableColumnHeader<TData, TValue>({
 }
 
 export function DataTable<TData, TValue>({
+  className,
   columns,
   data,
   columnVisibility,
@@ -440,86 +441,82 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="flex h-full w-full flex-col">
-      <ScrollArea className="h-full w-full overflow-scroll [&>div>div[style]]:!block">
-        <Table
-          id="table-main"
-          className="relative min-h-0 w-full flex-1 text-xs"
-        >
-          <TableHeader className="sticky">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead
-                      className="py-1"
-                      key={header.id}
-                      style={{
-                        width: `${header.getSize()}px`,
-                      }}
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody className="min-h-0 flex-1">
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <Popover key={row.id}>
-                  <PopoverTrigger asChild>
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && 'selected'}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          className="py-1"
-                          key={cell.id}
-                          width={cell.column.columnDef.size}
-                          style={{
-                            maxWidth: cell.column.columnDef.size,
-                            minWidth: cell.column.columnDef.size,
-                          }}
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </PopoverTrigger>
-                  <PopoverContent asChild>
-                    <ActivityCard
-                      className="w-400 p-0"
-                      row={row}
-                      setSelected={setSelected}
-                    />
-                  </PopoverContent>
-                </Popover>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </ScrollArea>
-      {paginationControl && <DataTablePagination table={table} className="" />}
+    <div className={cn('flex flex-col', className)}>
+      <Table
+        id="table-main"
+        className="text-xs"
+        wrapperClassName="overflow-scroll min-h-0 w-full flex-1"
+      >
+        <TableHeader className="sticky">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                return (
+                  <TableHead
+                    className="py-1"
+                    key={header.id}
+                    style={{
+                      width: `${header.getSize()}px`,
+                    }}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                  </TableHead>
+                );
+              })}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <Popover key={row.id}>
+                <PopoverTrigger asChild>
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && 'selected'}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        className="py-1"
+                        key={cell.id}
+                        width={cell.column.columnDef.size}
+                        style={{
+                          maxWidth: cell.column.columnDef.size,
+                          minWidth: cell.column.columnDef.size,
+                        }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </PopoverTrigger>
+                <PopoverContent asChild>
+                  <ActivityCard
+                    className="w-400 p-0"
+                    row={row}
+                    setSelected={setSelected}
+                  />
+                </PopoverContent>
+              </Popover>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center">
+                No results.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+      {paginationControl && <DataTablePagination table={table} />}
     </div>
   );
 }

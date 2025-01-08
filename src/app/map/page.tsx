@@ -331,11 +331,12 @@ function Map() {
       </ReactMapGL>
       <div
         className={cn(
-          'z-10 absolute max-h-[40%] w-[80%] left-[10%] right-[10%] bottom-0 bg-background mb-10 rounded-sm shadow-md overflow-y-scroll',
+          'z-10 absolute w-[80%] left-[10%] right-[10%] bottom-0 bg-background mb-10 rounded-lg shadow-lg overflow-hidden',
           { hidden: rows.length == 0 },
         )}
       >
         <DataTable
+          className="max-h-44"
           columns={columns}
           data={rows}
           setSorting={setSorting}
@@ -344,7 +345,6 @@ function Map() {
           setSelected={setSelected}
           columnVisibility={compactList.columnVisibility}
           setColumnVisibility={compactList.setColumnVisibility}
-          paginationControl={false}
         />
       </div>
     </div>

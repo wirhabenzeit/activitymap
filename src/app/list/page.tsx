@@ -36,6 +36,7 @@ export default function ListPage() {
   return (
     <div className="h-full max-h-dvh w-full">
       <DataTable
+        className="h-full"
         columns={columns}
         data={rows}
         setSorting={setSorting}
