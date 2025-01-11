@@ -18,9 +18,240 @@ import { aliasMap } from '~/settings/category';
 import Link from 'next/link';
 import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
 
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CaretSortIcon,
+} from '@radix-ui/react-icons';
+import { type Row } from '@tanstack/react-table';
+
+import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '~/components/ui/hover-card';
+
+interface DataTableProps<TData, TValue> {
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+}
+
+import { cn } from '~/lib/utils';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '~/components/ui/card';
+import { desc } from 'drizzle-orm';
+
 function decFormatter(unit = '', decimals = 0) {
   return (num: number | undefined) =>
     num == undefined ? null : num.toFixed(decimals) + unit;
+}
+
+const duration = (seconds: number) => {
+  const minutes = Math.floor(seconds / 60);
+  return Math.floor(minutes / 60) + 'h' + String(minutes % 60).padStart(2, '0');
+};
+
+type CardProps = React.ComponentProps<typeof Card>;
+
+interface ActivityCardProps extends CardProps {
+  row: Row<ActivityColumn>;
+  setSelected: (value: any) => void; // Replace 'any' with the appropriate type for 'setSelected'
+}
+
+export function ActivityCardO({
+  className,
+  row,
+  setSelected,
+  ...props
+}: ActivityCardProps) {
+  const date = new Date(row.original.start_date_local_timestamp * 1000);
+  const stats = [
+    {
+      title: 'When?',
+      description: date.toLocaleString('en-US'),
+    },
+    {
+      title: 'How long?',
+      description: `${duration(row.getValue('moving_time'))} (moving), ${duration(
+        row.getValue('elapsed_time'),
+      )} (elapsed)`,
+    },
+    {
+      title: 'How far?',
+      description: decFormatter('km', 1)(row.original.distance / 1000),
+    },
+    {
+      title: 'How high?',
+      description: `Gain: ${decFormatter('m', 0)(row.getValue('total_elevation_gain'))}, High: ${decFormatter(
+        'm',
+        0,
+      )(row.getValue('elev_high'))}`,
+    },
+    ...(row.getValue('average_heartrate')
+      ? [
+          {
+            title: 'How hard?',
+            description: `Avg: ${decFormatter('bpm', 0)(row.getValue('average_heartrate'))}, Max: ${decFormatter(
+              'bpm',
+              0,
+            )(row.getValue('max_heartrate'))}`,
+          },
+        ]
+      : []),
+    ...(row.getValue('weighted_average_watts')
+      ? [
+          {
+            title: 'How strong?',
+            description: `Normalized: ${decFormatter('W', 0)(row.getValue('weighted_average_watts'))} Avg: ${decFormatter('W', 0)(row.getValue('average_watts'))}, Max: ${decFormatter(
+              'W',
+              0,
+            )(row.getValue('max_watts'))}`,
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <Card className={cn('w-[380px]', className)} {...props}>
+      <CardHeader>
+        <CardTitle>{row.getValue('name')}</CardTitle>
+        <CardDescription>{row.getValue('description')}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <div>
+          {stats.map((stat, index) => (
+            <div
+              key={index}
+              className="mb-4 grid grid-cols-[25px_1fr] items-start pb-0 last:mb-0 last:pb-0"
+            >
+              <span className="flex h-2 w-2 translate-y-1 rounded-full bg-sky-500" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium leading-none">{stat.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  {stat.description}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+      <CardFooter className="flex gap-x-2">
+        <Button className="flex-1" asChild>
+          <a
+            href={`https://strava.com/activities/${row.getValue('id')}`}
+            target="_blank"
+          >
+            Strava
+          </a>
+        </Button>
+        <Button className="flex-1" onClick={() => row.toggleSelected(true)}>
+          <Link href="/map">Map</Link>
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+function ActivityCard({ row }) {
+  const sport_type = row.original.sport_type;
+  const sport_group = aliasMap[sport_type]!;
+  const Icon = categorySettings[sport_group].icon;
+
+  const date = new Date(row.original.start_date_local_timestamp * 1000);
+  const stats = [
+    {
+      icon: Calendar,
+      description: date.toLocaleString('en-US'),
+    },
+    {
+      icon: StopwatchIcon,
+      description: `${duration(row.getValue('moving_time'))} (moving), ${duration(
+        row.getValue('elapsed_time'),
+      )} (elapsed)`,
+    },
+    {
+      icon: RulerHorizontalIcon,
+      description: decFormatter('km', 1)(row.original.distance / 1000),
+    },
+    {
+      icon: Mountain,
+      description: `+${decFormatter('m', 0)(row.original.total_elevation_gain)} (${decFormatter(
+        'mas',
+        0,
+      )(row.getValue('elev_high'))})`,
+    },
+    ...(row.getValue('average_heartrate')
+      ? [
+          {
+            icon: Heart,
+            description: `${decFormatter('bpm', 0)(row.getValue('average_heartrate'))} (avg), ${decFormatter(
+              'bpm',
+              0,
+            )(row.getValue('max_heartrate'))} (max)`,
+          },
+        ]
+      : []),
+    ...(row.getValue('weighted_average_watts')
+      ? [
+          {
+            icon: Zap,
+            description: `${decFormatter('W', 0)(row.getValue('weighted_average_watts'))} (norm), ${decFormatter('W', 0)(row.getValue('average_watts'))} (avg)`,
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <HoverCard>
+      <HoverCardTrigger asChild>
+        <Button
+          asChild
+          variant="link"
+          className="text-left truncate underline justify-start max-w-full px-0"
+          size="sm"
+        >
+          <Link
+            href={`https://strava.com/activities/${row.getValue('id')}`}
+            target="_blank"
+          >
+            {row.getValue('name')}
+          </Link>
+        </Button>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-auto max-w-80">
+        <div className="flex justify-between space-x-4">
+          <Avatar>
+            <AvatarFallback>
+              <Icon
+                color={categorySettings[sport_group].color}
+                className="w-6 h-6"
+                height="3em"
+              />
+            </AvatarFallback>
+          </Avatar>
+          <div className="space-y-1">
+            <h4 className="text-sm font-semibold">{row.getValue('name')}</h4>
+            <p className="text-sm">{row.getValue('description') || ''}</p>
+            {stats.map((stat, index) => (
+              <div className="flex items-center pt-2" key={index}>
+                <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
+                <span className="text-xs text-muted-foreground">
+                  {stat.description}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
 }
 
 export type ActivityColumn = {
@@ -48,7 +279,7 @@ export const columns: ColumnDef<ActivityColumn>[] = [
   {
     id: 'select',
     accessorKey: 'sport_type',
-    size: 28,
+    size: 20,
     header: ({ table, column }) => (
       <DataTableColumnHeader
         table={table}
@@ -102,18 +333,7 @@ export const columns: ColumnDef<ActivityColumn>[] = [
       <DataTableColumnHeader table={table} column={column} title="Name" />
     ),
     size: 150,
-    cell: ({ row }) => (
-      <div className="truncate text-left">
-        <Button asChild variant="link" className="px-0" size="sm">
-          <Link
-            href={`https://strava.com/activities/${row.getValue('id')}`}
-            target="_blank"
-          >
-            {row.getValue('name')}
-          </Link>
-        </Button>
-      </div>
-    ),
+    cell: ({ row }) => <ActivityCard row={row} />,
   },
   {
     id: 'date',

@@ -83,6 +83,7 @@ export function DropdownMenuCheckboxes({
     );
     onToggle();
   };
+  console.log(title, active, values);
 
   return (
     <SidebarMenuItem>

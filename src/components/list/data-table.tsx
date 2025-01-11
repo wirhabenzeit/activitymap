@@ -43,7 +43,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '~/components/ui/popover';
-import { ScrollArea } from '~/components/ui/scroll-area';
+
+import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '~/components/ui/hover-card';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -82,117 +88,6 @@ import {
   CardTitle,
 } from '~/components/ui/card';
 import { set } from 'zod';
-
-function decFormatter(unit = '', decimals = 0) {
-  return (num: number | undefined) =>
-    num == undefined ? null : num.toFixed(decimals) + unit;
-}
-
-const duration = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60);
-  return Math.floor(minutes / 60) + 'h' + String(minutes % 60).padStart(2, '0');
-};
-
-type CardProps = React.ComponentProps<typeof Card>;
-
-interface ActivityCardProps extends CardProps {
-  row: Row<ActivityColumn>;
-  setSelected: (value: any) => void; // Replace 'any' with the appropriate type for 'setSelected'
-}
-
-export function ActivityCard({
-  className,
-  row,
-  setSelected,
-  ...props
-}: ActivityCardProps) {
-  const date = new Date(row.original.start_date_local_timestamp * 1000);
-  const stats = [
-    {
-      title: 'When?',
-      description: date.toLocaleString('en-US'),
-    },
-    {
-      title: 'How long?',
-      description: `Moving: ${duration(row.getValue('moving_time'))}, Elapsed: ${duration(
-        row.getValue('elapsed_time'),
-      )}`,
-    },
-    {
-      title: 'How far?',
-      description: decFormatter('km', 1)(row.original.distance / 1000),
-    },
-    {
-      title: 'How high?',
-      description: `Gain: ${decFormatter('m', 0)(row.getValue('total_elevation_gain'))}, High: ${decFormatter(
-        'm',
-        0,
-      )(row.getValue('elev_high'))}`,
-    },
-    ...(row.getValue('average_heartrate')
-      ? [
-          {
-            title: 'How hard?',
-            description: `Avg: ${decFormatter('bpm', 0)(row.getValue('average_heartrate'))}, Max: ${decFormatter(
-              'bpm',
-              0,
-            )(row.getValue('max_heartrate'))}`,
-          },
-        ]
-      : []),
-    ...(row.getValue('weighted_average_watts')
-      ? [
-          {
-            title: 'How strong?',
-            description: `Normalized: ${decFormatter('W', 0)(row.getValue('weighted_average_watts'))} Avg: ${decFormatter('W', 0)(row.getValue('average_watts'))}, Max: ${decFormatter(
-              'W',
-              0,
-            )(row.getValue('max_watts'))}`,
-          },
-        ]
-      : []),
-  ];
-
-  return (
-    <Card className={cn('w-[380px]', className)} {...props}>
-      <CardHeader>
-        <CardTitle>{row.getValue('name')}</CardTitle>
-        <CardDescription>{row.getValue('description')}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        <div>
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="mb-4 grid grid-cols-[25px_1fr] items-start pb-0 last:mb-0 last:pb-0"
-            >
-              <span className="flex h-2 w-2 translate-y-1 rounded-full bg-sky-500" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium leading-none">{stat.title}</p>
-                <p className="text-sm text-muted-foreground">
-                  {stat.description}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-      <CardFooter className="flex gap-x-2">
-        <Button className="flex-1" asChild>
-          <a
-            href={`https://strava.com/activities/${row.getValue('id')}`}
-            target="_blank"
-          >
-            Strava
-          </a>
-        </Button>
-        <Button className="flex-1" onClick={() => row.toggleSelected(true)}>
-          <Link href="/map">Map</Link>
-        </Button>
-      </CardFooter>
-    </Card>
-  );
-}
 
 interface DataTableViewOptionsProps<TData> {
   table: TableType<TData>;
@@ -474,38 +369,24 @@ export function DataTable<TData, TValue>({
         <TableBody>
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
-              <Popover key={row.id}>
-                <PopoverTrigger asChild>
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && 'selected'}
+              <TableRow
+                key={row.id}
+                data-state={row.getIsSelected() && 'selected'}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell
+                    className="py-1"
+                    key={cell.id}
+                    width={cell.column.columnDef.size}
+                    style={{
+                      maxWidth: cell.column.columnDef.size,
+                      minWidth: cell.column.columnDef.size,
+                    }}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell
-                        className="py-1"
-                        key={cell.id}
-                        width={cell.column.columnDef.size}
-                        style={{
-                          maxWidth: cell.column.columnDef.size,
-                          minWidth: cell.column.columnDef.size,
-                        }}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </PopoverTrigger>
-                <PopoverContent asChild>
-                  <ActivityCard
-                    className="w-400 p-0"
-                    row={row}
-                    setSelected={setSelected}
-                  />
-                </PopoverContent>
-              </Popover>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
             ))
           ) : (
             <TableRow>

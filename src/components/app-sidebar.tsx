@@ -18,7 +18,6 @@ import {
   InequalityFilter,
   MonthPicker,
   CategoryFilter,
-  BinaryFilter,
 } from './sidebar/filters';
 
 import { UserSettings } from './sidebar/user';
