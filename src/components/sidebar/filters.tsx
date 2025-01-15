@@ -44,17 +44,17 @@ import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
 import { Mountain, Briefcase } from 'lucide-react';
 
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
-import { Switch } from '../ui/switch';
-import { Toggle } from '../ui/toggle';
 import { Checkbox } from '../ui/checkbox';
+import { SportType } from '~/server/db/schema';
+import { CheckedState } from '@radix-ui/react-checkbox';
 
 type DropdownProps = {
   title: string;
-  values: string[];
+  values: Record<SportType, CheckedState>;
   Icon: ComponentType<LucideProps>;
   color: string;
   onToggle: () => void;
-  onChange: (values: string[]) => void;
+  onChange: (value: SportType) => void;
   active: boolean;
 };
 
@@ -67,28 +67,10 @@ export function DropdownMenuCheckboxes({
   onChange,
   active,
 }: DropdownProps) {
-  const [selected, setSelected] = useState(
-    Object.fromEntries(values.map((key) => [key, true])),
-  );
-  React.useEffect(() => {
-    onChange(
-      Object.entries(selected)
-        .filter(([v, a]) => a)
-        .map(([v, a]) => v),
-    );
-  }, [selected]);
-  const onClick = () => {
-    setSelected((selected) =>
-      Object.fromEntries(Object.keys(selected).map((key) => [key, !active])),
-    );
-    onToggle();
-  };
-  console.log(title, active, values);
-
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild>
-        <a onClick={onClick} href="#">
+        <a onClick={onToggle} href="#">
           {active ? (
             <Icon color={color} />
           ) : (
@@ -106,17 +88,12 @@ export function DropdownMenuCheckboxes({
           </SidebarMenuAction>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="start">
-          {values.map((key) => (
+          {Object.entries(values).map(([key, selected]) => (
             <DropdownMenuCheckboxItem
-              checked={selected[key]}
+              checked={selected}
               key={key}
               onSelect={(event) => event.preventDefault()}
-              onCheckedChange={() =>
-                setSelected((selected) => ({
-                  ...selected,
-                  [key]: !selected[key],
-                }))
-              }
+              onCheckedChange={() => onChange(key)}
             >
               {key}
             </DropdownMenuCheckboxItem>
@@ -128,11 +105,12 @@ export function DropdownMenuCheckboxes({
 }
 
 export function CategoryFilter() {
-  const { updateCategory, toggleCategory, categories } = useStore(
+  const { toggleSportGroup, toggleSportType, sportType, sportGroup } = useStore(
     useShallow((state) => ({
-      updateCategory: state.updateCategory,
-      toggleCategory: state.toggleCategory,
-      categories: state.categories,
+      sportType: state.sportType,
+      sportGroup: state.sportGroup,
+      toggleSportGroup: state.toggleSportGroup,
+      toggleSportType: state.toggleSportType,
     })),
   );
 
@@ -141,14 +119,14 @@ export function CategoryFilter() {
       {Object.entries(categorySettings).map(
         ([id, { name, color, icon, alias }]) => (
           <DropdownMenuCheckboxes
-            values={alias}
             color={color}
             title={name}
             key={id}
             Icon={icon}
-            active={categories[id as keyof typeof categories].active}
-            onToggle={() => toggleCategory(id as keyof typeof categories)}
-            onChange={(v) => updateCategory(id as keyof typeof categories, v)}
+            active={sportGroup[id as keyof typeof sportGroup]}
+            values={Object.fromEntries(alias.map((a) => [a, sportType[a]]))}
+            onToggle={() => toggleSportGroup(id as keyof typeof sportGroup)}
+            onChange={(key: SportType) => toggleSportType(key)}
           />
         ),
       )}
@@ -238,7 +216,10 @@ export function MonthPicker() {
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0">
           <MonthRangePicker
-            onMonthRangeSelect={setDates}
+            onMonthRangeSelect={(range) => {
+              console.log(range);
+              setDates(range);
+            }}
             selectedMonthRange={dates}
           />
         </PopoverContent>

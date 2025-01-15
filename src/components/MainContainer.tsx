@@ -102,7 +102,7 @@ export default function MainContainer({
 
     const unsub = useStore.subscribe((state, prevState) => {
       if (
-        state.categories !== prevState.categories ||
+        state.sportType !== prevState.sportType ||
         state.binary !== prevState.binary ||
         state.search !== prevState.search ||
         state.values !== prevState.values ||

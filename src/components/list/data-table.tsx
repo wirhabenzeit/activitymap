@@ -150,13 +150,12 @@ export function DataTablePagination<TData>({
       )}
     >
       <div className="flex-1 text-muted-foreground">
-        <span className="hidden md:inline">
-          {table.getFilteredSelectedRowModel().rows.length} of{' '}
-          {table.getFilteredRowModel().rows.length} activities selected.
+        <span className="">
+          {`${table.getFilteredSelectedRowModel().rows.length}/${table.getFilteredRowModel().rows.length} selected`}
         </span>
       </div>
       <div className="flex items-center space-x-6 lg:space-x-8">
-        <div className="flex items-center space-x-2">
+        <div className="items-center space-x-2 flex">
           <p className="font-medium">Page size</p>
           <Select
             value={`${table.getState().pagination.pageSize}`}
@@ -176,7 +175,7 @@ export function DataTablePagination<TData>({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex w-[100px] items-center justify-center font-medium">
+        <div className="w-[100px] items-center justify-center font-medium hidden md:flex">
           Page {table.getState().pagination.pageIndex + 1} of{' '}
           {table.getPageCount()}
         </div>

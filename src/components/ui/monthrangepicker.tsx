@@ -1,7 +1,7 @@
-import * as React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, buttonVariants } from "./button";
-import { cn } from "~/lib/utils";
+import * as React from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button, buttonVariants } from './button';
+import { cn } from '~/lib/utils';
 
 const addMonths = (input: Date, months: number) => {
   const date = new Date(input);
@@ -26,34 +26,34 @@ type Month = {
 
 const MONTHS: Month[][] = [
   [
-    { number: 0, name: "Jan", yearOffset: 0 },
-    { number: 1, name: "Feb", yearOffset: 0 },
-    { number: 2, name: "Mar", yearOffset: 0 },
-    { number: 3, name: "Apr", yearOffset: 0 },
-    { number: 0, name: "Jan", yearOffset: 1 },
-    { number: 1, name: "Feb", yearOffset: 1 },
-    { number: 2, name: "Mar", yearOffset: 1 },
-    { number: 3, name: "Apr", yearOffset: 1 },
+    { number: 0, name: 'Jan', yearOffset: 0 },
+    { number: 1, name: 'Feb', yearOffset: 0 },
+    { number: 2, name: 'Mar', yearOffset: 0 },
+    { number: 3, name: 'Apr', yearOffset: 0 },
+    { number: 0, name: 'Jan', yearOffset: 1 },
+    { number: 1, name: 'Feb', yearOffset: 1 },
+    { number: 2, name: 'Mar', yearOffset: 1 },
+    { number: 3, name: 'Apr', yearOffset: 1 },
   ],
   [
-    { number: 4, name: "May", yearOffset: 0 },
-    { number: 5, name: "Jun", yearOffset: 0 },
-    { number: 6, name: "Jul", yearOffset: 0 },
-    { number: 7, name: "Aug", yearOffset: 0 },
-    { number: 4, name: "May", yearOffset: 1 },
-    { number: 5, name: "Jun", yearOffset: 1 },
-    { number: 6, name: "Jul", yearOffset: 1 },
-    { number: 7, name: "Aug", yearOffset: 1 },
+    { number: 4, name: 'May', yearOffset: 0 },
+    { number: 5, name: 'Jun', yearOffset: 0 },
+    { number: 6, name: 'Jul', yearOffset: 0 },
+    { number: 7, name: 'Aug', yearOffset: 0 },
+    { number: 4, name: 'May', yearOffset: 1 },
+    { number: 5, name: 'Jun', yearOffset: 1 },
+    { number: 6, name: 'Jul', yearOffset: 1 },
+    { number: 7, name: 'Aug', yearOffset: 1 },
   ],
   [
-    { number: 8, name: "Sep", yearOffset: 0 },
-    { number: 9, name: "Oct", yearOffset: 0 },
-    { number: 10, name: "Nov", yearOffset: 0 },
-    { number: 11, name: "Dec", yearOffset: 0 },
-    { number: 8, name: "Sep", yearOffset: 1 },
-    { number: 9, name: "Oct", yearOffset: 1 },
-    { number: 10, name: "Nov", yearOffset: 1 },
-    { number: 11, name: "Dec", yearOffset: 1 },
+    { number: 8, name: 'Sep', yearOffset: 0 },
+    { number: 9, name: 'Oct', yearOffset: 0 },
+    { number: 10, name: 'Nov', yearOffset: 0 },
+    { number: 11, name: 'Dec', yearOffset: 0 },
+    { number: 8, name: 'Sep', yearOffset: 1 },
+    { number: 9, name: 'Oct', yearOffset: 1 },
+    { number: 10, name: 'Nov', yearOffset: 1 },
+    { number: 11, name: 'Dec', yearOffset: 1 },
   ],
 ];
 
@@ -67,24 +67,25 @@ type QuickSelector = {
 
 const QUICK_SELECTORS: QuickSelector[] = [
   {
-    label: "Reset",
-    startMonth: new Date(new Date().getFullYear() - 20, 0),
-    endMonth: new Date(),
-  },
-  {
-    label: "This year",
+    label: 'This year',
     startMonth: new Date(new Date().getFullYear(), 0),
     endMonth: new Date(new Date().getFullYear(), 11),
   },
   {
-    label: "Last month",
+    label: 'Last month',
     startMonth: new Date(addMonths(new Date(), -1)),
     endMonth: new Date(),
   },
   {
-    label: "Last 12 months",
+    label: 'Last 12 months',
     startMonth: new Date(addMonths(new Date(), -12)),
     endMonth: new Date(),
+  },
+  {
+    label: 'Reset',
+    startMonth: new Date(), // Placeholder dates
+    endMonth: new Date(), // Placeholder dates
+    variant: 'destructive',
   },
 ];
 
@@ -112,12 +113,12 @@ type MonthRangeCalProps = {
 };
 
 type ButtonVariant =
-  | "default"
-  | "outline"
-  | "ghost"
-  | "link"
-  | "destructive"
-  | "secondary"
+  | 'default'
+  | 'outline'
+  | 'ghost'
+  | 'link'
+  | 'destructive'
+  | 'secondary'
   | null
   | undefined;
 
@@ -137,7 +138,7 @@ function MonthRangePicker({
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & MonthRangeCalProps) {
   return (
-    <div className={cn("min-w-[350px] p-3", className)} {...props}>
+    <div className={cn('min-w-[350px] p-3', className)} {...props}>
       <div className="flex flex-col space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
         <div className="w-full">
           <MonthRangeCal
@@ -191,21 +192,6 @@ function MonthRangeCal({
 
   if (minDate && maxDate && minDate > maxDate) minDate = maxDate;
 
-  const handleReset = () => {
-    setStartYear(initialStartYear);
-    setStartMonth(initialStartMonth);
-    setEndYear(initialEndYear);
-    setEndMonth(initialEndMonth);
-    setRangePending(false);
-    setEndLocked(true);
-    if (onMonthRangeSelect) {
-      onMonthRangeSelect({
-        start: new Date(initialStartYear, initialStartMonth),
-        end: new Date(initialEndYear, initialEndMonth),
-      });
-    }
-  };
-
   return (
     <div className="flex flex-col gap-4 sm:flex-row">
       <div className="min-w-[350px] space-y-4">
@@ -220,8 +206,8 @@ function MonthRangeCal({
                 if (onYearBackward) onYearBackward();
               }}
               className={cn(
-                buttonVariants({ variant: variant?.chevrons ?? "outline" }),
-                "absolute left-1 inline-flex h-7 w-7 items-center justify-center p-0",
+                buttonVariants({ variant: variant?.chevrons ?? 'outline' }),
+                'absolute left-1 inline-flex h-7 w-7 items-center justify-center p-0',
               )}
             >
               <ChevronLeft className="h-4 w-4 opacity-50" />
@@ -232,8 +218,8 @@ function MonthRangeCal({
                 if (onYearForward) onYearForward();
               }}
               className={cn(
-                buttonVariants({ variant: variant?.chevrons ?? "outline" }),
-                "absolute right-1 inline-flex h-7 w-7 items-center justify-center p-0",
+                buttonVariants({ variant: variant?.chevrons ?? 'outline' }),
+                'absolute right-1 inline-flex h-7 w-7 items-center justify-center p-0',
               )}
             >
               <ChevronRight className="h-4 w-4 opacity-50" />
@@ -249,16 +235,16 @@ function MonthRangeCal({
           <tbody>
             {MONTHS.map((monthRow, a) => {
               return (
-                <tr key={"row-" + a} className="mt-2 flex w-full">
+                <tr key={'row-' + a} className="mt-2 flex w-full">
                   {monthRow.map((m, i) => {
                     return (
                       <td
-                        key={m.number + "-" + m.yearOffset}
+                        key={m.number + '-' + m.yearOffset}
                         className={cn(
                           cn(
                             cn(
                               cn(
-                                "relative h-10 w-1/4 p-0 text-center text-xs focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected].day-range-end)]:rounded-r-md",
+                                'relative h-10 w-1/4 p-0 text-center text-xs focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected].day-range-end)]:rounded-r-md',
                                 (menuYear + m.yearOffset > startYear ||
                                   (menuYear + m.yearOffset == startYear &&
                                     m.number > startMonth)) &&
@@ -266,24 +252,24 @@ function MonthRangeCal({
                                     (menuYear + m.yearOffset == endYear &&
                                       m.number < endMonth)) &&
                                   (rangePending || endLocked)
-                                  ? "bg-accent text-accent-foreground"
-                                  : "",
+                                  ? 'bg-accent text-accent-foreground'
+                                  : '',
                               ),
                               menuYear + m.yearOffset == startYear &&
                                 m.number == startMonth &&
                                 (rangePending || endLocked)
-                                ? "rounded-l-md bg-accent text-accent-foreground"
-                                : "",
+                                ? 'rounded-l-md bg-accent text-accent-foreground'
+                                : '',
                             ),
                             menuYear + m.yearOffset == endYear &&
                               m.number == endMonth &&
                               (rangePending || endLocked) &&
                               menuYear + m.yearOffset >= startYear &&
                               m.number >= startMonth
-                              ? "rounded-r-md bg-accent text-accent-foreground"
-                              : "",
+                              ? 'rounded-r-md bg-accent text-accent-foreground'
+                              : '',
                           ),
-                          i == 3 ? "mr-2" : i == 4 ? "ml-2" : "",
+                          i == 3 ? 'mr-2' : i == 4 ? 'ml-2' : '',
                         )}
                         onMouseEnter={() => {
                           if (rangePending && !endLocked) {
@@ -361,10 +347,10 @@ function MonthRangeCal({
                                 (endMonth == m.number &&
                                   menuYear + m.yearOffset == endYear &&
                                   !rangePending)
-                                  ? (variant?.calendar?.selected ?? "default")
-                                  : (variant?.calendar?.main ?? "ghost"),
+                                  ? (variant?.calendar?.selected ?? 'default')
+                                  : (variant?.calendar?.main ?? 'ghost'),
                             }),
-                            "h-full w-full p-0 font-normal aria-selected:opacity-100",
+                            'h-full w-full p-0 font-normal aria-selected:opacity-100',
                           )}
                         >
                           {callbacks?.monthLabel
@@ -387,7 +373,7 @@ function MonthRangeCal({
             return (
               <Button
                 onClick={() => {
-                  setStartYear(s.startMonth.getFullYear());
+                  setStartYear(s.startMonth.getMonth());
                   setStartMonth(s.startMonth.getMonth());
                   setEndYear(s.endMonth.getFullYear());
                   setEndMonth(s.endMonth.getMonth());
@@ -401,7 +387,7 @@ function MonthRangeCal({
                   if (s.onClick) s.onClick(s);
                 }}
                 key={s.label}
-                variant={s.variant ?? "outline"}
+                variant={s.variant ?? 'outline'}
               >
                 {s.label}
               </Button>
@@ -413,6 +399,6 @@ function MonthRangeCal({
   );
 }
 
-MonthRangePicker.displayName = "MonthRangePicker";
+MonthRangePicker.displayName = 'MonthRangePicker';
 
 export { MonthRangePicker };

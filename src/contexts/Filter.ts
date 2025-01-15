@@ -1,23 +1,24 @@
-import { type StateCreator } from "zustand";
-import * as d3 from "d3";
+import { type StateCreator } from 'zustand';
+import * as d3 from 'd3';
 
-import { categorySettings } from "~/settings/category";
+import { aliasMap, categorySettings } from '~/settings/category';
 
-import { type CategorySetting } from "~/settings/category";
-import { inequalityFilters, binaryFilters } from "~/settings/filter";
+import { type CategorySetting } from '~/settings/category';
+import { inequalityFilters, binaryFilters } from '~/settings/filter';
 import {
   type BooleanColumn,
   type SportType,
   type Activity,
   type ValueColumn,
-} from "~/server/db/schema";
+} from '~/server/db/schema';
 
-import { type TotalZustand } from "./Zustand";
+import { type TotalZustand } from './Zustand';
 
 type CategoryGroup = keyof CategorySetting;
 
 export type FilterZustand = {
-  categories: Record<CategoryGroup, { active: boolean; filter: string[] }>;
+  sportType: Record<SportType, boolean>;
+  sportGroup: Record<CategoryGroup, boolean>;
   dateRange: { start: Date; end: Date } | undefined;
   values: Record<ValueColumn, [number, number] | undefined>;
   search: string;
@@ -25,8 +26,8 @@ export type FilterZustand = {
   filterRanges: Record<ValueColumn, [number, number] | undefined>;
   filterRangesSet: boolean;
   filterIDs: number[];
-  toggleCategory: (group: CategoryGroup) => void;
-  updateCategory: (group: CategoryGroup, category: string[]) => void;
+  toggleSportGroup: (group: CategoryGroup) => void;
+  toggleSportType: (type: SportType) => void;
   setDateRange: (range: { start: Date; end: Date }) => void;
   setValueFilter: (
     id: ValueColumn,
@@ -40,21 +41,47 @@ export type FilterZustand = {
 
 export const filterSlice: StateCreator<
   TotalZustand,
-  [["zustand/immer", never]],
+  [['zustand/immer', never]],
   [],
   FilterZustand
 > = (set) => ({
-  categories: Object.fromEntries(
-    Object.entries(categorySettings).map(([key, { active, alias }]) => [
-      key as CategoryGroup,
-      { active, filter: active ? alias : [] },
-    ]),
-  ) as Record<CategoryGroup, { active: boolean; filter: string[] }>,
+  sportType: Object.fromEntries(
+    Object.values(categorySettings).flatMap(
+      ({ alias }: { alias: SportType[] }) =>
+        alias.map((a: SportType) => [a, true]),
+    ),
+  ) as Record<SportType, boolean>,
+  sportGroup: Object.fromEntries(
+    Object.keys(categorySettings).map((key) => [key as CategoryGroup, true]),
+  ) as Record<CategoryGroup, boolean>,
+  toggleSportGroup: (group) => {
+    set((state) => {
+      state.sportGroup[group] = !state.sportGroup[group];
+      categorySettings[group].alias.forEach((key) => {
+        state.sportType[key] = state.sportGroup[group];
+      });
+    });
+  },
+  toggleSportType: (type) => {
+    set((state) => {
+      state.sportType[type] = !state.sportType[type];
+      const group = aliasMap[type]!;
+      if (!state.sportGroup[group] && state.sportType[type]) {
+        state.sportGroup[group] = true;
+      }
+      if (
+        state.sportGroup[group] &&
+        categorySettings[group].alias.every((key) => !state.sportType[key])
+      ) {
+        state.sportGroup[group] = false;
+      }
+    });
+  },
   dateRange: undefined,
   values: Object.fromEntries(
     Object.keys(inequalityFilters).map((key) => [key, undefined]),
   ) as Record<ValueColumn, [number, number] | undefined>,
-  search: "",
+  search: '',
   binary: Object.fromEntries(
     Object.entries(binaryFilters).map(([key, { defaultValue }]) => [
       key,
@@ -71,21 +98,9 @@ export const filterSlice: StateCreator<
       state.dateRange = range;
     });
   },
-  toggleCategory: (group) =>
-    set((state) => {
-      state.categories[group].filter = state.categories[group].active
-        ? []
-        : (categorySettings[group].alias as string[]);
-      state.categories[group].active = !state.categories[group].active;
-    }),
   setBinary: (id, value) =>
     set((state) => {
       state.binary[id] = value;
-    }),
-  updateCategory: (group, category) =>
-    set((state) => {
-      state.categories[group].filter = category;
-      state.categories[group].active = category.length > 0;
     }),
   setValueFilter: (id, value) =>
     set((state) => {
@@ -98,21 +113,27 @@ export const filterSlice: StateCreator<
   updateFilters: () =>
     set((state) => {
       const filter = (row: Activity) => {
-        const activeCat = [] as SportType[];
-        Object.entries(state.categories).forEach(([, value]) => {
-          activeCat.push(...(value.filter as SportType[]));
-        });
+        const activeCat = Object.entries(state.sportType)
+          .filter(([key, active]) => active)
+          .map(([key, active]) => key) as SportType[];
         if (!activeCat.includes(row.sport_type)) {
           return false;
         }
-        if (
-          state.dateRange &&
-          (row.start_date_local_timestamp <
-            state.dateRange.start.getTime() / 1000 ||
-            row.start_date_local_timestamp >
-              state.dateRange.end.getTime() / 1000)
-        )
-          return false;
+        if (state.dateRange) {
+          const startDate = state.dateRange.start.getTime() / 1000;
+          const endDate = new Date(state.dateRange.end);
+          endDate.setMonth(endDate.getMonth() + 1);
+          endDate.setDate(0); // Set to the last day of the previous month
+          endDate.setHours(23, 59, 59, 999); // Set to the last moment of the day
+          const endDateTimestamp = endDate.getTime() / 1000;
+
+          if (
+            row.start_date_local_timestamp < startDate ||
+            row.start_date_local_timestamp > endDateTimestamp
+          ) {
+            return false;
+          }
+        }
         if (
           state.search &&
           !row.name.toLowerCase().includes(state.search.toLowerCase()) &&
