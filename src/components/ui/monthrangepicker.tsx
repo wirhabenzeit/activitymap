@@ -2,6 +2,7 @@ import * as React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, buttonVariants } from './button';
 import { cn } from '~/lib/utils';
+import { useStore } from '~/contexts/Zustand';
 
 const addMonths = (input: Date, months: number) => {
   const date = new Date(input);
@@ -72,14 +73,23 @@ const QUICK_SELECTORS: QuickSelector[] = [
     endMonth: new Date(new Date().getFullYear(), 11),
   },
   {
-    label: 'Last month',
-    startMonth: new Date(addMonths(new Date(), -1)),
-    endMonth: new Date(),
+    label: 'Last year',
+    startMonth: new Date(new Date().getFullYear() - 1, 0),
+    endMonth: new Date(new Date().getFullYear() - 1, 11),
   },
   {
-    label: 'Last 12 months',
-    startMonth: new Date(addMonths(new Date(), -12)),
-    endMonth: new Date(),
+    label: 'This month',
+    startMonth: new Date(new Date().getFullYear(), new Date().getMonth()),
+    endMonth: new Date(new Date().getFullYear(), new Date().getMonth()),
+  },
+  {
+    label: 'Last month',
+    startMonth: new Date(
+      addMonths(new Date(new Date().getFullYear(), new Date().getMonth()), -1),
+    ),
+    endMonth: new Date(
+      addMonths(new Date(new Date().getFullYear(), new Date().getMonth()), -1),
+    ),
   },
   {
     label: 'Reset',
@@ -189,6 +199,7 @@ function MonthRangeCal({
   const [rangePending, setRangePending] = React.useState<boolean>(false);
   const [endLocked, setEndLocked] = React.useState<boolean>(true);
   const [menuYear, setMenuYear] = React.useState<number>(startYear);
+  const setDateRange = useStore((state) => state.setDateRange);
 
   if (minDate && maxDate && minDate > maxDate) minDate = maxDate;
 
@@ -373,20 +384,24 @@ function MonthRangeCal({
             return (
               <Button
                 onClick={() => {
-                  setStartYear(s.startMonth.getMonth());
-                  setStartMonth(s.startMonth.getMonth());
-                  setEndYear(s.endMonth.getFullYear());
-                  setEndMonth(s.endMonth.getMonth());
-                  setRangePending(false);
-                  setEndLocked(true);
-                  if (onMonthRangeSelect)
-                    onMonthRangeSelect({
-                      start: s.startMonth,
-                      end: s.endMonth,
-                    });
-                  if (s.onClick) s.onClick(s);
+                  if (s.label == 'Reset') setDateRange(undefined);
+                  else {
+                    setStartYear(s.startMonth.getMonth());
+                    setStartMonth(s.startMonth.getMonth());
+                    setEndYear(s.endMonth.getFullYear());
+                    setEndMonth(s.endMonth.getMonth());
+                    setRangePending(false);
+                    setEndLocked(true);
+                    if (onMonthRangeSelect)
+                      onMonthRangeSelect({
+                        start: s.startMonth,
+                        end: s.endMonth,
+                      });
+                    if (s.onClick) s.onClick(s);
+                  }
                 }}
                 key={s.label}
+                size="sm"
                 variant={s.variant ?? 'outline'}
               >
                 {s.label}
