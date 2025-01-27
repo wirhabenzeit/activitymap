@@ -26,8 +26,14 @@ export type FilterZustand = {
   filterRanges: Record<ValueColumn, [number, number] | undefined>;
   filterRangesSet: boolean;
   filterIDs: number[];
-  toggleSportGroup: (group: CategoryGroup) => void;
-  toggleSportType: (type: SportType) => void;
+  setSportGroup: (
+    updateFn: (
+      group: Record<CategoryGroup, boolean>,
+    ) => Record<CategoryGroup, boolean>,
+  ) => void;
+  setSportType: (
+    updateFn: (type: Record<SportType, boolean>) => Record<SportType, boolean>,
+  ) => void;
   setDateRange: (range: { start: Date; end: Date }) => void;
   setValueFilter: (
     id: ValueColumn,
@@ -54,27 +60,28 @@ export const filterSlice: StateCreator<
   sportGroup: Object.fromEntries(
     Object.keys(categorySettings).map((key) => [key as CategoryGroup, true]),
   ) as Record<CategoryGroup, boolean>,
-  toggleSportGroup: (group) => {
+  setSportGroup: (updateFn) => {
     set((state) => {
-      state.sportGroup[group] = !state.sportGroup[group];
-      categorySettings[group].alias.forEach((key) => {
-        state.sportType[key] = state.sportGroup[group];
+      state.sportGroup = updateFn(state.sportGroup);
+      (
+        Object.keys(state.sportGroup) as (keyof typeof state.sportGroup)[]
+      ).forEach((group) => {
+        categorySettings[group].alias.forEach((key) => {
+          state.sportType[key] = state.sportGroup[group];
+        });
       });
     });
   },
-  toggleSportType: (type) => {
+  setSportType: (updateFn) => {
     set((state) => {
-      state.sportType[type] = !state.sportType[type];
-      const group = aliasMap[type]!;
-      if (!state.sportGroup[group] && state.sportType[type]) {
-        state.sportGroup[group] = true;
-      }
-      if (
-        state.sportGroup[group] &&
-        categorySettings[group].alias.every((key) => !state.sportType[key])
-      ) {
-        state.sportGroup[group] = false;
-      }
+      state.sportType = updateFn(state.sportType);
+      (
+        Object.keys(state.sportGroup) as (keyof typeof state.sportGroup)[]
+      ).forEach((group) => {
+        state.sportGroup[group] = categorySettings[group].alias.some(
+          (key) => state.sportType[key],
+        );
+      });
     });
   },
   dateRange: undefined,

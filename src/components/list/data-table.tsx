@@ -36,6 +36,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableFooter,
   TableRow,
 } from '~/components/ui/table';
 import {
@@ -99,11 +100,7 @@ export function DataTableViewOptions<TData>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="ml-auto hidden h-8 lg:flex"
-        >
+        <Button variant="outline" size="sm" className="h-8">
           <MixerHorizontalIcon className="mr-2 h-4 w-4" />
           View
         </Button>
@@ -129,6 +126,17 @@ export function DataTableViewOptions<TData>({
               </DropdownMenuCheckboxItem>
             );
           })}
+        <DropdownMenuLabel>Page size</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {[50, 100, 200].map((pageSize) => (
+          <DropdownMenuCheckboxItem
+            key={pageSize}
+            checked={table.getState().pagination.pageSize === pageSize}
+            onClick={() => table.setPageSize(pageSize)}
+          >
+            {pageSize}
+          </DropdownMenuCheckboxItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -149,32 +157,13 @@ export function DataTablePagination<TData>({
         className,
       )}
     >
-      <div className="flex-1 text-muted-foreground">
+      <div className="text-muted-foreground">
         <span className="">
-          {`${table.getFilteredSelectedRowModel().rows.length}/${table.getFilteredRowModel().rows.length} selected`}
+          {`${table.getFilteredSelectedRowModel().rows.length}/${table.getFilteredRowModel().rows.length}`}
         </span>
       </div>
+      <DataTableViewOptions table={table} />
       <div className="flex items-center space-x-6 lg:space-x-8">
-        <div className="items-center space-x-2 flex">
-          <p className="font-medium">Page size</p>
-          <Select
-            value={`${table.getState().pagination.pageSize}`}
-            onValueChange={(value) => {
-              table.setPageSize(Number(value));
-            }}
-          >
-            <SelectTrigger className="h-8 w-[70px]">
-              <SelectValue placeholder={table.getState().pagination.pageSize} />
-            </SelectTrigger>
-            <SelectContent side="top">
-              {[50, 100, 200].map((pageSize) => (
-                <SelectItem key={pageSize} value={`${pageSize}`}>
-                  {pageSize}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
         <div className="w-[100px] items-center justify-center font-medium hidden md:flex">
           Page {table.getState().pagination.pageIndex + 1} of{' '}
           {table.getPageCount()}
@@ -338,20 +327,18 @@ export function DataTable<TData, TValue>({
     <div className={cn('flex flex-col', className)}>
       <Table
         id="table-main"
-        className="text-xs"
+        className="text-xs border-separate border-spacing-0 table-fixed"
         wrapperClassName="overflow-scroll min-h-0 w-full flex-1"
       >
-        <TableHeader className="sticky">
+        <TableHeader className="sticky [&_tr]:border-b-0">
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
+            <TableRow key={headerGroup.id} className="border-b-0">
               {headerGroup.headers.map((header) => {
                 return (
                   <TableHead
-                    className="py-1"
+                    className="py-0"
                     key={header.id}
-                    style={{
-                      width: `${header.getSize()}px`,
-                    }}
+                    style={{ width: header.column.getSize() }}
                   >
                     {header.isPlaceholder
                       ? null
@@ -359,6 +346,23 @@ export function DataTable<TData, TValue>({
                           header.column.columnDef.header,
                           header.getContext(),
                         )}
+                  </TableHead>
+                );
+              })}
+            </TableRow>
+          ))}
+          {table.getFooterGroups().map((footerGroup) => (
+            <TableRow key={footerGroup.id} className="border-b">
+              {footerGroup.headers.map((footer) => {
+                return (
+                  <TableHead
+                    key={footer.id}
+                    className="py-0 h-8 border-b border-t border-muted/50"
+                  >
+                    {flexRender(
+                      footer.column.columnDef.footer,
+                      footer.getContext(),
+                    )}
                   </TableHead>
                 );
               })}
@@ -376,10 +380,11 @@ export function DataTable<TData, TValue>({
                   <TableCell
                     className="py-1"
                     key={cell.id}
-                    width={cell.column.columnDef.size}
+                    width={cell.column.getSize()}
                     style={{
-                      maxWidth: cell.column.columnDef.size,
-                      minWidth: cell.column.columnDef.size,
+                      width: cell.column.getSize(),
+                      minWidth: cell.column.getSize(),
+                      maxWidth: cell.column.getSize(),
                     }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

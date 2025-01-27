@@ -1,6 +1,3 @@
-import { type Activity } from '~/server/db/schema';
-import { categorySettings, aliasMap } from './category';
-
 function decFormatter(unit = '', decimals = 0) {
   return (num: number | undefined) =>
     num == undefined ? null : num.toFixed(decimals) + unit;

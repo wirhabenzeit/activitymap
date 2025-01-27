@@ -1,6 +1,7 @@
 'use client';
 
 import { ComponentType } from 'react';
+import { useEffect } from 'react';
 
 import { LucideProps, MoreHorizontal } from 'lucide-react';
 
@@ -40,9 +41,6 @@ import { format } from 'date-fns/format';
 import { useState } from 'react';
 import { cn } from '~/lib/utils';
 
-import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
-import { Mountain, Briefcase } from 'lucide-react';
-
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
 import { Checkbox } from '../ui/checkbox';
 import { SportType } from '~/server/db/schema';
@@ -58,76 +56,112 @@ type DropdownProps = {
   active: boolean;
 };
 
-export function DropdownMenuCheckboxes({
-  title,
-  values,
-  Icon,
-  color,
-  onToggle,
-  onChange,
-  active,
-}: DropdownProps) {
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton asChild>
-        <a onClick={onToggle} href="#">
-          {active ? (
-            <Icon color={color} />
-          ) : (
-            <Icon className="text-foreground/60" />
-          )}
-          <span className={active ? 'text-foreground' : 'text-foreground/60'}>
-            {title}
-          </span>
-        </a>
-      </SidebarMenuButton>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <SidebarMenuAction>
-            <MoreHorizontal />
-          </SidebarMenuAction>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" align="start">
-          {Object.entries(values).map(([key, selected]) => (
-            <DropdownMenuCheckboxItem
-              checked={selected}
-              key={key}
-              onSelect={(event) => event.preventDefault()}
-              onCheckedChange={() => onChange(key)}
-            >
-              {key}
-            </DropdownMenuCheckboxItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </SidebarMenuItem>
-  );
-}
-
 export function CategoryFilter() {
-  const { toggleSportGroup, toggleSportType, sportType, sportGroup } = useStore(
+  const { sportType, sportGroup, setSportGroup, setSportType } = useStore(
     useShallow((state) => ({
       sportType: state.sportType,
       sportGroup: state.sportGroup,
-      toggleSportGroup: state.toggleSportGroup,
-      toggleSportType: state.toggleSportType,
+      setSportGroup: state.setSportGroup,
+      setSportType: state.setSportType,
     })),
   );
+  const [clicks, setClicks] = useState(0);
+  const [key, setKey] = useState<keyof typeof sportGroup | undefined>(
+    undefined,
+  );
+
+  useEffect(() => {
+    let singleClickTimer: NodeJS.Timeout;
+    if (clicks === 1) {
+      singleClickTimer = setTimeout(function () {
+        doSingleClickThing();
+        setClicks(0);
+      }, 250);
+    } else if (clicks >= 2) {
+      doDoubleClickThing();
+      setClicks(0);
+    }
+    return () => clearTimeout(singleClickTimer);
+  }, [clicks]);
+
+  const doSingleClickThing = () => {
+    if (key) setSportGroup((group) => ({ ...group, [key]: !group[key] }));
+  };
+
+  const doDoubleClickThing = () => {
+    if (key)
+      setSportGroup(
+        (group) =>
+          Object.fromEntries(
+            Object.keys(group).map((k) => [k, k === key]),
+          ) as Record<keyof typeof sportGroup, boolean>,
+      );
+  };
 
   return (
     <SidebarMenu>
       {Object.entries(categorySettings).map(
-        ([id, { name, color, icon, alias }]) => (
-          <DropdownMenuCheckboxes
-            color={color}
-            title={name}
-            key={id}
-            Icon={icon}
-            active={sportGroup[id as keyof typeof sportGroup]}
-            values={Object.fromEntries(alias.map((a) => [a, sportType[a]]))}
-            onToggle={() => toggleSportGroup(id as keyof typeof sportGroup)}
-            onChange={(key: SportType) => toggleSportType(key)}
-          />
+        ([id, { name, color, icon: Icon, alias }]) => (
+          <SidebarMenuItem key={id}>
+            <SidebarMenuButton
+              //onClick={() => toggleSportGroup(id as keyof typeof sportGroup)}
+              onClick={(e) => {
+                e.preventDefault();
+                setClicks(clicks + 1);
+                setKey(id);
+              }}
+            >
+              {sportGroup[id as keyof typeof sportGroup] ? (
+                <Icon color={color} />
+              ) : (
+                <Icon className="text-foreground/60" />
+              )}
+              <span
+                className={
+                  sportGroup[id as keyof typeof sportGroup]
+                    ? 'text-foreground'
+                    : 'text-foreground/60'
+                }
+              >
+                {name}
+              </span>
+            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuAction>
+                  <MoreHorizontal />
+                </SidebarMenuAction>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start">
+                {(
+                  Object.entries(
+                    Object.fromEntries(alias.map((a) => [a, sportType[a]])),
+                  ) as [SportType, boolean][]
+                ).map(([key, selected]) => (
+                  <DropdownMenuCheckboxItem
+                    checked={selected}
+                    key={key}
+                    onSelect={(event) => event.preventDefault()}
+                    onCheckedChange={() =>
+                      setSportType((type) => ({ ...type, [key]: !type[key] }))
+                    }
+                  >
+                    {key}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+          // <DropdownMenuCheckboxes
+          //   color={color}
+          //   title={name}
+          //   key={id}
+          //   Icon={icon}
+          //   active={sportGroup[id as keyof typeof sportGroup]}
+          //   values={Object.fromEntries(alias.map((a) => [a, sportType[a]]))}
+          //   onToggle={() => toggleSportGroup(id as keyof typeof sportGroup)}
+          //   onChange={(key: SportType) => toggleSportType(key)}
+          // />
         ),
       )}
     </SidebarMenu>
@@ -201,16 +235,24 @@ export function MonthPicker() {
     useShallow((state) => [state.dateRange, state.setDateRange]),
   );
 
+  const dateStr = [dates?.start, dates?.end].map((date) =>
+    date ? format(date, 'MMM yyyy') : undefined,
+  );
+
   return (
     <SidebarMenuItem>
       <Popover>
         <PopoverTrigger asChild>
           <SidebarMenuButton className={cn(!dates && 'text-muted-foreground')}>
             <CalendarIcon />
-            {dates ? (
-              `${format(dates.start, 'MMM yyyy')} - ${format(dates.end, 'MMM yyyy')}`
-            ) : (
+            {dates == undefined ? (
               <span>Pick a month range</span>
+            ) : dateStr[0] == dateStr[1] ? (
+              <span>{dateStr[0]}</span>
+            ) : (
+              <span>
+                {dateStr[0]} - {dateStr[1]}
+              </span>
             )}
           </SidebarMenuButton>
         </PopoverTrigger>
