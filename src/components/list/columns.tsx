@@ -113,48 +113,59 @@ function ActivityCard({ row }: ActivityCardProps) {
   ];
 
   return (
-    <HoverCard>
-      <HoverCardTrigger asChild>
-        <Button
-          asChild
-          variant="link"
-          className="text-left truncate underline justify-start max-w-full px-0"
-          size="sm"
-        >
-          <Link
-            href={`https://strava.com/activities/${row.getValue('id')}`}
-            target="_blank"
+    <span className="flex items-center space-x-2">
+      <Button
+        variant={row.getIsSelected() ? 'outline' : 'ghost'}
+        size="sm"
+        className="h-6 w-6 border"
+        onClick={() => row.toggleSelected()}
+        aria-label="Select row"
+      >
+        <Icon color={categorySettings[sport_group].color} />
+      </Button>
+      <HoverCard>
+        <HoverCardTrigger asChild>
+          <Button
+            asChild
+            variant="link"
+            className="text-left truncate underline justify-start max-w-full px-0"
+            size="sm"
           >
-            {row.getValue('name')}
-          </Link>
-        </Button>
-      </HoverCardTrigger>
-      <HoverCardContent className="w-auto max-w-80">
-        <div className="flex justify-between space-x-4">
-          <Avatar>
-            <AvatarFallback>
-              <Icon
-                color={categorySettings[sport_group].color}
-                className="w-6 h-6"
-                height="3em"
-              />
-            </AvatarFallback>
-          </Avatar>
-          <div className="space-y-1">
-            <h4 className="text-sm font-semibold">{row.getValue('name')}</h4>
-            <p className="text-sm">{row.getValue('description') || ''}</p>
-            {stats.map((stat, index) => (
-              <div className="flex items-center pt-2" key={index}>
-                <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
-                <span className="text-xs text-muted-foreground">
-                  {stat.description}
-                </span>
-              </div>
-            ))}
+            <Link
+              href={`https://strava.com/activities/${row.getValue('id')}`}
+              target="_blank"
+            >
+              {row.getValue('name')}
+            </Link>
+          </Button>
+        </HoverCardTrigger>
+        <HoverCardContent className="w-auto max-w-80 z-50">
+          <div className="flex justify-between space-x-4">
+            <Avatar>
+              <AvatarFallback>
+                <Icon
+                  color={categorySettings[sport_group].color}
+                  className="w-6 h-6"
+                  height="3em"
+                />
+              </AvatarFallback>
+            </Avatar>
+            <div className="space-y-1">
+              <h4 className="text-sm font-semibold">{row.getValue('name')}</h4>
+              <p className="text-sm">{row.getValue('description') || ''}</p>
+              {stats.map((stat, index) => (
+                <div className="flex items-center pt-2" key={index}>
+                  <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
+                  <span className="text-xs text-muted-foreground">
+                    {stat.description}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </HoverCardContent>
-    </HoverCard>
+        </HoverCardContent>
+      </HoverCard>
+    </span>
   );
 }
 
@@ -164,51 +175,83 @@ export const columns: ColumnDef<Activity>[] = [
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title="ID" />
     ),
-  },
-  {
-    id: 'select',
-    accessorKey: 'sport_type',
-    size: 40,
-    header: ({ table, column }) => (
-      <Checkbox
-        className="h-6 w-6"
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && 'indeterminate')
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: ({ row }) => {
-      const sport_type = row.original.sport_type;
-      const sport_group = aliasMap[sport_type]!;
-      const Icon = categorySettings[sport_group].icon;
-      return (
-        <Button
-          variant={row.getIsSelected() ? 'outline' : 'secondary'}
-          size="sm"
-          className="h-6 w-6"
-          onClick={() => row.toggleSelected()}
-          aria-label="Select row"
-        >
-          <Icon color={categorySettings[sport_group].color} />
-        </Button>
-      );
-    },
     enableHiding: false,
   },
   {
     accessorKey: 'name',
     header: ({ column, table }) => (
-      <DataTableColumnHeader table={table} column={column} title="Name" />
+      <DataTableColumnHeader table={table} column={column}>
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            className="h-6 w-6"
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && 'indeterminate')
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+            aria-label="Select all"
+          />
+          <span>Name</span>
+        </div>
+      </DataTableColumnHeader>
     ),
     size: 150,
     cell: ({ row, getValue }) => <ActivityCard row={row} />,
+    enableHiding: false,
     // footer: ({ column, table }) => (
     //   <div className="text-left">{table.getRowModel().rows.length}</div>
     // ),
   },
+  ...Object.entries(activityFields).map(
+    ([
+      id,
+      {
+        title,
+        formatter,
+        Icon,
+        reducer,
+        accessorFn,
+        summaryFormatter,
+        reducerSymbol,
+      },
+    ]) => ({
+      id,
+      accessorKey: id,
+      cell: ({ getValue }) => (
+        <div className="text-right">{formatter(getValue())}</div>
+      ),
+      meta: title,
+      header: ({ column, table }) => (
+        <DataTableColumnHeader table={table} column={column}>
+          {Icon && <Icon className="w-4 h-4" />}
+          {/* <span>{title}</span> */}
+        </DataTableColumnHeader>
+      ),
+      size: 60,
+      enableResizing: false,
+      ...(accessorFn && { accessorFn }),
+      ...(!accessorFn && { accessorKey: id }),
+      ...(reducer && {
+        footer: ({ column, table }) => (
+          <div className="text-right">
+            {summaryFormatter
+              ? summaryFormatter(
+                  reducer(
+                    table.getRowModel().rows.map((row) => row.getValue(id)),
+                  ),
+                )
+              : `${reducerSymbol || ''}${formatter(
+                  reducer(
+                    table.getRowModel().rows.map((row) => row.getValue(id)),
+                  ),
+                )}`}
+          </div>
+        ),
+      }),
+    }),
+  ),
   {
     accessorKey: 'description',
     header: ({ column, table }) => (
@@ -234,52 +277,4 @@ export const columns: ColumnDef<Activity>[] = [
       </Popover>
     ),
   },
-  ...Object.entries(activityFields).map(
-    ([
-      id,
-      {
-        title,
-        formatter,
-        Icon,
-        reducer,
-        accessorFn,
-        summaryFormatter,
-        reducerSymbol,
-      },
-    ]) => ({
-      id,
-      accessorKey: id,
-      cell: ({ getValue }) => (
-        <div className="text-right">{formatter(getValue())}</div>
-      ),
-      header: ({ column, table }) => (
-        <DataTableColumnHeader
-          table={table}
-          column={column}
-          title={Icon ? <Icon /> : title}
-        />
-      ),
-      size: 60,
-      enableResizing: false,
-      ...(accessorFn && { accessorFn }),
-      ...(!accessorFn && { accessorKey: id }),
-      ...(reducer && {
-        footer: ({ column, table }) => (
-          <div className="text-right">
-            {summaryFormatter
-              ? summaryFormatter(
-                  reducer(
-                    table.getRowModel().rows.map((row) => row.getValue(id)),
-                  ),
-                )
-              : `${reducerSymbol || ''}${formatter(
-                  reducer(
-                    table.getRowModel().rows.map((row) => row.getValue(id)),
-                  ),
-                )}`}
-          </div>
-        ),
-      }),
-    }),
-  ),
 ];

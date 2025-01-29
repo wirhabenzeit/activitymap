@@ -29,6 +29,10 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSubContent,
 } from '~/components/ui/dropdown-menu';
 import {
   Table,
@@ -39,18 +43,6 @@ import {
   TableFooter,
   TableRow,
 } from '~/components/ui/table';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '~/components/ui/popover';
-
-import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '~/components/ui/hover-card';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -76,18 +68,10 @@ import { ActivityColumn } from './columns';
 import { useStore } from '~/contexts/Zustand';
 import { useShallow } from 'zustand/shallow';
 
-import { BellRing, Check } from 'lucide-react';
+import { BellRing, Check, Columns, FileStack, UserPlus } from 'lucide-react';
 
 import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card';
 import { set } from 'zod';
 
 interface DataTableViewOptionsProps<TData> {
@@ -98,45 +82,65 @@ export function DataTableViewOptions<TData>({
   table,
 }: DataTableViewOptionsProps<TData>) {
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="h-8">
           <MixerHorizontalIcon className="mr-2 h-4 w-4" />
           View
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[150px]">
-        <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {table
-          .getAllColumns()
-          .filter(
-            (column) =>
-              typeof column.accessorFn !== 'undefined' && column.getCanHide(),
-          )
-          .map((column) => {
-            return (
-              <DropdownMenuCheckboxItem
-                key={column.id}
-                className="capitalize"
-                checked={column.getIsVisible()}
-                onCheckedChange={(value) => column.toggleVisibility(!!value)}
-              >
-                {column.id}
-              </DropdownMenuCheckboxItem>
-            );
-          })}
-        <DropdownMenuLabel>Page size</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {[50, 100, 200].map((pageSize) => (
-          <DropdownMenuCheckboxItem
-            key={pageSize}
-            checked={table.getState().pagination.pageSize === pageSize}
-            onClick={() => table.setPageSize(pageSize)}
-          >
-            {pageSize}
-          </DropdownMenuCheckboxItem>
-        ))}
+      <DropdownMenuContent className="w-56">
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Columns className="h-4" />
+            <span>Columns</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent className="h-96 overflow-y-auto">
+              {table
+                .getAllColumns()
+                .filter(
+                  (column) =>
+                    typeof column.accessorFn !== 'undefined' &&
+                    column.getCanHide(),
+                )
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onClick={(e) => {
+                        column.toggleVisibility(!column.getIsVisible());
+                        e.preventDefault(); // Prevent the default behavior of closing the menu
+                        //e.stopPropagation(); // Stop the event from bubbling up
+                      }}
+                    >
+                      {(column.columnDef.meta as string) || column.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <FileStack className="h-4" />
+            <span>{`${table.getState().pagination.pageSize} per page`}</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent>
+              {[50, 100, 200, 500].map((pageSize) => (
+                <DropdownMenuItem
+                  key={pageSize}
+                  onClick={() => table.setPageSize(pageSize)}
+                >
+                  {pageSize}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -221,51 +225,20 @@ interface DataTableColumnHeaderProps<TData, TValue>
 
 export function DataTableColumnHeader<TData, TValue>({
   column,
-  title,
   className,
-  dropdown = true,
-  table,
+  children,
+  title,
 }: DataTableColumnHeaderProps<TData, TValue>) {
   if (!column.getCanSort()) {
-    return <div className={cn(className)}>{title}</div>;
+    return <div className={cn(className)}>{children}</div>;
   }
 
   return (
     <div className={cn('flex items-center space-x-2', className)}>
-      {dropdown ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild className="flex-1">
-            <Button
-              variant="link"
-              size="sm"
-              className="h-8 justify-center px-0 data-[state=open]:bg-accent"
-            >
-              {title}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : (
-        <span>{title}</span>
-      )}
+      <div className="flex-1">
+        {title && <span className="w-4 h-4">{title}</span>}
+        {children}
+      </div>
       <Button
         variant="ghost"
         size="sm"
@@ -315,6 +288,9 @@ export function DataTable<TData, TValue>({
       pagination: {
         pageSize: 50,
       },
+      columnPinning: {
+        left: ['name'],
+      },
     },
     state: {
       sorting,
@@ -336,7 +312,11 @@ export function DataTable<TData, TValue>({
               {headerGroup.headers.map((header) => {
                 return (
                   <TableHead
-                    className="py-0"
+                    className={cn(
+                      'py-0',
+                      header.column.getIsPinned() &&
+                        'sticky left-0 z-20 bg-muted',
+                    )}
                     key={header.id}
                     style={{ width: header.column.getSize() }}
                   >
@@ -357,7 +337,7 @@ export function DataTable<TData, TValue>({
                 return (
                   <TableHead
                     key={footer.id}
-                    className="py-0 h-8 border-b border-t border-muted/50"
+                    className="py-0 h-8 border-b border-t"
                   >
                     {flexRender(
                       footer.column.columnDef.footer,
@@ -375,10 +355,14 @@ export function DataTable<TData, TValue>({
               <TableRow
                 key={row.id}
                 data-state={row.getIsSelected() && 'selected'}
+                className="group"
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
-                    className="py-1"
+                    className={cn(
+                      'py-1 bg-background group-data-[state=selected]:bg-muted',
+                      cell.column.getIsPinned() && 'sticky left-0 z-1',
+                    )}
                     key={cell.id}
                     width={cell.column.getSize()}
                     style={{

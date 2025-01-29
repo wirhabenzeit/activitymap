@@ -126,13 +126,17 @@ export function CategoryFilter() {
                 {name}
               </span>
             </SidebarMenuButton>
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuAction>
                   <MoreHorizontal />
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="start">
+              <DropdownMenuContent
+                side="right"
+                align="start"
+                className="max-h-96 !overflow-scroll"
+              >
                 {(
                   Object.entries(
                     Object.fromEntries(alias.map((a) => [a, sportType[a]])),
