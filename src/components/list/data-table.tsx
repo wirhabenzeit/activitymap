@@ -315,7 +315,7 @@ export function DataTable<TData, TValue>({
                     className={cn(
                       'py-0',
                       header.column.getIsPinned() &&
-                        'sticky left-0 z-20 bg-muted',
+                        'sticky left-0 bg-muted border-border border-r',
                     )}
                     key={header.id}
                     style={{ width: header.column.getSize() }}
@@ -337,7 +337,11 @@ export function DataTable<TData, TValue>({
                 return (
                   <TableHead
                     key={footer.id}
-                    className="py-0 h-8 border-b border-t"
+                    className={cn(
+                      'py-0',
+                      footer.column.getIsPinned() &&
+                        'sticky left-0 bg-muted border-r border-border',
+                    )}
                   >
                     {flexRender(
                       footer.column.columnDef.footer,
@@ -361,7 +365,8 @@ export function DataTable<TData, TValue>({
                   <TableCell
                     className={cn(
                       'py-1 bg-background group-data-[state=selected]:bg-muted',
-                      cell.column.getIsPinned() && 'sticky left-0 z-1',
+                      cell.column.getIsPinned() &&
+                        'sticky left-0 border-border border-r z-10',
                     )}
                     key={cell.id}
                     width={cell.column.getSize()}

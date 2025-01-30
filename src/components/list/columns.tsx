@@ -1,7 +1,15 @@
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
-import { Calendar, Clock, Gauge, Mountain, Heart, Zap } from 'lucide-react';
+import {
+  Calendar,
+  Clock,
+  Gauge,
+  Mountain,
+  Heart,
+  Zap,
+  Pin,
+} from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -139,7 +147,7 @@ function ActivityCard({ row }: ActivityCardProps) {
             </Link>
           </Button>
         </HoverCardTrigger>
-        <HoverCardContent className="w-auto max-w-80 z-50">
+        <HoverCardContent className="w-auto max-w-80">
           <div className="flex justify-between space-x-4">
             <Avatar>
               <AvatarFallback>
@@ -194,6 +202,20 @@ export const columns: ColumnDef<Activity>[] = [
             aria-label="Select all"
           />
           <span>Name</span>
+          <div className="flex-1 text-right">
+            <Button
+              variant={column.getIsPinned() ? 'outline' : 'ghost'}
+              size="sm"
+              className="p-1 border"
+              onClick={() =>
+                table.setColumnPinning(({ left }) => ({
+                  left: left?.includes('name') ? [] : ['name'],
+                }))
+              }
+            >
+              <Pin />
+            </Button>
+          </div>
         </div>
       </DataTableColumnHeader>
     ),
