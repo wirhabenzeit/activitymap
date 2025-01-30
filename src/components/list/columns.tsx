@@ -54,6 +54,7 @@ import {
 } from '~/components/ui/card';
 import { title } from 'process';
 import { access } from 'fs';
+import { HoverCardPortal } from '@radix-ui/react-hover-card';
 
 function decFormatter(unit = '', decimals = 0) {
   return (num: number | undefined) =>
@@ -147,31 +148,35 @@ function ActivityCard({ row }: ActivityCardProps) {
             </Link>
           </Button>
         </HoverCardTrigger>
-        <HoverCardContent className="w-auto max-w-80">
-          <div className="flex justify-between space-x-4">
-            <Avatar>
-              <AvatarFallback>
-                <Icon
-                  color={categorySettings[sport_group].color}
-                  className="w-6 h-6"
-                  height="3em"
-                />
-              </AvatarFallback>
-            </Avatar>
-            <div className="space-y-1">
-              <h4 className="text-sm font-semibold">{row.getValue('name')}</h4>
-              <p className="text-sm">{row.getValue('description') || ''}</p>
-              {stats.map((stat, index) => (
-                <div className="flex items-center pt-2" key={index}>
-                  <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
-                  <span className="text-xs text-muted-foreground">
-                    {stat.description}
-                  </span>
-                </div>
-              ))}
+        <HoverCardPortal>
+          <HoverCardContent className="w-auto max-w-80">
+            <div className="flex justify-between space-x-4">
+              <Avatar>
+                <AvatarFallback>
+                  <Icon
+                    color={categorySettings[sport_group].color}
+                    className="w-6 h-6"
+                    height="3em"
+                  />
+                </AvatarFallback>
+              </Avatar>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">
+                  {row.getValue('name')}
+                </h4>
+                <p className="text-sm">{row.getValue('description') || ''}</p>
+                {stats.map((stat, index) => (
+                  <div className="flex items-center pt-2" key={index}>
+                    <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
+                    <span className="text-xs text-muted-foreground">
+                      {stat.description}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </HoverCardContent>
+          </HoverCardContent>
+        </HoverCardPortal>
       </HoverCard>
     </span>
   );

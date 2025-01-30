@@ -1,18 +1,22 @@
-import { type StateCreator } from "zustand";
-import { type TotalZustand } from "./Zustand";
-import { listSettings } from "~/settings/list";
-import { SortingState, VisibilityState, Updater } from "@tanstack/react-table";
+import { type StateCreator } from 'zustand';
+import { type TotalZustand } from './Zustand';
+import { listSettings } from '~/settings/list';
+import { SortingState, VisibilityState, Updater } from '@tanstack/react-table';
 
 export type ListZustand = {
   compactList: {
     sorting: SortingState;
     setSorting: (updater: Updater<SortingState>) => void;
+    summaryRow: boolean;
+    setSummaryRow: (updater: Updater<boolean>) => void;
     columnVisibility: VisibilityState;
     setColumnVisibility: (update: Updater<VisibilityState>) => void;
   };
   fullList: {
     sorting: SortingState;
     setSorting: (updater: Updater<SortingState>) => void;
+    summaryRow: boolean;
+    setSummaryRow: (updater: Updater<boolean>) => void;
     columnVisibility: VisibilityState;
     setColumnVisibility: (update: Updater<VisibilityState>) => void;
   };
@@ -20,7 +24,7 @@ export type ListZustand = {
 
 export const listSlice: StateCreator<
   TotalZustand,
-  [["zustand/immer", never]],
+  [['zustand/immer', never]],
   [],
   ListZustand
 > = (set) => ({
@@ -29,6 +33,10 @@ export const listSlice: StateCreator<
     setSorting: (updater) =>
       set((state) => {
         state.compactList.sorting = updater(state.compactList.sorting);
+      }),
+    setSummaryRow: (updater) =>
+      set((state) => {
+        state.compactList.summaryRow = updater(state.compactList.summaryRow);
       }),
     setColumnVisibility: (updater) =>
       set((state) => {
@@ -42,6 +50,10 @@ export const listSlice: StateCreator<
     setSorting: (updater) =>
       set((state) => {
         state.fullList.sorting = updater(state.fullList.sorting);
+      }),
+    setSummaryRow: (updater) =>
+      set((state) => {
+        state.fullList.summaryRow = updater(state.fullList.summaryRow);
       }),
     setColumnVisibility: (updater) =>
       set((state) => {

@@ -68,7 +68,14 @@ import { ActivityColumn } from './columns';
 import { useStore } from '~/contexts/Zustand';
 import { useShallow } from 'zustand/shallow';
 
-import { BellRing, Check, Columns, FileStack, UserPlus } from 'lucide-react';
+import {
+  BellRing,
+  Check,
+  Columns,
+  FileStack,
+  LineChart,
+  UserPlus,
+} from 'lucide-react';
 
 import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
@@ -80,6 +87,8 @@ interface DataTableViewOptionsProps<TData> {
 
 export function DataTableViewOptions<TData>({
   table,
+  summaryRow,
+  setSummaryRow,
 }: DataTableViewOptionsProps<TData>) {
   return (
     <DropdownMenu modal={false}>
@@ -141,6 +150,11 @@ export function DataTableViewOptions<TData>({
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
         </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => setSummaryRow((prev) => !prev)}>
+          <LineChart className="h-4" />
+          <span>{summaryRow ? 'Hide' : 'Show'} column summary</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -153,6 +167,8 @@ interface DataTablePaginationProps<TData>
 export function DataTablePagination<TData>({
   table,
   className,
+  summaryRow,
+  setSummaryRow,
 }: DataTablePaginationProps<TData>) {
   return (
     <div
@@ -166,7 +182,11 @@ export function DataTablePagination<TData>({
           {`${table.getFilteredSelectedRowModel().rows.length}/${table.getFilteredRowModel().rows.length}`}
         </span>
       </div>
-      <DataTableViewOptions table={table} />
+      <DataTableViewOptions
+        table={table}
+        summaryRow={summaryRow}
+        setSummaryRow={setSummaryRow}
+      />
       <div className="flex items-center space-x-6 lg:space-x-8">
         <div className="w-[100px] items-center justify-center font-medium hidden md:flex">
           Page {table.getState().pagination.pageIndex + 1} of{' '}
@@ -268,6 +288,8 @@ export function DataTable<TData, TValue>({
   selected,
   setSelected,
   paginationControl = true,
+  summaryRow,
+  setSummaryRow,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
@@ -332,7 +354,10 @@ export function DataTable<TData, TValue>({
             </TableRow>
           ))}
           {table.getFooterGroups().map((footerGroup) => (
-            <TableRow key={footerGroup.id} className="border-b">
+            <TableRow
+              key={footerGroup.id}
+              className={cn('border-b', !summaryRow && 'hidden')}
+            >
               {footerGroup.headers.map((footer) => {
                 return (
                   <TableHead
@@ -366,7 +391,7 @@ export function DataTable<TData, TValue>({
                     className={cn(
                       'py-1 bg-background group-data-[state=selected]:bg-muted',
                       cell.column.getIsPinned() &&
-                        'sticky left-0 border-border border-r z-10',
+                        'sticky left-0 border-border border-r',
                     )}
                     key={cell.id}
                     width={cell.column.getSize()}
@@ -390,7 +415,13 @@ export function DataTable<TData, TValue>({
           )}
         </TableBody>
       </Table>
-      {paginationControl && <DataTablePagination table={table} />}
+      {paginationControl && (
+        <DataTablePagination
+          table={table}
+          summaryRow={summaryRow}
+          setSummaryRow={setSummaryRow}
+        />
+      )}
     </div>
   );
 }

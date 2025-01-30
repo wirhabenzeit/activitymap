@@ -23,6 +23,7 @@ export const listSettings = {
         kudos_count: false,
         average_heartrate: false,
       },
+      summaryRow: false,
     },
     full: {
       sorting: [{ id: 'id', desc: true }],
@@ -39,6 +40,7 @@ export const listSettings = {
         kudos_count: false,
         average_heartrate: false,
       },
+      summaryRow: true,
     },
   },
 };

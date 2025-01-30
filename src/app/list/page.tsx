@@ -16,6 +16,8 @@ export default function ListPage() {
     setColumnVisibility,
     activityDict,
     filterIDs,
+    summaryRow,
+    setSummaryRow,
   } = useStore(
     useShallow((state) => ({
       selected: state.selected,
@@ -26,6 +28,8 @@ export default function ListPage() {
       setColumnVisibility: state.fullList.setColumnVisibility,
       activityDict: state.activityDict,
       filterIDs: state.filterIDs,
+      summaryRow: state.fullList.summaryRow,
+      setSummaryRow: state.fullList.setSummaryRow,
     })),
   );
 
@@ -45,6 +49,8 @@ export default function ListPage() {
         setSelected={setSelected}
         columnVisibility={columnVisibility}
         setColumnVisibility={setColumnVisibility}
+        summaryRow={summaryRow}
+        setSummaryRow={setSummaryRow}
       />
     </div>
   );

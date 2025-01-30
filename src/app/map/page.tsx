@@ -336,7 +336,7 @@ function Map() {
         )}
       >
         <DataTable
-          className="max-h-44"
+          className="max-h-64"
           columns={columns}
           data={rows}
           setSorting={setSorting}
@@ -345,6 +345,8 @@ function Map() {
           setSelected={setSelected}
           columnVisibility={compactList.columnVisibility}
           setColumnVisibility={compactList.setColumnVisibility}
+          summaryRow={compactList.summaryRow}
+          setSummaryRow={compactList.setSummaryRow}
         />
       </div>
     </div>
