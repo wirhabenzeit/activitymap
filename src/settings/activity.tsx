@@ -12,7 +12,9 @@ function durationFormatter(seconds: number) {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-  if (days > 0) {
+  if (days > 99) {
+    return `${days}d`;
+  } else if (days > 0) {
     return `${days}d${hours}h`;
   } else {
     return `${hours}h${minutes}m`;

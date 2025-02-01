@@ -162,32 +162,25 @@ function Map() {
 
   const {
     selected,
-    setHighlighted,
     activityDict,
-    compactList,
-    setSorting,
     filterIDs,
     setSelected,
-    setColumnVisibilityModel,
     baseMap,
     overlays,
     mapPosition,
     setPosition,
-    updateActivity,
     threeDim,
     toggleThreeDim,
     showPhotos,
     togglePhotos,
+    compactList,
   } = useStore(
     useShallow((state) => ({
       selected: state.selected,
       setHighlighted: state.setHighlighted,
       activityDict: state.activityDict,
-      compactList: state.compactList,
-      setSorting: state.compactList.setSorting,
       setSelected: state.setSelected,
       filterIDs: state.filterIDs,
-      setColumnVisibilityModel: state.compactList.setColumnVisibility,
       baseMap: state.baseMap,
       overlays: state.overlayMaps,
       mapPosition: state.position,
@@ -197,6 +190,7 @@ function Map() {
       showPhotos: state.showPhotos,
       togglePhotos: state.togglePhotos,
       toggleThreeDim: state.toggleThreeDim,
+      compactList: state.compactList,
     })),
   );
   const { open } = useSidebar();
@@ -339,14 +333,9 @@ function Map() {
           className="max-h-64"
           columns={columns}
           data={rows}
-          setSorting={setSorting}
-          sorting={compactList.sorting}
           selected={selected}
           setSelected={setSelected}
-          columnVisibility={compactList.columnVisibility}
-          setColumnVisibility={compactList.setColumnVisibility}
-          summaryRow={compactList.summaryRow}
-          setSummaryRow={compactList.setSummaryRow}
+          {...compactList}
         />
       </div>
     </div>

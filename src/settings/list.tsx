@@ -1,11 +1,7 @@
-function decFormatter(unit = '', decimals = 0) {
-  return (num: number | undefined) =>
-    num == undefined ? null : num.toFixed(decimals) + unit;
-}
-
 export const listSettings = {
   defaultState: {
     compact: {
+      density: 'sm',
       sorting: [{ id: 'id', desc: true }],
       columnVisibility: {
         select: false,
@@ -23,9 +19,10 @@ export const listSettings = {
         kudos_count: false,
         average_heartrate: false,
       },
-      summaryRow: false,
+      summaryRow: null,
     },
     full: {
+      density: 'md',
       sorting: [{ id: 'id', desc: true }],
       columnVisibility: {
         id: false,
@@ -40,7 +37,7 @@ export const listSettings = {
         kudos_count: false,
         average_heartrate: false,
       },
-      summaryRow: true,
+      summaryRow: 'page',
     },
   },
 };

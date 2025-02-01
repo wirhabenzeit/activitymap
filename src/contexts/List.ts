@@ -1,65 +1,132 @@
-import { type StateCreator } from 'zustand';
+import { Dispatch, SetStateAction } from 'react';
+import { StoreApi, type StateCreator } from 'zustand';
 import { type TotalZustand } from './Zustand';
-import { listSettings } from '~/settings/list';
-import { SortingState, VisibilityState, Updater } from '@tanstack/react-table';
+import {
+  SortingState,
+  VisibilityState,
+  Updater,
+  ColumnPinningState,
+  ColumnFilter,
+  ColumnFiltersState,
+} from '@tanstack/react-table';
+import { WritableDraft } from 'immer';
+
+export type SummaryRowState = null | 'page' | 'all';
+export type DensityState = 'sm' | 'md' | 'lg';
+
+export type ListState = {
+  sorting: SortingState;
+  density: DensityState;
+  summaryRow: SummaryRowState;
+  columnVisibility: VisibilityState;
+  columnPinning: ColumnPinningState;
+};
 
 export type ListZustand = {
-  compactList: {
-    sorting: SortingState;
-    setSorting: (updater: Updater<SortingState>) => void;
-    summaryRow: boolean;
-    setSummaryRow: (updater: Updater<boolean>) => void;
-    columnVisibility: VisibilityState;
-    setColumnVisibility: (update: Updater<VisibilityState>) => void;
-  };
-  fullList: {
-    sorting: SortingState;
-    setSorting: (updater: Updater<SortingState>) => void;
-    summaryRow: boolean;
-    setSummaryRow: (updater: Updater<boolean>) => void;
-    columnVisibility: VisibilityState;
-    setColumnVisibility: (update: Updater<VisibilityState>) => void;
-  };
+  compactList: ListState & ListStateChangers;
+  fullList: ListState & ListStateChangers;
 };
+
+export type ListStateChangers = {
+  setDensity: Dispatch<SetStateAction<DensityState>>;
+  setSorting: Dispatch<SetStateAction<SortingState>>;
+  setSummaryRow: Dispatch<SetStateAction<SummaryRowState>>;
+  setColumnVisibility: Dispatch<Updater<VisibilityState>>;
+  setColumnPinning: Dispatch<Updater<ColumnPinningState>>;
+};
+
+const createListStateChangers = (
+  set: (
+    partial:
+      | TotalZustand
+      | Partial<TotalZustand>
+      | ((state: WritableDraft<TotalZustand>) => void),
+    replace?: false,
+  ) => void,
+  listType: 'compactList' | 'fullList',
+): ListStateChangers => ({
+  setDensity: (value) =>
+    set((state) => {
+      state[listType].density =
+        typeof value === 'function' ? value(state[listType].density) : value;
+    }),
+  setSorting: (value) =>
+    set((state) => {
+      state[listType].sorting =
+        typeof value === 'function' ? value(state[listType].sorting) : value;
+    }),
+  setSummaryRow: (value) =>
+    set((state) => {
+      state[listType].summaryRow =
+        typeof value === 'function' ? value(state[listType].summaryRow) : value;
+    }),
+  setColumnVisibility: (value) =>
+    set((state) => {
+      state[listType].columnVisibility =
+        typeof value === 'function'
+          ? value(state[listType].columnVisibility)
+          : value;
+    }),
+  setColumnPinning: (value) =>
+    set((state) => {
+      state[listType].columnPinning =
+        typeof value === 'function'
+          ? value(state[listType].columnPinning)
+          : value;
+    }),
+});
 
 export const listSlice: StateCreator<
   TotalZustand,
   [['zustand/immer', never]],
   [],
   ListZustand
-> = (set) => ({
+> = (set, get) => ({
   compactList: {
-    ...listSettings.defaultState.compact,
-    setSorting: (updater) =>
-      set((state) => {
-        state.compactList.sorting = updater(state.compactList.sorting);
-      }),
-    setSummaryRow: (updater) =>
-      set((state) => {
-        state.compactList.summaryRow = updater(state.compactList.summaryRow);
-      }),
-    setColumnVisibility: (updater) =>
-      set((state) => {
-        state.compactList.columnVisibility = updater(
-          state.compactList.columnVisibility,
-        );
-      }),
+    density: 'sm',
+    columnPinning: {
+      left: ['name'],
+    },
+    sorting: [{ id: 'id', desc: true }],
+    columnVisibility: {
+      select: false,
+      id: false,
+      time: false,
+      sport_type: false,
+      moving_time: false,
+      average_speed: false,
+      elev_high: false,
+      elev_low: false,
+      weighted_average_watts: false,
+      average_watts: false,
+      max_watts: false,
+      max_heartrate: false,
+      kudos_count: false,
+      average_heartrate: false,
+    },
+    summaryRow: null,
+    ...createListStateChangers(set, 'compactList'),
   },
   fullList: {
-    ...listSettings.defaultState.full,
-    setSorting: (updater) =>
-      set((state) => {
-        state.fullList.sorting = updater(state.fullList.sorting);
-      }),
-    setSummaryRow: (updater) =>
-      set((state) => {
-        state.fullList.summaryRow = updater(state.fullList.summaryRow);
-      }),
-    setColumnVisibility: (updater) =>
-      set((state) => {
-        state.fullList.columnVisibility = updater(
-          state.fullList.columnVisibility,
-        );
-      }),
+    density: 'md',
+    columnPinning: {
+      left: ['name'],
+    },
+    sorting: [{ id: 'id', desc: true }],
+    columnVisibility: {
+      id: false,
+      time: false,
+      sport_type: false,
+      moving_time: false,
+      elev_high: false,
+      elev_low: false,
+      weighted_average_watts: false,
+      max_watts: false,
+      max_heartrate: false,
+      kudos_count: false,
+      average_heartrate: false,
+    },
+    summaryRow: 'page',
+    ...createListStateChangers(set, 'fullList'),
   },
 });

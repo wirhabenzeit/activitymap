@@ -1,25 +1,17 @@
 'use client';
 import * as React from 'react';
 
-import {
-  ColumnDef,
-  SortingState,
-  getSortedRowModel,
-  getPaginationRowModel,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  VisibilityState,
-  Column,
-  Table as TableType,
-} from '@tanstack/react-table';
-import Link from 'next/link';
+import { shallow } from 'zustand/shallow';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
   CaretSortIcon,
 } from '@radix-ui/react-icons';
-import { type Row } from '@tanstack/react-table';
+import {
+  ColumnFiltersState,
+  getFilteredRowModel,
+  type Row,
+} from '@tanstack/react-table';
 
 import {
   DropdownMenu,
@@ -44,11 +36,6 @@ import {
   TableRow,
 } from '~/components/ui/table';
 
-interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
-  data: TData[];
-}
-
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -57,29 +44,125 @@ import {
   MixerHorizontalIcon,
 } from '@radix-ui/react-icons';
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select';
-import { ActivityColumn } from './columns';
-import { useStore } from '~/contexts/Zustand';
-import { useShallow } from 'zustand/shallow';
-
-import {
-  BellRing,
-  Check,
-  Columns,
-  FileStack,
-  LineChart,
-  UserPlus,
-} from 'lucide-react';
+import { Columns, FileSpreadsheet, FileStack, LineChart } from 'lucide-react';
 
 import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
-import { set } from 'zod';
+
+import {
+  ColumnDef,
+  SortingState,
+  functionalUpdate,
+  makeStateUpdater,
+  getSortedRowModel,
+  getPaginationRowModel,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  VisibilityState,
+  Column,
+  Table as TableType,
+  OnChangeFn,
+  Updater,
+  RowData,
+  TableFeature,
+} from '@tanstack/react-table';
+import { ListState, ListStateChangers } from '~/contexts/List';
+import { column } from '@observablehq/plot';
+import { useStore } from '~/contexts/Zustand';
+
+export type DensityState = 'sm' | 'md' | 'lg';
+export interface DensityTableState {
+  density: DensityState;
+}
+export interface DensityOptions {
+  enableDensity?: boolean;
+  onDensityChange?: OnChangeFn<DensityState>;
+}
+export interface DensityInstance {
+  setDensity: (updater: Updater<DensityState>) => void;
+  toggleDensity: (value?: DensityState) => void;
+}
+declare module '@tanstack/react-table' {
+  interface TableState extends DensityTableState {}
+  interface TableOptionsResolved<TData extends RowData>
+    extends DensityOptions {}
+  interface Table<TData extends RowData> extends DensityInstance {}
+}
+export const DensityFeature: TableFeature<any> = {
+  getInitialState: (state): DensityTableState => {
+    return {
+      density: 'md',
+      ...state,
+    };
+  },
+  getDefaultOptions: <TData extends RowData>(
+    table: TableType<TData>,
+  ): DensityOptions => {
+    return {
+      enableDensity: true,
+      onDensityChange: makeStateUpdater('density', table),
+    } as DensityOptions;
+  },
+  createTable: <TData extends RowData>(table: TableType<TData>): void => {
+    table.setDensity = (updater) => {
+      const safeUpdater: Updater<DensityState> = (old) => {
+        let newState = functionalUpdate(updater, old);
+        return newState;
+      };
+      return table.options.onDensityChange?.(safeUpdater);
+    };
+    table.toggleDensity = (value) => {
+      table.setDensity((old) => {
+        if (value) return value;
+        return old === 'lg' ? 'md' : old === 'md' ? 'sm' : 'lg'; //cycle through the 3 options
+      });
+    };
+  },
+};
+
+export type SummaryRowState = null | 'page' | 'all' | 'selected';
+export interface SummaryRowTableState {
+  summaryRow: SummaryRowState;
+}
+export interface SummaryRowOptions {
+  enableSummaryRow?: boolean;
+  onSummaryRowChange?: OnChangeFn<SummaryRowState>;
+}
+export interface SummaryRowInstance {
+  setSummaryRow: (updater: Updater<SummaryRowState>) => void;
+}
+declare module '@tanstack/react-table' {
+  interface TableState extends SummaryRowTableState {}
+  interface TableOptionsResolved<TData extends RowData>
+    extends SummaryRowOptions {}
+  interface Table<TData extends RowData> extends SummaryRowInstance {}
+}
+export const SummaryRowFeature: TableFeature<any> = {
+  getInitialState: (state): SummaryRowTableState => {
+    return {
+      summaryRow: 'page',
+      ...state,
+    };
+  },
+  getDefaultOptions: <TData extends RowData>(
+    table: TableType<TData>,
+  ): SummaryRowOptions => {
+    return {
+      enableSummaryRow: true,
+      onSummaryRowChange: makeStateUpdater('summaryRow', table),
+    } as SummaryRowOptions;
+  },
+  createTable: <TData extends RowData>(table: TableType<TData>): void => {
+    table.setSummaryRow = (updater) => {
+      const safeUpdater: Updater<SummaryRowState> = (old) => {
+        let newState = functionalUpdate(updater, old);
+        return newState;
+      };
+      return table.options.onSummaryRowChange?.(safeUpdater);
+    };
+  },
+};
 
 interface DataTableViewOptionsProps<TData> {
   table: TableType<TData>;
@@ -87,8 +170,6 @@ interface DataTableViewOptionsProps<TData> {
 
 export function DataTableViewOptions<TData>({
   table,
-  summaryRow,
-  setSummaryRow,
 }: DataTableViewOptionsProps<TData>) {
   return (
     <DropdownMenu modal={false}>
@@ -100,8 +181,8 @@ export function DataTableViewOptions<TData>({
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56">
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Columns className="h-4" />
+          <DropdownMenuSubTrigger className="gap-2">
+            <Columns className="size-4" />
             <span>Columns</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuPortal>
@@ -133,8 +214,8 @@ export function DataTableViewOptions<TData>({
           </DropdownMenuPortal>
         </DropdownMenuSub>
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <FileStack className="h-4" />
+          <DropdownMenuSubTrigger className="gap-2">
+            <FileStack className="size-4" />
             <span>{`${table.getState().pagination.pageSize} per page`}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuPortal>
@@ -150,11 +231,54 @@ export function DataTableViewOptions<TData>({
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
         </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setSummaryRow((prev) => !prev)}>
-          <LineChart className="h-4" />
-          <span>{summaryRow ? 'Hide' : 'Show'} column summary</span>
-        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="gap-2">
+            <LineChart className="size-4" />
+            <span>Column summary</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent>
+              {[null, 'page', 'all', 'selected'].map((value) => (
+                <DropdownMenuCheckboxItem
+                  key={value}
+                  onClick={() => table.setSummaryRow(value)}
+                  checked={table.getState().summaryRow === value}
+                >
+                  {value === null
+                    ? 'None'
+                    : value === 'page'
+                      ? 'Page'
+                      : value === 'all'
+                        ? 'All'
+                        : 'Selected'}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="gap-2">
+            <FileSpreadsheet className="size-4" />
+            <span>Table density</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent>
+              {['sm', 'md', 'lg'].map((value) => (
+                <DropdownMenuCheckboxItem
+                  key={value}
+                  onClick={() => table.setDensity(value)}
+                  checked={table.getState().density === value}
+                >
+                  {value === 'sm'
+                    ? 'Dense'
+                    : value === 'md'
+                      ? 'Normal'
+                      : 'Loose'}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -167,8 +291,6 @@ interface DataTablePaginationProps<TData>
 export function DataTablePagination<TData>({
   table,
   className,
-  summaryRow,
-  setSummaryRow,
 }: DataTablePaginationProps<TData>) {
   return (
     <div
@@ -182,11 +304,7 @@ export function DataTablePagination<TData>({
           {`${table.getFilteredSelectedRowModel().rows.length}/${table.getFilteredRowModel().rows.length}`}
         </span>
       </div>
-      <DataTableViewOptions
-        table={table}
-        summaryRow={summaryRow}
-        setSummaryRow={setSummaryRow}
-      />
+      <DataTableViewOptions table={table} />
       <div className="flex items-center space-x-6 lg:space-x-8">
         <div className="w-[100px] items-center justify-center font-medium hidden md:flex">
           Page {table.getState().pagination.pageIndex + 1} of{' '}
@@ -277,21 +395,39 @@ export function DataTableColumnHeader<TData, TValue>({
   );
 }
 
+interface DataTableProps<TData, TValue> extends ListState, ListStateChangers {
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+  className?: string;
+  columnVisibility: VisibilityState;
+  sorting: SortingState;
+  paginationControl?: boolean;
+  selected: number[];
+  setSelected: (updater: Updater<number[]>) => void;
+  columnFilters: ColumnFiltersState;
+}
+
 export function DataTable<TData, TValue>({
   className,
   columns,
   data,
+  columnFilters,
   columnVisibility,
   sorting,
+  selected,
+  density,
+  columnPinning,
+  summaryRow,
+  paginationControl = true,
   setSorting,
   setColumnVisibility,
-  selected,
   setSelected,
-  paginationControl = true,
-  summaryRow,
+  setDensity,
+  setColumnPinning,
   setSummaryRow,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
+    _features: [DensityFeature, SummaryRowFeature],
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
@@ -300,21 +436,24 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
+    getFilteredRowModel: getFilteredRowModel(), //<- important
     onRowSelectionChange: (updater) => {
       const updatedIDs = updater(
         Object.fromEntries(selected.map((id) => [id, true])),
       );
       setSelected(Object.keys(updatedIDs).map(Number));
     },
+    onDensityChange: setDensity,
+    onSummaryRowChange: setSummaryRow,
+    onColumnPinningChange: setColumnPinning,
     initialState: {
-      pagination: {
-        pageSize: 50,
-      },
-      columnPinning: {
-        left: ['name'],
-      },
+      pagination: { pageSize: 50 },
     },
     state: {
+      columnPinning,
+      columnFilters,
+      summaryRow,
+      density,
       sorting,
       columnVisibility,
       rowSelection: Object.fromEntries(selected.map((id) => [id, true])),
@@ -325,7 +464,7 @@ export function DataTable<TData, TValue>({
     <div className={cn('flex flex-col', className)}>
       <Table
         id="table-main"
-        className="text-xs border-separate border-spacing-0 table-fixed"
+        className="text-xs border-separate border-spacing-0 table-fixed w-full"
         wrapperClassName="overflow-scroll min-h-0 w-full flex-1"
       >
         <TableHeader className="sticky [&_tr]:border-b-0">
@@ -337,10 +476,14 @@ export function DataTable<TData, TValue>({
                     className={cn(
                       'py-0',
                       header.column.getIsPinned() &&
-                        'sticky left-0 bg-muted border-border border-r',
+                        'sticky left-0 bg-muted border-border border-r border-b',
                     )}
                     key={header.id}
-                    style={{ width: header.column.getSize() }}
+                    style={{
+                      width: header.column.getSize(),
+                      minWidth: header.column.getSize(),
+                      //maxWidth: header.column.getSize(),
+                    }}
                   >
                     {header.isPlaceholder
                       ? null
@@ -363,7 +506,7 @@ export function DataTable<TData, TValue>({
                   <TableHead
                     key={footer.id}
                     className={cn(
-                      'py-0',
+                      'h-8 border-b border-t border-border text-xs font-bold',
                       footer.column.getIsPinned() &&
                         'sticky left-0 bg-muted border-r border-border',
                     )}
@@ -389,9 +532,14 @@ export function DataTable<TData, TValue>({
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     className={cn(
-                      'py-1 bg-background group-data-[state=selected]:bg-muted',
+                      'bg-background group-data-[state=selected]:bg-muted',
                       cell.column.getIsPinned() &&
                         'sticky left-0 border-border border-r',
+                      density == 'sm'
+                        ? 'py-0 px-1'
+                        : density == 'md'
+                          ? 'py-1 px-2'
+                          : 'p-2 text-sm',
                     )}
                     key={cell.id}
                     width={cell.column.getSize()}
@@ -415,13 +563,7 @@ export function DataTable<TData, TValue>({
           )}
         </TableBody>
       </Table>
-      {paginationControl && (
-        <DataTablePagination
-          table={table}
-          summaryRow={summaryRow}
-          setSummaryRow={setSummaryRow}
-        />
-      )}
+      {paginationControl && <DataTablePagination table={table} />}
     </div>
   );
 }

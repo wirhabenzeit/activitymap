@@ -1,6 +1,6 @@
 'use client';
 
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, Table } from '@tanstack/react-table';
 import {
   Calendar,
   Clock,
@@ -182,6 +182,47 @@ function ActivityCard({ row }: ActivityCardProps) {
   );
 }
 
+function columnFromField(
+  id: keyof typeof activityFields,
+  spec: (typeof activityFields)[keyof typeof activityFields],
+): ColumnDef<Activity> {
+  const footer = ({ table }: { table: Table<Activity> }) => {
+    const rows =
+      table.getState().summaryRow == null
+        ? []
+        : table.getState().summaryRow == 'page'
+          ? table.getRowModel().rows
+          : table.getState().summaryRow == 'all'
+            ? table.getFilteredRowModel().rows
+            : table.getSelectedRowModel().rows;
+    console.log(id, table.getState().summaryRow, rows.length);
+    const reducedValue = spec.reducer(rows.map((row) => row.getValue(id)));
+    const summary = spec.summaryFormatter
+      ? spec.summaryFormatter(reducedValue)
+      : `${spec.reducerSymbol || ''}${spec.formatter(reducedValue)}`;
+    return <div className="text-right">{summary}</div>;
+  };
+
+  return {
+    id,
+    cell: ({ getValue }) => (
+      <div className="text-right">{spec.formatter(getValue())}</div>
+    ),
+    meta: title,
+    header: ({ column, table }) => (
+      <DataTableColumnHeader table={table} column={column}>
+        {spec.Icon && <spec.Icon className="w-4 h-4" />}
+        {/* <span>{title}</span> */}
+      </DataTableColumnHeader>
+    ),
+    size: 60,
+    enableResizing: false,
+    ...(spec.accessorFn && { accessorFn: spec.accessorFn }),
+    ...(!spec.accessorFn && { accessorKey: id }),
+    ...(spec.reducer && { footer }),
+  };
+}
+
 export const columns: ColumnDef<Activity>[] = [
   {
     accessorKey: 'id',
@@ -189,6 +230,9 @@ export const columns: ColumnDef<Activity>[] = [
       <DataTableColumnHeader table={table} column={column} title="ID" />
     ),
     enableHiding: false,
+    filterFn: (row, columnId, filterValue) => {
+      return filterValue.includes(row.id);
+    },
   },
   {
     accessorKey: 'name',
@@ -227,57 +271,9 @@ export const columns: ColumnDef<Activity>[] = [
     size: 150,
     cell: ({ row, getValue }) => <ActivityCard row={row} />,
     enableHiding: false,
-    // footer: ({ column, table }) => (
-    //   <div className="text-left">{table.getRowModel().rows.length}</div>
-    // ),
   },
-  ...Object.entries(activityFields).map(
-    ([
-      id,
-      {
-        title,
-        formatter,
-        Icon,
-        reducer,
-        accessorFn,
-        summaryFormatter,
-        reducerSymbol,
-      },
-    ]) => ({
-      id,
-      accessorKey: id,
-      cell: ({ getValue }) => (
-        <div className="text-right">{formatter(getValue())}</div>
-      ),
-      meta: title,
-      header: ({ column, table }) => (
-        <DataTableColumnHeader table={table} column={column}>
-          {Icon && <Icon className="w-4 h-4" />}
-          {/* <span>{title}</span> */}
-        </DataTableColumnHeader>
-      ),
-      size: 60,
-      enableResizing: false,
-      ...(accessorFn && { accessorFn }),
-      ...(!accessorFn && { accessorKey: id }),
-      ...(reducer && {
-        footer: ({ column, table }) => (
-          <div className="text-right">
-            {summaryFormatter
-              ? summaryFormatter(
-                  reducer(
-                    table.getRowModel().rows.map((row) => row.getValue(id)),
-                  ),
-                )
-              : `${reducerSymbol || ''}${formatter(
-                  reducer(
-                    table.getRowModel().rows.map((row) => row.getValue(id)),
-                  ),
-                )}`}
-          </div>
-        ),
-      }),
-    }),
+  ...Object.entries(activityFields).map(([id, spec]) =>
+    columnFromField(id, spec),
   ),
   {
     accessorKey: 'description',
