@@ -1,7 +1,6 @@
 'use client';
 import * as React from 'react';
 
-import { shallow } from 'zustand/shallow';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -9,6 +8,7 @@ import {
 } from '@radix-ui/react-icons';
 import {
   ColumnFiltersState,
+  ColumnGrouping,
   getFilteredRowModel,
   type Row,
 } from '@tanstack/react-table';
@@ -19,8 +19,6 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuPortal,
@@ -68,8 +66,13 @@ import {
   TableFeature,
 } from '@tanstack/react-table';
 import { ListState, ListStateChangers } from '~/contexts/List';
-import { column } from '@observablehq/plot';
-import { useStore } from '~/contexts/Zustand';
+
+declare module '@tanstack/react-table' {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    title: string;
+    width: string;
+  }
+}
 
 export type DensityState = 'sm' | 'md' | 'lg';
 export interface DensityTableState {
@@ -202,11 +205,10 @@ export function DataTableViewOptions<TData>({
                       checked={column.getIsVisible()}
                       onClick={(e) => {
                         column.toggleVisibility(!column.getIsVisible());
-                        e.preventDefault(); // Prevent the default behavior of closing the menu
-                        //e.stopPropagation(); // Stop the event from bubbling up
+                        e.preventDefault();
                       }}
                     >
-                      {(column.columnDef.meta as string) || column.id}
+                      {(column.columnDef.meta.title as string) || column.id}
                     </DropdownMenuCheckboxItem>
                   );
                 })}
@@ -356,8 +358,8 @@ export function DataTablePagination<TData>({
 interface DataTableColumnHeaderProps<TData, TValue>
   extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   column: Column<TData, TValue>;
-  title: React.ReactNode | string;
-  table: TableType<ActivityColumn>;
+  title?: string;
+  table: TableType<TData>;
   dropdown?: boolean;
 }
 
@@ -372,7 +374,7 @@ export function DataTableColumnHeader<TData, TValue>({
   }
 
   return (
-    <div className={cn('flex items-center space-x-2', className)}>
+    <div className={cn('flex items-center space-x-2 w-full', className)}>
       <div className="flex-1">
         {title && <span className="w-4 h-4">{title}</span>}
         {children}
@@ -464,26 +466,32 @@ export function DataTable<TData, TValue>({
     <div className={cn('flex flex-col', className)}>
       <Table
         id="table-main"
-        className="text-xs border-separate border-spacing-0 table-fixed w-full"
+        className="text-xs grid"
         wrapperClassName="overflow-scroll min-h-0 w-full flex-1"
+        style={{
+          gridTemplateColumns: table
+            .getVisibleFlatColumns()
+            .map((column) => column.columnDef.meta?.width)
+            .join(' '),
+        }}
       >
-        <TableHeader className="sticky [&_tr]:border-b-0">
+        <TableHeader className="sticky [&_tr]:border-b-0 grid grid-cols-subgrid col-span-full">
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="border-b-0">
+            <TableRow
+              key={headerGroup.id}
+              className="border-b-0 grid grid-cols-subgrid col-span-full"
+            >
               {headerGroup.headers.map((header) => {
                 return (
                   <TableHead
                     className={cn(
-                      'py-0',
-                      header.column.getIsPinned() &&
-                        'sticky left-0 bg-muted border-border border-r border-b',
+                      'py-0 flex items-center',
+                      header.column.getIsPinned() == 'left' &&
+                        'sticky left-0 bg-muted border-border border-r',
+                      header.column.getIsPinned() == 'right' &&
+                        'sticky right-0 bg-muted border-border border-l',
                     )}
                     key={header.id}
-                    style={{
-                      width: header.column.getSize(),
-                      minWidth: header.column.getSize(),
-                      //maxWidth: header.column.getSize(),
-                    }}
                   >
                     {header.isPlaceholder
                       ? null
@@ -499,16 +507,21 @@ export function DataTable<TData, TValue>({
           {table.getFooterGroups().map((footerGroup) => (
             <TableRow
               key={footerGroup.id}
-              className={cn('border-b', !summaryRow && 'hidden')}
+              className={cn(
+                'border-b grid grid-cols-subgrid col-span-full',
+                !summaryRow && 'hidden',
+              )}
             >
               {footerGroup.headers.map((footer) => {
                 return (
                   <TableHead
                     key={footer.id}
                     className={cn(
-                      'h-8 border-b border-t border-border text-xs font-bold',
-                      footer.column.getIsPinned() &&
+                      'h-8 border-b border-t border-border text-xs font-bold flex items-center',
+                      footer.column.getIsPinned() == 'left' &&
                         'sticky left-0 bg-muted border-r border-border',
+                      footer.column.getIsPinned() == 'right' &&
+                        'sticky right-0 bg-muted border-l border-border',
                     )}
                   >
                     {flexRender(
@@ -521,20 +534,22 @@ export function DataTable<TData, TValue>({
             </TableRow>
           ))}
         </TableHeader>
-        <TableBody>
+        <TableBody className="grid grid-cols-subgrid col-span-full">
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
               <TableRow
                 key={row.id}
                 data-state={row.getIsSelected() && 'selected'}
-                className="group"
+                className="group grid grid-cols-subgrid col-span-full"
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     className={cn(
-                      'bg-background group-data-[state=selected]:bg-muted',
-                      cell.column.getIsPinned() &&
+                      'bg-background group-data-[state=selected]:bg-muted flex items-center',
+                      cell.column.getIsPinned() == 'left' &&
                         'sticky left-0 border-border border-r',
+                      cell.column.getIsPinned() == 'right' &&
+                        'sticky right-0 border-border border-l',
                       density == 'sm'
                         ? 'py-0 px-1'
                         : density == 'md'
@@ -542,12 +557,6 @@ export function DataTable<TData, TValue>({
                           : 'p-2 text-sm',
                     )}
                     key={cell.id}
-                    width={cell.column.getSize()}
-                    style={{
-                      width: cell.column.getSize(),
-                      minWidth: cell.column.getSize(),
-                      maxWidth: cell.column.getSize(),
-                    }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>

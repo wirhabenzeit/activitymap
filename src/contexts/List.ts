@@ -86,6 +86,7 @@ export const listSlice: StateCreator<
     density: 'sm',
     columnPinning: {
       left: ['name'],
+      right: ['edit'],
     },
     sorting: [{ id: 'id', desc: true }],
     columnVisibility: {
@@ -103,6 +104,7 @@ export const listSlice: StateCreator<
       max_heartrate: false,
       kudos_count: false,
       average_heartrate: false,
+      edit: false,
     },
     summaryRow: null,
     ...createListStateChangers(set, 'compactList'),
@@ -111,6 +113,7 @@ export const listSlice: StateCreator<
     density: 'md',
     columnPinning: {
       left: ['name'],
+      right: ['edit'],
     },
     sorting: [{ id: 'id', desc: true }],
     columnVisibility: {
@@ -125,6 +128,7 @@ export const listSlice: StateCreator<
       max_heartrate: false,
       kudos_count: false,
       average_heartrate: false,
+      edit: false,
     },
     summaryRow: 'page',
     ...createListStateChangers(set, 'fullList'),
