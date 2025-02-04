@@ -22,6 +22,14 @@ import { Card } from '~/components/ui/card';
 import { HoverCardPortal } from '@radix-ui/react-hover-card';
 import { activityFields } from '~/settings/activity';
 
+import { EditActivity, ProfileForm } from './edit';
+import { useState } from 'react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '~/components/ui/popover';
+
 type CardProps = React.ComponentProps<typeof Card>;
 
 interface ActivityCardProps extends CardProps {
@@ -31,7 +39,30 @@ interface ActivityCardProps extends CardProps {
 const formattedValue = (key: keyof typeof activityFields, row: Row<Activity>) =>
   activityFields[key].formatter(row.getValue(key));
 
-export function ActivityCard({ row }: ActivityCardProps) {
+export function DescriptionCard({ row }: { row: Row<Activity> }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Popover>
+        <PopoverTrigger asChild>
+          <div
+            className="w-full truncate italic h-full flex items-center"
+            onDoubleClick={() => setOpen(true)}
+          >
+            {row.original.description}
+          </div>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto max-w-80">
+          <ActivityCardContent row={row} />
+        </PopoverContent>
+      </Popover>
+      <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
+    </>
+  );
+}
+
+export function ActivityCardContent({ row }: ActivityCardProps) {
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type]!;
   const Icon = categorySettings[sport_group].icon;
@@ -73,7 +104,43 @@ export function ActivityCard({ row }: ActivityCardProps) {
   ];
 
   return (
-    <div className="flex items-center space-x-2 w-full">
+    <div className="flex justify-between space-x-4">
+      <Avatar>
+        <AvatarFallback>
+          <Icon
+            color={categorySettings[sport_group].color}
+            className="w-6 h-6"
+            height="3em"
+          />
+        </AvatarFallback>
+      </Avatar>
+      <div className="space-y-1">
+        <h4 className="text-sm font-semibold">{row.getValue('name')}</h4>
+        <p className="text-sm">{row.getValue('description') || ''}</p>
+        {stats.map((stat, index) => (
+          <div className="flex items-center pt-2" key={index}>
+            <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
+            <span className="text-xs text-muted-foreground">
+              {stat.description}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ActivityCard({ row }: ActivityCardProps) {
+  const [open, setOpen] = useState(false);
+  const sport_type = row.original.sport_type;
+  const sport_group = aliasMap[sport_type]!;
+  const Icon = categorySettings[sport_group].icon;
+
+  return (
+    <div
+      className="flex items-center space-x-2 w-full"
+      onDoubleClick={() => setOpen(true)}
+    >
       <Button
         variant={row.getIsSelected() ? 'outline' : 'ghost'}
         size="sm"
@@ -101,34 +168,11 @@ export function ActivityCard({ row }: ActivityCardProps) {
         </HoverCardTrigger>
         <HoverCardPortal>
           <HoverCardContent className="w-auto max-w-80">
-            <div className="flex justify-between space-x-4">
-              <Avatar>
-                <AvatarFallback>
-                  <Icon
-                    color={categorySettings[sport_group].color}
-                    className="w-6 h-6"
-                    height="3em"
-                  />
-                </AvatarFallback>
-              </Avatar>
-              <div className="space-y-1">
-                <h4 className="text-sm font-semibold">
-                  {row.getValue('name')}
-                </h4>
-                <p className="text-sm">{row.getValue('description') || ''}</p>
-                {stats.map((stat, index) => (
-                  <div className="flex items-center pt-2" key={index}>
-                    <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
-                    <span className="text-xs text-muted-foreground">
-                      {stat.description}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ActivityCardContent row={row} />
           </HoverCardContent>
         </HoverCardPortal>
       </HoverCard>
+      <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
     </div>
   );
 }

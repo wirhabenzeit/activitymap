@@ -15,8 +15,8 @@ import { Button } from '~/components/ui/button';
 import { DataTableColumnHeader } from './data-table';
 import { activityFields } from '~/settings/activity';
 
-import { ActivityCard } from './card';
-import { EditButton } from './edit';
+import { ActivityCard, DescriptionCard } from './card';
+import { EditActivity, EditButton } from './edit';
 
 function columnFromField(
   id: keyof typeof activityFields,
@@ -119,25 +119,13 @@ export const columns: ColumnDef<Activity>[] = [
       />
     ),
     enableResizing: true,
-    cell: ({ row }) => (
-      <Popover>
-        <PopoverTrigger asChild>
-          <div className="w-full truncate italic">
-            {row.original.description}
-          </div>
-        </PopoverTrigger>
-        <PopoverContent>
-          <div className="text-sm">{row.getValue('name')}</div>
-          <span className="text-sm italic">{row.original.description}</span>
-        </PopoverContent>
-      </Popover>
-    ),
+    cell: ({ row }) => <DescriptionCard row={row} />,
   },
   {
     id: 'edit',
     meta: { title: 'Edit', width: '40px' },
     header: ({ column, table }) => <div>Edit</div>,
-    cell: ({ row }) => <EditButton row={row} />,
+    cell: ({ row }) => <EditActivity row={row} trigger={true} />,
     enableResizing: false,
     size: 40,
     accessorFn: (row) => row.id,

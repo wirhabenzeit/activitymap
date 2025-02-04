@@ -3,6 +3,7 @@
 import {
   activities as activitySchema,
   photos,
+  SportType,
   users,
   type Activity,
   type Photo,
@@ -27,8 +28,10 @@ type Subscription = {
 export type UpdatableActivity = {
   id: number;
   athlete: number;
-  name: string | null;
-  description: string | null;
+  name?: string;
+  description?: string;
+  sport_type?: SportType;
+  commute?: boolean;
 };
 
 async function get(

@@ -20,6 +20,7 @@ import {
 } from '~/server/db/actions';
 import {
   getActivities as getStravaActivities,
+  UpdatableActivity,
   updateActivity as updateStravaActivity,
 } from '~/server/strava/actions';
 import { type WritableDraft } from 'immer';
@@ -64,7 +65,7 @@ export type ActivityZustand = {
   setUser: (user: User) => void;
   setAccount: (account: Account) => void;
   loadPhotos: () => Promise<void>;
-  updateActivity: (act: Activity) => Promise<Activity>;
+  updateActivity: (act: UpdatableActivity) => Promise<Activity>;
   setLoading: (x: boolean) => void;
   loadFromDB: ({
     ids,
@@ -144,25 +145,29 @@ export const activitySlice: StateCreator<
       state.loading = x;
     });
   },
-  updateActivity: async (activity: Activity) => {
+  updateActivity: async (activity: UpdatableActivity) => {
     const guest = get().guest;
     if (guest) {
       console.error('Guests cannot update activities');
-      return activity;
+      throw new Error('Failed to update activity');
     }
     try {
-      const updatedActivity = await updateStravaActivity({
-        name: activity.name,
-        id: activity.id,
-        description: activity.description,
-        athlete: activity.athlete,
+      set((state) => {
+        state.loading = true;
       });
+      const updatedActivity: Activity = await updateStravaActivity(activity);
       set((state) => {
         state.activityDict[Number(updatedActivity.id)] = updatedActivity;
+      });
+      set((state) => {
+        state.loading = false;
       });
       return updatedActivity;
     } catch (e) {
       console.error(e);
+      set((state) => {
+        state.loading = false;
+      });
       throw new Error('Failed to update activity');
     }
   },

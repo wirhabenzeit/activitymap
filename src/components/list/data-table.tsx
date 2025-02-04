@@ -42,7 +42,13 @@ import {
   MixerHorizontalIcon,
 } from '@radix-ui/react-icons';
 
-import { Columns, FileSpreadsheet, FileStack, LineChart } from 'lucide-react';
+import {
+  Columns,
+  Edit,
+  FileSpreadsheet,
+  FileStack,
+  LineChart,
+} from 'lucide-react';
 
 import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
@@ -175,114 +181,127 @@ export function DataTableViewOptions<TData>({
   table,
 }: DataTableViewOptionsProps<TData>) {
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8">
-          <MixerHorizontalIcon className="mr-2 h-4 w-4" />
-          View
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56">
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2">
-            <Columns className="size-4" />
-            <span>Columns</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuPortal>
-            <DropdownMenuSubContent className="h-96 overflow-y-auto">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== 'undefined' &&
-                    column.getCanHide(),
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onClick={(e) => {
-                        column.toggleVisibility(!column.getIsVisible());
-                        e.preventDefault();
-                      }}
-                    >
-                      {(column.columnDef.meta.title as string) || column.id}
-                    </DropdownMenuCheckboxItem>
-                  );
-                })}
-            </DropdownMenuSubContent>
-          </DropdownMenuPortal>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2">
-            <FileStack className="size-4" />
-            <span>{`${table.getState().pagination.pageSize} per page`}</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuPortal>
-            <DropdownMenuSubContent>
-              {[50, 100, 200, 500].map((pageSize) => (
-                <DropdownMenuItem
-                  key={pageSize}
-                  onClick={() => table.setPageSize(pageSize)}
-                >
-                  {pageSize}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuPortal>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2">
-            <LineChart className="size-4" />
-            <span>Column summary</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuPortal>
-            <DropdownMenuSubContent>
-              {[null, 'page', 'all', 'selected'].map((value) => (
-                <DropdownMenuCheckboxItem
-                  key={value}
-                  onClick={() => table.setSummaryRow(value)}
-                  checked={table.getState().summaryRow === value}
-                >
-                  {value === null
-                    ? 'None'
-                    : value === 'page'
-                      ? 'Page'
-                      : value === 'all'
-                        ? 'All'
-                        : 'Selected'}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuPortal>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2">
-            <FileSpreadsheet className="size-4" />
-            <span>Table density</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuPortal>
-            <DropdownMenuSubContent>
-              {['sm', 'md', 'lg'].map((value) => (
-                <DropdownMenuCheckboxItem
-                  key={value}
-                  onClick={() => table.setDensity(value)}
-                  checked={table.getState().density === value}
-                >
-                  {value === 'sm'
-                    ? 'Dense'
-                    : value === 'md'
-                      ? 'Normal'
-                      : 'Loose'}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuPortal>
-        </DropdownMenuSub>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex items-center space-x-2">
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8">
+            <MixerHorizontalIcon className="mr-2 h-4 w-4" />
+            View
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56">
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="gap-2">
+              <Columns className="size-4" />
+              <span>Columns</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent className="h-120 overflow-y-auto">
+                {table
+                  .getAllColumns()
+                  .filter(
+                    (column) =>
+                      typeof column.accessorFn !== 'undefined' &&
+                      column.getCanHide(),
+                  )
+                  .map((column) => {
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize"
+                        checked={column.getIsVisible()}
+                        onClick={(e) => {
+                          column.toggleVisibility(!column.getIsVisible());
+                          e.preventDefault();
+                        }}
+                      >
+                        {(column.columnDef.meta.title as string) || column.id}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="gap-2">
+              <FileStack className="size-4" />
+              <span>{`${table.getState().pagination.pageSize} per page`}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent>
+                {[50, 100, 200, 500].map((pageSize) => (
+                  <DropdownMenuItem
+                    key={pageSize}
+                    onClick={() => table.setPageSize(pageSize)}
+                  >
+                    {pageSize}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="gap-2">
+              <LineChart className="size-4" />
+              <span>Column summary</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent>
+                {[null, 'page', 'all', 'selected'].map((value) => (
+                  <DropdownMenuCheckboxItem
+                    key={value}
+                    onClick={() => table.setSummaryRow(value)}
+                    checked={table.getState().summaryRow === value}
+                  >
+                    {value === null
+                      ? 'None'
+                      : value === 'page'
+                        ? 'Page'
+                        : value === 'all'
+                          ? 'All'
+                          : 'Selected'}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="gap-2">
+              <FileSpreadsheet className="size-4" />
+              <span>Table density</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent>
+                {['sm', 'md', 'lg'].map((value) => (
+                  <DropdownMenuCheckboxItem
+                    key={value}
+                    onClick={() => table.setDensity(value)}
+                    checked={table.getState().density === value}
+                  >
+                    {value === 'sm'
+                      ? 'Dense'
+                      : value === 'md'
+                        ? 'Normal'
+                        : 'Loose'}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {/* <Button
+        variant="outline"
+        size="sm"
+        className={cn(
+          'h-8 px-2',
+          table.getColumn('edit')?.getIsVisible() && 'bg-header-background',
+        )}
+        onClick={() => table.getColumn('edit')?.toggleVisibility()}
+      >
+        <Edit className="size-4" />
+      </Button> */}
+    </div>
   );
 }
 
