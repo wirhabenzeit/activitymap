@@ -49,7 +49,9 @@ function columnFromField(
     },
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column}>
-        {spec.Icon && <spec.Icon className="w-4 h-4" />}
+        <div className="w-full justify-end flex">
+          {spec.Icon && <spec.Icon className="w-4 h-4" />}
+        </div>
         {/* <span>{title}</span> */}
       </DataTableColumnHeader>
     ),
@@ -102,7 +104,9 @@ export const columns: ColumnDef<Activity>[] = [
         </div>
       </DataTableColumnHeader>
     ),
-    cell: ({ row }) => <ActivityCard row={row} />,
+    cell: ({ row, table }) => (
+      <ActivityCard row={row} map={table.getState().map} />
+    ),
     enableHiding: false,
   },
   ...Object.entries(activityFields).map(([id, spec]) =>

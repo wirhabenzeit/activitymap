@@ -21,6 +21,7 @@ import ReactMapGL, {
   Source,
   type MapRef,
   type SkyLayer,
+  MapboxMap,
 } from 'react-map-gl';
 
 import { DataTable } from '~/components/list/data-table';
@@ -335,6 +336,7 @@ function Map() {
           data={rows}
           selected={selected}
           setSelected={setSelected}
+          map={mapRefLoc}
           {...compactList}
         />
       </div>

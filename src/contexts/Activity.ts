@@ -94,7 +94,7 @@ const setActivities =
     acts.forEach((act) => {
       state.activityDict[Number(act.id)] = {
         ...act,
-        map: undefined,
+        //map: undefined,
       };
     });
     if (state.geoJson) {

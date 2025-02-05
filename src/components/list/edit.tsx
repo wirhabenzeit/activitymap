@@ -70,9 +70,7 @@ export function ProfileForm({ row }: { row: Row<Activity> }) {
       athlete: row.original.athlete,
       ...(values.description && { description: values.description }),
     };
-    console.log('activityUpdate', row.original, activityUpdate);
     const newActivity = await updateActivity(activityUpdate);
-    console.log('newActivity', newActivity);
   }
   const activtyTypes = sportType.enumValues
     .map((value) => ({
@@ -135,7 +133,7 @@ export function ProfileForm({ row }: { row: Row<Activity> }) {
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading || !form.formState.isDirty}>
           {loading ? 'Saving...' : 'Save changes'}
         </Button>
       </form>

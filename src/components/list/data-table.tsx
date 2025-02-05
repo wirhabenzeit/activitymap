@@ -8,9 +8,8 @@ import {
 } from '@radix-ui/react-icons';
 import {
   ColumnFiltersState,
-  ColumnGrouping,
   getFilteredRowModel,
-  type Row,
+  TableOptionsResolved,
 } from '@tanstack/react-table';
 
 import {
@@ -72,6 +71,8 @@ import {
   TableFeature,
 } from '@tanstack/react-table';
 import { ListState, ListStateChangers } from '~/contexts/List';
+import { Map } from 'mapbox-gl';
+import { MapRef } from 'react-map-gl';
 
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
@@ -126,6 +127,45 @@ export const DensityFeature: TableFeature<any> = {
         if (value) return value;
         return old === 'lg' ? 'md' : old === 'md' ? 'sm' : 'lg'; //cycle through the 3 options
       });
+    };
+  },
+};
+
+export interface MapTableState {
+  map?: MapRef;
+}
+export interface MapOptions {
+  onMapChange?: OnChangeFn<MapRef | undefined>;
+}
+export interface MapInstance {
+  setMap: (updater: Updater<MapRef | undefined>) => void;
+}
+declare module '@tanstack/react-table' {
+  interface TableState extends MapTableState {}
+  interface TableOptionsResolved<TData extends RowData> extends MapOptions {}
+  interface Table<TData extends RowData> extends MapInstance {}
+}
+export const MapFeature: TableFeature<any> = {
+  getInitialState: (state): MapTableState => {
+    return {
+      map: undefined,
+      ...state,
+    };
+  },
+  getDefaultOptions: <TData extends RowData>(
+    table: TableType<TData>,
+  ): Partial<TableOptionsResolved<TData>> => {
+    return {
+      onMapChange: makeStateUpdater('map', table),
+    };
+  },
+  createTable: <TData extends RowData>(table: TableType<TData>): void => {
+    table.setMap = (updater) => {
+      const safeUpdater: Updater<MapRef | undefined> = (old) => {
+        let newState = functionalUpdate(updater, old);
+        return newState;
+      };
+      return table.options.onMapChange?.(safeUpdater);
     };
   },
 };
@@ -426,6 +466,7 @@ interface DataTableProps<TData, TValue> extends ListState, ListStateChangers {
   selected: number[];
   setSelected: (updater: Updater<number[]>) => void;
   columnFilters: ColumnFiltersState;
+  map?: MapRef;
 }
 
 export function DataTable<TData, TValue>({
@@ -440,6 +481,7 @@ export function DataTable<TData, TValue>({
   columnPinning,
   summaryRow,
   paginationControl = true,
+  map,
   setSorting,
   setColumnVisibility,
   setSelected,
@@ -448,7 +490,7 @@ export function DataTable<TData, TValue>({
   setSummaryRow,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
-    _features: [DensityFeature, SummaryRowFeature],
+    _features: [DensityFeature, SummaryRowFeature, MapFeature],
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
@@ -468,9 +510,10 @@ export function DataTable<TData, TValue>({
     onSummaryRowChange: setSummaryRow,
     onColumnPinningChange: setColumnPinning,
     initialState: {
-      pagination: { pageSize: 50 },
+      pagination: { pageSize: 200 },
     },
     state: {
+      map,
       columnPinning,
       columnFilters,
       summaryRow,

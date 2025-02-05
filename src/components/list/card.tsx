@@ -1,6 +1,14 @@
 'use client';
 
-import { Calendar, Mountain, Heart, Zap } from 'lucide-react';
+import {
+  Calendar,
+  Mountain,
+  Heart,
+  Zap,
+  ExternalLink,
+  Map,
+  Info,
+} from 'lucide-react';
 
 import { Activity } from '~/server/db/schema';
 import { categorySettings } from '~/settings/category';
@@ -11,15 +19,14 @@ import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
 
 import { type Row } from '@tanstack/react-table';
 
-import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '~/components/ui/hover-card';
-
-import { Card } from '~/components/ui/card';
-import { HoverCardPortal } from '@radix-ui/react-hover-card';
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '~/components/ui/card';
 import { activityFields } from '~/settings/activity';
 
 import { EditActivity, ProfileForm } from './edit';
@@ -29,11 +36,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '~/components/ui/popover';
+import { MapRef } from 'react-map-gl';
+import { useStore } from '~/contexts/Zustand';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
 interface ActivityCardProps extends CardProps {
   row: Row<Activity>;
+  map?: MapRef;
 }
 
 const formattedValue = (key: keyof typeof activityFields, row: Row<Activity>) =>
@@ -44,25 +54,19 @@ export function DescriptionCard({ row }: { row: Row<Activity> }) {
 
   return (
     <>
-      <Popover>
-        <PopoverTrigger asChild>
-          <div
-            className="w-full truncate italic h-full flex items-center"
-            onDoubleClick={() => setOpen(true)}
-          >
-            {row.original.description}
-          </div>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto max-w-80">
-          <ActivityCardContent row={row} />
-        </PopoverContent>
-      </Popover>
+      <div
+        className="w-full truncate italic h-full flex items-center"
+        onDoubleClick={() => setOpen(true)}
+      >
+        {row.original.description}
+      </div>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
     </>
   );
 }
 
 export function ActivityCardContent({ row }: ActivityCardProps) {
+  const [open, setOpen] = useState(false);
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type]!;
   const Icon = categorySettings[sport_group].icon;
@@ -104,75 +108,109 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
   ];
 
   return (
-    <div className="flex justify-between space-x-4">
-      <Avatar>
-        <AvatarFallback>
-          <Icon
-            color={categorySettings[sport_group].color}
-            className="w-6 h-6"
-            height="3em"
-          />
-        </AvatarFallback>
-      </Avatar>
-      <div className="space-y-1">
-        <h4 className="text-sm font-semibold">{row.getValue('name')}</h4>
-        <p className="text-sm">{row.getValue('description') || ''}</p>
-        {stats.map((stat, index) => (
-          <div className="flex items-center pt-2" key={index}>
-            <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
-            <span className="text-xs text-muted-foreground">
-              {stat.description}
-            </span>
+    <>
+      <Card className="w-auto max-w-80">
+        <CardHeader>
+          <CardTitle>
+            <div className="flex items-center space-x-4">
+              <Icon
+                color={categorySettings[sport_group].color}
+                className="w-6 h-6"
+                height="3em"
+              />
+              <div>{row.getValue('name')}</div>
+            </div>
+          </CardTitle>
+          <CardDescription>{row.getValue('description') || ''}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-1">
+            {stats.map((stat, index) => (
+              <div className="flex items-center pt-2" key={index}>
+                <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
+                <div className="text-xs text-muted-foreground">
+                  {stat.description}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function ActivityCard({ row }: ActivityCardProps) {
-  const [open, setOpen] = useState(false);
-  const sport_type = row.original.sport_type;
-  const sport_group = aliasMap[sport_type]!;
-  const Icon = categorySettings[sport_group].icon;
-
-  return (
-    <div
-      className="flex items-center space-x-2 w-full"
-      onDoubleClick={() => setOpen(true)}
-    >
-      <Button
-        variant={row.getIsSelected() ? 'outline' : 'ghost'}
-        size="sm"
-        className="h-6 w-6 border"
-        onClick={() => row.toggleSelected()}
-        aria-label="Select row"
-      >
-        <Icon color={categorySettings[sport_group].color} />
-      </Button>
-      <HoverCard>
-        <HoverCardTrigger asChild>
-          <Button
-            asChild
-            variant="link"
-            className="text-left truncate underline justify-start max-w-full px-0"
-            size="sm"
-          >
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <Button onClick={() => setOpen(true)}>Edit</Button>
+          <Button variant="outline">
             <Link
               href={`https://strava.com/activities/${row.getValue('id')}`}
               target="_blank"
             >
-              {row.getValue('name')}
+              View on Strava
             </Link>
           </Button>
-        </HoverCardTrigger>
-        <HoverCardPortal>
-          <HoverCardContent className="w-auto max-w-80">
-            <ActivityCardContent row={row} />
-          </HoverCardContent>
-        </HoverCardPortal>
-      </HoverCard>
+        </CardFooter>
+      </Card>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
-    </div>
+    </>
+  );
+}
+
+export function ActivityCard({ row, map }: ActivityCardProps) {
+  const [open, setOpen] = useState(false);
+  const sport_type = row.original.sport_type;
+  const sport_group = aliasMap[sport_type]!;
+  const Icon = categorySettings[sport_group].icon;
+  const setHighlighted = useStore((state) => state.setHighlighted);
+
+  return (
+    <>
+      <div
+        className="flex items-center space-x-2 w-full"
+        onDoubleClick={() => setOpen(true)}
+      >
+        <Button
+          variant={row.getIsSelected() ? 'outline' : 'ghost'}
+          size="sm"
+          className="h-6 w-6 border"
+          onClick={() => row.toggleSelected()}
+          aria-label="Select row"
+        >
+          <Icon color={categorySettings[sport_group].color} />
+        </Button>
+        <div className="text-left truncate justify-start max-w-full">
+          {row.getValue('name')}
+        </div>
+        <div className="flex-1" />
+        <Button
+          variant="ghost"
+          className="px-0 h-4"
+          size="sm"
+          onClick={() => {
+            const mapInstance = map?.current?.getMap();
+            const bbox = row.original.map?.bbox;
+            if (mapInstance && bbox) {
+              setHighlighted(Number(row.id));
+              mapInstance.fitBounds(
+                [
+                  [bbox[0], bbox[1]],
+                  [bbox[2], bbox[3]],
+                ],
+                { padding: 50 },
+              );
+            }
+          }}
+        >
+          <Map className="w-4 h-4 text-primary/50" />
+        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" className="p-0 h-4" size="sm">
+              <Info className="w-4 h-4 text-primary/50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="p-0 w-auto">
+            <ActivityCardContent row={row} />
+          </PopoverContent>
+        </Popover>
+        <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
+      </div>
+    </>
   );
 }
