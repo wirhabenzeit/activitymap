@@ -1,11 +1,11 @@
-import {type ReactElement, cloneElement, memo} from "react";
-import {createPortal} from "react-dom";
+import { type ReactElement, cloneElement, memo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   type ControlPosition,
   type IControl,
   type MapboxMap,
   useControl,
-} from "react-map-gl";
+} from 'react-map-gl/mapbox';
 
 type Config = {
   position: ControlPosition;
@@ -20,22 +20,21 @@ type OverlayProps = {
 class OverlayControl implements IControl {
   _map: MapboxMap | null = null;
   _container: HTMLElement | null = null;
-  _position: ControlPosition = "bottom-right";
+  _position: ControlPosition = 'bottom-right';
   _redraw?: () => void;
 
-  constructor({position, redraw}: Config) {
+  constructor({ position, redraw }: Config) {
     this._position = position;
     if (redraw !== undefined) this._redraw = redraw;
   }
 
   onAdd(map: MapboxMap) {
     this._map = map;
-    this._container = document.createElement("div");
-    this._container.className =
-      "mapboxgl-ctrl mapboxgl-ctrl-group";
+    this._container = document.createElement('div');
+    this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
 
     if (this._redraw !== undefined) {
-      map.on("move", this._redraw);
+      map.on('move', this._redraw);
       this._redraw();
     }
 
@@ -43,11 +42,9 @@ class OverlayControl implements IControl {
   }
 
   onRemove() {
-    if (this._map === null || this._container === null)
-      return;
+    if (this._map === null || this._container === null) return;
     this._container.remove();
-    if (this._redraw !== undefined)
-      this._map.off("move", this._redraw);
+    if (this._redraw !== undefined) this._map.off('move', this._redraw);
     this._map = null;
   }
 
@@ -64,16 +61,16 @@ class OverlayControl implements IControl {
   }
 }
 
-const Overlay = ({position, children}: OverlayProps) => {
+const Overlay = ({ position, children }: OverlayProps) => {
   const ctrl = useControl<OverlayControl>(() => {
-    return new OverlayControl({position});
+    return new OverlayControl({ position });
   });
 
   const map = ctrl.getMap();
   const elem = ctrl.getElement();
   if (map === null || elem === null) return;
 
-  return createPortal(cloneElement(children, {map}), elem);
+  return createPortal(cloneElement(children, { map }), elem);
 };
 
 export default memo(Overlay);

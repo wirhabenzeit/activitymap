@@ -1,8 +1,8 @@
-import { Marker } from "react-map-gl";
-import { useStore } from "~/contexts/Zustand";
-import { Avatar, AvatarImage } from "../ui/avatar";
-import { useMemo, useState } from "react";
-import { useShallow } from "zustand/shallow";
+import { Marker } from 'react-map-gl/mapbox';
+import { useStore } from '~/contexts/Zustand';
+import { Avatar, AvatarImage } from '../ui/avatar';
+import { useMemo, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 export default function PhotoLayer() {
   const { photos, position, filterIDs } = useStore(
@@ -73,7 +73,7 @@ function PhotoMarker({
       longitude={longitude}
       latitude={latitude}
       anchor="center"
-      style={{ zIndex: hover ? 3 : 2, cursor: "pointer" }}
+      style={{ zIndex: hover ? 3 : 2, cursor: 'pointer' }}
       onClick={(e) => {
         e.originalEvent.stopPropagation();
         setSelected([activity_id]);

@@ -22,7 +22,7 @@ import ReactMapGL, {
   type MapRef,
   type SkyLayer,
   MapboxMap,
-} from 'react-map-gl';
+} from 'react-map-gl/mapbox';
 
 import { DataTable } from '~/components/list/data-table';
 
@@ -142,9 +142,9 @@ function RouteLayer() {
         id="routeLayerHigh"
         type="line"
         paint={{
-          'line-color': 'white',
+          'line-color': 'black',
+          'line-pattern': 'pattern-dot',
           'line-width': 6,
-          'line-opacity': 0.4,
         }}
         layout={{
           'line-join': 'round',
@@ -196,6 +196,8 @@ function Map() {
   );
   const { open } = useSidebar();
   const mapRefLoc = createRef<MapRef>();
+
+  console.log('Map render', mapPosition);
 
   useEffect(() => {
     const map = mapRefLoc.current?.getMap();
@@ -260,6 +262,18 @@ function Map() {
           if (mapRefLoc.current) {
             setPosition(viewState, mapRefLoc.current.getMap().getBounds());
           }
+        }}
+        onLoad={() => {
+          mapRefLoc.current?.loadImage(
+            'https://docs.mapbox.com/mapbox-gl-js/assets/pattern-dot.png',
+            (error, image) => {
+              if (error) throw error;
+              if (mapRefLoc.current) {
+                if (!mapRefLoc.current.getMap().hasImage('pattern-dot'))
+                  mapRefLoc.current.getMap().addImage('pattern-dot', image);
+              }
+            },
+          );
         }}
         //optimizeForTerrain={true}
         //onLoad={(event: MapboxEvent) => console.log(event)}

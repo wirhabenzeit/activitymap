@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import {
   Calendar,
   Mountain,
@@ -36,8 +37,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '~/components/ui/popover';
-import { MapRef } from 'react-map-gl';
+import { MapRef } from 'react-map-gl/mapbox';
 import { useStore } from '~/contexts/Zustand';
+import { useShallow } from 'zustand/shallow';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
@@ -157,7 +159,14 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type]!;
   const Icon = categorySettings[sport_group].icon;
-  const setHighlighted = useStore((state) => state.setHighlighted);
+  const [setHighlighted, setPosition, setSelected] = useStore(
+    useShallow((state) => [
+      state.setHighlighted,
+      state.setPosition,
+      state.setSelected,
+    ]),
+  );
+  const { push } = useRouter();
 
   return (
     <>
@@ -185,8 +194,12 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
           onClick={() => {
             const mapInstance = map?.current?.getMap();
             const bbox = row.original.map?.bbox;
-            if (mapInstance && bbox) {
-              setHighlighted(Number(row.id));
+            if (!bbox) return;
+            setSelected((prev) =>
+              prev.includes(row.id) ? prev : [...prev, row.id],
+            );
+            setHighlighted(Number(row.id));
+            if (mapInstance) {
               mapInstance.fitBounds(
                 [
                   [bbox[0], bbox[1]],
@@ -194,6 +207,14 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
                 ],
                 { padding: 50 },
               );
+            } else {
+              const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2];
+              const zoom = 12;
+              setPosition(
+                { longitude: center[0], latitude: center[1], zoom },
+                {},
+              );
+              push('/map');
             }
           }}
         >

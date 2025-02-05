@@ -16,7 +16,7 @@ import { DataTableColumnHeader } from './data-table';
 import { activityFields } from '~/settings/activity';
 
 import { ActivityCard, DescriptionCard } from './card';
-import { EditActivity, EditButton } from './edit';
+import { EditActivity } from './edit';
 
 function columnFromField(
   id: keyof typeof activityFields,

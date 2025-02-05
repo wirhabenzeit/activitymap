@@ -1,14 +1,9 @@
-"use client";
+'use client';
 
-import {
-  type MapMouseEvent,
-  Point,
-  type PointLike,
-} from "mapbox-gl";
-import {type MapContextValue} from "react-map-gl/dist/esm/components/map";
-import {useControl} from "react-map-gl";
-import {useStore} from "~/contexts/Zustand";
-import {useShallow} from "zustand/shallow";
+import { type MapMouseEvent, Point, type PointLike } from 'mapbox-gl';
+import { useControl } from 'react-map-gl/mapbox';
+import { useStore } from '~/contexts/Zustand';
+import { useShallow } from 'zustand/shallow';
 
 const styles = `
 .boxdraw {
@@ -23,22 +18,22 @@ const styles = `
 `;
 
 export function Selection() {
-  const {setSelected} = useStore(
+  const { setSelected } = useStore(
     useShallow((state) => ({
       setSelected: state.setSelected,
-    }))
+    })),
   );
 
   useControl(
     (context: MapContextValue) =>
       new SelectionControl({
         context,
-        layers: ["routeLayerBG", "routeLayerBGsel"],
-        source: "routeSource",
+        layers: ['routeLayerBG', 'routeLayerBGsel'],
+        source: 'routeSource',
         selectionHandler: (sel: number[]) => {
           setSelected(Array.from(new Set(sel)));
         },
-      })
+      }),
   );
   return null;
 }
@@ -67,7 +62,7 @@ export class SelectionControl {
     selectionHandler: (ids: number[]) => void;
     context: MapContextValue;
   }) {
-    const styleSheet = document.createElement("style");
+    const styleSheet = document.createElement('style');
     styleSheet.innerText = styles;
     document.head.appendChild(styleSheet);
 
@@ -75,7 +70,7 @@ export class SelectionControl {
     this.source = source;
     this.selectionHandler = selectionHandler;
     this.context = context;
-    this._container = document.createElement("div");
+    this._container = document.createElement('div');
   }
 
   onChange() {
@@ -85,12 +80,8 @@ export class SelectionControl {
   mousePos = (e: MapMouseEvent) => {
     if (!this.rect || !this.canvas) return new Point(0, 0);
     return new Point(
-      e.originalEvent.clientX -
-        this.rect.left -
-        this.canvas.clientLeft,
-      e.originalEvent.clientY -
-        this.rect.top -
-        this.canvas.clientTop
+      e.originalEvent.clientX - this.rect.left - this.canvas.clientLeft,
+      e.originalEvent.clientY - this.rect.top - this.canvas.clientTop,
     );
   };
 
@@ -101,16 +92,11 @@ export class SelectionControl {
       [e.point.x - 5, e.point.y - 5],
       [e.point.x + 5, e.point.y + 5],
     ];
-    const selectedFeatures = this.map.queryRenderedFeatures(
-      bbox,
-      {
-        layers: this.layers,
-      }
-    );
+    const selectedFeatures = this.map.queryRenderedFeatures(bbox, {
+      layers: this.layers,
+    });
     this.selectionHandler(
-      selectedFeatures.map(
-        (feature) => feature.id as number
-      )
+      selectedFeatures.map((feature) => feature.id as number),
     );
   };
 
@@ -119,24 +105,18 @@ export class SelectionControl {
     this.canvas = map.getCanvasContainer();
     this.rect = this.canvas.getBoundingClientRect();
 
-    map.on("mousedown", this.mouseDown);
-    map.on("click", this.click);
+    map.on('mousedown', this.mouseDown);
+    map.on('click', this.click);
 
     return this._container;
   }
 
   mouseDown = (e: MapMouseEvent) => {
-    if (
-      !(
-        e.originalEvent.shiftKey &&
-        e.originalEvent.button === 0
-      )
-    )
-      return;
+    if (!(e.originalEvent.shiftKey && e.originalEvent.button === 0)) return;
 
     this.map?.dragPan.disable();
-    this.map?.on("mousemove", this.onMouseMove);
-    this.map?.on("mouseup", this.onMouseUp);
+    this.map?.on('mousemove', this.onMouseMove);
+    this.map?.on('mouseup', this.onMouseUp);
     this.start = this.mousePos(e);
   };
 
@@ -144,8 +124,8 @@ export class SelectionControl {
     this.current = this.mousePos(e);
 
     if (!this.box) {
-      this.box = document.createElement("div");
-      this.box.classList.add("boxdraw");
+      this.box = document.createElement('div');
+      this.box.classList.add('boxdraw');
       this.canvas?.appendChild(this.box);
     }
 
@@ -156,8 +136,8 @@ export class SelectionControl {
 
     const pos = `translate(${minX}px, ${minY}px)`;
     this.box.style.transform = pos;
-    this.box.style.width = maxX - minX + "px";
-    this.box.style.height = maxY - minY + "px";
+    this.box.style.width = maxX - minX + 'px';
+    this.box.style.height = maxY - minY + 'px';
   };
 
   onMouseUp = (e: MapMouseEvent) => {
@@ -166,8 +146,8 @@ export class SelectionControl {
 
   finish = (bbox: [PointLike, PointLike]) => {
     // Remove these events now that finish has been called.
-    this.map?.off("mousemove", this.onMouseMove);
-    this.map?.off("mouseup", this.onMouseUp);
+    this.map?.off('mousemove', this.onMouseMove);
+    this.map?.off('mouseup', this.onMouseUp);
 
     if (this.box?.parentNode) {
       this.box.parentNode.removeChild(this.box);
@@ -176,25 +156,20 @@ export class SelectionControl {
 
     // If bbox exists. use this value as the argument for `queryRenderedFeatures`
     if (bbox) {
-      const selectedFeatures =
-        this.map?.queryRenderedFeatures(bbox, {
-          layers: this.layers,
-        });
+      const selectedFeatures = this.map?.queryRenderedFeatures(bbox, {
+        layers: this.layers,
+      });
       if (selectedFeatures)
         this.selectionHandler(
-          selectedFeatures.map(
-            (feature) => feature.id as number
-          )
+          selectedFeatures.map((feature) => feature.id as number),
         );
     }
     this.map?.dragPan.enable();
   };
 
   onRemove(map: mapboxgl.Map) {
-    map.off("mousedown", this.mouseDown);
-    map.off("click", this.click);
-    this._container.parentNode?.removeChild(
-      this._container
-    );
+    map.off('mousedown', this.mouseDown);
+    map.off('click', this.click);
+    this._container.parentNode?.removeChild(this._container);
   }
 }

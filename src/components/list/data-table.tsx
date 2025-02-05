@@ -72,7 +72,7 @@ import {
 } from '@tanstack/react-table';
 import { ListState, ListStateChangers } from '~/contexts/List';
 import { Map } from 'mapbox-gl';
-import { MapRef } from 'react-map-gl';
+import { MapRef } from 'react-map-gl/mapbox';
 
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
