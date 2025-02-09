@@ -128,6 +128,15 @@ export async function POST(
             .where(eq(photos.activity_id, data.object_id));
           console.log('Deleted', del);
         }
+        const athlete = await db
+          .select()
+          .from(accounts)
+          .where(eq(accounts.providerAccountId, data.owner_id));
+        if (athlete.length === 0) {
+          return new Response('Athlete not found', {
+            status: 400,
+          });
+        }
         await getStravaActivities({
           activities: [{ id: data.object_id, athlete: data.owner_id }],
           database: true,

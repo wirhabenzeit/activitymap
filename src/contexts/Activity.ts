@@ -224,7 +224,7 @@ export const activitySlice: StateCreator<
     try {
       const athleteId = (await getAccount({})).providerAccountId;
       if (athleteId != undefined) {
-        const { activities: acts } = await getStravaActivities({
+        const { activities: acts, photos: phts } = await getStravaActivities({
           get_photos: photos,
           activities: ids?.map((id) => ({
             id,
@@ -233,6 +233,9 @@ export const activitySlice: StateCreator<
         });
         console.log(acts);
         set(setActivities(acts));
+        set((state) => {
+          state.photos = [...state.photos, ...phts];
+        });
         return acts.length;
       }
       return 0;
@@ -240,5 +243,8 @@ export const activitySlice: StateCreator<
       console.error(e);
       throw new Error('Failed to fetch activities');
     }
+    set((state) => {
+      state.loading = false;
+    });
   },
 });

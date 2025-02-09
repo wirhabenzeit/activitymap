@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Map,
   Info,
+  CircleArrowLeft,
 } from 'lucide-react';
 
 import { Activity, Photo } from '~/server/db/schema';
@@ -16,7 +17,11 @@ import { categorySettings } from '~/settings/category';
 import { Button } from '~/components/ui/button';
 import { aliasMap } from '~/settings/category';
 import Link from 'next/link';
-import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
+import {
+  ReloadIcon,
+  RulerHorizontalIcon,
+  StopwatchIcon,
+} from '@radix-ui/react-icons';
 
 import { type Row } from '@tanstack/react-table';
 
@@ -70,6 +75,7 @@ export function DescriptionCard({ row }: { row: Row<Activity> }) {
 
 export function ActivityCardContent({ row }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
+  const loadFromStrava = useStore((state) => state.loadFromStrava);
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type]!;
   const Icon = categorySettings[sport_group].icon;
@@ -138,8 +144,15 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
             ))}
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between">
+        <CardFooter className="flex justify-between space-x-1">
           <Button onClick={() => setOpen(true)}>Edit</Button>
+          <Button
+            onClick={() =>
+              loadFromStrava({ photos: true, ids: [row.original.id] })
+            }
+          >
+            <ReloadIcon />
+          </Button>
           <Button variant="outline">
             <Link
               href={`https://strava.com/activities/${row.getValue('id')}`}

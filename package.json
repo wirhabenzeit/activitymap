@@ -87,6 +87,7 @@
     "shpjs": "^6.1.0",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
+    "ws": "^8.18.0",
     "zod": "^3.24.1",
     "zustand": "^5.0.3"
   },
