@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import {
   accounts,
   activities,
+  photos,
   users as usersSchema,
   type Activity,
 } from '~/server/db/schema';
@@ -120,6 +121,13 @@ export async function POST(
         return new Response(`Deleted activity ${data.object_id}`);
       }
       if (data.aspect_type === 'create' || data.aspect_type === 'update') {
+        if (data.aspect_type === 'update') {
+          // check for photos
+          const del = await db
+            .delete(photos)
+            .where(eq(photos.activity_id, data.object_id));
+          console.log('Deleted', del);
+        }
         await getStravaActivities({
           activities: [{ id: data.object_id, athlete: data.owner_id }],
           database: true,

@@ -57,14 +57,14 @@ export default function Stats({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full min-h-0 w-full flex-col flex-nowrap overflow-hidden">
       <StatsProvider>
-        <div className="flex w-full flex-shrink-0 items-stretch overflow-hidden">
+        <div className="flex w-full shrink-0 items-stretch overflow-hidden">
           <Tabs defaultValue={pathname} className="flex-1">
             <TabsList className="inline-flex h-9 w-full items-center justify-start rounded-none border-b bg-transparent p-0 text-muted-foreground">
               {Object.entries(tabs).map(([url, tab]) => (
                 <TabsLinkTrigger
                   href={url}
                   key={url}
-                  className="relative inline-flex h-9 items-center justify-center whitespace-nowrap rounded-none border-b-2 border-b-transparent bg-transparent px-4 py-1 pb-2 pt-2 text-sm font-semibold text-muted-foreground shadow-none ring-offset-background transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-b-primary data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                  className="relative inline-flex h-9 items-center justify-center whitespace-nowrap rounded-none border-b-2 border-b-transparent bg-transparent px-4 py-1 pb-2 pt-2 text-sm font-semibold text-muted-foreground shadow-none ring-offset-background transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-b-primary data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-none"
                 >
                   <span className="capitalize">{tab.label}</span>
                 </TabsLinkTrigger>
@@ -84,7 +84,7 @@ export default function Stats({ children }: { children: React.ReactNode }) {
             </Button>
           </div>
         </div>
-        <div ref={elementRef} className="min-h-0 w-full flex-grow">
+        <div ref={elementRef} className="min-h-0 w-full grow">
           {children}
         </div>
         <div

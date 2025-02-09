@@ -82,9 +82,13 @@ function PhotoMarker({
       <Avatar
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        className="size-8 border-2 border-white transition-all hover:size-32"
+        className="size-8 border-2 border-white transition-all hover:size-32 overflow-auto"
       >
-        <AvatarImage src={photoUrl} alt={caption ?? activity_name} />
+        <AvatarImage
+          src={photoUrl}
+          alt={caption ?? activity_name}
+          className="w-full h-full object-cover"
+        />
       </Avatar>
     </Marker>
   );

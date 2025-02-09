@@ -6,9 +6,10 @@ import { DataTable } from '../../components/list/data-table';
 import { useStore } from '~/contexts/Zustand';
 import { useShallow } from 'zustand/shallow';
 import React from 'react';
+import { Photo } from '~/server/db/schema';
 
 export default function ListPage() {
-  const { selected, setSelected, activityDict, filterIDs, tableState } =
+  const { selected, setSelected, activityDict, filterIDs, tableState, photos } =
     useStore(
       useShallow((state) => ({
         selected: state.selected,
@@ -16,11 +17,28 @@ export default function ListPage() {
         activityDict: state.activityDict,
         filterIDs: state.filterIDs,
         tableState: state.fullList,
+        photos: state.photos,
       })),
     );
 
   const columnFilters = [{ id: 'id', value: filterIDs }];
-  const rows = React.useMemo(() => Object.values(activityDict), [activityDict]);
+  const photoDict = photos.reduce(
+    (acc, photo) => {
+      if (photo.activity_id in acc) acc[photo.activity_id].push(photo);
+      else acc[photo.activity_id] = [photo];
+      return acc;
+    },
+    {} as Record<number, Photo[]>,
+  );
+  const rows = React.useMemo(
+    () =>
+      Object.entries(activityDict).map(([id, act]) => ({
+        ...act,
+        ...(id in photoDict && { photos: photoDict[id] }),
+      })),
+    [activityDict, photos],
+  );
+  console.log('photoDict', photoDict);
 
   return (
     <div className="h-full max-h-dvh w-full">

@@ -15,7 +15,7 @@ import { Button } from '~/components/ui/button';
 import { DataTableColumnHeader } from './data-table';
 import { activityFields } from '~/settings/activity';
 
-import { ActivityCard, DescriptionCard } from './card';
+import { ActivityCard, DescriptionCard, PhotoCard } from './card';
 import { EditActivity } from './edit';
 
 function columnFromField(
@@ -124,6 +124,14 @@ export const columns: ColumnDef<Activity>[] = [
     ),
     enableResizing: true,
     cell: ({ row }) => <DescriptionCard row={row} />,
+  },
+  {
+    accessorKey: 'photos',
+    meta: { title: 'Photos', width: '100px' },
+    header: ({ column, table }) => (
+      <DataTableColumnHeader table={table} column={column} title="Photos" />
+    ),
+    cell: ({ getValue }) => <PhotoCard photos={getValue()} />,
   },
   {
     id: 'edit',

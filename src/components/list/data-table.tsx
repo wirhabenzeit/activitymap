@@ -607,7 +607,7 @@ export function DataTable<TData, TValue>({
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     className={cn(
-                      'bg-background group-data-[state=selected]:bg-muted flex items-center',
+                      'bg-background group-data-[state=selected]:bg-muted flex items-center h-8',
                       cell.column.getIsPinned() == 'left' &&
                         'sticky left-0 border-border border-r',
                       cell.column.getIsPinned() == 'right' &&

@@ -11,7 +11,7 @@ import {
   Info,
 } from 'lucide-react';
 
-import { Activity } from '~/server/db/schema';
+import { Activity, Photo } from '~/server/db/schema';
 import { categorySettings } from '~/settings/category';
 import { Button } from '~/components/ui/button';
 import { aliasMap } from '~/settings/category';
@@ -40,6 +40,7 @@ import {
 import { MapRef } from 'react-map-gl/mapbox';
 import { useStore } from '~/contexts/Zustand';
 import { useShallow } from 'zustand/shallow';
+import { cn } from '~/lib/utils';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
@@ -159,8 +160,9 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type]!;
   const Icon = categorySettings[sport_group].icon;
-  const [setHighlighted, setPosition, setSelected] = useStore(
+  const [highlighted, setHighlighted, setPosition, setSelected] = useStore(
     useShallow((state) => [
+      state.highlighted,
       state.setHighlighted,
       state.setPosition,
       state.setSelected,
@@ -183,7 +185,14 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
         >
           <Icon color={categorySettings[sport_group].color} />
         </Button>
-        <div className="text-left truncate justify-start max-w-full">
+        <div
+          className={cn(
+            'text-left truncate justify-start max-w-full',
+            highlighted === Number(row.id)
+              ? 'text-header-background'
+              : 'text-primary',
+          )}
+        >
           {row.getValue('name')}
         </div>
         <div className="flex-1" />
@@ -233,5 +242,22 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
         <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
       </div>
     </>
+  );
+}
+
+export function PhotoCard({ photos }: { photos: Photo[] }) {
+  console.log(photos);
+  return photos ? (
+    <div className="flex items-center h-full space-x-2">
+      {photos.map((photo) => (
+        <img
+          src={Object.values(photo.urls)[0]}
+          alt={photo.caption}
+          className="h-full rounded-sm aspect-square object-cover"
+        />
+      ))}
+    </div>
+  ) : (
+    'No'
   );
 }

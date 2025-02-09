@@ -92,7 +92,7 @@ const setActivities =
     state.loading = false;
     state.loaded = true;
     acts.forEach((act) => {
-      state.activityDict[Number(act.id)] = {
+      state.activityDict[act.id] = {
         ...act,
         //map: undefined,
       };

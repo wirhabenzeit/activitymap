@@ -10,6 +10,7 @@ import {
   ColumnFiltersState,
 } from '@tanstack/react-table';
 import { WritableDraft } from 'immer';
+import { photos } from 'drizzle/schema';
 
 export type SummaryRowState = null | 'page' | 'all';
 export type DensityState = 'sm' | 'md' | 'lg';
@@ -105,6 +106,7 @@ export const listSlice: StateCreator<
       kudos_count: false,
       average_heartrate: false,
       edit: false,
+      photos: false,
     },
     summaryRow: null,
     ...createListStateChangers(set, 'compactList'),
@@ -129,6 +131,7 @@ export const listSlice: StateCreator<
       kudos_count: false,
       average_heartrate: false,
       edit: false,
+      photos: false,
     },
     summaryRow: 'page',
     ...createListStateChangers(set, 'fullList'),

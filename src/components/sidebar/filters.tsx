@@ -135,7 +135,7 @@ export function CategoryFilter() {
               <DropdownMenuContent
                 side="right"
                 align="start"
-                className="max-h-96 !overflow-scroll"
+                className="max-h-96 overflow-scroll!"
               >
                 {(
                   Object.entries(

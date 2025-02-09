@@ -51,6 +51,7 @@ import { Selection } from '~/components/map/SelectionControl';
 import { LayerSwitcher } from '~/components/map/LayerSwitcher';
 import PhotoLayer from '~/components/map/Photo';
 import { cn } from '~/lib/utils';
+import { map } from 'd3';
 
 function RouteLayer() {
   const { filterIDs } = useStore(
@@ -197,8 +198,6 @@ function Map() {
   const { open } = useSidebar();
   const mapRefLoc = createRef<MapRef>();
 
-  console.log('Map render', mapPosition);
-
   useEffect(() => {
     const map = mapRefLoc.current?.getMap();
     if (map) {
@@ -281,10 +280,10 @@ function Map() {
         mapStyle={
           mapSettingBase.type === 'vector' ? mapSettingBase.url : undefined
         }
-        // terrain={{
-        //   source: "mapbox-dem",
-        //   exaggeration: threeDim ? 1.5 : 0,
-        // }}
+        terrain={{
+          source: 'mapbox-dem',
+          exaggeration: threeDim ? 1.5 : 0,
+        }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
@@ -316,7 +315,15 @@ function Map() {
         </Overlay>
         <Overlay position="top-left">
           <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
-            <Button onClick={toggleThreeDim} className="[&_svg]:size-5">
+            <Button
+              onClick={() => {
+                toggleThreeDim();
+                mapRefLoc.current
+                  ?.getMap()
+                  .easeTo({ pitch: threeDim ? 0 : 60 });
+              }}
+              className="[&_svg]:size-5"
+            >
               <Globe
                 className="mx-auto"
                 color={threeDim ? 'hsl(var(--header-background))' : 'gray'}

@@ -17,14 +17,10 @@ Map, list, and analyze of all your Strava activities.
 - Shareable map screenshots
 - Overlays of biking and hiking routes
 
-![Map](./map.png)
-
 ### List View
 
 - Customizable columns
 - Sortable columns
-
-![List](./list.png)
 
 ### Stats View
 
@@ -32,9 +28,6 @@ Map, list, and analyze of all your Strava activities.
 - Timeline of total distance/elevation/time per period of time, with local averaging
 - Configurable scatter plot of all activities
 - Progress plot per year or month
-
-![Stats Timeline](./stats1.png)
-![Stats Calendar](./stats2.png)
 
 ## Dependencies
 
