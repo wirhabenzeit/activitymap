@@ -1,20 +1,19 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, type JSX } from "react";
-import { createPortal } from "react-dom";
-import { useTheme } from "next-themes";
-import { useStore } from "~/contexts/Zustand";
-import { useShallow } from "zustand/shallow";
+import { useEffect, useRef, type JSX, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { useTheme } from 'next-themes';
+import { useShallowStore } from '~/store';
 
-import { useContext } from "react";
-import { StatsContext } from "~/app/stats/[name]/StatsContext";
+import { useContext } from 'react';
+import { StatsContext } from '~/app/stats/[name]/StatsContext';
 import statsPlots, {
   type StatsSetter,
   type StatsSetting,
   type StatsSettings,
-} from "~/stats";
+} from '~/stats';
 
-import * as React from "react";
+import * as React from 'react';
 
 import {
   Select,
@@ -22,13 +21,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
+} from '~/components/ui/select';
 
-import { Slider } from "~/components/ui/slider";
+import { Slider } from '~/components/ui/slider';
 
-import { type Activity } from "~/server/db/schema";
-import { Button } from "~/components/ui/button";
-import { Plot } from "@observablehq/plot";
+import { type Activity } from '~/server/db/schema';
+import { Button } from '~/components/ui/button';
+import { Plot } from '@observablehq/plot';
 
 type Stats<K extends keyof StatsSetting> = {
   settings: StatsSettings[K];
@@ -73,7 +72,7 @@ function FormElement<T extends keyof StatsSetting>({
   const setter = (value: StatsSetting[T]) => stat.setter(propName, value);
 
   switch (setting.type) {
-    case "categorical":
+    case 'categorical':
       return (
         <SelectFormElement
           key={propName}
@@ -82,7 +81,7 @@ function FormElement<T extends keyof StatsSetting>({
           setter={setter}
         />
       );
-    case "number":
+    case 'number':
       return (
         <SliderFormElement
           key={propName}
@@ -107,7 +106,7 @@ function Form<T extends keyof StatsSetting>(stat: Stats<T>) {
 }
 
 type CategoricalSetting<K extends string, T> = {
-  type: "categorical";
+  type: 'categorical';
   label: string;
   options: Record<
     K,
@@ -147,7 +146,7 @@ export const SelectFormElement = <K extends string, T>({
 };
 
 type ValueSetting = {
-  type: "value";
+  type: 'value';
   domain: [number, number];
   label: string;
   minIcon: JSX.Element;
@@ -197,69 +196,57 @@ export const SliderFormElement = ({
 type Setting = CategoricalSetting<any, any> | ValueSetting;
 
 export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
-  const {
-    loaded,
-    statsSettings,
-    activityDict,
-    setStats,
-    filterIDs,
-    selected,
-    setSelected,
-  } = useStore(
-    useShallow((state) => ({
-      loaded: state.loaded,
+  const { activityDict, filterIDs, settings, setSettings } = useShallowStore(
+    (state) => ({
       activityDict: state.activityDict,
       filterIDs: state.filterIDs,
-      statsSettings: state.statsSettings,
-      setStats: state.setStatsSettings,
-      selected: state.selected,
-      setSelected: state.setSelected,
-    })),
+      settings: state.settings,
+      setSettings: state.setSettings,
+    }),
   );
   const { theme } = useTheme();
 
   const figureRef = useRef<HTMLDivElement>(null);
   const { width, height, settingsRef } = useContext(StatsContext);
 
-  const stats = (Object.keys(statsPlots) as (keyof StatsSetting)[]).reduce(
-    (acc, key) => ({
-      ...acc,
-      [key]: {
-        plot: statsPlots[key].plot,
-        legend: statsPlots[key].legend,
-        setting: statsSettings[key],
-        settings: statsPlots[key].settings,
-        kind: key,
-        setter: setStats[key],
-      },
-    }),
-    {} as Record<keyof StatsSetting, Stats<keyof StatsSetting>>,
+  const stats = useMemo(
+    () =>
+      (Object.keys(statsPlots) as (keyof StatsSetting)[]).reduce(
+        (acc, key) => ({
+          ...acc,
+          [key]: {
+            plot: statsPlots[key].plot,
+            legend: statsPlots[key].legend,
+            setting: settings[key],
+            settings: statsPlots[key].settings,
+            kind: key,
+            setter: setSettings[key],
+          },
+        }),
+        {} as Record<keyof StatsSetting, Stats<keyof StatsSetting>>,
+      ),
+    [settings, setSettings],
   );
 
   useEffect(() => {
-    if (!loaded) return;
-    if (!figureRef.current) return;
-    if (!settingsRef.current) return;
+    if (!figureRef.current || !settingsRef.current) return;
 
     const plot = makePlot(stats[name])({
       activities: filterIDs.map((id) => activityDict[id]!),
-      selected: selected,
-      setSelected: setSelected,
-      height,
       width,
-      theme,
+      height,
+      theme: theme === 'dark' ? 'dark' : 'light',
     });
 
-    Object.assign(plot, {
-      style: `margin: 0;`,
-    });
+    if (!plot) return;
 
+    plot.style = 'margin: 0;';
     figureRef.current.append(plot as Node);
+
     const legend = makeLegend(stats[name])(plot);
     if (legend) {
-      Object.assign(legend, {
-        style: `min-height: 0; display: block; margin-bottom: 0 !important;`,
-      });
+      legend.style =
+        'min-height: 0; display: block; margin-bottom: 0 !important;';
       settingsRef.current.append(legend);
     }
 
@@ -267,15 +254,12 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
       plot.remove();
       if (legend) legend.remove();
     };
-  }, [
-    width,
-    height,
-    activityDict,
-    statsSettings[name],
-    filterIDs,
-    selected,
-    theme,
-  ]);
+  }, [width, height, activityDict, settings[name], filterIDs, theme]);
+
+  const form = useMemo(
+    () => (settingsRef.current ? Form<typeof name>(stats[name]) : null),
+    [stats, name, settingsRef.current],
+  );
 
   return (
     <>
@@ -287,8 +271,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
         }}
         ref={figureRef}
       />
-      {settingsRef.current &&
-        createPortal(Form<typeof name>(stats[name]), settingsRef.current)}
+      {settingsRef.current && form && createPortal(form, settingsRef.current)}
     </>
   );
 }

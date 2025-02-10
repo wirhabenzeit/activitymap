@@ -1,16 +1,13 @@
-"use client";
+'use client';
 
-import {OpenAI} from "openai";
-import Markdown from "react-markdown";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import {
-  docco,
-  dark,
-} from "react-syntax-highlighter/dist/esm/styles/hljs";
+import { OpenAI } from 'openai';
+import Markdown from 'react-markdown';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { docco, dark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
-import {AssistantStream} from "openai/lib/AssistantStream";
+import { AssistantStream } from 'openai/lib/AssistantStream';
 
-import {useEffect, useState, useRef} from "react";
+import { useEffect, useState, useRef } from 'react';
 import {
   IconButton,
   TextField,
@@ -24,23 +21,21 @@ import {
   Grid,
   ListItemText,
   CircularProgress,
-} from "@mui/material";
-import {Insights, SendOutlined} from "@mui/icons-material";
+} from '@mui/material';
+import { Insights, SendOutlined } from '@mui/icons-material';
 
-import {useStore} from "~/contexts/Zustand";
-import {type User} from "~/server/db/schema";
-import {useShallow} from "zustand/shallow";
+import { useShallowStore } from '~/store';
+import { type User } from '~/server/db/schema';
+import { useShallow } from 'zustand/shallow';
 
 export function ChatBot() {
   const [open, setOpen] = useState(false);
-  const {selected, user, guest, session} = useStore(
-    useShallow((state) => ({
-      selected: state.selected,
-      user: state.user,
-      session: state.session,
-      guest: state.guest,
-    }))
-  );
+  const { selected, user, guest, session } = useShallowStore((state) => ({
+    selected: state.selected,
+    user: state.user,
+    guest: state.guest,
+    session: state.session,
+  }));
 
   if (!user || !session || guest) return null;
 
@@ -50,12 +45,8 @@ export function ChatBot() {
 
   return (
     <>
-      <IconButton
-        sx={{mx: 0}}
-        onClick={handleClickOpen}
-        size="small"
-      >
-        <Insights sx={{color: "white", opacity: 0.9}} />
+      <IconButton sx={{ mx: 0 }} onClick={handleClickOpen} size="small">
+        <Insights sx={{ color: 'white', opacity: 0.9 }} />
       </IconButton>
       <ChatBotDialog
         open={open}
@@ -74,19 +65,9 @@ interface ChatBotDialogProps {
   user: User;
 }
 
-function ChatBotDialog({
-  open,
-  onClose,
-  selected,
-  user,
-}: ChatBotDialogProps) {
+function ChatBotDialog({ open, onClose, selected, user }: ChatBotDialogProps) {
   return (
-    <Dialog
-      open={open}
-      fullWidth
-      maxWidth="md"
-      onClose={onClose}
-    >
+    <Dialog open={open} fullWidth maxWidth="md" onClose={onClose}>
       <DialogTitle>Chat</DialogTitle>
       <OpenAIAssistant
         assistantId="asst_iMT1VRPZZNotIsd5NtXvjUAr"
@@ -109,7 +90,7 @@ interface OpenAIAssistantProps {
 }
 
 type FileAPIResponse = {
-  object: "file";
+  object: 'file';
   id: string;
   purpose: string;
   filename: string;
@@ -119,68 +100,56 @@ type FileAPIResponse = {
   status_details: null;
 };
 
-function OpenAIAssistant({
-  assistantId,
-  greeting,
-}: OpenAIAssistantProps) {
+function OpenAIAssistant({ assistantId, greeting }: OpenAIAssistantProps) {
   const streamingCodeRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [threadId, setThreadId] = useState<string | null>(
-    null
-  );
-  const [prompt, setPrompt] = useState("");
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [streamingMessage, setStreamingMessage] =
-    useState<Message | null>(null);
+  const [streamingMessage, setStreamingMessage] = useState<Message | null>(
+    null,
+  );
   const [streamingCode, setStreamingCode] =
-    useState<OpenAI.Beta.Threads.Runs.Steps.ToolCall | null>(
-      null
-    );
+    useState<OpenAI.Beta.Threads.Runs.Steps.ToolCall | null>(null);
   const messageId = useRef(0);
   const endOfMessagesRef = useRef(null);
 
   const greetingMessage: Message = {
-    id: "greeting",
-    role: "assistant",
+    id: 'greeting',
+    role: 'assistant',
     content: greeting,
     createdAt: new Date(),
   };
 
-  const session = useStore((state) => state.session);
+  const session = useShallowStore((state) => state.session);
 
   const uploadFile = async () => {
     if (!session) return;
     const sessionToken = session.sessionToken;
-    const fileResponse = await fetch(
-      `/api/ai/file?session=${sessionToken}`,
-      {
-        method: "POST",
-      }
-    );
-    const file =
-      (await fileResponse.json()) as FileAPIResponse;
+    const fileResponse = await fetch(`/api/ai/file?session=${sessionToken}`, {
+      method: 'POST',
+    });
+    const file = (await fileResponse.json()) as FileAPIResponse;
     const fileID = file.id;
-    const response = await fetch("/api/ai/message", {
-      method: "POST",
+    const response = await fetch('/api/ai/message', {
+      method: 'POST',
       body: JSON.stringify({
         assistantId,
         threadId,
         content:
-          "This is the CSV containing all my activity data. Do not reply yet, wait for me to ask a question.",
+          'This is the CSV containing all my activity data. Do not reply yet, wait for me to ask a question.',
         attachments: [
           {
             file_id: fileID,
-            tools: [{type: "code_interpreter"}],
+            tools: [{ type: 'code_interpreter' }],
           },
         ],
       }),
     });
     console.log(response);
     if (!response.body) return;
-    const runner = AssistantStream.fromReadableStream(
-      response.body
-    );
-    runner.on("messageCreated", (message) => {
+    const runner = AssistantStream.fromReadableStream(response.body);
+    runner.on('messageCreated', (message) => {
       setThreadId(message.thread_id);
       setIsLoading(false);
     });
@@ -193,29 +162,20 @@ function OpenAIAssistant({
 
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({
-      behavior: "smooth",
+      behavior: 'smooth',
     });
-  }, [
-    messages,
-    isLoading,
-    streamingMessage,
-    streamingCode,
-  ]);
+  }, [messages, isLoading, streamingMessage, streamingCode]);
 
-  const handlePromptChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handlePromptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPrompt(e.target.value);
   };
 
-  const handleSubmit = async (
-    e: React.FormEvent<HTMLFormElement>
-  ) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setStreamingMessage({
-      id: "Thinking...",
-      role: "assistant",
-      content: "_Thinking..._",
+      id: 'Thinking...',
+      role: 'assistant',
+      content: '_Thinking..._',
       createdAt: new Date(),
     });
     setIsLoading(true);
@@ -225,14 +185,14 @@ function OpenAIAssistant({
       ...prev,
       {
         id: messageId.current.toString(),
-        role: "user",
+        role: 'user',
         content: prompt,
         createdAt: new Date(),
       },
     ]);
 
-    const response = await fetch("/api/ai/message", {
-      method: "POST",
+    const response = await fetch('/api/ai/message', {
+      method: 'POST',
       body: JSON.stringify({
         assistantId,
         threadId,
@@ -240,98 +200,76 @@ function OpenAIAssistant({
       }),
     });
 
-    setPrompt("");
+    setPrompt('');
 
     if (!response.body) return;
 
-    const runner = AssistantStream.fromReadableStream(
-      response.body
-    );
-    runner.on("messageCreated", (message) =>
-      setThreadId(message.thread_id)
-    );
-    runner.on("textDelta", (_delta, contentSnapshot) =>
+    const runner = AssistantStream.fromReadableStream(response.body);
+    runner.on('messageCreated', (message) => setThreadId(message.thread_id));
+    runner.on('textDelta', (_delta, contentSnapshot) =>
       setStreamingMessage({
         ...streamingMessage,
         content: contentSnapshot.value,
-      })
+      }),
     );
-    runner.on("messageDone", (message) => {
+    runner.on('messageDone', (message) => {
       const finalContent =
-        message.content[0].type === "text"
-          ? message.content[0].text.value
-          : "";
+        message.content[0].type === 'text' ? message.content[0].text.value : '';
       messageId.current++;
       const newMessage = {
         id: messageId.current.toString(),
-        role: "assistant",
+        role: 'assistant',
         content: finalContent,
         createdAt: new Date(),
       };
-      console.log("new Message", newMessage);
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        newMessage,
-      ]);
+      console.log('new Message', newMessage);
+      setMessages((prevMessages) => [...prevMessages, newMessage]);
       setIsLoading(false);
     });
 
-    runner.on("toolCallCreated", (toolCall) => {
-      if (toolCall.type === "code_interpreter")
-        setStreamingCode(toolCall);
+    runner.on('toolCallCreated', (toolCall) => {
+      if (toolCall.type === 'code_interpreter') setStreamingCode(toolCall);
     });
 
-    runner.on("toolCallDelta", (delta) => {
-      if (delta.type !== "code_interpreter") return;
+    runner.on('toolCallDelta', (delta) => {
+      if (delta.type !== 'code_interpreter') return;
       setStreamingCode((toolCall) => {
-        let input = toolCall
-          ? toolCall.code_interpreter.input
-          : "";
-        let outputs = toolCall
-          ? toolCall.code_interpreter.outputs
-          : [];
-        if (delta.code_interpreter.input)
-          input += delta.code_interpreter.input;
+        let input = toolCall ? toolCall.code_interpreter.input : '';
+        let outputs = toolCall ? toolCall.code_interpreter.outputs : [];
+        if (delta.code_interpreter.input) input += delta.code_interpreter.input;
         if (delta.code_interpreter.outputs)
-          outputs = outputs.concat(
-            delta.code_interpreter.outputs
-          );
+          outputs = outputs.concat(delta.code_interpreter.outputs);
         const newStreamingCode = {
           ...delta,
-          code_interpreter: {input, outputs},
+          code_interpreter: { input, outputs },
         };
         streamingCodeRef.current = newStreamingCode;
         return newStreamingCode;
       });
     });
 
-    runner.on("toolCallDone", (toolCall) => {
-      if (toolCall.type === "code_interpreter") {
+    runner.on('toolCallDone', (toolCall) => {
+      if (toolCall.type === 'code_interpreter') {
         messageId.current++;
         const newMessage = {
           ...streamingCodeRef.current,
           id: messageId.current.toString(),
         };
-        console.log("new Code", newMessage);
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          newMessage,
-        ]);
+        console.log('new Code', newMessage);
+        setMessages((prevMessages) => [...prevMessages, newMessage]);
         setStreamingCode(null);
         streamingCodeRef.current = null;
       }
     });
 
-    runner.on("error", (error) => console.error(error));
+    runner.on('error', (error) => console.error(error));
   };
 
   return (
     <>
       <DialogContent dividers>
         <List>
-          <OpenAIAssistantMessage
-            message={greetingMessage}
-          />
+          <OpenAIAssistantMessage message={greetingMessage} />
           {messages.map((m) => (
             <ListItem key={m.id}>
               <OpenAIAssistantMessage message={m} />
@@ -339,32 +277,25 @@ function OpenAIAssistant({
           ))}
           {isLoading && streamingMessage && (
             <ListItem key="streamingMessage">
-              <OpenAIAssistantMessage
-                message={streamingMessage}
-              />
+              <OpenAIAssistantMessage message={streamingMessage} />
             </ListItem>
           )}
           {isLoading && streamingCode && (
             <ListItem key="streamingCode">
-              <OpenAIAssistantMessage
-                message={streamingCode}
-              />
+              <OpenAIAssistantMessage message={streamingCode} />
             </ListItem>
           )}
           <div ref={endOfMessagesRef} />
         </List>
       </DialogContent>
       <DialogActions>
-        <form
-          onSubmit={handleSubmit}
-          style={{width: "100%"}}
-        >
+        <form onSubmit={handleSubmit} style={{ width: '100%' }}>
           <FormGroup
             sx={{
-              display: "flex",
-              flexDirection: "row",
-              flexWrap: "nowrap",
-              width: "100%",
+              display: 'flex',
+              flexDirection: 'row',
+              flexWrap: 'nowrap',
+              width: '100%',
             }}
           >
             <TextField
@@ -373,7 +304,7 @@ function OpenAIAssistant({
               fullWidth
               onChange={handlePromptChange}
               value={prompt}
-              sx={{flexGrow: 1}}
+              sx={{ flexGrow: 1 }}
               placeholder="What would you like to know?"
             />
             <IconButton
@@ -382,11 +313,7 @@ function OpenAIAssistant({
               color="primary"
               type="submit"
             >
-              {isLoading ? (
-                <CircularProgress />
-              ) : (
-                <SendOutlined />
-              )}
+              {isLoading ? <CircularProgress /> : <SendOutlined />}
             </IconButton>
           </FormGroup>
         </form>
@@ -395,41 +322,38 @@ function OpenAIAssistant({
   );
 }
 
-function OpenAIAssistantMessage({message}) {
+function OpenAIAssistantMessage({ message }) {
   return (
     <Grid container>
-      {"role" in message && (
+      {'role' in message && (
         <Grid item xs={12}>
           <ListItemText
-            align={
-              message.role === "user" ? "right" : "left"
-            }
+            align={message.role === 'user' ? 'right' : 'left'}
             primary={<Markdown>{message.content}</Markdown>}
             secondary={message.createdAt.toLocaleTimeString()}
           />
         </Grid>
       )}
-      {"type" in message &&
-        message.type === "code_interpreter" && (
-          <Grid item xs={12}>
-            <ListItemText
-              align="left"
-              primary={
-                <SyntaxHighlighter
-                  language="python"
-                  style={dark}
-                  customStyle={{fontSize: ".8rem"}}
-                >
-                  {message.code_interpreter.input}
-                </SyntaxHighlighter>
-              }
-            />
-          </Grid>
-        )}
-      {"type" in message &&
-        message.type === "code_interpreter" &&
+      {'type' in message && message.type === 'code_interpreter' && (
+        <Grid item xs={12}>
+          <ListItemText
+            align="left"
+            primary={
+              <SyntaxHighlighter
+                language="python"
+                style={dark}
+                customStyle={{ fontSize: '.8rem' }}
+              >
+                {message.code_interpreter.input}
+              </SyntaxHighlighter>
+            }
+          />
+        </Grid>
+      )}
+      {'type' in message &&
+        message.type === 'code_interpreter' &&
         message.code_interpreter.outputs.map((output, i) =>
-          output.type === "logs" ? (
+          output.type === 'logs' ? (
             <Grid item xs={12} key={i}>
               <ListItemText
                 align="left"
@@ -437,14 +361,14 @@ function OpenAIAssistantMessage({message}) {
                   <SyntaxHighlighter
                     language="shell"
                     style={docco}
-                    customStyle={{fontSize: ".8rem"}}
+                    customStyle={{ fontSize: '.8rem' }}
                   >
                     {output.logs}
                   </SyntaxHighlighter>
                 }
               />
             </Grid>
-          ) : output.type === "image" ? (
+          ) : output.type === 'image' ? (
             <Grid item xs={12} key={i}>
               <ListItemText
                 align="left"
@@ -452,12 +376,12 @@ function OpenAIAssistantMessage({message}) {
                   <img
                     src={`/api/ai/image?fileID=${output.image.file_id}`}
                     alt="AI generated image"
-                    style={{maxWidth: "100%"}}
+                    style={{ maxWidth: '100%' }}
                   />
                 }
               />
             </Grid>
-          ) : null
+          ) : null,
         )}
     </Grid>
   );

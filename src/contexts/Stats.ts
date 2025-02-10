@@ -1,10 +1,7 @@
-import {type StateCreator} from "zustand";
-import {type Activity} from "~/server/db/schema";
+import { type StateCreator } from 'zustand';
+import { type Activity } from '~/server/db/schema';
 
-import statsPlots, {
-  defaultStatsSettings,
-  type StatsSetting,
-} from "~/stats";
+import statsPlots, { defaultStatsSettings, type StatsSetting } from '~/stats';
 
 export type Value = {
   id: string;
@@ -14,7 +11,7 @@ export type Value = {
   unit: string;
   reducer: (
     iterable: Activity[],
-    accessor: (d: Activity) => number | string
+    accessor: (d: Activity) => number | string,
   ) => number | string;
   color: unknown;
 };
@@ -35,13 +32,13 @@ type SetterFunctions = {
     S extends StatsSetting[P],
   >(
     name: K,
-    value: S[K]
+    value: S[K],
   ) => void;
 };
 
 export const statsSlice: StateCreator<
   StatsZustand,
-  [["zustand/immer", never]],
+  [['zustand/immer', never]],
   [],
   StatsZustand
 > = (set, get) => {
@@ -57,21 +54,18 @@ export const statsSlice: StateCreator<
           V extends StatsSetting[typeof plotName][K],
         >(
           name: K,
-          value: V
+          value: V,
         ) =>
           set((state) => {
             if (!(plotName in state.statsSettings)) return;
 
             const setter = statsPlots[plotName].setter(
-              get().statsSettings[plotName]
+              get().statsSettings[plotName],
             );
-            state.statsSettings[plotName] = setter(
-              name,
-              value
-            );
+            state.statsSettings[plotName] = setter(name, value);
           }),
       }),
-      {} as SetterFunctions
+      {} as SetterFunctions,
     ),
     extent: [undefined, undefined],
   };

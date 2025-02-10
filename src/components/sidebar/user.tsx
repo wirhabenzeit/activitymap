@@ -11,8 +11,7 @@ import {
 import Link from 'next/link';
 import { signIn, signOut } from 'next-auth/react';
 
-import { useStore } from '~/contexts/Zustand';
-import { useShallow } from 'zustand/shallow';
+import { useShallowStore } from '~/store';
 
 import { SidebarMenuButton, SidebarMenuItem } from '~/components/ui/sidebar';
 import {
@@ -31,15 +30,14 @@ import Image from 'next/image';
 import { cn } from '~/lib/utils';
 
 export function UserSettings() {
-  const { user, guest, loading, account, loadFromStrava } = useStore(
-    useShallow((state) => ({
+  const { user, guest, loading, account, loadFromStrava } = useShallowStore(
+    (state) => ({
       user: state.user,
-      account: state.account,
       guest: state.guest,
       loading: state.loading,
-      activityDict: state.activityDict,
+      account: state.account,
       loadFromStrava: state.loadFromStrava,
-    })),
+    }),
   );
 
   return (

@@ -7,7 +7,6 @@ import ws from 'ws';
 config({ path: '.env' }); // or .env.local
 
 let sql;
-console.log('process.env', process.env);
 if (process.env.VERCEL_ENV === 'development') {
   console.log('Using localtest.me');
   const connectionString =
@@ -25,7 +24,6 @@ if (process.env.VERCEL_ENV === 'development') {
   neonConfig.webSocketConstructor = ws;
   sql = neon(connectionString);
 } else {
-  console.log('Using DATABASE_URL');
   sql = neon(process.env.DATABASE_URL!);
 }
 export const db = drizzle({ client: sql, schema });

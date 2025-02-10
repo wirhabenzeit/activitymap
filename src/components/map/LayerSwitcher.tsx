@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import { Map } from "lucide-react";
+import { Map } from 'lucide-react';
 
-import { useStore } from "~/contexts/Zustand";
+import { useShallowStore } from '~/store';
 
-import { mapSettings } from "~/settings/map";
-import { useShallow } from "zustand/shallow";
+import { mapSettings } from '~/settings/map';
+import { useShallow } from 'zustand/shallow';
 
-import { Button } from "~/components/ui/button";
+import { Button } from '~/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,10 +17,10 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+} from '~/components/ui/dropdown-menu';
 
 export function DropdownMenuRadioGroupDemo() {
-  const [position, setPosition] = useState("bottom");
+  const [position, setPosition] = useState('bottom');
 
   return (
     <DropdownMenu>
@@ -41,14 +41,13 @@ export function DropdownMenuRadioGroupDemo() {
 }
 
 export function LayerSwitcher() {
-  const { overlayMaps, baseMap, toggleOverlayMap, setBaseMap } = useStore(
-    useShallow((state) => ({
+  const { overlayMaps, baseMap, toggleOverlayMap, setBaseMap } =
+    useShallowStore((state) => ({
       overlayMaps: state.overlayMaps,
       baseMap: state.baseMap,
       toggleOverlayMap: state.toggleOverlayMap,
       setBaseMap: state.setBaseMap,
-    })),
-  );
+    }));
 
   return (
     <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">

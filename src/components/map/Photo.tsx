@@ -1,17 +1,15 @@
 import { Marker } from 'react-map-gl/mapbox';
-import { useStore } from '~/contexts/Zustand';
+import { useShallowStore } from '~/store';
 import { Avatar, AvatarImage } from '../ui/avatar';
 import { useMemo, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 export default function PhotoLayer() {
-  const { photos, position, filterIDs } = useStore(
-    useShallow((state) => ({
-      photos: state.photos,
-      position: state.position,
-      filterIDs: state.filterIDs,
-    })),
-  );
+  const { photos, position, filterIDs } = useShallowStore((state) => ({
+    photos: state.photos,
+    position: state.position,
+    filterIDs: state.filterIDs,
+  }));
 
   const displayPhotos = useMemo(() => {
     return photos.filter((photo) => {
@@ -62,11 +60,9 @@ function PhotoMarker({
   const photoUrl = Object.values(urls)[0];
   const [hover, setHover] = useState(false);
 
-  const { setSelected } = useStore(
-    useShallow((state) => ({
-      setSelected: state.setSelected,
-    })),
-  );
+  const { setSelected } = useShallowStore((state) => ({
+    setSelected: state.setSelected,
+  }));
 
   return (
     <Marker

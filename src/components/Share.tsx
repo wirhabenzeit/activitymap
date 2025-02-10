@@ -1,15 +1,12 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 
-import { Share as ShareIcon, Copy } from "lucide-react";
+import { Share as ShareIcon, Copy } from 'lucide-react';
 
-import { useStore } from "~/contexts/Zustand";
-import { useShallow } from "zustand/shallow";
-
-import { type User } from "~/server/db/schema";
-import { Switch } from "~/components/ui/switch";
-import { Button } from "~/components/ui/button";
+import { useShallowStore } from '~/store';
+import { Switch } from '~/components/ui/switch';
+import { Button } from '~/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -17,23 +14,21 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "~/components/ui/dialog";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
+} from '~/components/ui/dialog';
+import { Input } from '~/components/ui/input';
+import { Label } from '~/components/ui/label';
 
 export function ShareButton() {
-  const { selected, user, guest } = useStore(
-    useShallow((state) => ({
-      selected: state.selected,
-      user: state.user,
-      guest: state.guest,
-    })),
-  );
+  const { selected, user, guest } = useShallowStore((state) => ({
+    selected: state.selected,
+    user: state.user,
+    guest: state.guest,
+  }));
   const [selectedValue, setSelectedValue] = useState(false);
-  const shareUrl = new URL("https://activitymap.dominik.page");
+  const shareUrl = new URL('https://activitymap.dominik.page');
 
   if (selectedValue)
-    shareUrl.searchParams.append("activities", selected.join(","));
+    shareUrl.searchParams.append('activities', selected.join(','));
 
   return (
     <Dialog>

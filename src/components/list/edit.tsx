@@ -45,13 +45,13 @@ import {
   SelectValue,
 } from '~/components/ui/select';
 import { aliasMap, colorMap, iconMap } from '~/settings/category';
-import { useStore } from '~/contexts/Zustand';
-import { useShallow } from 'zustand/shallow';
+import { useShallowStore } from '~/store';
 
 export function ProfileForm({ row }: { row: Row<Activity> }) {
-  const [updateActivity, loading] = useStore(
-    useShallow((state) => [state.updateActivity, state.loading]),
-  );
+  const [updateActivity, loading] = useShallowStore((state) => [
+    state.updateActivity,
+    state.loading,
+  ]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

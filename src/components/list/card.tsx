@@ -46,12 +46,15 @@ import { MapRef } from 'react-map-gl/mapbox';
 import { useStore } from '~/contexts/Zustand';
 import { useShallow } from 'zustand/shallow';
 import { cn } from '~/lib/utils';
+import { type RefObject } from 'react';
+import { type ViewState } from 'react-map-gl/mapbox';
+import { LngLatBounds } from 'mapbox-gl';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
 interface ActivityCardProps extends CardProps {
   row: Row<Activity>;
-  map?: MapRef;
+  map?: RefObject<MapRef>;
 }
 
 const formattedValue = (key: keyof typeof activityFields, row: Row<Activity>) =>
@@ -214,30 +217,51 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
           className="px-0 h-4"
           size="sm"
           onClick={() => {
-            const mapInstance = map?.current?.getMap();
             const bbox = row.original.map?.bbox;
-            if (!bbox) return;
+            if (!bbox) {
+              console.log('No bbox available for activity');
+              return;
+            }
             setSelected((prev) =>
-              prev.includes(row.id) ? prev : [...prev, row.id],
+              prev.includes(Number(row.id)) ? prev : [...prev, Number(row.id)],
             );
             setHighlighted(Number(row.id));
-            if (mapInstance) {
-              mapInstance.fitBounds(
-                [
-                  [bbox[0], bbox[1]],
-                  [bbox[2], bbox[3]],
-                ],
-                { padding: 50 },
+            console.log('map', map);
+            if (!map) {
+              console.log(
+                'No map reference available, redirecting to map view',
               );
-            } else {
               const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2];
               const zoom = 12;
               setPosition(
-                { longitude: center[0], latitude: center[1], zoom },
-                {},
+                {
+                  longitude: center[0] || 0,
+                  latitude: center[1] || 0,
+                  zoom,
+                  bearing: 0,
+                  pitch: 0,
+                  padding: { top: 0, bottom: 0, left: 0, right: 0 },
+                },
+                new LngLatBounds([bbox[0], bbox[1]], [bbox[2], bbox[3]]),
               );
               push('/map');
+              return;
             }
+
+            const mapboxInstance = map?.current?.getMap();
+            if (!mapboxInstance) {
+              console.log('No mapbox instance available');
+              return;
+            }
+
+            console.log('Fitting bounds to:', bbox);
+            mapboxInstance.fitBounds(
+              [
+                [bbox[0], bbox[1]],
+                [bbox[2], bbox[3]],
+              ],
+              { padding: 50 },
+            );
           }}
         >
           <Map className="w-4 h-4 text-primary/50" />
@@ -265,7 +289,7 @@ export function PhotoCard({ photos }: { photos: Photo[] }) {
       {photos.map((photo) => (
         <img
           src={Object.values(photo.urls)[0]}
-          alt={photo.caption}
+          alt={photo.caption ?? ''}
           className="h-full rounded-sm aspect-square object-cover"
         />
       ))}

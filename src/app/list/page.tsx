@@ -3,23 +3,21 @@
 import { columns } from '../../components/list/columns';
 import { DataTable } from '../../components/list/data-table';
 
-import { useStore } from '~/contexts/Zustand';
-import { useShallow } from 'zustand/shallow';
+import { useShallowStore } from '~/store';
+
 import React from 'react';
 import { Photo } from '~/server/db/schema';
 
 export default function ListPage() {
   const { selected, setSelected, activityDict, filterIDs, tableState, photos } =
-    useStore(
-      useShallow((state) => ({
-        selected: state.selected,
-        setSelected: state.setSelected,
-        activityDict: state.activityDict,
-        filterIDs: state.filterIDs,
-        tableState: state.fullList,
-        photos: state.photos,
-      })),
-    );
+    useShallowStore((state) => ({
+      selected: state.selected,
+      setSelected: state.setSelected,
+      activityDict: state.activityDict,
+      filterIDs: state.filterIDs,
+      tableState: state.fullList,
+      photos: state.photos,
+    }));
 
   const columnFilters = [{ id: 'id', value: filterIDs }];
   const photoDict = photos.reduce(

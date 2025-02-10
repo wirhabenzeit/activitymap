@@ -5,8 +5,7 @@ import { useEffect } from 'react';
 
 import { LucideProps, MoreHorizontal } from 'lucide-react';
 
-import { useStore } from '~/contexts/Zustand';
-import { useShallow } from 'zustand/shallow';
+import { useShallowStore } from '~/store';
 
 import * as React from 'react';
 import { categorySettings } from '~/settings/category';
@@ -57,16 +56,15 @@ type DropdownProps = {
 };
 
 export function CategoryFilter() {
-  const { sportType, sportGroup, setSportGroup, setSportType } = useStore(
-    useShallow((state) => ({
+  const { sportType, sportGroup, setSportGroup, setSportType } =
+    useShallowStore((state) => ({
       sportType: state.sportType,
       sportGroup: state.sportGroup,
       setSportGroup: state.setSportGroup,
       setSportType: state.setSportType,
-    })),
-  );
+    }));
   const [clicks, setClicks] = useState(0);
-  const [key, setKey] = useState<keyof typeof sportGroup | undefined>(
+  const [key, setKey] = useState<keyof typeof categorySettings | undefined>(
     undefined,
   );
 
@@ -94,7 +92,7 @@ export function CategoryFilter() {
         (group) =>
           Object.fromEntries(
             Object.keys(group).map((k) => [k, k === key]),
-          ) as Record<keyof typeof sportGroup, boolean>,
+          ) as Record<keyof typeof categorySettings, boolean>,
       );
   };
 
@@ -104,11 +102,10 @@ export function CategoryFilter() {
         ([id, { name, color, icon: Icon, alias }]) => (
           <SidebarMenuItem key={id}>
             <SidebarMenuButton
-              //onClick={() => toggleSportGroup(id as keyof typeof sportGroup)}
               onClick={(e) => {
                 e.preventDefault();
                 setClicks(clicks + 1);
-                setKey(id);
+                setKey(id as keyof typeof categorySettings);
               }}
             >
               {sportGroup[id as keyof typeof sportGroup] ? (
@@ -156,16 +153,6 @@ export function CategoryFilter() {
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>
-          // <DropdownMenuCheckboxes
-          //   color={color}
-          //   title={name}
-          //   key={id}
-          //   Icon={icon}
-          //   active={sportGroup[id as keyof typeof sportGroup]}
-          //   values={Object.fromEntries(alias.map((a) => [a, sportType[a]]))}
-          //   onToggle={() => toggleSportGroup(id as keyof typeof sportGroup)}
-          //   onChange={(key: SportType) => toggleSportType(key)}
-          // />
         ),
       )}
     </SidebarMenu>
@@ -177,33 +164,27 @@ export function InequalityFilter({
 }: {
   name: keyof typeof inequalityFilters;
 }) {
-  const [greater, setGreater] = useState(true);
+  const [operator, setOperator] = useState<'>=' | '<='>('>=' as const);
   const [input, setInput] = useState('');
   const [value, setValue] = useState(0.0);
 
   const validateInput = (value: string) => {
     const number = parseFloat(value);
-    const valid = !isNaN(value);
-    if (valid) {
+    if (!isNaN(number)) {
       setInput(value);
-      setValue(isNaN(number) ? 0 : number);
+      setValue(number);
     }
   };
 
-  const [setValueFilter, values, filterRanges] = useStore(
-    useShallow((state) => [
-      state.setValueFilter,
-      state.values,
-      state.filterRanges,
-    ]),
-  );
+  const setValues = useShallowStore((state) => state.setValues);
 
   React.useEffect(() => {
-    if (!filterRanges[name]) return;
     const transformed = inequalityFilters[name].transform(value);
-    if (greater) setValueFilter(name, [transformed, filterRanges[name][1]]);
-    else setValueFilter(name, [filterRanges[name][0], transformed]);
-  }, [greater, value]);
+    setValues((prev) => ({
+      ...prev,
+      [name]: input === '' ? undefined : { value: transformed, operator },
+    }));
+  }, [operator, value, input, name]);
 
   return (
     <SidebarMenuItem>
@@ -214,9 +195,9 @@ export function InequalityFilter({
             <Button
               className="absolute left-1 h-6 w-6 px-1 py-1 text-foreground/60"
               variant="secondary"
-              onClick={() => setGreater((greater) => !greater)}
+              onClick={() => setOperator((op) => (op === '>=' ? '<=' : '>='))}
             >
-              {greater ? '≥' : '≤'}
+              {operator}
             </Button>
             <Input
               value={input}
@@ -235,9 +216,10 @@ export function InequalityFilter({
 }
 
 export function MonthPicker() {
-  const [dates, setDates] = useStore(
-    useShallow((state) => [state.dateRange, state.setDateRange]),
-  );
+  const [dates, setDates] = useShallowStore((state) => [
+    state.dateRange,
+    state.setDateRange,
+  ]);
 
   const dateStr = [dates?.start, dates?.end].map((date) =>
     date ? format(date, 'MMM yyyy') : undefined,
@@ -275,9 +257,17 @@ export function MonthPicker() {
 }
 
 export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
-  const [value, setBinary] = useStore(
-    useShallow((state) => [state.binary[name], state.setBinary]),
-  );
+  const [binary, setBinary] = useShallowStore((state) => [
+    state.binary[name],
+    state.setBinary,
+  ]);
+
+  const handleChange = () => {
+    setBinary((prev) => ({
+      ...prev,
+      [name]: binary === undefined ? true : !binary,
+    }));
+  };
 
   return (
     <SidebarMenuItem className="flex items-center gap-4 h-8 mx-2">
@@ -289,8 +279,8 @@ export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
         {binaryFilters[name].label}
       </label>
       <Checkbox
-        checked={value == undefined ? 'indeterminate' : value}
-        onClick={() => setBinary(name, value == undefined ? true : !value)}
+        checked={binary === undefined ? 'indeterminate' : binary}
+        onCheckedChange={handleChange}
       />
     </SidebarMenuItem>
   );

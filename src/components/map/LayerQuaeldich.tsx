@@ -1,22 +1,12 @@
-"use client";
+'use client';
 
-import {
-  useState,
-  useEffect,
-  useCallback,
-  RefObject,
-} from "react";
+import { useState, useEffect, useCallback, RefObject } from 'react';
 
-import FileSaver from "file-saver";
+import FileSaver from 'file-saver';
 
-import {
-  Layer,
-  Source,
-  useMap,
-  type MapboxMap,
-} from "react-map-gl";
+import { Layer, Source, useMap, type MapboxMap } from 'react-map-gl';
 
-import * as togeojson from "@mapbox/togeojson";
+import * as togeojson from '@mapbox/togeojson';
 
 import {
   Paper,
@@ -35,10 +25,10 @@ import {
   ListItem,
   ListItemText,
   Skeleton,
-} from "@mui/material";
+} from '@mui/material';
 
-import proj4 from "proj4";
-import GeoJsonToGpx from "@dwayneparton/geojson-to-gpx";
+import proj4 from 'proj4';
+import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
 import {
   Hiking as HikingIcon,
   KeyboardArrowLeft,
@@ -47,21 +37,19 @@ import {
   Copyright as CopyrightIcon,
   Link as LinkIcon,
   Download as DownloadIcon,
-} from "@mui/icons-material";
-import {BBox} from "geojson";
-import {useStore} from "~/contexts/Zustand";
-import {type CustomLayerProps} from "~/settings/map";
+} from '@mui/icons-material';
+import { BBox } from 'geojson';
+import { useStore } from '~/contexts/Zustand';
+import { type CustomLayerProps } from '~/settings/map';
 
-export const LayerQuaeldich: React.FC<CustomLayerProps> = ({
-  mapRef,
-}) => {
+export const LayerQuaeldich: React.FC<CustomLayerProps> = ({ mapRef }) => {
   const [card, setCard] = useState(null);
   const [json, setJson] = useState({
-    type: "FeatureCollection",
+    type: 'FeatureCollection',
     features: [],
   });
   const [routes, setRoutes] = useState({
-    type: "FeatureCollection",
+    type: 'FeatureCollection',
     features: [],
   });
 
@@ -73,41 +61,36 @@ export const LayerQuaeldich: React.FC<CustomLayerProps> = ({
     const selectedFeatures = mapRef.current
       .getMap()
       .queryRenderedFeatures(bbox, {
-        layers: ["quaeldichLayer"],
+        layers: ['quaeldichLayer'],
       });
     if (selectedFeatures.length === 0) {
       setCard(null);
-      setRoutes({type: "FeatureCollection", features: []});
+      setRoutes({ type: 'FeatureCollection', features: [] });
       return;
     }
     const id = selectedFeatures[0].properties.id;
     const url =
-      "https://corsproxy.io/?" +
+      'https://corsproxy.io/?' +
       encodeURIComponent(
-        `https://www.quaeldich.de/common/js/lookup-passkml.php?PassID=${id}`
+        `https://www.quaeldich.de/common/js/lookup-passkml.php?PassID=${id}`,
       );
     const response = await fetch(url);
     const data = await response.json();
-    setCard({...data, ...selectedFeatures[0].properties});
+    setCard({ ...data, ...selectedFeatures[0].properties });
     getRoutes(data.kmls);
   };
 
   useEffect(() => {
-    mapRef.current.getMap().on("click", onClick);
+    mapRef.current.getMap().on('click', onClick);
   }, []);
 
   const getRoute = async (url, id) => {
     const response = await fetch(url);
     const data = await response.text();
-    const dom = new DOMParser().parseFromString(
-      data,
-      "text/xml"
-    );
+    const dom = new DOMParser().parseFromString(data, 'text/xml');
     const geojson = togeojson.kml(dom);
     const regExp = /\(([^)]+)\)/;
-    const matches = regExp.exec(
-      geojson.features[0].properties.name
-    );
+    const matches = regExp.exec(geojson.features[0].properties.name);
     setCard((card) => ({
       ...card,
       kml_infos: {
@@ -122,38 +105,34 @@ export const LayerQuaeldich: React.FC<CustomLayerProps> = ({
       setRoutes((routes) => ({
         ...routes,
         features: [...routes.features, feature],
-      }))
+      })),
     );
   };
 
   const getRoutes = async (kmls) => {
-    setRoutes({type: "FeatureCollection", features: []});
+    setRoutes({ type: 'FeatureCollection', features: [] });
     Object.entries(kmls).forEach(async ([id, link]) => {
       const url =
-        "https://corsproxy.io/?" +
-        encodeURIComponent(
-          "https://www.quaeldich.de/" + link
-        );
+        'https://corsproxy.io/?' +
+        encodeURIComponent('https://www.quaeldich.de/' + link);
       getRoute(url, id);
     });
   };
 
   useEffect(() => {
     fetch(
-      "https://corsproxy.io/?" +
+      'https://corsproxy.io/?' +
         encodeURIComponent(
-          "https://www.quaeldich.de/common/js/paesse_json_v4.php"
-        )
+          'https://www.quaeldich.de/common/js/paesse_json_v4.php',
+        ),
     )
       .then((response) => response.text())
       .then((data) => {
-        const points = new Function(
-          data + "\n return addressPoints;"
-        )();
+        const points = new Function(data + '\n return addressPoints;')();
         const features = points.map((point) => ({
-          type: "Feature",
+          type: 'Feature',
           geometry: {
-            type: "Point",
+            type: 'Point',
             coordinates: [point[1], point[0]],
           },
           properties: {
@@ -164,7 +143,7 @@ export const LayerQuaeldich: React.FC<CustomLayerProps> = ({
             up2: point[6],
           },
         }));
-        setJson({type: "FeatureCollection", features});
+        setJson({ type: 'FeatureCollection', features });
       });
   }, []);
 
@@ -182,10 +161,10 @@ export const LayerQuaeldich: React.FC<CustomLayerProps> = ({
             key="quaeldichlayer"
             type="circle"
             paint={{
-              "circle-radius": 5,
-              "circle-color": "#ff0000",
-              "circle-stroke-width": 1,
-              "circle-stroke-color": "#ffffff",
+              'circle-radius': 5,
+              'circle-color': '#ff0000',
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#ffffff',
             }}
           />
         )}
@@ -202,8 +181,8 @@ export const LayerQuaeldich: React.FC<CustomLayerProps> = ({
             key="quaeldichRouteslayer"
             type="line"
             paint={{
-              "line-color": "#ff0000",
-              "line-width": 2,
+              'line-color': '#ff0000',
+              'line-width': 2,
             }}
           />
         )}
@@ -212,50 +191,44 @@ export const LayerQuaeldich: React.FC<CustomLayerProps> = ({
         elevation={3}
         sx={{
           zIndex: 2,
-          position: "absolute",
-          left: "10px",
+          position: 'absolute',
+          left: '10px',
           //right: "0px",
           //marginLeft: "auto",
           //marginRight: "auto",
-          width: "320px",
-          bottom: "10px",
-          margin: "auto",
-          visibility: card != null ? "visible" : "hidden",
+          width: '320px',
+          bottom: '10px',
+          margin: 'auto',
+          visibility: card != null ? 'visible' : 'hidden',
         }}
       >
         {card != null && (
-          <Card sx={{width: 320, minHeight: 300}}>
+          <Card sx={{ width: 320, minHeight: 300 }}>
             <CardContent>
               <Typography variant="h5" component="div">
                 {card.name}
               </Typography>
               <Chip
                 icon={<TerrainIcon />}
-                label={card.altitude + "m"}
+                label={card.altitude + 'm'}
                 size="small"
-                sx={{mx: 0.5}}
+                sx={{ mx: 0.5 }}
               />
               <List dense>
                 {Object.entries(card.kml_infos).map(
                   ([key, value]) =>
-                    "href" in value && (
+                    'href' in value && (
                       <ListItem key={key}>
                         <ListItemText
                           primary={value.output}
-                          secondary={
-                            "info" in value
-                              ? value.info
-                              : ""
-                          }
+                          secondary={'info' in value ? value.info : ''}
                         />
                       </ListItem>
-                    )
+                    ),
                 )}
               </List>
             </CardContent>
-            <CardActions
-              sx={{justifyContent: "center", p: 0}}
-            >
+            <CardActions sx={{ justifyContent: 'center', p: 0 }}>
               <Button
                 size="small"
                 href={`https://www.quaeldich.de/paesse/${card.url}`}

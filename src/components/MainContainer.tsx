@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
-import { useStore } from '~/contexts/Zustand';
+import { useShallowStore } from '~/store';
 import { getAccount, getUser } from '~/server/db/actions';
 import type { User, Session } from '~/server/db/schema';
 import { useShallow } from 'zustand/shallow';
@@ -20,27 +20,21 @@ export default function MainContainer({
     loadFromDB,
     loadPhotos,
     updateFilters,
-    setFilterRanges,
-    toggleUserSettings,
     setUser,
     setAccount,
     setGuest,
     setLoading,
     setSession,
-  } = useStore(
-    useShallow((state) => ({
-      loadFromDB: state.loadFromDB,
-      updateFilters: state.updateFilters,
-      setFilterRanges: state.setFilterRanges,
-      toggleUserSettings: state.toggleUserSettings,
-      loadPhotos: state.loadPhotos,
-      setUser: state.setUser,
-      setAccount: state.setAccount,
-      setGuest: state.setGuest,
-      setLoading: state.setLoading,
-      setSession: state.setSession,
-    })),
-  );
+  } = useShallowStore((state) => ({
+    loadFromDB: state.loadFromDB,
+    updateFilters: state.updateFilters,
+    loadPhotos: state.loadPhotos,
+    setUser: state.setUser,
+    setAccount: state.setAccount,
+    setGuest: state.setGuest,
+    setLoading: state.setLoading,
+    setSession: state.setSession,
+  }));
 
   const searchParams = useSearchParams();
 
@@ -97,10 +91,9 @@ export default function MainContainer({
         console.log;
       }
       await loadPhotos();
-      if (nActivities === 0) toggleUserSettings();
     }
 
-    const unsub = useStore.subscribe((state, prevState) => {
+    const unsub = useShallowStore.subscribe((state, prevState) => {
       if (
         state.sportType !== prevState.sportType ||
         state.binary !== prevState.binary ||
@@ -110,12 +103,11 @@ export default function MainContainer({
       ) {
         updateFilters();
       } else if (state.activityDict !== prevState.activityDict) {
-        setFilterRanges();
         updateFilters();
       }
     });
 
-    return unsub;
+    return () => unsub();
   }, []);
 
   return <>{children}</>;

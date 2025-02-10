@@ -4,6 +4,7 @@ import { type MapMouseEvent, Point, type PointLike } from 'mapbox-gl';
 import { useControl } from 'react-map-gl/mapbox';
 import { useStore } from '~/contexts/Zustand';
 import { useShallow } from 'zustand/shallow';
+import { useShallowStore } from '~/store';
 
 const styles = `
 .boxdraw {
@@ -18,11 +19,10 @@ const styles = `
 `;
 
 export function Selection() {
-  const { setSelected } = useStore(
-    useShallow((state) => ({
-      setSelected: state.setSelected,
-    })),
-  );
+  const [setSelected, selected] = useShallowStore((state) => [
+    state.setSelected,
+    state.selected,
+  ]);
 
   useControl(
     (context: MapContextValue) =>
@@ -31,7 +31,8 @@ export function Selection() {
         layers: ['routeLayerBG', 'routeLayerBGsel'],
         source: 'routeSource',
         selectionHandler: (sel: number[]) => {
-          setSelected(Array.from(new Set(sel)));
+          const ids = Array.from(new Set(sel));
+          setSelected(ids);
         },
       }),
   );

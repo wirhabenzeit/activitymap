@@ -20,9 +20,8 @@ import ReactMapGL, {
   Layer,
   Source,
   type MapRef,
-  type SkyLayer,
-  MapboxMap,
 } from 'react-map-gl/mapbox';
+import type { SkyLayer } from 'mapbox-gl';
 
 import { DataTable } from '~/components/list/data-table';
 
@@ -35,13 +34,11 @@ const skyLayer: SkyLayer = {
     'sky-atmosphere-sun-intensity': 15,
   },
 };
-import { useShallow } from 'zustand/shallow';
+import { useShallowStore } from '~/store';
 
 import Overlay from '~/components/map/Overlay';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
-
-import { useStore } from '~/contexts/Zustand';
 
 import { type CustomLayerProps, mapSettings } from '~/settings/map';
 import { categorySettings } from '~/settings/category';
@@ -54,17 +51,13 @@ import { cn } from '~/lib/utils';
 import { map } from 'd3';
 
 function RouteLayer() {
-  const { filterIDs } = useStore(
-    useShallow((state) => ({
+  const { filterIDs, selected, highlighted, geoJson } = useShallowStore(
+    (state) => ({
       filterIDs: state.filterIDs,
-    })),
-  );
-  const { selected, highlighted, geoJson } = useStore(
-    useShallow((state) => ({
       selected: state.selected,
       highlighted: state.highlighted,
       geoJson: state.geoJson,
-    })),
+    }),
   );
 
   const color: mapboxgl.Expression = ['match', ['get', 'sport_type']];
@@ -75,12 +68,29 @@ function RouteLayer() {
   });
   color.push('#000000');
 
-  const filter = ['in', 'id', ...filterIDs];
-  const selectedFilter = ['in', 'id', ...selected];
-  const unselectedFilter = ['!in', 'id', ...selected];
-  const filterAll = ['all', filter, unselectedFilter];
-  const filterSel = ['all', filter, selectedFilter];
-  const filterHigh = ['==', 'id', highlighted];
+  const filter: mapboxgl.FilterSpecification = ['in', 'id', ...filterIDs];
+  const selectedFilter: mapboxgl.FilterSpecification = [
+    'in',
+    'id',
+    ...selected,
+  ];
+  const unselectedFilter: mapboxgl.FilterSpecification = [
+    '!in',
+    'id',
+    ...selected,
+  ];
+  const filterAll: mapboxgl.FilterSpecification = [
+    'all',
+    filter,
+    unselectedFilter,
+  ];
+  const filterSel: mapboxgl.FilterSpecification = [
+    'all',
+    filter,
+    selectedFilter,
+  ];
+  const filterHigh: mapboxgl.FilterSpecification = ['==', 'id', highlighted];
+
   return (
     <Source data={geoJson} id="routeSource" type="geojson">
       <Layer
@@ -176,27 +186,28 @@ function Map() {
     showPhotos,
     togglePhotos,
     compactList,
-  } = useStore(
-    useShallow((state) => ({
-      selected: state.selected,
-      setHighlighted: state.setHighlighted,
-      activityDict: state.activityDict,
-      setSelected: state.setSelected,
-      filterIDs: state.filterIDs,
-      baseMap: state.baseMap,
-      overlays: state.overlayMaps,
-      mapPosition: state.position,
-      setPosition: state.setPosition,
-      updateActivity: state.updateActivity,
-      threeDim: state.threeDim,
-      showPhotos: state.showPhotos,
-      togglePhotos: state.togglePhotos,
-      toggleThreeDim: state.toggleThreeDim,
-      compactList: state.compactList,
-    })),
-  );
+    loaded,
+  } = useShallowStore((state) => ({
+    selected: state.selected,
+    setHighlighted: state.setHighlighted,
+    activityDict: state.activityDict,
+    setSelected: state.setSelected,
+    filterIDs: state.filterIDs,
+    baseMap: state.baseMap,
+    overlays: state.overlayMaps,
+    mapPosition: state.position,
+    setPosition: state.setPosition,
+    updateActivity: state.updateActivity,
+    threeDim: state.threeDim,
+    showPhotos: state.showPhotos,
+    togglePhotos: state.togglePhotos,
+    toggleThreeDim: state.toggleThreeDim,
+    compactList: state.compactList,
+    loaded: state.loaded,
+  }));
   const { open } = useSidebar();
   const mapRefLoc = createRef<MapRef>();
+  const columnFilters = [{ id: 'id', value: filterIDs }];
 
   useEffect(() => {
     const map = mapRefLoc.current?.getMap();
@@ -205,7 +216,6 @@ function Map() {
     }
   }, [open]);
 
-  const loaded = useStore(useShallow((state) => state.loaded));
   const [viewport, setViewport] = useState(mapPosition);
 
   const overlayMaps = useMemo(
@@ -258,24 +268,29 @@ function Map() {
         {...viewport}
         onMove={({ viewState }) => setViewport(viewState)}
         onMoveEnd={({ viewState }) => {
-          if (mapRefLoc.current) {
-            setPosition(viewState, mapRefLoc.current.getMap().getBounds());
+          const map = mapRefLoc.current?.getMap();
+          if (map) {
+            const bounds = map.getBounds();
+            if (bounds) {
+              setPosition(viewState, bounds);
+            }
           }
         }}
         onLoad={() => {
-          mapRefLoc.current?.loadImage(
-            'https://docs.mapbox.com/mapbox-gl-js/assets/pattern-dot.png',
-            (error, image) => {
-              if (error) throw error;
-              if (mapRefLoc.current) {
-                if (!mapRefLoc.current.getMap().hasImage('pattern-dot'))
-                  mapRefLoc.current.getMap().addImage('pattern-dot', image);
-              }
-            },
-          );
+          const map = mapRefLoc.current?.getMap();
+          if (map) {
+            map.loadImage(
+              'https://docs.mapbox.com/mapbox-gl-js/assets/pattern-dot.png',
+              (error, image) => {
+                if (error) throw error;
+                if (image && !map.hasImage('pattern-dot')) {
+                  map.addImage('pattern-dot', image);
+                }
+              },
+            );
+          }
         }}
         //optimizeForTerrain={true}
-        //onLoad={(event: MapboxEvent) => console.log(event)}
         projection={'globe' as unknown as mapboxgl.Projection}
         mapStyle={
           mapSettingBase.type === 'vector' ? mapSettingBase.url : undefined
@@ -358,6 +373,7 @@ function Map() {
           selected={selected}
           setSelected={setSelected}
           map={mapRefLoc}
+          columnFilters={columnFilters}
           {...compactList}
         />
       </div>
