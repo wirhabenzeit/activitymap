@@ -43,11 +43,10 @@ import {
   PopoverTrigger,
 } from '~/components/ui/popover';
 import { MapRef } from 'react-map-gl/mapbox';
-import { useStore } from '~/contexts/Zustand';
+import { useStore } from '~/store';
 import { useShallow } from 'zustand/shallow';
 import { cn } from '~/lib/utils';
 import { type RefObject } from 'react';
-import { type ViewState } from 'react-map-gl/mapbox';
 import { LngLatBounds } from 'mapbox-gl';
 
 type CardProps = React.ComponentProps<typeof Card>;

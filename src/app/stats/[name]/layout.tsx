@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import React, { useContext } from "react";
+import React, { useContext } from 'react';
 
-import { Settings } from "lucide-react";
+import { Settings } from 'lucide-react';
 
-import { useStore } from "~/contexts/Zustand";
+import { useStore } from '~/store';
 
-import { Separator } from "~/components/ui/separator";
+import { Separator } from '~/components/ui/separator';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useShallow } from "zustand/shallow";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useShallow } from 'zustand/shallow';
 
-import statsPlots from "~/stats";
-import { StatsContext, StatsProvider } from "./StatsContext";
-import { Button } from "~/components/ui/button";
-import { cn } from "~/lib/utils";
-import { TabsTrigger, TabsList, Tabs } from "~/components/ui/tabs";
+import statsPlots from '~/stats';
+import { StatsContext, StatsProvider } from './StatsContext';
+import { Button } from '~/components/ui/button';
+import { cn } from '~/lib/utils';
+import { TabsTrigger, TabsList, Tabs } from '~/components/ui/tabs';
 
 type StatsPlotsKeys = keyof typeof statsPlots;
 type TabKeys = `/stats/${StatsPlotsKeys}`;
@@ -35,22 +35,25 @@ const TabsLinkTrigger: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ href, children, className }) => (
-  <TabsTrigger value={href} asChild className={className ? className : ""}>
+  <TabsTrigger value={href} asChild className={className ? className : ''}>
     <Link href={href}>{children}</Link>
   </TabsTrigger>
 );
 
 export default function Stats({ children }: { children: React.ReactNode }) {
-  const { settingsOpen, toggleStatsSettings: toggleStatsSettings } = useStore(
+  const { settingsOpen, setSettingsOpen, activeTab, setActiveTab } = useStore(
     useShallow((state) => ({
-      settingsOpen: state.statsSettingsOpen,
-      toggleStatsSettings: state.toggleStatsSettings,
-      setActiveStatsTab: state.setActiveStatsTab,
-      activeStatsTab: state.activeStatsTab,
+      settingsOpen: state.settingsOpen,
+      setSettingsOpen: state.setSettingsOpen,
+      setActiveTab: state.setActiveTab,
+      activeTab: state.activeTab,
     })),
   );
 
   const pathname = usePathname();
+  React.useEffect(() => {
+    setActiveTab(pathname);
+  }, [pathname]);
 
   const { settingsRef, elementRef } = useContext(StatsContext);
 
@@ -75,11 +78,11 @@ export default function Stats({ children }: { children: React.ReactNode }) {
             <Separator orientation="vertical" />
             <Button
               variant="link"
-              onClick={toggleStatsSettings}
+              onClick={() => setSettingsOpen((open) => !open)}
               className="rounded-none border-b p-2"
             >
               <Settings
-                className={settingsOpen ? "text-header-background" : ""}
+                className={settingsOpen ? 'text-header-background' : ''}
               />
             </Button>
           </div>
@@ -89,8 +92,8 @@ export default function Stats({ children }: { children: React.ReactNode }) {
         </div>
         <div
           className={cn(
-            "w-full overflow-y-hidden overflow-x-scroll border-t-2 border-muted",
-            settingsOpen ? "block" : "hidden",
+            'w-full overflow-y-hidden overflow-x-scroll border-t-2 border-muted',
+            settingsOpen ? 'block' : 'hidden',
           )}
         >
           <div

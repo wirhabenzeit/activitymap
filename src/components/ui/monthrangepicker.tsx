@@ -2,7 +2,7 @@ import * as React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, buttonVariants } from './button';
 import { cn } from '~/lib/utils';
-import { useStore } from '~/contexts/Zustand';
+import { useStore } from '~/store';
 
 const addMonths = (input: Date, months: number) => {
   const date = new Date(input);

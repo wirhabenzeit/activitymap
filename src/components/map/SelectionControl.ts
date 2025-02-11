@@ -2,8 +2,6 @@
 
 import { type MapMouseEvent, Point, type PointLike } from 'mapbox-gl';
 import { useControl } from 'react-map-gl/mapbox';
-import { useStore } from '~/contexts/Zustand';
-import { useShallow } from 'zustand/shallow';
 import { useShallowStore } from '~/store';
 
 const styles = `

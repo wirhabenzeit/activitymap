@@ -3,7 +3,7 @@
 import { useEffect, useRef, type JSX, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from 'next-themes';
-import { useShallowStore } from '~/store';
+import { useShallowStore, useStore } from '~/store';
 
 import { useContext } from 'react';
 import { StatsContext } from '~/app/stats/[name]/StatsContext';
@@ -27,7 +27,7 @@ import { Slider } from '~/components/ui/slider';
 
 import { type Activity } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
-import { Plot } from '@observablehq/plot';
+import { type Plot } from '@observablehq/plot';
 
 type Stats<K extends keyof StatsSetting> = {
   settings: StatsSettings[K];
@@ -43,10 +43,8 @@ type Stats<K extends keyof StatsSetting> = {
     activities: Activity[];
     width: number;
     height: number;
-  }) => Plot.Plot & HTMLElement;
-  legend: (
-    setting: StatsSetting[K],
-  ) => (plot: Plot.Plot) => Plot.Plot & HTMLElement;
+  }) => Plot & HTMLElement;
+  legend: (setting: StatsSetting[K]) => (plot: Plot) => Plot & HTMLElement;
   kind: K;
 };
 
@@ -69,7 +67,8 @@ function FormElement<T extends keyof StatsSetting>({
 }: FormElementProps<T>) {
   const setting = stat.settings[propName];
   const value = stat.setting[propName];
-  const setter = (value: StatsSetting[T]) => stat.setter(propName, value);
+  const setter = (value: StatsSetting[T]) =>
+    stat.setter((s) => ({ ...s, [propName]: value }));
 
   switch (setting.type) {
     case 'categorical':
@@ -128,7 +127,9 @@ export const SelectFormElement = <K extends string, T>({
   value: K;
   setter: (value: K) => void;
 }) => {
+  const ssetting = useStore((state) => state.settings);
   if (Object.keys(setting.options).length == 1) return null;
+  console.log(ssetting, setting, value);
   return (
     <Select value={value} onValueChange={(val) => setter(val as K)}>
       <SelectTrigger className="w-[140px]">
@@ -210,28 +211,26 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
   const { width, height, settingsRef } = useContext(StatsContext);
 
   const stats = useMemo(
-    () =>
-      (Object.keys(statsPlots) as (keyof StatsSetting)[]).reduce(
-        (acc, key) => ({
-          ...acc,
-          [key]: {
-            plot: statsPlots[key].plot,
-            legend: statsPlots[key].legend,
-            setting: settings[key],
-            settings: statsPlots[key].settings,
-            kind: key,
-            setter: setSettings[key],
-          },
-        }),
-        {} as Record<keyof StatsSetting, Stats<keyof StatsSetting>>,
-      ),
-    [settings, setSettings],
+    () => ({
+      plot: statsPlots[name].plot,
+      legend: statsPlots[name].legend,
+      setting: settings[name],
+      kind: name,
+      settings: statsPlots[name].settings,
+      setter: (value) =>
+        setSettings((setting) => ({
+          ...setting,
+          [name]: value(setting[name]),
+        })),
+    }),
+    [settings],
   );
+  console.log(stats);
 
   useEffect(() => {
     if (!figureRef.current || !settingsRef.current) return;
 
-    const plot = makePlot(stats[name])({
+    const plot = makePlot(stats)({
       activities: filterIDs.map((id) => activityDict[id]!),
       width,
       height,
@@ -243,7 +242,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
     plot.style = 'margin: 0;';
     figureRef.current.append(plot as Node);
 
-    const legend = makeLegend(stats[name])(plot);
+    const legend = makeLegend(stats)(plot);
     if (legend) {
       legend.style =
         'min-height: 0; display: block; margin-bottom: 0 !important;';
@@ -257,7 +256,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
   }, [width, height, activityDict, settings[name], filterIDs, theme]);
 
   const form = useMemo(
-    () => (settingsRef.current ? Form<typeof name>(stats[name]) : null),
+    () => (settingsRef.current ? Form<typeof name>(stats) : null),
     [stats, name, settingsRef.current],
   );
 

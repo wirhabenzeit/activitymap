@@ -70,7 +70,7 @@ import {
   RowData,
   TableFeature,
 } from '@tanstack/react-table';
-import { ListState, ListStateChangers } from '~/contexts/List';
+import { ListActions, ListState } from '~/store/list';
 import { Map } from 'mapbox-gl';
 import { MapRef } from 'react-map-gl/mapbox';
 
@@ -456,7 +456,7 @@ export function DataTableColumnHeader<TData, TValue>({
   );
 }
 
-interface DataTableProps<TData, TValue> extends ListState, ListStateChangers {
+interface DataTableProps<TData, TValue> extends ListState, ListActions {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   className?: string;
@@ -616,7 +616,7 @@ export function DataTable<TData, TValue>({
                         ? 'py-0 px-1'
                         : density == 'md'
                           ? 'py-1 px-2'
-                          : 'p-2 text-sm',
+                          : 'py-2 text-sm',
                     )}
                     key={cell.id}
                   >
