@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { useShallowStore } from '~/store';
 import { getAccount, getUser } from '~/server/db/actions';
 import type { User, Session } from '~/server/db/schema';
-import { useShallow } from 'zustand/shallow';
 
 export default function MainContainer({
   user,
@@ -19,7 +18,6 @@ export default function MainContainer({
   const {
     loadFromDB,
     loadPhotos,
-    updateFilters,
     setUser,
     setAccount,
     setGuest,
@@ -27,7 +25,6 @@ export default function MainContainer({
     setSession,
   } = useShallowStore((state) => ({
     loadFromDB: state.loadFromDB,
-    updateFilters: state.updateFilters,
     loadPhotos: state.loadPhotos,
     setUser: state.setUser,
     setAccount: state.setAccount,
@@ -40,74 +37,40 @@ export default function MainContainer({
 
   useEffect(() => {
     if (session !== undefined) setSession(session);
-    if (user != undefined) {
-      setUser(user);
 
-      getAccount({
-        userId: user.id,
-      }).then((account) => {
-        if (account) setAccount(account);
-      });
-      load({}).then(console.log).catch(console.error);
+    if (user != undefined) {
+      // Handle logged-in user initialization
+      setUser(user);
+      getAccount({ userId: user.id })
+        .then((account) => {
+          if (account) setAccount(account);
+          return loadFromDB({});
+        })
+        .then(() => loadPhotos())
+        .catch(console.error);
     } else if (searchParams.has('user')) {
-      async function getUserFromDB() {
-        const user = await getUser(searchParams.get('user')!);
-        if (user) {
-          console.log('setting user', user);
-          setUser(user);
-          const account = await getAccount({
-            userId: user.id,
-          });
-          setGuest(true);
-          load({
-            providerAccountId: account.providerAccountId,
-          })
-            .then(console.log)
-            .catch(console.error);
-        }
-      }
-      getUserFromDB().then(console.log).catch(console.error);
+      // Handle guest user view
+      getUser(searchParams.get('user')!)
+        .then(async (user) => {
+          if (user) {
+            setUser(user);
+            const account = await getAccount({ userId: user.id });
+            setGuest(true);
+            return loadFromDB({ athleteId: account.providerAccountId });
+          }
+        })
+        .then(() => loadPhotos())
+        .catch(console.error);
     } else if (searchParams.has('activities')) {
+      // Handle specific activities view
       setGuest(true);
       const activities = searchParams.get('activities')?.split(',').map(Number);
-      load({ activities }).then(console.log).catch(console.error);
+      loadFromDB({ ids: activities })
+        .then(() => loadPhotos())
+        .catch(console.error);
     } else {
       setLoading(false);
     }
-
-    async function load({
-      activities,
-      providerAccountId,
-    }: {
-      activities?: number[];
-      providerAccountId?: number;
-    }) {
-      const nActivities = await loadFromDB({
-        ids: activities,
-        athleteId: providerAccountId,
-      });
-      const dbUser = await getUser(user!.id);
-      if (dbUser && !dbUser.complete) {
-        console.log;
-      }
-      await loadPhotos();
-    }
-
-    const unsub = useShallowStore.subscribe((state, prevState) => {
-      if (
-        state.sportType !== prevState.sportType ||
-        state.binary !== prevState.binary ||
-        state.search !== prevState.search ||
-        state.values !== prevState.values ||
-        state.dateRange !== prevState.dateRange
-      ) {
-        updateFilters();
-      } else if (state.activityDict !== prevState.activityDict) {
-        updateFilters();
-      }
-    });
-
-    return () => unsub();
   }, []);
 
   return <>{children}</>;

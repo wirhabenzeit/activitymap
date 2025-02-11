@@ -4,7 +4,7 @@ import { type RootState } from './index';
 import { type Activity } from '~/server/db/schema';
 import { defaultStatsSettings, type StatsSetting } from '~/components/stats';
 
-type StatsTab =
+export type StatsTab =
   | '/stats/scatter'
   | '/stats/calendar'
   | '/stats/progress'
@@ -20,7 +20,7 @@ export type Value = {
     iterable: Activity[],
     accessor: (d: Activity) => number | string,
   ) => number | string;
-  color: unknown;
+  color: string;
 };
 
 export type StatsCalendar = {
@@ -34,9 +34,9 @@ export type StatsState = {
 };
 
 export type StatsActions = {
-  setActiveTab: Dispatch<SetStateAction<StatsTab>>;
-  setSettingsOpen: Dispatch<SetStateAction<boolean>>;
-  setSettings: Dispatch<SetStateAction<StatsSetting>>;
+  setActiveTab: (update: SetStateAction<StatsTab>) => void;
+  setSettingsOpen: (update: SetStateAction<boolean>) => void;
+  setSettings: (update: SetStateAction<StatsSetting>) => void;
 };
 
 export type StatsSlice = StatsState & StatsActions;
@@ -54,19 +54,19 @@ export const createStatsSlice: StateCreator<
 
   // Actions
   setActiveTab: (update) =>
-    set((state: RootState) => {
+    set((state) => {
       state.activeTab =
         typeof update === 'function' ? update(state.activeTab) : update;
     }),
 
   setSettingsOpen: (update) =>
-    set((state: RootState) => {
+    set((state) => {
       state.settingsOpen =
         typeof update === 'function' ? update(state.settingsOpen) : update;
     }),
 
   setSettings: (update) =>
-    set((state: RootState) => {
+    set((state) => {
       state.settings =
         typeof update === 'function' ? update(state.settings) : update;
     }),

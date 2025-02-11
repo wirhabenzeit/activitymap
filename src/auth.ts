@@ -4,8 +4,6 @@ import NextAuth from 'next-auth';
 import Strava from 'next-auth/providers/strava';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import type { Adapter } from 'next-auth/adapters';
-import { eq } from 'drizzle-orm';
-import { users } from '~/server/db/schema';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [

@@ -84,7 +84,7 @@ export const activityFields = {
     summaryFormatter: (v: Number) => `${v}d`,
   },
   average_speed: {
-    formatter: (v: Number) => decFormatter('kmh', 1)(v * 3.6),
+    formatter: (v: number) => decFormatter('kmh', 1)(v * 3.6),
     Icon: Clock,
     title: 'Average Speed',
     reducer: d3.mean,

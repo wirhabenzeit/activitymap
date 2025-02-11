@@ -36,7 +36,6 @@ export default function ListPage() {
       })),
     [activityDict, photos],
   );
-  console.log('photoDict', photoDict);
 
   return (
     <div className="h-full max-h-dvh w-full">

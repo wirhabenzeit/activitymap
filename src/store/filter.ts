@@ -30,42 +30,56 @@ export type ValueFilter = {
 export type FilterState = {
   sportType: Record<SportType, boolean>;
   sportGroup: Record<CategoryGroup, boolean>;
-  dateRange: { start: Date; end: Date } | undefined;
+  dateRange: DateRange | undefined;
   values: Record<ValueColumn, ValueFilter | undefined>;
   search: string;
-  binary: Record<keyof Activity, boolean | undefined>;
+  binary: Record<BinaryColumn, boolean>;
   filterIDs: number[];
+  activityDict: Record<number, Activity>;
 };
 
-type FilterActions = {
-  setSportGroup: Dispatch<SetStateAction<Record<CategoryGroup, boolean>>>;
-  setSportType: Dispatch<SetStateAction<Record<SportType, boolean>>>;
-  setDateRange: Dispatch<
-    SetStateAction<{ start: Date; end: Date } | undefined>
-  >;
-  setValues: Dispatch<
-    SetStateAction<Record<ValueColumn, ValueFilter | undefined>>
-  >;
-  setSearch: Dispatch<SetStateAction<string>>;
-  setBinary: Dispatch<
-    SetStateAction<Record<keyof Activity, boolean | undefined>>
-  >;
+export type FilterActions = {
+  setSportGroup: (
+    update: SetStateAction<Record<CategoryGroup, boolean>>,
+  ) => void;
+  setSportType: (update: SetStateAction<Record<SportType, boolean>>) => void;
+  setDateRange: (update: SetStateAction<DateRange | undefined>) => void;
+  setValues: (
+    update: SetStateAction<Record<ValueColumn, ValueFilter | undefined>>,
+  ) => void;
+  setSearch: (update: SetStateAction<string>) => void;
+  setBinary: (update: SetStateAction<Record<BinaryColumn, boolean>>) => void;
   updateFilters: () => void;
 };
 
 export type FilterSlice = FilterState & FilterActions;
 
-const initializeSportType = () =>
+const initializeSportType = (): Record<SportType, boolean> =>
   Object.fromEntries(
     Object.values(categorySettings).flatMap(({ alias }) =>
       alias.map((a) => [a, true]),
     ),
   ) as Record<SportType, boolean>;
 
-const initializeSportGroup = () =>
+const initializeSportGroup = (): Record<CategoryGroup, boolean> =>
   Object.fromEntries(
     Object.keys(categorySettings).map((key) => [key, true]),
   ) as Record<CategoryGroup, boolean>;
+
+const initializeValues = (): Record<ValueColumn, ValueFilter | undefined> => ({
+  distance: undefined,
+  moving_time: undefined,
+  elapsed_time: undefined,
+  total_elevation_gain: undefined,
+  elev_high: undefined,
+  elev_low: undefined,
+});
+
+const initializeBinary = (): Record<BinaryColumn, boolean> => ({
+  commute: false,
+  private: false,
+  flagged: false,
+});
 
 export const createFilterSlice: StateCreator<
   RootState,
@@ -77,17 +91,11 @@ export const createFilterSlice: StateCreator<
   sportType: initializeSportType(),
   sportGroup: initializeSportGroup(),
   dateRange: undefined,
-  values: {
-    distance: undefined,
-    moving_time: undefined,
-    elapsed_time: undefined,
-    total_elevation_gain: undefined,
-    elev_high: undefined,
-    elev_low: undefined,
-  },
+  values: initializeValues(),
   search: '',
-  binary: {} as Record<keyof Activity, boolean | undefined>,
+  binary: initializeBinary(),
   filterIDs: [],
+  activityDict: {},
 
   // Actions
   setSportGroup: (update) => {
@@ -177,7 +185,6 @@ export const createFilterSlice: StateCreator<
 
           // Binary filters
           for (const [key, value] of Object.entries(state.binary)) {
-            if (value === undefined) continue;
             if (activity[key as keyof Activity] !== value) return false;
           }
 
