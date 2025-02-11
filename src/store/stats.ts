@@ -2,7 +2,7 @@ import { type StateCreator } from 'zustand';
 import { type Dispatch, type SetStateAction } from 'react';
 import { type RootState } from './index';
 import { type Activity } from '~/server/db/schema';
-import { defaultStatsSettings, type StatsSetting } from '~/stats';
+import { defaultStatsSettings, type StatsSetting } from '~/components/stats';
 
 type StatsTab =
   | '/stats/scatter'
@@ -49,7 +49,7 @@ export const createStatsSlice: StateCreator<
 > = (set) => ({
   // Initial state
   activeTab: '/stats/scatter',
-  settingsOpen: false,
+  settingsOpen: true,
   settings: defaultStatsSettings,
 
   // Actions

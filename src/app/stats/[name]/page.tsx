@@ -1,4 +1,4 @@
-import statsPlots from '~/stats';
+import statsPlots from '~/components/stats';
 import { notFound } from 'next/navigation';
 
 import Plot from '~/components/stats/plot';

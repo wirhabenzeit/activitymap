@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useShallow } from 'zustand/shallow';
 
-import statsPlots from '~/stats';
+import statsPlots from '~/components/stats';
 import { StatsContext, StatsProvider } from './StatsContext';
 import { Button } from '~/components/ui/button';
 import { cn } from '~/lib/utils';
@@ -51,9 +51,6 @@ export default function Stats({ children }: { children: React.ReactNode }) {
   );
 
   const pathname = usePathname();
-  React.useEffect(() => {
-    setActiveTab(pathname);
-  }, [pathname]);
 
   const { settingsRef, elementRef } = useContext(StatsContext);
 

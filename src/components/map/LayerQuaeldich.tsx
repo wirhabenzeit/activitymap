@@ -39,7 +39,7 @@ import {
   Download as DownloadIcon,
 } from '@mui/icons-material';
 import { BBox } from 'geojson';
-import { useStore } from '~/contexts/Zustand';
+import { useStore } from '~/store';
 import { type CustomLayerProps } from '~/settings/map';
 
 export const LayerQuaeldich: React.FC<CustomLayerProps> = ({ mapRef }) => {

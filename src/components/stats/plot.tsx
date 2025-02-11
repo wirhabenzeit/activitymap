@@ -11,7 +11,7 @@ import statsPlots, {
   type StatsSetter,
   type StatsSetting,
   type StatsSettings,
-} from '~/stats';
+} from './index';
 
 import * as React from 'react';
 
@@ -68,7 +68,7 @@ function FormElement<T extends keyof StatsSetting>({
   const setting = stat.settings[propName];
   const value = stat.setting[propName];
   const setter = (value: StatsSetting[T]) =>
-    stat.setter((s) => ({ ...s, [propName]: value }));
+    stat.setter((s) => ({ ...s, [propName]: value(s[propName]) }));
 
   switch (setting.type) {
     case 'categorical':
@@ -131,7 +131,7 @@ export const SelectFormElement = <K extends string, T>({
   if (Object.keys(setting.options).length == 1) return null;
   console.log(ssetting, setting, value);
   return (
-    <Select value={value} onValueChange={(val) => setter(val as K)}>
+    <Select value={value} onValueChange={(val) => setter(() => val)}>
       <SelectTrigger className="w-[140px]">
         <SelectValue placeholder="Theme" />
       </SelectTrigger>
@@ -166,7 +166,9 @@ export const SliderFormElement = ({
   return (
     <div className="flex items-center space-x-1">
       <Button
-        onClick={() => setter(value.domain[0])}
+        onClick={() =>
+          setter((val) => ({ value: val.domain[0], domain: val.domain }))
+        }
         disabled={value.value == value.domain[0]}
         variant="ghost"
         className="p-2"
@@ -179,11 +181,13 @@ export const SliderFormElement = ({
         min={value.domain[0]}
         max={value.domain[1]}
         onValueChange={(v) => {
-          if (v && v[0]) setter(v[0]);
+          if (v && v[0]) setter((val) => ({ value: v[0], domain: val.domain }));
         }}
       />
       <Button
-        onClick={() => setter(value.domain[1])}
+        onClick={() =>
+          setter((val) => ({ value: val.domain[1], domain: val.domain }))
+        }
         disabled={value.value == value.domain[1]}
         variant="ghost"
         className="p-2"
@@ -225,7 +229,6 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
     }),
     [settings],
   );
-  console.log(stats);
 
   useEffect(() => {
     if (!figureRef.current || !settingsRef.current) return;

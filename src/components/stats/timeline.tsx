@@ -1,107 +1,107 @@
-import * as Plot from "@observablehq/plot";
+import * as Plot from '@observablehq/plot';
 
-import { ChartLine, ChartColumn } from "lucide-react";
-import * as d3 from "d3";
+import { ChartLine, ChartColumn } from 'lucide-react';
+import * as d3 from 'd3';
 
-import { type Activity } from "~/server/db/schema";
-import { categorySettings, aliasMap } from "~/settings/category";
+import { type Activity } from '~/server/db/schema';
+import { categorySettings, aliasMap } from '~/settings/category';
 
-import { commonSettings, prepend } from "~/stats";
+import { commonSettings, prepend } from './index';
 
 export const settings = {
   averaging: {
-    type: "number",
-    label: "Averaging",
+    type: 'number',
+    label: 'Averaging',
     minIcon: <ChartColumn />,
     maxIcon: <ChartLine />,
   },
   value: {
-    type: "categorical",
-    label: "Value",
+    type: 'categorical',
+    label: 'Value',
     options: {
       count: {
-        id: "count",
+        id: 'count',
         fun: () => 1,
         sortable: false,
         format: (v: number) => v.toFixed(0),
-        label: "Count",
-        unit: "",
+        label: 'Count',
+        unit: '',
       },
       distance: {
-        id: "distance",
+        id: 'distance',
         fun: (d: Activity) => d.distance,
         sortable: true,
         format: (v: number) =>
           v >= 10_000_000
-            ? (v / 1_000_000).toFixed() + "k"
+            ? (v / 1_000_000).toFixed() + 'k'
             : (v / 1000).toFixed(),
-        label: "Distance (km)",
-        unit: "km",
+        label: 'Distance (km)',
+        unit: 'km',
       },
       elevation: {
-        id: "elevation",
+        id: 'elevation',
         sortable: true,
         fun: (d: Activity) => d.total_elevation_gain,
         format: (v: number) =>
-          v >= 10_000 ? (v / 1_000).toFixed() + "k" : v.toFixed(),
-        label: "Elevation (m)",
-        unit: "m",
+          v >= 10_000 ? (v / 1_000).toFixed() + 'k' : v.toFixed(),
+        label: 'Elevation (m)',
+        unit: 'm',
       },
       time: {
-        id: "time",
+        id: 'time',
         sortable: true,
         fun: (d: Activity) => (d.elapsed_time ?? 0) / 3600,
         format: (v: number) => v.toFixed(0),
-        label: "Duration (h)",
-        unit: "h",
+        label: 'Duration (h)',
+        unit: 'h',
       },
     },
   },
   timePeriod: {
-    type: "categorical",
-    label: "Time Period",
+    type: 'categorical',
+    label: 'Time Period',
     options: {
       year: {
-        id: "year",
-        label: "Year",
+        id: 'year',
+        label: 'Year',
         tick: d3.utcYear,
         days: 365,
-        tickFormat: "%Y",
+        tickFormat: '%Y',
         averagingDomain: [0, 0],
       },
       month: {
-        id: "month",
-        label: "Month",
+        id: 'month',
+        label: 'Month',
         tick: d3.utcMonth,
         days: 30,
-        tickFormat: "%b %Y",
+        tickFormat: '%b %Y',
         averagingDomain: [0, 3],
       },
       week: {
-        id: "week",
-        label: "Week",
+        id: 'week',
+        label: 'Week',
         tick: d3.timeMonday,
         days: 7,
-        tickFormat: "%Y-%m-%d",
+        tickFormat: '%Y-%m-%d',
         averagingDomain: [0, 12],
       },
       day: {
-        id: "day",
-        label: "Day",
+        id: 'day',
+        label: 'Day',
         tick: d3.timeDay,
         days: 1,
-        tickFormat: "%Y-%m-%d",
+        tickFormat: '%Y-%m-%d',
         averagingDomain: [0, 90],
       },
     },
   },
   group: {
-    type: "categorical",
-    label: "Group",
+    type: 'categorical',
+    label: 'Group',
     options: {
       sport_group: {
-        id: "sport_group",
-        label: "Type",
+        id: 'sport_group',
+        label: 'Type',
         format: (id: keyof typeof categorySettings) =>
           categorySettings[id].name,
         fun: (d: Activity) => aliasMap[d.sport_type],
@@ -110,38 +110,38 @@ export const settings = {
         icon: (id: keyof typeof categorySettings) => categorySettings[id].icon,
       },
       no_group: {
-        id: "no_group",
-        label: "All",
-        format: () => "All",
-        fun: () => "All",
-        color: () => "#000000",
-        icon: () => "child-reaching",
+        id: 'no_group',
+        label: 'All',
+        format: () => 'All',
+        fun: () => 'All',
+        color: () => '#000000',
+        icon: () => 'child-reaching',
       },
     },
   },
   yScale: {
-    type: "categorical",
-    label: "Y Scale",
+    type: 'categorical',
+    label: 'Y Scale',
     options: {
       linear: {
-        id: "linear",
-        label: "Linear",
+        id: 'linear',
+        label: 'Linear',
         prop: {
-          type: "linear",
+          type: 'linear',
         },
       },
       sqrt: {
-        id: "sqrt",
-        label: "Sqrt",
+        id: 'sqrt',
+        label: 'Sqrt',
         prop: {
-          type: "sqrt",
+          type: 'sqrt',
         },
       },
       cbrt: {
-        id: "cbrt",
-        label: "Cbrt",
+        id: 'cbrt',
+        label: 'Cbrt',
         prop: {
-          type: "pow",
+          type: 'pow',
           exponent: 1 / 3,
         },
       },
@@ -151,10 +151,10 @@ export const settings = {
 
 export const defaultSettings: TimelineSetting = {
   averaging: { value: 1, domain: [0, 3] },
-  value: "distance",
-  timePeriod: "month",
-  group: "sport_group",
-  yScale: "linear",
+  value: 'distance',
+  timePeriod: 'month',
+  group: 'sport_group',
+  yScale: 'linear',
 };
 
 type TimelineSetting = {
@@ -184,11 +184,11 @@ export const getter = (setting: TimelineSetting): Spec => ({
 export const setter =
   (timeline: TimelineSetting) =>
   <K extends keyof TimelineSetting>(name: K, value: TimelineSetting[K]) => {
-    if (["value", "group", "yScale"].includes(name)) {
+    if (['value', 'group', 'yScale'].includes(name)) {
       const newTimeline = { ...timeline, [name]: value };
       return newTimeline;
     }
-    if (name === "averaging") {
+    if (name === 'averaging') {
       return {
         ...timeline,
         averaging: {
@@ -197,7 +197,7 @@ export const setter =
         },
       };
     }
-    if (name === "timePeriod") {
+    if (name === 'timePeriod') {
       {
         const oldDays = settings.timePeriod.options[timeline.timePeriod].days;
         const newDays =
@@ -317,28 +317,28 @@ export const plot =
           ticks: 6,
           ...timeline.yScale.prop,
           label: null,
-          anchor: "left",
+          anchor: 'left',
           tickSize: 12,
           ...(bigPlot
             ? {}
             : {
                 tickRotate: -90,
-                tickFormat: prepend(" ", timeline.value.format),
-                textAnchor: "start",
+                tickFormat: prepend(' ', timeline.value.format),
+                textAnchor: 'start',
                 tickSize: 14,
                 tickPadding: -10,
               }),
         }),
         Plot.gridX({
-          ticks: "year",
+          ticks: 'year',
         }),
         Plot.axisX({
-          anchor: "top",
+          anchor: 'top',
           label: null,
           tickSize: 12,
           ...(!bigPlot
             ? {
-                textAnchor: "start",
+                textAnchor: 'start',
                 tickPadding: -10,
                 tickFormat: d3.timeFormat(" '%y"),
               }
@@ -351,11 +351,11 @@ export const plot =
                   Plot.text(
                     range,
                     Plot.pointerX({
-                      textAnchor: "start",
+                      textAnchor: 'start',
                       px: (d: Date) => d,
                       y: (d: Date) => map.get(d)!.get(type),
                       dx: 8,
-                      frameAnchor: "right",
+                      frameAnchor: 'right',
                       text: (d: Date) =>
                         timeline.value.format(map.get(d)!.get(type)!),
                       fill: timeline.group.color(type),
@@ -379,11 +379,11 @@ export const plot =
         Plot.lineY(
           data,
           Plot.windowY({
-            x: "date",
+            x: 'date',
             y: timeline.value.label,
             k: timeline.averaging + 1,
-            curve: "monotone-x",
-            reduce: "mean",
+            curve: 'monotone-x',
+            reduce: 'mean',
             stroke: (x: Data) => timeline.group.color(x.type),
             channels: {
               Date: (d: Data) =>
@@ -393,8 +393,8 @@ export const plot =
             },
             tip: {
               channels: {
-                Date: "date",
-                Type: "type",
+                Date: 'date',
+                Type: 'type',
               },
               format: {
                 y: timeline.value.format,
@@ -407,12 +407,12 @@ export const plot =
           }),
         ),
         Plot.areaY(data, {
-          x: "date",
-          y2: "value",
+          x: 'date',
+          y2: 'value',
           y1: 0,
           fill: (x: Data) => timeline.group.color(x.type),
           opacity: 0.1,
-          curve: "step",
+          curve: 'step',
         }),
       ],
     });
