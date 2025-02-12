@@ -1,28 +1,27 @@
-"use server";
+'use server';
 
-import {inArray, eq, count, desc} from "drizzle-orm";
+import { inArray, eq, count, desc } from 'drizzle-orm';
 import {
   type Activity,
   type Account,
   activities,
   photos,
   accounts,
-} from "./schema";
-import {db} from "./index";
-import {auth} from "~/auth";
-import {range} from "d3";
+} from './schema';
+import { db } from './index';
+import { auth } from '~/auth';
+import { range } from 'd3';
 
 export const getUser = async (id?: string) => {
   if (!id) {
     const session = await auth();
-    if (!session?.user?.id)
-      throw new Error("Not authenticated");
+    if (!session?.user?.id) throw new Error('Not authenticated');
     id = session.user.id!;
   }
   const user = await db.query.users.findFirst({
-    where: (users, {eq}) => eq(users.id, id),
+    where: (users, { eq }) => eq(users.id, id),
   });
-  if (!user) throw new Error("User not found");
+  if (!user) throw new Error('User not found');
   return user;
 };
 
@@ -40,64 +39,53 @@ export const getAccount = async ({
       userId = user.id;
     }
     account = (await db.query.accounts.findFirst({
-      where: (accounts, {eq}) =>
-        eq(accounts.userId, userId!),
+      where: (accounts, { eq }) => eq(accounts.userId, userId!),
     })) as Account;
   } else {
     account = (await db.query.accounts.findFirst({
-      where: (accounts, {eq}) =>
+      where: (accounts, { eq }) =>
         eq(accounts.providerAccountId, providerAccountId),
     })) as Account;
   }
-  if (!account) throw new Error("Account not found");
-  if (
-    account.expires_at &&
-    account.expires_at * 1000 < Date.now()
-  ) {
+  if (!account) throw new Error('Account not found');
+  if (account.expires_at && account.expires_at * 1000 < Date.now()) {
     try {
       const response = await fetch(
-        "https://www.strava.com/api/v3/oauth/token",
+        'https://www.strava.com/api/v3/oauth/token',
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             client_id: process.env.AUTH_STRAVA_ID,
             client_secret: process.env.AUTH_STRAVA_SECRET,
-            grant_type: "refresh_token",
+            grant_type: 'refresh_token',
             refresh_token: account.refresh_token,
           }),
-        }
+        },
       );
 
-      const tokens = (await response.json()) as Record<
-        string,
-        unknown
-      >;
+      const tokens = (await response.json()) as Record<string, unknown>;
 
-      console.log("Refreshed access token", tokens);
+      console.log('Refreshed access token', tokens);
 
       if (!response.ok) throw tokens;
 
       account.access_token = tokens.access_token as string;
       account.expires_at = Math.floor(
-        Date.now() / 1000 + (tokens.expires_in as number)
+        Date.now() / 1000 + (tokens.expires_in as number),
       );
       account.refresh_token =
-        (tokens.refresh_token as string) ??
-        account.refresh_token;
+        (tokens.refresh_token as string) ?? account.refresh_token;
 
-      await db
-        .insert(accounts)
-        .values(account)
-        .onConflictDoUpdate({
-          target: accounts.providerAccountId,
-          set: account,
-        });
+      await db.insert(accounts).values(account).onConflictDoUpdate({
+        target: accounts.providerAccountId,
+        set: account,
+      });
     } catch (error) {
-      console.error("Error refreshing access token", error);
-      throw new Error("Failed to refresh access token");
+      console.error('Error refreshing access token', error);
+      throw new Error('Failed to refresh access token');
     }
   }
   return account;
@@ -113,12 +101,7 @@ export async function getActivities({
   summary?: boolean;
 }) {
   let acts: Activity[];
-  console.log(
-    "getting activities",
-    ids,
-    athlete_id,
-    summary
-  );
+  console.log('getting activities', ids, athlete_id, summary);
   if (summary) {
     acts = await db
       .select()
@@ -132,7 +115,7 @@ export async function getActivities({
   else {
     if (athlete_id == undefined) {
       const athlete = await getAccount({});
-      console.log("athlete", athlete);
+      console.log('athlete', athlete);
       athlete_id = athlete.providerAccountId;
     }
     acts = await db
@@ -160,24 +143,15 @@ export async function getActivitiesPaged({
     const athlete = await getAccount({});
     athlete_id = athlete.providerAccountId;
   }
-  const actCount =
-    (
-      await db
-        .select({count: count()})
-        .from(activities)
-        .where(eq(activities.athlete, athlete_id))
-    )[0]?.count ?? 0;
-  const pages = Math.ceil(actCount / pageSize);
-  const promises = range(pages).map((pageNumber) =>
-    db
-      .select()
-      .from(activities)
-      .where(eq(activities.athlete, athlete_id))
-      .orderBy(desc(activities.start_date_local_timestamp))
-      .limit(pageSize)
-      .offset(pageNumber * pageSize)
-  );
-  return promises;
+
+  // Get all activities in one query
+  const result = await db
+    .select()
+    .from(activities)
+    .where(eq(activities.athlete, athlete_id))
+    .orderBy(desc(activities.start_date_local_timestamp));
+
+  return result;
 }
 
 export async function getPhotos() {
@@ -186,8 +160,6 @@ export async function getPhotos() {
   const phts = await db
     .select()
     .from(photos)
-    .where(
-      eq(photos.athlete_id, athlete.providerAccountId)
-    );
+    .where(eq(photos.athlete_id, athlete.providerAccountId));
   return phts;
 }

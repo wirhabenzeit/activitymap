@@ -1,18 +1,19 @@
 import '~/styles/globals.css';
 
-import { SidebarProvider } from '~/components/ui/sidebar';
 import { ThemeProvider } from '~/components/theme-provider';
+import { AuthProvider } from '~/components/providers/auth';
+import { auth } from '~/auth';
+import { SidebarProvider } from '~/components/ui/sidebar';
 import { AppSidebar } from '~/components/app-sidebar';
 import { AppHeader } from '~/components/app-header';
-
-import MainContainer from '~/components/MainContainer';
-import { auth } from '~/auth';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { getUser, getAccount } from '~/server/db/actions';
+import type { InitialAuth } from '~/store/auth';
 
 export const metadata = {
-  title: 'Activity Map',
-  description: 'A map of Strava activities',
+  title: 'ActivityMap',
+  description: 'Visualize your activities',
   icons: [{ rel: 'icon', url: '/favicon.ico' }],
 };
 
@@ -22,7 +23,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const user = session && 'user' in session ? session.user : undefined;
+  const initialAuth: InitialAuth = { session: null, user: null, account: null };
+
+  if (session?.user?.id) {
+    const user = await getUser(session.user.id);
+    const account = user ? await getAccount({ userId: user.id }) : null;
+    if (user && account) {
+      initialAuth.session = session;
+      initialAuth.user = user;
+      initialAuth.account = account;
+    }
+  }
 
   return (
     <html
@@ -216,28 +227,30 @@ export default async function RootLayout({
         <Analytics />
         <SpeedInsights />
       </head>
-      <body
-        style={{ width: '100dvw', height: '100dvh', overflow: 'hidden' }}
-        className="font-sans"
-      >
-        <ThemeProvider attribute="class">
-          <SidebarProvider
-            className="flex h-dvh flex-col"
-            style={{ height: '100dvh' }}
-          >
-            <AppHeader />
-            <div className="flex min-h-0 flex-1 overflow-hidden">
-              <AppSidebar />
-              <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                <div className="h-14 w-full" />
-                <div className="min-h-0 w-full flex-1 overflow-hidden">
-                  <MainContainer user={user} session={session}>
+      <body style={{ width: '100dvw', height: '100dvh', overflow: 'hidden' }}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider initialAuth={initialAuth}>
+            <SidebarProvider
+              className="flex h-dvh flex-col"
+              style={{ height: '100dvh' }}
+            >
+              <AppHeader />
+              <div className="flex min-h-0 flex-1 overflow-hidden">
+                <AppSidebar />
+                <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                  <div className="h-14 w-full" />
+                  <div className="min-h-0 w-full flex-1 overflow-hidden">
                     {children}
-                  </MainContainer>
-                </div>
-              </main>
-            </div>
-          </SidebarProvider>
+                  </div>
+                </main>
+              </div>
+            </SidebarProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

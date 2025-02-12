@@ -9,6 +9,7 @@ import { type SelectionSlice, createSelectionSlice } from './selection';
 import { type MapSlice, createMapSlice } from './map';
 import { type ActivitySlice, createActivitySlice } from './activity';
 import { type FilterSlice, createFilterSlice } from './filter';
+import { type AuthSlice, createAuthSlice } from './auth';
 
 // Combine all slice types into the root state type
 export type RootState = StatsSlice &
@@ -16,7 +17,8 @@ export type RootState = StatsSlice &
   SelectionSlice &
   MapSlice &
   ActivitySlice &
-  FilterSlice;
+  FilterSlice &
+  AuthSlice;
 
 // Create the store with all middlewares and slices
 export const store = create<RootState>()(
@@ -28,6 +30,7 @@ export const store = create<RootState>()(
       ...createMapSlice(set, get, store),
       ...createActivitySlice(set, get, store),
       ...createFilterSlice(set, get, store),
+      ...createAuthSlice(set, get, store),
     })),
     { name: 'Strava Store' },
   ),
