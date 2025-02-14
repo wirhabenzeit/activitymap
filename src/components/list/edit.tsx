@@ -3,6 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { type JSXElementConstructor, type ComponentType } from 'react';
 
 import { Button } from '~/components/ui/button';
 import {
@@ -15,19 +16,10 @@ import {
 } from '~/components/ui/form';
 import { Input } from '~/components/ui/input';
 
-const formSchema = z.object({
-  name: z.string().min(2, {
-    message: 'Activity name must be at least 2 characters long',
-  }),
-  description: z.string(),
-  sportType: z.enum(sportType.enumValues),
-});
-
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -35,7 +27,7 @@ import {
 import { Edit } from 'lucide-react';
 import { Row } from '@tanstack/react-table';
 import { Activity } from '~/server/db/schema';
-import { UpdatableActivity } from '~/server/strava/actions';
+import { type UpdatableActivity, type SportType } from '~/server/strava/types';
 import { sportType } from 'drizzle/schema';
 import { Select } from '../ui/select';
 import {
@@ -46,14 +38,38 @@ import {
 } from '~/components/ui/select';
 import { aliasMap, colorMap, iconMap } from '~/settings/category';
 import { useShallowStore } from '~/store';
+import { LucideIcon } from 'lucide-react';
 
-export function ProfileForm({ row }: { row: Row<Activity> }) {
+const formSchema = z.object({
+  name: z.string().min(2, {
+    message: 'Activity name must be at least 2 characters long',
+  }),
+  description: z.string(),
+  sportType: z.custom<SportType>(),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+type ActivityTypeInfo = {
+  name: SportType;
+  Icon: ComponentType<{ className?: string; style?: { color: string } }>;
+  color: string;
+  group: string;
+};
+
+export function ProfileForm({
+  row,
+  setOpen,
+}: {
+  row: Row<Activity>;
+  setOpen?: (open: boolean) => void;
+}) {
   const [updateActivity, loading] = useShallowStore((state) => [
     state.updateActivity,
     state.loading,
   ]);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: row.original.name,
@@ -62,7 +78,7 @@ export function ProfileForm({ row }: { row: Row<Activity> }) {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormValues) {
     const activityUpdate: UpdatableActivity = {
       name: values.name,
       sport_type: values.sportType,
@@ -70,39 +86,54 @@ export function ProfileForm({ row }: { row: Row<Activity> }) {
       athlete: row.original.athlete,
       ...(values.description && { description: values.description }),
     };
-    const newActivity = await updateActivity(activityUpdate);
+    await updateActivity(activityUpdate);
+    setOpen?.(false);
   }
+
   const activtyTypes = sportType.enumValues
-    .map((value) => ({
-      name: value,
-      Icon: iconMap[value],
-      color: colorMap[value],
-      alias: aliasMap[value],
-    }))
-    .sort((a, b) => a.alias.localeCompare(b.alias));
+    .filter(
+      (value): value is SportType =>
+        value in iconMap && value in aliasMap && value in colorMap,
+    )
+    .map(
+      (value): ActivityTypeInfo => ({
+        name: value,
+        Icon: iconMap[value]!,
+        color: colorMap[value]!,
+        group: aliasMap[value]!,
+      }),
+    )
+    .sort((a, b) => a.group.localeCompare(b.group));
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        {[
-          { name: 'name', label: 'Name' },
-          { name: 'description', label: 'Description' },
-        ].map(({ name, label }) => (
-          <FormField
-            control={form.control}
-            name={name}
-            key={name}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{label}</FormLabel>
-                <FormControl>
-                  <Input placeholder={row.getValue(name)} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        ))}
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input placeholder={row.getValue('name')} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Input placeholder={row.getValue('description')} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="sportType"
@@ -168,10 +199,7 @@ export function EditActivity({
             Make changes to your activity here.
           </DialogDescription>
         </DialogHeader>
-        <ProfileForm row={row} />
-        {/* <DialogFooter>
-          <Button type="submit">Save changes</Button>
-        </DialogFooter> */}
+        <ProfileForm row={row} setOpen={setOpen} />
       </DialogContent>
     </Dialog>
   );

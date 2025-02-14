@@ -61,8 +61,7 @@ export const activityFields = {
     reducerSymbol: '≥',
   },
   date: {
-    accessorFn: (act: Activity) =>
-      new Date(act.start_date_local_timestamp * 1000),
+    accessorFn: (act: Activity) => act.start_date_local,
     formatter: (date: Date) =>
       date.toLocaleDateString('en-US', {
         day: '2-digit',

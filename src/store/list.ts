@@ -128,7 +128,7 @@ export const createListSlice: StateCreator<
       kudos_count: false,
       average_heartrate: false,
       edit: false,
-      photos: false,
+      photos: true,
     },
     summaryRow: 'page',
     ...createListActions(set, 'fullList'),

@@ -24,7 +24,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account, profile, email, credentials }) {
       if (user && user.id) {
         const db_user = await db.query.users.findFirst({
-          where: (users, { eq }) => eq(users.id, user.id),
+          where: (users, { eq }) => eq(users.id, user.id as string),
         });
       }
       return true;

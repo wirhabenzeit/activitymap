@@ -6,13 +6,12 @@ import {
   Mountain,
   Heart,
   Zap,
-  ExternalLink,
   Map,
   Info,
-  CircleArrowLeft,
+  Loader2,
 } from 'lucide-react';
 
-import { Activity, Photo } from '~/server/db/schema';
+import { type Activity, type Photo } from '~/server/db/schema';
 import { categorySettings } from '~/settings/category';
 import { Button } from '~/components/ui/button';
 import { aliasMap } from '~/settings/category';
@@ -42,18 +41,25 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '~/components/ui/popover';
-import { MapRef } from 'react-map-gl/mapbox';
+import { type MapRef } from 'react-map-gl/mapbox';
 import { useStore } from '~/store';
 import { useShallow } from 'zustand/shallow';
 import { cn } from '~/lib/utils';
 import { type RefObject } from 'react';
 import { LngLatBounds } from 'mapbox-gl';
+import { useShallowStore } from '~/store';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
 interface ActivityCardProps extends CardProps {
   row: Row<Activity>;
   map?: RefObject<MapRef>;
+}
+
+interface ActivityMap {
+  bbox?: [number, number, number, number];
+  polyline?: string;
+  summary_polyline?: string;
 }
 
 const formattedValue = (key: keyof typeof activityFields, row: Row<Activity>) =>
@@ -77,16 +83,25 @@ export function DescriptionCard({ row }: { row: Row<Activity> }) {
 
 export function ActivityCardContent({ row }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
-  const loadFromStrava = useStore((state) => state.loadFromStrava);
+  const { loadFromStrava, loading } = useShallowStore((state) => ({
+    loadFromStrava: state.loadFromStrava,
+    loading: state.loading,
+  }));
   const sport_type = row.original.sport_type;
-  const sport_group = aliasMap[sport_type]!;
-  const Icon = categorySettings[sport_group].icon;
+  const sport_group = aliasMap[sport_type];
+  const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
 
-  const date = new Date(row.original.start_date_local_timestamp * 1000);
+  const date = row.original.start_date_local;
   const stats = [
     {
       icon: Calendar,
-      description: date.toLocaleString('en-US'),
+      description: date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
     },
     {
       icon: StopwatchIcon,
@@ -118,17 +133,23 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
       : []),
   ];
 
+  const handleRefresh = async () => {
+    await loadFromStrava({ photos: true, ids: [row.original.id] });
+  };
+
   return (
     <>
-      <Card className="w-auto max-w-80">
+      <Card className="w-auto max-w-80 border-none shadow-none">
         <CardHeader>
           <CardTitle>
             <div className="flex items-center space-x-4">
-              <Icon
-                color={categorySettings[sport_group].color}
-                className="w-6 h-6"
-                height="3em"
-              />
+              {Icon && sport_group && (
+                <Icon
+                  color={categorySettings[sport_group].color}
+                  className="w-6 h-6"
+                  height="3em"
+                />
+              )}
               <div>{row.getValue('name')}</div>
             </div>
           </CardTitle>
@@ -148,12 +169,12 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
         </CardContent>
         <CardFooter className="flex justify-between space-x-1">
           <Button onClick={() => setOpen(true)}>Edit</Button>
-          <Button
-            onClick={() =>
-              loadFromStrava({ photos: true, ids: [row.original.id] })
-            }
-          >
-            <ReloadIcon />
+          <Button onClick={handleRefresh} disabled={loading}>
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ReloadIcon />
+            )}
           </Button>
           <Button variant="outline">
             <Link
@@ -173,8 +194,8 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
 export function ActivityCard({ row, map }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
   const sport_type = row.original.sport_type;
-  const sport_group = aliasMap[sport_type]!;
-  const Icon = categorySettings[sport_group].icon;
+  const sport_group = aliasMap[sport_type];
+  const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
   const [highlighted, setHighlighted, setPosition, setSelected] = useStore(
     useShallow((state) => [
       state.highlighted,
@@ -184,6 +205,60 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
     ]),
   );
   const { push } = useRouter();
+
+  const handleMapClick = () => {
+    const bbox = row.original.map_bbox;
+    if (!bbox || bbox.length < 4) {
+      console.log('No bbox available for activity');
+      return;
+    }
+
+    // Create a local copy that TypeScript knows is defined
+    const [minLng, minLat, maxLng, maxLat] = bbox as [
+      number,
+      number,
+      number,
+      number,
+    ];
+
+    setSelected((prev) =>
+      prev.includes(Number(row.id)) ? prev : [...prev, Number(row.id)],
+    );
+    setHighlighted(Number(row.id));
+
+    if (!map) {
+      console.log('No map reference available, redirecting to map view');
+      const center = [(minLng + maxLng) / 2, (minLat + maxLat) / 2] as [
+        number,
+        number,
+      ];
+      const zoom = 13;
+      const bounds = new LngLatBounds(
+        [minLng, minLat] as [number, number],
+        [maxLng, maxLat] as [number, number],
+      );
+      setSelected([Number(row.id)]);
+      setHighlighted(Number(row.id));
+      setPosition(
+        {
+          longitude: center[0],
+          latitude: center[1],
+          zoom,
+          bearing: 0,
+          pitch: 0,
+          padding: { top: 0, bottom: 0, left: 0, right: 0 },
+        },
+        bounds,
+      );
+      push('/map');
+      return;
+    }
+    const bounds = new LngLatBounds(
+      [minLng, minLat] as [number, number],
+      [maxLng, maxLat] as [number, number],
+    );
+    map.current?.fitBounds(bounds, { padding: 100 });
+  };
 
   return (
     <>
@@ -198,7 +273,13 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
           onClick={() => row.toggleSelected()}
           aria-label="Select row"
         >
-          <Icon color={categorySettings[sport_group].color} />
+          {Icon && sport_group && (
+            <Icon
+              color={categorySettings[sport_group].color}
+              className="w-6 h-6"
+              height="3em"
+            />
+          )}
         </Button>
         <div
           className={cn(
@@ -215,85 +296,38 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
           variant="ghost"
           className="px-0 h-4"
           size="sm"
-          onClick={() => {
-            const bbox = row.original.map?.bbox;
-            if (!bbox) {
-              console.log('No bbox available for activity');
-              return;
-            }
-            setSelected((prev) =>
-              prev.includes(Number(row.id)) ? prev : [...prev, Number(row.id)],
-            );
-            setHighlighted(Number(row.id));
-            console.log('map', map);
-            if (!map) {
-              console.log(
-                'No map reference available, redirecting to map view',
-              );
-              const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2];
-              const zoom = 12;
-              setPosition(
-                {
-                  longitude: center[0] || 0,
-                  latitude: center[1] || 0,
-                  zoom,
-                  bearing: 0,
-                  pitch: 0,
-                  padding: { top: 0, bottom: 0, left: 0, right: 0 },
-                },
-                new LngLatBounds([bbox[0], bbox[1]], [bbox[2], bbox[3]]),
-              );
-              push('/map');
-              return;
-            }
-
-            const mapboxInstance = map?.current?.getMap();
-            if (!mapboxInstance) {
-              console.log('No mapbox instance available');
-              return;
-            }
-
-            console.log('Fitting bounds to:', bbox);
-            mapboxInstance.fitBounds(
-              [
-                [bbox[0], bbox[1]],
-                [bbox[2], bbox[3]],
-              ],
-              { padding: 50 },
-            );
-          }}
+          onClick={handleMapClick}
         >
-          <Map className="w-4 h-4 text-primary/50" />
+          <Map className="h-4 w-4" />
         </Button>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" className="p-0 h-4" size="sm">
-              <Info className="w-4 h-4 text-primary/50" />
+            <Button variant="ghost" className="px-0 h-4" size="sm">
+              <Info className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="p-0 w-auto">
             <ActivityCardContent row={row} />
           </PopoverContent>
         </Popover>
-        <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
       </div>
+      <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
     </>
   );
 }
 
 export function PhotoCard({ photos }: { photos: Photo[] }) {
-  console.log(photos);
-  return photos ? (
-    <div className="flex items-center h-full space-x-2">
-      {photos.map((photo) => (
-        <img
-          src={Object.values(photo.urls)[0]}
-          alt={photo.caption ?? ''}
-          className="h-full rounded-sm aspect-square object-cover"
-        />
-      ))}
+  return (
+    <div className="flex flex-row items-center gap-2 h-[1.5rem] overflow-x-scroll">
+      {photos &&
+        photos.map((photo) => (
+          <img
+            key={photo.unique_id}
+            src={photo.urls ? Object.values(photo.urls)[0] : ''}
+            alt={photo.caption ?? ''}
+            className="h-full rounded-sm aspect-square object-cover"
+          />
+        ))}
     </div>
-  ) : (
-    'No'
   );
 }

@@ -19,10 +19,8 @@ import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 
 export function ShareButton() {
-  const { selected, user, guest } = useShallowStore((state) => ({
+  const { selected } = useShallowStore((state) => ({
     selected: state.selected,
-    user: state.user,
-    guest: state.guest,
   }));
   const [selectedValue, setSelectedValue] = useState(false);
   const shareUrl = new URL('https://activitymap.dominik.page');

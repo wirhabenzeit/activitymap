@@ -1,15 +1,11 @@
 'use client';
 
 import { ColumnDef, Table } from '@tanstack/react-table';
-import { Edit, Pin } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '~/components/ui/popover';
+import { Pin } from 'lucide-react';
 import { Checkbox } from '~/components/ui/checkbox';
+import { type ComponentType } from 'react';
 
-import { Activity } from '~/server/db/schema';
+import { Activity, type Photo } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
 
 import { DataTableColumnHeader } from './data-table';
@@ -18,9 +14,19 @@ import { activityFields } from '~/settings/activity';
 import { ActivityCard, DescriptionCard, PhotoCard } from './card';
 import { EditActivity } from './edit';
 
+type ActivityField = {
+  formatter: (value: any) => string | null;
+  Icon?: ComponentType<any>;
+  title: string;
+  reducer?: (values: any[]) => number;
+  reducerSymbol?: string;
+  summaryFormatter?: (value: any) => string;
+  accessorFn?: (row: Activity) => any;
+};
+
 function columnFromField(
   id: keyof typeof activityFields,
-  spec: (typeof activityFields)[keyof typeof activityFields],
+  spec: ActivityField,
 ): ColumnDef<Activity> {
   const footer = ({ table }: { table: Table<Activity> }) => {
     const rows =
@@ -31,10 +37,14 @@ function columnFromField(
           : table.getState().summaryRow == 'all'
             ? table.getFilteredRowModel().rows
             : table.getSelectedRowModel().rows;
-    const reducedValue = spec.reducer(rows.map((row) => row.getValue(id)));
-    const summary = spec.summaryFormatter
-      ? spec.summaryFormatter(reducedValue)
-      : `${spec.reducerSymbol || ''}${spec.formatter(reducedValue)}`;
+    const values = rows.map((row) => row.getValue(id));
+    const reducedValue = spec.reducer ? spec.reducer(values) : null;
+    const summary =
+      spec.summaryFormatter && reducedValue != null
+        ? spec.summaryFormatter(reducedValue)
+        : reducedValue != null
+          ? `${spec.reducerSymbol || ''}${spec.formatter(reducedValue)}`
+          : '';
     return <div className="text-right w-full">{summary}</div>;
   };
 
@@ -52,7 +62,6 @@ function columnFromField(
         <div className="w-full justify-end flex">
           {spec.Icon && <spec.Icon className="w-4 h-4" />}
         </div>
-        {/* <span>{title}</span> */}
       </DataTableColumnHeader>
     ),
     enableResizing: true,
@@ -64,6 +73,7 @@ function columnFromField(
 
 export const columns: ColumnDef<Activity>[] = [
   {
+    id: 'id',
     accessorKey: 'id',
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title="ID" />
@@ -74,6 +84,7 @@ export const columns: ColumnDef<Activity>[] = [
     },
   },
   {
+    id: 'name',
     accessorKey: 'name',
     meta: { title: 'Name', width: 'minmax(200px, 3fr)' },
     header: ({ column, table }) => (
@@ -104,15 +115,22 @@ export const columns: ColumnDef<Activity>[] = [
         </div>
       </DataTableColumnHeader>
     ),
-    cell: ({ row, table }) => (
-      <ActivityCard row={row} map={table.getState().map} />
-    ),
+    cell: ({ row, table }) => {
+      const mapRef = table.getState().map;
+      return (
+        <ActivityCard
+          row={row}
+          map={mapRef ? { current: mapRef } : undefined}
+        />
+      );
+    },
     enableHiding: false,
   },
   ...Object.entries(activityFields).map(([id, spec]) =>
-    columnFromField(id, spec),
+    columnFromField(id as keyof typeof activityFields, spec as ActivityField),
   ),
   {
+    id: 'description',
     accessorKey: 'description',
     meta: { title: 'Description', width: 'minmax(200px, 3fr)' },
     header: ({ column, table }) => (
@@ -126,12 +144,16 @@ export const columns: ColumnDef<Activity>[] = [
     cell: ({ row }) => <DescriptionCard row={row} />,
   },
   {
+    id: 'photos',
     accessorKey: 'photos',
-    meta: { title: 'Photos', width: '100px' },
+    meta: { title: 'Photos', width: 'minmax(80px, 1fr)' },
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title="Photos" />
     ),
-    cell: ({ getValue }) => <PhotoCard photos={getValue()} />,
+    cell: ({ getValue }) => {
+      const photos = getValue() as Photo[] | undefined;
+      return <PhotoCard photos={photos || []} />;
+    },
   },
   {
     id: 'edit',

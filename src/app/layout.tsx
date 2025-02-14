@@ -10,6 +10,9 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { getUser, getAccount } from '~/server/db/actions';
 import type { InitialAuth } from '~/store/auth';
+import { Toaster } from '~/components/ui/toaster';
+import { ToastManager } from '~/components/providers/toast';
+import { cn } from '~/lib/utils';
 
 export const metadata = {
   title: 'ActivityMap',
@@ -250,6 +253,8 @@ export default async function RootLayout({
                 </main>
               </div>
             </SidebarProvider>
+            <Toaster />
+            <ToastManager />
           </AuthProvider>
         </ThemeProvider>
       </body>

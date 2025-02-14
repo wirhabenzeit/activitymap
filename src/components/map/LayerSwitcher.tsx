@@ -5,7 +5,6 @@ import { Map } from 'lucide-react';
 import { useShallowStore } from '~/store';
 
 import { mapSettings } from '~/settings/map';
-import { useShallow } from 'zustand/shallow';
 
 import { Button } from '~/components/ui/button';
 import {

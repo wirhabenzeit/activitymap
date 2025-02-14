@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  ChevronsUpDown,
-  LogOut,
-  CircleArrowLeft,
-  Loader,
-  Loader2,
-} from 'lucide-react';
+import { ChevronsUpDown, LogOut, CircleArrowLeft, Loader2 } from 'lucide-react';
 
 import Link from 'next/link';
 import { signIn, signOut } from 'next-auth/react';
@@ -24,21 +18,36 @@ import {
 } from '~/components/ui/dropdown-menu';
 
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
+import { useToast } from '~/hooks/use-toast';
 
 import * as React from 'react';
 import Image from 'next/image';
 import { cn } from '~/lib/utils';
+import { useState } from 'react';
+import { User2 } from 'lucide-react';
 
 export function UserSettings() {
-  const { user, guest, loading, account, loadFromStrava } = useShallowStore(
-    (state) => ({
-      user: state.user,
-      guest: state.guest,
-      loading: state.loading,
-      account: state.account,
-      loadFromStrava: state.loadFromStrava,
-    }),
+  const { user, loading, account, loadFromStrava } = useShallowStore(
+    (state) => {
+      return {
+        user: state.user,
+        loading: state.loading,
+        account: state.account,
+        loadFromStrava: state.loadFromStrava,
+      };
+    },
   );
+
+  const handleLoadActivities = async () => {
+    try {
+      console.log('Starting load activities, current loading state:', loading);
+      await loadFromStrava({});
+      console.log('Finished load activities, current loading state:', loading);
+    } catch (error) {
+      // Error handling is now done in the server action
+      console.error(error);
+    }
+  };
 
   return (
     <SidebarMenuItem>
@@ -50,7 +59,7 @@ export function UserSettings() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={user.image!} alt={user.name} />
+                <AvatarImage src={user.image!} alt={user.name || ''} />
                 <Loader2
                   className={cn(
                     'absolute inset-0 m-auto size-8 text-white animate-spin',
@@ -78,8 +87,10 @@ export function UserSettings() {
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src={user.image!} alt={user.name} />
-                    <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                    <AvatarImage src={user?.image || undefined} />
+                    <AvatarFallback>
+                      <User2 className="h-5 w-5" />
+                    </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">{user.name}</span>
@@ -103,9 +114,9 @@ export function UserSettings() {
                 Strava Profile
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => loadFromStrava({})}>
+            <DropdownMenuItem onClick={handleLoadActivities} disabled={loading}>
               <CircleArrowLeft />
-              Get Activities
+              {loading ? 'Loading...' : 'Get Activities'}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut()}>

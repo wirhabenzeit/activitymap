@@ -607,16 +607,16 @@ export function DataTable<TData, TValue>({
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     className={cn(
-                      'bg-background group-data-[state=selected]:bg-muted flex items-center h-8',
+                      'bg-background group-data-[state=selected]:bg-muted flex items-center',
                       cell.column.getIsPinned() == 'left' &&
                         'sticky left-0 border-border border-r',
                       cell.column.getIsPinned() == 'right' &&
                         'sticky right-0 border-border border-l',
                       density == 'sm'
-                        ? 'py-0 px-1'
+                        ? 'py-1 px-1'
                         : density == 'md'
-                          ? 'py-1 px-2'
-                          : 'py-2 text-sm',
+                          ? 'p-2'
+                          : 'py-3 px-2 text-sm',
                     )}
                     key={cell.id}
                   >

@@ -1,22 +1,20 @@
 'use server';
 
 import { inArray, eq, count, desc } from 'drizzle-orm';
-import {
-  type Activity,
-  type Account,
-  activities,
-  photos,
-  accounts,
-} from './schema';
+import { type Activity, activities, photos, accounts } from './schema';
 import { db } from './index';
 import { auth } from '~/auth';
 import { range } from 'd3';
+import type { AdapterAccount } from 'next-auth/adapters';
+
+// Use the AdapterAccount type from next-auth
+export type Account = AdapterAccount;
 
 export const getUser = async (id?: string) => {
   if (!id) {
     const session = await auth();
     if (!session?.user?.id) throw new Error('Not authenticated');
-    id = session.user.id!;
+    id = session.user.id;
   }
   const user = await db.query.users.findFirst({
     where: (users, { eq }) => eq(users.id, id),
@@ -28,27 +26,32 @@ export const getUser = async (id?: string) => {
 export const getAccount = async ({
   providerAccountId,
   userId,
+  forceRefresh = false,
 }: {
-  providerAccountId?: number;
+  providerAccountId?: string;
   userId?: string;
+  forceRefresh?: boolean;
 }) => {
-  let account: Account;
-  if (!providerAccountId) {
-    if (!userId) {
-      const user = await getUser();
-      userId = user.id;
-    }
-    account = (await db.query.accounts.findFirst({
-      where: (accounts, { eq }) => eq(accounts.userId, userId!),
-    })) as Account;
-  } else {
-    account = (await db.query.accounts.findFirst({
-      where: (accounts, { eq }) =>
-        eq(accounts.providerAccountId, providerAccountId),
-    })) as Account;
-  }
+  const resolvedUserId = userId ?? (await getUser()).id;
+
+  let account = providerAccountId
+    ? await db.query.accounts.findFirst({
+        where: (accounts, { eq }) =>
+          eq(accounts.providerAccountId, providerAccountId),
+      })
+    : await db.query.accounts.findFirst({
+        where: (accounts, { eq }) => eq(accounts.userId, resolvedUserId),
+      });
+
   if (!account) throw new Error('Account not found');
-  if (account.expires_at && account.expires_at * 1000 < Date.now()) {
+
+  const currentTime = Math.floor(Date.now() / 1000);
+  const isExpired =
+    forceRefresh ||
+    (account.expires_at ? currentTime >= account.expires_at : true);
+
+  if (isExpired) {
+    console.log('Token expired or missing expiration, refreshing...');
     try {
       const response = await fetch(
         'https://www.strava.com/api/v3/oauth/token',
@@ -67,24 +70,46 @@ export const getAccount = async ({
       );
 
       const tokens = (await response.json()) as Record<string, unknown>;
-
-      console.log('Refreshed access token', tokens);
+      console.log('Token refresh response:', {
+        status: response.status,
+        ok: response.ok,
+        tokens: {
+          expires_in: tokens.expires_in,
+          token_type: tokens.token_type,
+          has_access_token: !!tokens.access_token,
+          has_refresh_token: !!tokens.refresh_token,
+        },
+      });
 
       if (!response.ok) throw tokens;
 
-      account.access_token = tokens.access_token as string;
-      account.expires_at = Math.floor(
-        Date.now() / 1000 + (tokens.expires_in as number),
+      const newExpiresAt = Math.floor(
+        currentTime + (tokens.expires_in as number),
       );
-      account.refresh_token =
-        (tokens.refresh_token as string) ?? account.refresh_token;
+      account = {
+        ...account,
+        access_token: tokens.access_token as string,
+        expires_at: newExpiresAt,
+        refresh_token:
+          (tokens.refresh_token as string) ?? account.refresh_token,
+      };
 
-      await db.insert(accounts).values(account).onConflictDoUpdate({
-        target: accounts.providerAccountId,
-        set: account,
+      console.log('Updating account with new tokens:', {
+        expires_at: account.expires_at,
+        expires_in_seconds: account.expires_at - currentTime,
+        has_access_token: !!account.access_token,
+        has_refresh_token: !!account.refresh_token,
       });
+
+      await db
+        .insert(accounts)
+        .values(account)
+        .onConflictDoUpdate({
+          target: [accounts.provider, accounts.providerAccountId],
+          set: account,
+        });
     } catch (error) {
-      console.error('Error refreshing access token', error);
+      console.error('Error refreshing access token:', error);
       throw new Error('Failed to refresh access token');
     }
   }
@@ -97,69 +122,48 @@ export async function getActivities({
   summary = false,
 }: {
   ids?: number[];
-  athlete_id?: number;
+  athlete_id?: string;
   summary?: boolean;
 }) {
-  let acts: Activity[];
-  console.log('getting activities', ids, athlete_id, summary);
-  if (summary) {
-    acts = await db
-      .select()
-      .from(activities)
-      .where(eq(activities.detailed_activity, false));
-  } else if (ids !== undefined)
-    acts = await db
-      .select()
-      .from(activities)
-      .where(inArray(activities.id, ids));
-  else {
-    if (athlete_id == undefined) {
-      const athlete = await getAccount({});
-      console.log('athlete', athlete);
-      athlete_id = athlete.providerAccountId;
-    }
-    acts = await db
-      .select()
-      .from(activities)
-      .where(eq(activities.athlete, athlete_id))
-      .orderBy(desc(activities.start_date_local_timestamp));
-    //.limit(250)
-    //.offset(500);
-    //console.log("acts", acts);
-    //acts = await db.select().from(activities);
-    //.where(eq(activities.athlete, athlete_id))
+  if (!athlete_id && !ids && !summary) {
+    const account = await getAccount({});
+    athlete_id = account.providerAccountId;
   }
-  return acts;
+
+  return athlete_id
+    ? await db
+        .select()
+        .from(activities)
+        .where(eq(activities.athlete, parseInt(athlete_id)))
+        .orderBy(desc(activities.start_date_local))
+    : ids
+      ? await db.select().from(activities).where(inArray(activities.id, ids))
+      : await db.select().from(activities);
 }
 
 export async function getActivitiesPaged({
   athlete_id,
   pageSize = 100,
 }: {
-  athlete_id?: number;
+  athlete_id?: string;
   pageSize: number;
 }) {
-  if (athlete_id == undefined) {
-    const athlete = await getAccount({});
-    athlete_id = athlete.providerAccountId;
+  if (!athlete_id) {
+    const account = await getAccount({});
+    athlete_id = account.providerAccountId;
   }
 
-  // Get all activities in one query
-  const result = await db
+  return db
     .select()
     .from(activities)
-    .where(eq(activities.athlete, athlete_id))
-    .orderBy(desc(activities.start_date_local_timestamp));
-
-  return result;
+    .where(eq(activities.athlete, parseInt(athlete_id)))
+    .orderBy(desc(activities.start_date_local));
 }
 
 export async function getPhotos() {
-  const athlete = await getAccount({});
-
-  const phts = await db
+  const account = await getAccount({});
+  return db
     .select()
     .from(photos)
-    .where(eq(photos.athlete_id, athlete.providerAccountId));
-  return phts;
+    .where(eq(photos.athlete_id, parseInt(account.providerAccountId)));
 }
