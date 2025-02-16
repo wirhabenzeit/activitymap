@@ -52,10 +52,17 @@ export async function POST(
     }
 
     if (data.aspect_type === 'create' || data.aspect_type === 'update') {
-      const { activity, photos } = await handleWebhookActivity({
+      const {
+        activities: [activity],
+        photos,
+      } = await handleWebhookActivity({
         activityId: data.object_id,
         athleteId: data.owner_id,
       });
+
+      if (!activity) {
+        throw new Error('No activity returned from Strava');
+      }
 
       return new Response(
         `${data.aspect_type === 'create' ? 'Created' : 'Updated'} activity ${

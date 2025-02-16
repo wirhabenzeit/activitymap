@@ -10,6 +10,20 @@ import type { AdapterAccount } from 'next-auth/adapters';
 // Use the AdapterAccount type from next-auth
 export type Account = AdapterAccount;
 
+export const getUserByStravaId = async (stravaId: string) => {
+  const account = await db.query.accounts.findFirst({
+    where: (accounts, { eq }) => eq(accounts.providerAccountId, stravaId),
+  });
+  if (!account) throw new Error('Account not found');
+
+  const user = await db.query.users.findFirst({
+    where: (users, { eq }) => eq(users.id, account.userId),
+  });
+  if (!user) throw new Error('User not found');
+
+  return user;
+};
+
 export const getUser = async (id?: string) => {
   if (!id) {
     const session = await auth();
@@ -32,16 +46,24 @@ export const getAccount = async ({
   userId?: string;
   forceRefresh?: boolean;
 }) => {
-  const resolvedUserId = userId ?? (await getUser()).id;
+  let account;
 
-  let account = providerAccountId
-    ? await db.query.accounts.findFirst({
-        where: (accounts, { eq }) =>
-          eq(accounts.providerAccountId, providerAccountId),
-      })
-    : await db.query.accounts.findFirst({
-        where: (accounts, { eq }) => eq(accounts.userId, resolvedUserId),
-      });
+  if (providerAccountId) {
+    account = await db.query.accounts.findFirst({
+      where: (accounts, { eq }) =>
+        eq(accounts.providerAccountId, providerAccountId),
+    });
+  } else if (userId) {
+    account = await db.query.accounts.findFirst({
+      where: (accounts, { eq }) => eq(accounts.userId, userId),
+    });
+  } else {
+    // Only try to resolve through session if no IDs provided
+    const resolvedUserId = await getUser().then((user) => user.id);
+    account = await db.query.accounts.findFirst({
+      where: (accounts, { eq }) => eq(accounts.userId, resolvedUserId),
+    });
+  }
 
   if (!account) throw new Error('Account not found');
 

@@ -365,6 +365,7 @@ export async function manageWebhook(url: string) {
   try {
     // Get existing subscriptions
     const subscriptions = await client.getSubscriptions();
+    console.log('Subscriptions:', subscriptions);
 
     // Delete existing subscriptions with different URLs
     await Promise.all(
@@ -390,7 +391,13 @@ export async function handleWebhookActivity({
   activityId: number;
   athleteId: number;
 }) {
-  const account = await getAccount({ providerAccountId: athleteId.toString() });
+  console.log('Handling webhook activity:', { activityId, athleteId });
+
+  // Get account directly using Strava athlete ID
+  const account = await getAccount({
+    providerAccountId: athleteId.toString(),
+  });
+
   if (!account.access_token) {
     throw new Error('No Strava access token found');
   }

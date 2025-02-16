@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronsUpDown, LogOut, CircleArrowLeft, Loader2 } from 'lucide-react';
+import { ChevronsUpDown, LogOut, CircleArrowLeft, Loader2, CircleCheck } from 'lucide-react';
 
 import Link from 'next/link';
 import { signIn, signOut } from 'next-auth/react';
@@ -18,13 +18,12 @@ import {
 } from '~/components/ui/dropdown-menu';
 
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
-import { useToast } from '~/hooks/use-toast';
 
 import * as React from 'react';
 import Image from 'next/image';
 import { cn } from '~/lib/utils';
-import { useState } from 'react';
 import { User2 } from 'lucide-react';
+import { manageWebhook } from '~/server/strava/actions';
 
 export function UserSettings() {
   const { user, loading, account, loadFromStrava } = useShallowStore(
@@ -37,6 +36,9 @@ export function UserSettings() {
       };
     },
   );
+
+  const checkWebhook = async () => {
+    manageWebhook
 
   const handleLoadActivities = async () => {
     try {
@@ -117,6 +119,12 @@ export function UserSettings() {
             <DropdownMenuItem onClick={handleLoadActivities} disabled={loading}>
               <CircleArrowLeft />
               {loading ? 'Loading...' : 'Get Activities'}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={()=>{
+              checkWebhook();
+            }}>
+              <CircleCheck />
+              Check Webhook
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut()}>
