@@ -255,7 +255,7 @@ export function DataTableViewOptions<TData>({
                           e.preventDefault();
                         }}
                       >
-                        {(column.columnDef.meta.title as string) || column.id}
+                        {(column.columnDef.meta?.title as string) || column.id}
                       </DropdownMenuCheckboxItem>
                     );
                   })}
@@ -290,7 +290,9 @@ export function DataTableViewOptions<TData>({
                 {[null, 'page', 'all', 'selected'].map((value) => (
                   <DropdownMenuCheckboxItem
                     key={value}
-                    onClick={() => table.setSummaryRow(value)}
+                    onClick={() =>
+                      table.setSummaryRow(() => value as SummaryRowState)
+                    }
                     checked={table.getState().summaryRow === value}
                   >
                     {value === null
@@ -315,7 +317,9 @@ export function DataTableViewOptions<TData>({
                 {['sm', 'md', 'lg'].map((value) => (
                   <DropdownMenuCheckboxItem
                     key={value}
-                    onClick={() => table.setDensity(value)}
+                    onClick={() =>
+                      table.setDensity(() => value as DensityState)
+                    }
                     checked={table.getState().density === value}
                   >
                     {value === 'sm'
@@ -330,17 +334,6 @@ export function DataTableViewOptions<TData>({
           </DropdownMenuSub>
         </DropdownMenuContent>
       </DropdownMenu>
-      {/* <Button
-        variant="outline"
-        size="sm"
-        className={cn(
-          'h-8 px-2',
-          table.getColumn('edit')?.getIsVisible() && 'bg-header-background',
-        )}
-        onClick={() => table.getColumn('edit')?.toggleVisibility()}
-      >
-        <Edit className="size-4" />
-      </Button> */}
     </div>
   );
 }

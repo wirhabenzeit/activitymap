@@ -93,28 +93,43 @@ async function fetchStravaActivities({
   athleteId: number;
   shouldDeletePhotos?: boolean;
 }): Promise<{ activities: Activity[]; photos: Photo[] }> {
+  console.log('Starting fetchStravaActivities with params:', {
+    hasAccessToken: !!accessToken,
+    before,
+    activityIds,
+    includePhotos,
+    athleteId,
+    shouldDeletePhotos,
+  });
+
   const client = new StravaClient(accessToken);
   const photos: Photo[] = [];
 
   try {
     // Get activities either by IDs or before timestamp
+    console.log('Fetching activities from Strava API...');
     const stravaActivities = activityIds
       ? await Promise.all(activityIds.map((id) => client.getActivity(id)))
       : await client.getActivities({
           before,
           per_page: 200,
         });
+    console.log(`Fetched ${stravaActivities.length} activities from Strava`);
 
     // Transform activities
+    console.log('Transforming activities...');
     const activities = stravaActivities.map((act) => ({
       ...transformStravaActivity(act),
       athlete: athleteId,
     }));
+    console.log(`Transformed ${activities.length} activities`);
 
     // Get photos if requested
     if (includePhotos) {
+      console.log('Photos requested, processing photos...');
       // Delete existing photos only if explicitly requested
       if (shouldDeletePhotos && stravaActivities.length > 0) {
+        console.log('Deleting existing photos...');
         await db
           .delete(photosSchema)
           .where(
@@ -127,6 +142,7 @@ async function fetchStravaActivities({
       // Then fetch and insert new photos
       for (const activity of stravaActivities) {
         if (activity.total_photo_count > 0) {
+          console.log(`Fetching photos for activity ${activity.id}...`);
           const activityPhotos = await client.getActivityPhotos(activity.id);
           photos.push(
             ...activityPhotos.map((photo) =>
@@ -135,10 +151,12 @@ async function fetchStravaActivities({
           );
         }
       }
+      console.log(`Processed ${photos.length} photos total`);
     }
 
     // Insert into database
-    await db
+    console.log('Inserting activities into database...');
+    const result = await db
       .insert(activitySchema)
       .values(activities)
       .onConflictDoUpdate({
@@ -194,9 +212,14 @@ async function fetchStravaActivities({
           display_hide_heartrate_option: sql`excluded.display_hide_heartrate_option`,
           last_updated: sql`excluded.last_updated`,
         },
-      });
+      })
+      .returning();
+    console.log(
+      `Database insert/update complete. Affected rows: ${result.length}`,
+    );
 
     if (photos.length > 0) {
+      console.log('Inserting photos into database...');
       await db
         .insert(photosSchema)
         .values(photos)
@@ -219,11 +242,12 @@ async function fetchStravaActivities({
             resource_state: sql`excluded.resource_state`,
           },
         });
+      console.log('Photos insert/update complete');
     }
 
     return { activities, photos };
   } catch (error) {
-    console.error('Error fetching activities:', error);
+    console.error('Error in fetchStravaActivities:', error);
     throw error;
   }
 }

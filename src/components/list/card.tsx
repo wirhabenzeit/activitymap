@@ -48,6 +48,15 @@ import { cn } from '~/lib/utils';
 import { type RefObject } from 'react';
 import { LngLatBounds } from 'mapbox-gl';
 import { useShallowStore } from '~/store';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import {
+  Carousel,
+  CarouselApi,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '../ui/carousel';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
@@ -316,18 +325,60 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
   );
 }
 
-export function PhotoCard({ photos }: { photos: Photo[] }) {
+export function PhotoCard({
+  photos,
+  title,
+}: {
+  photos: Photo[];
+  title: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [api, setApi] = useState<CarouselApi>();
+
   return (
-    <div className="flex flex-row items-center gap-2 h-[1.5rem] overflow-x-scroll">
-      {photos &&
-        photos.map((photo) => (
-          <img
-            key={photo.unique_id}
-            src={photo.urls ? Object.values(photo.urls)[0] : ''}
-            alt={photo.caption ?? ''}
-            className="h-full rounded-sm aspect-square object-cover"
-          />
-        ))}
-    </div>
+    <>
+      <div className="flex flex-row items-center gap-2 h-[1.5rem] overflow-x-scroll">
+        {photos &&
+          photos.map((photo, index) => (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="p-0 h-full rounded-sm aspect-square object-cover"
+            >
+              <img
+                key={photo.unique_id}
+                src={photo.urls ? Object.values(photo.urls)[0] : ''}
+                alt={photo.caption ?? ''}
+                className="h-full rounded-sm aspect-square object-cover"
+                onClick={() => {
+                  api?.scrollTo(index);
+                  console.log(api);
+                  setOpen(true);
+                }}
+              />
+            </Button>
+          ))}
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="[&>button]:hidden p-0 max-w-2xl">
+          <Carousel setApi={setApi}>
+            <DialogTitle>{title}</DialogTitle>
+            <CarouselContent>
+              {photos.map((photo) => (
+                <CarouselItem key={photo.unique_id}>
+                  <img
+                    src={photo.urls ? Object.values(photo.urls)[0] : ''}
+                    alt={photo.caption ?? ''}
+                    className="h-full rounded-sm object-contain"
+                  />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious />
+            <CarouselNext />
+          </Carousel>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

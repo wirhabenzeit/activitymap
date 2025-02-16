@@ -162,19 +162,32 @@ export const createActivitySlice: StateCreator<
   },
 
   loadFromStrava: async ({ photos = false, ids }) => {
+    console.log('Starting loadFromStrava:', { photos, ids });
     const account = get().account;
-    if (!account) throw new Error('No account found');
+    if (!account) {
+      console.error('No account found in store state');
+      throw new Error('No account found');
+    }
+    console.log('Found account:', {
+      providerAccountId: account.providerAccountId,
+      hasAccessToken: !!account.access_token,
+    });
 
     try {
       set((state) => {
         state.loading = true;
+        console.log('Set loading state to true');
       });
 
       if (ids) {
+        console.log('Loading specific activities by ID:', ids);
         // Case 1: Loading specific activities by ID
         const { activities, photos: newPhotos } = await fetchActivitiesByIds(
           ids,
           photos,
+        );
+        console.log(
+          `Received ${activities.length} activities and ${newPhotos.length} photos from API`,
         );
 
         // Check which activities are new vs updated
@@ -187,8 +200,13 @@ export const createActivitySlice: StateCreator<
         const updatedActivities = activities.filter((act) =>
           existingActivities.has(act.id),
         );
+        console.log('Activity changes:', {
+          new: newActivities.length,
+          updated: updatedActivities.length,
+        });
 
         set((state) => {
+          console.log('Updating store state with new data');
           // Remove old photos for these activities
           state.photos = state.photos.filter(
             (photo) => !ids.includes(photo.activity_id!),
@@ -219,6 +237,7 @@ export const createActivitySlice: StateCreator<
           }
           state.loading = false;
           state.loaded = true;
+          console.log('Store state updated successfully');
         });
 
         // Create appropriate notification based on whether activities were new or updated
@@ -241,7 +260,8 @@ export const createActivitySlice: StateCreator<
         }
         return activities.length;
       } else {
-        // Case 2: Loading older activities
+        console.log('Loading activities');
+        // Case 2: Loading activities
         // Find oldest activity from current state
         const activities = Object.values(get().activityDict);
         const oldestActivity =
@@ -255,12 +275,27 @@ export const createActivitySlice: StateCreator<
           ? Math.floor(oldestActivity.start_date.getTime() / 1000)
           : undefined;
 
-        if (!timestamp) {
-          return 0;
-        }
+        console.log('State:', {
+          hasActivities: activities.length > 0,
+          oldestActivityDate: oldestActivity?.start_date,
+          timestamp,
+        });
 
-        const result = await fetchActivitiesBeforeTimestamp(timestamp, photos);
+        // If we have no activities, fetch the initial set
+        // If we have activities, fetch older ones using the timestamp
+        const result = timestamp
+          ? await fetchActivitiesBeforeTimestamp(timestamp, photos)
+          : await fetchActivitiesBeforeTimestamp(
+              Math.floor(Date.now() / 1000),
+              photos,
+            );
+
+        console.log(
+          `Received ${result.activities.length} activities and ${result.photos.length} photos from API`,
+        );
+
         set((state) => {
+          console.log('Updating store state with new data');
           result.activities.forEach((activity: Activity) => {
             state.activityDict[activity.id] = activity;
             if (activity.map_polyline || activity.map_summary_polyline) {
@@ -286,6 +321,7 @@ export const createActivitySlice: StateCreator<
           }
           state.loading = false;
           state.loaded = true;
+          console.log('Store state updated successfully');
         });
         get().addNotification({
           type: 'success',
@@ -295,8 +331,10 @@ export const createActivitySlice: StateCreator<
         return result.activities.length;
       }
     } catch (e) {
+      console.error('Error in loadFromStrava:', e);
       set((state) => {
         state.loading = false;
+        console.log('Set loading state to false due to error');
       });
       get().addNotification({
         type: 'error',
