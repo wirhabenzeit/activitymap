@@ -13,14 +13,13 @@ import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type UpdatableActivity, type MutableStravaPhoto } from './types';
 import { sql } from 'drizzle-orm';
-import { store } from '~/store';
 import { eq } from 'drizzle-orm';
 import { webhooks } from '~/server/db/schema';
 
 export async function updateActivity(act: UpdatableActivity) {
   try {
     const account = await getAccount({});
-    if (!account.access_token) {
+    if (!account || !account.access_token) {
       throw new Error('No Strava access token found');
     }
 
@@ -55,19 +54,6 @@ export async function updateActivity(act: UpdatableActivity) {
       if (!updatedActivity) {
         throw new Error('Failed to update activity in database');
       }
-
-      store.setState((state) => ({
-        ...state,
-        notifications: [
-          ...state.notifications,
-          {
-            id: crypto.randomUUID(),
-            type: 'success',
-            title: 'Activity updated',
-            message: `Successfully updated activity "${updatedActivity.name}"`,
-          },
-        ],
-      }));
 
       return updatedActivity;
     } catch (error) {
@@ -260,44 +246,18 @@ export async function fetchActivitiesByIds(
 ) {
   try {
     const account = await getAccount({});
-    if (!account.access_token) {
+    if (!account || !account.access_token) {
       throw new Error('No Strava access token found');
     }
 
-    const result = await fetchStravaActivities({
+    return fetchStravaActivities({
       accessToken: account.access_token,
       activityIds: ids,
       includePhotos,
       athleteId: parseInt(account.providerAccountId),
     });
-
-    store.setState((state) => {
-      const notification = {
-        id: crypto.randomUUID(),
-        type: 'success' as const,
-        title: 'Activity refreshed',
-        message: `Successfully refreshed ${result.activities.length} ${result.activities.length === 1 ? 'activity' : 'activities'} from Strava`,
-      };
-      return {
-        ...state,
-        notifications: [...state.notifications, notification],
-      };
-    });
-
-    return result;
   } catch (error) {
-    store.setState((state) => {
-      const notification = {
-        id: crypto.randomUUID(),
-        type: 'error' as const,
-        title: 'Error refreshing activity',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      };
-      return {
-        ...state,
-        notifications: [...state.notifications, notification],
-      };
-    });
+    console.error('Error fetching activities by IDs:', error);
     throw error;
   }
 }
@@ -308,47 +268,18 @@ export async function fetchActivitiesBeforeTimestamp(
 ) {
   try {
     const account = await getAccount({});
-    if (!account.access_token) {
+    if (!account || !account.access_token) {
       throw new Error('No Strava access token found');
     }
 
-    const result = await fetchStravaActivities({
+    return fetchStravaActivities({
       accessToken: account.access_token,
       before: timestamp,
       includePhotos,
       athleteId: parseInt(account.providerAccountId),
     });
-
-    store.setState((state) => ({
-      ...state,
-      notifications: [
-        ...state.notifications,
-        {
-          id: crypto.randomUUID(),
-          type: 'success',
-          title: 'Activities loaded',
-          message: `Successfully loaded ${result.activities.length} activities from Strava`,
-        },
-      ],
-    }));
-
-    return result;
   } catch (error) {
-    store.setState((state) => ({
-      ...state,
-      notifications: [
-        ...state.notifications,
-        {
-          id: crypto.randomUUID(),
-          type: 'error',
-          title: 'Error loading activities',
-          message:
-            error instanceof Error
-              ? error.message
-              : 'An unknown error occurred',
-        },
-      ],
-    }));
+    console.error('Error fetching activities before timestamp:', error);
     throw error;
   }
 }
@@ -440,6 +371,12 @@ export async function handleWebhookActivity({
   const account = await getAccount({
     providerAccountId: athleteId.toString(),
   });
+
+  // If no account found, this user hasn't connected their Strava account to our app
+  if (!account) {
+    console.log('No account found for athlete ID:', athleteId);
+    return { activities: [], photos: [] };
+  }
 
   if (!account.access_token) {
     throw new Error('No Strava access token found');

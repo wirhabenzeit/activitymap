@@ -53,6 +53,9 @@ export const getAccount = async ({
       where: (accounts, { eq }) =>
         eq(accounts.providerAccountId, providerAccountId),
     });
+    // If account not found by providerAccountId, this is likely a webhook request
+    // We should not throw an error, but return null to handle this case appropriately
+    if (!account) return null;
   } else if (userId) {
     account = await db.query.accounts.findFirst({
       where: (accounts, { eq }) => eq(accounts.userId, userId),
@@ -65,7 +68,10 @@ export const getAccount = async ({
     });
   }
 
-  if (!account) throw new Error('Account not found');
+  // Only throw if we were looking up by userId or through session
+  if (!account && !providerAccountId) throw new Error('Account not found');
+  // Return null if we were looking up by providerAccountId and didn't find anything
+  if (!account) return null;
 
   const currentTime = Math.floor(Date.now() / 1000);
   const isExpired =
@@ -108,7 +114,7 @@ export const getAccount = async ({
       const newExpiresAt = Math.floor(
         currentTime + (tokens.expires_in as number),
       );
-      account = {
+      const updatedAccount = {
         ...account,
         access_token: tokens.access_token as string,
         expires_at: newExpiresAt,
@@ -117,19 +123,21 @@ export const getAccount = async ({
       };
 
       console.log('Updating account with new tokens:', {
-        expires_at: account.expires_at,
-        expires_in_seconds: account.expires_at - currentTime,
-        has_access_token: !!account.access_token,
-        has_refresh_token: !!account.refresh_token,
+        expires_at: updatedAccount.expires_at,
+        expires_in_seconds: updatedAccount.expires_at - currentTime,
+        has_access_token: !!updatedAccount.access_token,
+        has_refresh_token: !!updatedAccount.refresh_token,
       });
 
       await db
         .insert(accounts)
-        .values(account)
+        .values(updatedAccount)
         .onConflictDoUpdate({
           target: [accounts.provider, accounts.providerAccountId],
-          set: account,
+          set: updatedAccount,
         });
+
+      return updatedAccount;
     } catch (error) {
       console.error('Error refreshing access token:', error);
       throw new Error('Failed to refresh access token');
@@ -149,6 +157,7 @@ export async function getActivities({
 }) {
   if (!athlete_id && !ids && !summary) {
     const account = await getAccount({});
+    if (!account) throw new Error('No account found');
     athlete_id = account.providerAccountId;
   }
 
@@ -172,6 +181,7 @@ export async function getActivitiesPaged({
 }) {
   if (!athlete_id) {
     const account = await getAccount({});
+    if (!account) throw new Error('No account found');
     athlete_id = account.providerAccountId;
   }
 
@@ -184,6 +194,7 @@ export async function getActivitiesPaged({
 
 export async function getPhotos() {
   const account = await getAccount({});
+  if (!account) throw new Error('No account found');
   return db
     .select()
     .from(photos)

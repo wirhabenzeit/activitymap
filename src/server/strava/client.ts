@@ -1,4 +1,3 @@
-import type { SportType } from '~/server/db/schema';
 import type {
   StravaActivity,
   StravaPhoto,
@@ -63,6 +62,9 @@ export class StravaClient {
         console.log('Got 401, forcing token refresh and retrying...');
         const { getAccount } = await import('~/server/db/actions');
         const account = await getAccount({ forceRefresh: true });
+        if (!account) {
+          throw new Error('No account found');
+        }
         this.accessToken = account.access_token!;
         return this.request<T>(endpoint, options, retryCount + 1);
       }
@@ -117,7 +119,7 @@ export class StravaClient {
     size: number = 2048,
   ): Promise<StravaPhoto[]> {
     return this.request<StravaPhoto[]>(
-      `/activities/${id}/photos?size=${size}&photo_sources=true`,
+      `/activities/${id}/photos?size=256,${size}&photo_sources=true`,
     );
   }
 
