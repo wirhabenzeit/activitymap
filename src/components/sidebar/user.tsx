@@ -66,7 +66,7 @@ export function UserSettings() {
   const handleLoadActivities = async () => {
     try {
       console.log('Starting load activities, current loading state:', loading);
-      await loadFromStrava({});
+      await loadFromStrava({ photos: true });
       console.log('Finished load activities, current loading state:', loading);
     } catch (error) {
       // Error handling is now done in the server action

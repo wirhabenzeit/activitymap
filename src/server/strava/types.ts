@@ -139,7 +139,7 @@ export interface StravaPhoto {
   uploaded_at: string | null;
   created_at: string | null;
   urls: Record<string, string>;
-  sizes: Record<string, { height: number; width: number }>;
+  sizes: Record<string, [number, number]>;
   default_photo: boolean;
   location: [number, number] | null;
 }

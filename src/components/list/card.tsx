@@ -367,7 +367,7 @@ export function PhotoCard({
               {photos.map((photo) => (
                 <CarouselItem key={photo.unique_id}>
                   <img
-                    src={photo.urls ? Object.values(photo.urls)[0] : ''}
+                    src={photo.urls ? Object.values(photo.urls).at(-1) : ''}
                     alt={photo.caption ?? ''}
                     className="h-full rounded-sm object-contain"
                   />

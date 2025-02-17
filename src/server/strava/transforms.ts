@@ -4,6 +4,7 @@ import type { StravaActivity, StravaPhoto } from './types';
 
 export function transformStravaActivity(
   activity: StravaActivity,
+  isComplete: boolean = false,
 ): Omit<Activity, 'athlete'> {
   const start_date = new Date(activity.start_date);
   const local_date = new Date(
@@ -84,6 +85,7 @@ export function transformStravaActivity(
     calories: activity.calories,
     pr_count: activity.pr_count,
     last_updated: new Date(),
+    is_complete: isComplete,
   };
 }
 

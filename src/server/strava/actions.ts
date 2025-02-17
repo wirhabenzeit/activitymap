@@ -15,6 +15,7 @@ import { type UpdatableActivity, type MutableStravaPhoto } from './types';
 import { sql } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import { webhooks } from '~/server/db/schema';
+import type { StravaActivity } from './types';
 
 export async function updateActivity(act: UpdatableActivity) {
   try {
@@ -94,23 +95,37 @@ async function fetchStravaActivities({
   const photos: Photo[] = [];
 
   try {
-    // Get activities either by IDs or before timestamp
-    console.log('Fetching activities from Strava API...');
-    const stravaActivities = activityIds
-      ? await Promise.all(activityIds.map((id) => client.getActivity(id)))
-      : await client.getActivities({
-          before,
-          per_page: 200,
-        });
-    console.log(`Fetched ${stravaActivities.length} activities from Strava`);
+    console.log('Fetching activities from Strava...');
+    let stravaActivities: StravaActivity[];
+
+    if (activityIds) {
+      // When fetching specific activities, get complete data
+      console.log('Fetching complete activity data for IDs:', activityIds);
+      stravaActivities = await Promise.all(
+        activityIds.map((id) => client.getActivity(id)),
+      );
+    } else {
+      // When fetching all activities, get summary data
+      console.log('Fetching summary activity data');
+      stravaActivities = await client.getActivities({
+        before,
+        per_page: 200,
+      });
+    }
+
+    console.log(`Retrieved ${stravaActivities.length} activities from Strava`);
 
     // Transform activities
-    console.log('Transforming activities...');
-    const activities = stravaActivities.map((act) => ({
-      ...transformStravaActivity(act),
-      athlete: athleteId,
-    }));
-    console.log(`Transformed ${activities.length} activities`);
+    const activities = stravaActivities
+      .map((act) => {
+        // Set isComplete=true for webhook activities (fetched by ID) or when explicitly requested
+        const isComplete = !!activityIds;
+        console.log(
+          `Transforming activity ${act.id} with is_complete=${isComplete}`,
+        );
+        return transformStravaActivity(act, isComplete);
+      })
+      .map((act) => ({ ...act, athlete: athleteId }));
 
     // Get photos if requested
     if (includePhotos) {
@@ -199,6 +214,7 @@ async function fetchStravaActivities({
           heartrate_opt_out: sql`excluded.heartrate_opt_out`,
           display_hide_heartrate_option: sql`excluded.display_hide_heartrate_option`,
           last_updated: sql`excluded.last_updated`,
+          is_complete: sql`excluded.is_complete`,
         },
       })
       .returning();

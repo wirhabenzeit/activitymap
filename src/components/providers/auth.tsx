@@ -40,7 +40,7 @@ export function AuthProvider({
         .then((activityCount) => {
           // If no activities found in DB, fetch from Strava
           if (activityCount === 0) {
-            return loadFromStrava({ photos: true });
+            return loadFromStrava({ photos: false });
           }
           return activityCount;
         })

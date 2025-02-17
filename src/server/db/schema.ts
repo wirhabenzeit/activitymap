@@ -126,6 +126,7 @@ export const activities = pgTable(
     weighted_average_watts: integer('weighted_average_watts'),
     kilojoules: doublePrecision('kilojoules'),
     last_updated: timestamp('last_updated', { mode: 'date' }).defaultNow(),
+    is_complete: boolean('is_complete').notNull().default(false),
   },
   (table) => [
     index('activities_athlete_idx').on(table.athlete),
@@ -145,8 +146,7 @@ export const photos = pgTable(
     type: integer('type').notNull(),
     source: integer('source'),
     urls: jsonb('urls').$type<Record<string, string>>(),
-    sizes:
-      jsonb('sizes').$type<Record<string, { height: number; width: number }>>(),
+    sizes: jsonb('sizes').$type<Record<string, [number, number]>>(),
     default_photo: boolean('default_photo'),
     location: doublePrecision('location').array(),
     uploaded_at: timestamp('uploaded_at', { mode: 'date' }),

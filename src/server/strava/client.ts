@@ -47,14 +47,34 @@ export class StravaClient {
       status: response.status,
       ok: response.ok,
       statusText: response.statusText,
+      contentType: response.headers.get('content-type'),
     });
 
     if (!response.ok) {
-      const error = (await response.json()) as StravaError;
+      const contentType = response.headers.get('content-type');
+      let errorMessage: string;
+      let errorDetails: any;
+
+      try {
+        if (contentType?.includes('application/json')) {
+          const error = (await response.json()) as StravaError;
+          errorMessage = error.message ?? 'Unknown error';
+          errorDetails = error;
+        } else {
+          errorMessage = await response.text();
+          errorDetails = { rawResponse: errorMessage };
+        }
+      } catch (parseError) {
+        console.error('Error parsing error response:', parseError);
+        errorMessage = `Failed to parse error response: ${parseError}`;
+        errorDetails = { parseError };
+      }
+
       console.error('Strava API error:', {
-        message: error.message,
+        message: errorMessage,
         status: response.status,
-        errors: error.errors,
+        contentType,
+        details: errorDetails,
       });
 
       // If we get a 401 and haven't retried yet, try to refresh the token
@@ -70,13 +90,22 @@ export class StravaClient {
       }
 
       throw new StravaApiError(
-        error.message ?? 'Unknown error',
+        errorMessage,
         response.status,
-        error.errors,
+        errorDetails.errors,
       );
     }
 
-    return response.json() as Promise<T>;
+    try {
+      return (await response.json()) as T;
+    } catch (parseError) {
+      console.error('Error parsing successful response:', {
+        parseError,
+        status: response.status,
+        contentType: response.headers.get('content-type'),
+      });
+      throw new Error(`Failed to parse response as JSON: ${parseError}`);
+    }
   }
 
   async getActivity(id: number): Promise<StravaActivity> {
@@ -114,13 +143,22 @@ export class StravaClient {
     });
   }
 
-  async getActivityPhotos(
-    id: number,
-    size: number = 2048,
-  ): Promise<StravaPhoto[]> {
-    return this.request<StravaPhoto[]>(
-      `/activities/${id}/photos?size=256,${size}&photo_sources=true`,
-    );
+  async getActivityPhotos(id: number): Promise<StravaPhoto[]> {
+    const [smallPhotos, largePhotos] = await Promise.all([
+      this.request<StravaPhoto[]>(
+        `/activities/${id}/photos?size=256&photo_sources=true`,
+      ),
+      this.request<StravaPhoto[]>(
+        `/activities/${id}/photos?size=5000&photo_sources=true`,
+      ),
+    ]);
+
+    // Merge the URLs from both requests into the large photos
+    return largePhotos.map((photo, index) => ({
+      ...photo,
+      urls: { ...(smallPhotos[index]?.urls || {}), ...(photo.urls || {}) },
+      sizes: { ...(smallPhotos[index]?.sizes || {}), ...(photo.sizes || {}) },
+    }));
   }
 
   async getSubscriptions(): Promise<StravaSubscription[]> {
