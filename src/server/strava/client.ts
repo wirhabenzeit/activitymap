@@ -122,22 +122,50 @@ export class StravaClient {
   }
 
   async getSubscriptions(): Promise<StravaSubscription[]> {
-    return this.request<StravaSubscription[]>('/push_subscriptions');
+    const clientId = process.env.AUTH_STRAVA_ID;
+    const clientSecret = process.env.AUTH_STRAVA_SECRET;
+
+    if (!clientId || !clientSecret) {
+      throw new Error(
+        'Missing Strava client credentials (AUTH_STRAVA_ID/AUTH_STRAVA_SECRET)',
+      );
+    }
+
+    const searchParams = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+    });
+
+    return this.request<StravaSubscription[]>(
+      `/push_subscriptions?${searchParams}`,
+      {
+        headers: {
+          // No Authorization header needed for this endpoint
+          Authorization: '',
+        },
+      },
+    );
   }
 
   async createSubscription(
     callbackUrl: string,
     verifyToken: string,
   ): Promise<StravaSubscription> {
-    const clientId = process.env.STRAVA_CLIENT_ID;
-    const clientSecret = process.env.STRAVA_CLIENT_SECRET;
+    const clientId = process.env.AUTH_STRAVA_ID;
+    const clientSecret = process.env.AUTH_STRAVA_SECRET;
 
     if (!clientId || !clientSecret) {
-      throw new Error('Missing Strava client credentials');
+      throw new Error(
+        'Missing Strava client credentials (AUTH_STRAVA_ID/AUTH_STRAVA_SECRET)',
+      );
     }
 
     return this.request<StravaSubscription>('/push_subscriptions', {
       method: 'POST',
+      headers: {
+        // No Authorization header needed for this endpoint
+        Authorization: '',
+      },
       body: JSON.stringify({
         client_id: clientId,
         client_secret: clientSecret,
@@ -148,19 +176,26 @@ export class StravaClient {
   }
 
   async deleteSubscription(id: number): Promise<void> {
-    const clientId = process.env.STRAVA_CLIENT_ID;
-    const clientSecret = process.env.STRAVA_CLIENT_SECRET;
+    const clientId = process.env.AUTH_STRAVA_ID;
+    const clientSecret = process.env.AUTH_STRAVA_SECRET;
 
     if (!clientId || !clientSecret) {
-      throw new Error('Missing Strava client credentials');
+      throw new Error(
+        'Missing Strava client credentials (AUTH_STRAVA_ID/AUTH_STRAVA_SECRET)',
+      );
     }
 
-    await this.request(`/push_subscriptions/${id}`, {
+    const searchParams = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+    });
+
+    await this.request(`/push_subscriptions/${id}?${searchParams}`, {
       method: 'DELETE',
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
+      headers: {
+        // No Authorization header needed for this endpoint
+        Authorization: '',
+      },
     });
   }
 }

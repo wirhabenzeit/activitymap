@@ -341,12 +341,12 @@ export function PhotoCard({
         {photos &&
           photos.map((photo, index) => (
             <Button
+              key={photo.unique_id}
               variant="ghost"
               size="icon"
-              className="p-0 h-full rounded-sm aspect-square object-cover"
+              className="p-0 h-full rounded-sm aspect-square object-cover w-auto"
             >
               <img
-                key={photo.unique_id}
                 src={photo.urls ? Object.values(photo.urls)[0] : ''}
                 alt={photo.caption ?? ''}
                 className="h-full rounded-sm aspect-square object-cover"

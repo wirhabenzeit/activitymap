@@ -13,26 +13,42 @@ export function AuthProvider({
   initialAuth: InitialAuth;
   children: React.ReactNode;
 }) {
-  const { initializeAuth, loadFromDB, loadPhotos, session, user, account } =
-    useShallowStore((state) => ({
-      initializeAuth: state.initializeAuth,
-      loadFromDB: state.loadFromDB,
-      loadPhotos: state.loadPhotos,
-      session: state.session,
-      user: state.user,
-      account: state.account,
-    }));
+  const {
+    initializeAuth,
+    loadFromDB,
+    loadFromStrava,
+    loadPhotos,
+    session,
+    user,
+    account,
+  } = useShallowStore((state) => ({
+    initializeAuth: state.initializeAuth,
+    loadFromDB: state.loadFromDB,
+    loadFromStrava: state.loadFromStrava,
+    loadPhotos: state.loadPhotos,
+    session: state.session,
+    user: state.user,
+    account: state.account,
+  }));
 
   useEffect(() => {
     if (initialAuth.session) {
       initializeAuth(initialAuth);
 
       // Load initial data
-      loadFromDB({}).catch(console.error);
+      loadFromDB({})
+        .then((activityCount) => {
+          // If no activities found in DB, fetch from Strava
+          if (activityCount === 0) {
+            return loadFromStrava({ photos: true });
+          }
+          return activityCount;
+        })
+        .catch(console.error);
+
       loadPhotos().catch(console.error);
-      console.log(session, user, account);
     }
-  }, [initialAuth, initializeAuth, loadFromDB, loadPhotos]);
+  }, [initialAuth, initializeAuth, loadFromDB, loadFromStrava, loadPhotos]);
 
   return <>{children}</>;
 }

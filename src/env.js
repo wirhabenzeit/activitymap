@@ -25,6 +25,8 @@ export const env = createEnv({
     AUTH_SECRET: z.string(),
     AUTH_STRAVA_ID: z.string(),
     AUTH_STRAVA_SECRET: z.string(),
+    AUTH_STRAVA_VERIFY_TOKEN: z.string(),
+    PUBLIC_URL: z.string().url(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -37,6 +39,7 @@ export const env = createEnv({
    */
   client: {
     NEXT_PUBLIC_MAPBOX_TOKEN: z.string(),
+    NEXT_PUBLIC_ENV: z.enum(['development', 'production']).optional(),
   },
 
   /**
@@ -64,8 +67,11 @@ export const env = createEnv({
     AUTH_SECRET: process.env.AUTH_SECRET,
     AUTH_STRAVA_ID: process.env.AUTH_STRAVA_ID,
     AUTH_STRAVA_SECRET: process.env.AUTH_STRAVA_SECRET,
+    AUTH_STRAVA_VERIFY_TOKEN: process.env.AUTH_STRAVA_VERIFY_TOKEN,
+    PUBLIC_URL: process.env.PUBLIC_URL,
     NEXT_PUBLIC_MAPBOX_TOKEN:
       process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
+    NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

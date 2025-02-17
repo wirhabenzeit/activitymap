@@ -14,6 +14,8 @@ import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type UpdatableActivity, type MutableStravaPhoto } from './types';
 import { sql } from 'drizzle-orm';
 import { store } from '~/store';
+import { eq } from 'drizzle-orm';
+import { webhooks } from '~/server/db/schema';
 
 export async function updateActivity(act: UpdatableActivity) {
   try {
@@ -354,29 +356,70 @@ export async function fetchActivitiesBeforeTimestamp(
 /**
  * Handle Strava webhook subscription management
  */
-export async function manageWebhook(url: string) {
-  const account = await getAccount({});
-  if (!account.access_token) {
-    throw new Error('No Strava access token found');
+export async function manageWebhook() {
+  if (!process.env.PUBLIC_URL) {
+    throw new Error('PUBLIC_URL environment variable is not set');
   }
 
-  const client = new StravaClient(account.access_token);
+  // Construct the webhook URL from PUBLIC_URL
+  const webhookUrl = new URL(
+    '/api/strava/webhook',
+    process.env.PUBLIC_URL,
+  ).toString();
+
+  const client = new StravaClient(''); // No access token needed for webhook management
 
   try {
-    // Get existing subscriptions
-    const subscriptions = await client.getSubscriptions();
-    console.log('Subscriptions:', subscriptions);
+    // Get existing subscriptions from Strava
+    const stravaSubscriptions = await client.getSubscriptions();
+    console.log('Current Strava subscriptions:', stravaSubscriptions);
 
-    // Delete existing subscriptions with different URLs
-    await Promise.all(
-      subscriptions
-        .filter((sub) => sub.callback_url !== url)
-        .map((sub) => client.deleteSubscription(sub.id)),
+    // Find any subscription that matches our URL
+    const matchingSubscription = stravaSubscriptions.find(
+      (sub) => sub.callback_url === webhookUrl,
     );
 
-    // Create new subscription if none exists with the current URL
-    if (!subscriptions.some((sub) => sub.callback_url === url)) {
-      await client.createSubscription(url, process.env.STRAVA_VERIFY_TOKEN!);
+    if (matchingSubscription) {
+      console.log('Found matching subscription:', matchingSubscription);
+
+      // Insert or update the subscription in our database
+      await db
+        .insert(webhooks)
+        .values({
+          id: matchingSubscription.id,
+          resource_state: matchingSubscription.resource_state,
+          application_id: matchingSubscription.application_id,
+          callback_url: matchingSubscription.callback_url,
+          created_at: new Date(matchingSubscription.created_at),
+          updated_at: new Date(matchingSubscription.updated_at),
+          verified: true, // If it exists in Strava, it's verified
+          active: true,
+        })
+        .onConflictDoUpdate({
+          target: webhooks.id,
+          set: {
+            resource_state: matchingSubscription.resource_state,
+            application_id: matchingSubscription.application_id,
+            callback_url: matchingSubscription.callback_url,
+            updated_at: new Date(matchingSubscription.updated_at),
+            verified: true,
+            active: true,
+          },
+        });
+
+      // Return the updated subscription status
+      return {
+        subscriptions: stravaSubscriptions,
+        databaseStatus: 'synchronized',
+        matchingSubscription,
+      };
+    } else {
+      // No matching subscription found
+      return {
+        subscriptions: stravaSubscriptions,
+        databaseStatus: 'no_matching_subscription',
+        matchingSubscription: null,
+      };
     }
   } catch (error) {
     console.error('Failed to manage webhook subscription:', error);
@@ -409,4 +452,28 @@ export async function handleWebhookActivity({
     athleteId,
     shouldDeletePhotos: true,
   });
+}
+
+export async function checkWebhookStatus() {
+  if (!process.env.PUBLIC_URL) {
+    throw new Error('PUBLIC_URL environment variable is not set');
+  }
+
+  // Construct the expected webhook URL
+  const expectedUrl = new URL(
+    '/api/strava/webhook',
+    process.env.PUBLIC_URL,
+  ).toString();
+
+  // Use manageWebhook to handle subscription status and database synchronization
+  const result = await manageWebhook();
+
+  // Return comprehensive status information
+  return {
+    expectedUrl,
+    subscriptions: result.subscriptions,
+    hasMatchingSubscription: result.matchingSubscription !== null,
+    databaseStatus: result.databaseStatus,
+    matchingSubscription: result.matchingSubscription,
+  };
 }

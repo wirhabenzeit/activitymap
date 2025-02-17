@@ -1,6 +1,13 @@
 'use client';
 
-import { ChevronsUpDown, LogOut, CircleArrowLeft, Loader2, CircleCheck } from 'lucide-react';
+import {
+  ChevronsUpDown,
+  LogOut,
+  CircleArrowLeft,
+  Loader2,
+  CircleCheck,
+  Info,
+} from 'lucide-react';
 
 import Link from 'next/link';
 import { signIn, signOut } from 'next-auth/react';
@@ -23,7 +30,9 @@ import * as React from 'react';
 import Image from 'next/image';
 import { cn } from '~/lib/utils';
 import { User2 } from 'lucide-react';
-import { manageWebhook } from '~/server/strava/actions';
+import { manageWebhook, checkWebhookStatus } from '~/server/strava/actions';
+import { StravaClient } from '~/server/strava/client';
+import { env } from '~/env';
 
 export function UserSettings() {
   const { user, loading, account, loadFromStrava } = useShallowStore(
@@ -37,8 +46,22 @@ export function UserSettings() {
     },
   );
 
-  const checkWebhook = async () => {
-    manageWebhook
+  const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
+
+  const handleWebhookStatus = async () => {
+    try {
+      const result = await checkWebhookStatus();
+      console.log('Webhook status:', {
+        expectedUrl: result.expectedUrl,
+        hasMatchingSubscription: result.hasMatchingSubscription,
+        databaseStatus: result.databaseStatus,
+        matchingSubscription: result.matchingSubscription,
+        subscriptions: result.subscriptions,
+      });
+    } catch (error) {
+      console.error('Failed to check webhook status:', error);
+    }
+  };
 
   const handleLoadActivities = async () => {
     try {
@@ -120,12 +143,12 @@ export function UserSettings() {
               <CircleArrowLeft />
               {loading ? 'Loading...' : 'Get Activities'}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={()=>{
-              checkWebhook();
-            }}>
-              <CircleCheck />
-              Check Webhook
-            </DropdownMenuItem>
+            {isDevelopment && (
+              <DropdownMenuItem onClick={handleWebhookStatus}>
+                <Info />
+                Webhook Status
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut()}>
               <LogOut />

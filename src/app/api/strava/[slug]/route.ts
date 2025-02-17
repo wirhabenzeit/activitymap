@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '~/server/db';
-import { activities, photos } from '~/server/db/schema';
+import { activities, photos, webhooks } from '~/server/db/schema';
 import { handleWebhookActivity } from '~/server/strava/actions';
 import type { WebhookRequest } from '~/types/strava';
 import { NextRequest } from 'next/server';
@@ -18,6 +18,15 @@ export async function GET(
   const challenge = req.nextUrl.searchParams.get('hub.challenge');
 
   if (mode === 'subscribe' && token === process.env.STRAVA_VERIFY_TOKEN) {
+    // Mark the webhook as verified in our database
+    const webhookId = req.nextUrl.searchParams.get('webhook_id');
+    if (webhookId) {
+      await db
+        .update(webhooks)
+        .set({ verified: true })
+        .where(eq(webhooks.id, parseInt(webhookId)));
+    }
+
     return new Response(JSON.stringify({ 'hub.challenge': challenge }), {
       headers: { 'Content-Type': 'application/json' },
     });
@@ -39,6 +48,24 @@ export async function POST(
   try {
     const data = (await req.json()) as WebhookRequest;
     console.log('Webhook data:', data);
+
+    // Verify that this is a valid subscription from our database
+    const subscription = await db.query.webhooks.findFirst({
+      where: (webhooks, { eq, and }) =>
+        and(
+          eq(webhooks.id, data.subscription_id),
+          eq(webhooks.verified, true),
+          eq(webhooks.active, true),
+        ),
+    });
+
+    if (!subscription) {
+      console.error('Invalid subscription ID:', {
+        received: data.subscription_id,
+        subscription,
+      });
+      return new Response('Invalid subscription ID', { status: 403 });
+    }
 
     if (data.object_type === 'athlete') {
       return new Response('OK');

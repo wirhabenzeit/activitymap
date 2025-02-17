@@ -16,7 +16,8 @@ import {
   bigint,
 } from 'drizzle-orm/pg-core';
 import type { AdapterAccount } from 'next-auth/adapters';
-import { type SportType, sportTypes } from '~/server/strava/types';
+import { sportTypes } from '~/server/strava/types';
+import type { SportType } from '~/server/strava/types';
 
 export const sportTypeEnum = pgEnum('sport_type', sportTypes);
 
@@ -59,15 +60,16 @@ export const sessions = pgTable('session', {
   expires: timestamp('expires', { mode: 'date' }).notNull(),
 });
 
-export const verificationTokens = pgTable(
-  'verificationToken',
-  {
-    identifier: text('identifier').notNull(),
-    token: text('token').notNull(),
-    expires: timestamp('expires', { mode: 'date' }).notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.identifier, table.token] })],
-);
+export const webhooks = pgTable('webhook', {
+  id: bigint('id', { mode: 'number' }).primaryKey(),
+  resource_state: integer('resource_state'),
+  application_id: integer('application_id'),
+  callback_url: text('callback_url').notNull(),
+  created_at: timestamp('created_at', { mode: 'date' }).notNull(),
+  updated_at: timestamp('updated_at', { mode: 'date' }).notNull(),
+  verified: boolean('verified').notNull().default(false),
+  active: boolean('active').notNull().default(true),
+});
 
 export const activities = pgTable(
   'activities',
@@ -174,5 +176,6 @@ export type User = typeof users.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type Photo = typeof photos.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
+export type Webhook = typeof webhooks.$inferSelect;
 
 export { sportTypes, type SportType };
