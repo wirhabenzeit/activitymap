@@ -40,14 +40,26 @@ export async function POST(
   props: { params: Promise<{ slug: string }> },
 ) {
   const params = await props.params;
-  console.log('Webhook received:', params.slug);
+  console.log('Webhook POST received:', {
+    slug: params.slug,
+    method: req.method,
+    headers: Object.fromEntries(req.headers.entries()),
+  });
 
   if (params.slug !== 'webhook')
     return new Response('Invalid endpoint', { status: 404 });
 
   try {
     const data = (await req.json()) as WebhookRequest;
-    console.log('Webhook data:', data);
+    console.log('Webhook payload:', {
+      object_type: data.object_type,
+      object_id: data.object_id,
+      aspect_type: data.aspect_type,
+      owner_id: data.owner_id,
+      subscription_id: data.subscription_id,
+      event_time: new Date(data.event_time * 1000).toISOString(),
+      updates: data.updates,
+    });
 
     // Verify that this is a valid subscription from our database
     const subscription = await db.query.webhooks.findFirst({
@@ -59,6 +71,19 @@ export async function POST(
         ),
     });
 
+    console.log('Subscription check:', {
+      received_id: data.subscription_id,
+      found: !!subscription,
+      subscription_details: subscription
+        ? {
+            id: subscription.id,
+            verified: subscription.verified,
+            active: subscription.active,
+            callback_url: subscription.callback_url,
+          }
+        : null,
+    });
+
     if (!subscription) {
       console.error('Invalid subscription ID:', {
         received: data.subscription_id,
@@ -68,10 +93,15 @@ export async function POST(
     }
 
     if (data.object_type === 'athlete') {
+      console.log('Received athlete webhook, skipping');
       return new Response('OK');
     }
 
     if (data.aspect_type === 'delete') {
+      console.log('Processing delete webhook:', {
+        activity_id: data.object_id,
+        athlete_id: data.owner_id,
+      });
       await db.delete(activities).where(eq(activities.id, data.object_id));
       // Also delete associated photos
       await db.delete(photos).where(eq(photos.activity_id, data.object_id));
@@ -79,28 +109,53 @@ export async function POST(
     }
 
     if (data.aspect_type === 'create' || data.aspect_type === 'update') {
-      const {
-        activities: [activity],
-        photos,
-      } = await handleWebhookActivity({
+      console.log('Processing create/update webhook:', {
+        activity_id: data.object_id,
+        athlete_id: data.owner_id,
+        aspect_type: data.aspect_type,
+      });
+
+      const result = await handleWebhookActivity({
         activityId: data.object_id,
         athleteId: data.owner_id,
       });
 
-      if (!activity) {
+      console.log('Webhook activity processing result:', {
+        activity_count: result.activities.length,
+        photo_count: result.photos.length,
+        first_activity: result.activities[0]
+          ? {
+              id: result.activities[0].id,
+              name: result.activities[0].name,
+              is_complete: result.activities[0].is_complete,
+            }
+          : null,
+      });
+
+      if (!result.activities[0]) {
         throw new Error('No activity returned from Strava');
       }
 
       return new Response(
         `${data.aspect_type === 'create' ? 'Created' : 'Updated'} activity ${
-          activity.id
-        } with ${photos.length} photos`,
+          result.activities[0].id
+        } with ${result.photos.length} photos`,
       );
     }
 
     return new Response('Invalid aspect type', { status: 400 });
   } catch (e) {
-    console.error('Webhook request failed:', e);
+    console.error('Webhook request failed:', {
+      error:
+        e instanceof Error
+          ? {
+              message: e.message,
+              name: e.name,
+              stack: e.stack,
+            }
+          : e,
+      timestamp: new Date().toISOString(),
+    });
     return new Response(
       e instanceof Error ? e.message : 'Unknown error processing webhook',
       { status: 500 },

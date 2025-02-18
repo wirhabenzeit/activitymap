@@ -9,6 +9,9 @@ import {
   Map,
   Info,
   Loader2,
+  ArrowLeft,
+  ArrowRight,
+  X,
 } from 'lucide-react';
 
 import { type Activity, type Photo } from '~/server/db/schema';
@@ -352,7 +355,6 @@ export function PhotoCard({
                 className="h-full rounded-sm aspect-square object-cover"
                 onClick={() => {
                   api?.scrollTo(index);
-                  console.log(api);
                   setOpen(true);
                 }}
               />
@@ -360,22 +362,27 @@ export function PhotoCard({
           ))}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="[&>button]:hidden p-0 max-w-2xl">
-          <Carousel setApi={setApi}>
-            <DialogTitle>{title}</DialogTitle>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] w-auto p-0 rounded-lg border-2 overflow-hidden">
+          <DialogTitle className="p-6 hidden">{title}</DialogTitle>
+          <Carousel setApi={setApi} className="w-full">
             <CarouselContent>
               {photos.map((photo) => (
-                <CarouselItem key={photo.unique_id}>
+                <CarouselItem
+                  key={photo.unique_id}
+                  className="flex items-center justify-center"
+                >
                   <img
                     src={photo.urls ? Object.values(photo.urls).at(-1) : ''}
                     alt={photo.caption ?? ''}
-                    className="h-full rounded-sm object-contain"
+                    className="object-contain max-w-full max-h-[80vh] w-auto h-auto"
                   />
                 </CarouselItem>
               ))}
             </CarouselContent>
-            <CarouselPrevious />
-            <CarouselNext />
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+              <CarouselPrevious />
+              <CarouselNext />
+            </div>
           </Carousel>
         </DialogContent>
       </Dialog>

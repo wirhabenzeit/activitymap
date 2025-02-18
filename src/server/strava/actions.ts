@@ -82,38 +82,66 @@ async function fetchStravaActivities({
   athleteId: number;
   shouldDeletePhotos?: boolean;
 }): Promise<{ activities: Activity[]; photos: Photo[] }> {
-  console.log('Starting fetchStravaActivities with params:', {
-    hasAccessToken: !!accessToken,
-    before,
-    activityIds,
-    includePhotos,
-    athleteId,
-    shouldDeletePhotos,
+  console.log('Starting fetchStravaActivities:', {
+    has_access_token: !!accessToken,
+    before: before ? new Date(before * 1000).toISOString() : undefined,
+    activity_ids: activityIds,
+    include_photos: includePhotos,
+    athlete_id: athleteId,
+    should_delete_photos: shouldDeletePhotos,
+    timestamp: new Date().toISOString(),
   });
 
   const client = new StravaClient(accessToken);
   const photos: Photo[] = [];
 
   try {
-    console.log('Fetching activities from Strava...');
     let stravaActivities: StravaActivity[];
 
     if (activityIds) {
-      // When fetching specific activities, get complete data
-      console.log('Fetching complete activity data for IDs:', activityIds);
+      console.log('Fetching complete activities by IDs:', {
+        ids: activityIds,
+        count: activityIds.length,
+      });
       stravaActivities = await Promise.all(
-        activityIds.map((id) => client.getActivity(id)),
+        activityIds.map(async (id) => {
+          try {
+            const activity = await client.getActivity(id);
+            console.log('Successfully fetched activity:', {
+              id: activity.id,
+              name: activity.name,
+              type: activity.sport_type,
+              has_polyline:
+                !!activity.map.polyline || !!activity.map.summary_polyline,
+            });
+            return activity;
+          } catch (error) {
+            console.error('Failed to fetch individual activity:', {
+              id,
+              error: error instanceof Error ? error.message : error,
+            });
+            throw error;
+          }
+        }),
       );
     } else {
-      // When fetching all activities, get summary data
-      console.log('Fetching summary activity data');
+      console.log('Fetching summary activities');
       stravaActivities = await client.getActivities({
         before,
         per_page: 200,
       });
     }
 
-    console.log(`Retrieved ${stravaActivities.length} activities from Strava`);
+    console.log('Activity fetch completed:', {
+      total_activities: stravaActivities.length,
+      first_activity: stravaActivities[0]
+        ? {
+            id: stravaActivities[0].id,
+            name: stravaActivities[0].name,
+            type: stravaActivities[0].sport_type,
+          }
+        : null,
+    });
 
     // Transform activities
     const activities = stravaActivities
@@ -381,11 +409,24 @@ export async function handleWebhookActivity({
   activityId: number;
   athleteId: number;
 }) {
-  console.log('Handling webhook activity:', { activityId, athleteId });
+  console.log('Starting webhook activity processing:', {
+    activityId,
+    athleteId,
+    timestamp: new Date().toISOString(),
+  });
 
   // Get account directly using Strava athlete ID
   const account = await getAccount({
     providerAccountId: athleteId.toString(),
+  });
+
+  console.log('Account lookup result:', {
+    found: !!account,
+    athlete_id: athleteId,
+    has_access_token: account?.access_token ? true : false,
+    token_expires_at: account?.expires_at
+      ? new Date(account.expires_at * 1000).toISOString()
+      : null,
   });
 
   // If no account found, this user hasn't connected their Strava account to our app
@@ -395,16 +436,56 @@ export async function handleWebhookActivity({
   }
 
   if (!account.access_token) {
+    console.error('Account found but no access token present:', {
+      athlete_id: athleteId,
+      provider_account_id: account.providerAccountId,
+    });
     throw new Error('No Strava access token found');
   }
 
-  return fetchStravaActivities({
-    accessToken: account.access_token,
-    activityIds: [activityId],
-    includePhotos: true,
-    athleteId,
-    shouldDeletePhotos: true,
-  });
+  try {
+    const result = await fetchStravaActivities({
+      accessToken: account.access_token,
+      activityIds: [activityId],
+      includePhotos: true,
+      athleteId,
+      shouldDeletePhotos: true,
+    });
+
+    console.log('Webhook activity processing completed:', {
+      activityId,
+      athleteId,
+      activities_processed: result.activities.length,
+      photos_processed: result.photos.length,
+      first_activity: result.activities[0]
+        ? {
+            id: result.activities[0].id,
+            name: result.activities[0].name,
+            is_complete: result.activities[0].is_complete,
+            has_polyline:
+              !!result.activities[0].map_polyline ||
+              !!result.activities[0].map_summary_polyline,
+          }
+        : null,
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error in handleWebhookActivity:', {
+      error:
+        error instanceof Error
+          ? {
+              message: error.message,
+              name: error.name,
+              stack: error.stack,
+            }
+          : error,
+      activityId,
+      athleteId,
+      timestamp: new Date().toISOString(),
+    });
+    throw error;
+  }
 }
 
 export async function checkWebhookStatus() {

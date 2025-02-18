@@ -25,7 +25,6 @@ export const env = createEnv({
     AUTH_SECRET: z.string(),
     AUTH_STRAVA_ID: z.string(),
     AUTH_STRAVA_SECRET: z.string(),
-    AUTH_STRAVA_VERIFY_TOKEN: z.string(),
     PUBLIC_URL: z.string().url(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
@@ -67,7 +66,6 @@ export const env = createEnv({
     AUTH_SECRET: process.env.AUTH_SECRET,
     AUTH_STRAVA_ID: process.env.AUTH_STRAVA_ID,
     AUTH_STRAVA_SECRET: process.env.AUTH_STRAVA_SECRET,
-    AUTH_STRAVA_VERIFY_TOKEN: process.env.AUTH_STRAVA_VERIFY_TOKEN,
     PUBLIC_URL: process.env.PUBLIC_URL,
     NEXT_PUBLIC_MAPBOX_TOKEN:
       process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
