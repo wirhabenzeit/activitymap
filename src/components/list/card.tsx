@@ -337,6 +337,7 @@ export function PhotoCard({
 }) {
   const [open, setOpen] = useState(false);
   const [api, setApi] = useState<CarouselApi>();
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   return (
     <>
@@ -361,28 +362,42 @@ export function PhotoCard({
             </Button>
           ))}
       </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-[90vw] max-h-[90vh] w-auto p-0 rounded-lg border-2 overflow-hidden">
-          <DialogTitle className="p-6 hidden">{title}</DialogTitle>
-          <Carousel setApi={setApi} className="w-full">
-            <CarouselContent>
-              {photos.map((photo) => (
+      <Dialog open={open} onOpenChange={setOpen} modal={false}>
+        <DialogContent
+          className="p-0 bg-background/80 w-screen h-screen overflow-hidden max-w-none max-h-none border-0 rounded-none focus:outline-none"
+          onClick={() => setOpen(false)}
+        >
+          <DialogTitle className="hidden">{title}</DialogTitle>
+          <Carousel className="relative" setApi={(api) => setApi(api)}>
+            <CarouselContent className="h-full absolute inset-0 ml-0">
+              {photos.map((photo, index) => (
                 <CarouselItem
                   key={photo.unique_id}
-                  className="flex items-center justify-center"
+                  className="flex items-center justify-center pl-0"
                 >
                   <img
                     src={photo.urls ? Object.values(photo.urls).at(-1) : ''}
                     alt={photo.caption ?? ''}
-                    className="object-contain max-w-full max-h-[80vh] w-auto h-auto"
+                    className="max-w-[calc(100vw-4rem)] max-h-[calc(100vh-4rem)] object-contain rounded-lg border-2 border-background"
+                    onClick={(e) => e.stopPropagation()}
                   />
                 </CarouselItem>
               ))}
             </CarouselContent>
-            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-              <CarouselPrevious />
-              <CarouselNext />
-            </div>
+            <CarouselPrevious
+              className="absolute left-4"
+              onClick={(e) => {
+                e.stopPropagation();
+                api?.scrollPrev();
+              }}
+            />
+            <CarouselNext
+              className="absolute right-4"
+              onClick={(e) => {
+                e.stopPropagation();
+                api?.scrollNext();
+              }}
+            />
           </Carousel>
         </DialogContent>
       </Dialog>
