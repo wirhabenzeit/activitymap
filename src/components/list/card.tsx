@@ -10,6 +10,9 @@ import {
   Loader2,
   Download,
 } from 'lucide-react';
+import { decode } from '@mapbox/polyline';
+import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
+import type { Feature, LineString } from 'geojson';
 
 import { type Activity, type Photo } from '~/server/db/schema';
 import { categorySettings } from '~/settings/category';
@@ -136,17 +139,18 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
 
   const handleDownloadGpx = () => {
     const polyline =
-      row.original.map_polyline || row.original.map_summary_polyline;
+      row.original.map_polyline ?? row.original.map_summary_polyline;
     if (!polyline) return;
 
     // Decode polyline to coordinates
     const coordinates = decode(polyline).map(([lat, lon]) => [lon, lat]);
+    const name: string = row.getValue('name');
 
     // Create GeoJSON object
     const geojson: Feature<LineString> = {
       type: 'Feature',
       properties: {
-        name: String(row.getValue('name')),
+        name,
         time: row.original.start_date.toISOString(),
       },
       geometry: {
@@ -161,7 +165,7 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
         metadata: {
           name: String(row.getValue('name')),
           time: row.original.start_date.toISOString(),
-          desc: row.original.description || undefined,
+          desc: row.original.description ?? undefined,
         },
       };
 
@@ -173,7 +177,7 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${row.getValue('name')}.gpx`;
+    a.download = `${name}.gpx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
