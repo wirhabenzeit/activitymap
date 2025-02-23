@@ -214,7 +214,7 @@ function Map() {
     if (map) {
       setTimeout(() => map.resize(), 200);
     }
-  }, [open]);
+  }, [open, mapRefLoc]);
 
   const [viewport, setViewport] = useState(mapPosition);
 
@@ -372,7 +372,7 @@ function Map() {
           data={rows}
           selected={selected}
           setSelected={setSelected}
-          map={mapRefLoc}
+          map={mapRefLoc.current ?? undefined}
           columnFilters={columnFilters}
           {...compactList}
         />

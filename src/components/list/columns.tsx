@@ -3,31 +3,24 @@
 import { type ColumnDef, type Table } from '@tanstack/react-table';
 import { Pin } from 'lucide-react';
 import { Checkbox } from '~/components/ui/checkbox';
-import { type ComponentType } from 'react';
 
 import { type Activity, type Photo } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
 
 import { DataTableColumnHeader } from './data-table';
-import { activityFields } from '~/settings/activity';
+import {
+  activityFields,
+  type ActivityField,
+  type ActivityValueType,
+} from '~/settings/activity';
 
 import { ActivityCard, DescriptionCard } from './card';
 import { EditActivity } from './edit';
 import { PhotoLightbox } from './photo';
 
-type ActivityField = {
-  formatter: (value: any) => string | null;
-  Icon?: ComponentType<any>;
-  title: string;
-  reducer?: (values: any[]) => number;
-  reducerSymbol?: string;
-  summaryFormatter?: (value: any) => string;
-  accessorFn?: (row: Activity) => any;
-};
-
-function columnFromField(
+function columnFromField<K extends ActivityValueType>(
   id: keyof typeof activityFields,
-  spec: ActivityField,
+  spec: ActivityField<K>,
 ): ColumnDef<Activity> {
   const footer = ({ table }: { table: Table<Activity> }) => {
     const rows =
@@ -38,21 +31,20 @@ function columnFromField(
           : table.getState().summaryRow == 'all'
             ? table.getFilteredRowModel().rows
             : table.getSelectedRowModel().rows;
-    const values = rows.map((row) => row.getValue(id));
+    const values: K[] = rows.map((row) => row.getValue(id));
     const reducedValue = spec.reducer ? spec.reducer(values) : null;
-    const summary =
-      spec.summaryFormatter && reducedValue != null
-        ? spec.summaryFormatter(reducedValue)
-        : reducedValue != null
-          ? `${spec.reducerSymbol ?? ''}${spec.formatter(reducedValue)}`
-          : '';
+    const summary = spec.summary
+      ? spec.summary(values)
+      : reducedValue != null
+        ? `${spec.reducerSymbol ?? ''}${spec.formatter(reducedValue)}`
+        : '';
     return <div className="text-right w-full">{summary}</div>;
   };
 
   return {
     id,
     cell: ({ getValue }) => (
-      <div className="text-right w-full">{spec.formatter(getValue())}</div>
+      <div className="text-right w-full">{spec.formatter(getValue() as K)}</div>
     ),
     meta: {
       title: spec.title,
@@ -68,7 +60,7 @@ function columnFromField(
     enableResizing: true,
     ...(spec.accessorFn && { accessorFn: spec.accessorFn }),
     ...(!spec.accessorFn && { accessorKey: id }),
-    ...(spec.reducer && { footer }),
+    ...((spec.reducer ?? spec.summary) && { footer }),
   };
 }
 
@@ -80,9 +72,11 @@ export const columns: ColumnDef<Activity>[] = [
       <DataTableColumnHeader table={table} column={column} title="ID" />
     ),
     enableHiding: false,
-    filterFn: (row, columnId, filterValue) => {
-      return filterValue.includes(row.original.public_id);
-    },
+    filterFn: (
+      row: { original: Activity },
+      _columnId: string,
+      filterValue: number[],
+    ) => filterValue.includes(row.original.id),
   },
   {
     id: 'name',
@@ -128,7 +122,10 @@ export const columns: ColumnDef<Activity>[] = [
     enableHiding: false,
   },
   ...Object.entries(activityFields).map(([id, spec]) =>
-    columnFromField(id as keyof typeof activityFields, spec as ActivityField),
+    columnFromField(
+      id as keyof typeof activityFields,
+      spec as ActivityField<ActivityValueType>,
+    ),
   ),
   {
     id: 'description',

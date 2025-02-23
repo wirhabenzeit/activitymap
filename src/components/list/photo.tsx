@@ -26,7 +26,21 @@ export function PhotoLightbox({
 }: PhotoLightboxProps) {
   const [open, setOpen] = useState(false);
   const [api, setApi] = useState<CarouselApi>();
-  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const smallPhotos = photos.map((photo) => ({
+    url: photo.urls ? (Object.values(photo.urls)[0] ?? '') : '',
+    unique_id: photo.unique_id,
+    caption: photo.caption ?? '',
+    width: photo.sizes ? Object.values(photo.sizes)[0]?.[0] : 0,
+    height: photo.sizes ? Object.values(photo.sizes)[0]?.[1] : 0,
+  }));
+  const largePhotos = photos.map((photo) => ({
+    url: photo.urls ? (Object.values(photo.urls).at(-1) ?? '') : '',
+    unique_id: photo.unique_id,
+    caption: photo.caption ?? '',
+    width: photo.sizes ? Object.values(photo.sizes).at(-1)?.[0] : 0,
+    height: photo.sizes ? Object.values(photo.sizes).at(-1)?.[1] : 0,
+  }));
 
   return (
     <>
@@ -36,18 +50,18 @@ export function PhotoLightbox({
           className,
         )}
       >
-        {photos?.map((photo, index) => (
+        {smallPhotos.map((photo, index) => (
           <Button
             key={photo.unique_id}
             variant="ghost"
             size="icon"
             className="p-0 h-full rounded-sm aspect-square object-cover w-auto"
           >
-            <Image
-              src={photo.urls ? Object.values(photo.urls)[0] : ''}
-              width={Object.values(photo.sizes)[0][0]}
-              height={Object.values(photo.sizes)[0][1]}
-              alt={photo.caption ?? ''}
+            <img
+              src={photo.url}
+              //width={photo.width}
+              //height={photo.height}
+              alt={photo.caption}
               className="h-full rounded-sm aspect-square object-cover"
               onClick={() => {
                 api?.scrollTo(index);
@@ -65,16 +79,16 @@ export function PhotoLightbox({
           <DialogTitle className="hidden">{title}</DialogTitle>
           <Carousel className="relative" setApi={(api) => setApi(api)}>
             <CarouselContent className="h-full absolute inset-0 ml-0">
-              {photos.map((photo, index) => (
+              {largePhotos.map((photo) => (
                 <CarouselItem
                   key={photo.unique_id}
                   className="flex items-center justify-center pl-0"
                 >
-                  <Image
-                    src={photo.urls ? Object.values(photo.urls).at(-1) : ''}
-                    width={Object.values(photo.sizes).at(-1)?.[0] ?? 0}
-                    height={Object.values(photo.sizes).at(-1)?.[1] ?? 0}
-                    alt={photo.caption ?? ''}
+                  <img
+                    src={photo.url}
+                    //width={photo.width}
+                    //height={photo.height}
+                    alt={photo.caption}
                     className="max-w-[calc(100vw-4rem)] max-h-[calc(100vh-4rem)] object-contain rounded-lg border-2 border-background"
                     onClick={(e) => e.stopPropagation()}
                   />

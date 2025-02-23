@@ -6,48 +6,39 @@ import { DataTable } from '../../components/list/data-table';
 import { useShallowStore } from '~/store';
 
 import React from 'react';
-import { type Photo } from '~/server/db/schema';
+
+const groupBy = <T, K extends PropertyKey>(arr: T[], key: (i: T) => K) =>
+  arr.reduce(
+    (groups, item) => {
+      (groups[key(item)] ||= []).push(item);
+      return groups;
+    },
+    {} as Record<K, T[]>,
+  );
 
 export default function ListPage() {
-  const {
-    selected,
-    setSelected,
-    activityDict,
-    filterIDs,
-    tableState,
-    photos,
-    loaded,
-  } = useShallowStore((state) => ({
-    selected: state.selected,
-    setSelected: state.setSelected,
-    activityDict: state.activityDict,
-    filterIDs: state.filterIDs,
-    tableState: state.fullList,
-    photos: state.photos,
-    loaded: state.loaded,
-  }));
+  const { selected, setSelected, activityDict, filterIDs, tableState, photos } =
+    useShallowStore((state) => ({
+      selected: state.selected,
+      setSelected: state.setSelected,
+      activityDict: state.activityDict,
+      filterIDs: state.filterIDs,
+      tableState: state.fullList,
+      photos: state.photos,
+    }));
 
   const columnFilters = [{ id: 'id', value: filterIDs }];
-  const photoDict = photos.reduce(
-    (acc, photo) => {
-      const id = photo.activity_id;
-      if (id in acc) {
-        acc[id].push(photo);
-      } else {
-        acc[id] = [photo];
-      }
-      return acc;
-    },
-    {} as Record<number, Photo[]>,
-  );
+  const photoDict = groupBy(photos, (photo) => photo.activity_id);
+
   const rows = React.useMemo(() => {
-    return Object.values(activityDict).map((act) => {
-      const photos = photoDict[(act as { id: number }).id] ?? [];
+    const result = Object.entries(activityDict).map(([idStr, act]) => {
+      const id = parseInt(idStr);
       return {
         ...act,
-        photos,
+        ...(id in photoDict && { photos: photoDict[id] }),
       };
     });
+    return result;
   }, [activityDict, photoDict]);
 
   return (

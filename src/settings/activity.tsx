@@ -2,6 +2,7 @@ import { Calendar, Clock, Heart, Mountain, Zap } from 'lucide-react';
 import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
 import { type Activity } from '~/server/db/schema';
 import * as d3 from 'd3';
+import { type ComponentType } from 'react';
 
 function decFormatter(unit = '', decimals = 0) {
   return (num: number | undefined) =>
@@ -21,9 +22,21 @@ function durationFormatter(seconds: number) {
   }
 }
 
+export type ActivityValueType = number | string | Date | boolean;
+
+export type ActivityField<K> = {
+  formatter: (value: K) => string;
+  accessorFn?: (activity: Activity) => K;
+  Icon?: ComponentType<{ className?: string }>;
+  title: string;
+  reducer?: (values: K[]) => K;
+  reducerSymbol?: string;
+  summary?: (values: K[]) => string;
+};
+
 export const activityFields = {
   distance: {
-    formatter: (distance: number) => decFormatter('km', 1)(distance / 1000),
+    formatter: (value: number) => decFormatter('km', 1)(value / 1000),
     Icon: RulerHorizontalIcon,
     title: 'Distance',
     reducer: d3.sum,
@@ -41,20 +54,20 @@ export const activityFields = {
     reducer: d3.sum,
   },
   total_elevation_gain: {
-    formatter: decFormatter('m', 0),
+    formatter: (v: number) => decFormatter('m', 0)(v),
     Icon: Mountain,
     title: 'Elevation Gain',
     reducer: d3.sum,
   },
   elev_high: {
-    formatter: decFormatter('m', 0),
+    formatter: (v: number) => decFormatter('m', 0)(v),
     Icon: Mountain,
     title: 'Elevation High',
     reducer: d3.max,
     reducerSymbol: '≤',
   },
   elev_low: {
-    formatter: decFormatter('m', 0),
+    formatter: (v: number) => decFormatter('m', 0)(v),
     Icon: Mountain,
     title: 'Elevation Low',
     reducer: d3.min,
@@ -70,8 +83,8 @@ export const activityFields = {
       }),
     Icon: Calendar,
     title: 'Date',
-    reducer: (v: Date[]) =>
-      new Set(
+    summary: (v: Date[]) => {
+      const dates = new Set(
         v.map((d) =>
           d.toLocaleDateString('en-US', {
             month: '2-digit',
@@ -79,8 +92,9 @@ export const activityFields = {
             day: '2-digit',
           }),
         ),
-      ).size,
-    summaryFormatter: (v: number) => `${v}d`,
+      );
+      return `${dates.size}d`;
+    },
   },
   average_speed: {
     formatter: (v: number) => decFormatter('kmh', 1)(v * 3.6),
@@ -90,38 +104,38 @@ export const activityFields = {
     reducerSymbol: '∅',
   },
   weighted_average_watts: {
-    formatter: decFormatter('W', 0),
+    formatter: (v: number) => decFormatter('W', 0)(v),
     Icon: Zap,
     title: 'Weighted Average Watts',
     reducer: d3.mean,
     reducerSymbol: '∅',
   },
   average_watts: {
-    formatter: decFormatter('W', 0),
+    formatter: (v: number) => decFormatter('W', 0)(v),
     Icon: Zap,
     title: 'Average Watts',
     reducer: d3.mean,
     reducerSymbol: '∅',
   },
   max_watts: {
-    formatter: decFormatter('W', 0),
+    formatter: (v: number) => decFormatter('W', 0)(v),
     Icon: Zap,
     title: 'Max Watts',
     reducer: d3.max,
     reducerSymbol: '≤',
   },
   max_heartrate: {
-    formatter: decFormatter('bpm', 0),
+    formatter: (v: number) => decFormatter('bpm', 0)(v),
     Icon: Heart,
     title: 'Max Heartrate',
     reducer: d3.max,
     reducerSymbol: '≤',
   },
   average_heartrate: {
-    formatter: decFormatter('bpm', 0),
+    formatter: (v: number) => decFormatter('bpm', 0)(v),
     Icon: Heart,
     title: 'Average Heartrate',
     reducer: d3.mean,
     reducerSymbol: '∅',
   },
-};
+} as const;

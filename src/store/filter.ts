@@ -124,7 +124,7 @@ export const createFilterSlice: StateCreator<
       const activities = Object.values(get().activityDict);
       state.filterIDs = activities
         .filter((activity) => applyFilters(state, activity))
-        .map((activity) => activity.public_id);
+        .map((activity) => activity.id);
     });
   };
 

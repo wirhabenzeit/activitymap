@@ -38,7 +38,7 @@ export function ShareButton() {
   useEffect(() => {
     const url = new URL(window.location.origin);
     if (shareMode === 'selected' && selected.length > 0) {
-      // Get public_ids directly from activityDict
+      // Get public_ids from activityDict for sharing
       const publicIds = selected
         .map((id) => activityDict[id]?.public_id)
         .filter(Boolean);

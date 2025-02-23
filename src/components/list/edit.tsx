@@ -38,7 +38,6 @@ import {
 } from '~/components/ui/select';
 import { aliasMap, colorMap, iconMap } from '~/settings/category';
 import { useShallowStore } from '~/store';
-import { LucideIcon } from 'lucide-react';
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -73,7 +72,7 @@ export function ProfileForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: row.original.name,
-      description: row.original.description || '',
+      description: row.original.description ?? '',
       sportType: row.original.sport_type,
     },
   });
