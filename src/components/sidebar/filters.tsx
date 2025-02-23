@@ -1,9 +1,9 @@
 'use client';
 
-import { ComponentType } from 'react';
+import { type ComponentType } from 'react';
 import { useEffect } from 'react';
 
-import { LucideProps, MoreHorizontal } from 'lucide-react';
+import { type LucideProps, MoreHorizontal } from 'lucide-react';
 
 import { useShallowStore } from '~/store';
 
@@ -42,8 +42,8 @@ import { cn } from '~/lib/utils';
 
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
 import { Checkbox } from '../ui/checkbox';
-import { SportType } from '~/server/db/schema';
-import { CheckedState } from '@radix-ui/react-checkbox';
+import { type SportType } from '~/server/db/schema';
+import { type CheckedState } from '@radix-ui/react-checkbox';
 
 type DropdownProps = {
   title: string;

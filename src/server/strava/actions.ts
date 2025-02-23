@@ -20,7 +20,7 @@ import type { StravaActivity } from './types';
 export async function updateActivity(act: UpdatableActivity) {
   try {
     const account = await getAccount({});
-    if (!account || !account.access_token) {
+    if (!account?.access_token) {
       throw new Error('No Strava access token found');
     }
 
@@ -290,7 +290,7 @@ export async function fetchActivitiesByIds(
 ) {
   try {
     const account = await getAccount({});
-    if (!account || !account.access_token) {
+    if (!account?.access_token) {
       throw new Error('No Strava access token found');
     }
 
@@ -312,7 +312,7 @@ export async function fetchActivitiesBeforeTimestamp(
 ) {
   try {
     const account = await getAccount({});
-    if (!account || !account.access_token) {
+    if (!account?.access_token) {
       throw new Error('No Strava access token found');
     }
 

@@ -14,7 +14,7 @@ export default function PhotoLayer() {
   const displayPhotos = useMemo(() => {
     return photos.filter((photo) => {
       if (!photo.location?.[0] || !photo.location[1]) return false;
-      return filterIDs.includes(photo.activity_id!);
+      return filterIDs.includes(photo.activity_id);
     });
   }, [photos, filterIDs]);
 
@@ -30,7 +30,7 @@ export default function PhotoLayer() {
             urls={photo.urls}
             sizes={photo.sizes}
             activity_name={photo.activity_name!}
-            activity_id={photo.activity_id!}
+            activity_id={photo.activity_id}
             caption={photo.caption ?? undefined}
           />
         ))}

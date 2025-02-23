@@ -1,6 +1,6 @@
 import { Calendar, Clock, Heart, Mountain, Zap } from 'lucide-react';
 import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
-import { Activity } from '~/server/db/schema';
+import { type Activity } from '~/server/db/schema';
 import * as d3 from 'd3';
 
 function decFormatter(unit = '', decimals = 0) {
@@ -80,7 +80,7 @@ export const activityFields = {
           }),
         ),
       ).size,
-    summaryFormatter: (v: Number) => `${v}d`,
+    summaryFormatter: (v: number) => `${v}d`,
   },
   average_speed: {
     formatter: (v: number) => decFormatter('kmh', 1)(v * 3.6),

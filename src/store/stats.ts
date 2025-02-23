@@ -1,5 +1,5 @@
 import { type StateCreator } from 'zustand';
-import { type Dispatch, type SetStateAction } from 'react';
+import { type SetStateAction } from 'react';
 import { type RootState } from './index';
 import { type Activity } from '~/server/db/schema';
 import { defaultStatsSettings, type StatsSetting } from '~/components/stats';

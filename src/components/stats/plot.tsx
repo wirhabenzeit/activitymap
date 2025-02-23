@@ -181,7 +181,7 @@ export const SliderFormElement = ({
         min={value.domain[0]}
         max={value.domain[1]}
         onValueChange={(v) => {
-          if (v && v[0]) setter((val) => ({ value: v[0], domain: val.domain }));
+          if (v?.[0]) setter((val) => ({ value: v[0], domain: val.domain }));
         }}
       />
       <Button

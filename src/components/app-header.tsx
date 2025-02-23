@@ -1,19 +1,19 @@
-"use client";
+'use client';
 
-import { MainNav } from "./main-nav";
-import { SidebarTrigger } from "./ui/sidebar";
-import { Separator } from "./ui/separator";
+import { MainNav } from './main-nav';
+import { SidebarTrigger } from './ui/sidebar';
+import { Separator } from './ui/separator';
 
-import * as React from "react";
-import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import * as React from 'react';
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
-import { Button } from "~/components/ui/button";
-import { ShareButton } from "./Share";
+import { Button } from '~/components/ui/button';
+import { ShareButton } from './Share';
 
 export function ModeToggle() {
   const { setTheme, theme } = useTheme();
-  const themeMap = { undefined: "light", dark: "light", light: "dark" };
+  const themeMap = { undefined: 'light', dark: 'light', light: 'dark' };
 
   return (
     <Button
@@ -41,19 +41,6 @@ export const AppHeader = () => {
         <div className="flex flex-1 items-center justify-end space-x-2">
           <nav className="flex items-center text-header-foreground">
             <ShareButton />
-            {/* <a href="https://" target="_blank" rel="noreferrer">
-              <div
-                className={cn(
-                  buttonVariants({
-                    variant: "ghost",
-                  }),
-                  "h-8 w-8 px-0",
-                )}
-              >
-                <Calendar className="h-4 w-4" />
-                <span className="sr-only">GitHub</span>
-              </div>
-            </a> */}
             <ModeToggle />
           </nav>
         </div>

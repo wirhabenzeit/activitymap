@@ -1,4 +1,6 @@
 'use client';
+'use no memo';
+
 import * as React from 'react';
 
 import {
@@ -7,9 +9,9 @@ import {
   CaretSortIcon,
 } from '@radix-ui/react-icons';
 import {
-  ColumnFiltersState,
+  type ColumnFiltersState,
   getFilteredRowModel,
-  TableOptionsResolved,
+  type TableOptionsResolved,
 } from '@tanstack/react-table';
 
 import {
@@ -29,7 +31,6 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableFooter,
   TableRow,
 } from '~/components/ui/table';
 
@@ -53,8 +54,8 @@ import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
 
 import {
-  ColumnDef,
-  SortingState,
+  type ColumnDef,
+  type SortingState,
   functionalUpdate,
   makeStateUpdater,
   getSortedRowModel,
@@ -62,17 +63,16 @@ import {
   flexRender,
   getCoreRowModel,
   useReactTable,
-  VisibilityState,
-  Column,
-  Table as TableType,
-  OnChangeFn,
-  Updater,
-  RowData,
-  TableFeature,
+  type VisibilityState,
+  type Column,
+  type Table as TableType,
+  type OnChangeFn,
+  type Updater,
+  type RowData,
+  type TableFeature,
 } from '@tanstack/react-table';
-import { ListActions, ListState } from '~/store/list';
-import { Map } from 'mapbox-gl';
-import { MapRef } from 'react-map-gl/mapbox';
+import { type ListActions, type ListState } from '~/store/list';
+import { type MapRef } from 'react-map-gl/mapbox';
 
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
@@ -117,7 +117,7 @@ export const DensityFeature: TableFeature<any> = {
   createTable: <TData extends RowData>(table: TableType<TData>): void => {
     table.setDensity = (updater) => {
       const safeUpdater: Updater<DensityState> = (old) => {
-        let newState = functionalUpdate(updater, old);
+        const newState = functionalUpdate(updater, old);
         return newState;
       };
       return table.options.onDensityChange?.(safeUpdater);
@@ -162,7 +162,7 @@ export const MapFeature: TableFeature<any> = {
   createTable: <TData extends RowData>(table: TableType<TData>): void => {
     table.setMap = (updater) => {
       const safeUpdater: Updater<MapRef | undefined> = (old) => {
-        let newState = functionalUpdate(updater, old);
+        const newState = functionalUpdate(updater, old);
         return newState;
       };
       return table.options.onMapChange?.(safeUpdater);
@@ -205,7 +205,7 @@ export const SummaryRowFeature: TableFeature<any> = {
   createTable: <TData extends RowData>(table: TableType<TData>): void => {
     table.setSummaryRow = (updater) => {
       const safeUpdater: Updater<SummaryRowState> = (old) => {
-        let newState = functionalUpdate(updater, old);
+        const newState = functionalUpdate(updater, old);
         return newState;
       };
       return table.options.onSummaryRowChange?.(safeUpdater);
@@ -255,7 +255,7 @@ export function DataTableViewOptions<TData>({
                           e.preventDefault();
                         }}
                       >
-                        {(column.columnDef.meta?.title as string) || column.id}
+                        {column.columnDef.meta?.title! || column.id}
                       </DropdownMenuCheckboxItem>
                     );
                   })}
@@ -492,7 +492,7 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    getFilteredRowModel: getFilteredRowModel(), //<- important
+    getFilteredRowModel: getFilteredRowModel(),
     onRowSelectionChange: (updater) => {
       const updatedIDs = updater(
         Object.fromEntries(selected.map((id) => [id, true])),

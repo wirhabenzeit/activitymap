@@ -4,7 +4,7 @@ import type { StravaActivity, StravaPhoto } from './types';
 
 export function transformStravaActivity(
   activity: StravaActivity,
-  isComplete: boolean = false,
+  isComplete = false,
 ): Omit<Activity, 'athlete'> {
   const start_date = new Date(activity.start_date);
   const local_date = new Date(
@@ -26,7 +26,7 @@ export function transformStravaActivity(
         Math.max(acc[3], coord[1]),
       ],
       [Infinity, Infinity, -Infinity, -Infinity],
-    ) as [number, number, number, number];
+    );
   }
 
   // Generate a deterministic public_id based on the activity ID

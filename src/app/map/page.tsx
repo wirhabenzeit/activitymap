@@ -1,4 +1,5 @@
 'use client';
+'use no memo';
 
 import {
   useState,
@@ -48,7 +49,6 @@ import { Selection } from '~/components/map/SelectionControl';
 import { LayerSwitcher } from '~/components/map/LayerSwitcher';
 import PhotoLayer from '~/components/map/Photo';
 import { cn } from '~/lib/utils';
-import { map } from 'd3';
 
 function RouteLayer() {
   const { filterIDs, selected, highlighted, geoJson } = useShallowStore(

@@ -2,7 +2,7 @@ import { FaBriefcase } from "react-icons/fa6";
 import { RulerHorizontalIcon, StopwatchIcon } from "@radix-ui/react-icons";
 import { Mountain } from "lucide-react";
 
-import { ReactElement } from "react";
+import { type ReactElement } from "react";
 
 export const inequalityFilters = {
   distance: {

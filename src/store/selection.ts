@@ -1,6 +1,6 @@
 import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
-import { Dispatch, SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction } from 'react';
 
 export type SelectionState = {
   selected: number[];

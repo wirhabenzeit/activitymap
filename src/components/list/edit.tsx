@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { type JSXElementConstructor, type ComponentType } from 'react';
+import { type ComponentType } from 'react';
 
 import { Button } from '~/components/ui/button';
 import {
@@ -25,8 +25,8 @@ import {
   DialogTrigger,
 } from '~/components/ui/dialog';
 import { Edit } from 'lucide-react';
-import { Row } from '@tanstack/react-table';
-import { Activity } from '~/server/db/schema';
+import { type Row } from '@tanstack/react-table';
+import { type Activity } from '~/server/db/schema';
 import { type UpdatableActivity, type SportType } from '~/server/strava/types';
 import { sportType } from 'drizzle/schema';
 import { Select } from '../ui/select';

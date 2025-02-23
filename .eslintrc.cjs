@@ -1,30 +1,21 @@
-const reactCompiler = require('eslint-plugin-react-compiler');
-const typescript = require('@typescript-eslint/eslint-plugin');
-const drizzle = require('eslint-plugin-drizzle');
-const react = require('eslint-plugin-react');
-
 /** @type {import("eslint").Linter.Config} */
-const config = {
+module.exports = {
+  root: true,
   parser: "@typescript-eslint/parser",
   parserOptions: {
-    project: true,
+    project: "./tsconfig.json",
   },
-  plugins: {
-    '@typescript-eslint': typescript,
-    'drizzle': drizzle,
-    'react': react,
-    'react-compiler': reactCompiler
-  },
+  plugins: ["@typescript-eslint", "drizzle"],
   extends: [
     "next/core-web-vitals",
     "prettier",
+    "plugin:drizzle/recommended",
     "plugin:@typescript-eslint/recommended-type-checked",
     "plugin:@typescript-eslint/stylistic-type-checked",
   ],
   rules: {
     "@typescript-eslint/array-type": "off",
     "@typescript-eslint/consistent-type-definitions": "off",
-    "react-compiler/react-compiler": "error",
     "@typescript-eslint/consistent-type-imports": [
       "warn",
       {
@@ -61,4 +52,3 @@ const config = {
     ],
   },
 };
-module.exports = config;

@@ -1,11 +1,11 @@
 'use client';
 
-import { ColumnDef, Table } from '@tanstack/react-table';
+import { type ColumnDef, type Table } from '@tanstack/react-table';
 import { Pin } from 'lucide-react';
 import { Checkbox } from '~/components/ui/checkbox';
 import { type ComponentType } from 'react';
 
-import { Activity, type Photo } from '~/server/db/schema';
+import { type Activity, type Photo } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
 
 import { DataTableColumnHeader } from './data-table';
@@ -44,7 +44,7 @@ function columnFromField(
       spec.summaryFormatter && reducedValue != null
         ? spec.summaryFormatter(reducedValue)
         : reducedValue != null
-          ? `${spec.reducerSymbol || ''}${spec.formatter(reducedValue)}`
+          ? `${spec.reducerSymbol ?? ''}${spec.formatter(reducedValue)}`
           : '';
     return <div className="text-right w-full">{summary}</div>;
   };
@@ -81,7 +81,7 @@ export const columns: ColumnDef<Activity>[] = [
     ),
     enableHiding: false,
     filterFn: (row, columnId, filterValue) => {
-      return filterValue.includes(row.id);
+      return filterValue.includes(row.original.public_id);
     },
   },
   {
@@ -154,7 +154,7 @@ export const columns: ColumnDef<Activity>[] = [
     cell: ({ getValue, row }) => {
       const photos = getValue() as Photo[] | undefined;
       return (
-        <PhotoLightbox photos={photos || []} title={row.getValue('name')} />
+        <PhotoLightbox photos={photos ?? []} title={row.getValue('name')} />
       );
     },
   },
@@ -175,7 +175,9 @@ export const columns: ColumnDef<Activity>[] = [
   {
     id: 'edit',
     meta: { title: 'Edit', width: '40px' },
-    header: ({ column, table }) => <div>Edit</div>,
+    header: ({ column, table }) => (
+      <DataTableColumnHeader table={table} column={column} title="Edit" />
+    ),
     cell: ({ row }) => <EditActivity row={row} trigger={true} />,
     enableResizing: false,
     size: 40,

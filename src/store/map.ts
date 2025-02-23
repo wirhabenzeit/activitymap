@@ -35,10 +35,10 @@ export const createMapSlice: StateCreator<
   // Initial state
   baseMap: Object.entries(mapSettings).find(
     ([, map]) => map.visible && !map.overlay,
-  )![0] as keyof typeof mapSettings,
+  )![0],
   overlayMaps: Object.entries(mapSettings)
     .filter(([, map]) => map.visible && map.overlay)
-    .map(([key]) => key as keyof typeof mapSettings),
+    .map(([key]) => key),
   position: defaultMapPosition,
   bbox: defaultMapBounds,
   threeDim: false,

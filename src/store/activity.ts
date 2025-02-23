@@ -2,11 +2,9 @@ import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
 import type { Activity, Photo } from '~/server/db/schema';
 import { type FeatureCollection, type Feature, type Geometry } from 'geojson';
-import geosimplify from '@mapbox/geosimplify-js';
 import { decode } from '@mapbox/polyline';
 import {
   getActivities as getDBActivities,
-  getActivitiesPaged,
   getPhotos,
 } from '~/server/db/actions';
 import {
@@ -43,18 +41,18 @@ export type ActivitySlice = ActivityState & ActivityActions;
 
 const createFeature = (act: Activity): Feature<Geometry> => ({
   type: 'Feature',
-  id: act.id,
+  id: act.public_id,
   geometry: {
     type: 'LineString',
     coordinates:
-      act.map_polyline || act.map_summary_polyline
-        ? decode(act.map_polyline || act.map_summary_polyline!).map(
+      (act.map_polyline ?? act.map_summary_polyline)
+        ? decode(act.map_polyline ?? act.map_summary_polyline!).map(
             ([lat, lon]) => [lon, lat],
           )
         : [],
   },
   properties: {
-    id: act.id,
+    id: act.public_id,
     sport_type: act.sport_type,
   },
   bbox:
@@ -96,10 +94,10 @@ export const createActivitySlice: StateCreator<
       if (!updatedActivity) throw new Error('Failed to update activity');
 
       set((state) => {
-        state.activityDict[updatedActivity.id] = updatedActivity;
+        state.activityDict[updatedActivity.public_id] = updatedActivity;
         // Update the GeoJSON feature if it exists
         const featureIndex = state.geoJson.features.findIndex(
-          (f) => f.id === updatedActivity.id,
+          (f) => f.id === updatedActivity.public_id,
         );
         if (
           featureIndex !== -1 &&
@@ -159,20 +157,23 @@ export const createActivitySlice: StateCreator<
       });
 
       const validActivities = activities.filter(
-        (act) => act.map_polyline || act.map_summary_polyline,
+        (act) => act.map_polyline ?? act.map_summary_polyline,
       );
 
       set((state) => {
-        state.activityDict = Object.fromEntries(
-          activities.map((act) => [act.id, act]),
-        );
         state.geoJson = {
           type: 'FeatureCollection',
           features: validActivities.map(createFeature),
         };
         state.loading = false;
         state.loaded = true;
+        state.activityDict = Object.fromEntries(
+          activities.map((act) => [act.public_id, act]),
+        );
       });
+
+      // Explicitly update filterIDs
+      get().updateFilterIDs();
 
       console.log('Store state updated with activities:', {
         activityCount: activities.length,
@@ -223,10 +224,10 @@ export const createActivitySlice: StateCreator<
           Object.keys(get().activityDict).map(Number),
         );
         const newActivities = activities.filter(
-          (act) => !existingActivities.has(act.id),
+          (act) => !existingActivities.has(act.public_id),
         );
         const updatedActivities = activities.filter((act) =>
-          existingActivities.has(act.id),
+          existingActivities.has(act.public_id),
         );
         console.log('Activity changes:', {
           new: newActivities.length,
@@ -237,16 +238,16 @@ export const createActivitySlice: StateCreator<
           console.log('Updating store state with new data');
           // Remove old photos for these activities
           state.photos = state.photos.filter(
-            (photo) => !ids.includes(photo.activity_id!),
+            (photo) => !ids.includes(photo.activity_id),
           );
 
           activities.forEach((activity: Activity) => {
-            state.activityDict[activity.id] = activity;
+            state.activityDict[activity.public_id] = activity;
             if (activity.map_polyline || activity.map_summary_polyline) {
               try {
                 // Remove existing feature if it exists
                 const featureIndex = state.geoJson.features.findIndex(
-                  (f) => f.id === activity.id,
+                  (f) => f.id === activity.public_id,
                 );
                 if (featureIndex !== -1) {
                   state.geoJson.features.splice(featureIndex, 1);
@@ -325,12 +326,12 @@ export const createActivitySlice: StateCreator<
         set((state) => {
           console.log('Updating store state with new data');
           result.activities.forEach((activity: Activity) => {
-            state.activityDict[activity.id] = activity;
+            state.activityDict[activity.public_id] = activity;
             if (activity.map_polyline || activity.map_summary_polyline) {
               try {
                 // Remove existing feature if it exists
                 const featureIndex = state.geoJson.features.findIndex(
-                  (f) => f.id === activity.id,
+                  (f) => f.id === activity.public_id,
                 );
                 if (featureIndex !== -1) {
                   state.geoJson.features.splice(featureIndex, 1);

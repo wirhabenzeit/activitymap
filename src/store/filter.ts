@@ -2,7 +2,7 @@ import { type StateCreator } from 'zustand';
 import { type Dispatch, type SetStateAction } from 'react';
 import { type SportType, type Activity } from '~/server/db/schema';
 import { categorySettings, type CategorySetting } from '~/settings/category';
-import { inequalityFilters, binaryFilters } from '~/settings/filter';
+import { type inequalityFilters, binaryFilters } from '~/settings/filter';
 import { type RootState } from './index';
 
 type CategoryGroup = keyof CategorySetting;
@@ -45,6 +45,7 @@ export type FilterActions = {
   ) => void;
   setSearch: (update: SetStateAction<string>) => void;
   setBinary: (update: SetStateAction<Record<BinaryColumn, boolean>>) => void;
+  updateFilterIDs: () => void;
 };
 
 export type FilterSlice = FilterState & FilterActions;
@@ -118,6 +119,15 @@ export const createFilterSlice: StateCreator<
   [],
   FilterSlice
 > = (set, get, store) => {
+  const updateFilterIDs = () => {
+    set((state) => {
+      const activities = Object.values(get().activityDict);
+      state.filterIDs = activities
+        .filter((activity) => applyFilters(state, activity))
+        .map((activity) => activity.public_id);
+    });
+  };
+
   const slices: FilterSlice = {
     // Initial state
     sportType: initializeSportType(),
@@ -130,6 +140,7 @@ export const createFilterSlice: StateCreator<
     activityDict: {},
 
     // Actions
+    updateFilterIDs,
     setSportGroup: (update) => {
       set((state) => {
         const newSportGroup =
@@ -198,12 +209,7 @@ export const createFilterSlice: StateCreator<
       state.dateRange !== prevState.dateRange ||
       state.activityDict !== prevState.activityDict
     ) {
-      set((state) => {
-        const activities = Object.values(get().activityDict);
-        state.filterIDs = activities
-          .filter((activity) => applyFilters(state, activity))
-          .map((activity) => activity.id);
-      });
+      updateFilterIDs();
     }
   });
 

@@ -1,13 +1,13 @@
-import { Dispatch, SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction } from 'react';
 import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
 import {
-  SortingState,
-  VisibilityState,
-  Updater,
-  ColumnPinningState,
+  type SortingState,
+  type VisibilityState,
+  type Updater,
+  type ColumnPinningState,
 } from '@tanstack/react-table';
-import { WritableDraft } from 'immer';
+import { type WritableDraft } from 'immer';
 
 export type SummaryRowState = null | 'page' | 'all';
 export type DensityState = 'sm' | 'md' | 'lg';

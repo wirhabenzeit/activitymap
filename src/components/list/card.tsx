@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import {
   Calendar,
   Mountain,
@@ -9,9 +8,6 @@ import {
   Map,
   Info,
   Loader2,
-  ArrowLeft,
-  ArrowRight,
-  X,
   Download,
 } from 'lucide-react';
 
@@ -38,7 +34,7 @@ import {
 } from '~/components/ui/card';
 import { activityFields } from '~/settings/activity';
 
-import { EditActivity, ProfileForm } from './edit';
+import { EditActivity } from './edit';
 import { useState } from 'react';
 import {
   Popover,
@@ -46,37 +42,17 @@ import {
   PopoverTrigger,
 } from '~/components/ui/popover';
 import { type MapRef } from 'react-map-gl/mapbox';
-import { useStore } from '~/store';
-import { useShallow } from 'zustand/shallow';
 import { cn } from '~/lib/utils';
 import { type RefObject } from 'react';
 import { LngLatBounds } from 'mapbox-gl';
 import { useShallowStore } from '~/store';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import {
-  Carousel,
-  CarouselApi,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '../ui/carousel';
 import { PhotoLightbox } from './photo';
-import { decode } from '@mapbox/polyline';
-import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
-import type { Feature, LineString } from 'geojson';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
 interface ActivityCardProps extends CardProps {
   row: Row<Activity>;
   map?: RefObject<MapRef>;
-}
-
-interface ActivityMap {
-  bbox?: [number, number, number, number];
-  polyline?: string;
-  summary_polyline?: string;
 }
 
 const formattedValue = (key: keyof typeof activityFields, row: Row<Activity>) =>
@@ -109,7 +85,8 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
-  const photos = row.getValue('photos') as Photo[] | undefined;
+  const photos: Photo[] = row.getValue('photos');
+  const id: number = row.getValue('id');
 
   const date = row.original.start_date_local;
   const stats = [
@@ -220,7 +197,7 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
             </div>
           </CardTitle>
           <CardDescription>
-            {row.getValue('description') || ''}
+            {row.getValue('description') ?? ''}
             {photos && photos.length > 0 ? (
               <div className="pt-4">
                 <PhotoLightbox
@@ -265,10 +242,7 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
             <Download className="h-4 w-4" />
           </Button>
           <Button variant="outline">
-            <Link
-              href={`https://strava.com/activities/${row.getValue('id')}`}
-              target="_blank"
-            >
+            <Link href={`https://strava.com/activities/${id}`} target="_blank">
               Strava
             </Link>
           </Button>

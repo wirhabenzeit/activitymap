@@ -7,8 +7,7 @@ import {
 } from 'react-icons/fa6';
 
 import { type Activity } from '~/server/db/schema';
-import { ReactElement } from 'react';
-import { IconType } from 'react-icons/lib';
+import { type IconType } from 'react-icons/lib';
 
 export type CategorySetting = Record<
   'bcXcSki' | 'trailHike' | 'run' | 'ride' | 'misc',

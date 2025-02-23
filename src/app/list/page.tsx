@@ -6,36 +6,49 @@ import { DataTable } from '../../components/list/data-table';
 import { useShallowStore } from '~/store';
 
 import React from 'react';
-import { Photo } from '~/server/db/schema';
+import { type Photo } from '~/server/db/schema';
 
 export default function ListPage() {
-  const { selected, setSelected, activityDict, filterIDs, tableState, photos } =
-    useShallowStore((state) => ({
-      selected: state.selected,
-      setSelected: state.setSelected,
-      activityDict: state.activityDict,
-      filterIDs: state.filterIDs,
-      tableState: state.fullList,
-      photos: state.photos,
-    }));
+  const {
+    selected,
+    setSelected,
+    activityDict,
+    filterIDs,
+    tableState,
+    photos,
+    loaded,
+  } = useShallowStore((state) => ({
+    selected: state.selected,
+    setSelected: state.setSelected,
+    activityDict: state.activityDict,
+    filterIDs: state.filterIDs,
+    tableState: state.fullList,
+    photos: state.photos,
+    loaded: state.loaded,
+  }));
 
   const columnFilters = [{ id: 'id', value: filterIDs }];
   const photoDict = photos.reduce(
     (acc, photo) => {
-      if (photo.activity_id in acc) acc[photo.activity_id].push(photo);
-      else acc[photo.activity_id] = [photo];
+      const id = photo.activity_id;
+      if (id in acc) {
+        acc[id].push(photo);
+      } else {
+        acc[id] = [photo];
+      }
       return acc;
     },
     {} as Record<number, Photo[]>,
   );
-  const rows = React.useMemo(
-    () =>
-      Object.entries(activityDict).map(([id, act]) => ({
+  const rows = React.useMemo(() => {
+    return Object.values(activityDict).map((act) => {
+      const photos = photoDict[(act as { id: number }).id] ?? [];
+      return {
         ...act,
-        ...(id in photoDict && { photos: photoDict[id] }),
-      })),
-    [activityDict, photos],
-  );
+        photos,
+      };
+    });
+  }, [activityDict, photoDict]);
 
   return (
     <div className="h-full max-h-dvh w-full">
@@ -45,7 +58,6 @@ export default function ListPage() {
         data={rows}
         selected={selected}
         setSelected={setSelected}
-        filterIDs={filterIDs}
         columnFilters={columnFilters}
         {...tableState}
       />

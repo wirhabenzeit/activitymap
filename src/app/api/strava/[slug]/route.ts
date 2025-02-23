@@ -3,7 +3,7 @@ import { db } from '~/server/db';
 import { activities, photos, webhooks } from '~/server/db/schema';
 import { handleWebhookActivity } from '~/server/strava/actions';
 import type { WebhookRequest } from '~/types/strava';
-import { NextRequest } from 'next/server';
+import { type NextRequest } from 'next/server';
 
 export async function GET(
   req: NextRequest,
