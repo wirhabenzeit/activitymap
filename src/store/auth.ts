@@ -7,12 +7,24 @@ export type InitialAuth = {
   session: Session | null;
   user: User | null;
   account: Account | null;
+  guestMode?: {
+    type: 'user' | 'activities';
+    userId?: string;
+    activityIds?: number[];
+  };
 };
 
 export type AuthState = {
   user: User | undefined;
   session: Session | undefined;
   account: Account | undefined;
+  isInitialized: boolean;
+  isGuest: boolean;
+  guestMode: {
+    type: 'user' | 'activities' | null;
+    userId?: string;
+    activityIds?: number[];
+  };
 };
 
 export type AuthActions = {
@@ -26,23 +38,44 @@ export const createAuthSlice: StateCreator<
   [['zustand/immer', never]],
   [],
   AuthSlice
-> = (set, get) => ({
+> = (set) => ({
   // Initial state
   user: undefined,
   session: undefined,
   account: undefined,
+  isInitialized: false,
+  isGuest: false,
+  guestMode: {
+    type: null,
+    userId: undefined,
+    activityIds: undefined,
+  },
 
   // Actions
   initializeAuth: (auth) => {
+    console.log('Initializing auth with:', auth);
     set((state) => {
-      state.session = auth.session ?? undefined;
-      state.user = auth.user ?? undefined;
-      state.account = auth.account ?? undefined;
-    });
+      if (auth.guestMode) {
+        state.isGuest = true;
+        state.guestMode = {
+          type: auth.guestMode.type,
+          userId: auth.guestMode.userId,
+          activityIds: auth.guestMode.activityIds,
+        };
+      } else {
+        state.session = auth.session ?? undefined;
+        state.user = auth.user ?? undefined;
+        state.account = auth.account ?? undefined;
+      }
+      state.isInitialized = true;
 
-    // Initialize activities if we have an account
-    if (auth.account) {
-      get().loadFromDB({});
-    }
+      console.log('Auth state after initialization:', {
+        isGuest: state.isGuest,
+        guestMode: state.guestMode,
+        user: state.user,
+        account: state.account,
+        isInitialized: state.isInitialized,
+      });
+    });
   },
 });

@@ -13,6 +13,7 @@ import type { InitialAuth } from '~/store/auth';
 import { Toaster } from '~/components/ui/toaster';
 import { ToastManager } from '~/components/providers/toast';
 import { cn } from '~/lib/utils';
+import { headers } from 'next/headers';
 
 export const metadata = {
   title: 'ActivityMap',
@@ -26,16 +27,23 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const initialAuth: InitialAuth = { session: null, user: null, account: null };
+  const initialAuth: InitialAuth = {
+    session: null,
+    user: null,
+    account: null,
+  };
 
+  // If we have a session, get the user and account details
   if (session?.user?.id) {
     const user = await getUser(session.user.id);
     const account = user ? await getAccount({ userId: user.id }) : null;
-    if (user && account) {
-      initialAuth.session = session;
-      initialAuth.user = user;
-      initialAuth.account = account;
-    }
+    initialAuth.session = session;
+    initialAuth.user = user ?? null;
+    initialAuth.account = account ?? null;
+    console.log('Authenticated session initialized:', {
+      hasUser: !!user,
+      hasAccount: !!account,
+    });
   }
 
   return (

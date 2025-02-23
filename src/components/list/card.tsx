@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   ArrowRight,
   X,
+  Download,
 } from 'lucide-react';
 
 import { type Activity, type Photo } from '~/server/db/schema';
@@ -60,6 +61,10 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '../ui/carousel';
+import { PhotoLightbox } from './photo';
+import { decode } from '@mapbox/polyline';
+import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
+import type { Feature, LineString } from 'geojson';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
@@ -79,12 +84,13 @@ const formattedValue = (key: keyof typeof activityFields, row: Row<Activity>) =>
 
 export function DescriptionCard({ row }: { row: Row<Activity> }) {
   const [open, setOpen] = useState(false);
+  const isGuest = useShallowStore((state) => state.isGuest);
 
   return (
     <>
       <div
         className="w-full truncate italic h-full flex items-center"
-        onDoubleClick={() => setOpen(true)}
+        onDoubleClick={() => !isGuest && setOpen(true)}
       >
         {row.original.description}
       </div>
@@ -95,13 +101,15 @@ export function DescriptionCard({ row }: { row: Row<Activity> }) {
 
 export function ActivityCardContent({ row }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
-  const { loadFromStrava, loading } = useShallowStore((state) => ({
+  const { loadFromStrava, loading, isGuest } = useShallowStore((state) => ({
     loadFromStrava: state.loadFromStrava,
     loading: state.loading,
+    isGuest: state.isGuest,
   }));
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
+  const photos = row.getValue('photos') as Photo[] | undefined;
 
   const date = row.original.start_date_local;
   const stats = [
@@ -149,6 +157,52 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
     await loadFromStrava({ photos: true, ids: [row.original.id] });
   };
 
+  const handleDownloadGpx = () => {
+    const polyline =
+      row.original.map_polyline || row.original.map_summary_polyline;
+    if (!polyline) return;
+
+    // Decode polyline to coordinates
+    const coordinates = decode(polyline).map(([lat, lon]) => [lon, lat]);
+
+    // Create GeoJSON object
+    const geojson: Feature<LineString> = {
+      type: 'Feature',
+      properties: {
+        name: String(row.getValue('name')),
+        time: row.original.start_date.toISOString(),
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates,
+      },
+    };
+
+    // Convert to GPX with metadata
+    const options: { metadata: { name: string; time: string; desc?: string } } =
+      {
+        metadata: {
+          name: String(row.getValue('name')),
+          time: row.original.start_date.toISOString(),
+          desc: row.original.description || undefined,
+        },
+      };
+
+    const gpx = GeoJsonToGpx(geojson, options);
+    const gpxString = new XMLSerializer().serializeToString(gpx);
+
+    // Create and trigger download
+    const blob = new Blob([gpxString], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${row.getValue('name')}.gpx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       <Card className="w-auto max-w-80 border-none shadow-none">
@@ -165,7 +219,18 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
               <div>{row.getValue('name')}</div>
             </div>
           </CardTitle>
-          <CardDescription>{row.getValue('description') || ''}</CardDescription>
+          <CardDescription>
+            {row.getValue('description') || ''}
+            {photos && photos.length > 0 ? (
+              <div className="pt-4">
+                <PhotoLightbox
+                  photos={photos}
+                  title={row.getValue('name')}
+                  className="h-[3rem]"
+                />
+              </div>
+            ) : null}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-1">
@@ -180,20 +245,31 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
           </div>
         </CardContent>
         <CardFooter className="flex justify-between space-x-1">
-          <Button onClick={() => setOpen(true)}>Edit</Button>
-          <Button onClick={handleRefresh} disabled={loading}>
+          <Button onClick={() => setOpen(true)} disabled={isGuest}>
+            Edit
+          </Button>
+          <Button onClick={handleRefresh} disabled={loading || isGuest}>
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <ReloadIcon />
             )}
           </Button>
+          <Button
+            variant="outline"
+            onClick={handleDownloadGpx}
+            disabled={
+              !row.original.map_polyline && !row.original.map_summary_polyline
+            }
+          >
+            <Download className="h-4 w-4" />
+          </Button>
           <Button variant="outline">
             <Link
               href={`https://strava.com/activities/${row.getValue('id')}`}
               target="_blank"
             >
-              View on Strava
+              Strava
             </Link>
           </Button>
         </CardFooter>
@@ -205,78 +281,35 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
 
 export function ActivityCard({ row, map }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
+  const { highlighted, setHighlighted, isGuest } = useShallowStore((state) => ({
+    highlighted: state.highlighted,
+    setHighlighted: state.setHighlighted,
+    isGuest: state.isGuest,
+  }));
+
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
-  const [highlighted, setHighlighted, setPosition, setSelected] = useStore(
-    useShallow((state) => [
-      state.highlighted,
-      state.setHighlighted,
-      state.setPosition,
-      state.setSelected,
-    ]),
-  );
-  const { push } = useRouter();
 
   const handleMapClick = () => {
+    if (!map?.current) return;
     const bbox = row.original.map_bbox;
-    if (!bbox || bbox.length < 4) {
-      console.log('No bbox available for activity');
-      return;
-    }
+    if (!bbox || bbox.length < 4) return;
 
-    // Create a local copy that TypeScript knows is defined
-    const [minLng, minLat, maxLng, maxLat] = bbox as [
-      number,
-      number,
-      number,
-      number,
-    ];
-
-    setSelected((prev) =>
-      prev.includes(Number(row.id)) ? prev : [...prev, Number(row.id)],
-    );
-    setHighlighted(Number(row.id));
-
-    if (!map) {
-      console.log('No map reference available, redirecting to map view');
-      const center = [(minLng + maxLng) / 2, (minLat + maxLat) / 2] as [
-        number,
-        number,
-      ];
-      const zoom = 13;
-      const bounds = new LngLatBounds(
-        [minLng, minLat] as [number, number],
-        [maxLng, maxLat] as [number, number],
-      );
-      setSelected([Number(row.id)]);
-      setHighlighted(Number(row.id));
-      setPosition(
-        {
-          longitude: center[0],
-          latitude: center[1],
-          zoom,
-          bearing: 0,
-          pitch: 0,
-          padding: { top: 0, bottom: 0, left: 0, right: 0 },
-        },
-        bounds,
-      );
-      push('/map');
-      return;
-    }
+    // Create a bounds object with the bbox coordinates
     const bounds = new LngLatBounds(
-      [minLng, minLat] as [number, number],
-      [maxLng, maxLat] as [number, number],
+      [bbox[0], bbox[1]] as [number, number],
+      [bbox[2], bbox[3]] as [number, number],
     );
-    map.current?.fitBounds(bounds, { padding: 100 });
+    map.current.fitBounds(bounds, { padding: 50 });
+    setHighlighted(row.original.id);
   };
 
   return (
     <>
       <div
         className="flex items-center space-x-2 w-full"
-        onDoubleClick={() => setOpen(true)}
+        onDoubleClick={() => !isGuest && setOpen(true)}
       >
         <Button
           variant={row.getIsSelected() ? 'outline' : 'ghost'}
@@ -324,83 +357,6 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
         </Popover>
       </div>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
-    </>
-  );
-}
-
-export function PhotoCard({
-  photos,
-  title,
-}: {
-  photos: Photo[];
-  title: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [api, setApi] = useState<CarouselApi>();
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  return (
-    <>
-      <div className="flex flex-row items-center gap-2 h-[1.5rem] overflow-x-scroll">
-        {photos &&
-          photos.map((photo, index) => (
-            <Button
-              key={photo.unique_id}
-              variant="ghost"
-              size="icon"
-              className="p-0 h-full rounded-sm aspect-square object-cover w-auto"
-            >
-              <img
-                src={photo.urls ? Object.values(photo.urls)[0] : ''}
-                alt={photo.caption ?? ''}
-                className="h-full rounded-sm aspect-square object-cover"
-                onClick={() => {
-                  api?.scrollTo(index);
-                  setOpen(true);
-                }}
-              />
-            </Button>
-          ))}
-      </div>
-      <Dialog open={open} onOpenChange={setOpen} modal={false}>
-        <DialogContent
-          className="p-0 bg-background/80 w-screen h-screen overflow-hidden max-w-none max-h-none border-0 rounded-none focus:outline-none"
-          onClick={() => setOpen(false)}
-        >
-          <DialogTitle className="hidden">{title}</DialogTitle>
-          <Carousel className="relative" setApi={(api) => setApi(api)}>
-            <CarouselContent className="h-full absolute inset-0 ml-0">
-              {photos.map((photo, index) => (
-                <CarouselItem
-                  key={photo.unique_id}
-                  className="flex items-center justify-center pl-0"
-                >
-                  <img
-                    src={photo.urls ? Object.values(photo.urls).at(-1) : ''}
-                    alt={photo.caption ?? ''}
-                    className="max-w-[calc(100vw-4rem)] max-h-[calc(100vh-4rem)] object-contain rounded-lg border-2 border-background"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <CarouselPrevious
-              className="absolute left-4"
-              onClick={(e) => {
-                e.stopPropagation();
-                api?.scrollPrev();
-              }}
-            />
-            <CarouselNext
-              className="absolute right-4"
-              onClick={(e) => {
-                e.stopPropagation();
-                api?.scrollNext();
-              }}
-            />
-          </Carousel>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

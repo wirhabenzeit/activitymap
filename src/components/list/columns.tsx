@@ -11,8 +11,9 @@ import { Button } from '~/components/ui/button';
 import { DataTableColumnHeader } from './data-table';
 import { activityFields } from '~/settings/activity';
 
-import { ActivityCard, DescriptionCard, PhotoCard } from './card';
+import { ActivityCard, DescriptionCard } from './card';
 import { EditActivity } from './edit';
+import { PhotoLightbox } from './photo';
 
 type ActivityField = {
   formatter: (value: any) => string | null;
@@ -150,9 +151,25 @@ export const columns: ColumnDef<Activity>[] = [
     header: ({ column, table }) => (
       <DataTableColumnHeader table={table} column={column} title="Photos" />
     ),
-    cell: ({ getValue }) => {
+    cell: ({ getValue, row }) => {
       const photos = getValue() as Photo[] | undefined;
-      return <PhotoCard photos={photos || []} />;
+      return (
+        <PhotoLightbox photos={photos || []} title={row.getValue('name')} />
+      );
+    },
+  },
+  {
+    id: 'is_complete',
+    accessorKey: 'is_complete',
+    meta: { title: 'Complete', width: 'minmax(80px, 1fr)' },
+    header: ({ column, table }) => (
+      <DataTableColumnHeader table={table} column={column} title="Complete" />
+    ),
+    cell: ({ getValue }) => {
+      const isComplete = getValue() as boolean;
+      return (
+        <div className="text-right w-full">{isComplete ? 'Yes' : 'No'}</div>
+      );
     },
   },
   {

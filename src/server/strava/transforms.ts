@@ -29,9 +29,22 @@ export function transformStravaActivity(
     ) as [number, number, number, number];
   }
 
-  // Generate a random public_id that's different from the Strava ID
-  // Using a 53-bit number (max safe integer in JavaScript)
-  const public_id = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+  // Generate a deterministic public_id based on the activity ID
+  // Using FNV-1a hash function modified to produce a positive bigint
+  const fnv1a = (str: string) => {
+    const prime = BigInt(0x00000100000001b3);
+    let hash = BigInt(0xcbf29ce484222325);
+    const uint64_max = BigInt('9223372036854775807'); // max safe bigint in postgres
+
+    for (let i = 0; i < str.length; i++) {
+      hash = hash ^ BigInt(str.charCodeAt(i));
+      hash = (hash * prime) % uint64_max;
+    }
+
+    return Number(hash);
+  };
+
+  const public_id = fnv1a(`strava_${activity.id}_${activity.athlete.id}`);
 
   return {
     id: activity.id,

@@ -183,18 +183,25 @@ export function EditActivity({
   setOpen?: (open: boolean) => void;
   trigger: boolean;
 }) {
+  const isGuest = useShallowStore((state) => state.isGuest);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger && (
         <DialogTrigger asChild>
-          <Button variant={'ghost'} size={'sm'} className="p-1">
+          <Button
+            variant={'ghost'}
+            size={'sm'}
+            className="p-1"
+            disabled={isGuest}
+          >
             <Edit className="size-4" />
           </Button>
         </DialogTrigger>
       )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit actity</DialogTitle>
+          <DialogTitle>Edit activity</DialogTitle>
           <DialogDescription>
             Make changes to your activity here.
           </DialogDescription>

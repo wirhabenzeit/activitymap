@@ -1,16 +1,20 @@
+const reactCompiler = require('eslint-plugin-react-compiler');
+const typescript = require('@typescript-eslint/eslint-plugin');
+const drizzle = require('eslint-plugin-drizzle');
+const react = require('eslint-plugin-react');
+
 /** @type {import("eslint").Linter.Config} */
 const config = {
   parser: "@typescript-eslint/parser",
   parserOptions: {
     project: true,
   },
-  plugins: [
-    "@typescript-eslint",
-    "drizzle",
-    "react",
-    "eslint-plugin-react-compiler",
-    "react-compiler",
-  ],
+  plugins: {
+    '@typescript-eslint': typescript,
+    'drizzle': drizzle,
+    'react': react,
+    'react-compiler': reactCompiler
+  },
   extends: [
     "next/core-web-vitals",
     "prettier",

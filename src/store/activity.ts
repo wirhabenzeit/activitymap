@@ -1,7 +1,7 @@
 import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
 import type { Activity, Photo } from '~/server/db/schema';
-import { type FeatureCollection, type Feature } from 'geojson';
+import { type FeatureCollection, type Feature, type Geometry } from 'geojson';
 import geosimplify from '@mapbox/geosimplify-js';
 import { decode } from '@mapbox/polyline';
 import {
@@ -28,7 +28,11 @@ export type ActivityActions = {
   loadPhotos: () => Promise<void>;
   updateActivity: (act: UpdatableActivity) => Promise<Activity>;
   setLoading: (x: boolean) => void;
-  loadFromDB: (params: { ids?: number[] }) => Promise<number>;
+  loadFromDB: (params: {
+    ids?: number[];
+    publicIds?: number[];
+    userId?: string;
+  }) => Promise<number>;
   loadFromStrava: (params: {
     photos?: boolean;
     ids?: number[];
@@ -37,33 +41,27 @@ export type ActivityActions = {
 
 export type ActivitySlice = ActivityState & ActivityActions;
 
-const FeatureFromActivity = (act: Activity): Feature => {
-  if (!act.map_polyline && !act.map_summary_polyline)
-    throw new Error('No polyline data');
-  const polyline = act.map_polyline || act.map_summary_polyline;
-  if (!polyline) throw new Error('No polyline data');
-
-  const coordinates = decode(polyline).map(([lat, lon]) => [lon, lat]);
-  return {
-    type: 'Feature',
+const createFeature = (act: Activity): Feature<Geometry> => ({
+  type: 'Feature',
+  id: act.id,
+  geometry: {
+    type: 'LineString',
+    coordinates:
+      act.map_polyline || act.map_summary_polyline
+        ? decode(act.map_polyline || act.map_summary_polyline!).map(
+            ([lat, lon]) => [lon, lat],
+          )
+        : [],
+  },
+  properties: {
     id: act.id,
-    geometry: {
-      type: 'LineString',
-      coordinates:
-        coordinates.length > 100
-          ? geosimplify(coordinates, 20, 200)
-          : coordinates,
-    },
-    properties: {
-      id: act.id,
-      sport_type: act.sport_type,
-    },
-    bbox:
-      act.map_bbox && act.map_bbox.length === 4
-        ? (act.map_bbox as [number, number, number, number])
-        : undefined,
-  };
-};
+    sport_type: act.sport_type,
+  },
+  bbox:
+    act.map_bbox && act.map_bbox.length === 4
+      ? (act.map_bbox as [number, number, number, number])
+      : undefined,
+});
 
 export const createActivitySlice: StateCreator<
   RootState,
@@ -107,8 +105,7 @@ export const createActivitySlice: StateCreator<
           featureIndex !== -1 &&
           (updatedActivity.map_polyline || updatedActivity.map_summary_polyline)
         ) {
-          state.geoJson.features[featureIndex] =
-            FeatureFromActivity(updatedActivity);
+          state.geoJson.features[featureIndex] = createFeature(updatedActivity);
         }
         state.loading = false;
       });
@@ -126,38 +123,69 @@ export const createActivitySlice: StateCreator<
       state.loading = x;
     }),
 
-  loadFromDB: async ({ ids }) => {
+  loadFromDB: async ({ ids, publicIds, userId }) => {
+    const account = get().account;
+    console.log('Starting loadFromDB:', {
+      ids,
+      publicIds,
+      userId,
+      hasAccount: !!account,
+      accountDetails: account && {
+        userId: account.userId,
+        providerAccountId: account.providerAccountId,
+      },
+    });
+
     set((state) => {
       state.loading = true;
     });
+
     try {
-      const activities = ids
-        ? await getDBActivities({ ids })
-        : await getActivitiesPaged({ pageSize: 500 });
+      const activities: Activity[] = await getDBActivities({
+        ids,
+        public_ids: publicIds,
+        user_id: userId,
+      });
+
+      console.log('DB activities fetch result:', {
+        count: activities.length,
+        firstActivity: activities[0]
+          ? {
+              id: activities[0].id,
+              name: activities[0].name,
+              athlete: activities[0].athlete,
+            }
+          : null,
+      });
+
+      const validActivities = activities.filter(
+        (act) => act.map_polyline || act.map_summary_polyline,
+      );
 
       set((state) => {
+        state.activityDict = Object.fromEntries(
+          activities.map((act) => [act.id, act]),
+        );
+        state.geoJson = {
+          type: 'FeatureCollection',
+          features: validActivities.map(createFeature),
+        };
         state.loading = false;
         state.loaded = true;
-        activities.forEach((activity) => {
-          state.activityDict[activity.id] = activity;
-          if (activity.map_polyline || activity.map_summary_polyline) {
-            try {
-              state.geoJson.features.push(FeatureFromActivity(activity));
-            } catch (e) {
-              console.warn(
-                `Failed to create feature for activity ${activity.id}:`,
-                e,
-              );
-            }
-          }
-        });
       });
+
+      console.log('Store state updated with activities:', {
+        activityCount: activities.length,
+        featureCount: validActivities.length,
+      });
+
       return activities.length;
-    } catch (e) {
+    } catch (error) {
+      console.error('Error loading activities from DB:', error);
       set((state) => {
         state.loading = false;
       });
-      throw new Error('Failed to fetch activities');
+      return 0;
     }
   },
 
@@ -223,7 +251,7 @@ export const createActivitySlice: StateCreator<
                 if (featureIndex !== -1) {
                   state.geoJson.features.splice(featureIndex, 1);
                 }
-                state.geoJson.features.push(FeatureFromActivity(activity));
+                state.geoJson.features.push(createFeature(activity));
               } catch (e) {
                 console.warn(
                   `Failed to create feature for activity ${activity.id}:`,
@@ -307,7 +335,7 @@ export const createActivitySlice: StateCreator<
                 if (featureIndex !== -1) {
                   state.geoJson.features.splice(featureIndex, 1);
                 }
-                state.geoJson.features.push(FeatureFromActivity(activity));
+                state.geoJson.features.push(createFeature(activity));
               } catch (e) {
                 console.warn(
                   `Failed to create feature for activity ${activity.id}:`,

@@ -150,26 +150,92 @@ export async function getActivities({
   ids,
   athlete_id,
   summary = false,
+  public_ids,
+  user_id,
 }: {
   ids?: number[];
   athlete_id?: string;
   summary?: boolean;
+  public_ids?: number[];
+  user_id?: string;
 }) {
-  if (!athlete_id && !ids && !summary) {
+  console.log('getActivities called with:', {
+    ids,
+    athlete_id,
+    summary,
+    public_ids,
+    user_id,
+  });
+
+  if (!athlete_id && !ids && !summary && !public_ids && !user_id) {
+    console.log('No specific parameters provided, fetching account');
     const account = await getAccount({});
     if (!account) throw new Error('No account found');
     athlete_id = account.providerAccountId;
+    console.log('Using athlete_id from account:', athlete_id);
   }
 
-  return athlete_id
-    ? await db
-        .select()
-        .from(activities)
-        .where(eq(activities.athlete, parseInt(athlete_id)))
-        .orderBy(desc(activities.start_date_local))
-    : ids
-      ? await db.select().from(activities).where(inArray(activities.id, ids))
-      : await db.select().from(activities);
+  let result;
+
+  if (public_ids) {
+    console.log('Fetching by public_ids:', public_ids);
+    result = await db
+      .select()
+      .from(activities)
+      .where(inArray(activities.public_id, public_ids))
+      .orderBy(desc(activities.start_date_local));
+  } else if (user_id) {
+    console.log('Fetching by user_id:', user_id);
+    const user = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.id, user_id),
+    });
+    if (!user) throw new Error('User not found');
+
+    const userAccount = await db.query.accounts.findFirst({
+      where: (accounts, { eq }) => eq(accounts.userId, user_id),
+    });
+    if (!userAccount) throw new Error('Account not found');
+
+    console.log('Found user account:', {
+      userId: user_id,
+      providerAccountId: userAccount.providerAccountId,
+    });
+
+    result = await db
+      .select()
+      .from(activities)
+      .where(eq(activities.athlete, parseInt(userAccount.providerAccountId)))
+      .orderBy(desc(activities.start_date_local));
+  } else if (athlete_id) {
+    console.log('Fetching by athlete_id:', athlete_id);
+    result = await db
+      .select()
+      .from(activities)
+      .where(eq(activities.athlete, parseInt(athlete_id)))
+      .orderBy(desc(activities.start_date_local));
+  } else if (ids) {
+    console.log('Fetching by specific ids:', ids);
+    result = await db
+      .select()
+      .from(activities)
+      .where(inArray(activities.id, ids));
+  } else {
+    console.log('Fetching all activities');
+    result = await db.select().from(activities);
+  }
+
+  console.log('Query completed:', {
+    resultCount: result.length,
+    firstActivity: result[0]
+      ? {
+          id: result[0].id,
+          name: result[0].name,
+          athlete: result[0].athlete,
+        }
+      : null,
+  });
+
+  return result;
 }
 
 export async function getActivitiesPaged({
