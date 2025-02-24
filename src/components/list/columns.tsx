@@ -7,7 +7,7 @@ import { Checkbox } from '~/components/ui/checkbox';
 import { type Activity, type Photo } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
 
-import { DataTableColumnHeader } from './data-table';
+import { DataTableColumnHeader } from './data-table-column-header';
 import {
   activityFields,
   type ActivityField,

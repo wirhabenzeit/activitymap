@@ -9,7 +9,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Strava({
       authorization: {
-        params: { scope: 'activity:read,activity:write' },
+        params: { scope: 'read,activity:read,activity:write' },
       },
     }),
   ],
