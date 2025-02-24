@@ -50,8 +50,8 @@ function columnFromField<K extends ActivityValueType>(
       title: spec.title,
       width: 'minmax(70px, 1fr)',
     },
-    header: ({ column, table }) => (
-      <DataTableColumnHeader table={table} column={column}>
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column}>
         <div className="w-full justify-end flex">
           {spec.Icon && <spec.Icon className="w-4 h-4" />}
         </div>
@@ -68,8 +68,8 @@ export const columns: ColumnDef<Activity>[] = [
   {
     id: 'id',
     accessorKey: 'id',
-    header: ({ column, table }) => (
-      <DataTableColumnHeader table={table} column={column} title="ID" />
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="ID" />
     ),
     enableHiding: false,
     filterFn: (
@@ -83,7 +83,7 @@ export const columns: ColumnDef<Activity>[] = [
     accessorKey: 'name',
     meta: { title: 'Name', width: 'minmax(200px, 3fr)' },
     header: ({ column, table }) => (
-      <DataTableColumnHeader table={table} column={column}>
+      <DataTableColumnHeader column={column}>
         <div className="flex items-center space-x-2">
           <Checkbox
             className="h-6 w-6"
@@ -131,12 +131,8 @@ export const columns: ColumnDef<Activity>[] = [
     id: 'description',
     accessorKey: 'description',
     meta: { title: 'Description', width: 'minmax(200px, 3fr)' },
-    header: ({ column, table }) => (
-      <DataTableColumnHeader
-        table={table}
-        column={column}
-        title="Description"
-      />
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Description" />
     ),
     enableResizing: true,
     cell: ({ row }) => <DescriptionCard row={row} />,
@@ -145,8 +141,8 @@ export const columns: ColumnDef<Activity>[] = [
     id: 'photos',
     accessorKey: 'photos',
     meta: { title: 'Photos', width: 'minmax(80px, 1fr)' },
-    header: ({ column, table }) => (
-      <DataTableColumnHeader table={table} column={column} title="Photos" />
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Photos" />
     ),
     cell: ({ getValue, row }) => {
       const photos = getValue() as Photo[] | undefined;
@@ -159,8 +155,8 @@ export const columns: ColumnDef<Activity>[] = [
     id: 'is_complete',
     accessorKey: 'is_complete',
     meta: { title: 'Complete', width: 'minmax(80px, 1fr)' },
-    header: ({ column, table }) => (
-      <DataTableColumnHeader table={table} column={column} title="Complete" />
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Complete" />
     ),
     cell: ({ getValue }) => {
       const isComplete = getValue() as boolean;
@@ -172,8 +168,8 @@ export const columns: ColumnDef<Activity>[] = [
   {
     id: 'edit',
     meta: { title: 'Edit', width: '40px' },
-    header: ({ column, table }) => (
-      <DataTableColumnHeader table={table} column={column} title="Edit" />
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Edit" />
     ),
     cell: ({ row }) => <EditActivity row={row} trigger={true} />,
     enableResizing: false,

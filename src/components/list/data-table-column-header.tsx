@@ -1,10 +1,11 @@
 'use client';
+'use no memo';
 
 import { type Column } from '@tanstack/react-table';
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   CaretSortIcon,
+  CaretDownIcon,
+  CaretUpIcon,
 } from '@radix-ui/react-icons';
 import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
@@ -38,9 +39,9 @@ export function DataTableColumnHeader<TData, TValue>({
         onClick={() => column.toggleSorting()}
       >
         {column.getIsSorted() === 'desc' ? (
-          <ArrowDownIcon className="h-4 w-4" />
+          <CaretDownIcon className="h-4 w-4" />
         ) : column.getIsSorted() === 'asc' ? (
-          <ArrowUpIcon className="h-4 w-4" />
+          <CaretUpIcon className="h-4 w-4" />
         ) : (
           <CaretSortIcon className="h-4 w-4" />
         )}

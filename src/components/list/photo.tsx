@@ -11,7 +11,6 @@ import {
   CarouselPrevious,
 } from '~/components/ui/carousel';
 import { cn } from '~/lib/utils';
-import Image from 'next/image';
 
 interface PhotoLightboxProps {
   photos: Photo[];
@@ -59,8 +58,6 @@ export function PhotoLightbox({
           >
             <img
               src={photo.url}
-              //width={photo.width}
-              //height={photo.height}
               alt={photo.caption}
               className="h-full rounded-sm aspect-square object-cover"
               onClick={() => {
@@ -86,8 +83,6 @@ export function PhotoLightbox({
                 >
                   <img
                     src={photo.url}
-                    //width={photo.width}
-                    //height={photo.height}
                     alt={photo.caption}
                     className="max-w-[calc(100vw-4rem)] max-h-[calc(100vh-4rem)] object-contain rounded-lg border-2 border-background"
                     onClick={(e) => e.stopPropagation()}

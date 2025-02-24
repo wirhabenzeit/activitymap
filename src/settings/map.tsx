@@ -1,6 +1,3 @@
-import { LayerSAC } from '~/components/map/LayerSAC';
-import { LayerFriflyt } from '~/components/map/LayerFriflyt';
-import { LayerQuaeldich } from '~/components/map/LayerQuaeldich';
 import { LngLatBounds } from 'mapbox-gl';
 import type { RefObject } from 'react';
 import type { MapRef } from 'react-map-gl';
@@ -101,7 +98,7 @@ export const mapSettings: Record<string, MapSetting> = {
     overlay: false,
   },
   NorgesKart: {
-    url: `https://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo4&zoom={z}&x={x}&y={y}`,
+    url: `https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png`,
     type: 'raster',
     visible: false,
     overlay: false,

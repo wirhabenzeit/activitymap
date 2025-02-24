@@ -42,7 +42,7 @@ import {
 
 interface ListState {
   density: DensityState;
-  columnPinning: { left: string[]; right: string[] };
+  columnPinning: { left?: string[]; right?: string[] };
   summaryRow: SummaryRowState;
 }
 
@@ -58,7 +58,7 @@ interface ListActions {
   setColumnVisibility: (updater: Updater<VisibilityState>) => void;
   setDensity: (updater: Updater<DensityState>) => void;
   setColumnPinning: (
-    updater: Updater<{ left: string[]; right: string[] }>,
+    updater: Updater<{ left?: string[]; right?: string[] }>,
   ) => void;
   setSummaryRow: (updater: Updater<SummaryRowState>) => void;
 }

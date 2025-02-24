@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import {
   type ControlPosition,
   type IControl,
-  type MapboxMap,
   useControl,
 } from 'react-map-gl/mapbox';
 

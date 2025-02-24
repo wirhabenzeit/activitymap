@@ -2,7 +2,6 @@ import { Marker } from 'react-map-gl/mapbox';
 import { useShallowStore } from '~/store';
 import { Avatar, AvatarImage } from '../ui/avatar';
 import { useMemo, useState } from 'react';
-import { useShallow } from 'zustand/shallow';
 
 export default function PhotoLayer() {
   const { photos, position, filterIDs } = useShallowStore((state) => ({
