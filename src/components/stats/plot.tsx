@@ -8,7 +8,6 @@ import { useShallowStore, useStore } from '~/store';
 import { useContext } from 'react';
 import { StatsContext } from '~/app/stats/[name]/StatsContext';
 import statsPlots, {
-  type StatsSetter,
   type StatsSetting,
   type StatsSettings,
 } from './index';
@@ -29,54 +28,75 @@ import { type Activity } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
 import { type Plot } from '@observablehq/plot';
 
-type Stats<K extends keyof StatsSetting> = {
+// Define a union type for all possible setting keys
+type SettingKey = keyof StatsSetting;
+
+type Stats<K extends SettingKey> = {
   settings: StatsSettings[K];
   setting: StatsSetting[K];
-  setter: StatsSetter[K];
+  setter: (updater: (prev: StatsSetting[K]) => StatsSetting[K]) => void;
   plot: (
     setting: StatsSetting[K],
   ) => ({
     activities,
     width,
     height,
+    theme,
   }: {
     activities: Activity[];
     width: number;
     height: number;
-  }) => Plot & HTMLElement;
-  legend: (setting: StatsSetting[K]) => (plot: Plot) => Plot & HTMLElement;
+    theme: "light" | "dark";
+  }) => (Plot & HTMLElement) | null;
+  legend: (setting: StatsSetting[K]) => (plot: Plot) => (Plot & HTMLElement) | null;
   kind: K;
 };
 
-function makePlot(stat: Stats<keyof StatsSetting>) {
+function makePlot<K extends SettingKey>(stat: Stats<K>) {
   return stat.plot(stat.setting);
 }
 
-function makeLegend(stat: Stats<keyof StatsSetting>) {
+function makeLegend<K extends SettingKey>(stat: Stats<K>) {
   return stat.legend(stat.setting);
 }
 
-type FormElementProps<T extends keyof StatsSetting> = {
-  propName: T;
-  stat: Stats<T>;
+// Define a base setting type that captures common properties
+type BaseSetting = {
+  type: string;
+  [key: string]: unknown;
 };
 
-function FormElement<T extends keyof StatsSetting>({
+// Define a generic stats type for FormElement
+type GenericStats = {
+  settings: Record<string, BaseSetting>;
+  setting: Record<string, unknown>;
+  setter: (updater: (prev: Record<string, unknown>) => Record<string, unknown>) => void;
+  kind: SettingKey;
+};
+
+type FormElementProps = {
+  propName: string;
+  stat: GenericStats;
+};
+
+function FormElement({
   propName,
   stat,
-}: FormElementProps<T>) {
+}: FormElementProps) {
   const setting = stat.settings[propName];
+  if (!setting) return null;
+  
   const value = stat.setting[propName];
-  const setter = (value: StatsSetting[T]) =>
-    stat.setter((s) => ({ ...s, [propName]: value(s[propName]) }));
+  const setter = (valueFn: (val: unknown) => unknown) =>
+    stat.setter((s) => ({ ...s, [propName]: valueFn(s[propName]) }));
 
   switch (setting.type) {
     case 'categorical':
       return (
         <SelectFormElement
           key={propName}
-          setting={setting}
-          value={value}
+          setting={setting as CategoricalSetting<string, unknown>}
+          value={value as string}
           setter={setter}
         />
       );
@@ -84,9 +104,9 @@ function FormElement<T extends keyof StatsSetting>({
       return (
         <SliderFormElement
           key={propName}
-          setting={setting}
-          value={value}
-          setter={setter}
+          setting={setting as ValueSetting}
+          value={value as SliderValue}
+          setter={setter as unknown as (value: (val: SliderValue) => SliderValue) => void}
         />
       );
     default:
@@ -94,11 +114,11 @@ function FormElement<T extends keyof StatsSetting>({
   }
 }
 
-function Form<T extends keyof StatsSetting>(stat: Stats<T>) {
+function FormComponent<T extends SettingKey>({ stat }: { stat: Stats<T> }) {
   return (
     <>
-      {(Object.keys(stat.settings) as T[]).map((propName) => (
-        <FormElement key={propName} propName={propName} stat={stat} />
+      {Object.keys(stat.settings).map((propName) => (
+        <FormElement key={propName} propName={propName} stat={stat as unknown as GenericStats} />
       ))}
     </>
   );
@@ -111,7 +131,7 @@ type CategoricalSetting<K extends string, T> = {
     K,
     {
       label: string;
-      [key: string]: any;
+      [key: string]: unknown;
     } & T
   >;
 };
@@ -121,17 +141,15 @@ export const SelectFormElement = <K extends string, T>({
   value,
   setter,
 }: {
-  key: string;
-  keyName: string;
   setting: CategoricalSetting<K, T>;
   value: K;
-  setter: (value: K) => void;
+  setter: (value: (val: unknown) => unknown) => void;
 }) => {
   const ssetting = useStore((state) => state.settings);
   if (Object.keys(setting.options).length == 1) return null;
   console.log(ssetting, setting, value);
   return (
-    <Select value={value} onValueChange={(val) => setter(() => val)}>
+    <Select value={value} onValueChange={(val) => setter(() => val as K)}>
       <SelectTrigger className="w-[140px]">
         <SelectValue placeholder="Theme" />
       </SelectTrigger>
@@ -154,14 +172,16 @@ type ValueSetting = {
   maxIcon: JSX.Element;
 };
 
+type SliderValue = { value: number; domain: [number, number] };
+
 export const SliderFormElement = ({
   setting,
   value,
   setter,
 }: {
   setting: ValueSetting;
-  value: { value: number; domain: [number, number] };
-  setter: (value: number) => void;
+  value: SliderValue;
+  setter: (value: (val: SliderValue) => SliderValue) => void;
 }) => {
   return (
     <div className="flex items-center space-x-1">
@@ -181,7 +201,10 @@ export const SliderFormElement = ({
         min={value.domain[0]}
         max={value.domain[1]}
         onValueChange={(v) => {
-          if (v?.[0]) setter((val) => ({ value: v[0], domain: val.domain }));
+          const newValue = v?.[0];
+          if (typeof newValue === 'number') {
+            setter((val) => ({ value: newValue, domain: val.domain }));
+          }
         }}
       />
       <Button
@@ -198,7 +221,6 @@ export const SliderFormElement = ({
   );
 };
 
-type Setting = CategoricalSetting<any, any> | ValueSetting;
 
 export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
   const { activityDict, filterIDs, settings, setSettings } = useShallowStore(
@@ -221,19 +243,21 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
       setting: settings[name],
       kind: name,
       settings: statsPlots[name].settings,
-      setter: (value) =>
+      setter: (value: (prev: StatsSetting[typeof name]) => StatsSetting[typeof name]) =>
         setSettings((setting) => ({
           ...setting,
           [name]: value(setting[name]),
         })),
     }),
-    [settings],
+    [settings, name, setSettings],
   );
 
   useEffect(() => {
     if (!figureRef.current || !settingsRef.current) return;
 
-    const plot = makePlot(stats)({
+    // Use type assertion with unknown as intermediate step
+    const plotFn = makePlot(stats as unknown as Stats<typeof name>);
+    const plot = plotFn({
       activities: filterIDs.map((id) => activityDict[id]!),
       width,
       height,
@@ -242,13 +266,13 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
 
     if (!plot) return;
 
-    plot.style = 'margin: 0;';
+    plot.setAttribute('style', 'margin: 0;');
     figureRef.current.append(plot as Node);
 
-    const legend = makeLegend(stats)(plot);
+    const legendFn = makeLegend(stats as unknown as Stats<typeof name>);
+    const legend = legendFn(plot);
     if (legend) {
-      legend.style =
-        'min-height: 0; display: block; margin-bottom: 0 !important;';
+      legend.setAttribute('style', 'min-height: 0; display: block; margin-bottom: 0 !important;');
       settingsRef.current.append(legend);
     }
 
@@ -256,12 +280,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
       plot.remove();
       if (legend) legend.remove();
     };
-  }, [width, height, activityDict, settings[name], filterIDs, theme]);
-
-  const form = useMemo(
-    () => (settingsRef.current ? Form<typeof name>(stats) : null),
-    [stats, name, settingsRef.current],
-  );
+  }, [width, height, activityDict, settings[name], filterIDs, theme, name, stats, settingsRef]);
 
   return (
     <>
@@ -273,7 +292,10 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
         }}
         ref={figureRef}
       />
-      {settingsRef.current && form && createPortal(form, settingsRef.current)}
+      {settingsRef.current && createPortal(
+        <FormComponent stat={stats as unknown as Stats<typeof name>} />, 
+        settingsRef.current
+      )}
     </>
   );
 }

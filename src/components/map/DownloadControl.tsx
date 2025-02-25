@@ -39,7 +39,7 @@ export function Download() {
       container: container,
       center: map.current.getCenter(),
       zoom: map.current.getZoom(),
-      style: map.current.getStyle(),
+      style: map.current.getStyle() ?? undefined,
       bearing: map.current.getBearing(),
       pitch: map.current.getPitch(),
       interactive: false,

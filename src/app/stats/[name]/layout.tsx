@@ -35,18 +35,16 @@ const TabsLinkTrigger: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ href, children, className }) => (
-  <TabsTrigger value={href} asChild className={className ? className : ''}>
+  <TabsTrigger value={href} asChild className={className ?? ''}>
     <Link href={href}>{children}</Link>
   </TabsTrigger>
 );
 
 export default function Stats({ children }: { children: React.ReactNode }) {
-  const { settingsOpen, setSettingsOpen, activeTab, setActiveTab } = useStore(
+  const { settingsOpen, setSettingsOpen } = useStore(
     useShallow((state) => ({
       settingsOpen: state.settingsOpen,
       setSettingsOpen: state.setSettingsOpen,
-      setActiveTab: state.setActiveTab,
-      activeTab: state.activeTab,
     })),
   );
 

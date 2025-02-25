@@ -12,8 +12,6 @@ import { getUser, getAccount } from '~/server/db/actions';
 import type { InitialAuth } from '~/store/auth';
 import { Toaster } from '~/components/ui/toaster';
 import { ToastManager } from '~/components/providers/toast';
-import { cn } from '~/lib/utils';
-import { headers } from 'next/headers';
 
 export const metadata = {
   title: 'ActivityMap',

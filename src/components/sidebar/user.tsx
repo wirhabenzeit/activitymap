@@ -8,7 +8,6 @@ import {
   Info,
 } from 'lucide-react';
 
-import Link from 'next/link';
 import { signIn, signOut } from 'next-auth/react';
 
 import { useShallowStore } from '~/store';
@@ -28,19 +27,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 import * as React from 'react';
 import Image from 'next/image';
 import { cn } from '~/lib/utils';
-import { User2 } from 'lucide-react';
 import { checkWebhookStatus } from '~/server/strava/actions';
 import { env } from '~/env';
 
 export function UserSettings() {
-  const { user, loading, account, loadFromStrava, isInitialized } =
-    useShallowStore((state) => ({
+  const { user, loading, loadFromStrava, isInitialized } = useShallowStore(
+    (state) => ({
       user: state.user,
       loading: state.loading,
-      account: state.account,
       loadFromStrava: state.loadFromStrava,
       isInitialized: state.isInitialized,
-    }));
+    }),
+  );
 
   const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
 

@@ -3,8 +3,6 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useShallowStore } from '~/store';
-import type { Session } from 'next-auth';
-import type { User, Account } from '~/server/db/schema';
 import type { InitialAuth } from '~/store/auth';
 
 export function AuthProvider({

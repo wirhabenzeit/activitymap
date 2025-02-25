@@ -1,9 +1,8 @@
 'use client';
 
-import { type ComponentType } from 'react';
 import { useEffect } from 'react';
 
-import { type LucideProps, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 import { useShallowStore } from '~/store';
 
@@ -43,17 +42,6 @@ import { cn } from '~/lib/utils';
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
 import { Checkbox } from '../ui/checkbox';
 import { type SportType } from '~/server/db/schema';
-import { type CheckedState } from '@radix-ui/react-checkbox';
-
-type DropdownProps = {
-  title: string;
-  values: Record<SportType, CheckedState>;
-  Icon: ComponentType<LucideProps>;
-  color: string;
-  onToggle: () => void;
-  onChange: (value: SportType) => void;
-  active: boolean;
-};
 
 export function CategoryFilter() {
   const { sportType, sportGroup, setSportGroup, setSportType } =
@@ -69,6 +57,19 @@ export function CategoryFilter() {
   );
 
   useEffect(() => {
+    const doSingleClickThing = () => {
+      if (key) setSportGroup((group) => ({ ...group, [key]: !group[key] }));
+    };
+
+    const doDoubleClickThing = () => {
+      if (key)
+        setSportGroup(
+          (group) =>
+            Object.fromEntries(
+              Object.keys(group).map((k) => [k, k === key]),
+            ) as Record<keyof typeof categorySettings, boolean>,
+        );
+    };
     let singleClickTimer: NodeJS.Timeout;
     if (clicks === 1) {
       singleClickTimer = setTimeout(function () {
@@ -80,21 +81,7 @@ export function CategoryFilter() {
       setClicks(0);
     }
     return () => clearTimeout(singleClickTimer);
-  }, [clicks]);
-
-  const doSingleClickThing = () => {
-    if (key) setSportGroup((group) => ({ ...group, [key]: !group[key] }));
-  };
-
-  const doDoubleClickThing = () => {
-    if (key)
-      setSportGroup(
-        (group) =>
-          Object.fromEntries(
-            Object.keys(group).map((k) => [k, k === key]),
-          ) as Record<keyof typeof categorySettings, boolean>,
-      );
-  };
+  }, [clicks, key, setSportGroup]);
 
   return (
     <SidebarMenu>
@@ -184,7 +171,7 @@ export function InequalityFilter({
       ...prev,
       [name]: input === '' ? undefined : { value: transformed, operator },
     }));
-  }, [operator, value, input, name]);
+  }, [operator, value, input, name, setValues]);
 
   return (
     <SidebarMenuItem>
@@ -279,7 +266,7 @@ export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
         {binaryFilters[name].label}
       </label>
       <Checkbox
-        checked={binary === undefined ? 'indeterminate' : binary}
+        checked={binary ?? 'indeterminate'}
         onCheckedChange={handleChange}
       />
     </SidebarMenuItem>

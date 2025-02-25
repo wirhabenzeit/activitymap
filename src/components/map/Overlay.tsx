@@ -5,7 +5,7 @@ import {
   type IControl,
   useControl,
 } from 'react-map-gl/mapbox';
-
+import { type Map as MapboxMap } from 'mapbox-gl';
 type Config = {
   position: ControlPosition;
   redraw?: () => void;
@@ -69,7 +69,7 @@ const Overlay = ({ position, children }: OverlayProps) => {
   const elem = ctrl.getElement();
   if (map === null || elem === null) return;
 
-  return createPortal(cloneElement(children, { map }), elem);
+  return createPortal(cloneElement(children), elem);
 };
 
 export default memo(Overlay);
