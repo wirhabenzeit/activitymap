@@ -51,7 +51,7 @@ export default async function RootLayout({
       style={{ width: '100dvw', height: '100dvh' }}
       suppressHydrationWarning
     >
-      <ReactScan />
+      {/* <ReactScan /> */}
       <head>
         <meta
           name="viewport"
