@@ -1,6 +1,4 @@
 import { LngLatBounds } from 'mapbox-gl';
-import type { RefObject } from 'react';
-import type { MapRef } from 'react-map-gl';
 
 type RasterMapSetting = {
   url: string;
@@ -17,18 +15,8 @@ type VectorMapSetting = {
   overlay: false;
 };
 
-export type CustomLayerProps = {
-  mapRef: RefObject<MapRef | null>;
-};
 
-type CustomMapSetting = {
-  type: 'custom';
-  visible: boolean;
-  overlay: true;
-  component: React.FC<CustomLayerProps>;
-};
-
-type MapSetting = RasterMapSetting | VectorMapSetting | CustomMapSetting;
+type MapSetting = RasterMapSetting | VectorMapSetting ;
 
 export const mapSettings: Record<string, MapSetting> = {
   'Mapbox Street': {
@@ -103,24 +91,6 @@ export const mapSettings: Record<string, MapSetting> = {
     visible: false,
     overlay: false,
   },
-  // "SAC Tourenportal": {
-  //   overlay: true,
-  //   visible: false,
-  //   type: "custom",
-  //   component: LayerSAC,
-  // },
-  // "Friflyt Routes": {
-  //   overlay: true,
-  //   visible: false,
-  //   type: "custom",
-  //   component: LayerFriflyt,
-  // },
-  // "Quäldich Pässe": {
-  //   overlay: true,
-  //   visible: false,
-  //   type: "custom",
-  //   component: LayerQuaeldich,
-  // },
   'Swisstopo Ski': {
     url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/{z}/{x}/{y}.png`,
     type: 'raster',

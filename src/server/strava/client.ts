@@ -29,7 +29,7 @@ export class StravaClient {
   ): Promise<T> {
     console.log('Making Strava API request:', {
       endpoint,
-      method: options.method || 'GET',
+      method: options.method ?? 'GET',
       hasAuthToken: !!this.accessToken,
       retryCount,
     });
@@ -53,7 +53,12 @@ export class StravaClient {
     if (!response.ok) {
       const contentType = response.headers.get('content-type');
       let errorMessage: string;
-      let errorDetails: any;
+      let errorDetails: {
+        message?: string;
+        errors?: Array<{ resource: string; field: string; code: string }>;
+        rawResponse?: string;
+        parseError?: unknown;
+      } = {};
 
       try {
         if (contentType?.includes('application/json')) {
@@ -66,7 +71,7 @@ export class StravaClient {
         }
       } catch (parseError) {
         console.error('Error parsing error response:', parseError);
-        errorMessage = `Failed to parse error response: ${parseError}`;
+        errorMessage = `Failed to parse error response: ${String(parseError)}`;
         errorDetails = { parseError };
       }
 
@@ -104,7 +109,7 @@ export class StravaClient {
         status: response.status,
         contentType: response.headers.get('content-type'),
       });
-      throw new Error(`Failed to parse response as JSON: ${parseError}`);
+      throw new Error(`Failed to parse response as JSON: ${String(parseError)}`);
     }
   }
 
@@ -156,8 +161,8 @@ export class StravaClient {
     // Merge the URLs from both requests into the large photos
     return largePhotos.map((photo, index) => ({
       ...photo,
-      urls: { ...(smallPhotos[index]?.urls || {}), ...(photo.urls || {}) },
-      sizes: { ...(smallPhotos[index]?.sizes || {}), ...(photo.sizes || {}) },
+      urls: { ...(smallPhotos[index]?.urls ?? {}), ...(photo.urls ?? {}) },
+      sizes: { ...(smallPhotos[index]?.sizes ?? {}), ...(photo.sizes ?? {}) },
     }));
   }
 

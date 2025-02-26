@@ -372,7 +372,7 @@ function Map() {
           data={rows}
           selected={selected}
           setSelected={setSelected}
-          map={mapRefLoc.current ?? undefined}
+          map={mapRefLoc}
           columnFilters={columnFilters}
           {...compactList}
         />

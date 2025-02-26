@@ -1,8 +1,8 @@
 import { type StateCreator } from 'zustand';
-import { type Dispatch, type SetStateAction } from 'react';
+import { type SetStateAction } from 'react';
 import { type SportType, type Activity } from '~/server/db/schema';
 import { categorySettings, type CategorySetting } from '~/settings/category';
-import { type inequalityFilters, binaryFilters } from '~/settings/filter';
+import { type inequalityFilters } from '~/settings/filter';
 import { type RootState } from './index';
 
 type CategoryGroup = keyof CategorySetting;

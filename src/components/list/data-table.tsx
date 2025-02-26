@@ -19,6 +19,7 @@ import {
   flexRender,
 } from '@tanstack/react-table';
 import { type MapRef } from 'react-map-gl/mapbox';
+import { type RefObject } from 'react';
 
 import {
   Table,
@@ -73,7 +74,7 @@ interface DataTableProps<TData, TValue> extends ListState, ListActions {
   selected: number[];
   setSelected: (updater: Updater<number[]>) => void;
   columnFilters: ColumnFiltersState;
-  map?: MapRef;
+  map?: RefObject<MapRef | null>;
 }
 
 interface RowWithId {

@@ -115,7 +115,7 @@ export const columns: ColumnDef<Activity>[] = [
       return (
         <ActivityCard
           row={row}
-          map={mapRef ? { current: mapRef } : undefined}
+          map={mapRef}
         />
       );
     },

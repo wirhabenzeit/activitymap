@@ -145,9 +145,7 @@ export const SelectFormElement = <K extends string, T>({
   value: K;
   setter: (value: (val: unknown) => unknown) => void;
 }) => {
-  const ssetting = useStore((state) => state.settings);
   if (Object.keys(setting.options).length == 1) return null;
-  console.log(ssetting, setting, value);
   return (
     <Select value={value} onValueChange={(val) => setter(() => val as K)}>
       <SelectTrigger className="w-[140px]">

@@ -12,6 +12,7 @@ import { getUser, getAccount } from '~/server/db/actions';
 import type { InitialAuth } from '~/store/auth';
 import { Toaster } from '~/components/ui/toaster';
 import { ToastManager } from '~/components/providers/toast';
+import { ReactScan } from '~/components/react-scan';
 
 export const metadata = {
   title: 'ActivityMap',
@@ -50,6 +51,7 @@ export default async function RootLayout({
       style={{ width: '100dvw', height: '100dvh' }}
       suppressHydrationWarning
     >
+      <ReactScan />
       <head>
         <meta
           name="viewport"

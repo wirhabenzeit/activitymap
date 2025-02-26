@@ -10,6 +10,7 @@ import {
   functionalUpdate,
 } from '@tanstack/react-table';
 import type { MapRef } from 'react-map-gl/mapbox';
+import { type RefObject } from 'react';
 
 // Density Feature
 export type DensityState = 'sm' | 'md' | 'lg';
@@ -76,26 +77,26 @@ export const DensityFeature: TableFeature = {
 
 // Map Feature
 export interface MapTableState {
-  map?: MapRef;
+  map?: RefObject<MapRef | null>;
 }
 
 export interface MapOptions {
-  onMapChange?: OnChangeFn<MapRef | undefined>;
+  onMapChange?: OnChangeFn<RefObject<MapRef | null> | undefined>;
 }
 
 export interface MapInstance {
-  setMap: (updater: Updater<MapRef | undefined>) => void;
+  setMap: (updater: Updater<RefObject<MapRef | null> | undefined>) => void;
 }
 
 declare module '@tanstack/react-table' {
   interface TableState {
-    map?: MapRef;
+    map?: RefObject<MapRef | null>;
   }
   interface TableOptionsResolved<TData extends RowData> {
-    onMapChange?: OnChangeFn<MapRef | undefined>;
+    onMapChange?: OnChangeFn<RefObject<MapRef | null> | undefined>;
   }
   interface Table<TData extends RowData> {
-    setMap: (updater: Updater<MapRef | undefined>) => void;
+    setMap: (updater: Updater<RefObject<MapRef | null> | undefined>) => void;
   }
 }
 
@@ -115,7 +116,7 @@ export const MapFeature: TableFeature = {
   },
   createTable: <TData extends RowData>(table: Table<TData>): void => {
     table.setMap = (updater) => {
-      const safeUpdater: Updater<MapRef | undefined> = (old) => {
+      const safeUpdater: Updater<RefObject<MapRef | null> | undefined> = (old) => {
         const newState = functionalUpdate(updater, old);
         return newState;
       };

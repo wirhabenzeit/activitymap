@@ -4,11 +4,14 @@ import { type RootState } from './index';
 import { type Activity } from '~/server/db/schema';
 import { defaultStatsSettings, type StatsSetting } from '~/components/stats';
 
-export type StatsTab =
-  | '/stats/scatter'
-  | '/stats/calendar'
-  | '/stats/progress'
-  | '/stats/timeline';
+export enum StatsPlots {
+  calendar = '/stats/calendar',
+  progress = '/stats/progress',
+  timeline = '/stats/timeline',
+  scatter = '/stats/scatter',
+}
+
+export type StatsTab = typeof StatsPlots[keyof typeof StatsPlots];
 
 export type Value = {
   id: string;
@@ -48,7 +51,7 @@ export const createStatsSlice: StateCreator<
   StatsSlice
 > = (set) => ({
   // Initial state
-  activeTab: '/stats/scatter',
+  activeTab: StatsPlots.scatter,
   settingsOpen: true,
   settings: defaultStatsSettings,
 

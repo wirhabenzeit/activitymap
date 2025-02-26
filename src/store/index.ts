@@ -1,4 +1,4 @@
-import { create, type StoreApi } from 'zustand';
+import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { useShallow } from 'zustand/shallow';
@@ -47,8 +47,8 @@ export const useStore = store;
 export const useShallowStore = Object.assign(
   <T>(selector: (state: RootState) => T) => useStore(useShallow(selector)),
   {
-    subscribe: store.subscribe,
-    getState: store.getState,
-    setState: store.setState,
+    subscribe: (...args: Parameters<typeof store.subscribe>) => store.subscribe(...args),
+    getState: () => store.getState(),
+    setState: (...args: Parameters<typeof store.setState>) => store.setState(...args),
   },
 );

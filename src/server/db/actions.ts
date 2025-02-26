@@ -1,10 +1,9 @@
 'use server';
 
-import { inArray, eq, count, desc } from 'drizzle-orm';
-import { type Activity, activities, photos, accounts } from './schema';
+import { inArray, eq, desc } from 'drizzle-orm';
+import { activities, photos, accounts } from './schema';
 import { db } from './index';
 import { auth } from '~/auth';
-import { range } from 'd3';
 import type { AdapterAccount } from 'next-auth/adapters';
 
 // Use the AdapterAccount type from next-auth
@@ -109,7 +108,7 @@ export const getAccount = async ({
         },
       });
 
-      if (!response.ok) throw tokens;
+      if (!response.ok) throw new Error('Failed to refresh access token', tokens);
 
       const newExpiresAt = Math.floor(
         currentTime + (tokens.expires_in as number),
@@ -236,26 +235,6 @@ export async function getActivities({
   });
 
   return result;
-}
-
-export async function getActivitiesPaged({
-  athlete_id,
-  pageSize = 100,
-}: {
-  athlete_id?: string;
-  pageSize: number;
-}) {
-  if (!athlete_id) {
-    const account = await getAccount({});
-    if (!account) throw new Error('No account found');
-    athlete_id = account.providerAccountId;
-  }
-
-  return db
-    .select()
-    .from(activities)
-    .where(eq(activities.athlete, parseInt(athlete_id)))
-    .orderBy(desc(activities.start_date_local));
 }
 
 export async function getPhotos() {

@@ -50,12 +50,13 @@ import { type RefObject } from 'react';
 import { LngLatBounds } from 'mapbox-gl';
 import { useShallowStore } from '~/store';
 import { PhotoLightbox } from './photo';
+import { useRouter } from 'next/navigation';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
 interface ActivityCardProps extends CardProps {
   row: Row<Activity>;
-  map?: RefObject<MapRef>;
+  map?: RefObject<MapRef | null>;
 }
 
 const formattedValue = (key: keyof typeof activityFields, row: Row<Activity>) =>
@@ -259,10 +260,13 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
 
 export function ActivityCard({ row, map }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
-  const { highlighted, setHighlighted, isGuest } = useShallowStore((state) => ({
+  const router = useRouter();
+  const { highlighted, setHighlighted, isGuest, setPosition, setSelected } = useShallowStore((state) => ({
     highlighted: state.highlighted,
     setHighlighted: state.setHighlighted,
     isGuest: state.isGuest,
+    setPosition: state.setPosition,
+    setSelected: state.setSelected,
   }));
 
   const sport_type = row.original.sport_type;
@@ -270,17 +274,44 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
 
   const handleMapClick = () => {
-    if (!map?.current) return;
     const bbox = row.original.map_bbox;
     if (!bbox || bbox.length < 4) return;
 
-    // Create a bounds object with the bbox coordinates
-    const bounds = new LngLatBounds(
-      [bbox[0], bbox[1]] as [number, number],
-      [bbox[2], bbox[3]] as [number, number],
-    );
-    map.current.fitBounds(bounds, { padding: 50 });
-    setHighlighted(row.original.id);
+    if (map?.current) {
+      // Create a bounds object with the bbox coordinates
+      const bounds = new LngLatBounds(
+        [bbox[0], bbox[1]] as [number, number],
+        [bbox[2], bbox[3]] as [number, number],
+      );
+      map.current.fitBounds(bounds, { padding: 50 });
+      setHighlighted(row.original.id);
+    } else {
+      // If map is not available, navigate to the map page
+      // Create a bounds object with the bbox coordinates
+      const bounds = new LngLatBounds(
+        [bbox[0], bbox[1]] as [number, number],
+        [bbox[2], bbox[3]] as [number, number],
+      );
+      
+      // Create a viewport state centered on the bounds
+      const center = bounds.getCenter();
+      const viewState = {
+        longitude: center.lng,
+        latitude: center.lat,
+        zoom: 12, // Default zoom level
+        bearing: 0,
+        pitch: 0,
+        padding: { top: 0, bottom: 0, left: 0, right: 0 }
+      };
+      
+      // Set the position in the store
+      setPosition(viewState, bounds);
+      setSelected((selected) => selected.includes(row.original.id) ? selected : [...selected, row.original.id]);
+      setHighlighted(row.original.id);
+      
+      // Navigate to the map page
+      router.push('/map');
+    }
   };
 
   return (

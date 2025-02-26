@@ -11,9 +11,8 @@ import { db } from '~/server/db';
 import { getAccount } from '~/server/db/actions';
 import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
-import { type UpdatableActivity, type MutableStravaPhoto } from './types';
+import { type UpdatableActivity } from './types';
 import { sql } from 'drizzle-orm';
-import { eq } from 'drizzle-orm';
 import { webhooks } from '~/server/db/schema';
 import type { StravaActivity } from './types';
 

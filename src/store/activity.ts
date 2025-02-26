@@ -109,6 +109,7 @@ export const createActivitySlice: StateCreator<
       });
       return updatedActivity;
     } catch (e) {
+      console.error('Error updating activity:', e);
       set((state) => {
         state.loading = false;
       });

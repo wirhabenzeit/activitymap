@@ -76,7 +76,7 @@ export function LayerSwitcher() {
               <DropdownMenuCheckboxItem
                 key={key}
                 checked={overlayMaps.includes(key)}
-                onClick={(e) => {
+                onClick={() => {
                   toggleOverlayMap(key);
                 }}
               >

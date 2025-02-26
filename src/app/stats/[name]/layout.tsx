@@ -17,6 +17,7 @@ import { StatsContext, StatsProvider } from './StatsContext';
 import { Button } from '~/components/ui/button';
 import { cn } from '~/lib/utils';
 import { TabsTrigger, TabsList, Tabs } from '~/components/ui/tabs';
+import { StatsPlots } from '~/store/stats';
 
 type StatsPlotsKeys = keyof typeof statsPlots;
 type TabKeys = `/stats/${StatsPlotsKeys}`;
@@ -41,14 +42,19 @@ const TabsLinkTrigger: React.FC<{
 );
 
 export default function Stats({ children }: { children: React.ReactNode }) {
-  const { settingsOpen, setSettingsOpen } = useStore(
+  const { settingsOpen, setSettingsOpen, activeTab, setActiveTab } = useStore(
     useShallow((state) => ({
       settingsOpen: state.settingsOpen,
       setSettingsOpen: state.setSettingsOpen,
+      activeTab: state.activeTab,
+      setActiveTab: state.setActiveTab,
     })),
   );
 
   const pathname = usePathname();
+  if (Object.values(StatsPlots).includes(pathname as StatsPlots)) {
+    setActiveTab(pathname as StatsPlots);
+  }
 
   const { settingsRef, elementRef } = useContext(StatsContext);
 

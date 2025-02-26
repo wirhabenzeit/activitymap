@@ -141,7 +141,7 @@ export const plot =
       .groups(activities, (x) => by.tick(new Date(x.start_date_local)))
       .flatMap(([dateKey, acts]) => {
         acts = acts.sort(
-          (a, b) => a.start_date_local_timestamp - b.start_date_local_timestamp,
+          (a, b) => a.start_date_local.getTime() - b.start_date_local.getTime(),
         );
         if (acts.length == 0) return [];
         const cumsum = d3.cumsum(acts, value.fun);

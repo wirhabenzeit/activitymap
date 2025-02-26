@@ -1,7 +1,7 @@
 'use client';
 
 import { type MapMouseEvent, Point, type PointLike } from 'mapbox-gl';
-import { useControl } from 'react-map-gl/mapbox';
+import { useControl, type IControl } from 'react-map-gl/mapbox';
 import { useShallowStore } from '~/store';
 
 const styles = `
@@ -17,15 +17,13 @@ const styles = `
 `;
 
 export function Selection() {
-  const [setSelected, selected] = useShallowStore((state) => [
+  const [setSelected] = useShallowStore((state) => [
     state.setSelected,
-    state.selected,
   ]);
 
   useControl(
-    (context: MapContextValue) =>
+    () =>
       new SelectionControl({
-        context,
         layers: ['routeLayerBG', 'routeLayerBGsel'],
         source: 'routeSource',
         selectionHandler: (sel: number[]) => {
@@ -37,11 +35,10 @@ export function Selection() {
   return null;
 }
 
-export class SelectionControl {
+export class SelectionControl implements IControl {
   layers: string[];
   source: string;
   selectionHandler: (ids: number[]) => void;
-  context: MapContextValue;
   canvas?: HTMLElement;
   map?: mapboxgl.Map;
   start?: Point;
@@ -54,12 +51,10 @@ export class SelectionControl {
     layers,
     source,
     selectionHandler,
-    context,
   }: {
     layers: string[];
     source: string;
     selectionHandler: (ids: number[]) => void;
-    context: MapContextValue;
   }) {
     const styleSheet = document.createElement('style');
     styleSheet.innerText = styles;
@@ -68,7 +63,6 @@ export class SelectionControl {
     this.layers = layers;
     this.source = source;
     this.selectionHandler = selectionHandler;
-    this.context = context;
     this._container = document.createElement('div');
   }
 

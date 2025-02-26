@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Map } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { useShallowStore } from "~/store";
 
 export function MainNav() {
   const pathname = usePathname();
+  const activeTab = useShallowStore((state) => state.activeTab);
 
   return (
     <div className="ml-2 mr-4 flex">
@@ -35,7 +37,7 @@ export function MainNav() {
           List
         </Link>
         <Link
-          href="/stats"
+          href={activeTab}
           className={cn(
             "hover:text-header-foreground transition-colors",
             pathname?.startsWith("/stats")
