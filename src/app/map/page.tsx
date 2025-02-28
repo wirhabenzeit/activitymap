@@ -1,11 +1,10 @@
 'use client';
 'use no memo';
 
-import {
+import React, {
   useState,
   useCallback,
   useMemo,
-  type FC,
   createRef,
   useEffect,
 } from 'react';
@@ -41,14 +40,14 @@ import Overlay from '~/components/map/Overlay';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-import { type CustomLayerProps, mapSettings } from '~/settings/map';
+import { mapSettings } from '~/settings/map';
 import { categorySettings } from '~/settings/category';
 
 import { Download } from '~/components/map/DownloadControl';
 import { Selection } from '~/components/map/SelectionControl';
 import { LayerSwitcher } from '~/components/map/LayerSwitcher';
 import PhotoLayer from '~/components/map/Photo';
-import { cn } from '~/lib/utils';
+import { cn, groupBy } from '~/lib/utils';
 
 function RouteLayer() {
   const { filterIDs, selected, highlighted, geoJson } = useShallowStore(
@@ -187,6 +186,7 @@ function Map() {
     togglePhotos,
     compactList,
     loaded,
+    photos,
   } = useShallowStore((state) => ({
     selected: state.selected,
     setHighlighted: state.setHighlighted,
@@ -204,6 +204,7 @@ function Map() {
     toggleThreeDim: state.toggleThreeDim,
     compactList: state.compactList,
     loaded: state.loaded,
+    photos: state.photos,
   }));
   const { open } = useSidebar();
   const mapRefLoc = createRef<MapRef>();
@@ -224,38 +225,39 @@ function Map() {
         {overlays.map((mapName) => {
           const mapSetting = mapSettings[mapName];
           if (mapSetting == undefined) return;
-          if (mapSetting.type == 'custom') {
-            const CustomLayer: FC<CustomLayerProps> = mapSetting.component;
-            return <CustomLayer key={mapName} mapRef={mapRefLoc} />;
-          } else
-            return (
-              <Source
-                key={mapName + 'source'}
+          return (
+            <Source
+              key={mapName + 'source'}
+              id={mapName}
+              type="raster"
+              tiles={[mapSetting.url]}
+              tileSize={256}
+            >
+              <Layer
+                key={mapName + 'layer'}
                 id={mapName}
                 type="raster"
-                tiles={[mapSetting.url]}
-                tileSize={256}
-              >
-                <Layer
-                  key={mapName + 'layer'}
-                  id={mapName}
-                  type="raster"
-                  paint={{
-                    'raster-opacity':
-                      'opacity' in mapSetting ? mapSetting.opacity! : 1,
-                  }}
-                />
-              </Source>
-            );
+                paint={{
+                  'raster-opacity':
+                    'opacity' in mapSetting ? mapSetting.opacity! : 1,
+                }}
+              />
+            </Source>
+          );
         })}
       </>
     ),
-    [overlays, mapRefLoc],
+    [overlays],
   );
 
   const mapSettingBase = mapSettings[baseMap]!;
+
+  const photoDict = groupBy(photos, (photo) => photo.activity_id);
   const rows = selected
-    .map((key) => activityDict[key])
+    .map((key) => ({
+      ...activityDict[key],
+      ...(key in photoDict && { photos: photoDict[key] }),
+    }))
     .filter((x) => x != undefined);
 
   return (
@@ -290,7 +292,6 @@ function Map() {
             );
           }
         }}
-        //optimizeForTerrain={true}
         projection={'globe' as unknown as mapboxgl.Projection}
         mapStyle={
           mapSettingBase.type === 'vector' ? mapSettingBase.url : undefined
@@ -306,7 +307,7 @@ function Map() {
         interactiveLayerIds={['routeLayerBG', 'routeLayerBGsel']}
       >
         {mapSettingBase != undefined && mapSettingBase.type == 'raster' && (
-          <Source type="raster" tiles={[mapSettingBase.url]} tileSize={256}>
+          <Source type="raster" tiles={[mapSettingBase.url]} tileSize={128}>
             <Layer id="baseMap" type="raster" paint={{ 'raster-opacity': 1 }} />
           </Source>
         )}

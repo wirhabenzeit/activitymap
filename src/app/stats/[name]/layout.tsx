@@ -42,11 +42,10 @@ const TabsLinkTrigger: React.FC<{
 );
 
 export default function Stats({ children }: { children: React.ReactNode }) {
-  const { settingsOpen, setSettingsOpen, activeTab, setActiveTab } = useStore(
+  const { settingsOpen, setSettingsOpen, setActiveTab } = useStore(
     useShallow((state) => ({
       settingsOpen: state.settingsOpen,
       setSettingsOpen: state.setSettingsOpen,
-      activeTab: state.activeTab,
       setActiveTab: state.setActiveTab,
     })),
   );

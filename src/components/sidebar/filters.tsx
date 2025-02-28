@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { type Dispatch, type SetStateAction, useEffect } from 'react';
 
 import { MoreHorizontal } from 'lucide-react';
 
@@ -14,6 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuAction,
+  useSidebar,
 } from '~/components/ui/sidebar';
 
 import {
@@ -146,6 +147,39 @@ export function CategoryFilter() {
   );
 }
 
+function InequalityFilterContent({
+  operator,
+  setOperator,
+  unit,
+  input,
+  validateInput,
+}: {
+  operator: '>=' | '<=';
+  setOperator: Dispatch<SetStateAction<'>=' | '<='>>;
+  unit: string;
+  input: string;
+  validateInput: (value: string) => void;
+}) {
+  return (
+    <span className="relative flex w-full items-center">
+      <Button
+        className="absolute left-1 h-6 w-6 px-1 py-1 text-foreground/60"
+        variant="secondary"
+        onClick={() => setOperator((op) => (op === '>=' ? '<=' : '>='))}
+      >
+        {operator}
+      </Button>
+      <Input
+        value={input}
+        placeholder="0"
+        onChange={(event) => validateInput(event.target.value)}
+        className="h-8 w-full pl-8 pr-8 text-right focus-visible:bg-background focus-visible:ring-0"
+      />
+      <span className="absolute right-2 py-1 text-foreground/60">{unit}</span>
+    </span>
+  );
+}
+
 export function InequalityFilter({
   name,
 }: {
@@ -164,6 +198,7 @@ export function InequalityFilter({
   };
 
   const setValues = useShallowStore((state) => state.setValues);
+  const { open } = useSidebar();
 
   React.useEffect(() => {
     const transformed = inequalityFilters[name].transform(value);
@@ -174,30 +209,30 @@ export function InequalityFilter({
   }, [operator, value, input, name, setValues]);
 
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton asChild className="pr-0">
-        <div>
-          {inequalityFilters[name].icon}
-          <span className="relative flex w-full items-center">
-            <Button
-              className="absolute left-1 h-6 w-6 px-1 py-1 text-foreground/60"
-              variant="secondary"
-              onClick={() => setOperator((op) => (op === '>=' ? '<=' : '>='))}
-            >
-              {operator}
-            </Button>
-            <Input
-              value={input}
-              placeholder="0"
-              onChange={(event) => validateInput(event.target.value)}
-              className="h-8 w-full pl-8 pr-8 text-right focus-visible:bg-background focus-visible:ring-0"
-            />
-            <span className="absolute right-2 py-1 text-foreground/60">
-              {inequalityFilters[name].unit}
-            </span>
-          </span>
-        </div>
-      </SidebarMenuButton>
+    <SidebarMenuItem className="peer/menu-button flex w-full items-center gap-0 overflow-hidden rounded-md text-left outline-hidden transition-[width,height,padding] group-data-[collapsible=icon]:size-8! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 h-8 text-sm">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button className="size-8 px-2" variant="ghost" disabled={open}>
+            {inequalityFilters[name].icon}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-2">
+          <InequalityFilterContent
+            operator={operator}
+            setOperator={setOperator}
+            unit={inequalityFilters[name].unit}
+            input={input}
+            validateInput={validateInput}
+          />
+        </PopoverContent>
+      </Popover>
+      <InequalityFilterContent
+        operator={operator}
+        setOperator={setOperator}
+        unit={inequalityFilters[name].unit}
+        input={input}
+        validateInput={validateInput}
+      />
     </SidebarMenuItem>
   );
 }

@@ -15,8 +15,7 @@ type VectorMapSetting = {
   overlay: false;
 };
 
-
-type MapSetting = RasterMapSetting | VectorMapSetting ;
+type MapSetting = RasterMapSetting | VectorMapSetting;
 
 export const mapSettings: Record<string, MapSetting> = {
   'Mapbox Street': {
@@ -61,8 +60,20 @@ export const mapSettings: Record<string, MapSetting> = {
     visible: false,
     overlay: false,
   },
-  'Swisstopo Light': {
-    url: 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.leichte-basiskarte.vt/style.json',
+  'Swisstopo Vector Basemap': {
+    url: 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json',
+    type: 'vector',
+    visible: false,
+    overlay: false,
+  },
+  'Swisstopo Vector Light': {
+    url: 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json',
+    type: 'vector',
+    visible: false,
+    overlay: false,
+  },
+  'Swisstopo Vector Winter': {
+    url: 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap-winter.vt/style.json',
     type: 'vector',
     visible: false,
     overlay: false,

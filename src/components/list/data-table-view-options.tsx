@@ -1,4 +1,5 @@
 'use client';
+'use no memo';
 
 import { type Table as TableType } from '@tanstack/react-table';
 import { type DensityState, type SummaryRowState } from './table-extensions';

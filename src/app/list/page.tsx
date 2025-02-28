@@ -2,19 +2,11 @@
 
 import { columns } from '../../components/list/columns';
 import { DataTable } from '../../components/list/data-table';
+import { groupBy } from '~/lib/utils';
 
 import { useShallowStore } from '~/store';
 
 import React from 'react';
-
-const groupBy = <T, K extends PropertyKey>(arr: T[], key: (i: T) => K) =>
-  arr.reduce(
-    (groups, item) => {
-      (groups[key(item)] ||= []).push(item);
-      return groups;
-    },
-    {} as Record<K, T[]>,
-  );
 
 export default function ListPage() {
   const { selected, setSelected, activityDict, filterIDs, tableState, photos } =
