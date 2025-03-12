@@ -32,7 +32,7 @@ export function AppSidebar() {
           <div className="h-10" />
         </SidebarHeader>
       )}
-      <SidebarContent>
+      <SidebarContent className="overflow-x-hidden">
         <SidebarGroup>
           <SidebarGroupLabel>Categories</SidebarGroupLabel>
           <SidebarGroupContent>

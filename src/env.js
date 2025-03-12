@@ -7,6 +7,7 @@ export const env = createEnv({
    * isn't built with invalid env vars.
    */
   server: {
+    CRON_SECRET: z.string(),
     DATABASE_URL: z.string().url(),
     DATABASE_URL_UNPOOLED: z.string().url(),
     PGHOST: z.string(),
@@ -46,6 +47,7 @@ export const env = createEnv({
    * middlewares) or client-side so we need to destruct manually.
    */
   runtimeEnv: {
+    CRON_SECRET: process.env.CRON_SECRET,
     POSTGRES_URL: process.env.POSTGRES_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     DATABASE_URL_UNPOOLED: process.env.DATABASE_URL_UNPOOLED,

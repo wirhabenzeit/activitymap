@@ -23,10 +23,13 @@ export function DataTablePagination<TData>({
 }: DataTablePaginationProps<TData>) {
   return (
     <div
-      className={cn('flex items-center justify-between gap-4 p-2', className)}
+      className={cn(
+        'flex items-center justify-between gap-4 p-2 border-t border-border bg-muted',
+        className,
+      )}
     >
       <span className="text-sm text-muted-foreground">
-        {`${table.getFilteredSelectedRowModel().rows.length}/${table.getFilteredRowModel().rows.length} row(s)`}
+        {`${table.getFilteredSelectedRowModel().rows.length}/${table.getFilteredRowModel().rows.length}`}
       </span>
       <DataTableViewOptions table={table} />
       <div className="flex items-center gap-4">
