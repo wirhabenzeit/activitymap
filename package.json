@@ -10,7 +10,8 @@
     "start": "next start",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:reset": "tsx drizzle/reset.ts"
+    "db:reset": "tsx drizzle/reset.ts",
+    "test:sync": "tsx src/scripts/test-sync-activities.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.8.0",

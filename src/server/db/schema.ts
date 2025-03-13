@@ -26,6 +26,9 @@ export const users = pgTable('user', {
   emailVerified: timestamp('emailVerified', { mode: 'date' }),
   image: text('image'),
   athlete_id: bigint('athlete_id', { mode: 'number' }).unique(),
+  oldest_activity_reached: boolean('oldest_activity_reached')
+    .notNull()
+    .default(false),
 });
 
 export const accounts = pgTable(
@@ -99,7 +102,7 @@ export const activities = pgTable(
     map_id: varchar('map_id'),
     map_polyline: text('map_polyline'),
     map_summary_polyline: text('map_summary_polyline'),
-    map_bbox: doublePrecision('map_bbox').array(4),
+    map_bbox: doublePrecision('map_bbox').array(),
     trainer: boolean('trainer'),
     commute: boolean('commute'),
     manual: boolean('manual'),
@@ -164,6 +167,20 @@ export const photos = pgTable(
   ],
 );
 
+export const activitySync = pgTable(
+  'activity_sync',
+  {
+    id: text('id').primaryKey(),
+    user_id: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    last_sync: timestamp('last_sync', { mode: 'date' }).defaultNow(),
+    sync_in_progress: boolean('sync_in_progress').notNull().default(false),
+    last_error: text('last_error'),
+  },
+  (table) => [index('activity_sync_user_id_idx').on(table.user_id)],
+);
+
 export const activitiesRelations = relations(activities, ({ many }) => ({
   photos: many(photos),
 }));
@@ -175,10 +192,26 @@ export const photosRelations = relations(photos, ({ one }) => ({
   }),
 }));
 
+export const activitySyncRelations = relations(activitySync, ({ one }) => ({
+  user: one(users, {
+    fields: [activitySync.user_id],
+    references: [users.id],
+  }),
+}));
+
+export const usersRelations = relations(users, ({ many }) => ({
+  accounts: many(accounts),
+  activities: many(activities, {
+    relationName: 'user_activities',
+  }),
+  activitySyncs: many(activitySync),
+}));
+
 export type User = typeof users.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type Photo = typeof photos.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
+export type ActivitySync = typeof activitySync.$inferSelect;
 
 export { sportTypes, type SportType };

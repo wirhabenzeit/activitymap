@@ -23,6 +23,7 @@ export async function updateActivity(act: UpdatableActivity) {
       throw new Error('No Strava access token found');
     }
 
+    // Token refresh is now handled by getAccount
     const client = new StravaClient(account.access_token);
 
     try {
@@ -66,13 +67,14 @@ export async function updateActivity(act: UpdatableActivity) {
   }
 }
 
-async function fetchStravaActivities({
+export async function fetchStravaActivities({
   accessToken,
   before,
   activityIds,
   includePhotos = false,
   athleteId,
   shouldDeletePhotos = false,
+  limit = 50,
 }: {
   accessToken: string;
   before?: number;
@@ -80,6 +82,7 @@ async function fetchStravaActivities({
   includePhotos?: boolean;
   athleteId: number;
   shouldDeletePhotos?: boolean;
+  limit?: number;
 }): Promise<{ activities: Activity[]; photos: Photo[] }> {
   console.log('Starting fetchStravaActivities:', {
     has_access_token: !!accessToken,
@@ -91,6 +94,7 @@ async function fetchStravaActivities({
     timestamp: new Date().toISOString(),
   });
 
+  // Token refresh is now handled outside this function
   const client = new StravaClient(accessToken);
   const photos: Photo[] = [];
 
@@ -127,7 +131,7 @@ async function fetchStravaActivities({
       console.log('Fetching summary activities');
       stravaActivities = await client.getActivities({
         before,
-        per_page: 50,
+        per_page: limit,
       });
     }
 
@@ -349,6 +353,7 @@ export async function manageWebhook() {
     process.env.PUBLIC_URL,
   ).toString();
 
+  // No userId needed for webhook management (no auth required)
   const client = new StravaClient(''); // No access token needed for webhook management
 
   try {

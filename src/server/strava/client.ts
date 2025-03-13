@@ -6,6 +6,8 @@ import type {
   UpdatableActivity,
 } from './types';
 
+
+
 const STRAVA_API_BASE_URL = 'https://www.strava.com/api/v3';
 
 export class StravaApiError extends Error {
@@ -20,7 +22,14 @@ export class StravaApiError extends Error {
 }
 
 export class StravaClient {
-  constructor(private accessToken: string) {}
+  constructor(
+    private accessToken: string
+  ) {
+    console.log('StravaClient initialized:', { 
+      hasToken: !!accessToken,
+      tokenLength: accessToken ? accessToken.length : 0
+    });
+  }
 
   private async request<T>(
     endpoint: string,
@@ -82,17 +91,8 @@ export class StravaClient {
         details: errorDetails,
       });
 
-      // If we get a 401 and haven't retried yet, try to refresh the token
-      if (response.status === 401 && retryCount === 0) {
-        console.log('Got 401, forcing token refresh and retrying...');
-        const { getAccount } = await import('~/server/db/actions');
-        const account = await getAccount({ forceRefresh: true });
-        if (!account) {
-          throw new Error('No account found');
-        }
-        this.accessToken = account.access_token!;
-        return this.request<T>(endpoint, options, retryCount + 1);
-      }
+      // Token management is now handled outside this class
+      // If we get a 401, we won't retry here as refreshing should be done before creating the client
 
       throw new StravaApiError(
         errorMessage,
