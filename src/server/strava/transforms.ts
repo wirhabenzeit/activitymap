@@ -1,4 +1,4 @@
-import { decode } from '@mapbox/polyline';
+import polyline from '@mapbox/polyline';
 import type { Activity, Photo } from '~/server/db/schema';
 import type { StravaActivity, StravaPhoto } from './types';
 
@@ -15,7 +15,7 @@ export function transformStravaActivity(
 
   let bbox: [number, number, number, number] = [0, 0, 0, 0];
   if (activity.map?.summary_polyline) {
-    const coordinates = decode(activity.map.summary_polyline).map(
+    const coordinates = polyline.decode(activity.map.summary_polyline).map(
       ([lat, lon]) => [lon, lat] as [number, number],
     );
     bbox = coordinates.reduce(
@@ -104,27 +104,112 @@ export function transformStravaActivity(
 
 export function transformStravaPhoto(
   photo: StravaPhoto,
-  athlete_id: number,
-): Photo {
-  // Convert location from [number, number] to number[] to match schema
-  const location = photo.location ? Array.from(photo.location) : null;
+  athlete_id: number
+): Photo | null {
+  console.log(`[DEBUG] Transforming photo ${photo.unique_id} for activity ${photo.activity_id}`);
+  
+  // Log the input photo data for debugging
+  console.log(`[DEBUG] Input photo:`, {
+    id: photo.unique_id,
+    hasUrls: !!photo.urls,
+    hasSizes: !!photo.sizes,
+    urlKeys: photo.urls ? Object.keys(photo.urls) : [],
+    sizeKeys: photo.sizes ? Object.keys(photo.sizes) : []
+  });
+  
+  // Check if this appears to be a placeholder by looking for "placeholder" in the URL
+  let isPlaceholder = false;
+  
+  if (photo.urls) {
+    // Check all URLs for the word "placeholder"
+    for (const url of Object.values(photo.urls)) {
+      if (url.includes('placeholder')) {
+        isPlaceholder = true;
+        console.log(`[PLACEHOLDER] Detected placeholder image for photo ${photo.unique_id} by URL: ${url.substring(0, 50)}...`);
+        break;
+      }
+    }
+  }
+  
+  // Fallback check - if it only has size 1800 (for backward compatibility)
+  const urlKeys = photo.urls ? Object.keys(photo.urls) : [];
+  if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === "1800") {
+    isPlaceholder = true;
+    console.log(`[PLACEHOLDER] Detected placeholder image for photo ${photo.unique_id} by size key pattern`);
+  }
+  
+  // Skip placeholder images completely
+  if (isPlaceholder) {
+    console.log(`[PLACEHOLDER] Photo ${photo.unique_id} is being filtered out as a placeholder image`);
+    return null;
+  }
 
-  return {
+  // Process coordinates if they exist
+  let location: number[] | null = null;
+  
+  if (photo.location) {
+    // Validate location data
+    if (Array.isArray(photo.location) && photo.location.length === 2 && 
+        typeof photo.location[0] === 'number' && typeof photo.location[1] === 'number') {
+      // Strava uses [lat, lng] format - convert to array for db schema
+      location = [photo.location[0], photo.location[1]];
+      console.log(`[DEBUG] Photo ${photo.unique_id} has valid coordinates: [${location[0]}, ${location[1]}]`);
+    } else {
+      console.warn(`[DEBUG] Photo ${photo.unique_id} has invalid location format:`, photo.location);
+    }
+  }
+
+  // Handle created_at timestamp conversion safely
+  let createdAt: Date | null = null;
+  if (photo.created_at) {
+    // Check if created_at is a number (unix timestamp) or a string (ISO date)
+    if (typeof photo.created_at === 'number') {
+      createdAt = new Date(photo.created_at * 1000);
+    } else if (typeof photo.created_at === 'string') {
+      createdAt = new Date(photo.created_at);
+    }
+  }
+
+  // Create the transformed photo object matching the database schema
+  const transformedPhoto: Photo = {
     unique_id: photo.unique_id,
     athlete_id,
     activity_id: photo.activity_id,
     activity_name: photo.activity_name,
-    resource_state: photo.resource_state,
     caption: photo.caption,
     type: photo.type,
     source: photo.source,
-    status: null,
-    post_id: photo.post_id,
-    uploaded_at: photo.uploaded_at ? new Date(photo.uploaded_at) : null,
-    created_at: photo.created_at ? new Date(photo.created_at) : null,
     urls: photo.urls,
     sizes: photo.sizes,
     default_photo: photo.default_photo,
     location,
+    uploaded_at: photo.uploaded_at ? new Date(photo.uploaded_at) : null,
+    created_at: createdAt,
+    post_id: photo.post_id,
+    status: null,
+    resource_state: photo.resource_state,
   };
+
+  // Log the transformed photo for debugging
+  // Get a sample URL for logging, if available
+  let primaryUrlSample = 'none';
+  if (photo.urls && urlKeys.length > 0) {
+    const firstKey = urlKeys[0];
+    if (firstKey && photo.urls[firstKey]) {
+      const url = photo.urls[firstKey];
+      if (typeof url === 'string') {
+        primaryUrlSample = url.length > 30 ? `${url.substring(0, 30)}...` : url;
+      }
+    }
+  }
+    
+  console.log(`[DEBUG] Transformed photo:`, {
+    id: transformedPhoto.unique_id,
+    urlCount: urlKeys.length,
+    primaryUrlSample,
+    hasLocation: !!transformedPhoto.location,
+    isPlaceholder: transformedPhoto.status === 'placeholder'
+  });
+
+  return transformedPhoto;
 }

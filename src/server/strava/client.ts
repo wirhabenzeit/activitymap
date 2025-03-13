@@ -149,21 +149,159 @@ export class StravaClient {
   }
 
   async getActivityPhotos(id: number): Promise<StravaPhoto[]> {
-    const [smallPhotos, largePhotos] = await Promise.all([
-      this.request<StravaPhoto[]>(
-        `/activities/${id}/photos?size=256&photo_sources=true`,
-      ),
-      this.request<StravaPhoto[]>(
-        `/activities/${id}/photos?size=5000&photo_sources=true`,
-      ),
-    ]);
+    console.log(`[DEBUG] Fetching photos for activity ${id}`);
+    
+    try {
+      const [smallPhotos, largePhotos] = await Promise.all([
+        this.request<StravaPhoto[]>(
+          `/activities/${id}/photos?size=256&photo_sources=true`,
+        ),
+        this.request<StravaPhoto[]>(
+          `/activities/${id}/photos?size=5000&photo_sources=true`,
+        ),
+      ]);
 
-    // Merge the URLs from both requests into the large photos
-    return largePhotos.map((photo, index) => ({
-      ...photo,
-      urls: { ...(smallPhotos[index]?.urls ?? {}), ...(photo.urls ?? {}) },
-      sizes: { ...(smallPhotos[index]?.sizes ?? {}), ...(photo.sizes ?? {}) },
-    }));
+      console.log(`[DEBUG] Raw photo data: small=${smallPhotos.length}, large=${largePhotos.length}`);
+      
+      // Log some info about each photo set
+      if (smallPhotos.length > 0) {
+        const smallSample = smallPhotos[0]!;
+        console.log(`[DEBUG] Small photo sample:`, {
+          id: smallSample.unique_id,
+          source: smallSample.source,
+          hasUrls: !!smallSample.urls,
+          hasSizes: !!smallSample.sizes,
+          urlKeys: smallSample.urls ? Object.keys(smallSample.urls) : [],
+          sizeKeys: smallSample.sizes ? Object.keys(smallSample.sizes) : []
+        });
+      }
+      
+      if (largePhotos.length > 0) {
+        const largeSample = largePhotos[0]!;
+        console.log(`[DEBUG] Large photo sample:`, {
+          id: largeSample.unique_id,
+          source: largeSample.source,
+          hasUrls: !!largeSample.urls,
+          hasSizes: !!largeSample.sizes,
+          urlKeys: largeSample.urls ? Object.keys(largeSample.urls) : [],
+          sizeKeys: largeSample.sizes ? Object.keys(largeSample.sizes) : []
+        });
+      }
+
+      // Check for mismatches in photo counts
+      if (smallPhotos.length !== largePhotos.length) {
+        console.warn(`[DEBUG] Photo count mismatch: small=${smallPhotos.length}, large=${largePhotos.length}`);
+        
+        // Log all photo IDs to help identify mismatches
+        console.log('[DEBUG] Small photo IDs:', smallPhotos.map(p => p.unique_id));
+        console.log('[DEBUG] Large photo IDs:', largePhotos.map(p => p.unique_id));
+      }
+      
+      // Create a map of small photos by ID for easier lookup
+      const smallPhotoMap = new Map<string, StravaPhoto>();
+      smallPhotos.forEach(photo => {
+        smallPhotoMap.set(photo.unique_id, photo);
+      });
+      
+      // Create a map of large photos by ID for easier lookup
+      const largePhotoMap = new Map<string, StravaPhoto>();
+      largePhotos.forEach(photo => {
+        largePhotoMap.set(photo.unique_id, photo);
+      });
+      
+      // Get the complete set of unique photo IDs
+      const allPhotoIds = new Set<string>([
+        ...smallPhotos.map(p => p.unique_id),
+        ...largePhotos.map(p => p.unique_id)
+      ]);
+      
+      // Merge photos based on ID rather than index
+      const mergedPhotos: StravaPhoto[] = [];
+      
+      for (const photoId of allPhotoIds) {
+        const smallPhoto = smallPhotoMap.get(photoId);
+        const largePhoto = largePhotoMap.get(photoId);
+        
+        if (!smallPhoto && !largePhoto) {
+          console.warn(`[DEBUG] Photo ID ${photoId} not found in either small or large photos - this should never happen`);
+          continue;
+        }
+        
+        // Use large photo as base if available, otherwise use small
+        const basePhoto = largePhoto ?? smallPhoto!;
+        
+        // Special case: Check if the photo is a special size (like 1800)
+        const specialSize = basePhoto.urls && 
+                            basePhoto.urls["256"] === undefined && 
+                            basePhoto.urls["5000"] === undefined;
+                            
+        if (specialSize) {
+          console.log(`[DEBUG] Photo ${photoId} has special size:`, {
+            urlKeys: basePhoto.urls ? Object.keys(basePhoto.urls) : [],
+            sizeKeys: basePhoto.sizes ? Object.keys(basePhoto.sizes) : []
+          });
+          
+          // For special size photos, check if this appears to be a placeholder
+          // Primary detection: Look for "placeholder" in the URL
+          let isPlaceholder = false;
+          
+          if (basePhoto.urls) {
+            // Check all URLs for the word "placeholder"
+            for (const url of Object.values(basePhoto.urls)) {
+              if (url.includes('placeholder')) {
+                isPlaceholder = true;
+                console.log(`[DEBUG] Photo ${photoId} appears to be a placeholder by URL check`);
+                break;
+              }
+            }
+          }
+          
+          // Fallback detection: Check for special size pattern
+          const urlKeys = basePhoto.urls ? Object.keys(basePhoto.urls) : [];
+          if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === "1800") {
+            isPlaceholder = true;
+            console.log(`[DEBUG] Photo ${photoId} appears to be a placeholder by size pattern`);
+          }
+          
+          if (isPlaceholder) {
+            // Skip placeholder images - don't include them in the results
+            console.log(`[PLACEHOLDER] Photo ${photoId} is being filtered out as a placeholder image`);
+            continue;
+          }
+        }
+        
+        // Normal case: Merge small and large photo data
+        const merged = {
+          ...basePhoto,
+          urls: { 
+            ...(smallPhoto?.urls ?? {}), 
+            ...(largePhoto?.urls ?? {}) 
+          },
+          sizes: { 
+            ...(smallPhoto?.sizes ?? {}), 
+            ...(largePhoto?.sizes ?? {}) 
+          },
+        };
+        
+        if (mergedPhotos.length === 0) {
+          console.log(`[DEBUG] Merged photo sample:`, {
+            id: merged.unique_id,
+            hasUrls: !!merged.urls,
+            hasSizes: !!merged.sizes,
+            urlKeys: merged.urls ? Object.keys(merged.urls) : [],
+            sizeKeys: merged.sizes ? Object.keys(merged.sizes) : []
+          });
+        }
+        
+        mergedPhotos.push(merged);
+      }
+
+      console.log(`[DEBUG] Returning ${mergedPhotos.length} merged photos for activity ${id}`);
+      return mergedPhotos;
+    } catch (error) {
+      console.error(`[DEBUG] Error fetching photos for activity ${id}:`, error);
+      throw error;
+    }
   }
 
   async getSubscriptions(): Promise<StravaSubscription[]> {

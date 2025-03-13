@@ -25,6 +25,7 @@ export const users = pgTable('user', {
   email: text('email'),
   emailVerified: timestamp('emailVerified', { mode: 'date' }),
   image: text('image'),
+  athlete_id: bigint('athlete_id', { mode: 'number' }).unique(),
 });
 
 export const accounts = pgTable(
@@ -74,7 +75,9 @@ export const activities = pgTable(
   {
     id: bigint('id', { mode: 'number' }).primaryKey(),
     public_id: bigint('public_id', { mode: 'number' }).notNull().unique(),
-    athlete: bigint('athlete', { mode: 'number' }).notNull(),
+    athlete: bigint('athlete', { mode: 'number' })
+      .notNull()
+      .references(() => users.athlete_id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     description: text('description'),
     distance: doublePrecision('distance'),
@@ -137,7 +140,9 @@ export const photos = pgTable(
   'photos',
   {
     unique_id: varchar('unique_id').primaryKey(),
-    activity_id: bigint('activity_id', { mode: 'number' }).notNull(),
+    activity_id: bigint('activity_id', { mode: 'number' })
+      .notNull()
+      .references(() => activities.id, { onDelete: 'cascade' }),
     athlete_id: bigint('athlete_id', { mode: 'number' }).notNull(),
     activity_name: text('activity_name'),
     caption: text('caption'),

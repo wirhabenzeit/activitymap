@@ -174,11 +174,19 @@ async function fetchStravaActivities({
         if (activity.total_photo_count > 0) {
           console.log(`Fetching photos for activity ${activity.id}...`);
           const activityPhotos = await client.getActivityPhotos(activity.id);
-          photos.push(
-            ...activityPhotos.map((photo) =>
-              transformStravaPhoto(photo, athleteId),
-            ),
-          );
+          // Transform photos and filter out null values (placeholders)
+          const transformedPhotos = activityPhotos
+            .map((photo) => transformStravaPhoto(photo, athleteId))
+            .filter((photo): photo is Photo => photo !== null);
+            
+          if (transformedPhotos.length > 0) {
+            photos.push(...transformedPhotos);
+          }
+          
+          // Log if any photos were filtered out
+          if (transformedPhotos.length < activityPhotos.length) {
+            console.log(`Filtered out ${activityPhotos.length - transformedPhotos.length} placeholder photos for activity ${activity.id}`);
+          }
         }
       }
       console.log(`Processed ${photos.length} photos total`);
