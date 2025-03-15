@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { db } from '~/server/db';
 import { activities, photos, webhooks } from '~/server/db/schema';
-import { handleWebhookActivity } from '~/server/strava/actions';
+import { fetchStravaActivities } from '~/server/strava/actions';
+import { getAccount } from '~/server/db/actions';
 import type { WebhookRequest } from '~/types/strava';
 import { type NextRequest } from 'next/server';
 
@@ -115,9 +116,41 @@ export async function POST(
         aspect_type: data.aspect_type,
       });
 
-      const result = await handleWebhookActivity({
-        activityId: data.object_id,
+      // Get account directly using Strava athlete ID
+      const account = await getAccount({
+        providerAccountId: data.owner_id.toString(),
+      });
+
+      console.log('Account lookup result:', {
+        found: !!account,
+        athlete_id: data.owner_id,
+        has_access_token: account?.access_token ? true : false,
+        token_expires_at: account?.expires_at
+          ? new Date(account.expires_at * 1000).toISOString()
+          : null,
+      });
+
+      // If no account found, this user hasn't connected their Strava account to our app
+      if (!account) {
+        console.log('No account found for athlete ID:', data.owner_id);
+        return new Response('No account found for this athlete', { status: 404 });
+      }
+
+      if (!account.access_token) {
+        console.error('Account found but no access token present:', {
+          athlete_id: data.owner_id,
+          provider_account_id: account.providerAccountId,
+        });
+        return new Response('No Strava access token found', { status: 401 });
+      }
+
+      // This is a webhook call, so we're authorized by Strava directly
+      const result = await fetchStravaActivities({
+        accessToken: account.access_token,
+        activityIds: [data.object_id],
+        includePhotos: true,
         athleteId: data.owner_id,
+        shouldDeletePhotos: true,
       });
 
       console.log('Webhook activity processing result:', {

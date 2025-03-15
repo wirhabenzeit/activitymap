@@ -102,6 +102,112 @@ export function transformStravaActivity(
   };
 }
 
+/**
+ * Merge and process photos from different Strava API endpoints
+ * This handles combining small and large photo data and filtering out placeholders
+ */
+export function mergeAndProcessStravaPhotos(
+  smallPhotos: StravaPhoto[],
+  largePhotos: StravaPhoto[]
+): StravaPhoto[] {
+  // Create maps for faster lookup
+  const smallPhotoMap = new Map(smallPhotos.map(p => [p.unique_id, p]));
+  const largePhotoMap = new Map(largePhotos.map(p => [p.unique_id, p]));
+  
+  // Get all unique photo IDs
+  const allPhotoIds = Array.from(new Set([
+    ...smallPhotos.map(p => p.unique_id),
+    ...largePhotos.map(p => p.unique_id)
+  ]));
+  
+  // Merge photos based on ID rather than index
+  const mergedPhotos: StravaPhoto[] = [];
+  
+  for (const photoId of allPhotoIds) {
+    const smallPhoto = smallPhotoMap.get(photoId);
+    const largePhoto = largePhotoMap.get(photoId);
+    
+    if (!smallPhoto && !largePhoto) {
+      console.warn(`[DEBUG] Photo ID ${photoId} not found in either small or large photos - this should never happen`);
+      continue;
+    }
+    
+    // Use large photo as base if available, otherwise use small
+    const basePhoto = largePhoto ?? smallPhoto!;
+    
+    // Special case: Check if the photo is a special size (like 1800)
+    const specialSize = basePhoto.urls && 
+                        basePhoto.urls["256"] === undefined && 
+                        basePhoto.urls["5000"] === undefined;
+                        
+    if (specialSize) {
+      console.log(`[DEBUG] Photo ${photoId} has special size:`, {
+        urlKeys: basePhoto.urls ? Object.keys(basePhoto.urls) : [],
+        sizeKeys: basePhoto.sizes ? Object.keys(basePhoto.sizes) : []
+      });
+      
+      // For special size photos, check if this appears to be a placeholder
+      // Primary detection: Look for "placeholder" in the URL
+      let isPlaceholder = false;
+      
+      if (basePhoto.urls) {
+        // Check all URLs for the word "placeholder"
+        for (const url of Object.values(basePhoto.urls)) {
+          if (url.includes('placeholder')) {
+            isPlaceholder = true;
+            console.log(`[DEBUG] Photo ${photoId} appears to be a placeholder by URL check`);
+            break;
+          }
+        }
+      }
+      
+      // Fallback detection: Check for special size pattern
+      const urlKeys = basePhoto.urls ? Object.keys(basePhoto.urls) : [];
+      if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === "1800") {
+        isPlaceholder = true;
+        console.log(`[DEBUG] Photo ${photoId} appears to be a placeholder by size pattern`);
+      }
+      
+      if (isPlaceholder) {
+        // Skip placeholder images - don't include them in the results
+        console.log(`[PLACEHOLDER] Photo ${photoId} is being filtered out as a placeholder image`);
+        continue;
+      }
+    }
+    
+    // Normal case: Merge small and large photo data
+    const merged = {
+      ...basePhoto,
+      urls: { 
+        ...(smallPhoto?.urls ?? {}), 
+        ...(largePhoto?.urls ?? {}) 
+      },
+      sizes: { 
+        ...(smallPhoto?.sizes ?? {}), 
+        ...(largePhoto?.sizes ?? {}) 
+      },
+    };
+    
+    if (mergedPhotos.length === 0) {
+      console.log(`[DEBUG] Merged photo sample:`, {
+        id: merged.unique_id,
+        hasUrls: !!merged.urls,
+        hasSizes: !!merged.sizes,
+        urlKeys: merged.urls ? Object.keys(merged.urls) : [],
+        sizeKeys: merged.sizes ? Object.keys(merged.sizes) : []
+      });
+    }
+    
+    mergedPhotos.push(merged);
+  }
+  
+  return mergedPhotos;
+}
+
+/**
+ * Transform a Strava photo to our database schema format
+ * Handles validation and filtering of placeholder images
+ */
 export function transformStravaPhoto(
   photo: StravaPhoto,
   athlete_id: number

@@ -5,10 +5,17 @@ import type {
   StravaError,
   UpdatableActivity,
 } from './types';
-
-
+import { mergeAndProcessStravaPhotos } from './transforms';
 
 const STRAVA_API_BASE_URL = 'https://www.strava.com/api/v3';
+const STRAVA_TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token';
+
+export interface StravaTokens {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  expires_in: number;
+}
 
 export class StravaApiError extends Error {
   constructor(
@@ -22,13 +29,159 @@ export class StravaApiError extends Error {
 }
 
 export class StravaClient {
-  constructor(
-    private accessToken: string
-  ) {
-    console.log('StravaClient initialized:', { 
-      hasToken: !!accessToken,
-      tokenLength: accessToken ? accessToken.length : 0
+  private accessToken?: string;
+  private refreshToken?: string;
+  private clientId: string;
+  private clientSecret: string;
+  private tokenRefreshCallback?: (tokens: StravaTokens) => Promise<void>;
+
+  private constructor({
+    accessToken,
+    refreshToken,
+    tokenRefreshCallback,
+  }: {
+    accessToken?: string;
+    refreshToken?: string;
+    tokenRefreshCallback?: (tokens: StravaTokens) => Promise<void>;
+  }) {
+    this.accessToken = accessToken;
+    this.refreshToken = refreshToken;
+    this.tokenRefreshCallback = tokenRefreshCallback;
+
+    // Parse environment variables for client credentials
+    const clientId = process.env.AUTH_STRAVA_ID;
+    const clientSecret = process.env.AUTH_STRAVA_SECRET;
+
+    // Always validate credentials
+    if (!clientId || !clientSecret) {
+      throw new Error(
+        'Missing Strava client credentials (AUTH_STRAVA_ID/AUTH_STRAVA_SECRET)',
+      );
+    }
+
+    // Now we know these are non-null
+    this.clientId = clientId;
+    this.clientSecret = clientSecret;
+
+    console.log('StravaClient initialized:', {
+      hasAccessToken: !!this.accessToken,
+      hasRefreshToken: !!this.refreshToken,
+      hasClientCredentials: !!(this.clientId && this.clientSecret),
+      accessTokenLength: this.accessToken ? this.accessToken.length : 0,
     });
+  }
+
+  /**
+   * Create a StravaClient with an access token for authenticated user operations
+   */
+  static withAccessToken(accessToken: string): StravaClient {
+    return new StravaClient({ accessToken });
+  }
+
+  /**
+   * Create a StravaClient with a refresh token that can refresh access tokens
+   */
+  static withRefreshToken(
+    refreshToken: string,
+    tokenRefreshCallback: (tokens: StravaTokens) => Promise<void>,
+  ): StravaClient {
+    return new StravaClient({ refreshToken, tokenRefreshCallback });
+  }
+
+  /**
+   * Create a StravaClient with both access and refresh tokens
+   */
+  static withTokens(
+    accessToken: string,
+    refreshToken: string,
+    tokenRefreshCallback: (tokens: StravaTokens) => Promise<void>,
+  ): StravaClient {
+    return new StravaClient({
+      accessToken,
+      refreshToken,
+      tokenRefreshCallback,
+    });
+  }
+
+  /**
+   * Create a StravaClient for operations that don't require user authentication
+   * (like webhook management)
+   */
+  static withoutAuth(): StravaClient {
+    return new StravaClient({});
+  }
+
+  /**
+   * Refresh the access token using the refresh token
+   */
+  async refreshAccessToken(): Promise<StravaTokens> {
+    if (!this.refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    console.log('Refreshing access token...');
+
+    try {
+      const response = await fetch(STRAVA_TOKEN_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          grant_type: 'refresh_token',
+          refresh_token: this.refreshToken,
+        }),
+      });
+
+      const tokens = (await response.json()) as StravaTokens;
+      console.log('Token refresh response:', {
+        status: response.status,
+        ok: response.ok,
+        tokens: {
+          expires_in: tokens.expires_in,
+          expires_at: tokens.expires_at,
+          has_access_token: !!tokens.access_token,
+          has_refresh_token: !!tokens.refresh_token,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to refresh access token: ${response.status}`);
+      }
+
+      // Update internal tokens
+      this.accessToken = tokens.access_token;
+      if (tokens.refresh_token) {
+        this.refreshToken = tokens.refresh_token;
+      }
+
+      // Call the callback if provided
+      if (this.tokenRefreshCallback) {
+        await this.tokenRefreshCallback(tokens);
+      }
+
+      return tokens;
+    } catch (error) {
+      console.error('Error refreshing access token:', error);
+      throw new Error('Failed to refresh access token');
+    }
+  }
+
+  /**
+   * Ensure we have a valid access token, refreshing if necessary
+   */
+  private async ensureValidAccessToken(): Promise<string> {
+    if (!this.accessToken && this.refreshToken) {
+      // If we have a refresh token but no access token, refresh
+      const tokens = await this.refreshAccessToken();
+      return tokens.access_token;
+    } else if (!this.accessToken) {
+      throw new Error('No access token available');
+    }
+
+    return this.accessToken;
   }
 
   private async request<T>(
@@ -36,20 +189,46 @@ export class StravaClient {
     options: RequestInit = {},
     retryCount = 0,
   ): Promise<T> {
+    // Determine if this is a webhook endpoint (which doesn't need auth)
+    const isWebhookEndpoint = endpoint.includes('/push_subscriptions');
+
+    // Get authorization header based on endpoint type
+    let authHeader = '';
+    if (!isWebhookEndpoint) {
+      try {
+        // Only try to get an access token for non-webhook endpoints
+        const token = await this.ensureValidAccessToken();
+        authHeader = `Bearer ${token}`;
+      } catch (error) {
+        // For webhook endpoints, we'll proceed without auth
+        // For other endpoints, we need to throw
+        if (!isWebhookEndpoint) {
+          throw error;
+        }
+      }
+    }
+
     console.log('Making Strava API request:', {
       endpoint,
       method: options.method ?? 'GET',
-      hasAuthToken: !!this.accessToken,
+      hasAuthToken: !!authHeader,
+      isWebhookEndpoint,
       retryCount,
     });
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+
+    // Only add Authorization header if we have one
+    if (authHeader) {
+      headers.Authorization = authHeader;
+    }
+
     const response = await fetch(`${STRAVA_API_BASE_URL}${endpoint}`, {
       ...options,
-      headers: {
-        Authorization: `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
     });
 
     console.log('Strava API response:', {
@@ -109,7 +288,9 @@ export class StravaClient {
         status: response.status,
         contentType: response.headers.get('content-type'),
       });
-      throw new Error(`Failed to parse response as JSON: ${String(parseError)}`);
+      throw new Error(
+        `Failed to parse response as JSON: ${String(parseError)}`,
+      );
     }
   }
 
@@ -150,7 +331,7 @@ export class StravaClient {
 
   async getActivityPhotos(id: number): Promise<StravaPhoto[]> {
     console.log(`[DEBUG] Fetching photos for activity ${id}`);
-    
+
     try {
       const [smallPhotos, largePhotos] = await Promise.all([
         this.request<StravaPhoto[]>(
@@ -161,142 +342,26 @@ export class StravaClient {
         ),
       ]);
 
-      console.log(`[DEBUG] Raw photo data: small=${smallPhotos.length}, large=${largePhotos.length}`);
-      
-      // Log some info about each photo set
-      if (smallPhotos.length > 0) {
-        const smallSample = smallPhotos[0]!;
-        console.log(`[DEBUG] Small photo sample:`, {
-          id: smallSample.unique_id,
-          source: smallSample.source,
-          hasUrls: !!smallSample.urls,
-          hasSizes: !!smallSample.sizes,
-          urlKeys: smallSample.urls ? Object.keys(smallSample.urls) : [],
-          sizeKeys: smallSample.sizes ? Object.keys(smallSample.sizes) : []
-        });
-      }
-      
-      if (largePhotos.length > 0) {
-        const largeSample = largePhotos[0]!;
-        console.log(`[DEBUG] Large photo sample:`, {
-          id: largeSample.unique_id,
-          source: largeSample.source,
-          hasUrls: !!largeSample.urls,
-          hasSizes: !!largeSample.sizes,
-          urlKeys: largeSample.urls ? Object.keys(largeSample.urls) : [],
-          sizeKeys: largeSample.sizes ? Object.keys(largeSample.sizes) : []
-        });
-      }
+      console.log(
+        `[DEBUG] Raw photo data: small=${smallPhotos.length}, large=${largePhotos.length}`,
+      );
 
       // Check for mismatches in photo counts
       if (smallPhotos.length !== largePhotos.length) {
-        console.warn(`[DEBUG] Photo count mismatch: small=${smallPhotos.length}, large=${largePhotos.length}`);
-        
-        // Log all photo IDs to help identify mismatches
-        console.log('[DEBUG] Small photo IDs:', smallPhotos.map(p => p.unique_id));
-        console.log('[DEBUG] Large photo IDs:', largePhotos.map(p => p.unique_id));
-      }
-      
-      // Create a map of small photos by ID for easier lookup
-      const smallPhotoMap = new Map<string, StravaPhoto>();
-      smallPhotos.forEach(photo => {
-        smallPhotoMap.set(photo.unique_id, photo);
-      });
-      
-      // Create a map of large photos by ID for easier lookup
-      const largePhotoMap = new Map<string, StravaPhoto>();
-      largePhotos.forEach(photo => {
-        largePhotoMap.set(photo.unique_id, photo);
-      });
-      
-      // Get the complete set of unique photo IDs
-      const allPhotoIds = new Set<string>([
-        ...smallPhotos.map(p => p.unique_id),
-        ...largePhotos.map(p => p.unique_id)
-      ]);
-      
-      // Merge photos based on ID rather than index
-      const mergedPhotos: StravaPhoto[] = [];
-      
-      for (const photoId of allPhotoIds) {
-        const smallPhoto = smallPhotoMap.get(photoId);
-        const largePhoto = largePhotoMap.get(photoId);
-        
-        if (!smallPhoto && !largePhoto) {
-          console.warn(`[DEBUG] Photo ID ${photoId} not found in either small or large photos - this should never happen`);
-          continue;
-        }
-        
-        // Use large photo as base if available, otherwise use small
-        const basePhoto = largePhoto ?? smallPhoto!;
-        
-        // Special case: Check if the photo is a special size (like 1800)
-        const specialSize = basePhoto.urls && 
-                            basePhoto.urls["256"] === undefined && 
-                            basePhoto.urls["5000"] === undefined;
-                            
-        if (specialSize) {
-          console.log(`[DEBUG] Photo ${photoId} has special size:`, {
-            urlKeys: basePhoto.urls ? Object.keys(basePhoto.urls) : [],
-            sizeKeys: basePhoto.sizes ? Object.keys(basePhoto.sizes) : []
-          });
-          
-          // For special size photos, check if this appears to be a placeholder
-          // Primary detection: Look for "placeholder" in the URL
-          let isPlaceholder = false;
-          
-          if (basePhoto.urls) {
-            // Check all URLs for the word "placeholder"
-            for (const url of Object.values(basePhoto.urls)) {
-              if (url.includes('placeholder')) {
-                isPlaceholder = true;
-                console.log(`[DEBUG] Photo ${photoId} appears to be a placeholder by URL check`);
-                break;
-              }
-            }
-          }
-          
-          // Fallback detection: Check for special size pattern
-          const urlKeys = basePhoto.urls ? Object.keys(basePhoto.urls) : [];
-          if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === "1800") {
-            isPlaceholder = true;
-            console.log(`[DEBUG] Photo ${photoId} appears to be a placeholder by size pattern`);
-          }
-          
-          if (isPlaceholder) {
-            // Skip placeholder images - don't include them in the results
-            console.log(`[PLACEHOLDER] Photo ${photoId} is being filtered out as a placeholder image`);
-            continue;
-          }
-        }
-        
-        // Normal case: Merge small and large photo data
-        const merged = {
-          ...basePhoto,
-          urls: { 
-            ...(smallPhoto?.urls ?? {}), 
-            ...(largePhoto?.urls ?? {}) 
-          },
-          sizes: { 
-            ...(smallPhoto?.sizes ?? {}), 
-            ...(largePhoto?.sizes ?? {}) 
-          },
-        };
-        
-        if (mergedPhotos.length === 0) {
-          console.log(`[DEBUG] Merged photo sample:`, {
-            id: merged.unique_id,
-            hasUrls: !!merged.urls,
-            hasSizes: !!merged.sizes,
-            urlKeys: merged.urls ? Object.keys(merged.urls) : [],
-            sizeKeys: merged.sizes ? Object.keys(merged.sizes) : []
-          });
-        }
-        
-        mergedPhotos.push(merged);
+        console.warn(
+          `[DEBUG] Photo count mismatch: small=${smallPhotos.length}, large=${largePhotos.length}`,
+        );
       }
 
-      console.log(`[DEBUG] Returning ${mergedPhotos.length} merged photos for activity ${id}`);
+      // Use the dedicated transform function to merge and process photos
+      const mergedPhotos = mergeAndProcessStravaPhotos(
+        smallPhotos,
+        largePhotos,
+      );
+
+      console.log(
+        `[DEBUG] Returning ${mergedPhotos.length} merged photos for activity ${id}`,
+      );
       return mergedPhotos;
     } catch (error) {
       console.error(`[DEBUG] Error fetching photos for activity ${id}:`, error);
@@ -305,28 +370,13 @@ export class StravaClient {
   }
 
   async getSubscriptions(): Promise<StravaSubscription[]> {
-    const clientId = process.env.AUTH_STRAVA_ID;
-    const clientSecret = process.env.AUTH_STRAVA_SECRET;
-
-    if (!clientId || !clientSecret) {
-      throw new Error(
-        'Missing Strava client credentials (AUTH_STRAVA_ID/AUTH_STRAVA_SECRET)',
-      );
-    }
-
     const searchParams = new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
     });
 
     return this.request<StravaSubscription[]>(
       `/push_subscriptions?${searchParams}`,
-      {
-        headers: {
-          // No Authorization header needed for this endpoint
-          Authorization: '',
-        },
-      },
     );
   }
 
@@ -334,24 +384,11 @@ export class StravaClient {
     callbackUrl: string,
     verifyToken: string,
   ): Promise<StravaSubscription> {
-    const clientId = process.env.AUTH_STRAVA_ID;
-    const clientSecret = process.env.AUTH_STRAVA_SECRET;
-
-    if (!clientId || !clientSecret) {
-      throw new Error(
-        'Missing Strava client credentials (AUTH_STRAVA_ID/AUTH_STRAVA_SECRET)',
-      );
-    }
-
     return this.request<StravaSubscription>('/push_subscriptions', {
       method: 'POST',
-      headers: {
-        // No Authorization header needed for this endpoint
-        Authorization: '',
-      },
       body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
         callback_url: callbackUrl,
         verify_token: verifyToken,
       }),
@@ -359,26 +396,13 @@ export class StravaClient {
   }
 
   async deleteSubscription(id: number): Promise<void> {
-    const clientId = process.env.AUTH_STRAVA_ID;
-    const clientSecret = process.env.AUTH_STRAVA_SECRET;
-
-    if (!clientId || !clientSecret) {
-      throw new Error(
-        'Missing Strava client credentials (AUTH_STRAVA_ID/AUTH_STRAVA_SECRET)',
-      );
-    }
-
     const searchParams = new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
     });
 
     await this.request(`/push_subscriptions/${id}?${searchParams}`, {
       method: 'DELETE',
-      headers: {
-        // No Authorization header needed for this endpoint
-        Authorization: '',
-      },
     });
   }
 }

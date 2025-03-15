@@ -5,9 +5,12 @@ import { activities, photos, accounts } from './schema';
 import { db } from './index';
 import { auth } from '~/auth';
 import type { AdapterAccount } from 'next-auth/adapters';
+import { StravaClient, type StravaTokens } from '~/server/strava/client';
 
 // Use the AdapterAccount type from next-auth
 export type Account = AdapterAccount;
+// Define a type for the account based on the database schema
+type AccountType = typeof accounts.$inferSelect;
 
 export const getUserByStravaId = async (stravaId: string) => {
   const account = await db.query.accounts.findFirst({
@@ -45,26 +48,29 @@ export const getAccount = async ({
   userId?: string;
   forceRefresh?: boolean;
 }) => {
-  let account;
+  let account: AccountType | null = null;
 
   if (providerAccountId) {
-    account = await db.query.accounts.findFirst({
+    const result = await db.query.accounts.findFirst({
       where: (accounts, { eq }) =>
         eq(accounts.providerAccountId, providerAccountId),
     });
     // If account not found by providerAccountId, this is likely a webhook request
     // We should not throw an error, but return null to handle this case appropriately
-    if (!account) return null;
+    if (!result) return null;
+    account = result;
   } else if (userId) {
-    account = await db.query.accounts.findFirst({
+    const result = await db.query.accounts.findFirst({
       where: (accounts, { eq }) => eq(accounts.userId, userId),
     });
+    if (result) account = result;
   } else {
     // Only try to resolve through session if no IDs provided
     const resolvedUserId = await getUser().then((user) => user.id);
-    account = await db.query.accounts.findFirst({
+    const result = await db.query.accounts.findFirst({
       where: (accounts, { eq }) => eq(accounts.userId, resolvedUserId),
     });
+    if (result) account = result;
   }
 
   // Only throw if we were looking up by userId or through session
@@ -80,63 +86,45 @@ export const getAccount = async ({
   if (isExpired) {
     console.log('Token expired or missing expiration, refreshing...');
     try {
-      const response = await fetch(
-        'https://www.strava.com/api/v3/oauth/token',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            client_id: process.env.AUTH_STRAVA_ID,
-            client_secret: process.env.AUTH_STRAVA_SECRET,
-            grant_type: 'refresh_token',
-            refresh_token: account.refresh_token,
-          }),
+      // Create a Strava client with the refresh token
+      const stravaClient = StravaClient.withRefreshToken(
+        account.refresh_token!, // We know refresh_token exists if we got here
+        async (tokens: StravaTokens) => {
+          if (!account) return; // Safety check
+
+          // This callback will be called after token refresh
+          // Update the account with the new tokens
+          const updatedAccount = {
+            ...account,
+            access_token: tokens.access_token,
+            expires_at: tokens.expires_at,
+            refresh_token: tokens.refresh_token || account.refresh_token,
+          };
+
+          // Update the account in the database
+          await db
+            .update(accounts)
+            .set(updatedAccount)
+            .where(eq(accounts.providerAccountId, account.providerAccountId));
+
+          // Update our local copy of the account
+          account = updatedAccount;
         },
       );
 
-      const tokens = (await response.json()) as Record<string, unknown>;
-      console.log('Token refresh response:', {
-        status: response.status,
-        ok: response.ok,
-        tokens: {
-          expires_in: tokens.expires_in,
-          token_type: tokens.token_type,
-          has_access_token: !!tokens.access_token,
-          has_refresh_token: !!tokens.refresh_token,
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to refresh access token', tokens);
-
-      const newExpiresAt = Math.floor(
-        currentTime + (tokens.expires_in as number),
-      );
-      const updatedAccount = {
-        ...account,
-        access_token: tokens.access_token as string,
-        expires_at: newExpiresAt,
-        refresh_token:
-          (tokens.refresh_token as string) ?? account.refresh_token,
-      };
+      // Refresh the token - the callback will handle updating the account
+      await stravaClient.refreshAccessToken();
 
       console.log('Updating account with new tokens:', {
-        expires_at: updatedAccount.expires_at,
-        expires_in_seconds: updatedAccount.expires_at - currentTime,
-        has_access_token: !!updatedAccount.access_token,
-        has_refresh_token: !!updatedAccount.refresh_token,
+        expires_at: account.expires_at,
+        expires_in_seconds: account.expires_at
+          ? account.expires_at - currentTime
+          : undefined,
+        has_access_token: !!account.access_token,
+        has_refresh_token: !!account.refresh_token,
       });
 
-      await db
-        .insert(accounts)
-        .values(updatedAccount)
-        .onConflictDoUpdate({
-          target: [accounts.provider, accounts.providerAccountId],
-          set: updatedAccount,
-        });
-
-      return updatedAccount;
+      return account;
     } catch (error) {
       console.error('Error refreshing access token:', error);
       throw new Error('Failed to refresh access token');

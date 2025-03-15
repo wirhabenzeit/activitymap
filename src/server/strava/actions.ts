@@ -11,7 +11,7 @@ import { db } from '~/server/db';
 import { getAccount } from '~/server/db/actions';
 import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
-import { type UpdatableActivity } from './types';
+import { type UpdatableActivity, type StravaPhoto } from './types';
 import { sql } from 'drizzle-orm';
 import { webhooks } from '~/server/db/schema';
 import type { StravaActivity } from './types';
@@ -24,7 +24,7 @@ export async function updateActivity(act: UpdatableActivity) {
     }
 
     // Token refresh is now handled by getAccount
-    const client = new StravaClient(account.access_token);
+    const client = StravaClient.withAccessToken(account.access_token);
 
     try {
       // First update in Strava to ensure we have valid authorization
@@ -95,7 +95,7 @@ export async function fetchStravaActivities({
   });
 
   // Token refresh is now handled outside this function
-  const client = new StravaClient(accessToken);
+  const client = StravaClient.withAccessToken(accessToken);
   const photos: Photo[] = [];
 
   try {
@@ -180,16 +180,18 @@ export async function fetchStravaActivities({
           const activityPhotos = await client.getActivityPhotos(activity.id);
           // Transform photos and filter out null values (placeholders)
           const transformedPhotos = activityPhotos
-            .map((photo) => transformStravaPhoto(photo, athleteId))
+            .map((photo: StravaPhoto) => transformStravaPhoto(photo, athleteId))
             .filter((photo): photo is Photo => photo !== null);
-            
+
           if (transformedPhotos.length > 0) {
             photos.push(...transformedPhotos);
           }
-          
+
           // Log if any photos were filtered out
           if (transformedPhotos.length < activityPhotos.length) {
-            console.log(`Filtered out ${activityPhotos.length - transformedPhotos.length} placeholder photos for activity ${activity.id}`);
+            console.log(
+              `Filtered out ${activityPhotos.length - transformedPhotos.length} placeholder photos for activity ${activity.id}`,
+            );
           }
         }
       }
@@ -295,66 +297,19 @@ export async function fetchStravaActivities({
   }
 }
 
-export async function fetchActivitiesByIds(
-  ids: number[],
-  includePhotos = false,
-) {
-  try {
-    const account = await getAccount({});
-    if (!account?.access_token) {
-      throw new Error('No Strava access token found');
-    }
-
-    return fetchStravaActivities({
-      accessToken: account.access_token,
-      activityIds: ids,
-      includePhotos,
-      athleteId: parseInt(account.providerAccountId),
-    });
-  } catch (error) {
-    console.error('Error fetching activities by IDs:', error);
-    throw error;
-  }
-}
-
-export async function fetchActivitiesBeforeTimestamp(
-  timestamp: number,
-  includePhotos = false,
-) {
-  try {
-    const account = await getAccount({});
-    if (!account?.access_token) {
-      throw new Error('No Strava access token found');
-    }
-
-    return fetchStravaActivities({
-      accessToken: account.access_token,
-      before: timestamp,
-      includePhotos,
-      athleteId: parseInt(account.providerAccountId),
-    });
-  } catch (error) {
-    console.error('Error fetching activities before timestamp:', error);
-    throw error;
-  }
-}
-
-/**
- * Handle Strava webhook subscription management
- */
-export async function manageWebhook() {
+export async function checkWebhookStatus() {
   if (!process.env.PUBLIC_URL) {
     throw new Error('PUBLIC_URL environment variable is not set');
   }
 
   // Construct the webhook URL from PUBLIC_URL
-  const webhookUrl = new URL(
+  const expectedUrl = new URL(
     '/api/strava/webhook',
     process.env.PUBLIC_URL,
   ).toString();
 
   // No userId needed for webhook management (no auth required)
-  const client = new StravaClient(''); // No access token needed for webhook management
+  const client = StravaClient.withoutAuth(); // No access token needed for webhook management
 
   try {
     // Get existing subscriptions from Strava
@@ -363,8 +318,10 @@ export async function manageWebhook() {
 
     // Find any subscription that matches our URL
     const matchingSubscription = stravaSubscriptions.find(
-      (sub) => sub.callback_url === webhookUrl,
+      (sub) => sub.callback_url === expectedUrl,
     );
+
+    let databaseStatus = 'no_matching_subscription';
 
     if (matchingSubscription) {
       console.log('Found matching subscription:', matchingSubscription);
@@ -394,132 +351,19 @@ export async function manageWebhook() {
           },
         });
 
-      // Return the updated subscription status
-      return {
-        subscriptions: stravaSubscriptions,
-        databaseStatus: 'synchronized',
-        matchingSubscription,
-      };
-    } else {
-      // No matching subscription found
-      return {
-        subscriptions: stravaSubscriptions,
-        databaseStatus: 'no_matching_subscription',
-        matchingSubscription: null,
-      };
+      databaseStatus = 'synchronized';
     }
+
+    // Return comprehensive status information
+    return {
+      expectedUrl,
+      subscriptions: stravaSubscriptions,
+      hasMatchingSubscription: matchingSubscription !== null,
+      databaseStatus,
+      matchingSubscription,
+    };
   } catch (error) {
     console.error('Failed to manage webhook subscription:', error);
     throw error;
   }
-}
-
-export async function handleWebhookActivity({
-  activityId,
-  athleteId,
-}: {
-  activityId: number;
-  athleteId: number;
-}) {
-  console.log('Starting webhook activity processing:', {
-    activityId,
-    athleteId,
-    timestamp: new Date().toISOString(),
-  });
-
-  // Get account directly using Strava athlete ID
-  const account = await getAccount({
-    providerAccountId: athleteId.toString(),
-  });
-
-  console.log('Account lookup result:', {
-    found: !!account,
-    athlete_id: athleteId,
-    has_access_token: account?.access_token ? true : false,
-    token_expires_at: account?.expires_at
-      ? new Date(account.expires_at * 1000).toISOString()
-      : null,
-  });
-
-  // If no account found, this user hasn't connected their Strava account to our app
-  if (!account) {
-    console.log('No account found for athlete ID:', athleteId);
-    return { activities: [], photos: [] };
-  }
-
-  if (!account.access_token) {
-    console.error('Account found but no access token present:', {
-      athlete_id: athleteId,
-      provider_account_id: account.providerAccountId,
-    });
-    throw new Error('No Strava access token found');
-  }
-
-  try {
-    const result = await fetchStravaActivities({
-      accessToken: account.access_token,
-      activityIds: [activityId],
-      includePhotos: true,
-      athleteId,
-      shouldDeletePhotos: true,
-    });
-
-    console.log('Webhook activity processing completed:', {
-      activityId,
-      athleteId,
-      activities_processed: result.activities.length,
-      photos_processed: result.photos.length,
-      first_activity: result.activities[0]
-        ? {
-            id: result.activities[0].id,
-            name: result.activities[0].name,
-            is_complete: result.activities[0].is_complete,
-            has_polyline:
-              !!result.activities[0].map_polyline ||
-              !!result.activities[0].map_summary_polyline,
-          }
-        : null,
-    });
-
-    return result;
-  } catch (error) {
-    console.error('Error in handleWebhookActivity:', {
-      error:
-        error instanceof Error
-          ? {
-              message: error.message,
-              name: error.name,
-              stack: error.stack,
-            }
-          : error,
-      activityId,
-      athleteId,
-      timestamp: new Date().toISOString(),
-    });
-    throw error;
-  }
-}
-
-export async function checkWebhookStatus() {
-  if (!process.env.PUBLIC_URL) {
-    throw new Error('PUBLIC_URL environment variable is not set');
-  }
-
-  // Construct the expected webhook URL
-  const expectedUrl = new URL(
-    '/api/strava/webhook',
-    process.env.PUBLIC_URL,
-  ).toString();
-
-  // Use manageWebhook to handle subscription status and database synchronization
-  const result = await manageWebhook();
-
-  // Return comprehensive status information
-  return {
-    expectedUrl,
-    subscriptions: result.subscriptions,
-    hasMatchingSubscription: result.matchingSubscription !== null,
-    databaseStatus: result.databaseStatus,
-    matchingSubscription: result.matchingSubscription,
-  };
 }

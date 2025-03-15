@@ -29,6 +29,7 @@ import Image from 'next/image';
 import { cn } from '~/lib/utils';
 import { checkWebhookStatus } from '~/server/strava/actions';
 import { env } from '~/env';
+import { useToast } from '~/hooks/use-toast';
 
 export function UserSettings() {
   const { user, loading, loadFromStrava, isInitialized } = useShallowStore(
@@ -41,6 +42,7 @@ export function UserSettings() {
   );
 
   const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
+  const { toast } = useToast();
 
   const handleWebhookStatus = async () => {
     try {
@@ -52,8 +54,37 @@ export function UserSettings() {
         matchingSubscription: result.matchingSubscription,
         subscriptions: result.subscriptions,
       });
+      
+      // Display the result in a toast notification
+      toast({
+        title: 'Webhook Status',
+        description: (
+          <div className="space-y-1">
+            <p>
+              <span className="font-semibold">URL:</span> {result.expectedUrl}
+            </p>
+            <p>
+              <span className="font-semibold">Status:</span> {result.hasMatchingSubscription ? '✅ Active' : '❌ Not Found'}
+            </p>
+            <p>
+              <span className="font-semibold">Database:</span> {result.databaseStatus === 'synchronized' ? '✅ Synced' : '❌ Not Synced'}
+            </p>
+            {result.matchingSubscription && (
+              <p>
+                <span className="font-semibold">ID:</span> {result.matchingSubscription.id}
+              </p>
+            )}
+          </div>
+        ),
+        duration: 10000, // Show for 10 seconds
+      });
     } catch (error) {
       console.error('Failed to check webhook status:', error);
+      toast({
+        title: 'Webhook Status Error',
+        description: error instanceof Error ? error.message : 'Unknown error checking webhook status',
+        variant: 'destructive',
+      });
     }
   };
 

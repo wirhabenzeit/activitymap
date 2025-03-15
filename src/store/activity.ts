@@ -8,8 +8,7 @@ import {
   getPhotos,
 } from '~/server/db/actions';
 import {
-  fetchActivitiesByIds,
-  fetchActivitiesBeforeTimestamp,
+  fetchStravaActivities,
   updateActivity as updateStravaActivity,
 } from '~/server/strava/actions';
 import { type UpdatableActivity } from '~/server/strava/types';
@@ -212,10 +211,12 @@ export const createActivitySlice: StateCreator<
       if (ids) {
         console.log('Loading specific activities by ID:', ids);
         // Case 1: Loading specific activities by ID
-        const { activities, photos: newPhotos } = await fetchActivitiesByIds(
-          ids,
-          photos,
-        );
+        const { activities, photos: newPhotos } = await fetchStravaActivities({
+          accessToken: account.access_token!,
+          activityIds: ids,
+          includePhotos: photos,
+          athleteId: parseInt(account.providerAccountId),
+        });
         console.log(
           `Received ${activities.length} activities and ${newPhotos.length} photos from API`,
         );
@@ -313,12 +314,13 @@ export const createActivitySlice: StateCreator<
 
         // If we have no activities, fetch the initial set
         // If we have activities, fetch older ones using the timestamp
-        const result = timestamp
-          ? await fetchActivitiesBeforeTimestamp(timestamp, photos)
-          : await fetchActivitiesBeforeTimestamp(
-              Math.floor(Date.now() / 1000),
-              photos,
-            );
+        const beforeTimestamp = timestamp ?? Math.floor(Date.now() / 1000);
+        const result = await fetchStravaActivities({
+          accessToken: account.access_token!,
+          before: beforeTimestamp,
+          includePhotos: photos,
+          athleteId: parseInt(account.providerAccountId),
+        });
 
         console.log(
           `Received ${result.activities.length} activities and ${result.photos.length} photos from API`,
