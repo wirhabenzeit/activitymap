@@ -2,20 +2,23 @@ on:
   schedule:
     - cron: "0 5,17 * * *" # every day at 5am and 5pm
 jobs:
-  fetch_strava:
-    name: Fetch Strava
+  sync_activities:
+    name: Sync Strava Activities
     runs-on: ubuntu-22.04
+    # No need for environment variables as we can access secrets directly
     steps:
-      - name: Make Request
-        id: myRequest
+      - name: Sync Activities
+        id: syncRequest
         uses: fjogeleit/http-request-action@v1
         with:
-          method: "GET"
-          url: "https://activitymap.dominik.page/api/strava/cron?number=30"
-          timeout: 10000
+          method: "POST"
+          url: "https://activitymap.dominik.page/api/cron/sync-activities"
+          customHeaders: '{"x-cron-secret": "${{ secrets.CRON_SECRET }}"}'
+          data: '{"maxIncompleteActivities": 30, "maxOldActivities": 30, "minActivitiesThreshold": 2}'
+          timeout: 60000
       - name: Show Response
         run: |
-          echo ${{ steps.myRequest.outputs.response }}
-          echo ${{ steps.myRequest.outputs.headers }}
-          echo ${{ steps.myRequest.outputs.status }}
-          echo ${{ fromJson(steps.myRequest.outputs.response).field_you_want_to_access }}
+          echo "Status: ${{ steps.syncRequest.outputs.status }}"
+          echo "Activities updated: ${{ fromJson(steps.syncRequest.outputs.response).updatedIncomplete }}"
+          echo "New activities fetched: ${{ fromJson(steps.syncRequest.outputs.response).fetchedOlder }}"
+          echo "Users processed: ${{ fromJson(steps.syncRequest.outputs.response).processedUsers }}"
