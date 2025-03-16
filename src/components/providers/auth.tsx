@@ -17,6 +17,7 @@ export function AuthProvider({
     initializeAuth,
     loadFromDB,
     loadPhotos,
+    loadFromStrava,
     isInitialized,
     addNotification,
     user,
@@ -25,6 +26,7 @@ export function AuthProvider({
     initializeAuth: state.initializeAuth,
     loadFromDB: state.loadFromDB,
     loadPhotos: state.loadPhotos,
+    loadFromStrava: state.loadFromStrava,
     isInitialized: state.isInitialized,
     addNotification: state.addNotification,
     user: state.user,
@@ -112,12 +114,25 @@ export function AuthProvider({
               accountId: account?.providerAccountId,
             });
             if (activityCount === 0) {
-              addNotification({
-                type: 'info',
-                title: 'No activities found',
-                message:
-                  'Click "Get Activities" in the user menu to fetch your activities from Strava.',
-              });
+              console.log('No activities found in database, fetching from Strava API');
+              // Automatically fetch activities from Strava when none are found in the database
+              loadFromStrava({ photos: true })
+                .then((count: number) => {
+                  console.log(`Successfully fetched ${count} activities from Strava`);
+                  addNotification({
+                    type: 'success',
+                    title: 'Activities loaded',
+                    message: `Successfully loaded ${count} activities from Strava`,
+                  });
+                })
+                .catch((error: Error) => {
+                  console.error('Error fetching activities from Strava:', error);
+                  addNotification({
+                    type: 'error',
+                    title: 'Error loading activities',
+                    message: 'Failed to fetch activities from Strava. Please try again later.',
+                  });
+                });
             }
           })
           .catch((error) => {
@@ -141,6 +156,7 @@ export function AuthProvider({
     initializeAuth,
     loadFromDB,
     loadPhotos,
+    loadFromStrava,
     addNotification,
     user,
     account,
