@@ -3,7 +3,6 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 // Define type for configuration options
 interface SyncConfig {
-  userId?: string;
   maxIncompleteActivities?: number;
   maxOldActivities?: number;
   minActivitiesThreshold?: number;
@@ -16,7 +15,6 @@ interface SyncConfig {
  * - maxIncompleteActivities: Maximum number of incomplete activities to update per run (default: 30)
  * - maxOldActivities: Maximum number of old activities to fetch per run (default: 30)
  * - minActivitiesThreshold: Minimum number of activities to detect reaching oldest (default: 2)
- * - userId: Optional ID of a specific user to sync
  * 
  * Authentication:
  * - Requires CRON_SECRET to be set in the environment variables
@@ -60,10 +58,6 @@ export async function POST(request: NextRequest) {
       
       if (isValidObject(parsedBody)) {
         // Type guards for individual properties
-        if ('userId' in parsedBody && typeof parsedBody.userId === 'string') {
-          requestBody.userId = parsedBody.userId;
-        }
-        
         if ('maxIncompleteActivities' in parsedBody && 
             typeof parsedBody.maxIncompleteActivities === 'number') {
           requestBody.maxIncompleteActivities = parsedBody.maxIncompleteActivities;
@@ -86,7 +80,6 @@ export async function POST(request: NextRequest) {
 
     // Type-safe extraction of config values
     const config: SyncConfig = {
-      userId: typeof requestBody.userId === 'string' ? requestBody.userId : undefined,
       maxIncompleteActivities: typeof requestBody.maxIncompleteActivities === 'number' ? requestBody.maxIncompleteActivities : undefined,
       maxOldActivities: typeof requestBody.maxOldActivities === 'number' ? requestBody.maxOldActivities : undefined,
       minActivitiesThreshold: typeof requestBody.minActivitiesThreshold === 'number' ? requestBody.minActivitiesThreshold : undefined,
@@ -94,7 +87,6 @@ export async function POST(request: NextRequest) {
     
     // Run the sync process
     const result = await syncActivities({
-      userId: config.userId,
       maxIncompleteActivities: config.maxIncompleteActivities ?? 30,
       maxOldActivities: config.maxOldActivities ?? 30,
       minActivitiesThreshold: config.minActivitiesThreshold ?? 2,

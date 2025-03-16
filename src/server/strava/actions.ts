@@ -16,14 +16,17 @@ import { sql } from 'drizzle-orm';
 import { webhooks } from '~/server/db/schema';
 import type { StravaActivity } from './types';
 
-export async function updateActivity(act: UpdatableActivity) {
+export async function updateActivity(
+  act: UpdatableActivity,
+  accountInfo?: { access_token: string; providerAccountId: string },
+) {
   try {
-    const account = await getAccount({});
+    // If account info is not provided, fetch it
+    const account = accountInfo ?? (await getAccount({}));
     if (!account?.access_token) {
       throw new Error('No Strava access token found');
     }
 
-    // Token refresh is now handled by getAccount
     const client = StravaClient.withAccessToken(account.access_token);
 
     try {

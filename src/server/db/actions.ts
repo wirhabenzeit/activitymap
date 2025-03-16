@@ -12,20 +12,6 @@ export type Account = AdapterAccount;
 // Define a type for the account based on the database schema
 type AccountType = typeof accounts.$inferSelect;
 
-export const getUserByStravaId = async (stravaId: string) => {
-  const account = await db.query.accounts.findFirst({
-    where: (accounts, { eq }) => eq(accounts.providerAccountId, stravaId),
-  });
-  if (!account) throw new Error('Account not found');
-
-  const user = await db.query.users.findFirst({
-    where: (users, { eq }) => eq(users.id, account.userId),
-  });
-  if (!user) throw new Error('User not found');
-
-  return user;
-};
-
 export const getUser = async (id?: string) => {
   if (!id) {
     const session = await auth();

@@ -89,7 +89,19 @@ export const createActivitySlice: StateCreator<
       set((state) => {
         state.loading = true;
       });
-      const updatedActivity = await updateStravaActivity(activity);
+      
+      // Get account from store state
+      const account = get().account;
+      if (!account) {
+        throw new Error('No account found in store state');
+      }
+      
+      // Pass account information directly to the server action
+      const updatedActivity = await updateStravaActivity(activity, {
+        access_token: account.access_token!,
+        providerAccountId: account.providerAccountId,
+      });
+      
       if (!updatedActivity) throw new Error('Failed to update activity');
 
       set((state) => {

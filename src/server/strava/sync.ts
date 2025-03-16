@@ -5,7 +5,6 @@ import { getAccount } from '~/server/db/actions';
 import { fetchStravaActivities } from './actions';
 
 export type SyncActivityOptions = {
-  userId?: string; // If provided, sync only for this user
   maxActivities?: number; // Total max activities to process (default: 50)
   maxIncompleteActivities?: number; // Max incomplete activities to update (default: 25)
   maxOldActivities?: number; // Max old activities to fetch (default: 25)
@@ -13,7 +12,7 @@ export type SyncActivityOptions = {
 };
 
 /**
- * Update activities for all users or specific user:
+ * Update activities for all users with Strava accounts:
  * 1. Fetch activities older than the oldest existing activity
  * 2. Replace summary activities with detailed ones
  */
@@ -24,9 +23,9 @@ export async function syncActivities(
   fetchedOlder: number;
   reachedOldest: string[];
   errors: Record<string, string>;
+  processedUsers: number;
 }> {
   const {
-    userId,
     maxActivities = 50,
     maxIncompleteActivities = Math.floor(maxActivities / 2),
     maxOldActivities = Math.floor(maxActivities / 2),
@@ -39,12 +38,10 @@ export async function syncActivities(
   const reachedOldest: string[] = [];
   const errors: Record<string, string> = {};
 
-  // Step 1: Get all users to process (or just the specified user)
-  const userQuery = userId 
-    ? db.select().from(users).where(eq(users.id, userId))
-    : db.select().from(users).where(isNotNull(users.athlete_id));
-
-  const usersToProcess = await userQuery;
+  // Step 1: Get all users with Strava accounts to process
+  const usersToProcess = await db.select()
+    .from(users)
+    .where(isNotNull(users.athlete_id));
   
   console.log(`Processing ${usersToProcess.length} users for activity updates`);
 
@@ -172,6 +169,7 @@ export async function syncActivities(
     fetchedOlder,
     reachedOldest,
     errors,
+    processedUsers: usersToProcess.length,
   };
 }
 
