@@ -40,7 +40,7 @@ import Overlay from '~/components/map/Overlay';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-import { mapSettings } from '~/settings/map';
+import { baseMaps, overlayMaps } from '~/settings/map';
 import { categorySettings } from '~/settings/category';
 
 import { Download } from '~/components/map/DownloadControl';
@@ -219,18 +219,20 @@ function Map() {
 
   const [viewport, setViewport] = useState(mapPosition);
 
-  const overlayMaps = useMemo(
+  const overlayMapComponents = useMemo(
     () => (
       <>
         {overlays.map((mapName) => {
-          const mapSetting = mapSettings[mapName];
-          if (mapSetting == undefined) return;
+          const mapSetting = overlayMaps[mapName];
+          if (!mapSetting) return null;
+          if (mapSetting.type !== 'raster') return null;
+          
           return (
             <Source
               key={mapName + 'source'}
               id={mapName}
               type="raster"
-              tiles={[mapSetting.url]}
+              tiles={mapSetting.url ? [mapSetting.url] : []}
               tileSize={256}
             >
               <Layer
@@ -238,8 +240,7 @@ function Map() {
                 id={mapName}
                 type="raster"
                 paint={{
-                  'raster-opacity':
-                    'opacity' in mapSetting ? mapSetting.opacity! : 1,
+                  'raster-opacity': mapSetting.opacity ?? 1,
                 }}
               />
             </Source>
@@ -250,7 +251,7 @@ function Map() {
     [overlays],
   );
 
-  const mapSettingBase = mapSettings[baseMap]!;
+  const mapSettingBase = baseMaps[baseMap];
 
   const photoDict = groupBy(photos, (photo) => photo.activity_id);
   const rows = selected
@@ -294,7 +295,7 @@ function Map() {
         }}
         projection={'globe' as unknown as mapboxgl.Projection}
         mapStyle={
-          mapSettingBase.type === 'vector' ? mapSettingBase.url : undefined
+          mapSettingBase?.type === 'vector' ? mapSettingBase.url : undefined
         }
         terrain={{
           source: 'mapbox-dem',
@@ -307,7 +308,7 @@ function Map() {
         interactiveLayerIds={['routeLayerBG', 'routeLayerBGsel']}
       >
         {mapSettingBase != undefined && mapSettingBase.type == 'raster' && (
-          <Source type="raster" tiles={[mapSettingBase.url]} tileSize={128}>
+          <Source type="raster" tiles={mapSettingBase.url ? [mapSettingBase.url] : []} tileSize={128}>
             <Layer id="baseMap" type="raster" paint={{ 'raster-opacity': 1 }} />
           </Source>
         )}
@@ -357,7 +358,7 @@ function Map() {
             </Button>
           </div>
         </Overlay>
-        {overlayMaps}
+        {overlayMapComponents}
         {loaded && <RouteLayer />}
         {loaded && showPhotos && <PhotoLayer />}
       </ReactMapGL>

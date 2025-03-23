@@ -2,14 +2,15 @@ import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
 import { type ViewState, type LngLatBounds } from 'react-map-gl/mapbox';
 import {
-  mapSettings,
+  baseMaps,
+  overlayMaps,
   defaultMapPosition,
   defaultMapBounds,
 } from '~/settings/map';
 
 export type MapState = {
-  baseMap: keyof typeof mapSettings;
-  overlayMaps: (keyof typeof mapSettings)[];
+  baseMap: keyof typeof baseMaps;
+  overlayMaps: (keyof typeof overlayMaps)[];
   position: ViewState;
   bbox: LngLatBounds;
   threeDim: boolean;
@@ -18,8 +19,8 @@ export type MapState = {
 
 export type MapActions = {
   togglePhotos: () => void;
-  setBaseMap: (key: keyof typeof mapSettings) => void;
-  toggleOverlayMap: (key: keyof typeof mapSettings) => void;
+  setBaseMap: (key: keyof typeof baseMaps) => void;
+  toggleOverlayMap: (key: keyof typeof overlayMaps) => void;
   toggleThreeDim: () => void;
   setPosition: (position: ViewState, bbox: LngLatBounds) => void;
 };
@@ -33,11 +34,11 @@ export const createMapSlice: StateCreator<
   MapSlice
 > = (set) => ({
   // Initial state
-  baseMap: Object.entries(mapSettings).find(
-    ([, map]) => map.visible && !map.overlay,
+  baseMap: Object.entries(baseMaps).find(
+    ([, map]) => map.visible
   )![0],
-  overlayMaps: Object.entries(mapSettings)
-    .filter(([, map]) => map.visible && map.overlay)
+  overlayMaps: Object.entries(overlayMaps)
+    .filter(([, map]) => map.visible)
     .map(([key]) => key),
   position: defaultMapPosition,
   bbox: defaultMapBounds,
@@ -59,7 +60,7 @@ export const createMapSlice: StateCreator<
     set((state: RootState) => {
       if (state.overlayMaps.includes(key)) {
         state.overlayMaps = state.overlayMaps.filter(
-          (item: keyof typeof mapSettings) => item !== key,
+          (item: keyof typeof overlayMaps) => item !== key,
         );
       } else {
         state.overlayMaps = [...state.overlayMaps, key];

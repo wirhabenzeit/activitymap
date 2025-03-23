@@ -4,7 +4,7 @@ import { Map } from 'lucide-react';
 
 import { useShallowStore } from '~/store';
 
-import { mapSettings } from '~/settings/map';
+import { baseMaps, overlayMaps as overlayMapSettings } from '~/settings/map';
 
 import { Button } from '~/components/ui/button';
 import {
@@ -40,7 +40,7 @@ export function DropdownMenuRadioGroupDemo() {
 }
 
 export function LayerSwitcher() {
-  const { overlayMaps, baseMap, toggleOverlayMap, setBaseMap } =
+  const { overlayMaps: activeOverlays, baseMap, toggleOverlayMap, setBaseMap } =
     useShallowStore((state) => ({
       overlayMaps: state.overlayMaps,
       baseMap: state.baseMap,
@@ -60,29 +60,25 @@ export function LayerSwitcher() {
           <DropdownMenuLabel>Base Map</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuRadioGroup value={baseMap} onValueChange={setBaseMap}>
-            {Object.entries(mapSettings)
-              .filter(([, val]) => val.overlay === false)
-              .map(([key]) => (
-                <DropdownMenuRadioItem value={key} key={key}>
-                  {key}
-                </DropdownMenuRadioItem>
-              ))}
+            {Object.entries(baseMaps).map(([key]) => (
+              <DropdownMenuRadioItem value={key} key={key}>
+                {key}
+              </DropdownMenuRadioItem>
+            ))}
           </DropdownMenuRadioGroup>
           <DropdownMenuLabel>Overlays</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {Object.entries(mapSettings)
-            .filter(([, val]) => val.overlay === true)
-            .map(([key]) => (
-              <DropdownMenuCheckboxItem
-                key={key}
-                checked={overlayMaps.includes(key)}
-                onClick={() => {
-                  toggleOverlayMap(key);
-                }}
-              >
-                {key}
-              </DropdownMenuCheckboxItem>
-            ))}
+          {Object.entries(overlayMapSettings).map(([key]) => (
+            <DropdownMenuCheckboxItem
+              key={key}
+              checked={activeOverlays.includes(key)}
+              onClick={() => {
+                toggleOverlayMap(key);
+              }}
+            >
+              {key}
+            </DropdownMenuCheckboxItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
