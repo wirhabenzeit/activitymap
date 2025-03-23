@@ -168,7 +168,26 @@ async function processWebhookEvent(data: {
       console.log(`[Webhook] Fetching activity ${object_id} from Strava`);
       let stravaActivity;
       try {
-        stravaActivity = await client.getActivity(object_id);
+        // Add timeout to prevent hanging in serverless environment
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        // Wrap the API call in a Promise.race to handle timeouts explicitly
+        const fetchPromise = client.getActivity(object_id);
+        console.log(`[Webhook] API request initiated for activity ${object_id}`);
+        
+        // Use Promise.race to handle potential timeouts
+        stravaActivity = await Promise.race([
+          fetchPromise,
+          new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              reject(new Error(`[Webhook] Timeout fetching activity ${object_id} from Strava`));
+            }, 15000); // 15 second timeout as backup
+          })
+        ]);
+        
+        clearTimeout(timeoutId);
+        console.log(`[Webhook] API request completed for activity ${object_id}`);
         
         if (!stravaActivity) {
           console.error(`[Webhook] Failed to fetch activity ${object_id} from Strava - null response`);
@@ -176,6 +195,10 @@ async function processWebhookEvent(data: {
         }
       } catch (apiError) {
         console.error(`[Webhook] Error fetching activity ${object_id} from Strava:`, apiError);
+        if (apiError instanceof Error) {
+          console.error(`[Webhook] Error name: ${apiError.name}, message: ${apiError.message}`);
+          console.error(`[Webhook] Error stack: ${apiError.stack}`);
+        }
         return;
       }
       
