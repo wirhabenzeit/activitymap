@@ -118,35 +118,45 @@ async function processWebhookEvent(data: {
 }) {
   const { object_type, object_id, aspect_type, owner_id } = data;
   
+  console.log(`[Webhook] Processing ${aspect_type} event for ${object_type} ${object_id} (owner: ${owner_id})`);
+  
   // Only process activity events for now
   if (object_type !== 'activity') {
-    console.log(`Ignoring non-activity event: ${object_type}`);
+    console.log(`[Webhook] Ignoring non-activity event: ${object_type}`);
     return;
   }
   
   try {
     // Find the user account associated with this athlete ID
+    console.log(`[Webhook] Looking up account for athlete ID: ${owner_id}`);
     const account = await getAccount({
       providerAccountId: owner_id.toString()
     });
     
     if (!account) {
-      console.error(`No account found for athlete ID: ${owner_id}`);
+      console.error(`[Webhook] No account found for athlete ID: ${owner_id}`);
       return;
     }
+    
+    console.log(`[Webhook] Found account for athlete ID: ${owner_id}`);
+    console.log(`[Webhook] Access token available: ${!!account.access_token}, Refresh token available: ${!!account.refresh_token}`);
     
     const client = StravaClient.withTokens(account.access_token, account.refresh_token);
     
     if (aspect_type === 'create' || aspect_type === 'update') {
       // Fetch the activity details from Strava
+      console.log(`[Webhook] Fetching activity ${object_id} from Strava`);
       const stravaActivity = await client.getActivity(object_id);
       
       if (!stravaActivity) {
-        console.error(`Failed to fetch activity ${object_id} from Strava`);
+        console.error(`[Webhook] Failed to fetch activity ${object_id} from Strava`);
         return;
       }
       
+      console.log(`[Webhook] Successfully fetched activity ${object_id} from Strava`);
+      
       // Transform and save/update the activity
+      console.log(`[Webhook] Transforming activity data`);
       const activity = transformStravaActivity(stravaActivity);
       
       // Add the athlete ID from the owner_id
@@ -155,22 +165,35 @@ async function processWebhookEvent(data: {
         athlete: owner_id,
       };
       
-      await db
-        .insert(activities)
-        .values(activityWithAthlete)
-        .onConflictDoUpdate({
-          target: activities.id,
-          set: activityWithAthlete,
-        });
+      console.log(`[Webhook] Saving activity ${object_id} to database`);
+      try {
+        await db
+          .insert(activities)
+          .values(activityWithAthlete)
+          .onConflictDoUpdate({
+            target: activities.id,
+            set: activityWithAthlete,
+          });
+        console.log(`[Webhook] Successfully saved activity ${object_id} to database`);
+      } catch (dbError) {
+        console.error(`[Webhook] Database error while saving activity ${object_id}:`, dbError);
+        throw dbError;
+      }
       
-      console.log(`Successfully processed ${aspect_type} event for activity ${object_id}`);
+      console.log(`[Webhook] Successfully processed ${aspect_type} event for activity ${object_id}`);
     } else if (aspect_type === 'delete') {
       // Handle activity deletion
-      // For now, we'll just log it - in a real app you might want to mark it as deleted
-      console.log(`Activity ${object_id} was deleted`);
+      console.log(`[Webhook] Processing delete event for activity ${object_id}`);
+      try {
+        // For now, we'll just log it - in a real app you might want to mark it as deleted or remove it
+        console.log(`[Webhook] Activity ${object_id} was deleted`);
+      } catch (dbError) {
+        console.error(`[Webhook] Error handling activity deletion:`, dbError);
+        throw dbError;
+      }
     }
   } catch (error) {
-    console.error(`Error processing ${aspect_type} event for ${object_type} ${object_id}:`, error);
+    console.error(`[Webhook] Error processing ${aspect_type} event for ${object_type} ${object_id}:`, error);
     throw error; // Re-throw to be caught by the caller
   }
 }
