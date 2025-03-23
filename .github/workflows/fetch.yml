@@ -1,6 +1,6 @@
 on:
   schedule:
-    - cron: "0 5,17 * * *" # every day at 5am and 5pm
+    - cron: '0 2,8,14,20 * * *' # every day at 2am, 8am, 2pm and 8pm
 jobs:
   sync_activities:
     name: Sync Strava Activities
@@ -11,8 +11,8 @@ jobs:
         id: syncRequest
         uses: fjogeleit/http-request-action@v1
         with:
-          method: "POST"
-          url: "https://activitymap.dominik.page/api/cron/sync-activities"
+          method: 'POST'
+          url: 'https://activitymap.dominik.page/api/cron/sync-activities'
           customHeaders: '{"x-cron-secret": "${{ secrets.CRON_SECRET }}"}'
           data: '{"maxIncompleteActivities": 30, "maxOldActivities": 30, "minActivitiesThreshold": 2}'
           timeout: 60000
