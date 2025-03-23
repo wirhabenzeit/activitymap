@@ -218,7 +218,7 @@ export const stravaWebhooks = pgTable('strava_webhooks', {
   id: text('id').notNull().primaryKey(),
   subscriptionId: integer('subscription_id'),
   verifyToken: text('verify_token').notNull(),
-  callbackUrl: text('callback_url').notNull(),
+  callbackUrl: text('callback_url').notNull().unique(),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
 });

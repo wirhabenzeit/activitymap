@@ -26,9 +26,20 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
     <Card className="bg-white/90 backdrop-blur-sm absolute bottom-4 right-4 z-10 w-[min(500px,80dvw)] h-[50dvh] flex flex-col">
       <div className="overflow-auto flex-grow">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">
-            {feature.title ?? 'Feature Info'}
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-lg">
+              {feature.title ?? 'Feature Info'}
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 -mr-2"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="pb-4">
           {feature.image_url && (
