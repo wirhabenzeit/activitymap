@@ -214,12 +214,18 @@ export class StravaClient {
       hasAuthToken: !!authHeader,
       isWebhookEndpoint,
       retryCount,
+      bodyType: options.body instanceof FormData ? 'FormData' : typeof options.body,
     });
 
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
     };
+    
+    // Only set Content-Type to application/json if we're not sending FormData
+    // FormData will automatically set the correct Content-Type with boundary
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     // Only add Authorization header if we have one
     if (authHeader) {
@@ -263,11 +269,24 @@ export class StravaClient {
         errorDetails = { parseError };
       }
 
+      // Log the full error response for debugging
+      if (errorDetails.errors) {
+        console.error('Strava API error details:', JSON.stringify(errorDetails.errors, null, 2));
+      }
+      
       console.error('Strava API error:', {
         message: errorMessage,
         status: response.status,
+        statusText: response.statusText,
         contentType,
         details: errorDetails,
+        endpoint,
+        method: options.method ?? 'GET',
+        bodyType: options.body instanceof FormData ? 'FormData' : typeof options.body,
+        // If it's FormData, log the keys (but not values for security)
+        formDataKeys: options.body instanceof FormData 
+          ? Array.from(options.body.keys()) 
+          : undefined,
       });
 
       // Token management is now handled outside this class
@@ -375,23 +394,38 @@ export class StravaClient {
       client_secret: this.clientSecret,
     });
 
-    return this.request<StravaSubscription[]>(
+    const subscriptions = await this.request<StravaSubscription[]>(
       `/push_subscriptions?${searchParams}`,
     );
+    
+    console.log('Current Strava subscriptions:', JSON.stringify(subscriptions, null, 2));
+    return subscriptions;
   }
 
   async createSubscription(
     callbackUrl: string,
     verifyToken: string,
   ): Promise<StravaSubscription> {
+    // Create form data as per Strava API documentation
+    const formData = new FormData();
+    formData.append('client_id', this.clientId);
+    formData.append('client_secret', this.clientSecret);
+    formData.append('callback_url', callbackUrl);
+    formData.append('verify_token', verifyToken);
+    
+    // Log the request details
+    console.log('Creating Strava webhook subscription with:', {
+      endpoint: '/push_subscriptions',
+      client_id: this.clientId,
+      callback_url: callbackUrl,
+      verify_token: verifyToken,
+      // Don't log the client secret
+    });
+    
     return this.request<StravaSubscription>('/push_subscriptions', {
       method: 'POST',
-      body: JSON.stringify({
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        callback_url: callbackUrl,
-        verify_token: verifyToken,
-      }),
+      body: formData,
+      // Don't set Content-Type header, it will be set automatically with the boundary
     });
   }
 

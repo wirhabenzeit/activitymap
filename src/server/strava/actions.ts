@@ -13,8 +13,9 @@ import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type UpdatableActivity, type StravaPhoto } from './types';
 import { sql } from 'drizzle-orm';
-import { webhooks } from '~/server/db/schema';
+import { webhooks, stravaWebhooks } from '~/server/db/schema';
 import type { StravaActivity } from './types';
+import crypto from 'crypto';
 
 export async function updateActivity(
   act: UpdatableActivity,
@@ -361,12 +362,107 @@ export async function checkWebhookStatus() {
     return {
       expectedUrl,
       subscriptions: stravaSubscriptions,
-      hasMatchingSubscription: matchingSubscription !== null,
+      hasMatchingSubscription: !!matchingSubscription,
       databaseStatus,
       matchingSubscription,
     };
   } catch (error) {
     console.error('Failed to manage webhook subscription:', error);
     throw error;
+  }
+}
+
+/**
+ * Creates a new webhook subscription with Strava
+ * This should only be used in development mode
+ */
+export async function createWebhookSubscription() {
+  if (!process.env.PUBLIC_URL) {
+    throw new Error('PUBLIC_URL environment variable is not set');
+  }
+
+  // Construct the webhook URL from PUBLIC_URL
+  const callbackUrl = new URL(
+    '/api/strava/webhook',
+    process.env.PUBLIC_URL,
+  ).toString();
+
+  console.log('Creating Strava webhook subscription with:', {
+    endpoint: '/push_subscriptions',
+    client_id: process.env.STRAVA_CLIENT_ID,
+    callback_url: callbackUrl,
+    verify_token: 'ygjvd3uc6ff', // Using a fixed token for debugging
+  });
+
+  // Use a fixed verification token for debugging
+  const verifyToken = 'ygjvd3uc6ff';
+
+  // No userId needed for webhook management (no auth required)
+  const client = StravaClient.withoutAuth();
+
+  try {
+    // First, check if we already have existing subscriptions
+    const existingSubscriptions = await client.getSubscriptions();
+    
+    // Check if there's already a subscription with the same callback URL
+    const existingSubscription = existingSubscriptions.find(
+      (sub) => sub.callback_url === callbackUrl
+    );
+    
+    if (existingSubscription) {
+      console.log('Subscription already exists:', existingSubscription);
+      
+      // Update our database record with the existing subscription
+      await db
+        .insert(stravaWebhooks)
+        .values({
+          id: crypto.randomUUID(),
+          subscriptionId: existingSubscription.id,
+          verifyToken,
+          callbackUrl,
+        })
+        .onConflictDoUpdate({
+          target: [stravaWebhooks.callbackUrl],
+          set: {
+            verifyToken,
+            updatedAt: new Date(),
+          },
+        });
+      
+      return {
+        success: true,
+        subscription: existingSubscription,
+        message: 'Using existing subscription',
+      };
+    }
+    
+    // Create the subscription
+    const subscription = await client.createSubscription(callbackUrl, verifyToken);
+    console.log('Created Strava webhook subscription:', subscription);
+
+    // Insert the subscription into our database
+    await db
+      .insert(stravaWebhooks)
+      .values({
+        id: crypto.randomUUID(),
+        subscriptionId: subscription.id,
+        verifyToken,
+        callbackUrl,
+      });
+
+    return {
+      success: true,
+      subscription,
+      message: 'Created new subscription',
+    };
+  } catch (error) {
+    console.error('Failed to create webhook subscription:', error);
+    
+    // Return a more detailed error response
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      details: 'Make sure your callback URL is publicly accessible and your Strava API credentials are correct',
+    };
   }
 }

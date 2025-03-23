@@ -27,7 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 import * as React from 'react';
 import Image from 'next/image';
 import { cn } from '~/lib/utils';
-import { checkWebhookStatus } from '~/server/strava/actions';
+import { checkWebhookStatus, createWebhookSubscription } from '~/server/strava/actions';
 import { env } from '~/env';
 import { useToast } from '~/hooks/use-toast';
 
@@ -43,6 +43,42 @@ export function UserSettings() {
 
   const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
   const { toast } = useToast();
+
+  const handleCreateWebhook = async () => {
+    try {
+      const result = await createWebhookSubscription();
+      console.log('Webhook creation result:', result);
+      
+      // Display the result in a toast notification
+      toast({
+        title: 'Webhook Created',
+        description: (
+          <div className="space-y-1">
+            <p>
+              <span className="font-semibold">Success:</span> ✅
+            </p>
+            <p>
+              <span className="font-semibold">ID:</span> {result.subscription.id}
+            </p>
+            <p>
+              <span className="font-semibold">URL:</span> {result.subscription.callback_url}
+            </p>
+          </div>
+        ),
+        duration: 10000, // Show for 10 seconds
+      });
+      
+      // Refresh the webhook status
+      await handleWebhookStatus();
+    } catch (error) {
+      console.error('Failed to create webhook:', error);
+      toast({
+        title: 'Webhook Creation Error',
+        description: error instanceof Error ? error.message : 'Unknown error creating webhook',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleWebhookStatus = async () => {
     try {
@@ -179,13 +215,22 @@ export function UserSettings() {
               Get Activities
             </DropdownMenuItem>
             {isDevelopment && (
-              <DropdownMenuItem
-                onClick={handleWebhookStatus}
-                className="cursor-pointer"
-              >
-                <Info className="mr-2 h-4 w-4" />
-                Check Webhook Status
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem
+                  onClick={handleWebhookStatus}
+                  className="cursor-pointer"
+                >
+                  <Info className="mr-2 h-4 w-4" />
+                  Check Webhook Status
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleCreateWebhook}
+                  className="cursor-pointer"
+                >
+                  <Info className="mr-2 h-4 w-4" />
+                  Create Webhook Subscription
+                </DropdownMenuItem>
+              </>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
