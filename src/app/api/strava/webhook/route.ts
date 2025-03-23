@@ -129,27 +129,53 @@ async function processWebhookEvent(data: {
   try {
     // Find the user account associated with this athlete ID
     console.log(`[Webhook] Looking up account for athlete ID: ${owner_id}`);
-    const account = await getAccount({
-      providerAccountId: owner_id.toString()
-    });
-    
-    if (!account) {
-      console.error(`[Webhook] No account found for athlete ID: ${owner_id}`);
+    let account;
+    try {
+      account = await getAccount({
+        providerAccountId: owner_id.toString()
+      });
+      
+      if (!account) {
+        console.error(`[Webhook] No account found for athlete ID: ${owner_id}`);
+        return;
+      }
+    } catch (accountError) {
+      console.error(`[Webhook] Error getting account for athlete ID: ${owner_id}:`, accountError);
       return;
     }
     
     console.log(`[Webhook] Found account for athlete ID: ${owner_id}`);
     console.log(`[Webhook] Access token available: ${!!account.access_token}, Refresh token available: ${!!account.refresh_token}`);
     
-    const client = StravaClient.withTokens(account.access_token, account.refresh_token);
+    let client;
+    try {
+      // Add token refresh callback to update tokens in database
+      client = StravaClient.withTokens(
+        account.access_token ?? '', 
+        account.refresh_token ?? '',
+        async (_tokens) => {
+          console.log(`[Webhook] Tokens refreshed during webhook processing`);
+          // We don't need to update the database here as getAccount already handles this
+        }
+      );
+    } catch (clientError) {
+      console.error(`[Webhook] Error creating Strava client:`, clientError);
+      return;
+    }
     
     if (aspect_type === 'create' || aspect_type === 'update') {
       // Fetch the activity details from Strava
       console.log(`[Webhook] Fetching activity ${object_id} from Strava`);
-      const stravaActivity = await client.getActivity(object_id);
-      
-      if (!stravaActivity) {
-        console.error(`[Webhook] Failed to fetch activity ${object_id} from Strava`);
+      let stravaActivity;
+      try {
+        stravaActivity = await client.getActivity(object_id);
+        
+        if (!stravaActivity) {
+          console.error(`[Webhook] Failed to fetch activity ${object_id} from Strava - null response`);
+          return;
+        }
+      } catch (apiError) {
+        console.error(`[Webhook] Error fetching activity ${object_id} from Strava:`, apiError);
         return;
       }
       
@@ -167,6 +193,20 @@ async function processWebhookEvent(data: {
       
       console.log(`[Webhook] Saving activity ${object_id} to database`);
       try {
+        // Log the activity data structure (without sensitive data)
+        console.log(`[Webhook] Activity data structure:`, {
+          id: activityWithAthlete.id,
+          name: activityWithAthlete.name,
+          sport_type: activityWithAthlete.sport_type,
+          start_date: activityWithAthlete.start_date,
+          athlete: activityWithAthlete.athlete,
+          has_map_polyline: !!activityWithAthlete.map_polyline,
+          has_map_summary_polyline: !!activityWithAthlete.map_summary_polyline,
+          photo_count: activityWithAthlete.photo_count ?? 0,
+          total_photo_count: activityWithAthlete.total_photo_count ?? 0,
+          is_complete: activityWithAthlete.is_complete ?? false
+        });
+        
         await db
           .insert(activities)
           .values(activityWithAthlete)
@@ -177,6 +217,11 @@ async function processWebhookEvent(data: {
         console.log(`[Webhook] Successfully saved activity ${object_id} to database`);
       } catch (dbError) {
         console.error(`[Webhook] Database error while saving activity ${object_id}:`, dbError);
+        // Log more details about the error
+        if (dbError instanceof Error) {
+          console.error(`[Webhook] Error name: ${dbError.name}, message: ${dbError.message}`);
+          console.error(`[Webhook] Error stack: ${dbError.stack}`);
+        }
         throw dbError;
       }
       
