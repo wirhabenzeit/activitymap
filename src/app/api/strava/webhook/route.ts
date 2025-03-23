@@ -131,9 +131,24 @@ async function processWebhookEvent(data: {
     console.log(`[Webhook] Looking up account for athlete ID: ${owner_id}`);
     let account;
     try {
-      account = await getAccount({
+      console.log(`[Webhook] Before getAccount call for athlete ID: ${owner_id}`);
+      
+      // Add timeout handling for the database query
+      const accountPromise = getAccount({
         providerAccountId: owner_id.toString()
       });
+      
+      // Use Promise.race to handle potential timeouts
+      account = await Promise.race([
+        accountPromise,
+        new Promise<null>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`[Webhook] Timeout looking up account for athlete ID: ${owner_id}`));
+          }, 10000); // 10 second timeout
+        })
+      ]);
+      
+      console.log(`[Webhook] After getAccount call for athlete ID: ${owner_id}`);
       
       if (!account) {
         console.error(`[Webhook] No account found for athlete ID: ${owner_id}`);
@@ -141,6 +156,10 @@ async function processWebhookEvent(data: {
       }
     } catch (accountError) {
       console.error(`[Webhook] Error getting account for athlete ID: ${owner_id}:`, accountError);
+      if (accountError instanceof Error) {
+        console.error(`[Webhook] Error name: ${accountError.name}, message: ${accountError.message}`);
+        console.error(`[Webhook] Error stack: ${accountError.stack}`);
+      }
       return;
     }
     
