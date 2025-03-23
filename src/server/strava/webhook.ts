@@ -90,19 +90,39 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
   console.log(`[Webhook] Fetching activity ${object_id} from Strava`);
   let stravaActivity;
   try {
-    // Add timeout handling for the API request
-    const fetchPromise = client.getActivity(object_id);
-    console.log(`[Webhook] API request initiated for activity ${object_id}`);
+    // Create an AbortController for the fetch request
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      console.error(`[Webhook] Aborting fetch for activity ${object_id} due to timeout`);
+    }, 10000); // 10 second timeout
     
-    // Use Promise.race to handle potential timeouts
-    stravaActivity = await Promise.race([
-      fetchPromise,
-      new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(`[Webhook] Timeout fetching activity ${object_id} from Strava`));
-        }, 15000); // 15 second timeout
-      })
-    ]);
+    // Log the start of the API request with more details
+    console.log(`[Webhook] API request initiated for activity ${object_id} with timeout of 10s`);
+    
+    // Start the fetch promise
+    const fetchPromise = client.getActivity(object_id);
+    
+    // Use Promise.race with more detailed logging
+    try {
+      stravaActivity = await Promise.race([
+        fetchPromise.then(result => {
+          console.log(`[Webhook] API fetch promise resolved for activity ${object_id}`);
+          return result;
+        }),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            console.error(`[Webhook] Explicit timeout reached for activity ${object_id}`);
+            reject(new Error(`[Webhook] Timeout fetching activity ${object_id} from Strava after 15s`));
+          }, 15000); // 15 second backup timeout
+        })
+      ]);
+    } catch (raceError) {
+      console.error(`[Webhook] Error in Promise.race for activity ${object_id}:`, raceError);
+      throw raceError; // Re-throw to be caught by the outer try/catch
+    } finally {
+      clearTimeout(timeoutId);
+    }
     
     console.log(`[Webhook] API request completed for activity ${object_id}`);
     
@@ -110,12 +130,17 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
       console.error(`[Webhook] Failed to fetch activity ${object_id} from Strava - null response`);
       return;
     }
+    
+    // Log more details about the activity to help with debugging
+    console.log(`[Webhook] Activity ${object_id} fetched successfully with name: "${stravaActivity.name}"`);
   } catch (apiError) {
     console.error(`[Webhook] Error fetching activity ${object_id} from Strava:`, apiError);
     if (apiError instanceof Error) {
       console.error(`[Webhook] Error name: ${apiError.name}, message: ${apiError.message}`);
       console.error(`[Webhook] Error stack: ${apiError.stack}`);
     }
+    // Log additional context that might help diagnose the issue
+    console.error(`[Webhook] Context: object_type=${object_type}, aspect_type=${aspect_type}, owner_id=${owner_id}`);
     return;
   }
   
