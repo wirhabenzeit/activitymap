@@ -34,29 +34,62 @@ export const getAccount = async ({
   userId?: string;
   forceRefresh?: boolean;
 }) => {
+  console.log(`[DB] getAccount called with:`, { providerAccountId, userId, forceRefresh });
   let account: AccountType | null = null;
 
-  if (providerAccountId) {
-    const result = await db.query.accounts.findFirst({
-      where: (accounts, { eq }) =>
-        eq(accounts.providerAccountId, providerAccountId),
-    });
-    // If account not found by providerAccountId, this is likely a webhook request
-    // We should not throw an error, but return null to handle this case appropriately
-    if (!result) return null;
-    account = result;
-  } else if (userId) {
-    const result = await db.query.accounts.findFirst({
-      where: (accounts, { eq }) => eq(accounts.userId, userId),
-    });
-    if (result) account = result;
-  } else {
-    // Only try to resolve through session if no IDs provided
-    const resolvedUserId = await getUser().then((user) => user.id);
-    const result = await db.query.accounts.findFirst({
-      where: (accounts, { eq }) => eq(accounts.userId, resolvedUserId),
-    });
-    if (result) account = result;
+  try {
+    if (providerAccountId) {
+      console.log(`[DB] Looking up account by providerAccountId: ${providerAccountId}`);
+      const result = await db.query.accounts.findFirst({
+        where: (accounts, { eq }) =>
+          eq(accounts.providerAccountId, providerAccountId),
+      });
+      // If account not found by providerAccountId, this is likely a webhook request
+      // We should not throw an error, but return null to handle this case appropriately
+      if (!result) {
+        console.log(`[DB] No account found for providerAccountId: ${providerAccountId}`);
+        return null;
+      }
+      account = result;
+      console.log(`[DB] Found account for providerAccountId: ${providerAccountId}`);
+    } else if (userId) {
+      console.log(`[DB] Looking up account by userId: ${userId}`);
+      const result = await db.query.accounts.findFirst({
+        where: (accounts, { eq }) => eq(accounts.userId, userId),
+      });
+      if (result) {
+        account = result;
+        console.log(`[DB] Found account for userId: ${userId}`);
+      } else {
+        console.log(`[DB] No account found for userId: ${userId}`);
+      }
+    } else {
+      // Only try to resolve through session if no IDs provided
+      console.log(`[DB] No IDs provided, resolving through session`);
+      try {
+        const resolvedUserId = await getUser().then((user) => user.id);
+        console.log(`[DB] Resolved userId from session: ${resolvedUserId}`);
+        const result = await db.query.accounts.findFirst({
+          where: (accounts, { eq }) => eq(accounts.userId, resolvedUserId),
+        });
+        if (result) {
+          account = result;
+          console.log(`[DB] Found account for resolved userId: ${resolvedUserId}`);
+        } else {
+          console.log(`[DB] No account found for resolved userId: ${resolvedUserId}`);
+        }
+      } catch (sessionError) {
+        console.error(`[DB] Error resolving user from session:`, sessionError);
+        throw new Error('Failed to resolve user from session');
+      }
+    }
+  } catch (dbError) {
+    console.error(`[DB] Database error in getAccount:`, dbError);
+    if (dbError instanceof Error) {
+      console.error(`[DB] Error name: ${dbError.name}, message: ${dbError.message}`);
+      console.error(`[DB] Error stack: ${dbError.stack}`);
+    }
+    throw new Error('Database error in getAccount');
   }
 
   // Only throw if we were looking up by userId or through session
