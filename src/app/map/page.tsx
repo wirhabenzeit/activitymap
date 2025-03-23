@@ -219,32 +219,61 @@ function Map() {
 
   const [viewport, setViewport] = useState(mapPosition);
 
+  // Collect all interactive layer IDs from active overlays
+  const activeInteractiveLayerIds = useMemo(() => {
+    const ids: string[] = ['routeLayerBG', 'routeLayerBGsel']; // Default interactive layers
+    
+    overlays.forEach(mapName => {
+      const mapSetting = overlayMaps[mapName];
+      if (mapSetting?.interactiveLayerIds?.length) {
+        ids.push(...mapSetting.interactiveLayerIds);
+      }
+    });
+    
+    return ids;
+  }, [overlays]);
+
   const overlayMapComponents = useMemo(
     () => (
       <>
         {overlays.map((mapName) => {
           const mapSetting = overlayMaps[mapName];
           if (!mapSetting) return null;
-          if (mapSetting.type !== 'raster') return null;
           
-          return (
-            <Source
-              key={mapName + 'source'}
-              id={mapName}
-              type="raster"
-              tiles={mapSetting.url ? [mapSetting.url] : []}
-              tileSize={256}
-            >
-              <Layer
-                key={mapName + 'layer'}
+          // Handle raster overlays
+          if (mapSetting.type === 'raster') {
+            return (
+              <Source
+                key={mapName + 'source'}
                 id={mapName}
                 type="raster"
-                paint={{
-                  'raster-opacity': mapSetting.opacity ?? 1,
-                }}
+                tiles={mapSetting.url ? [mapSetting.url] : []}
+                tileSize={256}
+              >
+                <Layer
+                  key={mapName + 'layer'}
+                  id={mapName}
+                  type="raster"
+                  paint={{
+                    'raster-opacity': mapSetting.opacity ?? 1,
+                  }}
+                />
+              </Source>
+            );
+          }
+          
+          // Handle component overlays
+          if (mapSetting.type === 'component') {
+            const Component = mapSetting.component;
+            return (
+              <Component
+                key={mapName + '-component'}
+                {...(mapSetting.props ?? {})}
               />
-            </Source>
-          );
+            );
+          }
+          
+          return null;
         })}
       </>
     ),
@@ -305,7 +334,7 @@ function Map() {
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         cursor={cursor}
-        interactiveLayerIds={['routeLayerBG', 'routeLayerBGsel']}
+        interactiveLayerIds={activeInteractiveLayerIds}
       >
         {mapSettingBase != undefined && mapSettingBase.type == 'raster' && (
           <Source type="raster" tiles={mapSettingBase.url ? [mapSettingBase.url] : []} tileSize={128}>

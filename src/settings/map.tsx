@@ -1,5 +1,6 @@
 import { LngLatBounds } from 'mapbox-gl';
 import type React from 'react';
+import GeoJSONComponentOverlay from '~/components/map/GeoJSONComponentOverlay';
 
 // Base map types
 type RasterBaseMapSetting = {
@@ -22,6 +23,7 @@ type RasterOverlaySetting = {
   type: 'raster';
   visible: boolean;
   opacity?: number;
+  interactiveLayerIds?: string[];
 };
 
 type ComponentOverlaySetting<T = unknown> = {
@@ -29,9 +31,12 @@ type ComponentOverlaySetting<T = unknown> = {
   visible: boolean;
   component: React.ComponentType<T>;
   props?: T;
+  interactiveLayerIds?: string[];
 };
 
-type OverlaySetting = RasterOverlaySetting | ComponentOverlaySetting<Record<string, unknown>>;
+type OverlaySetting =
+  | RasterOverlaySetting
+  | ComponentOverlaySetting<Record<string, unknown>>;
 
 // Combined type for backward compatibility
 type MapSetting = {
@@ -143,6 +148,20 @@ export const overlayMaps: Record<string, OverlaySetting> = {
     visible: false,
     opacity: 0.4,
   },
+  Senja: {
+    type: 'component',
+    visible: false,
+    component: GeoJSONComponentOverlay,
+    props: {
+      id: 'senja-geojson',
+      data: '/senja.geojson',
+      color: '#ff0000',
+      lineWidth: 2,
+      opacity: 0.8,
+      interactive: true,
+    },
+    interactiveLayerIds: ['senja-geojson-line-layer'],
+  },
 };
 
 // For backward compatibility, export a combined mapSettings object
@@ -152,14 +171,14 @@ export const mapSettings: Record<string, MapSetting> = {
       ...acc,
       [key]: { ...value, overlay: false },
     }),
-    {} as Record<string, MapSetting>
+    {} as Record<string, MapSetting>,
   ),
   ...Object.entries(overlayMaps).reduce(
     (acc, [key, value]) => ({
       ...acc,
       [key]: { ...value, overlay: true },
     }),
-    {} as Record<string, MapSetting>
+    {} as Record<string, MapSetting>,
   ),
 };
 

@@ -40,23 +40,27 @@ export function DropdownMenuRadioGroupDemo() {
 }
 
 export function LayerSwitcher() {
-  const { overlayMaps: activeOverlays, baseMap, toggleOverlayMap, setBaseMap } =
-    useShallowStore((state) => ({
-      overlayMaps: state.overlayMaps,
-      baseMap: state.baseMap,
-      toggleOverlayMap: state.toggleOverlayMap,
-      setBaseMap: state.setBaseMap,
-    }));
+  const {
+    overlayMaps: activeOverlays,
+    baseMap,
+    toggleOverlayMap,
+    setBaseMap,
+  } = useShallowStore((state) => ({
+    overlayMaps: state.overlayMaps,
+    baseMap: state.baseMap,
+    toggleOverlayMap: state.toggleOverlayMap,
+    setBaseMap: state.setBaseMap,
+  }));
 
   return (
     <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="[&_svg]:size-5">
             <Map className="mx-auto" color="black" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-56">
+        <DropdownMenuContent className="w-56 h-120 overflow-y-auto">
           <DropdownMenuLabel>Base Map</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuRadioGroup value={baseMap} onValueChange={setBaseMap}>
