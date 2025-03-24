@@ -387,15 +387,19 @@ export async function createWebhookSubscription() {
     process.env.PUBLIC_URL,
   ).toString();
 
+  // Get the verification token from environment variables
+  const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN;
+  
+  if (!verifyToken) {
+    throw new Error('STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set');
+  }
+  
   console.log('Creating Strava webhook subscription with:', {
     endpoint: '/push_subscriptions',
     client_id: process.env.STRAVA_CLIENT_ID,
     callback_url: callbackUrl,
-    verify_token: 'ygjvd3uc6ff', // Using a fixed token for debugging
+    verify_token: '***********', // Masked for security
   });
-
-  // Use a fixed verification token for debugging
-  const verifyToken = 'ygjvd3uc6ff';
 
   // No userId needed for webhook management (no auth required)
   const client = StravaClient.withoutAuth();

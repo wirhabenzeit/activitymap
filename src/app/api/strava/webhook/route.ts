@@ -22,9 +22,9 @@ export async function GET(request: NextRequest) {
   
   console.log('Strava webhook verification params:', { mode, token, challenge });
   
-  // For debugging: Check if we're using the development verification token
-  const devToken = process.env.STRAVA_WEBHOOK_DEV_TOKEN;
-  if (devToken && token === devToken) {
+  // Check if the token matches our verification token
+  const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN;
+  if (verifyToken && token === verifyToken) {
     console.log('Using development verification token');
     return NextResponse.json({ 'hub.challenge': challenge });
   }

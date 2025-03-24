@@ -26,6 +26,7 @@ export const env = createEnv({
     AUTH_SECRET: z.string(),
     AUTH_STRAVA_ID: z.string(),
     AUTH_STRAVA_SECRET: z.string(),
+    STRAVA_WEBHOOK_VERIFY_TOKEN: z.string(),
     PUBLIC_URL: z.string().url(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
@@ -48,6 +49,7 @@ export const env = createEnv({
    */
   runtimeEnv: {
     CRON_SECRET: process.env.CRON_SECRET,
+    STRAVA_WEBHOOK_VERIFY_TOKEN: process.env.STRAVA_WEBHOOK_VERIFY_TOKEN,
     POSTGRES_URL: process.env.POSTGRES_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     DATABASE_URL_UNPOOLED: process.env.DATABASE_URL_UNPOOLED,
