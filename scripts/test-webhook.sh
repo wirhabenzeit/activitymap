@@ -11,8 +11,8 @@ LOCAL_URL="http://localhost:3000/api/strava/webhook"
 PROD_URL="https://activitymap.dominik.page/api/strava/webhook"
 
 # Choose which URL to use (uncomment one)
-URL=$LOCAL_URL
-#URL=$PROD_URL
+#URL=$LOCAL_URL
+URL=$PROD_URL
 
 # Current timestamp
 CURRENT_TIME=$(date +%s)

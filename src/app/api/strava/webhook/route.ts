@@ -22,8 +22,9 @@ export async function GET(request: NextRequest) {
   
   console.log('Strava webhook verification params:', { mode, token, challenge });
   
-  // For debugging: If we're using our fixed token for development
-  if (token === 'ygjvd3uc6ff') {
+  // For debugging: Check if we're using the development verification token
+  const devToken = process.env.STRAVA_WEBHOOK_DEV_TOKEN;
+  if (devToken && token === devToken) {
     console.log('Using development verification token');
     return NextResponse.json({ 'hub.challenge': challenge });
   }
@@ -79,18 +80,22 @@ export async function POST(request: NextRequest) {
     const data = await request.json() as StravaWebhookEvent;
     console.log('Strava webhook event data:', data);
     
-    // Always respond with 200 OK immediately to acknowledge receipt
-    // Process the event asynchronously to avoid timeouts
-    // This follows the separation of concerns pattern where API routes handle HTTP concerns
-    // and server actions handle business logic
-    processWebhookEvent(data).catch(error => {
-      console.error('Error processing webhook event:', error);
-    });
+    // Process the webhook synchronously before returning a response
+    // This is not recommended for production as it may lead to timeouts,
+    // but it's useful for testing to see if the processing works
+    const eventId = `${data.object_type}_${data.object_id}_${data.event_time}`;
+    console.log(`[Webhook] Processing event synchronously: ${eventId}`);
     
-    return new NextResponse('Event received', { status: 200 });
+    try {
+      await processWebhookEvent(data);
+      console.log(`[Webhook] Successfully processed event: ${eventId}`);
+      return new NextResponse('Event processed successfully', { status: 200 });
+    } catch (processingError) {
+      console.error(`[Webhook] Error processing event ${eventId}:`, processingError);
+      return new NextResponse('Error processing event', { status: 500 });
+    }
   } catch (error) {
     console.error('Error parsing Strava webhook event:', error);
-    // Still return 200 to avoid Strava retrying with the same invalid data
-    return new NextResponse('Invalid event format', { status: 200 });
+    return new NextResponse('Invalid event format', { status: 400 });
   }
 }

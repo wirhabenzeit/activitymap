@@ -5,7 +5,6 @@ import { activities } from '~/server/db/schema';
 import { getAccount } from '~/server/db/actions';
 import { StravaClient } from '~/server/strava/client';
 import { transformStravaActivity } from '~/server/strava/transforms';
-import { eq } from 'drizzle-orm';
 
 export type StravaWebhookEvent = {
   object_type: string;
