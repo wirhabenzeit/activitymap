@@ -12,7 +12,7 @@ import { getAccount } from '~/server/db/actions';
 import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type UpdatableActivity, type StravaPhoto } from './types';
-import { sql } from 'drizzle-orm';
+import { sql, inArray, eq } from 'drizzle-orm';
 import { webhooks, stravaWebhooks } from '~/server/db/schema';
 import type { StravaActivity } from './types';
 import crypto from 'crypto';
@@ -74,7 +74,7 @@ export async function updateActivity(
 export async function fetchStravaActivities({
   accessToken,
   before,
-  activityIds,
+  activityIds: requestedActivityIds,
   includePhotos = false,
   athleteId,
   shouldDeletePhotos = false,
@@ -91,7 +91,7 @@ export async function fetchStravaActivities({
   console.log('Starting fetchStravaActivities:', {
     has_access_token: !!accessToken,
     before: before ? new Date(before * 1000).toISOString() : undefined,
-    activity_ids: activityIds,
+    activity_ids: requestedActivityIds,
     include_photos: includePhotos,
     athlete_id: athleteId,
     should_delete_photos: shouldDeletePhotos,
@@ -105,13 +105,13 @@ export async function fetchStravaActivities({
   try {
     let stravaActivities: StravaActivity[];
 
-    if (activityIds) {
+    if (requestedActivityIds) {
       console.log('Fetching complete activities by IDs:', {
-        ids: activityIds,
-        count: activityIds.length,
+        ids: requestedActivityIds,
+        count: requestedActivityIds.length,
       });
       stravaActivities = await Promise.all(
-        activityIds.map(async (id) => {
+        requestedActivityIds.map(async (id) => {
           try {
             const activity = await client.getActivity(id);
             console.log('Successfully fetched activity:', {
@@ -150,17 +150,7 @@ export async function fetchStravaActivities({
         : null,
     });
 
-    // Transform activities
-    const activities = stravaActivities
-      .map((act) => {
-        // Set isComplete=true for webhook activities (fetched by ID) or when explicitly requested
-        const isComplete = !!activityIds;
-        console.log(
-          `Transforming activity ${act.id} with is_complete=${isComplete}`,
-        );
-        return transformStravaActivity(act, isComplete);
-      })
-      .map((act) => ({ ...act, athlete: athleteId }));
+
 
     // Get photos if requested
     if (includePhotos) {
@@ -202,96 +192,130 @@ export async function fetchStravaActivities({
       console.log(`Processed ${photos.length} photos total`);
     }
 
-    // Insert into database
-    console.log('Inserting activities into database...');
-    const result = await db
-      .insert(activitySchema)
-      .values(activities)
-      .onConflictDoUpdate({
-        target: activitySchema.id,
-        set: {
-          name: sql`excluded.name`,
-          description: sql`excluded.description`,
-          distance: sql`excluded.distance`,
-          moving_time: sql`excluded.moving_time`,
-          elapsed_time: sql`excluded.elapsed_time`,
-          total_elevation_gain: sql`excluded.total_elevation_gain`,
-          sport_type: sql`excluded.sport_type`,
-          start_date: sql`excluded.start_date`,
-          start_date_local: sql`excluded.start_date_local`,
-          timezone: sql`excluded.timezone`,
-          start_latlng: sql`excluded.start_latlng`,
-          end_latlng: sql`excluded.end_latlng`,
-          achievement_count: sql`excluded.achievement_count`,
-          kudos_count: sql`excluded.kudos_count`,
-          comment_count: sql`excluded.comment_count`,
-          athlete_count: sql`excluded.athlete_count`,
-          photo_count: sql`excluded.photo_count`,
-          total_photo_count: sql`excluded.total_photo_count`,
-          map_id: sql`excluded.map_id`,
-          map_polyline: sql`excluded.map_polyline`,
-          map_summary_polyline: sql`excluded.map_summary_polyline`,
-          map_bbox: sql`excluded.map_bbox`,
-          trainer: sql`excluded.trainer`,
-          commute: sql`excluded.commute`,
-          manual: sql`excluded.manual`,
-          private: sql`excluded.private`,
-          flagged: sql`excluded.flagged`,
-          workout_type: sql`excluded.workout_type`,
-          upload_id: sql`excluded.upload_id`,
-          average_speed: sql`excluded.average_speed`,
-          max_speed: sql`excluded.max_speed`,
-          has_kudoed: sql`excluded.has_kudoed`,
-          hide_from_home: sql`excluded.hide_from_home`,
-          gear_id: sql`excluded.gear_id`,
-          kilojoules: sql`excluded.kilojoules`,
-          average_watts: sql`excluded.average_watts`,
-          device_watts: sql`excluded.device_watts`,
-          max_watts: sql`excluded.max_watts`,
-          weighted_average_watts: sql`excluded.weighted_average_watts`,
-          elev_high: sql`excluded.elev_high`,
-          elev_low: sql`excluded.elev_low`,
-          pr_count: sql`excluded.pr_count`,
-          calories: sql`excluded.calories`,
-          has_heartrate: sql`excluded.has_heartrate`,
-          average_heartrate: sql`excluded.average_heartrate`,
-          max_heartrate: sql`excluded.max_heartrate`,
-          heartrate_opt_out: sql`excluded.heartrate_opt_out`,
-          display_hide_heartrate_option: sql`excluded.display_hide_heartrate_option`,
-          last_updated: sql`excluded.last_updated`,
-          is_complete: sql`excluded.is_complete`,
-        },
+    // Transform activities
+    const activities: Activity[] = stravaActivities
+      .map((act) => {
+        // Set isComplete=true for webhook activities (fetched by ID) or when explicitly requested
+        const isComplete = !!requestedActivityIds;
+        console.log(
+          `Transforming activity ${act.id} with is_complete=${isComplete}`,
+        );
+        return transformStravaActivity(act, isComplete);
       })
-      .returning();
+      .map((act) => ({ ...act, athlete: athleteId }));
+      
+    // First check which activities already exist in the database
+    console.log('Checking for existing activities...');
+    const activityIds: number[] = activities.map((a: Activity) => a.id);
+    const existingActivities = await db
+      .select({ id: activitySchema.id })
+      .from(activitySchema)
+      .where(inArray(activitySchema.id, activityIds));
+    
+    const existingActivityIds = new Set(existingActivities.map(a => a.id));
+    
+    // Filter to only new activities or activities that need to be updated
+    const newActivities = activities.filter((a: Activity) => !existingActivityIds.has(a.id));
+    // Only update if explicitly requested by IDs
+    const activitiesToUpdate = requestedActivityIds && requestedActivityIds.length > 0 ? activities : [];
+    
+    console.log(`Found ${existingActivityIds.size} existing activities, ${newActivities.length} new activities`);
+    
+    // Insert new activities
+    let result: Activity[] = [];
+    
+    if (newActivities.length > 0) {
+      console.log('Inserting new activities into database...');
+      const insertResult = await db
+        .insert(activitySchema)
+        .values(newActivities)
+        .returning();
+      result = [...insertResult];
+    }
+    
+    // Update existing activities only if explicitly requested by IDs
+    if (activitiesToUpdate.length > 0) {
+      console.log('Updating existing activities in database...');
+      for (const activity of activitiesToUpdate) {
+        // Skip undefined activities
+        if (!activity || !existingActivityIds.has(activity.id)) {
+          continue;
+        }
+        
+        // We need to create a clean object with only the fields we want to update
+        // to avoid type issues with the complex schema
+        // Using a more specific type to avoid 'any'
+        const updateData: Partial<Omit<Activity, 'id'>> = {};
+        
+        // Only include properties that exist and are not null/undefined
+        if (activity.name) updateData.name = activity.name;
+        if (activity.description !== undefined) updateData.description = activity.description;
+        if (activity.distance !== undefined) updateData.distance = activity.distance;
+        if (activity.moving_time !== undefined) updateData.moving_time = activity.moving_time;
+        if (activity.elapsed_time !== undefined) updateData.elapsed_time = activity.elapsed_time;
+        if (activity.total_elevation_gain !== undefined) updateData.total_elevation_gain = activity.total_elevation_gain;
+        if (activity.sport_type) updateData.sport_type = activity.sport_type;
+        if (activity.start_date) updateData.start_date = activity.start_date;
+        if (activity.start_date_local) updateData.start_date_local = activity.start_date_local;
+        if (activity.timezone) updateData.timezone = activity.timezone;
+        if (activity.start_latlng !== undefined) updateData.start_latlng = activity.start_latlng;
+        if (activity.end_latlng !== undefined) updateData.end_latlng = activity.end_latlng;
+        if (activity.achievement_count !== undefined) updateData.achievement_count = activity.achievement_count;
+        if (activity.kudos_count !== undefined) updateData.kudos_count = activity.kudos_count;
+        if (activity.comment_count !== undefined) updateData.comment_count = activity.comment_count;
+        if (activity.athlete_count !== undefined) updateData.athlete_count = activity.athlete_count;
+        if (activity.photo_count !== undefined) updateData.photo_count = activity.photo_count;
+        if (activity.total_photo_count !== undefined) updateData.total_photo_count = activity.total_photo_count;
+        if (activity.map_id) updateData.map_id = activity.map_id;
+        if (activity.map_polyline) updateData.map_polyline = activity.map_polyline;
+        if (activity.map_summary_polyline) updateData.map_summary_polyline = activity.map_summary_polyline;
+        if (activity.map_bbox !== undefined) updateData.map_bbox = activity.map_bbox;
+        if (activity.is_complete !== undefined) updateData.is_complete = activity.is_complete;
+        
+        // Only proceed with update if we have data to update
+        if (Object.keys(updateData).length === 0) {
+          continue;
+        }
+        
+        const updateResult = await db
+          .update(activitySchema)
+          .set(updateData)
+          .where(eq(activitySchema.id, activity.id))
+          .returning();
+          
+        if (updateResult.length > 0 && updateResult[0]) {
+          result.push(updateResult[0]);
+        }
+      }
+    }
     console.log(
       `Database insert/update complete. Affected rows: ${result.length}`,
     );
 
     if (photos.length > 0) {
-      console.log('Inserting photos into database...');
-      await db
-        .insert(photosSchema)
-        .values(photos)
-        .onConflictDoUpdate({
-          target: photosSchema.unique_id,
-          set: {
-            activity_id: sql`excluded.activity_id`,
-            activity_name: sql`excluded.activity_name`,
-            caption: sql`excluded.caption`,
-            type: sql`excluded.type`,
-            source: sql`excluded.source`,
-            urls: sql`excluded.urls`,
-            sizes: sql`excluded.sizes`,
-            default_photo: sql`excluded.default_photo`,
-            location: sql`excluded.location`,
-            uploaded_at: sql`excluded.uploaded_at`,
-            created_at: sql`excluded.created_at`,
-            post_id: sql`excluded.post_id`,
-            status: sql`excluded.status`,
-            resource_state: sql`excluded.resource_state`,
-          },
-        });
-      console.log('Photos insert/update complete');
+      console.log('Checking for existing photos...');
+      const photoIds = photos.map((p: Photo) => p.unique_id);
+      const existingPhotos = await db
+        .select({ uniqueId: photosSchema.unique_id })
+        .from(photosSchema)
+        .where(inArray(photosSchema.unique_id, photoIds));
+      
+      const existingPhotoIds = new Set(existingPhotos.map(p => p.uniqueId));
+      const newPhotos = photos.filter((p: Photo) => !existingPhotoIds.has(p.unique_id));
+      
+      console.log(`Found ${existingPhotoIds.size} existing photos, ${newPhotos.length} new photos`);
+      
+      if (newPhotos.length > 0) {
+        console.log('Inserting new photos into database...');
+        await db
+          .insert(photosSchema)
+          .values(newPhotos);
+        console.log(`Inserted ${newPhotos.length} new photos`);
+      } else {
+        console.log('No new photos to insert');
+      }
+      
+      console.log('Photos insert complete');
     }
 
     return { activities, photos };
@@ -444,7 +468,7 @@ export async function createWebhookSubscription() {
     const subscription = await client.createSubscription(callbackUrl, verifyToken);
     console.log('Created Strava webhook subscription:', subscription);
 
-    // Insert the subscription into our database
+    // Insert the subscription into our database or update if it already exists
     await db
       .insert(stravaWebhooks)
       .values({
@@ -452,6 +476,14 @@ export async function createWebhookSubscription() {
         subscriptionId: subscription.id,
         verifyToken,
         callbackUrl,
+      })
+      .onConflictDoUpdate({
+        target: [stravaWebhooks.callbackUrl],
+        set: {
+          subscriptionId: subscription.id,
+          verifyToken,
+          updatedAt: new Date(),
+        },
       });
 
     return {

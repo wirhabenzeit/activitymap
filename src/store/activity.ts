@@ -33,6 +33,7 @@ export type ActivityActions = {
   loadFromStrava: (params: {
     photos?: boolean;
     ids?: number[];
+    fetchNewest?: boolean;
   }) => Promise<number>;
 };
 
@@ -202,8 +203,8 @@ export const createActivitySlice: StateCreator<
     }
   },
 
-  loadFromStrava: async ({ photos = false, ids }) => {
-    console.log('Starting loadFromStrava:', { photos, ids });
+  loadFromStrava: async ({ photos = false, ids, fetchNewest = false }) => {
+    console.log('Starting loadFromStrava:', { photos, ids, fetchNewest });
     const account = get().account;
     if (!account) {
       console.error('No account found in store state');
@@ -256,27 +257,45 @@ export const createActivitySlice: StateCreator<
           );
 
           activities.forEach((activity: Activity) => {
-            state.activityDict[activity.id] = activity;
-            if (activity.map_polyline || activity.map_summary_polyline) {
-              try {
-                // Remove existing feature if it exists
-                const featureIndex = state.geoJson.features.findIndex(
-                  (f) => f.id === activity.id,
-                );
-                if (featureIndex !== -1) {
-                  state.geoJson.features.splice(featureIndex, 1);
+            // Check if we already have this activity and it's complete
+            const existingActivity = state.activityDict[activity.id];
+            
+            // Only replace existing activity if:
+            // 1. It doesn't exist, OR
+            // 2. The new activity is complete, OR
+            // 3. The existing activity is not complete
+            if (!existingActivity || activity.is_complete || !existingActivity.is_complete) {
+              console.log(`Updating activity ${activity.id} in store (is_complete=${activity.is_complete})`);
+              state.activityDict[activity.id] = activity;
+              
+              if (activity.map_polyline || activity.map_summary_polyline) {
+                try {
+                  // Remove existing feature if it exists
+                  const featureIndex = state.geoJson.features.findIndex(
+                    (f) => f.id === activity.id,
+                  );
+                  if (featureIndex !== -1) {
+                    state.geoJson.features.splice(featureIndex, 1);
+                  }
+                  state.geoJson.features.push(createFeature(activity));
+                } catch (e) {
+                  console.warn(
+                    `Failed to create feature for activity ${activity.id}:`,
+                    e,
+                  );
                 }
-                state.geoJson.features.push(createFeature(activity));
-              } catch (e) {
-                console.warn(
-                  `Failed to create feature for activity ${activity.id}:`,
-                  e,
-                );
               }
+            } else {
+              console.log(`Skipping update for complete activity ${activity.id}`);
             }
           });
           if (photos && newPhotos.length > 0) {
-            state.photos = [...state.photos, ...newPhotos];
+            // Deduplicate photos by unique_id
+            const existingPhotoIds = new Set(state.photos.map(p => p.unique_id));
+            const uniqueNewPhotos = newPhotos.filter(p => !existingPhotoIds.has(p.unique_id));
+            
+            console.log(`Adding ${uniqueNewPhotos.length} unique photos to store (filtered from ${newPhotos.length} total)`);
+            state.photos = [...state.photos, ...uniqueNewPhotos];
           }
           state.loading = false;
           state.loaded = true;
@@ -303,33 +322,38 @@ export const createActivitySlice: StateCreator<
         }
         return activities.length;
       } else {
-        console.log('Loading activities');
-        // Case 2: Loading activities
-        // Find oldest activity from current state
-        const activities = Object.values(get().activityDict);
-        const oldestActivity =
-          activities.length > 0
-            ? activities.reduce((oldest, current) =>
-                current.start_date < oldest.start_date ? current : oldest,
-              )
-            : null;
+        console.log('Loading activities, fetchNewest:', fetchNewest);
+        
+        let before: number | undefined = undefined;
+        
+        // Only calculate the 'before' timestamp if we're fetching older activities
+        if (!fetchNewest) {
+          // Find oldest activity from current state
+          const activities = Object.values(get().activityDict);
+          const oldestActivity =
+            activities.length > 0
+              ? activities.reduce((oldest, current) =>
+                  current.start_date < oldest.start_date ? current : oldest,
+                )
+              : null;
 
-        const timestamp = oldestActivity
-          ? Math.floor(oldestActivity.start_date.getTime() / 1000)
-          : undefined;
+          before = oldestActivity
+            ? Math.floor(oldestActivity.start_date.getTime() / 1000)
+            : Math.floor(Date.now() / 1000);
 
-        console.log('State:', {
-          hasActivities: activities.length > 0,
-          oldestActivityDate: oldestActivity?.start_date,
-          timestamp,
-        });
+          console.log('State for fetching older activities:', {
+            hasActivities: activities.length > 0,
+            oldestActivityDate: oldestActivity?.start_date,
+            before,
+          });
+        } else {
+          console.log('Fetching newest activities (no before parameter)');
+        }
 
-        // If we have no activities, fetch the initial set
-        // If we have activities, fetch older ones using the timestamp
-        const beforeTimestamp = timestamp ?? Math.floor(Date.now() / 1000);
+        // Fetch activities with or without the before parameter
         const result = await fetchStravaActivities({
           accessToken: account.access_token!,
-          before: beforeTimestamp,
+          before: before,
           includePhotos: photos,
           athleteId: parseInt(account.providerAccountId),
         });
@@ -341,36 +365,56 @@ export const createActivitySlice: StateCreator<
         set((state) => {
           console.log('Updating store state with new data');
           result.activities.forEach((activity: Activity) => {
-            state.activityDict[activity.id] = activity;
-            if (activity.map_polyline || activity.map_summary_polyline) {
-              try {
-                // Remove existing feature if it exists
-                const featureIndex = state.geoJson.features.findIndex(
-                  (f) => f.id === activity.id,
-                );
-                if (featureIndex !== -1) {
-                  state.geoJson.features.splice(featureIndex, 1);
+            // Check if we already have this activity and it's complete
+            const existingActivity = state.activityDict[activity.id];
+            
+            // Only replace existing activity if:
+            // 1. It doesn't exist, OR
+            // 2. The new activity is complete, OR
+            // 3. The existing activity is not complete
+            if (!existingActivity || activity.is_complete || !existingActivity.is_complete) {
+              console.log(`Updating activity ${activity.id} in store (is_complete=${activity.is_complete})`);
+              state.activityDict[activity.id] = activity;
+              
+              if (activity.map_polyline || activity.map_summary_polyline) {
+                try {
+                  // Remove existing feature if it exists
+                  const featureIndex = state.geoJson.features.findIndex(
+                    (f) => f.id === activity.id,
+                  );
+                  if (featureIndex !== -1) {
+                    state.geoJson.features.splice(featureIndex, 1);
+                  }
+                  state.geoJson.features.push(createFeature(activity));
+                } catch (e) {
+                  console.warn(
+                    `Failed to create feature for activity ${activity.id}:`,
+                    e,
+                  );
                 }
-                state.geoJson.features.push(createFeature(activity));
-              } catch (e) {
-                console.warn(
-                  `Failed to create feature for activity ${activity.id}:`,
-                  e,
-                );
               }
+            } else {
+              console.log(`Skipping update for complete activity ${activity.id}`);
             }
           });
           if (photos && result.photos.length > 0) {
-            state.photos = [...state.photos, ...result.photos];
+            // Deduplicate photos by unique_id
+            const existingPhotoIds = new Set(state.photos.map(p => p.unique_id));
+            const uniqueNewPhotos = result.photos.filter(p => !existingPhotoIds.has(p.unique_id));
+            
+            console.log(`Adding ${uniqueNewPhotos.length} unique photos to store (filtered from ${result.photos.length} total)`);
+            state.photos = [...state.photos, ...uniqueNewPhotos];
           }
           state.loading = false;
           state.loaded = true;
           console.log('Store state updated successfully');
         });
+        
+        const activityType = fetchNewest ? 'newest' : 'older';
         get().addNotification({
           type: 'success',
           title: 'Activities loaded',
-          message: `Successfully loaded ${result.activities.length} activities from Strava`,
+          message: `Successfully loaded ${result.activities.length} ${activityType} activities from Strava`,
         });
         return result.activities.length;
       }

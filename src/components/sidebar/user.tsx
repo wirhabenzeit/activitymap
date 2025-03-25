@@ -20,6 +20,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
 } from '~/components/ui/dropdown-menu';
 
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
@@ -124,11 +128,21 @@ export function UserSettings() {
     }
   };
 
-  const handleLoadActivities = async () => {
+  const handleLoadNewestActivities = async () => {
     try {
-      console.log('Starting load activities, current loading state:', loading);
-      await loadFromStrava({ photos: true });
-      console.log('Finished load activities, current loading state:', loading);
+      console.log('Starting load newest activities, current loading state:', loading);
+      await loadFromStrava({ photos: true, fetchNewest: true });
+      console.log('Finished load newest activities, current loading state:', loading);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleLoadOlderActivities = async () => {
+    try {
+      console.log('Starting load older activities, current loading state:', loading);
+      await loadFromStrava({ photos: true, fetchNewest: false });
+      console.log('Finished load older activities, current loading state:', loading);
     } catch (error) {
       console.error(error);
     }
@@ -202,18 +216,34 @@ export function UserSettings() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleLoadActivities}
-              disabled={loading}
-              className="cursor-pointer"
-            >
-              {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <CircleArrowLeft className="mr-2 h-4 w-4" />
-              )}
-              Get Activities
-            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={loading} className="cursor-pointer gap-2">
+                {loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CircleArrowLeft className="mr-2 h-4 w-4" />
+                )}
+                <span>Get Activities</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent className="w-56 rounded-lg">
+                  <DropdownMenuItem
+                    onClick={handleLoadNewestActivities}
+                    disabled={loading}
+                    className="cursor-pointer"
+                  >
+                    Get Newest Activities
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleLoadOlderActivities}
+                    disabled={loading}
+                    className="cursor-pointer"
+                  >
+                    Get Older Activities
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
             {isDevelopment && (
               <>
                 <DropdownMenuItem
