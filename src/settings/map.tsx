@@ -130,6 +130,12 @@ export const overlayMaps: Record<string, OverlaySetting> = {
     visible: false,
     opacity: 0.8,
   },
+  'NVE Avalanche': {
+    url: 'https://gis3.nve.no/arcgis/rest/services/wmts/Bratthet_med_utlop_2024/MapServer/tile/{z}/{y}/{x}',
+    type: 'raster',
+    visible: false,
+    opacity: 0.2,
+  },
   'Swisstopo Slope': {
     url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/{z}/{x}/{y}.png`,
     type: 'raster',
