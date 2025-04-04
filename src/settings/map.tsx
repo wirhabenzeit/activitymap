@@ -154,20 +154,20 @@ export const overlayMaps: Record<string, OverlaySetting> = {
     visible: false,
     opacity: 0.4,
   },
-  Senja: {
-    type: 'component',
-    visible: false,
-    component: GeoJSONComponentOverlay,
-    props: {
-      id: 'senja-geojson',
-      data: '/senja.geojson',
-      color: '#ff0000',
-      lineWidth: 2,
-      opacity: 0.8,
-      interactive: true,
-    },
-    interactiveLayerIds: ['senja-geojson-line-layer'],
-  },
+  // Senja: {
+  //   type: 'component',
+  //   visible: false,
+  //   component: GeoJSONComponentOverlay,
+  //   props: {
+  //     id: 'senja-geojson',
+  //     data: '/senja.geojson',
+  //     color: '#ff0000',
+  //     lineWidth: 2,
+  //     opacity: 0.8,
+  //     interactive: true,
+  //   },
+  //   interactiveLayerIds: ['senja-geojson-line-layer'],
+  // },
 };
 
 // For backward compatibility, export a combined mapSettings object

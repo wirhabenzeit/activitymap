@@ -1,3 +1,6 @@
+'use client';
+'use no memo';
+
 import { type ReactElement, cloneElement, memo } from 'react';
 import { createPortal } from 'react-dom';
 import {
