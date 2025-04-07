@@ -10,6 +10,7 @@ import {
 import {
   fetchStravaActivities,
   updateActivity as updateStravaActivity,
+  deleteActivities,
 } from '~/server/strava/actions';
 import { type UpdatableActivity } from '~/server/strava/types';
 
@@ -224,7 +225,7 @@ export const createActivitySlice: StateCreator<
       if (ids) {
         console.log('Loading specific activities by ID:', ids);
         // Case 1: Loading specific activities by ID
-        const { activities, photos: newPhotos } = await fetchStravaActivities({
+        const { activities, photos: newPhotos, notFoundIds } = await fetchStravaActivities({
           accessToken: account.access_token!,
           activityIds: ids,
           includePhotos: photos,
@@ -233,6 +234,34 @@ export const createActivitySlice: StateCreator<
         console.log(
           `Received ${activities.length} activities and ${newPhotos.length} photos from API`,
         );
+
+        // If activities were not found, delete them from DB and update local state
+        if (notFoundIds && notFoundIds.length > 0) {
+          console.log('Activities not found on Strava, triggering deletion:', notFoundIds);
+          // Call server action to delete from DB (fire-and-forget for now, errors logged server-side)
+          deleteActivities(notFoundIds).catch(err => {
+            console.error('Error calling deleteActivities server action:', err);
+            // Optionally handle/report client-side error
+          });
+
+          // Update local state immediately
+          set((state) => {
+            const updatedActivities = { ...state.activityDict };
+            const updatedVisibleActivities = state.visibleActivities.filter(id => !notFoundIds.includes(id));
+            const updatedSelectedActivities = state.selectedActivities.filter(id => !notFoundIds.includes(id));
+            notFoundIds.forEach(id => delete updatedActivities[id]);
+            console.log('Removed not found activities from local state:', notFoundIds);
+            return {
+              ...state,
+              activityDict: updatedActivities,
+              visibleActivities: updatedVisibleActivities,
+              selectedActivities: updatedSelectedActivities,
+              loading: false, // Ensure loading is set to false
+            };
+          });
+          // Since we handled the state update for deletion, we can return early
+          return notFoundIds.length; // Indicate how many were removed
+        }
 
         // Check which activities are new vs updated
         const existingActivities = new Set(
@@ -422,14 +451,17 @@ export const createActivitySlice: StateCreator<
       console.error('Error in loadFromStrava:', e);
       set((state) => {
         state.loading = false;
+        state.error = e instanceof Error ? e.message : String(e);
         console.log('Set loading state to false due to error');
       });
-      get().addNotification({
-        type: 'error',
-        title: 'Error loading activities',
-        message: e instanceof Error ? e.message : 'An unknown error occurred',
-      });
-      throw new Error('Failed to fetch activities from Strava');
+      // Ensure error is re-thrown or handled if needed by caller
+      throw e;
     }
   },
 });
+
+export const serverActions = {
+  fetchStravaActivities,
+  deleteActivities,
+  updateStravaActivity,
+};
