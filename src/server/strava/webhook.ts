@@ -1,10 +1,10 @@
 'use server';
 
 import { db } from '~/server/db';
-import { activities } from '~/server/db/schema';
+import { activities, photos } from '~/server/db/schema';
 import { getAccount } from '~/server/db/actions';
-import { StravaClient } from '~/server/strava/client';
-import { transformStravaActivity } from '~/server/strava/transforms';
+import { fetchStravaActivities } from '~/server/strava/actions';
+import { eq } from 'drizzle-orm';
 
 export type StravaWebhookEvent = {
   object_type: string;
@@ -33,8 +33,7 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
     return;
   }
 
-  // Find the user account associated with this athlete ID
-  console.log(`[Webhook] Looking up account for athlete ID: ${owner_id}`);
+  console.log(`[Webhook] Processing event for activity ID: ${object_id}, owner ID: ${owner_id}`);
 
   let account;
   try {
@@ -42,8 +41,8 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
       providerAccountId: owner_id.toString(),
     });
 
-    if (!account) {
-      console.error(`[Webhook] No account found for athlete ID: ${owner_id}`);
+    if (!account?.access_token) {
+      console.error(`[Webhook] No account or valid access token found for athlete ID: ${owner_id}`);
       return;
     }
   } catch (accountError) {
@@ -54,108 +53,82 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
     return;
   }
 
-  console.log(`[Webhook] Found account for athlete ID: ${owner_id}`);
-  console.log(
-    `[Webhook] Access token available: ${!!account.access_token}, Refresh token available: ${!!account.refresh_token}`,
-  );
-
-  let client;
+  // Fetch the activity details AND photos from Strava using fetchStravaActivities
+  console.log(`[Webhook] Fetching activity ${object_id} with photos from Strava`);
   try {
-    // Add token refresh callback to update tokens in database
-    client = StravaClient.withTokens(
-      account.access_token ?? '',
-      account.refresh_token ?? '',
-      async (_tokens) => {
-        console.log(`[Webhook] Tokens refreshed during webhook processing`);
-        // We don't need to update the database here as getAccount already handles this
-      },
-    );
+    const { activities: fetchedActivities, photos: fetchedPhotos, notFoundIds } =
+      await fetchStravaActivities({
+        accessToken: account.access_token,
+        activityIds: [object_id],
+        includePhotos: true,
+        athleteId: owner_id,
+        shouldDeletePhotos: true, // Indicate intent to replace photos
+        limit: 2, // Ensure we only fetch the specific activity
+      });
 
-    // Client is initialized - we don't need to log details here as the StravaClient constructor already logs this information
-  } catch (clientError) {
-    console.error(`[Webhook] Error creating Strava client:`, clientError);
-    return;
-  }
+    // Handle case where activity was not found (e.g., deleted)
+    if (notFoundIds.includes(object_id)) {
+      console.log(`[Webhook] Activity ${object_id} not found on Strava. Deleting from database.`);
+      try {
+        await db.delete(activities).where(eq(activities.id, object_id));
+        // Cascading delete should handle photos
+        console.log(`[Webhook] Successfully deleted activity ${object_id} from database.`);
+      } catch (deleteError) {
+        console.error(`[Webhook] Error deleting activity ${object_id}:`, deleteError);
+        // Log error but potentially continue if needed, or return
+      }
+      return; // Exit after handling deletion
+    }
 
-  // Fetch the activity details from Strava
-  console.log(`[Webhook] Fetching activity ${object_id} from Strava`);
-  let stravaActivity;
-  try {
-    stravaActivity = await client.getActivity(object_id);
+    // Check if we actually got the activity we requested
+    const activityToSave = fetchedActivities.find(act => act.id === object_id);
 
-    if (!stravaActivity) {
-      console.error(
-        `[Webhook] Failed to fetch activity ${object_id} from Strava - null response`,
-      );
+    if (!activityToSave) {
+      console.error(`[Webhook] Failed to fetch details for activity ${object_id} even though it wasn't in notFoundIds.`);
       return;
     }
 
     console.log(
-      `[Webhook] Activity ${object_id} fetched successfully with name: "${stravaActivity.name}"`,
+      `[Webhook] Activity ${object_id} fetched successfully with name: "${activityToSave.name}"`,
     );
-  } catch (apiError) {
-    console.error(
-      `[Webhook] Error fetching activity ${object_id} from Strava:`,
-      apiError,
-    );
-    return;
-  }
 
-  try {
-    // Transform the Strava activity to our database format
-    const transformedActivity = transformStravaActivity(stravaActivity, true);
-
-    // Add the athlete ID from the owner_id
-    const activityWithAthlete = {
-      ...transformedActivity,
-      athlete: owner_id,
-    };
-
-    // Log the activity data structure (without sensitive data)
-    console.log(`[Webhook] Activity data structure:`, {
-      id: activityWithAthlete.id,
-      name: activityWithAthlete.name,
-      sport_type: activityWithAthlete.sport_type,
-      start_date: activityWithAthlete.start_date,
-      athlete: activityWithAthlete.athlete,
-      has_map_polyline: !!activityWithAthlete.map_polyline,
-      has_map_summary_polyline: !!activityWithAthlete.map_summary_polyline,
-      photo_count: activityWithAthlete.photo_count ?? 0,
-      total_photo_count: activityWithAthlete.total_photo_count ?? 0,
-      is_complete: activityWithAthlete.is_complete ?? false,
-    });
-
-    // Upsert the activity in the database
-    console.log(
-      `[Webhook] Upserting activity ${activityWithAthlete.id} in database`,
-    );
-    try {
-      await db
+    // Database Operations within a transaction for atomicity
+    await db.transaction(async (tx) => {
+      // 1. Upsert the activity
+      console.log(`[Webhook] Upserting activity ${activityToSave.id} in database`);
+      await tx
         .insert(activities)
-        .values(activityWithAthlete)
+        .values(activityToSave) // Already includes athlete ID from transform
         .onConflictDoUpdate({
           target: activities.id,
-          set: activityWithAthlete,
+          set: activityToSave,
         });
-      console.log(
-        `[Webhook] Successfully upserted activity ${activityWithAthlete.id}`,
-      );
-    } catch (dbError) {
-      console.error(
-        `[Webhook] Error upserting activity ${activityWithAthlete.id}:`,
-        dbError,
-      );
-      return;
-    }
+      console.log(`[Webhook] Successfully upserted activity ${activityToSave.id}`);
+
+      // 2. Handle photos: Delete existing, then insert new ones
+      if (fetchedPhotos.length > 0) {
+        console.log(`[Webhook] Deleting existing photos for activity ${activityToSave.id}`);
+        await tx.delete(photos).where(eq(photos.activity_id, activityToSave.id));
+
+        console.log(`[Webhook] Inserting ${fetchedPhotos.length} new photos for activity ${activityToSave.id}`);
+        await tx.insert(photos).values(fetchedPhotos);
+        console.log(`[Webhook] Successfully inserted photos`);
+      } else {
+        // If includePhotos was true but no photos were returned, ensure existing are deleted
+        console.log(`[Webhook] No photos found for activity ${activityToSave.id}, ensuring existing photos are deleted.`);
+        await tx.delete(photos).where(eq(photos.activity_id, activityToSave.id));
+      }
+    });
 
     console.log(
-      `[Webhook] Successfully processed ${aspect_type} event for activity ${object_id}`,
+      `[Webhook] Successfully processed ${aspect_type} event for activity ${object_id} with photos.`,
     );
-  } catch (transformError) {
+
+  } catch (fetchError) {
     console.error(
-      `[Webhook] Error transforming activity ${object_id}:`,
-      transformError,
+      `[Webhook] Error during fetch or database operation for activity ${object_id}:`,
+      fetchError,
     );
-    return;
+    // Consider specific error handling or re-throwing if needed
   }
 }

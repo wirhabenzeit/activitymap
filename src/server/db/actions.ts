@@ -34,12 +34,18 @@ export const getAccount = async ({
   userId?: string;
   forceRefresh?: boolean;
 }) => {
-  console.log(`[DB] getAccount called with:`, { providerAccountId, userId, forceRefresh });
+  console.log(`[DB] getAccount called with:`, {
+    providerAccountId,
+    userId,
+    forceRefresh,
+  });
   let account: AccountType | null = null;
 
   try {
     if (providerAccountId) {
-      console.log(`[DB] Looking up account by providerAccountId: ${providerAccountId}`);
+      console.log(
+        `[DB] Looking up account by providerAccountId: ${providerAccountId}`,
+      );
       const result = await db.query.accounts.findFirst({
         where: (accounts, { eq }) =>
           eq(accounts.providerAccountId, providerAccountId),
@@ -47,11 +53,15 @@ export const getAccount = async ({
       // If account not found by providerAccountId, this is likely a webhook request
       // We should not throw an error, but return null to handle this case appropriately
       if (!result) {
-        console.log(`[DB] No account found for providerAccountId: ${providerAccountId}`);
+        console.log(
+          `[DB] No account found for providerAccountId: ${providerAccountId}`,
+        );
         return null;
       }
       account = result;
-      console.log(`[DB] Found account for providerAccountId: ${providerAccountId}`);
+      console.log(
+        `[DB] Found account for providerAccountId: ${providerAccountId}`,
+      );
     } else if (userId) {
       console.log(`[DB] Looking up account by userId: ${userId}`);
       const result = await db.query.accounts.findFirst({
@@ -74,9 +84,13 @@ export const getAccount = async ({
         });
         if (result) {
           account = result;
-          console.log(`[DB] Found account for resolved userId: ${resolvedUserId}`);
+          console.log(
+            `[DB] Found account for resolved userId: ${resolvedUserId}`,
+          );
         } else {
-          console.log(`[DB] No account found for resolved userId: ${resolvedUserId}`);
+          console.log(
+            `[DB] No account found for resolved userId: ${resolvedUserId}`,
+          );
         }
       } catch (sessionError) {
         console.error(`[DB] Error resolving user from session:`, sessionError);
@@ -86,7 +100,9 @@ export const getAccount = async ({
   } catch (dbError) {
     console.error(`[DB] Database error in getAccount:`, dbError);
     if (dbError instanceof Error) {
-      console.error(`[DB] Error name: ${dbError.name}, message: ${dbError.message}`);
+      console.error(
+        `[DB] Error name: ${dbError.name}, message: ${dbError.message}`,
+      );
       console.error(`[DB] Error stack: ${dbError.stack}`);
     }
     throw new Error('Database error in getAccount');
@@ -158,12 +174,14 @@ export async function getActivities({
   summary = false,
   public_ids,
   user_id,
+  limit = 1000,
 }: {
   ids?: number[];
   athlete_id?: string;
   summary?: boolean;
   public_ids?: number[];
   user_id?: string;
+  limit?: number;
 }) {
   console.log('getActivities called with:', {
     ids,
@@ -211,14 +229,16 @@ export async function getActivities({
       .select()
       .from(activities)
       .where(eq(activities.athlete, parseInt(userAccount.providerAccountId)))
-      .orderBy(desc(activities.start_date_local));
+      .orderBy(desc(activities.start_date_local))
+      .limit(limit);
   } else if (athlete_id) {
     console.log('Fetching by athlete_id:', athlete_id);
     result = await db
       .select()
       .from(activities)
       .where(eq(activities.athlete, parseInt(athlete_id)))
-      .orderBy(desc(activities.start_date_local));
+      .orderBy(desc(activities.start_date_local))
+      .limit(limit);
   } else if (ids) {
     console.log('Fetching by specific ids:', ids);
     result = await db

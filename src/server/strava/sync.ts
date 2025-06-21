@@ -114,6 +114,7 @@ export async function syncActivities(
             activityIds: [mostRecentActivity.id],
             athleteId,
             includePhotos: true, // Ensure photos are updated
+            shouldDeletePhotos: true, // Add this line to replace existing photos
             limit: 2, // Only fetching one activity
           });
           console.log(

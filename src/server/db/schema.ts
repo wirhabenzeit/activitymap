@@ -181,31 +181,31 @@ export const activitySync = pgTable(
   (table) => [index('activity_sync_user_id_idx').on(table.user_id)],
 );
 
-export const activitiesRelations = relations(activities, ({ many }) => ({
-  photos: many(photos),
-}));
+// export const activitiesRelations = relations(activities, ({ many }) => ({
+//   photos: many(photos),
+// }));
 
-export const photosRelations = relations(photos, ({ one }) => ({
-  activity: one(activities, {
-    fields: [photos.activity_id],
-    references: [activities.id],
-  }),
-}));
+// export const photosRelations = relations(photos, ({ one }) => ({
+//   activity: one(activities, {
+//     fields: [photos.activity_id],
+//     references: [activities.id],
+//   }),
+// }));
 
-export const activitySyncRelations = relations(activitySync, ({ one }) => ({
-  user: one(users, {
-    fields: [activitySync.user_id],
-    references: [users.id],
-  }),
-}));
+// export const activitySyncRelations = relations(activitySync, ({ one }) => ({
+//   user: one(users, {
+//     fields: [activitySync.user_id],
+//     references: [users.id],
+//   }),
+// }));
 
-export const usersRelations = relations(users, ({ many }) => ({
-  accounts: many(accounts),
-  activities: many(activities, {
-    relationName: 'user_activities',
-  }),
-  activitySyncs: many(activitySync),
-}));
+// export const usersRelations = relations(users, ({ many }) => ({
+//   accounts: many(accounts),
+//   activities: many(activities, {
+//     relationName: 'user_activities',
+//   }),
+//   activitySyncs: many(activitySync),
+// }));
 
 export type User = typeof users.$inferSelect;
 export type Activity = typeof activities.$inferSelect;

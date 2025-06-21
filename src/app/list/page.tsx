@@ -25,6 +25,7 @@ export default function ListPage() {
   const rows = React.useMemo(() => {
     const result = Object.entries(activityDict).map(([idStr, act]) => {
       const id = parseInt(idStr);
+
       return {
         ...act,
         ...(id in photoDict && { photos: photoDict[id] }),

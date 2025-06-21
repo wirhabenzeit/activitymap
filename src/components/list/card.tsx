@@ -14,7 +14,7 @@ import { decode } from '@mapbox/polyline';
 import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
 import type { Feature, LineString } from 'geojson';
 
-import { type Activity, type Photo } from '~/server/db/schema';
+import { type Activity } from '~/server/db/schema';
 import { categorySettings } from '~/settings/category';
 import { Button } from '~/components/ui/button';
 import { aliasMap } from '~/settings/category';
@@ -81,15 +81,21 @@ export function DescriptionCard({ row }: { row: Row<Activity> }) {
 
 export function ActivityCardContent({ row }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
-  const { loadFromStrava, loading, isGuest } = useShallowStore((state) => ({
+  const { loadFromStrava, loading, isGuest, photoDict } = useShallowStore((state) => ({
     loadFromStrava: state.loadFromStrava,
     loading: state.loading,
     isGuest: state.isGuest,
+    photoDict: state.photoDict,
   }));
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
-  const photos: Photo[] = row.getValue('photos');
+  const activityId = row.original.id;
+
+  const photos = Object.values(photoDict).filter(
+    (p) => p.activity_id === activityId,
+  );
+
   const id: number = row.getValue('id');
 
   const date = row.original.start_date_local;

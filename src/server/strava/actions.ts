@@ -194,7 +194,7 @@ export async function fetchStravaActivities({
             );
             console.log(`Fetched ${activityPhotos.length} photos for activity ${act.id}`);
             return activityPhotos.map((photo) =>
-              transformStravaPhoto(photo, act.id),
+              transformStravaPhoto(photo, athleteId),
             ).filter((photo): photo is Photo => photo !== null); // Filter out nulls
           } catch (error) {
             console.error(`Failed to fetch photos for activity ${act.id}:`, error);
