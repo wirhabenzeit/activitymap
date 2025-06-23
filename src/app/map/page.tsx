@@ -222,14 +222,14 @@ function Map() {
   // Collect all interactive layer IDs from active overlays
   const activeInteractiveLayerIds = useMemo(() => {
     const ids: string[] = ['routeLayerBG', 'routeLayerBGsel']; // Default interactive layers
-    
-    overlays.forEach(mapName => {
+
+    overlays.forEach((mapName) => {
       const mapSetting = overlayMaps[mapName];
       if (mapSetting?.interactiveLayerIds?.length) {
         ids.push(...mapSetting.interactiveLayerIds);
       }
     });
-    
+
     return ids;
   }, [overlays]);
 
@@ -239,7 +239,7 @@ function Map() {
         {overlays.map((mapName) => {
           const mapSetting = overlayMaps[mapName];
           if (!mapSetting) return null;
-          
+
           // Handle raster overlays
           if (mapSetting.type === 'raster') {
             return (
@@ -261,7 +261,7 @@ function Map() {
               </Source>
             );
           }
-          
+
           // Handle component overlays
           if (mapSetting.type === 'component') {
             const Component = mapSetting.component;
@@ -272,7 +272,7 @@ function Map() {
               />
             );
           }
-          
+
           return null;
         })}
       </>
@@ -284,10 +284,14 @@ function Map() {
 
   const photoDict = groupBy(photos, (photo) => photo.activity_id);
   const rows = selected
-    .map((key) => ({
-      ...activityDict[key],
-      ...(key in photoDict && { photos: photoDict[key] }),
-    }))
+    .map((key) => {
+      const activity = activityDict[key];
+      if (!activity) return undefined;
+      return {
+        ...activity,
+        ...(key in photoDict && { photos: photoDict[key] }),
+      };
+    })
     .filter((x) => x != undefined);
 
   return (
@@ -337,7 +341,11 @@ function Map() {
         interactiveLayerIds={activeInteractiveLayerIds}
       >
         {mapSettingBase != undefined && mapSettingBase.type == 'raster' && (
-          <Source type="raster" tiles={mapSettingBase.url ? [mapSettingBase.url] : []} tileSize={128}>
+          <Source
+            type="raster"
+            tiles={mapSettingBase.url ? [mapSettingBase.url] : []}
+            tileSize={128}
+          >
             <Layer id="baseMap" type="raster" paint={{ 'raster-opacity': 1 }} />
           </Source>
         )}
@@ -388,8 +396,8 @@ function Map() {
           </div>
         </Overlay>
         {overlayMapComponents}
-        {loaded && <RouteLayer />}
-        {loaded && showPhotos && <PhotoLayer />}
+        <RouteLayer />
+        {showPhotos && <PhotoLayer />}
       </ReactMapGL>
       <div
         className={cn(

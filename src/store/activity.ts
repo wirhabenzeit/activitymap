@@ -23,6 +23,10 @@ export type ActivityState = {
   photos: Photo[];
   photoDict: Record<string, Photo>;
   error: string | null;
+  // Batched loading state
+  batchOffset?: number;
+  batchSize?: number;
+  batchTimer?: ReturnType<typeof setTimeout> | null;
 };
 
 export type ActivityActions = {
@@ -39,6 +43,9 @@ export type ActivityActions = {
     ids?: number[];
     fetchNewest?: boolean;
   }) => Promise<number>;
+  // Batched loading actions
+  loadFromDBBatched: (params: { userId?: string }) => Promise<void>;
+  cancelBatchLoading: () => void;
 };
 
 export type ActivitySlice = ActivityState & ActivityActions;
@@ -50,7 +57,7 @@ const createFeature = (act: Activity): Feature<Geometry> => ({
     type: 'LineString',
     coordinates:
       (act.map_polyline ?? act.map_summary_polyline)
-        ? decode(act.map_polyline ?? act.map_summary_polyline!).map(
+        ? decode(act.map_summary_polyline!).map(
             ([lat, lon]) => [lon, lat],
           )
         : [],
@@ -88,6 +95,10 @@ export const createActivitySlice: StateCreator<
     photos: [],
     photoDict: {},
     error: null,
+    // Batched loading state
+    batchOffset: 0,
+    batchSize: 500,
+    batchTimer: null,
 
     // Actions
     loadPhotos: async () => {
@@ -523,6 +534,81 @@ export const createActivitySlice: StateCreator<
         // Ensure error is re-thrown or handled if needed by caller
         throw e;
       }
+    },
+
+    // Batched loading implementation
+    loadFromDBBatched: async ({ userId }) => {
+      // Cancel any previous batch
+      get().cancelBatchLoading();
+      set((state) => {
+        state.batchOffset = 0;
+        state.loading = true;
+        state.loaded = false;
+        state.error = null;
+        state.activityDict = {};
+        state.geoJson = { type: 'FeatureCollection', features: [] };
+      });
+      const batchSize = get().batchSize ?? 500;
+      let offset = 0;
+      const fetchBatch = async () => {
+        if (!get().loading) return;
+        try {
+          const activities: Activity[] = await getDBActivities({
+            user_id: userId,
+            limit: batchSize,
+            offset,
+          });
+          const validActivities = activities.filter(
+            (act) => act.map_polyline ?? act.map_summary_polyline,
+          );
+          set((state) => {
+            // Append to activityDict
+            for (const act of activities) {
+              state.activityDict[act.id] = act;
+            }
+            // Append to geoJson
+            state.geoJson.features.push(...validActivities.map(createFeature));
+          });
+          // Update filterIDs if available
+          if (get().updateFilterIDs) get().updateFilterIDs();
+          // Optionally load photos for new activities (optional, can be removed)
+          if (offset === 0) {
+            void (async () => { await get().loadPhotos(); })();
+          }
+          // If fewer than batchSize, we're done
+          if (activities.length < batchSize) {
+            set((state) => {
+              state.loading = false;
+              state.loaded = true;
+              state.batchTimer = null;
+            });
+            return;
+          }
+          // Otherwise, schedule next batch
+          offset += batchSize;
+          set((state) => { state.batchOffset = offset; });
+          const timer = setTimeout(() => { void fetchBatch(); }, 2000);
+          set((state) => { state.batchTimer = timer; });
+        } catch (error) {
+          set((state) => {
+            state.loading = false;
+            state.loaded = false;
+            state.error = error instanceof Error ? error.message : String(error);
+            state.batchTimer = null;
+          });
+        }
+      };
+      void fetchBatch();
+    },
+
+    cancelBatchLoading: () => {
+      const timer = get().batchTimer;
+      if (timer) clearTimeout(timer);
+      set((state) => {
+        state.loading = false;
+        state.loaded = false;
+        state.batchTimer = null;
+      });
     },
   };
 };

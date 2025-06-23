@@ -14,7 +14,7 @@
     "test:sync": "tsx src/scripts/test-sync-activities.ts"
   },
   "dependencies": {
-    "@auth/drizzle-adapter": "^1.9.1",
+    "@auth/drizzle-adapter": "^1.10.0",
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
     "@hookform/resolvers": "^5.1.1",
     "@mapbox/geosimplify-js": "^0.1.0",
@@ -112,7 +112,7 @@
     "eslint-plugin-react-compiler": "19.1.0-rc.2",
     "pg": "^8.16.2",
     "postcss": "^8.5.6",
-    "prettier": "^3.5.3",
+    "prettier": "^3.6.0",
     "prettier-plugin-tailwindcss": "^0.6.13",
     "pwa-asset-generator": "^8.0.5",
     "tailwindcss": "^4.1.10",

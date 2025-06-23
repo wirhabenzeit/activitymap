@@ -175,6 +175,7 @@ export async function getActivities({
   public_ids,
   user_id,
   limit = 1000,
+  offset = 0,
 }: {
   ids?: number[];
   athlete_id?: string;
@@ -182,6 +183,7 @@ export async function getActivities({
   public_ids?: number[];
   user_id?: string;
   limit?: number;
+  offset?: number;
 }) {
   console.log('getActivities called with:', {
     ids,
@@ -189,6 +191,8 @@ export async function getActivities({
     summary,
     public_ids,
     user_id,
+    limit,
+    offset,
   });
 
   if (!athlete_id && !ids && !summary && !public_ids && !user_id) {
@@ -230,7 +234,8 @@ export async function getActivities({
       .from(activities)
       .where(eq(activities.athlete, parseInt(userAccount.providerAccountId)))
       .orderBy(desc(activities.start_date_local))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
   } else if (athlete_id) {
     console.log('Fetching by athlete_id:', athlete_id);
     result = await db
@@ -238,7 +243,8 @@ export async function getActivities({
       .from(activities)
       .where(eq(activities.athlete, parseInt(athlete_id)))
       .orderBy(desc(activities.start_date_local))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
   } else if (ids) {
     console.log('Fetching by specific ids:', ids);
     result = await db

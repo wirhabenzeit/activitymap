@@ -15,7 +15,7 @@ export function AuthProvider({
   const searchParams = useSearchParams();
   const {
     initializeAuth,
-    loadFromDB,
+    loadFromDBBatched,
     loadPhotos,
     loadFromStrava,
     isInitialized,
@@ -24,7 +24,7 @@ export function AuthProvider({
     account,
   } = useShallowStore((state) => ({
     initializeAuth: state.initializeAuth,
-    loadFromDB: state.loadFromDB,
+    loadFromDBBatched: state.loadFromDBBatched,
     loadPhotos: state.loadPhotos,
     loadFromStrava: state.loadFromStrava,
     isInitialized: state.isInitialized,
@@ -75,21 +75,19 @@ export function AuthProvider({
           initialAuth.guestMode.type === 'activities' &&
           initialAuth.guestMode.activityIds
         ) {
-          loadFromDB({ publicIds: initialAuth.guestMode.activityIds }).catch(
-            (error) => {
-              console.error('Error loading activities in guest mode:', error);
-              addNotification({
-                type: 'error',
-                title: 'Error loading activities',
-                message: 'Failed to load shared activities.',
-              });
-            },
-          );
+          loadFromDBBatched({ userId: undefined }).catch((error) => {
+            console.error('Error loading activities in guest mode:', error);
+            addNotification({
+              type: 'error',
+              title: 'Error loading activities',
+              message: 'Failed to load shared activities.',
+            });
+          });
         } else if (
           initialAuth.guestMode.type === 'user' &&
           initialAuth.guestMode.userId
         ) {
-          loadFromDB({ userId: initialAuth.guestMode.userId }).catch(
+          loadFromDBBatched({ userId: initialAuth.guestMode.userId }).catch(
             (error) => {
               console.error(
                 'Error loading user activities in guest mode:',
@@ -106,43 +104,14 @@ export function AuthProvider({
       } else if (initialAuth.session) {
         // Normal auth flow - load from DB initially
         console.log('Starting normal auth flow DB load');
-        loadFromDB({})
-          .then((activityCount) => {
-            console.log('DB load completed:', {
-              activityCount,
-              userId: user?.id,
-              accountId: account?.providerAccountId,
-            });
-            if (activityCount === 0) {
-              console.log('No activities found in database, fetching from Strava API');
-              // Automatically fetch activities from Strava when none are found in the database
-              loadFromStrava({ photos: true })
-                .then((count: number) => {
-                  console.log(`Successfully fetched ${count} activities from Strava`);
-                  addNotification({
-                    type: 'success',
-                    title: 'Activities loaded',
-                    message: `Successfully loaded ${count} activities from Strava`,
-                  });
-                })
-                .catch((error: Error) => {
-                  console.error('Error fetching activities from Strava:', error);
-                  addNotification({
-                    type: 'error',
-                    title: 'Error loading activities',
-                    message: 'Failed to fetch activities from Strava. Please try again later.',
-                  });
-                });
-            }
-          })
-          .catch((error) => {
-            console.error('Error loading from DB:', error);
-            addNotification({
-              type: 'error',
-              title: 'Error loading activities',
-              message: 'Failed to load activities from database.',
-            });
+        loadFromDBBatched({ userId: user?.id }).catch((error) => {
+          console.error('Error loading from DB:', error);
+          addNotification({
+            type: 'error',
+            title: 'Error loading activities',
+            message: 'Failed to load activities from database.',
           });
+        });
 
         loadPhotos().catch((error) => {
           console.error('Error loading photos:', error);
@@ -154,7 +123,7 @@ export function AuthProvider({
     initialAuth,
     isInitialized,
     initializeAuth,
-    loadFromDB,
+    loadFromDBBatched,
     loadPhotos,
     loadFromStrava,
     addNotification,
