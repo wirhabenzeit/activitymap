@@ -1,5 +1,4 @@
 'use client';
-'use no memo';
 
 import * as React from 'react';
 
@@ -81,7 +80,7 @@ interface RowWithId {
   id: number;
 }
 
-export function DataTable<TData extends RowWithId, TValue>({
+export const DataTable = React.memo(function DataTable<TData extends RowWithId, TValue>({
   className,
   columns,
   data,
@@ -254,4 +253,6 @@ export function DataTable<TData extends RowWithId, TValue>({
       {paginationControl && <DataTablePagination table={table} />}
     </div>
   );
-}
+}) as <TData extends RowWithId, TValue>(
+  props: DataTableProps<TData, TValue>
+) => React.ReactElement;

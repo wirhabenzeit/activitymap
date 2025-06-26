@@ -18,7 +18,11 @@ const config = {
   reactStrictMode: true,
   async redirects() {
     return [
-      {source: "/", destination: "/map", permanent: true},
+      {
+        source: "/",
+        destination: "/map",
+        permanent: true,
+      },
       {
         source: "/stats",
         destination: "/stats/calendar",
