@@ -18,7 +18,10 @@ const ListView = React.memo(function ListView() {
     }));
 
   const columnFilters = [{ id: 'id', value: filterIDs }];
-  const photoDict = React.useMemo(() => groupBy(photos, (photo) => photo.activity_id), [photos]);
+  const photoDict = React.useMemo(
+    () => groupBy(photos, (photo) => photo.activity_id),
+    [photos],
+  );
 
   const rows = React.useMemo(() => {
     const result = Object.entries(activityDict).map(([idStr, act]) => {

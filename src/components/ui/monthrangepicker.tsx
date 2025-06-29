@@ -19,6 +19,11 @@ const addMonths = (input: Date, months: number) => {
 const getDaysInMonth = (year: number, month: number) =>
   new Date(year, month, 0).getDate();
 
+const getEndOfMonth = (year: number, month: number) => {
+  const date = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  return date;
+};
+
 type Month = {
   number: number;
   name: string;
@@ -70,25 +75,26 @@ const QUICK_SELECTORS: QuickSelector[] = [
   {
     label: 'This year',
     startMonth: new Date(new Date().getFullYear(), 0),
-    endMonth: new Date(new Date().getFullYear(), 11),
+    endMonth: getEndOfMonth(new Date().getFullYear(), 11),
   },
   {
     label: 'Last year',
     startMonth: new Date(new Date().getFullYear() - 1, 0),
-    endMonth: new Date(new Date().getFullYear() - 1, 11),
+    endMonth: getEndOfMonth(new Date().getFullYear() - 1, 11),
   },
   {
     label: 'This month',
     startMonth: new Date(new Date().getFullYear(), new Date().getMonth()),
-    endMonth: new Date(new Date().getFullYear(), new Date().getMonth()),
+    endMonth: getEndOfMonth(new Date().getFullYear(), new Date().getMonth()),
   },
   {
     label: 'Last month',
     startMonth: new Date(
       addMonths(new Date(new Date().getFullYear(), new Date().getMonth()), -1),
     ),
-    endMonth: new Date(
-      addMonths(new Date(new Date().getFullYear(), new Date().getMonth()), -1),
+    endMonth: getEndOfMonth(
+      addMonths(new Date(new Date().getFullYear(), new Date().getMonth()), -1).getFullYear(),
+      addMonths(new Date(new Date().getFullYear(), new Date().getMonth()), -1).getMonth(),
     ),
   },
   {
@@ -315,7 +321,7 @@ function MonthRangeCal({
                                 if (onMonthRangeSelect)
                                   onMonthRangeSelect({
                                     start: new Date(startYear, startMonth),
-                                    end: new Date(
+                                    end: getEndOfMonth(
                                       menuYear + m.yearOffset,
                                       m.number,
                                     ),
