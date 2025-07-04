@@ -10,8 +10,8 @@ export function MainNav() {
   const router = useRouter();
   const activeTab = useShallowStore((state) => state.activeTab);
 
-  const handleNavClick = (path: string) => {
-    router.replace(path, { scroll: false });
+  const handleNavigation = (path: string) => {
+    router.push(path);
   };
 
   const isActive = (path: string) => {
@@ -33,9 +33,9 @@ export function MainNav() {
   return (
     <div className="ml-2 mr-4 flex">
       <button
-        onClick={() => handleNavClick('/')}
+        onClick={() => handleNavigation('/')}
         className={cn(
-          "hover:text-header-foreground mr-4 flex items-center space-x-2 transition-colors lg:mr-6",
+          "hover:text-header-foreground mr-4 flex items-center space-x-2 lg:mr-6",
           currentView === 'map'
             ? "text-header-foreground"
             : "text-header-foreground/60",
@@ -46,9 +46,9 @@ export function MainNav() {
       </button>
       <nav className="flex items-center gap-4 text-sm font-semibold lg:gap-6">
         <button
-          onClick={() => handleNavClick('/list')}
+          onClick={() => handleNavigation('/list')}
           className={cn(
-            "hover:text-header-foreground transition-colors",
+            "hover:text-header-foreground",
             currentView === 'list'
               ? "text-header-foreground"
               : "text-header-foreground/60",
@@ -57,9 +57,9 @@ export function MainNav() {
           List
         </button>
         <button
-          onClick={() => handleNavClick(activeTab)}
+          onClick={() => handleNavigation(activeTab)}
           className={cn(
-            "hover:text-header-foreground transition-colors",
+            "hover:text-header-foreground",
             currentView === 'stats'
               ? "text-header-foreground"
               : "text-header-foreground/60",

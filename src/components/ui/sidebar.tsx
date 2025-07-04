@@ -10,7 +10,6 @@ import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Separator } from "~/components/ui/separator";
-import { Sheet, SheetContent } from "~/components/ui/sheet";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
   Tooltip,
@@ -18,11 +17,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-import {
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "~/components/ui/sheet";
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -120,7 +114,8 @@ const SidebarProvider = React.forwardRef<
 
     // We add a state so that we can do data-state="expanded" or "collapsed".
     // This makes it easier to style the sidebar with Tailwind classes.
-    const state = open ? "expanded" : "collapsed";
+    // On mobile, state depends on openMobile for proper content visibility
+    const state = isMobile ? (openMobile ? "expanded" : "collapsed") : (open ? "expanded" : "collapsed");
 
     const contextValue = React.useMemo<SidebarContext>(
       () => ({
@@ -208,25 +203,59 @@ const Sidebar = React.forwardRef<
 
     if (isMobile) {
       return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-          <SheetContent
-            data-sidebar="sidebar"
-            data-mobile="true"
-            className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-            style={
-              {
-                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-              } as React.CSSProperties
-            }
-            side={side}
+        <>
+          {/* Mobile sidebar that expands from collapsed to full width */}
+          <div
+            ref={ref}
+            className="group peer text-sidebar-foreground"
+            data-state={openMobile ? "expanded" : "collapsed"}
+            data-collapsible={openMobile ? "none" : "icon"}
+            data-variant={variant}
+            data-side={side}
           >
-            <SheetHeader className="sr-only">
-              <SheetTitle>Sidebar</SheetTitle>
-              <SheetDescription>Sidebar</SheetDescription>
-            </SheetHeader>
-            <div className="flex h-full w-full flex-col">{children}</div>
-          </SheetContent>
-        </Sheet>
+            {/* This is what handles the sidebar gap - always icon width to prevent layout shift */}
+            <div
+              className={cn(
+                "relative h-svh w-(--sidebar-width-icon) bg-transparent"
+              )}
+            />
+            <div
+              className={cn(
+                "fixed inset-y-0 z-50 h-svh",
+                side === "left" ? "left-0" : "right-0",
+                "flex",
+                variant === "floating" || variant === "inset"
+                  ? "p-2"
+                  : "group-data-[side=left]:border-r group-data-[side=right]:border-l",
+                className,
+              )}
+              style={
+                {
+                  width: openMobile ? SIDEBAR_WIDTH_MOBILE : SIDEBAR_WIDTH_ICON,
+                } as React.CSSProperties
+              }
+              {...props}
+            >
+              <div
+                data-sidebar="sidebar"
+                className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm overflow-hidden"
+              >
+                {/* Add top padding on mobile to account for header */}
+                <div className="h-14 w-full" />
+                {children}
+              </div>
+            </div>
+          </div>
+          
+          {/* Overlay that appears when expanded */}
+          <div 
+            className={cn(
+              "fixed top-14 left-0 right-0 bottom-0 z-40 bg-black/80 transition-opacity duration-300",
+              openMobile ? "opacity-100" : "opacity-0 pointer-events-none"
+            )}
+            onClick={() => setOpenMobile(false)}
+          />
+        </>
       );
     }
 

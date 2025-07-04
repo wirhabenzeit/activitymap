@@ -13,8 +13,10 @@ const config = {
     ignoreDuringBuilds: true,
   },
   experimental: {
-    reactCompiler: true,
+    // reactCompiler: true, // Temporarily disabled to test if this causes safe area issues
   },
+  // Disable automatic static optimization and prefetching
+  poweredByHeader: false,
   reactStrictMode: true,
   async redirects() {
     return [

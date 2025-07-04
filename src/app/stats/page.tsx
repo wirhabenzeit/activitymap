@@ -23,7 +23,7 @@ const tabs = (Object.keys(statsPlots) as (keyof typeof statsPlots)[]).reduce(
   {} as Record<StatsPlotsKeys, { label: string; index: number }>,
 );
 
-const StatsView = React.memo(function StatsView() {
+export default function StatsPage() {
   const { settingsOpen, setSettingsOpen, activeTab, setActiveTab } = useStore(
     useShallow((state) => ({
       settingsOpen: state.settingsOpen,
@@ -58,7 +58,7 @@ const StatsView = React.memo(function StatsView() {
       </StatsProvider>
     </div>
   );
-});
+}
 
 const StatsContent = React.memo(function StatsContent({
   currentTab,
@@ -119,5 +119,3 @@ const StatsContent = React.memo(function StatsContent({
     </>
   );
 });
-
-export default StatsView;

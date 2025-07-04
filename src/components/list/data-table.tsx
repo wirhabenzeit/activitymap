@@ -1,4 +1,5 @@
 'use client';
+'use no memo';
 
 import * as React from 'react';
 
@@ -80,7 +81,10 @@ interface RowWithId {
   id: number;
 }
 
-export const DataTable = React.memo(function DataTable<TData extends RowWithId, TValue>({
+export const DataTable = React.memo(function DataTable<
+  TData extends RowWithId,
+  TValue,
+>({
   className,
   columns,
   data,
@@ -254,5 +258,5 @@ export const DataTable = React.memo(function DataTable<TData extends RowWithId, 
     </div>
   );
 }) as <TData extends RowWithId, TValue>(
-  props: DataTableProps<TData, TValue>
+  props: DataTableProps<TData, TValue>,
 ) => React.ReactElement;
