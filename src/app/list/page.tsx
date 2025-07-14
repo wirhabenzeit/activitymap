@@ -36,7 +36,10 @@ export default function ListPage() {
   }, [activityDict, photoDict]);
 
   return (
-    <div className="h-full max-h-dvh w-full pb-safe bg-muted">
+    <div
+      className="h-full max-h-dvh w-full bg-muted"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <DataTable
         className="h-full"
         columns={columns}

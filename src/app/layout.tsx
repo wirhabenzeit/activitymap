@@ -12,6 +12,16 @@ import { getUser, getAccount } from '~/server/db/actions';
 import type { InitialAuth } from '~/store/auth';
 import { Toaster } from '~/components/ui/toaster';
 import { ToastManager } from '~/components/providers/toast';
+import type { Viewport } from 'next';
+
+// Configure these values as needed
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover', // very  important you know this
+};
 
 export const metadata = {
   title: 'ActivityMap',
@@ -55,14 +65,13 @@ export default async function RootLayout({
         <link rel="manifest" href="/site.webmanifest" />
         <link rel="apple-touch-icon" href="/apple-icon-180.png" />
 
-        <meta
+        {/* <meta
           name="viewport"
           content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-        />
+        /> */}
         <meta name="mobile-web-app-status-bar-style" content="#1976d2" />
-        
+
         <meta name="mobile-web-app-capable" content="yes" />
-        
 
         <link
           rel="apple-touch-startup-image"

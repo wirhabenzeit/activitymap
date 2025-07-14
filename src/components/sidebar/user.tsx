@@ -31,7 +31,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 import * as React from 'react';
 import Image from 'next/image';
 import { cn } from '~/lib/utils';
-import { checkWebhookStatus, createWebhookSubscription } from '~/server/strava/actions';
+import {
+  checkWebhookStatus,
+  createWebhookSubscription,
+} from '~/server/strava/actions';
 import { env } from '~/env';
 import { useToast } from '~/hooks/use-toast';
 
@@ -52,7 +55,7 @@ export function UserSettings() {
     try {
       const result = await createWebhookSubscription();
       console.log('Webhook creation result:', result);
-      
+
       // Display the result in a toast notification
       toast({
         title: 'Webhook Created',
@@ -62,23 +65,28 @@ export function UserSettings() {
               <span className="font-semibold">Success:</span> ✅
             </p>
             <p>
-              <span className="font-semibold">ID:</span> {result.subscription.id}
+              <span className="font-semibold">ID:</span>{' '}
+              {result.subscription.id}
             </p>
             <p>
-              <span className="font-semibold">URL:</span> {result.subscription.callback_url}
+              <span className="font-semibold">URL:</span>{' '}
+              {result.subscription.callback_url}
             </p>
           </div>
         ),
         duration: 10000, // Show for 10 seconds
       });
-      
+
       // Refresh the webhook status
       await handleWebhookStatus();
     } catch (error) {
       console.error('Failed to create webhook:', error);
       toast({
         title: 'Webhook Creation Error',
-        description: error instanceof Error ? error.message : 'Unknown error creating webhook',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error creating webhook',
         variant: 'destructive',
       });
     }
@@ -94,7 +102,7 @@ export function UserSettings() {
         matchingSubscription: result.matchingSubscription,
         subscriptions: result.subscriptions,
       });
-      
+
       // Display the result in a toast notification
       toast({
         title: 'Webhook Status',
@@ -104,14 +112,19 @@ export function UserSettings() {
               <span className="font-semibold">URL:</span> {result.expectedUrl}
             </p>
             <p>
-              <span className="font-semibold">Status:</span> {result.hasMatchingSubscription ? '✅ Active' : '❌ Not Found'}
+              <span className="font-semibold">Status:</span>{' '}
+              {result.hasMatchingSubscription ? '✅ Active' : '❌ Not Found'}
             </p>
             <p>
-              <span className="font-semibold">Database:</span> {result.databaseStatus === 'synchronized' ? '✅ Synced' : '❌ Not Synced'}
+              <span className="font-semibold">Database:</span>{' '}
+              {result.databaseStatus === 'synchronized'
+                ? '✅ Synced'
+                : '❌ Not Synced'}
             </p>
             {result.matchingSubscription && (
               <p>
-                <span className="font-semibold">ID:</span> {result.matchingSubscription.id}
+                <span className="font-semibold">ID:</span>{' '}
+                {result.matchingSubscription.id}
               </p>
             )}
           </div>
@@ -122,7 +135,10 @@ export function UserSettings() {
       console.error('Failed to check webhook status:', error);
       toast({
         title: 'Webhook Status Error',
-        description: error instanceof Error ? error.message : 'Unknown error checking webhook status',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error checking webhook status',
         variant: 'destructive',
       });
     }
@@ -130,9 +146,15 @@ export function UserSettings() {
 
   const handleLoadNewestActivities = async () => {
     try {
-      console.log('Starting load newest activities, current loading state:', loading);
+      console.log(
+        'Starting load newest activities, current loading state:',
+        loading,
+      );
       await loadFromStrava({ photos: true, fetchNewest: true });
-      console.log('Finished load newest activities, current loading state:', loading);
+      console.log(
+        'Finished load newest activities, current loading state:',
+        loading,
+      );
     } catch (error) {
       console.error(error);
     }
@@ -140,9 +162,15 @@ export function UserSettings() {
 
   const handleLoadOlderActivities = async () => {
     try {
-      console.log('Starting load older activities, current loading state:', loading);
+      console.log(
+        'Starting load older activities, current loading state:',
+        loading,
+      );
       await loadFromStrava({ photos: true, fetchNewest: false });
-      console.log('Finished load older activities, current loading state:', loading);
+      console.log(
+        'Finished load older activities, current loading state:',
+        loading,
+      );
     } catch (error) {
       console.error(error);
     }
@@ -217,7 +245,10 @@ export function UserSettings() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger disabled={loading} className="cursor-pointer gap-2">
+              <DropdownMenuSubTrigger
+                disabled={loading}
+                className="cursor-pointer gap-2"
+              >
                 {loading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (

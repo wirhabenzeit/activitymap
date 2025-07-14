@@ -145,6 +145,7 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     --plot-background: 0 0% 100%;
+    --safe-area-bottom: env(safe-area-inset-bottom);
   }
   .dark {
     --background: 0 0% 3.9%;

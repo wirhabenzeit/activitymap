@@ -58,7 +58,10 @@ export default function Stats({ children }: { children: React.ReactNode }) {
   const { settingsRef, elementRef } = useContext(StatsContext);
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col flex-nowrap overflow-hidden">
+    <div
+      className="flex h-full min-h-0 w-full flex-col flex-nowrap overflow-hidden"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <StatsProvider>
         <div className="flex w-full shrink-0 items-stretch overflow-hidden">
           <Tabs defaultValue={pathname} className="flex-1">
