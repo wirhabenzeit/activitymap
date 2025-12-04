@@ -1,4 +1,5 @@
-import { auth } from '~/auth';
+import { auth } from '~/lib/auth';
+import { headers } from 'next/headers';
 import { db } from '~/server/db';
 import { stringify } from 'csv-stringify/sync';
 import { type NextRequest } from 'next/server';
@@ -18,7 +19,9 @@ export async function GET(request: NextRequest) {
     userID = session?.userId;
     console.log('found session', session);
   } else {
-    const session = await auth();
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
     if (!session?.user?.id)
       return new Response('Not authenticated', {
         status: 401,

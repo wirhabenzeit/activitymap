@@ -15,6 +15,7 @@ export type MapState = {
   bbox: LngLatBounds;
   threeDim: boolean;
   showPhotos: boolean;
+  uploadedGeoJson: GeoJSON.FeatureCollection | null;
 };
 
 export type MapActions = {
@@ -23,6 +24,7 @@ export type MapActions = {
   toggleOverlayMap: (key: keyof typeof overlayMaps) => void;
   toggleThreeDim: () => void;
   setPosition: (position: ViewState, bbox: LngLatBounds) => void;
+  setUploadedGeoJson: (geoJson: GeoJSON.FeatureCollection | null) => void;
 };
 
 export type MapSlice = MapState & MapActions;
@@ -44,6 +46,7 @@ export const createMapSlice: StateCreator<
   bbox: defaultMapBounds,
   threeDim: false,
   showPhotos: false,
+  uploadedGeoJson: null,
 
   // Actions
   togglePhotos: () =>
@@ -76,5 +79,10 @@ export const createMapSlice: StateCreator<
   toggleThreeDim: () =>
     set((state: RootState) => {
       state.threeDim = !state.threeDim;
+    }),
+
+  setUploadedGeoJson: (geoJson) =>
+    set((state: RootState) => {
+      state.uploadedGeoJson = geoJson;
     }),
 });

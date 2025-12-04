@@ -1,7 +1,7 @@
 import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
 import type { User, Account } from '~/server/db/schema';
-import type { Session } from 'next-auth';
+import type { Session } from '~/lib/auth';
 
 export type InitialAuth = {
   session: Session | null;

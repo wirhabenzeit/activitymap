@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   doublePrecision,
@@ -13,7 +13,7 @@ import {
   varchar,
   bigint,
 } from 'drizzle-orm/pg-core';
-import type { AdapterAccount } from 'next-auth/adapters';
+
 import { sportTypes } from '~/server/strava/types';
 import type { SportType } from '~/server/strava/types';
 
@@ -23,44 +23,75 @@ export const users = pgTable('user', {
   id: text('id').notNull().primaryKey(),
   name: text('name'),
   email: text('email'),
-  emailVerified: timestamp('emailVerified', { mode: 'date' }),
+  emailVerified: boolean('emailVerified').default(false), // Changed to boolean for Better Auth
   image: text('image'),
   athlete_id: bigint('athlete_id', { mode: 'number' }).unique(),
   oldest_activity_reached: boolean('oldest_activity_reached')
     .notNull()
     .default(false),
+  // Better Auth additions
+  createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
 });
 
 export const accounts = pgTable(
   'account',
   {
+    id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()), // Better Auth requires id
     userId: text('userId')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    type: text('type').$type<AdapterAccount['type']>().notNull(),
+    type: text('type').notNull(),
     provider: text('provider').notNull(),
+    providerId: text('providerId').notNull(), // Better Auth uses providerId
     providerAccountId: text('providerAccountId').notNull(),
+    accountId: text('accountId').notNull(), // Better Auth uses accountId
     refresh_token: text('refresh_token'),
+    refreshToken: text('refreshToken'), // Better Auth format
     access_token: text('access_token'),
+    accessToken: text('accessToken'), // Better Auth format
     expires_at: integer('expires_at'),
+    expiresAt: timestamp('expiresAt', { mode: 'date' }), // Better Auth format
     token_type: text('token_type'),
     scope: text('scope'),
     id_token: text('id_token'),
+    idToken: text('idToken'), // Better Auth format
     session_state: text('session_state'),
+    // Better Auth additions
+    createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
   },
   (table) => [
-    primaryKey({ columns: [table.provider, table.providerAccountId] }),
     index('userId_idx').on(table.userId),
+    index('provider_idx').on(table.provider, table.providerAccountId),
   ],
 );
 
 export const sessions = pgTable('session', {
-  sessionToken: text('sessionToken').notNull().primaryKey(),
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()), // Better Auth uses id
+  sessionToken: text('sessionToken').unique(), // Keep for backward compat
+  token: text('token').notNull().unique(), // Better Auth uses token
   userId: text('userId')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  expires: timestamp('expires', { mode: 'date' }).notNull(),
+  expires: timestamp('expires', { mode: 'date' }), // Keep for backward compat
+  expiresAt: timestamp('expiresAt', { mode: 'date' }).notNull(), // Better Auth uses expiresAt
+  // Better Auth additions
+  ipAddress: text('ipAddress'),
+  userAgent: text('userAgent'),
+  createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
 });
+
+export const verification = pgTable('verification', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expiresAt', { mode: 'date' }).notNull(),
+  createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
+});
+
 
 export const webhooks = pgTable('webhook', {
   id: bigint('id', { mode: 'number' }).primaryKey(),

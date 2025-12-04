@@ -1,5 +1,5 @@
 import { type StateCreator } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+
 import { type RootState } from './index';
 import type { Activity, Photo } from '~/server/db/schema';
 import { type FeatureCollection, type Feature, type Geometry } from 'geojson';
@@ -58,8 +58,8 @@ const createFeature = (act: Activity): Feature<Geometry> => ({
     coordinates:
       (act.map_polyline ?? act.map_summary_polyline)
         ? decode(act.map_summary_polyline!).map(
-            ([lat, lon]) => [lon, lat],
-          )
+          ([lat, lon]) => [lon, lat],
+        )
         : [],
   },
   properties: {
@@ -67,7 +67,7 @@ const createFeature = (act: Activity): Feature<Geometry> => ({
     sport_type: act.sport_type,
   },
   bbox:
-    act.map_bbox && act.map_bbox.length === 4
+    act.map_bbox?.length === 4
       ? (act.map_bbox as [number, number, number, number])
       : undefined,
 });
@@ -202,10 +202,10 @@ export const createActivitySlice: StateCreator<
           count: activities.length,
           firstActivity: activities[0]
             ? {
-                id: activities[0].id,
-                name: activities[0].name,
-                athlete: activities[0].athlete,
-              }
+              id: activities[0].id,
+              name: activities[0].name,
+              athlete: activities[0].athlete,
+            }
             : null,
         });
 
@@ -422,8 +422,8 @@ export const createActivitySlice: StateCreator<
             const oldestActivity =
               activities.length > 0
                 ? activities.reduce((oldest, current) =>
-                    current.start_date < oldest.start_date ? current : oldest,
-                  )
+                  current.start_date < oldest.start_date ? current : oldest,
+                )
                 : null;
 
             before = oldestActivity

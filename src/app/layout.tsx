@@ -2,7 +2,8 @@ import '~/styles/globals.css';
 
 import { ThemeProvider } from '~/components/theme-provider';
 import { AuthProvider } from '~/components/providers/auth';
-import { auth } from '~/auth';
+import { auth } from '~/lib/auth';
+import { headers } from 'next/headers';
 import { SidebarProvider } from '~/components/ui/sidebar';
 import { AppSidebar } from '~/components/app-sidebar';
 import { AppHeader } from '~/components/app-header';
@@ -34,7 +35,9 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
   const initialAuth: InitialAuth = {
     session: null,
     user: null,

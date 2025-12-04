@@ -43,6 +43,7 @@ import { baseMaps, overlayMaps } from '~/settings/map';
 import { categorySettings } from '~/settings/category';
 
 import { Download } from '~/components/map/DownloadControl';
+import { UploadControl } from '~/components/map/UploadControl';
 import { Selection } from '~/components/map/SelectionControl';
 import { LayerSwitcher } from '~/components/map/LayerSwitcher';
 import PhotoLayer from '~/components/map/Photo';
@@ -184,8 +185,8 @@ export default function MapPage() {
     showPhotos,
     togglePhotos,
     compactList,
-    loaded,
     photos,
+    uploadedGeoJson,
   } = useShallowStore((state) => ({
     selected: state.selected,
     setHighlighted: state.setHighlighted,
@@ -202,7 +203,7 @@ export default function MapPage() {
     togglePhotos: state.togglePhotos,
     toggleThreeDim: state.toggleThreeDim,
     compactList: state.compactList,
-    loaded: state.loaded,
+    uploadedGeoJson: state.uploadedGeoJson,
     photos: state.photos,
   }));
   const { open } = useSidebar();
@@ -282,7 +283,7 @@ export default function MapPage() {
   const mapSettingBase = baseMaps[baseMap];
 
   const photoDict = useMemo(() => groupBy(photos, (photo) => photo.activity_id), [photos]);
-  const rows = useMemo(() => 
+  const rows = useMemo(() =>
     selected
       .map((key) => {
         const activity = activityDict[key];
@@ -342,7 +343,7 @@ export default function MapPage() {
         cursor={cursor}
         interactiveLayerIds={activeInteractiveLayerIds}
       >
-        {mapSettingBase != undefined && mapSettingBase.type == 'raster' && (
+        {mapSettingBase?.type === 'raster' && (
           <Source
             type="raster"
             tiles={mapSettingBase.url ? [mapSettingBase.url] : []}
@@ -364,6 +365,9 @@ export default function MapPage() {
         <FullscreenControl position="top-right" />
         <Overlay position="top-right">
           <Download />
+        </Overlay>
+        <Overlay position="top-right">
+          <UploadControl />
         </Overlay>
         <Selection />
         <Overlay position="top-left">
@@ -398,6 +402,23 @@ export default function MapPage() {
           </div>
         </Overlay>
         {overlayMapComponents}
+        {uploadedGeoJson && (
+          <Source id="uploaded-gpx" type="geojson" data={uploadedGeoJson}>
+            <Layer
+              id="uploaded-gpx-layer"
+              type="line"
+              paint={{
+                'line-color': '#000',
+                'line-width': 2,
+                'line-opacity': 1.,
+              }}
+              layout={{
+                'line-join': 'round',
+                'line-cap': 'round',
+              }}
+            />
+          </Source>
+        )}
         <RouteLayer />
         {showPhotos && <PhotoLayer />}
       </ReactMapGL>

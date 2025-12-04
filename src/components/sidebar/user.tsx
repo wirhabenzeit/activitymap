@@ -8,7 +8,7 @@ import {
   Info,
 } from 'lucide-react';
 
-import { signIn, signOut } from 'next-auth/react';
+import { signIn, signOut } from '~/lib/auth-client';
 
 import { useShallowStore } from '~/store';
 
@@ -184,7 +184,9 @@ export function UserSettings() {
             size="lg"
             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             onClick={
-              !isInitialized || user ? undefined : () => signIn('strava')
+              !isInitialized || user
+                ? undefined
+                : () => signIn.social({ provider: 'strava' })
             }
           >
             {user || !isInitialized ? (

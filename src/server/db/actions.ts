@@ -3,18 +3,18 @@
 import { inArray, eq, desc } from 'drizzle-orm';
 import { activities, photos, accounts } from './schema';
 import { db } from './index';
-import { auth } from '~/auth';
-import type { AdapterAccount } from 'next-auth/adapters';
+import { auth } from '~/lib/auth';
+import { headers } from 'next/headers';
 import { StravaClient, type StravaTokens } from '~/server/strava/client';
 
-// Use the AdapterAccount type from next-auth
-export type Account = AdapterAccount;
 // Define a type for the account based on the database schema
 type AccountType = typeof accounts.$inferSelect;
 
 export const getUser = async (id?: string) => {
   if (!id) {
-    const session = await auth();
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
     if (!session?.user?.id) throw new Error('Not authenticated');
     id = session.user.id;
   }
@@ -260,10 +260,10 @@ export async function getActivities({
     resultCount: result.length,
     firstActivity: result[0]
       ? {
-          id: result[0].id,
-          name: result[0].name,
-          athlete: result[0].athlete,
-        }
+        id: result[0].id,
+        name: result[0].name,
+        athlete: result[0].athlete,
+      }
       : null,
   });
 

@@ -9,7 +9,7 @@ declare module '@mapbox/togeojson' {
       };
       properties: {
         name: string;
-        [key: string]: any;
+        [key: string]: unknown;
       };
     }>;
   };
