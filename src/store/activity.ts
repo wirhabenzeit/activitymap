@@ -74,7 +74,7 @@ const createFeature = (act: Activity): Feature<Geometry> => ({
 
 export const createActivitySlice: StateCreator<
   RootState,
-  [['zustand/immer', never]],
+  [['zustand/immer', never], never],
   [],
   ActivitySlice
 > = (set, get, store) => {

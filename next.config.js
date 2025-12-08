@@ -9,9 +9,6 @@ const config = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   experimental: {
     // reactCompiler: true, // Temporarily disabled to test if this causes safe area issues
   },

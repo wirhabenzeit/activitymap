@@ -430,13 +430,13 @@ export default function MapPage() {
       >
         <DataTable
           className="max-h-64"
-          columns={columns}
+          columns={columns as any}
           data={rows}
           selected={selected}
           setSelected={setSelected}
           map={mapRefLoc}
           columnFilters={columnFilters}
-          {...compactList}
+          {...(compactList as any)}
         />
       </div>
     </div>

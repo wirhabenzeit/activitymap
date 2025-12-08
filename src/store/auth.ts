@@ -35,7 +35,7 @@ export type AuthSlice = AuthState & AuthActions;
 
 export const createAuthSlice: StateCreator<
   RootState,
-  [['zustand/immer', never]],
+  [['zustand/immer', never], never],
   [],
   AuthSlice
 > = (set) => ({

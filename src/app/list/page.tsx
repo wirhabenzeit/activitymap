@@ -47,7 +47,7 @@ export default function ListPage() {
         selected={selected}
         setSelected={setSelected}
         columnFilters={columnFilters}
-        {...tableState}
+        {...(tableState as any)}
       />
     </div>
   );

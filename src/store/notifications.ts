@@ -23,7 +23,7 @@ export type NotificationSlice = NotificationState & NotificationActions;
 
 export const createNotificationSlice: StateCreator<
   RootState,
-  [['zustand/immer', never]],
+  [['zustand/immer', never], never],
   [],
   NotificationSlice
 > = (set) => ({

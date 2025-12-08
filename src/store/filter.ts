@@ -115,7 +115,7 @@ const applyFilters = (state: FilterState, activity: Activity): boolean => {
 
 export const createFilterSlice: StateCreator<
   RootState,
-  [['zustand/immer', never]],
+  [['zustand/immer', never], never],
   [],
   FilterSlice
 > = (set, get, store) => {

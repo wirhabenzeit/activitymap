@@ -31,7 +31,7 @@ export type MapSlice = MapState & MapActions;
 
 export const createMapSlice: StateCreator<
   RootState,
-  [['zustand/immer', never]],
+  [['zustand/immer', never], never],
   [],
   MapSlice
 > = (set) => ({

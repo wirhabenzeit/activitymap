@@ -46,7 +46,7 @@ export type StatsSlice = StatsState & StatsActions;
 
 export const createStatsSlice: StateCreator<
   RootState,
-  [['zustand/immer', never]],
+  [['zustand/immer', never], never],
   [],
   StatsSlice
 > = (set) => ({

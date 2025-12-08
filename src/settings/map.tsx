@@ -26,7 +26,15 @@ type RasterOverlaySetting = {
   interactiveLayerIds?: string[];
 };
 
-type OverlaySetting = RasterOverlaySetting;
+type ComponentOverlaySetting = {
+  type: 'component';
+  visible: boolean;
+  component: React.ComponentType<Record<string, unknown>>;
+  props?: Record<string, unknown>;
+  interactiveLayerIds?: string[];
+};
+
+type OverlaySetting = RasterOverlaySetting | ComponentOverlaySetting;
 
 // Combined type for backward compatibility
 type MapSetting = {

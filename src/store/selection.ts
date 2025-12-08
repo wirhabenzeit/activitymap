@@ -16,7 +16,7 @@ export type SelectionSlice = SelectionState & SelectionActions;
 
 export const createSelectionSlice: StateCreator<
   RootState,
-  [['zustand/immer', never]],
+  [['zustand/immer', never], never],
   [],
   SelectionSlice
 > = (set) => ({

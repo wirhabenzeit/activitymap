@@ -66,11 +66,11 @@ export function UserSettings() {
             </p>
             <p>
               <span className="font-semibold">ID:</span>{' '}
-              {result.subscription.id}
+              {result.subscription?.id}
             </p>
             <p>
               <span className="font-semibold">URL:</span>{' '}
-              {result.subscription.callback_url}
+              {result.subscription?.callback_url}
             </p>
           </div>
         ),

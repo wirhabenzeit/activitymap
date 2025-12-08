@@ -76,7 +76,7 @@ const createListActions = (
 
 export const createListSlice: StateCreator<
   RootState,
-  [['zustand/immer', never]],
+  [['zustand/immer', never], never],
   [],
   ListSlice
 > = (set) => ({
