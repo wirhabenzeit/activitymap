@@ -6,9 +6,9 @@ await import("./src/env.js");
 
 /** @type {import("next").NextConfig} */
 const config = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // typescript: {
+  //   ignoreBuildErrors: true,
+  // },
   experimental: {
     // reactCompiler: true, // Temporarily disabled to test if this causes safe area issues
   },

@@ -85,9 +85,9 @@ const getter = (setting: CalendarSetting): Spec => ({
 
 const setter =
   (calendar: CalendarSetting) =>
-  <K extends keyof CalendarSetting>(name: K, value: CalendarSetting[K]) => {
-    return { ...calendar, [name]: value };
-  };
+    <K extends keyof CalendarSetting>(name: K, value: CalendarSetting[K]) => {
+      return { ...calendar, [name]: value };
+    };
 
 function makeCalendar({ date = Plot.identity, inset = 0.5, ...options } = {}) {
   let D: Date[] | null;
@@ -112,33 +112,35 @@ class MonthLine extends Plot.Mark {
     stroke: "currentColor",
     strokeWidth: 2,
   };
-  constructor(data, options = {}) {
-    const { x, y } = options;
-    super(
-      data,
-      {
-        x: { value: x, scale: "x" },
-        y: { value: y, scale: "y" },
-      },
-      options,
-      MonthLine.defaults,
-    );
+  stroke: any;
+  strokeWidth: any;
+  data: any;
+  channels: any;
+  constructor(data: any, options: any = {}) {
+    super();
+    this.data = data;
+    const { x, y, stroke, strokeWidth, ...rest } = options;
+    this.channels = {
+      x: { value: x, scale: "x" },
+      y: { value: y, scale: "y" },
+      ...rest,
+    };
+    this.stroke = stroke ?? MonthLine.defaults.stroke;
+    this.strokeWidth = strokeWidth ?? MonthLine.defaults.strokeWidth;
   }
-  render(index, { x, y }, { x: X, y: Y }, dimensions) {
+  render(index: any, { x, y }: any, { x: X, y: Y }: any, dimensions: any) {
     const { marginTop, marginBottom, height } = dimensions;
     const dx = x.bandwidth(),
       dy = y.bandwidth();
-    return htl.svg`<path fill=none stroke=${this.stroke} stroke-width=${
-      this.strokeWidth
-    } stroke-linecap="round" d=${Array.from(
-      index,
-      (i) =>
-        `${
-          Y[i] > marginTop + dy * 1.5 // is the first day a Monday?
-            ? `M${X[i] + dx},${marginTop}V${Y[i]}h${-dx}`
-            : `M${X[i]},${marginTop}`
-        }V${height - marginBottom}`,
-    ).join("")}>`;
+    return htl.svg`<path fill=none stroke=${(this as any).stroke} stroke-width=${(this as any).strokeWidth
+      } stroke-linecap="round" d=${Array.from(
+        index,
+        (i: any) =>
+          `${(Y as any)[i] > marginTop + dy * 1.5 // is the first day a Monday?
+            ? `M${(X as any)[i] + dx},${marginTop}V${(Y as any)[i]}h${-dx}`
+            : `M${(X as any)[i]},${marginTop}`
+          }V${height - marginBottom}`,
+      ).join("")}>`;
   }
 }
 
@@ -171,139 +173,138 @@ class MonthLine extends Plot.Mark {
 
 export const plot =
   (calendarSetting: CalendarSetting) =>
-  ({
-    activities,
-    theme,
-  }: {
-    activities: Activity[];
-    theme: "light" | "dark";
-  }) => {
-    const { value } = getter(calendarSetting);
-    const activitiesByDate = d3.group(activities, (f) =>
-      d3.utcDay(new Date(f.start_date_local)),
-    );
+    ({
+      activities,
+      theme,
+    }: {
+      activities: Activity[];
+      theme: "light" | "dark";
+    }) => {
+      const { value } = getter(calendarSetting);
+      const activitiesByDate = d3.group(activities, (f) =>
+        d3.utcDay(new Date(f.start_date_local)),
+      );
 
-    const widthPlot = 1000;
+      const widthPlot = 1000;
 
-    const dayTotals = d3.map(
-      d3.rollup(
-        activities,
-        value.reduce as (acts: Activity[]) => number | string,
-        (d) => d3.utcDay(new Date(d.start_date_local)),
-      ),
-      ([key, value]) => ({ date: key, value }),
-    );
-
-    if (dayTotals.length == 0) return null;
-
-    const start = d3.min(dayTotals, (d) => d.date);
-
-    const end = d3.utcDay.offset(d3.max(dayTotals, (d) => d.date)!);
-
-    const heightPlot =
-      start == undefined || end == undefined
-        ? 800
-        : ((end.getFullYear() - start.getFullYear() + 1) * widthPlot) / 5.8;
-
-    return Plot.plot({
-      figure: true,
-      style: { fontSize: "10pt" },
-      marginRight: 0,
-      marginLeft: 50,
-      marginTop: 20,
-      width: widthPlot,
-      height: heightPlot,
-      axis: null,
-      padding: 0,
-      x: {
-        domain: d3.range(54),
-      },
-      y: {
-        axis: "left",
-        domain: [-1, 0, 1, 2, 3, 4, 5, 6],
-        ticks: [0, 1, 2, 3, 4, 5, 6],
-        tickSize: 0,
-        tickFormat: (day) => Plot.formatWeekday()((day + 1) % 7),
-      },
-      fy: {
-        padding: 0.1,
-        reverse: true,
-      },
-      color: value.color,
-      marks: [
-        Plot.text(
-          d3.utcYears(d3.utcYear(start), end),
-          makeCalendar({
-            text: d3.utcFormat("%Y"),
-            fontWeight: "bold",
-            frameAnchor: "right",
-            x: 0,
-            y: -1,
-            dx: -20,
-          }),
+      const dayTotals = d3.map(
+        d3.rollup(
+          activities,
+          value.reduce as (acts: Activity[]) => number | string,
+          (d) => d3.utcDay(new Date(d.start_date_local)),
         ),
-        Plot.text(
-          d3.utcMonths(d3.utcMonth(start), end).map(d3.utcMonday.ceil),
-          makeCalendar({
-            text: d3.utcFormat("%b"),
-            frameAnchor: "left",
-            y: -1,
-            dx: -5,
-          }),
-        ),
-        Plot.cell(
-          dayTotals,
-          makeCalendar({
-            date: "date",
-            fill: "value",
-            opacity: 0.5,
-            rx: 1,
-            tip: true,
-            channels: {
-              title: (d) =>
-                `${d.date.toDateString()}\n\n${
-                  activitiesByDate
-                    .get(d.date)
+        ([key, value]) => ({ date: key, value }),
+      );
+
+      if (dayTotals.length == 0) return null;
+
+      const start = d3.min(dayTotals, (d) => d.date);
+
+      const end = d3.utcDay.offset(d3.max(dayTotals, (d) => d.date)!);
+
+      const heightPlot =
+        start == undefined || end == undefined
+          ? 800
+          : ((end.getFullYear() - start.getFullYear() + 1) * widthPlot) / 5.8;
+
+      return Plot.plot({
+        figure: true,
+        style: { fontSize: "10pt" },
+        marginRight: 0,
+        marginLeft: 50,
+        marginTop: 20,
+        width: widthPlot,
+        height: heightPlot,
+        axis: null,
+        padding: 0,
+        x: {
+          domain: d3.range(54),
+        },
+        y: {
+          axis: "left",
+          domain: [-1, 0, 1, 2, 3, 4, 5, 6],
+          ticks: [0, 1, 2, 3, 4, 5, 6],
+          tickSize: 0,
+          tickFormat: (day) => Plot.formatWeekday()((day + 1) % 7),
+        },
+        fy: {
+          padding: 0.1,
+          reverse: true,
+        },
+        color: value.color,
+        marks: [
+          Plot.text(
+            d3.utcYears(d3.utcYear(start), end),
+            (makeCalendar as any)({
+              text: d3.utcFormat("%Y"),
+              fontWeight: "bold",
+              frameAnchor: "right",
+              x: 0,
+              y: -1,
+              dx: -20,
+            }),
+          ),
+          Plot.text(
+            d3.utcMonths(d3.utcMonth(start), end).map(d3.utcMonday.ceil),
+            (makeCalendar as any)({
+              text: d3.utcFormat("%b"),
+              frameAnchor: "left",
+              y: -1,
+              dx: -5,
+            }),
+          ),
+          Plot.cell(
+            dayTotals,
+            (makeCalendar as any)({
+              date: "date",
+              fill: "value",
+              opacity: 0.5,
+              rx: 1,
+              tip: true,
+              channels: {
+                title: (d: any) =>
+                  `${d.date.toDateString()}\n\n${activitiesByDate
+                    .get(d.date)!
                     .map(
                       (a) =>
                         a.name +
                         (value.format == null
                           ? ""
-                          : ": " + value.format(value.fun(a))),
+                          : ": " + (value.format as any)((value.fun as any)(a))),
                     )
                     ?.join("\n") ?? ""
-                }`,
-            },
-          }),
-        ),
-        //on(
-        Plot.text(
-          d3.utcDays(start!, end),
-          makeCalendar({
-            text: d3.utcFormat("%-d"),
-            fontSize: 11,
-          }),
-        ),
-        new MonthLine(
-          d3.utcMonths(d3.utcMonth(start), end),
-          makeCalendar({
-            opacity: 1,
-            strokeWidth: 4,
-            stroke: theme == "dark" ? "black" : "white",
-          }),
-        ),
-        /*{
-            click: (e, {datum}) =>
-              setSelected(
-                activitiesByDate
-                  .get(datum)
-                  ?.map((activity) => activity.id)
-              ),
-          }
-        ),*/
-      ],
-    });
-  };
+                  }`,
+              },
+            }),
+          ),
+          //on(
+          Plot.text(
+            d3.utcDays(start!, end),
+            (makeCalendar as any)({
+              text: d3.utcFormat("%-d"),
+              fontSize: 11,
+            }),
+          ),
+          new MonthLine(
+            d3.utcMonths(d3.utcMonth(start), end),
+            (makeCalendar as any)({
+              opacity: 1,
+              strokeWidth: 4,
+              stroke: theme == "dark" ? "black" : "white",
+            }),
+          ) as any,
+          /*{
+              click: (e, {datum}) =>
+                setSelected(
+                  activitiesByDate
+                    .get(datum)
+                    ?.map((activity) => activity.id)
+                ),
+            }
+          ),*/
+        ],
+      });
+    };
 
 export const legend =
   (calendarSetting: CalendarSetting) => (plot: Plot.Plot) => {

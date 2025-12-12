@@ -112,134 +112,138 @@ const getter = (setting: ScatterSetting): Spec => ({
 
 const setter =
   (scatter: ScatterSetting) =>
-  <K extends keyof ScatterSetting>(name: K, value: ScatterSetting[K]) => {
-    return { ...scatter, [name]: value };
-  };
+    <K extends keyof ScatterSetting>(name: K, value: ScatterSetting[K]) => {
+      return { ...scatter, [name]: value };
+    };
 
 export const plot =
   (setting: ScatterSetting) =>
-  ({
-    activities,
-    width,
-    height,
-  }: {
-    activities: Activity[];
-    width: number;
-    height: number;
-  }) => {
-    const bigPlot = width > 500;
-    const { xValue, yValue, rValue, group } = getter(setting);
-    return Plot.plot({
-      ...commonSettings,
-      ...(bigPlot
-        ? {
+    ({
+      activities,
+      width,
+      height,
+    }: {
+      activities: Activity[];
+      width: number;
+      height: number;
+    }) => {
+      const bigPlot = width > 500;
+      const { xValue, yValue, rValue, group } = getter(setting);
+      return Plot.plot({
+        ...commonSettings,
+        ...(bigPlot
+          ? {
             marginLeft: 70,
             marginTop: 50,
           }
-        : {}),
-      height: height,
-      width: width,
-      r: {
-        range: [0, 10],
-        domain: d3.extent(activities, (act: Activity) => rValue.fun(act)),
-      },
-      marks: [
-        Plot.axisY({
-          ticks: 6,
-          label: null,
-          anchor: 'left',
-          tickSize: 12,
-          ...(bigPlot
-            ? {
+          : {}),
+        height: height,
+        width: width,
+        r: {
+          range: [0, 10],
+          domain: d3.extent(activities, (act: Activity) => rValue.fun(act)),
+        },
+        marks: [
+          Plot.axisY({
+            ticks: 6,
+            label: null,
+            anchor: 'left',
+            tickSize: 12,
+            ...(bigPlot
+              ? {
                 tickFormat:
                   'tickFormat' in yValue ? yValue.tickFormat : undefined,
               }
-            : {
+              : {
                 tickRotate: -90,
                 textAnchor: 'start',
                 tickSize: 14,
                 tickPadding: -10,
-                tickFormat:
-                  'tickFormatShort' in yValue
-                    ? prepend(' ', yValue.tickFormatShort)
-                    : prepend(' ', yValue.tickFormat),
+                tickFormat: (...args: unknown[]) => {
+                  const fn = 'tickFormatShort' in yValue
+                    ? prepend(' ', yValue.tickFormatShort as any)
+                    : prepend(' ', yValue.tickFormat as any);
+                  return fn ? fn(args[0] as Date | number) : String(args[0]);
+                },
               }),
-        }),
-        Plot.axisX({
-          anchor: 'top',
-          label: null,
-          tickSize: 12,
-          ...(!bigPlot
-            ? {
-                tickFormat:
-                  'tickFormatShort' in xValue
-                    ? prepend(' ', xValue.tickFormatShort)
-                    : prepend(' ', xValue.tickFormat),
+          }),
+          Plot.axisX({
+            anchor: 'top',
+            label: null,
+            tickSize: 12,
+            ...(!bigPlot
+              ? {
+                tickFormat: (...args: unknown[]) => {
+                  const fn = 'tickFormatShort' in xValue
+                    ? prepend(' ', xValue.tickFormatShort as any)
+                    : prepend(' ', xValue.tickFormat as any);
+                  return fn ? fn(args[0] as Date | number) : String(args[0]);
+                },
                 textAnchor: 'start',
                 tickPadding: -10,
               }
-            : {
-                tickFormat:
-                  'tickFormat' in xValue ? xValue.tickFormat : undefined,
+              : {
+                tickFormat: (...args: unknown[]) =>
+                  'tickFormat' in xValue ? (xValue.tickFormat as any)(args[0]) : String(args[0]),
               }),
-        }),
-        Plot.dot(
-          activities,
-          Plot.pointer({
+          }),
+          Plot.dot(
+            activities,
+            Plot.pointer({
+              x: xValue.fun,
+              y: yValue.fun,
+              r: rValue.fun,
+              fill: (d: Activity) => group.color(group.fun(d)),
+            }),
+          ),
+          Plot.dot(activities, {
             x: xValue.fun,
             y: yValue.fun,
             r: rValue.fun,
-            fill: (d: Activity) => group.color(group.fun(d)),
-          }),
-        ),
-        Plot.dot(activities, {
-          x: xValue.fun,
-          y: yValue.fun,
-          r: rValue.fun,
-          stroke: (d: Activity) => group.color(group.fun(d)),
-          opacity: 0.5,
-          channels: {
-            Activity: (d: Activity) => d.name,
-            [rValue.label]: rValue.fun,
-            [xValue.label]: xValue.fun,
-            [yValue.label]: yValue.fun,
-          },
-          tip: {
-            format: {
-              x: false,
-              y: false,
-              r: false,
-              stroke: false,
-              [rValue.label]: rValue.format,
-              [xValue.label]: xValue.format,
-              [yValue.label]: yValue.format,
+            stroke: (d: Activity) => group.color(group.fun(d)),
+            opacity: 0.5,
+            channels: {
+              Activity: (d: Activity) => d.name,
+              [rValue.label]: rValue.fun,
+              [xValue.label]: xValue.fun,
+              [yValue.label]: yValue.fun,
             },
-          },
-        }),
-        Plot.ruleY(
-          activities,
-          Plot.pointer({
-            px: xValue.fun,
-            y: yValue.fun,
-            stroke: (d: Activity) => group.color(group.fun(d)),
+            tip: {
+              format: {
+                x: false,
+                y: false,
+                r: false,
+                stroke: false,
+                [rValue.label]: rValue.format,
+                [xValue.label]: xValue.format,
+                [yValue.label]: yValue.format,
+              },
+            },
           }),
-        ),
-        Plot.ruleX(
-          activities,
-          Plot.pointer({
+          Plot.ruleY(
+            activities,
+            Plot.pointer({
+              px: xValue.fun,
+              y: yValue.fun,
+              stroke: (d: Activity) => group.color(group.fun(d)),
+            }),
+          ),
+          Plot.ruleX(
+            activities,
+            Plot.pointer({
+              x: xValue.fun,
+              py: yValue.fun,
+              stroke: (d: Activity) => group.color(group.fun(d)),
+            }),
+          ),
+          /*Plot.crosshair(activities, {
             x: xValue.fun,
-            py: yValue.fun,
-            stroke: (d: Activity) => group.color(group.fun(d)),
-          }),
-        ),
-        /*Plot.crosshair(activities, {
-          x: xValue.fun,
-          y: yValue.fun,
-          color: (d) => group.color(group.fun(d)),
-        }),*/
-      ],
-    });
-  };
+            y: yValue.fun,
+            color: (d) => group.color(group.fun(d)),
+          }),*/
+        ],
+      });
+    };
 
 function isIterableNumberValue(
   iterable: Iterable<unknown>,

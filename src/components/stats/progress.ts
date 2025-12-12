@@ -119,157 +119,163 @@ const getter = (setting: ProgressSetting): Spec => ({
 
 const setter =
   (progress: ProgressSetting) =>
-  <K extends keyof ProgressSetting>(name: K, value: ProgressSetting[K]) => {
-    return { ...progress, [name]: value };
-  };
+    <K extends keyof ProgressSetting>(name: K, value: ProgressSetting[K]) => {
+      return { ...progress, [name]: value };
+    };
 
 export const plot =
   (setting: ProgressSetting) =>
-  ({
-    activities,
-    width,
-    height,
-  }: {
-    activities: Activity[];
-    width: number;
-    height: number;
-  }) => {
-    const { by, value } = getter(setting);
-    const bigPlot = width > 500;
+    ({
+      activities,
+      width,
+      height,
+    }: {
+      activities: Activity[];
+      width: number;
+      height: number;
+    }) => {
+      const { by, value } = getter(setting);
+      const bigPlot = width > 500;
 
-    const cumulative = d3
-      .groups(activities, (x) => by.tick(new Date(x.start_date_local)))
-      .flatMap(([dateKey, acts]) => {
-        acts = acts.sort(
-          (a, b) => a.start_date_local.getTime() - b.start_date_local.getTime(),
-        );
-        if (acts.length == 0) return [];
-        const cumsum = d3.cumsum(acts, value.fun);
-        return [
-          {
-            start_date_local: by.tick(acts[0]!.start_date_local),
-            by: dateKey,
-            cumsum: 0,
-          },
-          ...acts.map((act, i) => ({
-            ...act,
-            by: dateKey,
-            cumsum: cumsum[i],
-          })),
-        ];
-      });
+      const cumulative = d3
+        .groups(activities, (x) => by.tick(new Date(x.start_date_local)))
+        .flatMap(([dateKey, acts]) => {
+          acts = acts.sort(
+            (a, b) => a.start_date_local.getTime() - b.start_date_local.getTime(),
+          );
+          if (acts.length == 0) return [];
+          const cumsum = d3.cumsum(acts, value.fun);
+          return [
+            {
+              start_date_local: by.tick(acts[0]!.start_date_local),
+              by: dateKey,
+              cumsum: 0,
+            },
+            ...acts.map((act, i) => ({
+              ...act,
+              by: dateKey,
+              cumsum: cumsum[i],
+            })),
+          ];
+        });
 
-    let data = cumulative.map((entry) => ({
-      ...entry,
-      virtualDate: new Date(
-        new Date('2024-01-01').getTime() +
+      let data = cumulative.map((entry) => ({
+        ...entry,
+        virtualDate: new Date(
+          new Date('2024-01-01').getTime() +
           entry.start_date_local.getTime() -
           by.tick(entry.start_date_local).getTime(),
-      ),
-    }));
-
-    const keys = Array.from(
-      new d3.InternSet(data.map((x) => by.tick(x.by))),
-    ).sort((a, b) => a.getTime() - b.getTime());
-
-    if (keys.length == 0) return Plot.plot({});
-
-    data = data
-      .filter((x) =>
-        keys
-          .slice(-5)
-          .map((y) => y.getTime())
-          .includes(x.by.getTime()),
-      )
-      .map((x) => ({
-        ...x,
-        currentPeriod: x.by.getTime() == keys[keys.length - 1]!.getTime(),
+        ),
       }));
 
-    return Plot.plot({
-      ...commonSettings,
-      ...(bigPlot
-        ? {
+      const keys = Array.from(
+        new d3.InternSet(data.map((x) => by.tick(x.by))),
+      ).sort((a, b) => a.getTime() - b.getTime());
+
+      if (keys.length == 0) return Plot.plot({});
+
+      data = data
+        .filter((x) =>
+          keys
+            .slice(-5)
+            .map((y) => y.getTime())
+            .includes(x.by.getTime()),
+        )
+        .map((x) => ({
+          ...x,
+          currentPeriod: x.by.getTime() == keys[keys.length - 1]!.getTime(),
+        }));
+
+      return Plot.plot({
+        ...commonSettings,
+        ...(bigPlot
+          ? {
             //marginBottom: 40,
             marginLeft: 70,
             marginTop: 40,
           }
-        : {}),
-      width,
-      height,
-      color: {
-        //type: "categorical",
-        scheme: 'viridis',
-        reverse: true,
-        type: 'ordinal',
-        legend: false,
-        tickFormat: by.legendFormat,
-      },
-      x: { domain: by.domain },
-      marks: [
-        //Plot.frame(),
-        Plot.axisX({
-          anchor: 'top',
-          label: null,
-          ticks: by.ticks,
-          tickSize: 12,
-          ...(!bigPlot
-            ? {
-                tickFormat: prepend(' ', by.tickFormat),
+          : {}),
+        width,
+        height,
+        color: {
+          //type: "categorical",
+          scheme: 'viridis',
+          reverse: true,
+          type: 'ordinal',
+          legend: false,
+          tickFormat: by.legendFormat,
+        },
+        x: { domain: by.domain },
+        marks: [
+          //Plot.frame(),
+          Plot.axisX({
+            anchor: 'top',
+            label: null,
+            ticks: by.ticks,
+            tickSize: 12,
+            ...(!bigPlot
+              ? {
+                tickFormat: (...args: unknown[]) => {
+                  const prependedFn = prepend(' ', by.tickFormat as any);
+                  return prependedFn ? prependedFn(args[0] as Date) : String(args[0]);
+                },
                 textAnchor: 'start',
                 tickPadding: -10,
               }
-            : { tickFormat: by.tickFormat }),
-        }),
-        Plot.axisY({
-          label: null,
-          tickFormat: value.tickFormat,
-          tickSize: 12,
-          tickSpacing: 120,
-          //anchor: "right",
-          ...(bigPlot
-            ? {}
-            : {
+              : { tickFormat: (...args: unknown[]) => (by.tickFormat as any)(args[0]) }),
+          }),
+          Plot.axisY({
+            label: null,
+            tickFormat: value.tickFormat,
+            tickSize: 12,
+            tickSpacing: 120,
+            //anchor: "right",
+            ...(bigPlot
+              ? {}
+              : {
                 tickRotate: -90,
-                tickFormat: prepend(' ', value.tickFormat),
+                tickFormat: (...args: unknown[]) => {
+                  const prependedFn = prepend(' ', value.tickFormat as any);
+                  return prependedFn ? prependedFn(args[0] as number) : String(args[0]);
+                },
                 textAnchor: 'start',
                 tickSize: 14,
                 tickPadding: -10,
               }),
-          //tickSpacing: 60,
-        }),
-        //Plot.ruleY([0]),
-        //Plot.ruleX([by.domain[0]]),
-        Plot.ruleY(
-          data,
-          Plot.pointer({
-            px: 'virtualDate',
+            //tickSpacing: 60,
+          }),
+          //Plot.ruleY([0]),
+          //Plot.ruleX([by.domain[0]]),
+          Plot.ruleY(
+            data,
+            Plot.pointer({
+              px: 'virtualDate',
+              y: 'cumsum',
+              stroke: 'by',
+            }),
+          ),
+          Plot.ruleX(
+            data,
+            Plot.pointer({
+              x: 'virtualDate',
+              py: 'cumsum',
+              stroke: 'by',
+            }),
+          ),
+          Plot.gridX({
+            ticks: by.gridTicks,
+          }),
+          Plot.line(data, {
             y: 'cumsum',
-            stroke: 'by',
-          }),
-        ),
-        Plot.ruleX(
-          data,
-          Plot.pointer({
             x: 'virtualDate',
-            py: 'cumsum',
             stroke: 'by',
+            curve: by.curve,
+            opacity: 0.3,
+            strokeWidth: (X: { currentPeriod: number }) =>
+              X.currentPeriod ? 4 : 2,
           }),
-        ),
-        Plot.gridX({
-          ticks: by.gridTicks,
-        }),
-        Plot.line(data, {
-          y: 'cumsum',
-          x: 'virtualDate',
-          stroke: 'by',
-          curve: by.curve,
-          opacity: 0.3,
-          strokeWidth: (X: { currentPeriod: number }) =>
-            X.currentPeriod ? 4 : 2,
-        }),
-        ...(by.dots
-          ? [
+          ...(by.dots
+            ? [
               Plot.dot(data, {
                 y: 'cumsum',
                 x: 'virtualDate',
@@ -278,38 +284,38 @@ export const plot =
                   x.currentPeriod ? 1 : 0.5,
               }),
             ]
-          : []),
-        Plot.dot(
-          data,
-          Plot.pointer({
-            y: 'cumsum',
-            x: 'virtualDate',
-            fill: 'by',
-          }),
-        ),
-        Plot.tip(
-          data,
-          Plot.pointer({
-            y: 'cumsum',
-            x: 'virtualDate',
-            stroke: 'by',
-            channels: {
-              Date: 'start_date_local',
-              Name: 'name',
-              [value.label]: value.fun,
-            },
-            format: {
-              x: false,
-              stroke: false,
-              y: false,
-              [value.label]: value.format,
-              Date: (x: Date) => d3.timeFormat('%Y-%m-%d')(x),
-            },
-          }),
-        ),
-      ],
-    });
-  };
+            : []),
+          Plot.dot(
+            data,
+            Plot.pointer({
+              y: 'cumsum',
+              x: 'virtualDate',
+              fill: 'by',
+            }),
+          ),
+          Plot.tip(
+            data,
+            Plot.pointer({
+              y: 'cumsum',
+              x: 'virtualDate',
+              stroke: 'by',
+              channels: {
+                Date: 'start_date_local',
+                Name: 'name',
+                [value.label]: value.fun,
+              },
+              format: {
+                x: false,
+                stroke: false,
+                y: false,
+                [value.label]: value.format,
+                Date: (x: Date) => d3.timeFormat('%Y-%m-%d')(x),
+              },
+            }),
+          ),
+        ],
+      });
+    };
 
 export const legend = () => (plot: Plot.Plot) => plot.legend('color');
 

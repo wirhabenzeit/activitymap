@@ -183,171 +183,174 @@ export const getter = (setting: TimelineSetting): Spec => ({
 
 export const setter =
   (timeline: TimelineSetting) =>
-  <K extends keyof TimelineSetting>(name: K, value: TimelineSetting[K]) => {
-    if (['value', 'group', 'yScale'].includes(name)) {
-      const newTimeline = { ...timeline, [name]: value };
-      return newTimeline;
-    }
-    if (name === 'averaging') {
-      return {
-        ...timeline,
-        averaging: {
-          value,
-          domain: timeline.averaging.domain,
-        },
-      };
-    }
-    if (name === 'timePeriod') {
-      {
-        const oldDays = settings.timePeriod.options[timeline.timePeriod].days;
-        const newDays =
-          settings.timePeriod.options[
-            value as keyof typeof settings.timePeriod.options
-          ].days;
-        const oldValue = timeline.averaging.value;
-        const newValue = Math.round((oldValue * oldDays) / newDays);
-        const newTimeline = {
-          ...timeline,
-          timePeriod: value,
-          averaging: {
-            value: newValue,
-            domain: [
-              0,
-              settings.timePeriod.options[
-                value as keyof typeof settings.timePeriod.options
-              ].averagingDomain[1],
-            ],
-          },
-        };
+    <K extends keyof TimelineSetting>(name: K, value: TimelineSetting[K]) => {
+      if (['value', 'group', 'yScale'].includes(name)) {
+        const newTimeline = { ...timeline, [name]: value };
         return newTimeline;
       }
-    }
-  };
+      if (name === 'averaging') {
+        return {
+          ...timeline,
+          averaging: {
+            value,
+            domain: timeline.averaging.domain,
+          },
+        };
+      }
+      if (name === 'timePeriod') {
+        {
+          const oldDays = settings.timePeriod.options[timeline.timePeriod].days;
+          const newDays =
+            settings.timePeriod.options[
+              value as keyof typeof settings.timePeriod.options
+            ].days;
+          const oldValue = timeline.averaging.value;
+          const newValue = Math.round((oldValue * oldDays) / newDays);
+          const newTimeline = {
+            ...timeline,
+            timePeriod: value,
+            averaging: {
+              value: newValue,
+              domain: [
+                0,
+                settings.timePeriod.options[
+                  value as keyof typeof settings.timePeriod.options
+                ].averagingDomain[1],
+              ],
+            },
+          };
+          return newTimeline;
+        }
+      }
+    };
 
 export const plot =
   (setting: TimelineSetting) =>
-  ({
-    activities,
-    width,
-    height,
-  }: {
-    activities: Activity[];
-    width: number;
-    height: number;
-  }) => {
-    const timeline = getter(setting);
-
-    const extent = d3.extent(activities, (d) =>
-      timeline.timePeriod.tick(new Date(d.start_date_local)),
-    );
-
-    if (extent[0] == undefined || extent[1] == undefined) return null;
-
-    const groupExtent = Array.from(
-      new Set(
-        activities.map(timeline.group.fun) as Array<
-          keyof typeof categorySettings
-        >,
-      ),
-    );
-
-    const range = timeline.timePeriod.tick.range(
-      extent[0],
-      timeline.timePeriod.tick.ceil(extent[1]),
-    );
-
-    const groups = d3.group(
+    ({
       activities,
-      (d) => timeline.timePeriod.tick(new Date(d.start_date_local)),
-      timeline.group.fun,
-    );
+      width,
+      height,
+    }: {
+      activities: Activity[];
+      width: number;
+      height: number;
+    }) => {
+      const timeline = getter(setting);
 
-    const timeMap = d3.map(range, (date) => {
-      return groupExtent.map((type) => ({
-        date,
-        type,
-        value:
-          groups.get(date)?.get(type) != undefined
-            ? d3.sum(groups.get(date)!.get(type)!, timeline.value.fun)
-            : 0,
-      }));
-    });
+      const extent = d3.extent(activities, (d) =>
+        timeline.timePeriod.tick(new Date(d.start_date_local)),
+      );
 
-    interface Data {
-      date: Date;
-      value: number;
-      type: keyof typeof categorySettings;
-    }
+      if (extent[0] == undefined || extent[1] == undefined) return null;
 
-    const data: Data[] = timeMap
-      .flat()
-      .sort((a, b) => a.date.getTime() - b.date.getTime())
-      .map((d) => ({
-        ...d,
-        [timeline.value.label]: d.value,
-      }));
+      const groupExtent = Array.from(
+        new Set(
+          activities.map(timeline.group.fun) as Array<
+            keyof typeof categorySettings
+          >,
+        ),
+      );
 
-    const map = new d3.InternMap(
-      timeMap.map((arr) => {
-        return [
-          arr[0]!.date,
-          new d3.InternMap(arr.map(({ value, type }) => [type, value])),
-        ];
-      }),
-    );
+      const range = timeline.timePeriod.tick.range(
+        extent[0],
+        timeline.timePeriod.tick.ceil(extent[1]),
+      );
 
-    const bigPlot = width > 500;
+      const groups = d3.group(
+        activities,
+        (d) => timeline.timePeriod.tick(new Date(d.start_date_local)),
+        timeline.group.fun,
+      );
 
-    return Plot.plot({
-      ...commonSettings,
-      ...(bigPlot
-        ? {
+      const timeMap = d3.map(range, (date) => {
+        return groupExtent.map((type) => ({
+          date,
+          type,
+          value:
+            groups.get(date)?.get(type) != undefined
+              ? d3.sum(groups.get(date)!.get(type)!, timeline.value.fun)
+              : 0,
+        }));
+      });
+
+      interface Data {
+        date: Date;
+        value: number;
+        type: keyof typeof categorySettings;
+      }
+
+      const data: Data[] = timeMap
+        .flat()
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+        .map((d) => ({
+          ...d,
+          [timeline.value.label]: d.value,
+        }));
+
+      const map = new d3.InternMap(
+        timeMap.map((arr) => {
+          return [
+            arr[0]!.date,
+            new d3.InternMap(arr.map(({ value, type }) => [type, value])),
+          ];
+        }),
+      );
+
+      const bigPlot = width > 500;
+
+      return Plot.plot({
+        ...commonSettings,
+        ...(bigPlot
+          ? {
             marginLeft: 70,
             marginTop: 50,
             marginRight: 60,
           }
-        : {}),
-      height: Math.max(height, 100),
-      width: Math.max(width, 100),
-      y: { ...timeline.yScale.prop },
-      marks: [
-        Plot.ruleY([0]),
-        Plot.axisY({
-          tickFormat: timeline.value.format,
-          ticks: 6,
-          ...timeline.yScale.prop,
-          label: null,
-          anchor: 'left',
-          tickSize: 12,
-          ...(bigPlot
-            ? {}
-            : {
+          : {}),
+        height: Math.max(height, 100),
+        width: Math.max(width, 100),
+        y: { ...timeline.yScale.prop },
+        marks: [
+          Plot.ruleY([0]),
+          Plot.axisY({
+            tickFormat: timeline.value.format,
+            ticks: 6,
+            ...timeline.yScale.prop,
+            label: null,
+            anchor: 'left',
+            tickSize: 12,
+            ...(bigPlot
+              ? {}
+              : {
                 tickRotate: -90,
-                tickFormat: prepend(' ', timeline.value.format),
+                tickFormat: (...args: unknown[]) => {
+                  const fn = prepend(' ', timeline.value.format as any);
+                  return fn ? fn(args[0]) : String(args[0]);
+                },
                 textAnchor: 'start',
                 tickSize: 14,
                 tickPadding: -10,
               }),
-        }),
-        Plot.gridX({
-          ticks: 'year',
-        }),
-        Plot.axisX({
-          anchor: 'top',
-          label: null,
-          tickSize: 12,
-          ...(!bigPlot
-            ? {
+          }),
+          Plot.gridX({
+            ticks: 'year',
+          }),
+          Plot.axisX({
+            anchor: 'top',
+            label: null,
+            tickSize: 12,
+            ...(!bigPlot
+              ? {
                 textAnchor: 'start',
                 tickPadding: -10,
                 tickFormat: d3.timeFormat(" '%y"),
               }
-            : {}),
-        }),
-        ...[
-          groupExtent.flatMap((type) => [
-            ...(bigPlot
-              ? [
+              : {}),
+          }),
+          ...[
+            groupExtent.flatMap((type) => [
+              ...(bigPlot
+                ? [
                   Plot.text(
                     range,
                     Plot.pointerX({
@@ -363,60 +366,60 @@ export const plot =
                     }),
                   ),
                 ]
-              : []),
-            Plot.dot(
-              range,
-              Plot.pointerX({
-                x: (d: Date) => d,
-                y: (d: Date) => map.get(d)?.get(type),
-                //opacity: 1,
-                fill: timeline.group.color(type),
-              }),
-            ),
-          ]),
-        ],
-        Plot.ruleX(range, Plot.pointerX({})),
-        Plot.lineY(
-          data,
-          Plot.windowY({
-            x: 'date',
-            y: timeline.value.label,
-            k: timeline.averaging + 1,
-            curve: 'monotone-x',
-            reduce: 'mean',
-            stroke: (x: Data) => timeline.group.color(x.type),
-            channels: {
-              Date: (d: Data) =>
-                `${d3.timeFormat(timeline.timePeriod.tickFormat)(
-                  d.date,
-                )} ± ${timeline.averaging} ${timeline.timePeriod.id}s`,
-            },
-            tip: {
+                : []),
+              Plot.dot(
+                range,
+                Plot.pointerX({
+                  x: (d: Date) => d,
+                  y: (d: Date) => map.get(d)?.get(type),
+                  //opacity: 1,
+                  fill: timeline.group.color(type),
+                }),
+              ),
+            ]),
+          ],
+          Plot.ruleX(range, Plot.pointerX({})),
+          Plot.lineY(
+            data,
+            Plot.windowY({
+              x: 'date',
+              y: timeline.value.label,
+              k: timeline.averaging + 1,
+              curve: 'monotone-x',
+              reduce: 'mean',
+              stroke: (x: Data) => timeline.group.color(x.type),
               channels: {
-                Date: 'date',
-                Type: 'type',
+                Date: (d: Data) =>
+                  `${d3.timeFormat(timeline.timePeriod.tickFormat)(
+                    d.date,
+                  )} ± ${timeline.averaging} ${timeline.timePeriod.id}s`,
               },
-              format: {
-                y: timeline.value.format,
-                Type: timeline.group.format,
-                x: false,
-                stroke: false,
-                z: false,
+              tip: {
+                channels: {
+                  Date: 'date',
+                  Type: 'type',
+                },
+                format: {
+                  y: timeline.value.format,
+                  Type: timeline.group.format,
+                  x: false,
+                  stroke: false,
+                  z: false,
+                },
               },
-            },
+            }),
+          ),
+          Plot.areaY(data, {
+            x: 'date',
+            y2: 'value',
+            y1: 0,
+            fill: (x: Data) => timeline.group.color(x.type),
+            opacity: 0.1,
+            curve: 'step',
           }),
-        ),
-        Plot.areaY(data, {
-          x: 'date',
-          y2: 'value',
-          y1: 0,
-          fill: (x: Data) => timeline.group.color(x.type),
-          opacity: 0.1,
-          curve: 'step',
-        }),
-      ],
-    });
-  };
+        ],
+      });
+    };
 
 export const legend = () => () => null;
 
