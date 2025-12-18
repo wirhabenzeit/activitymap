@@ -1,15 +1,15 @@
 'use client';
 
 import { MainNav } from './main-nav';
-import { SidebarTrigger } from './ui/sidebar';
-import { Separator } from './ui/separator';
+import { SidebarTrigger } from '~/components/ui/sidebar';
+import { Separator } from '~/components/ui/separator';
 
 import * as React from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 import { Button } from '~/components/ui/button';
-import { ShareButton } from './Share';
+import { ShareButton } from '../share-button';
 
 export function ModeToggle() {
   const { setTheme, theme } = useTheme();

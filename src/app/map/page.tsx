@@ -35,18 +35,18 @@ const skyLayer: SkyLayer = {
 };
 import { useShallowStore } from '~/store';
 
-import Overlay from '~/components/map/Overlay';
+import Overlay from '~/components/map/overlay';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 import { baseMaps, overlayMaps } from '~/settings/map';
 import { categorySettings } from '~/settings/category';
 
-import { Download } from '~/components/map/DownloadControl';
-import { UploadControl } from '~/components/map/UploadControl';
-import { Selection } from '~/components/map/SelectionControl';
-import { LayerSwitcher } from '~/components/map/LayerSwitcher';
-import PhotoLayer from '~/components/map/Photo';
+import { Download } from '~/components/map/download-control';
+import { UploadControl } from '~/components/map/upload-control';
+import { Selection } from '~/components/map/selection-control';
+import { LayerSwitcher } from '~/components/map/layer-switcher';
+import PhotoLayer from '~/components/map/photo';
 import { cn, groupBy } from '~/lib/utils';
 
 const RouteLayer = React.memo(function RouteLayer() {

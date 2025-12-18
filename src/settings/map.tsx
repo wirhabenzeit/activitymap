@@ -1,6 +1,6 @@
 import { LngLatBounds } from 'mapbox-gl';
 import type React from 'react';
-import GeoJSONComponentOverlay from '~/components/map/GeoJSONComponentOverlay';
+import GeoJSONComponentOverlay from '~/components/map/geojson-component-overlay';
 
 // Base map types
 type RasterBaseMapSetting = {

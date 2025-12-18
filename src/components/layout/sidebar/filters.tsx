@@ -41,7 +41,7 @@ import { useState } from 'react';
 import { cn } from '~/lib/utils';
 
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
-import { Checkbox } from '../ui/checkbox';
+import { Checkbox } from '~/components/ui/checkbox';
 import { type SportType } from '~/server/db/schema';
 
 export function CategoryFilter() {
