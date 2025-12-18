@@ -13,7 +13,7 @@ export function Download() {
 
   const download = () => {
     if (map.current == undefined) return;
-    console.log(map);
+
     const actualPixelRatio = window.devicePixelRatio;
     Object.defineProperty(window, 'devicePixelRatio', {
       get: function () {

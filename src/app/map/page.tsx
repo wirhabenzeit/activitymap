@@ -329,7 +329,7 @@ export default function MapPage() {
             );
           }
         }}
-        projection={'globe' as unknown as mapboxgl.Projection}
+        projection={'globe'}
         mapStyle={
           mapSettingBase?.type === 'vector' ? mapSettingBase.url : undefined
         }
@@ -430,7 +430,7 @@ export default function MapPage() {
       >
         <DataTable
           className="max-h-64"
-          columns={columns as any}
+          columns={columns}
           data={rows}
           selected={selected}
           setSelected={setSelected}

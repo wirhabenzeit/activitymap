@@ -113,94 +113,85 @@ export function mergeAndProcessStravaPhotos(
   // Create maps for faster lookup
   const smallPhotoMap = new Map(smallPhotos.map(p => [p.unique_id, p]));
   const largePhotoMap = new Map(largePhotos.map(p => [p.unique_id, p]));
-  
+
   // Get all unique photo IDs
   const allPhotoIds = Array.from(new Set([
     ...smallPhotos.map(p => p.unique_id),
     ...largePhotos.map(p => p.unique_id)
   ]));
-  
+
   // Merge photos based on ID rather than index
   const mergedPhotos: StravaPhoto[] = [];
-  
+
   for (const photoId of allPhotoIds) {
     const smallPhoto = smallPhotoMap.get(photoId);
     const largePhoto = largePhotoMap.get(photoId);
-    
+
     if (!smallPhoto && !largePhoto) {
-      console.warn(`[DEBUG] Photo ID ${photoId} not found in either small or large photos - this should never happen`);
+
       continue;
     }
-    
+
     // Use large photo as base if available, otherwise use small
     const basePhoto = largePhoto ?? smallPhoto!;
-    
+
     // Special case: Check if the photo is a special size (like 1800)
-    const specialSize = basePhoto.urls && 
-                        basePhoto.urls["256"] === undefined && 
-                        basePhoto.urls["5000"] === undefined;
-                        
+    const specialSize = basePhoto.urls &&
+      basePhoto.urls["256"] === undefined &&
+      basePhoto.urls["5000"] === undefined;
+
     if (specialSize) {
-      console.log(`[DEBUG] Photo ${photoId} has special size:`, {
-        urlKeys: basePhoto.urls ? Object.keys(basePhoto.urls) : [],
-        sizeKeys: basePhoto.sizes ? Object.keys(basePhoto.sizes) : []
-      });
-      
+
+
       // For special size photos, check if this appears to be a placeholder
       // Primary detection: Look for "placeholder" in the URL
       let isPlaceholder = false;
-      
+
       if (basePhoto.urls) {
         // Check all URLs for the word "placeholder"
         for (const url of Object.values(basePhoto.urls)) {
           if (url.includes('placeholder')) {
             isPlaceholder = true;
-            console.log(`[DEBUG] Photo ${photoId} appears to be a placeholder by URL check`);
+
             break;
           }
         }
       }
-      
+
       // Fallback detection: Check for special size pattern
       const urlKeys = basePhoto.urls ? Object.keys(basePhoto.urls) : [];
       if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === "1800") {
         isPlaceholder = true;
-        console.log(`[DEBUG] Photo ${photoId} appears to be a placeholder by size pattern`);
+
       }
-      
+
       if (isPlaceholder) {
         // Skip placeholder images - don't include them in the results
-        console.log(`[PLACEHOLDER] Photo ${photoId} is being filtered out as a placeholder image`);
+
         continue;
       }
     }
-    
+
     // Normal case: Merge small and large photo data
     const merged = {
       ...basePhoto,
-      urls: { 
-        ...(smallPhoto?.urls ?? {}), 
-        ...(largePhoto?.urls ?? {}) 
+      urls: {
+        ...(smallPhoto?.urls ?? {}),
+        ...(largePhoto?.urls ?? {})
       },
-      sizes: { 
-        ...(smallPhoto?.sizes ?? {}), 
-        ...(largePhoto?.sizes ?? {}) 
+      sizes: {
+        ...(smallPhoto?.sizes ?? {}),
+        ...(largePhoto?.sizes ?? {})
       },
     };
-    
+
     if (mergedPhotos.length === 0) {
-      console.log(`[DEBUG] Merged photo sample:`, {
-        id: merged.unique_id,
-        hasUrls: !!merged.urls,
-        hasSizes: !!merged.sizes,
-        urlKeys: merged.urls ? Object.keys(merged.urls) : [],
-        sizeKeys: merged.sizes ? Object.keys(merged.sizes) : []
-      });
+
     }
-    
+
     mergedPhotos.push(merged);
   }
-  
+
   return mergedPhotos;
 }
 
@@ -212,56 +203,50 @@ export function transformStravaPhoto(
   photo: StravaPhoto,
   athlete_id: number
 ): Photo | null {
-  console.log(`[DEBUG] Transforming photo ${photo.unique_id} for activity ${photo.activity_id}`);
-  
+
+
   // Log the input photo data for debugging
-  console.log(`[DEBUG] Input photo:`, {
-    id: photo.unique_id,
-    hasUrls: !!photo.urls,
-    hasSizes: !!photo.sizes,
-    urlKeys: photo.urls ? Object.keys(photo.urls) : [],
-    sizeKeys: photo.sizes ? Object.keys(photo.sizes) : []
-  });
-  
+
+
   // Check if this appears to be a placeholder by looking for "placeholder" in the URL
   let isPlaceholder = false;
-  
+
   if (photo.urls) {
     // Check all URLs for the word "placeholder"
     for (const url of Object.values(photo.urls)) {
       if (url.includes('placeholder')) {
         isPlaceholder = true;
-        console.log(`[PLACEHOLDER] Detected placeholder image for photo ${photo.unique_id} by URL: ${url.substring(0, 50)}...`);
+
         break;
       }
     }
   }
-  
+
   // Fallback check - if it only has size 1800 (for backward compatibility)
   const urlKeys = photo.urls ? Object.keys(photo.urls) : [];
   if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === "1800") {
     isPlaceholder = true;
-    console.log(`[PLACEHOLDER] Detected placeholder image for photo ${photo.unique_id} by size key pattern`);
+
   }
-  
+
   // Skip placeholder images completely
   if (isPlaceholder) {
-    console.log(`[PLACEHOLDER] Photo ${photo.unique_id} is being filtered out as a placeholder image`);
+
     return null;
   }
 
   // Process coordinates if they exist
   let location: number[] | null = null;
-  
+
   if (photo.location) {
     // Validate location data
-    if (Array.isArray(photo.location) && photo.location.length === 2 && 
-        typeof photo.location[0] === 'number' && typeof photo.location[1] === 'number') {
+    if (Array.isArray(photo.location) && photo.location.length === 2 &&
+      typeof photo.location[0] === 'number' && typeof photo.location[1] === 'number') {
       // Strava uses [lat, lng] format - convert to array for db schema
       location = [photo.location[0], photo.location[1]];
-      console.log(`[DEBUG] Photo ${photo.unique_id} has valid coordinates: [${location[0]}, ${location[1]}]`);
+
     } else {
-      console.warn(`[DEBUG] Photo ${photo.unique_id} has invalid location format:`, photo.location);
+
     }
   }
 
@@ -308,14 +293,8 @@ export function transformStravaPhoto(
       }
     }
   }
-    
-  console.log(`[DEBUG] Transformed photo:`, {
-    id: transformedPhoto.unique_id,
-    urlCount: urlKeys.length,
-    primaryUrlSample,
-    hasLocation: !!transformedPhoto.location,
-    isPlaceholder: transformedPhoto.status === 'placeholder'
-  });
+
+
 
   return transformedPhoto;
 }

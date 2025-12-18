@@ -1,8 +1,0 @@
-# Add these lines to your .env file:
-
-# Better Auth Configuration
-BETTER_AUTH_SECRET=evA1k85T3xxXd+ap9K8wHv923lL2OqIKazquwYcEG3I=
-BETTER_AUTH_URL=http://localhost:3000
-
-# Optional: Public app URL for client (if not already set)
-NEXT_PUBLIC_APP_URL=http://localhost:3000

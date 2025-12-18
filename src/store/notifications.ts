@@ -43,7 +43,7 @@ export const createNotificationSlice: StateCreator<
   removeNotification: (id) => {
     set((state) => {
       state.notifications = state.notifications.filter((n) => n.id !== id);
-      console.log('Notifications after removal:', state.notifications);
+
     });
   },
 });

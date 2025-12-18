@@ -44,12 +44,12 @@ export async function syncActivities(
     .from(users)
     .where(isNotNull(users.athlete_id));
 
-  console.log(`Processing ${usersToProcess.length} users for activity updates`);
+
 
   // Process each user
   for (const user of usersToProcess) {
     if (!user.athlete_id) {
-      console.log(`User ${user.id} has no athlete_id, skipping`);
+
       continue;
     }
 
@@ -106,9 +106,7 @@ export async function syncActivities(
         });
 
         if (mostRecentActivity) {
-          console.log(
-            `[User ${user.id}/${athleteId}] Syncing most recent activity: ${mostRecentActivity.id}`,
-          );
+
           await fetchStravaActivities({
             accessToken: account.access_token,
             activityIds: [mostRecentActivity.id],
@@ -117,13 +115,9 @@ export async function syncActivities(
             shouldDeletePhotos: true, // Add this line to replace existing photos
             limit: 2, // Only fetching one activity
           });
-          console.log(
-            `[User ${user.id}/${athleteId}] Successfully updated most recent activity: ${mostRecentActivity.id}`,
-          );
+
         } else {
-          console.log(
-            `[User ${user.id}/${athleteId}] No existing activities found, skipping recent activity sync.`,
-          );
+
         }
       } catch (recentSyncError) {
         console.error(
@@ -211,9 +205,7 @@ export async function syncActivities(
 
     // Check if we've hit the overall activities limit
     if (updatedIncomplete + fetchedOlder >= maxActivities) {
-      console.log(
-        `Reached max activities limit (${maxActivities}), stopping processing`,
-      );
+
       break;
     }
   }
@@ -235,9 +227,7 @@ async function updateIncompleteActivities(
   accessToken: string,
   limit: number,
 ): Promise<number> {
-  console.log(
-    `Updating up to ${limit} incomplete activities for athlete ${athleteId}`,
-  );
+
 
   // Get incomplete activities, prioritizing recent ones
   const incompleteActivities = await db
@@ -250,13 +240,11 @@ async function updateIncompleteActivities(
     .limit(limit);
 
   if (incompleteActivities.length === 0) {
-    console.log(`No incomplete activities found for athlete ${athleteId}`);
+
     return 0;
   }
 
-  console.log(
-    `Found ${incompleteActivities.length} incomplete activities for athlete ${athleteId}`,
-  );
+
 
   try {
     // Extract activity IDs to fetch complete versions
@@ -274,10 +262,7 @@ async function updateIncompleteActivities(
 
     // Delete activities that were not found on Strava
     if (notFoundIds && notFoundIds.length > 0) {
-      console.log(
-        `Deleting ${notFoundIds.length} activities not found on Strava:`,
-        notFoundIds,
-      );
+
       try {
         const deleteResult = await db
           .delete(activities)
@@ -289,10 +274,7 @@ async function updateIncompleteActivities(
           )
           .returning({ deletedId: activities.id }); // Return the IDs deleted
 
-        console.log(
-          `Database delete operation completed. Deleted IDs:`,
-          deleteResult.map((r) => r.deletedId),
-        );
+
         if (deleteResult.length !== notFoundIds.length) {
           console.warn(
             `Mismatch in deleted count. Expected ${notFoundIds.length}, got ${deleteResult.length}`,
@@ -307,9 +289,7 @@ async function updateIncompleteActivities(
       }
     }
 
-    console.log(
-      `Successfully fetched and updated ${updatedActivities.length} out of ${activityIds.length} activities`,
-    );
+
     return updatedActivities.length;
   } catch (error) {
     console.error(
@@ -329,9 +309,7 @@ async function fetchOlderActivities(
   limit: number,
   minActivitiesThreshold: number,
 ): Promise<{ fetched: number; reachedOldest: boolean }> {
-  console.log(
-    `Fetching up to ${limit} older activities for athlete ${athleteId}`,
-  );
+
 
   // Find the oldest activity timestamp
   const oldestActivity = await db
@@ -347,9 +325,6 @@ async function fetchOlderActivities(
       ? Math.floor(new Date(oldestActivity[0].start_date).getTime() / 1000)
       : Math.floor(Date.now() / 1000);
 
-  console.log(
-    `Oldest activity timestamp: ${oldestTimestamp} (${new Date(oldestTimestamp * 1000).toISOString()})`,
-  );
 
   try {
     // Use fetchStravaActivities to get older activities
@@ -361,23 +336,19 @@ async function fetchOlderActivities(
       limit,
     });
 
-    console.log(
-      `Fetched ${olderActivities.length} older activities from Strava`,
-    );
+
 
     // Check if we've reached the oldest activities
     // If number of activities returned is less than threshold, assume we've reached the end
     const reachedOldest = olderActivities.length < minActivitiesThreshold;
 
     if (olderActivities.length === 0) {
-      console.log('No older activities found');
+
       return { fetched: 0, reachedOldest: true };
     }
 
     if (reachedOldest) {
-      console.log(
-        `Number of activities (${olderActivities.length}) below threshold (${minActivitiesThreshold}), reached oldest`,
-      );
+
     }
 
     return {

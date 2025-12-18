@@ -80,7 +80,7 @@ export const createActivitySlice: StateCreator<
 > = (set, get, store) => {
   store.subscribe((state, prevState) => {
     if (state.loading !== prevState.loading) {
-      console.log('Loading state changed:', state.loading);
+
     }
   });
   return {
@@ -174,18 +174,9 @@ export const createActivitySlice: StateCreator<
       }),
 
     loadFromDB: async ({ ids, publicIds, userId }) => {
-      console.log('[loadFromDB] Starting to load activities from DB');
+
       const account = get().account;
-      console.log('Starting loadFromDB:', {
-        ids,
-        publicIds,
-        userId,
-        hasAccount: !!account,
-        accountDetails: account && {
-          userId: account.userId,
-          providerAccountId: account.providerAccountId,
-        },
-      });
+
 
       set((state) => {
         state.loading = true;
@@ -198,16 +189,7 @@ export const createActivitySlice: StateCreator<
           user_id: userId,
         });
 
-        console.log('DB activities fetch result:', {
-          count: activities.length,
-          firstActivity: activities[0]
-            ? {
-              id: activities[0].id,
-              name: activities[0].name,
-              athlete: activities[0].athlete,
-            }
-            : null,
-        });
+
 
         const validActivities = activities.filter(
           (act) => act.map_polyline ?? act.map_summary_polyline,
@@ -228,9 +210,9 @@ export const createActivitySlice: StateCreator<
         // Explicitly update filterIDs
         get().updateFilterIDs();
 
-        console.log('[loadFromDB] Before loadPhotos - photoDict keys:', Object.keys(get().photoDict).length);
+
         await get().loadPhotos();
-        console.log('[loadFromDB] After loadPhotos - photoDict keys:', Object.keys(get().photoDict).length);
+
 
         return activities.length;
       } catch (error) {
@@ -244,26 +226,22 @@ export const createActivitySlice: StateCreator<
     },
 
     loadFromStrava: async ({ photos = false, ids, fetchNewest = false }) => {
-      console.log('[loadFromStrava] Starting to load activities from Strava');
-      console.log(`[loadFromStrava] Loading activities: ${ids ? ids.join(',') : fetchNewest ? 'newest' : 'older'}`);
+
       const account = get().account;
       if (!account) {
         console.error('No account found in store state');
         throw new Error('No account found');
       }
-      console.log('Found account:', {
-        providerAccountId: account.providerAccountId,
-        hasAccessToken: !!account.access_token,
-      });
+
 
       try {
         set((state) => {
           state.loading = true;
-          console.log('Set loading state to true');
+
         });
 
         if (ids) {
-          console.log('Loading specific activities by ID:', ids);
+
           // Case 1: Loading specific activities by ID
           const {
             activities,
@@ -275,16 +253,11 @@ export const createActivitySlice: StateCreator<
             includePhotos: photos,
             athleteId: parseInt(account.providerAccountId),
           });
-          console.log(
-            `Received ${activities.length} activities and ${newPhotos.length} photos from API`,
-          );
+
 
           // If activities were not found, delete them from DB and update local state
           if (notFoundIds && notFoundIds.length > 0) {
-            console.log(
-              'Activities not found on Strava, triggering deletion:',
-              notFoundIds,
-            );
+
             // Call server action to delete from DB (fire-and-forget for now, errors logged server-side)
             const { deletedIds } = await deleteActivitiesInStore(notFoundIds);
 
@@ -299,10 +272,7 @@ export const createActivitySlice: StateCreator<
               state.geoJson.features = state.geoJson.features.filter(
                 (feature) => !deletedIds.includes(feature.id as number),
               );
-              console.log(
-                'Removed not found activities from local state:',
-                deletedIds,
-              );
+
             });
             // Since we handled the state update for deletion, we can return early
             return deletedIds.length; // Indicate how many were removed
@@ -316,13 +286,10 @@ export const createActivitySlice: StateCreator<
           const updatedActivities = activities.filter((act) =>
             existingIds.includes(act.id),
           );
-          console.log('Activity changes:', {
-            new: newActivities.length,
-            updated: updatedActivities.length,
-          });
+
 
           set((state) => {
-            console.log('Updating store state with new data');
+
             // Remove old photos for these activities
             state.photos = state.photos.filter(
               (photo) => !ids.includes(photo.activity_id),
@@ -341,9 +308,7 @@ export const createActivitySlice: StateCreator<
                 activity.is_complete ||
                 !existingActivity.is_complete
               ) {
-                console.log(
-                  `Updating activity ${activity.id} in store (is_complete=${activity.is_complete})`,
-                );
+
                 state.activityDict[activity.id] = activity;
 
                 if (activity.map_polyline || activity.map_summary_polyline) {
@@ -364,9 +329,7 @@ export const createActivitySlice: StateCreator<
                   }
                 }
               } else {
-                console.log(
-                  `Skipping update for complete activity ${activity.id}`,
-                );
+
               }
             });
             if (photos && newPhotos.length > 0) {
@@ -378,14 +341,12 @@ export const createActivitySlice: StateCreator<
                 (p) => !existingPhotoIds.has(p.unique_id),
               );
 
-              console.log(
-                `Adding ${uniqueNewPhotos.length} unique photos to store (filtered from ${newPhotos.length} total)`,
-              );
+
               state.photos = [...state.photos, ...uniqueNewPhotos];
             }
             state.loading = false;
             state.loaded = true;
-            console.log('Store state updated successfully');
+
           });
 
           // Create appropriate notification based on whether activities were new or updated
@@ -406,12 +367,12 @@ export const createActivitySlice: StateCreator<
               message: `${newActivities.length} activities added, ${updatedActivities.length} updated from Strava`,
             });
           }
-          console.log('[loadFromStrava] Before loadPhotos - photoDict keys:', Object.keys(get().photoDict).length);
+
           await get().loadPhotos();
-          console.log('[loadFromStrava] After loadPhotos - photoDict keys:', Object.keys(get().photoDict).length);
+
           return activities.length;
         } else {
-          console.log('Loading activities, fetchNewest:', fetchNewest);
+
 
           let before: number | undefined = undefined;
 
@@ -430,13 +391,9 @@ export const createActivitySlice: StateCreator<
               ? Math.floor(oldestActivity.start_date.getTime() / 1000)
               : Math.floor(Date.now() / 1000);
 
-            console.log('State for fetching older activities:', {
-              hasActivities: activities.length > 0,
-              oldestActivityDate: oldestActivity?.start_date,
-              before,
-            });
+
           } else {
-            console.log('Fetching newest activities (no before parameter)');
+
           }
 
           // Fetch activities with or without the before parameter
@@ -447,12 +404,10 @@ export const createActivitySlice: StateCreator<
             athleteId: parseInt(account.providerAccountId),
           });
 
-          console.log(
-            `Received ${result.activities.length} activities and ${result.photos.length} photos from API`,
-          );
+
 
           set((state) => {
-            console.log('Updating store state with new data');
+
             result.activities.forEach((activity: Activity) => {
               // Check if we already have this activity and it's complete
               const existingActivity = state.activityDict[activity.id];
@@ -466,9 +421,7 @@ export const createActivitySlice: StateCreator<
                 activity.is_complete ||
                 !existingActivity.is_complete
               ) {
-                console.log(
-                  `Updating activity ${activity.id} in store (is_complete=${activity.is_complete})`,
-                );
+
                 state.activityDict[activity.id] = activity;
 
                 if (activity.map_polyline || activity.map_summary_polyline) {
@@ -489,9 +442,7 @@ export const createActivitySlice: StateCreator<
                   }
                 }
               } else {
-                console.log(
-                  `Skipping update for complete activity ${activity.id}`,
-                );
+
               }
             });
             if (photos && result.photos.length > 0) {
@@ -503,14 +454,12 @@ export const createActivitySlice: StateCreator<
                 (p) => !existingPhotoIds.has(p.unique_id),
               );
 
-              console.log(
-                `Adding ${uniqueNewPhotos.length} unique photos to store (filtered from ${result.photos.length} total)`,
-              );
+
               state.photos = [...state.photos, ...uniqueNewPhotos];
             }
             state.loading = false;
             state.loaded = true;
-            console.log('Store state updated successfully');
+
           });
 
           const activityType = fetchNewest ? 'newest' : 'older';
@@ -519,9 +468,9 @@ export const createActivitySlice: StateCreator<
             title: 'Activities loaded',
             message: `Successfully loaded ${result.activities.length} ${activityType} activities from Strava`,
           });
-          console.log('[loadFromStrava] Before loadPhotos - photoDict keys:', Object.keys(get().photoDict).length);
+
           await get().loadPhotos();
-          console.log('[loadFromStrava] After loadPhotos - photoDict keys:', Object.keys(get().photoDict).length);
+
           return result.activities.length;
         }
       } catch (e) {
@@ -529,7 +478,7 @@ export const createActivitySlice: StateCreator<
         set((state) => {
           state.loading = false;
           state.error = e instanceof Error ? e.message : String(e);
-          console.log('Set loading state to false due to error');
+
         });
         // Ensure error is re-thrown or handled if needed by caller
         throw e;

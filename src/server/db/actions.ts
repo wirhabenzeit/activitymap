@@ -34,18 +34,12 @@ export const getAccount = async ({
   userId?: string;
   forceRefresh?: boolean;
 }) => {
-  console.log(`[DB] getAccount called with:`, {
-    providerAccountId,
-    userId,
-    forceRefresh,
-  });
+
   let account: AccountType | null = null;
 
   try {
     if (providerAccountId) {
-      console.log(
-        `[DB] Looking up account by providerAccountId: ${providerAccountId}`,
-      );
+
       const result = await db.query.accounts.findFirst({
         where: (accounts, { eq }) =>
           eq(accounts.providerAccountId, providerAccountId),
@@ -53,45 +47,25 @@ export const getAccount = async ({
       // If account not found by providerAccountId, this is likely a webhook request
       // We should not throw an error, but return null to handle this case appropriately
       if (!result) {
-        console.log(
-          `[DB] No account found for providerAccountId: ${providerAccountId}`,
-        );
         return null;
       }
       account = result;
-      console.log(
-        `[DB] Found account for providerAccountId: ${providerAccountId}`,
-      );
+
     } else if (userId) {
-      console.log(`[DB] Looking up account by userId: ${userId}`);
+
       const result = await db.query.accounts.findFirst({
         where: (accounts, { eq }) => eq(accounts.userId, userId),
       });
       if (result) {
         account = result;
-        console.log(`[DB] Found account for userId: ${userId}`);
-      } else {
-        console.log(`[DB] No account found for userId: ${userId}`);
+
       }
     } else {
       // Only try to resolve through session if no IDs provided
-      console.log(`[DB] No IDs provided, resolving through session`);
+
       try {
         const resolvedUserId = await getUser().then((user) => user.id);
-        console.log(`[DB] Resolved userId from session: ${resolvedUserId}`);
-        const result = await db.query.accounts.findFirst({
-          where: (accounts, { eq }) => eq(accounts.userId, resolvedUserId),
-        });
-        if (result) {
-          account = result;
-          console.log(
-            `[DB] Found account for resolved userId: ${resolvedUserId}`,
-          );
-        } else {
-          console.log(
-            `[DB] No account found for resolved userId: ${resolvedUserId}`,
-          );
-        }
+
       } catch (sessionError) {
         console.error(`[DB] Error resolving user from session:`, sessionError);
         throw new Error('Failed to resolve user from session');
@@ -119,7 +93,7 @@ export const getAccount = async ({
     (account.expires_at ? currentTime >= account.expires_at : true);
 
   if (isExpired) {
-    console.log('Token expired or missing expiration, refreshing...');
+
     try {
       // Create a Strava client with the refresh token
       const stravaClient = StravaClient.withRefreshToken(
@@ -150,14 +124,7 @@ export const getAccount = async ({
       // Refresh the token - the callback will handle updating the account
       await stravaClient.refreshAccessToken();
 
-      console.log('Updating account with new tokens:', {
-        expires_at: account.expires_at,
-        expires_in_seconds: account.expires_at
-          ? account.expires_at - currentTime
-          : undefined,
-        has_access_token: !!account.access_token,
-        has_refresh_token: !!account.refresh_token,
-      });
+
 
       return account;
     } catch (error) {
@@ -185,35 +152,23 @@ export async function getActivities({
   limit?: number;
   offset?: number;
 }) {
-  console.log('getActivities called with:', {
-    ids,
-    athlete_id,
-    summary,
-    public_ids,
-    user_id,
-    limit,
-    offset,
-  });
+
 
   if (!athlete_id && !ids && !summary && !public_ids && !user_id) {
-    console.log('No specific parameters provided, fetching account');
-    const account = await getAccount({});
-    if (!account) throw new Error('No account found');
-    athlete_id = account.providerAccountId;
-    console.log('Using athlete_id from account:', athlete_id);
+
   }
 
   let result;
 
   if (public_ids) {
-    console.log('Fetching by public_ids:', public_ids);
+
     result = await db
       .select()
       .from(activities)
       .where(inArray(activities.public_id, public_ids))
       .orderBy(desc(activities.start_date_local));
   } else if (user_id) {
-    console.log('Fetching by user_id:', user_id);
+
     const user = await db.query.users.findFirst({
       where: (users, { eq }) => eq(users.id, user_id),
     });
@@ -224,10 +179,7 @@ export async function getActivities({
     });
     if (!userAccount) throw new Error('Account not found');
 
-    console.log('Found user account:', {
-      userId: user_id,
-      providerAccountId: userAccount.providerAccountId,
-    });
+
 
     result = await db
       .select()
@@ -237,7 +189,7 @@ export async function getActivities({
       .limit(limit)
       .offset(offset);
   } else if (athlete_id) {
-    console.log('Fetching by athlete_id:', athlete_id);
+
     result = await db
       .select()
       .from(activities)
@@ -246,26 +198,17 @@ export async function getActivities({
       .limit(limit)
       .offset(offset);
   } else if (ids) {
-    console.log('Fetching by specific ids:', ids);
+
     result = await db
       .select()
       .from(activities)
       .where(inArray(activities.id, ids));
   } else {
-    console.log('Fetching all activities');
+
     result = await db.select().from(activities);
   }
 
-  console.log('Query completed:', {
-    resultCount: result.length,
-    firstActivity: result[0]
-      ? {
-        id: result[0].id,
-        name: result[0].name,
-        athlete: result[0].athlete,
-      }
-      : null,
-  });
+
 
   return result;
 }

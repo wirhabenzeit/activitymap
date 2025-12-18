@@ -112,9 +112,9 @@ class MonthLine extends Plot.Mark {
     stroke: "currentColor",
     strokeWidth: 2,
   };
-  stroke: any;
-  strokeWidth: any;
-  data: any;
+  stroke: string;
+  strokeWidth: number;
+  data: any[];
   channels: any;
   constructor(data: any, options: any = {}) {
     super();
@@ -128,11 +128,11 @@ class MonthLine extends Plot.Mark {
     this.stroke = stroke ?? MonthLine.defaults.stroke;
     this.strokeWidth = strokeWidth ?? MonthLine.defaults.strokeWidth;
   }
-  render(index: any, { x, y }: any, { x: X, y: Y }: any, dimensions: any) {
+  render(index: number[], { x, y }: any, { x: X, y: Y }: any, dimensions: any) {
     const { marginTop, marginBottom, height } = dimensions;
     const dx = x.bandwidth(),
       dy = y.bandwidth();
-    return htl.svg`<path fill=none stroke=${(this as any).stroke} stroke-width=${(this as any).strokeWidth
+    return htl.svg`<path fill=none stroke=${this.stroke} stroke-width=${this.strokeWidth
       } stroke-linecap="round" d=${Array.from(
         index,
         (i: any) =>

@@ -93,15 +93,7 @@ export async function fetchStravaActivities({
   shouldDeletePhotos?: boolean;
   limit?: number;
 }): Promise<{ activities: Activity[]; photos: Photo[]; notFoundIds: number[] }> {
-  console.log('Starting fetchStravaActivities:', {
-    has_access_token: !!accessToken,
-    before: before ? new Date(before * 1000).toISOString() : undefined,
-    activity_ids: requestedActivityIds,
-    include_photos: includePhotos,
-    athlete_id: athleteId,
-    should_delete_photos: shouldDeletePhotos,
-    timestamp: new Date().toISOString(),
-  });
+
 
   // Token refresh is now handled outside this function
   const client = StravaClient.withAccessToken(accessToken);
@@ -112,21 +104,12 @@ export async function fetchStravaActivities({
     let stravaActivitiesResult: (StravaActivity | null)[];
 
     if (requestedActivityIds) {
-      console.log('Fetching complete activities by IDs:', {
-        ids: requestedActivityIds,
-        count: requestedActivityIds.length,
-      });
+
       stravaActivitiesResult = await Promise.all(
         requestedActivityIds.map(async (id) => {
           try {
             const activity = await client.getActivity(id);
-            console.log('Successfully fetched activity:', {
-              id: activity.id,
-              name: activity.name,
-              type: activity.sport_type,
-              has_polyline:
-                !!activity.map.polyline || !!activity.map.summary_polyline,
-            });
+
             return activity;
           } catch (error: unknown) {
             let isNotFoundError = false;
@@ -135,7 +118,7 @@ export async function fetchStravaActivities({
               isNotFoundError =
                 apiError.status === 404 &&
                 !!(apiError.message?.includes('Record Not Found') ||
-                    apiError.details?.message?.includes('Record Not Found'));
+                  apiError.details?.message?.includes('Record Not Found'));
             }
 
             if (isNotFoundError) {
@@ -153,17 +136,14 @@ export async function fetchStravaActivities({
       );
       stravaActivitiesResult = stravaActivitiesResult;
     } else if (before) {
-      console.log('Fetching older activities before timestamp:', {
-        before_timestamp: before,
-        limit,
-      });
+
       const summaryActivities = await client.getActivities({
         before,
         per_page: limit,
       });
       stravaActivitiesResult = summaryActivities;
     } else {
-      console.log('Fetching latest summary activities');
+
       const summaryActivities = await client.getActivities({ per_page: limit });
       stravaActivitiesResult = summaryActivities;
     }
@@ -175,7 +155,7 @@ export async function fetchStravaActivities({
     const fetchedActivities: StravaActivity[] = validStravaActivities;
 
     if (!fetchedActivities || fetchedActivities.length === 0) {
-      console.log('No valid activities fetched or found.');
+
       return { activities: [], photos: [], notFoundIds };
     }
 
@@ -185,14 +165,14 @@ export async function fetchStravaActivities({
     });
 
     if (includePhotos && requestedActivityIds) {
-      console.log('Photos requested, processing photos...');
+
       const photoFetchPromises = fetchedActivities.map(async (act) => {
         if (act.map?.polyline || act.map?.summary_polyline) {
           try {
             const activityPhotos: StravaPhoto[] = await client.getActivityPhotos(
               act.id,
             );
-            console.log(`Fetched ${activityPhotos.length} photos for activity ${act.id}`);
+
             return activityPhotos.map((photo) =>
               transformStravaPhoto(photo, athleteId),
             ).filter((photo): photo is Photo => photo !== null); // Filter out nulls
@@ -201,7 +181,7 @@ export async function fetchStravaActivities({
             return []; // Return empty array on error for this activity
           }
         } else {
-          console.log(`Skipping photo fetch for activity ${act.id} due to missing map data.`);
+
           return [];
         }
       });
@@ -212,17 +192,15 @@ export async function fetchStravaActivities({
       if (shouldDeletePhotos && photos.length > 0) {
         const activityIdsWithPhotos = fetchedActivities.map((act) => act.id);
         if (activityIdsWithPhotos.length > 0) {
-          console.log(
-            `Deleting existing photos for ${activityIdsWithPhotos.length} activities before inserting new ones.`,
-          );
+
           await db
             .delete(photosSchema)
             .where(inArray(photosSchema.activity_id, activityIdsWithPhotos));
         }
       }
-      console.log(`Total ${photos.length} photos processed.`);
+
     } else if (includePhotos) {
-      console.log('Photo fetch skipped: Photos only fetched when specific activity IDs are provided.');
+
     }
 
     const dbActivities = activitiesToProcess.map((act) => ({
@@ -246,12 +224,12 @@ export async function fetchStravaActivities({
       ? dbActivities.filter((a) => existingActivityIds.has(a.id))
       : [];
 
-    console.log(`Found ${existingActivityIds.size} existing activities, ${newActivities.length} new activities`);
+
 
     let savedActivities: Activity[] = [];
 
     if (newActivities.length > 0) {
-      console.log('Inserting new activities into database...');
+
       const insertResult = await db
         .insert(activitySchema)
         .values(newActivities)
@@ -261,7 +239,7 @@ export async function fetchStravaActivities({
     }
 
     if (activitiesToUpdate.length > 0) {
-      console.log('Updating existing activities in database...');
+
       const updatePromises = activitiesToUpdate.map(async (activity) => {
         const updateData: Partial<Activity> = {};
 
@@ -302,10 +280,10 @@ export async function fetchStravaActivities({
       savedActivities.push(...updateResults.filter((res): res is Activity => res !== null));
     }
 
-    console.log(`Upserted/Updated ${savedActivities.length} activities into the database`);
+
 
     if (photos.length > 0) {
-      console.log('Checking for existing photos before insert...');
+
       const photoIds: string[] = photos.map((p) => p.unique_id).filter((id): id is string => !!id);
       let existingPhotos: { uniqueId: string | null }[] = [];
       if (photoIds.length > 0) {
@@ -318,18 +296,18 @@ export async function fetchStravaActivities({
       const existingPhotoIds = new Set(existingPhotos.map((p) => p.uniqueId));
       const newPhotos = photos.filter((p) => p.unique_id && !existingPhotoIds.has(p.unique_id));
 
-      console.log(`Found ${existingPhotoIds.size} existing photos, ${newPhotos.length} new photos`);
+
 
       if (newPhotos.length > 0) {
-        console.log('Inserting new photos into database...');
+
         await db
           .insert(photosSchema)
           .values(newPhotos)
           .onConflictDoNothing();
       } else {
-        console.log('No new photos to insert');
+
       }
-      console.log('Photos insert complete');
+
     }
 
     return { activities: savedActivities, photos, notFoundIds };
@@ -358,7 +336,7 @@ export async function deleteActivities(activityIds: number[]): Promise<{
     }
     const athleteId = parseInt(account.providerAccountId);
 
-    console.log(`Attempting to delete ${activityIds.length} activities for athlete ${athleteId}:`, activityIds);
+
 
     // Perform the deletion
     const deleteResult = await db
@@ -372,7 +350,7 @@ export async function deleteActivities(activityIds: number[]): Promise<{
       .returning({ deletedId: activitySchema.id });
 
     deletedCount = deleteResult.length;
-    console.log(`Successfully deleted ${deletedCount} activities from database:`, deleteResult.map(r => r.deletedId));
+
 
     // Check if any requested IDs were not deleted (e.g., didn't belong to the user)
     if (deletedCount < activityIds.length) {
@@ -407,7 +385,7 @@ export async function checkWebhookStatus() {
 
   try {
     const stravaSubscriptions = await client.getSubscriptions();
-    console.log('Current Strava subscriptions:', stravaSubscriptions);
+
 
     const matchingSubscription = stravaSubscriptions.find(
       (sub) => sub.callback_url === expectedUrl,
@@ -416,7 +394,7 @@ export async function checkWebhookStatus() {
     let databaseStatus = 'no_matching_subscription';
 
     if (matchingSubscription) {
-      console.log('Found matching subscription:', matchingSubscription);
+
 
       await db
         .insert(webhooks)
@@ -474,12 +452,7 @@ export async function createWebhookSubscription() {
     throw new Error('STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set');
   }
 
-  console.log('Creating Strava webhook subscription with:', {
-    endpoint: '/push_subscriptions',
-    client_id: process.env.STRAVA_CLIENT_ID,
-    callback_url: callbackUrl,
-    verify_token: '***********',
-  });
+
 
   const client = StravaClient.withoutAuth();
 
@@ -491,7 +464,7 @@ export async function createWebhookSubscription() {
     );
 
     if (existingSubscription) {
-      console.log('Subscription already exists:', existingSubscription);
+
 
       await db
         .insert(stravaWebhooks)
@@ -517,7 +490,7 @@ export async function createWebhookSubscription() {
     }
 
     const subscription = await client.createSubscription(callbackUrl, verifyToken);
-    console.log('Created Strava webhook subscription:', subscription);
+
 
     await db
       .insert(stravaWebhooks)

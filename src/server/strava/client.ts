@@ -63,12 +63,7 @@ export class StravaClient {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
 
-    console.log('StravaClient initialized:', {
-      hasAccessToken: !!this.accessToken,
-      hasRefreshToken: !!this.refreshToken,
-      hasClientCredentials: !!(this.clientId && this.clientSecret),
-      accessTokenLength: this.accessToken ? this.accessToken.length : 0,
-    });
+
   }
 
   /**
@@ -119,7 +114,7 @@ export class StravaClient {
       throw new Error('No refresh token available');
     }
 
-    console.log('Refreshing access token...');
+
 
     try {
       const response = await fetch(STRAVA_TOKEN_URL, {
@@ -136,16 +131,7 @@ export class StravaClient {
       });
 
       const tokens = (await response.json()) as StravaTokens;
-      console.log('Token refresh response:', {
-        status: response.status,
-        ok: response.ok,
-        tokens: {
-          expires_in: tokens.expires_in,
-          expires_at: tokens.expires_at,
-          has_access_token: !!tokens.access_token,
-          has_refresh_token: !!tokens.refresh_token,
-        },
-      });
+
 
       if (!response.ok) {
         throw new Error(`Failed to refresh access token: ${response.status}`);
@@ -208,19 +194,12 @@ export class StravaClient {
       }
     }
 
-    console.log('Making Strava API request:', {
-      endpoint,
-      method: options.method ?? 'GET',
-      hasAuthToken: !!authHeader,
-      isWebhookEndpoint,
-      retryCount,
-      bodyType: options.body instanceof FormData ? 'FormData' : typeof options.body,
-    });
+
 
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
-    
+
     // Only set Content-Type to application/json if we're not sending FormData
     // FormData will automatically set the correct Content-Type with boundary
     if (!(options.body instanceof FormData)) {
@@ -237,12 +216,7 @@ export class StravaClient {
       headers,
     });
 
-    console.log('Strava API response:', {
-      status: response.status,
-      ok: response.ok,
-      statusText: response.statusText,
-      contentType: response.headers.get('content-type'),
-    });
+
 
     if (!response.ok) {
       const contentType = response.headers.get('content-type');
@@ -273,7 +247,7 @@ export class StravaClient {
       if (errorDetails.errors) {
         console.error('Strava API error details:', JSON.stringify(errorDetails.errors, null, 2));
       }
-      
+
       console.error('Strava API error:', {
         message: errorMessage,
         status: response.status,
@@ -284,8 +258,8 @@ export class StravaClient {
         method: options.method ?? 'GET',
         bodyType: options.body instanceof FormData ? 'FormData' : typeof options.body,
         // If it's FormData, log the keys (but not values for security)
-        formDataKeys: options.body instanceof FormData 
-          ? Array.from(options.body.keys()) 
+        formDataKeys: options.body instanceof FormData
+          ? Array.from(options.body.keys())
           : undefined,
       });
 
@@ -349,7 +323,7 @@ export class StravaClient {
   }
 
   async getActivityPhotos(id: number): Promise<StravaPhoto[]> {
-    console.log(`[DEBUG] Fetching photos for activity ${id}`);
+
 
     try {
       const [smallPhotos, largePhotos] = await Promise.all([
@@ -361,9 +335,7 @@ export class StravaClient {
         ),
       ]);
 
-      console.log(
-        `[DEBUG] Raw photo data: small=${smallPhotos.length}, large=${largePhotos.length}`,
-      );
+
 
       // Check for mismatches in photo counts
       if (smallPhotos.length !== largePhotos.length) {
@@ -378,9 +350,7 @@ export class StravaClient {
         largePhotos,
       );
 
-      console.log(
-        `[DEBUG] Returning ${mergedPhotos.length} merged photos for activity ${id}`,
-      );
+
       return mergedPhotos;
     } catch (error) {
       console.error(`[DEBUG] Error fetching photos for activity ${id}:`, error);
@@ -397,8 +367,8 @@ export class StravaClient {
     const subscriptions = await this.request<StravaSubscription[]>(
       `/push_subscriptions?${searchParams}`,
     );
-    
-    console.log('Current Strava subscriptions:', JSON.stringify(subscriptions, null, 2));
+
+
     return subscriptions;
   }
 
@@ -412,16 +382,10 @@ export class StravaClient {
     formData.append('client_secret', this.clientSecret);
     formData.append('callback_url', callbackUrl);
     formData.append('verify_token', verifyToken);
-    
+
     // Log the request details
-    console.log('Creating Strava webhook subscription with:', {
-      endpoint: '/push_subscriptions',
-      client_id: this.clientId,
-      callback_url: callbackUrl,
-      verify_token: verifyToken,
-      // Don't log the client secret
-    });
-    
+
+
     return this.request<StravaSubscription>('/push_subscriptions', {
       method: 'POST',
       body: formData,

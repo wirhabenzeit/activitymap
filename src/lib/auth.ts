@@ -72,7 +72,7 @@ export const auth = betterAuth({
                             .set({ athlete_id: athleteId })
                             .where(eq(users.id, session.user.id));
 
-                        console.log(`[Better Auth] Updated athlete_id ${athleteId} for user ${session.user.id}`);
+
                     } catch (error) {
                         console.error("[Better Auth] Error updating athlete_id:", error);
                     }

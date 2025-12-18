@@ -267,7 +267,7 @@ export function MonthPicker() {
         <PopoverContent className="w-auto p-0">
           <MonthRangePicker
             onMonthRangeSelect={(range) => {
-              console.log(range);
+
               setDates(range);
             }}
             selectedMonthRange={dates}

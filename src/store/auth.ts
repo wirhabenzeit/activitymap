@@ -53,7 +53,7 @@ export const createAuthSlice: StateCreator<
 
   // Actions
   initializeAuth: (auth) => {
-    console.log('Initializing auth with:', auth);
+
     set((state) => {
       if (auth.guestMode) {
         state.isGuest = true;
@@ -69,13 +69,7 @@ export const createAuthSlice: StateCreator<
       }
       state.isInitialized = true;
 
-      console.log('Auth state after initialization:', {
-        isGuest: state.isGuest,
-        guestMode: state.guestMode,
-        user: state.user,
-        account: state.account,
-        isInitialized: state.isInitialized,
-      });
+
     });
   },
 });

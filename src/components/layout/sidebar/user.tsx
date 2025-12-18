@@ -54,7 +54,7 @@ export function UserSettings() {
   const handleCreateWebhook = async () => {
     try {
       const result = await createWebhookSubscription();
-      console.log('Webhook creation result:', result);
+
 
       // Display the result in a toast notification
       toast({
@@ -95,13 +95,7 @@ export function UserSettings() {
   const handleWebhookStatus = async () => {
     try {
       const result = await checkWebhookStatus();
-      console.log('Webhook status:', {
-        expectedUrl: result.expectedUrl,
-        hasMatchingSubscription: result.hasMatchingSubscription,
-        databaseStatus: result.databaseStatus,
-        matchingSubscription: result.matchingSubscription,
-        subscriptions: result.subscriptions,
-      });
+
 
       // Display the result in a toast notification
       toast({
@@ -146,15 +140,9 @@ export function UserSettings() {
 
   const handleLoadNewestActivities = async () => {
     try {
-      console.log(
-        'Starting load newest activities, current loading state:',
-        loading,
-      );
+
       await loadFromStrava({ photos: true, fetchNewest: true });
-      console.log(
-        'Finished load newest activities, current loading state:',
-        loading,
-      );
+
     } catch (error) {
       console.error(error);
     }
@@ -162,15 +150,9 @@ export function UserSettings() {
 
   const handleLoadOlderActivities = async () => {
     try {
-      console.log(
-        'Starting load older activities, current loading state:',
-        loading,
-      );
+
       await loadFromStrava({ photos: true, fetchNewest: false });
-      console.log(
-        'Finished load older activities, current loading state:',
-        loading,
-      );
+
     } catch (error) {
       console.error(error);
     }

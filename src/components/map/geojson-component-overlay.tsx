@@ -28,16 +28,14 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
   onAdd(map: mapboxgl.Map) {
     this.map = map;
     this.map.on('click', this.click);
-    console.log(`GeoJSON interaction control added for layer: ${this.layerId}`);
+
     return this.container;
   }
 
   onRemove() {
     if (this.map) {
       this.map.off('click', this.click);
-      console.log(
-        `GeoJSON interaction control removed for layer: ${this.layerId}`,
-      );
+
     }
   }
 
@@ -62,7 +60,7 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
     ) {
       // Pass the first feature's properties and the event to the callback
       this.onFeatureClick(selectedFeatures[0].properties, e);
-      console.log('GeoJSON feature clicked:', selectedFeatures[0].properties);
+
     }
   };
 }
@@ -96,7 +94,7 @@ export const GeoJSONComponentOverlay: React.FC<
     const [selectedFeature, setSelectedFeature] = useState<GeoJsonProperties | null>(null);
 
     const onFeatureClick = (feature: GeoJsonProperties, event: MapMouseEvent) => {
-      console.log('GeoJSON feature clicked:', feature);
+
       setSelectedFeature(feature);
     };
 
@@ -109,18 +107,11 @@ export const GeoJSONComponentOverlay: React.FC<
     );
 
     // Log when interactivity is enabled
-    useEffect(() => {
-      if (interactive) {
-        console.log(`Interactive GeoJSON overlay ${id} is enabled`);
-      }
-    }, [id, interactive]);
+
 
     // Log when component mounts/unmounts
     useEffect(() => {
-      console.log(`GeoJSON overlay component ${id} mounted`);
-      return () => {
-        console.log(`GeoJSON overlay component ${id} unmounted`);
-      };
+
     }, [id]);
 
     // Fetch GeoJSON data if URL is provided
@@ -132,7 +123,7 @@ export const GeoJSONComponentOverlay: React.FC<
         // Handle both absolute URLs and relative paths
         // For relative paths, ensure they're properly resolved
         const url = data.startsWith('http') ? data : data;
-        console.log(`Fetching GeoJSON from: ${url}`);
+
 
         // Use fetch with appropriate cache settings
         fetch(url, { cache: 'no-cache' })
@@ -143,7 +134,7 @@ export const GeoJSONComponentOverlay: React.FC<
             return response.json();
           })
           .then((jsonData: FeatureCollection) => {
-            console.log('GeoJSON data loaded successfully');
+
             setGeoJSONData(jsonData);
             setIsLoading(false);
           })
@@ -159,15 +150,10 @@ export const GeoJSONComponentOverlay: React.FC<
     }, [data]);
 
     // Add debugging for the render phase
-    useEffect(() => {
-      if (geoJSONData) {
-        console.log(`Rendering GeoJSON overlay with ID: ${id}`);
-        console.log('GeoJSON features count:', geoJSONData.features?.length ?? 0);
-      }
-    }, [id, geoJSONData]);
+
 
     if (isLoading) {
-      console.log(`Loading GeoJSON data for ${id}...`);
+
       return null;
     }
 

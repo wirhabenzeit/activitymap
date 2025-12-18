@@ -51,10 +51,7 @@ export default async function RootLayout({
     initialAuth.session = session;
     initialAuth.user = user ?? null;
     initialAuth.account = account ?? null;
-    console.log('Authenticated session initialized:', {
-      hasUser: !!user,
-      hasAccount: !!account,
-    });
+
   }
 
   return (

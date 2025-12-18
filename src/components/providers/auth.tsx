@@ -45,32 +45,24 @@ export function AuthProvider({
           userId: userParam ?? undefined,
           activityIds: activitiesParam
             ? activitiesParam
-                .split(',')
-                .map(Number)
-                .filter((id) => !isNaN(id))
+              .split(',')
+              .map(Number)
+              .filter((id) => !isNaN(id))
             : undefined,
         } as const;
 
-        console.log('Initializing guest mode from URL params:', guestMode);
+
         initialAuth.guestMode = guestMode;
       }
 
-      console.log('Auth initialization debug:', {
-        hasSession: !!initialAuth.session,
-        hasGuestMode: !!initialAuth.guestMode,
-        guestModeType: initialAuth.guestMode?.type,
-        initialAuthUser: initialAuth.user,
-        initialAuthAccount: initialAuth.account,
-        currentUser: user,
-        currentAccount: account,
-      });
+
 
       // Initialize the auth state
       initializeAuth(initialAuth);
 
       // Load data based on mode
       if (initialAuth.guestMode) {
-        console.log('Loading guest mode data:', initialAuth.guestMode);
+
         if (
           initialAuth.guestMode.type === 'activities' &&
           initialAuth.guestMode.activityIds
@@ -103,7 +95,7 @@ export function AuthProvider({
         }
       } else if (initialAuth.session) {
         // Normal auth flow - load from DB initially
-        console.log('Starting normal auth flow DB load');
+
         loadFromDBBatched({ userId: user?.id }).catch((error) => {
           console.error('Error loading from DB:', error);
           addNotification({
