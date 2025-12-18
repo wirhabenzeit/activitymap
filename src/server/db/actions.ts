@@ -65,6 +65,12 @@ export const getAccount = async ({
 
       try {
         const resolvedUserId = await getUser().then((user) => user.id);
+        const result = await db.query.accounts.findFirst({
+          where: (accounts, { eq }) => eq(accounts.userId, resolvedUserId),
+        });
+        if (result) {
+          account = result;
+        }
 
       } catch (sessionError) {
         console.error(`[DB] Error resolving user from session:`, sessionError);
@@ -155,7 +161,9 @@ export async function getActivities({
 
 
   if (!athlete_id && !ids && !summary && !public_ids && !user_id) {
-
+    const account = await getAccount({});
+    if (!account) throw new Error('No account found');
+    athlete_id = account.providerAccountId;
   }
 
   let result;
