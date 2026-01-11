@@ -39,7 +39,7 @@ import { env } from '~/env';
 import { useToast } from '~/hooks/use-toast';
 import { useActivities } from '~/hooks/use-activities';
 
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useIsFetching } from '@tanstack/react-query';
 import { fetchStravaActivities } from '~/server/strava/actions';
 
 export function UserSettings() {
@@ -55,6 +55,7 @@ export function UserSettings() {
 
   const [loading, setLoading] = React.useState(false);
   const queryClient = useQueryClient();
+  const isFetchingActivities = useIsFetching({ queryKey: ['activities'] }) > 0;
   const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
   const { toast } = useToast();
 
@@ -239,7 +240,7 @@ export function UserSettings() {
                     className={cn(
                       'absolute inset-0 m-auto size-8 text-white animate-spin',
                       {
-                        hidden: !loading,
+                        hidden: !loading && !isFetchingActivities,
                       },
                     )}
                   />
@@ -287,10 +288,10 @@ export function UserSettings() {
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger
-                disabled={loading}
+                disabled={loading || isFetchingActivities}
                 className="cursor-pointer gap-2"
               >
-                {loading ? (
+                {loading || isFetchingActivities ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <CircleArrowLeft className="mr-2 h-4 w-4" />
@@ -301,14 +302,14 @@ export function UserSettings() {
                 <DropdownMenuSubContent className="w-56 rounded-lg">
                   <DropdownMenuItem
                     onClick={handleLoadNewestActivities}
-                    disabled={loading}
+                    disabled={loading || isFetchingActivities}
                     className="cursor-pointer"
                   >
                     Get Newest Activities
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleLoadOlderActivities}
-                    disabled={loading}
+                    disabled={loading || isFetchingActivities}
                     className="cursor-pointer"
                   >
                     Get Older Activities
