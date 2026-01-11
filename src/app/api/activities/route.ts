@@ -1,4 +1,4 @@
-import { getActivities } from '~/server/db/actions';
+import { getActivitiesByIds } from '~/server/db/actions';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -10,9 +10,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const activities = await getActivities({
-      ids: ids.split(',').map(Number),
-    });
+    const activities = await getActivitiesByIds(ids.split(',').map(Number));
 
     return NextResponse.json(
       activities.map((activity) => ({

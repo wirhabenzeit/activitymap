@@ -37,17 +37,24 @@ import {
 } from '~/server/strava/actions';
 import { env } from '~/env';
 import { useToast } from '~/hooks/use-toast';
+import { useActivities } from '~/hooks/use-activities';
+
+import { useQueryClient } from '@tanstack/react-query';
+import { fetchStravaActivities } from '~/server/strava/actions';
 
 export function UserSettings() {
-  const { user, loading, loadFromStrava, isInitialized } = useShallowStore(
+  const { user, account, isInitialized } = useShallowStore(
     (state) => ({
       user: state.user,
-      loading: state.loading,
-      loadFromStrava: state.loadFromStrava,
+      account: state.account,
       isInitialized: state.isInitialized,
     }),
   );
 
+  const { data: activities = [] } = useActivities();
+
+  const [loading, setLoading] = React.useState(false);
+  const queryClient = useQueryClient();
   const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
   const { toast } = useToast();
 
@@ -139,22 +146,72 @@ export function UserSettings() {
   };
 
   const handleLoadNewestActivities = async () => {
+    if (!account) return;
+    setLoading(true);
     try {
+      const result = await fetchStravaActivities({
+        accessToken: account.access_token!,
+        athleteId: parseInt(account.providerAccountId),
+        includePhotos: true,
+      });
 
-      await loadFromStrava({ photos: true, fetchNewest: true });
+      await queryClient.invalidateQueries({ queryKey: ['activities'] });
+      await queryClient.invalidateQueries({ queryKey: ['photos'] });
 
+      toast({
+        title: 'Activities Loaded',
+        description: `Successfully loaded ${result.activities.length} new activities.`,
+      });
     } catch (error) {
       console.error(error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load newest activities.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleLoadOlderActivities = async () => {
+    if (!account) return;
+    setLoading(true);
     try {
+      // Find the oldest activity date to fetch before it
+      let beforeTimestamp: number | undefined;
+      if (activities.length > 0) {
+        const oldestDate = activities.reduce((min, act) => {
+          const actDate = new Date(act.start_date).getTime();
+          return actDate < min ? actDate : min;
+        }, Date.now());
+        beforeTimestamp = Math.floor(oldestDate / 1000);
+      }
 
-      await loadFromStrava({ photos: true, fetchNewest: false });
+      const result = await fetchStravaActivities({
+        accessToken: account.access_token!,
+        athleteId: parseInt(account.providerAccountId),
+        includePhotos: true,
+        before: beforeTimestamp,
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ['activities'] });
+      await queryClient.invalidateQueries({ queryKey: ['photos'] });
+
+      toast({
+        title: 'Activities Loaded',
+        description: `Successfully loaded ${result.activities.length} older activities.`,
+      });
 
     } catch (error) {
       console.error(error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load older activities.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -79,20 +79,28 @@ export function DescriptionCard({ row }: { row: Row<Activity> }) {
   );
 }
 
+import { usePhotos } from '~/hooks/use-photos';
+import { useQueryClient } from '@tanstack/react-query';
+import { fetchStravaActivities } from '~/server/strava/actions';
+import { useToast } from '~/hooks/use-toast';
+
 export function ActivityCardContent({ row }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
-  const { loadFromStrava, loading, isGuest, photoDict } = useShallowStore((state) => ({
-    loadFromStrava: state.loadFromStrava,
-    loading: state.loading,
+  const [loading, setLoading] = useState(false);
+  const { isGuest, account } = useShallowStore((state) => ({
     isGuest: state.isGuest,
-    photoDict: state.photoDict,
+    account: state.account,
   }));
+  const { data: allPhotos = [] } = usePhotos();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
   const activityId = row.original.id;
 
-  const photos = Object.values(photoDict).filter(
+  const photos = allPhotos.filter(
     (p) => p.activity_id === activityId,
   );
 
@@ -124,24 +132,50 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
     },
     ...(row.getValue('average_heartrate')
       ? [
-          {
-            icon: Heart,
-            description: `${formattedValue('average_heartrate', row)} (avg), ${formattedValue('max_heartrate', row)} (max)`,
-          },
-        ]
+        {
+          icon: Heart,
+          description: `${formattedValue('average_heartrate', row)} (avg), ${formattedValue('max_heartrate', row)} (max)`,
+        },
+      ]
       : []),
     ...(row.getValue('weighted_average_watts')
       ? [
-          {
-            icon: Zap,
-            description: `${formattedValue('weighted_average_watts', row)} (norm), ${formattedValue('average_watts', row)} (avg), ${formattedValue('max_watts', row)} (max)`,
-          },
-        ]
+        {
+          icon: Zap,
+          description: `${formattedValue('weighted_average_watts', row)} (norm), ${formattedValue('average_watts', row)} (avg), ${formattedValue('max_watts', row)} (max)`,
+        },
+      ]
       : []),
   ];
 
   const handleRefresh = async () => {
-    await loadFromStrava({ photos: true, ids: [row.original.id] });
+    if (!account) return;
+    setLoading(true);
+    try {
+      await fetchStravaActivities({
+        accessToken: account.access_token!,
+        athleteId: parseInt(account.providerAccountId),
+        activityIds: [row.original.id],
+        includePhotos: true,
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ['activities'] });
+      await queryClient.invalidateQueries({ queryKey: ['photos'] });
+
+      toast({
+        title: 'Activity Refreshed',
+        description: 'Successfully refreshed activity data from Strava.',
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh activity.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDownloadGpx = () => {
@@ -168,13 +202,13 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
 
     // Convert to GPX with metadata
     const options: { metadata: { name: string; time: string; desc?: string } } =
-      {
-        metadata: {
-          name: String(row.getValue('name')),
-          time: row.original.start_date.toISOString(),
-          desc: row.original.description ?? undefined,
-        },
-      };
+    {
+      metadata: {
+        name: String(row.getValue('name')),
+        time: row.original.start_date.toISOString(),
+        desc: row.original.description ?? undefined,
+      },
+    };
 
     const gpx = GeoJsonToGpx(geojson, options);
     const gpxString = new XMLSerializer().serializeToString(gpx);
@@ -298,7 +332,7 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
         [bbox[0], bbox[1]] as [number, number],
         [bbox[2], bbox[3]] as [number, number],
       );
-      
+
       // Create a viewport state centered on the bounds
       const center = bounds.getCenter();
       const viewState = {
@@ -309,12 +343,12 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
         pitch: 0,
         padding: { top: 0, bottom: 0, left: 0, right: 0 }
       };
-      
+
       // Set the position in the store
       setPosition(viewState, bounds);
       setSelected((selected) => selected.includes(row.original.id) ? selected : [...selected, row.original.id]);
       setHighlighted(row.original.id);
-      
+
       // Navigate to the map page
       router.push('/map');
     }

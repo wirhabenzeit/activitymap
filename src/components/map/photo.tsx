@@ -3,12 +3,16 @@ import { useShallowStore } from '~/store';
 import { Avatar, AvatarImage } from '../ui/avatar';
 import { useMemo, useState } from 'react';
 
+import { usePhotos } from '~/hooks/use-photos';
+import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+
 export default function PhotoLayer() {
-  const { photos, position, filterIDs } = useShallowStore((state) => ({
-    photos: state.photos,
+  const { position } = useShallowStore((state) => ({
     position: state.position,
-    filterIDs: state.filterIDs,
   }));
+
+  const { data: photos = [] } = usePhotos();
+  const { filterIDs } = useFilteredActivities();
 
   const displayPhotos = useMemo(() => {
     return photos.filter((photo) => {

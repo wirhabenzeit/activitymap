@@ -56,6 +56,11 @@ type ActivityTypeInfo = {
   group: string;
 };
 
+import { updateActivity } from '~/server/strava/actions';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '~/hooks/use-toast';
+import { useState } from 'react';
+
 export function ProfileForm({
   row,
   setOpen,
@@ -63,10 +68,13 @@ export function ProfileForm({
   row: Row<Activity>;
   setOpen?: (open: boolean) => void;
 }) {
-  const [updateActivity, loading] = useShallowStore((state) => [
-    state.updateActivity,
-    state.loading,
-  ]);
+  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  // We removed updateActivity from the store, so no need to select it
+  const { account } = useShallowStore((state) => ({
+    account: state.account,
+  }));
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -78,15 +86,40 @@ export function ProfileForm({
   });
 
   async function onSubmit(values: FormValues) {
-    const activityUpdate: UpdatableActivity = {
-      name: values.name,
-      sport_type: values.sportType,
-      id: row.original.id,
-      athlete: row.original.athlete,
-      ...(values.description && { description: values.description }),
-    };
-    await updateActivity(activityUpdate);
-    setOpen?.(false);
+    if (!account) return;
+    setLoading(true);
+    try {
+      const activityUpdate: UpdatableActivity = {
+        name: values.name,
+        sport_type: values.sportType,
+        id: row.original.id,
+        athlete: row.original.athlete,
+        ...(values.description && { description: values.description }),
+      };
+
+      await updateActivity(activityUpdate, {
+        access_token: account.access_token!,
+        providerAccountId: account.providerAccountId,
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ['activities'] });
+
+      toast({
+        title: 'Activity Updated',
+        description: 'Changes have been saved to Strava and local database.',
+      });
+
+      setOpen?.(false);
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update activity.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   const activtyTypes = sportType.enumValues
