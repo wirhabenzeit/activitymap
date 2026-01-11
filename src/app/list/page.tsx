@@ -6,16 +6,21 @@ import { DataTable } from '../../components/list/data-table';
 import { groupBy } from '~/lib/utils';
 import { useShallowStore } from '~/store';
 
+import { useActivities } from '~/hooks/use-activities';
+import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+import { usePhotos } from '~/hooks/use-photos';
+
 export default function ListPage() {
-  const { selected, setSelected, activityDict, filterIDs, tableState, photos } =
+  const { selected, setSelected, tableState } =
     useShallowStore((state) => ({
       selected: state.selected,
       setSelected: state.setSelected,
-      activityDict: state.activityDict,
-      filterIDs: state.filterIDs,
       tableState: state.fullList,
-      photos: state.photos,
     }));
+
+  const { data: activities = [] } = useActivities();
+  const { data: photos = [] } = usePhotos();
+  const { filterIDs } = useFilteredActivities();
 
   const columnFilters = [{ id: 'id', value: filterIDs }];
   const photoDict = React.useMemo(
@@ -24,16 +29,13 @@ export default function ListPage() {
   );
 
   const rows = React.useMemo(() => {
-    const result = Object.entries(activityDict).map(([idStr, act]) => {
-      const id = parseInt(idStr);
-
+    return activities.map((act) => {
       return {
         ...act,
-        ...(id in photoDict && { photos: photoDict[id] }),
+        ...(act.id in photoDict && { photos: photoDict[act.id] }),
       };
     });
-    return result;
-  }, [activityDict, photoDict]);
+  }, [activities, photoDict]);
 
   return (
     <div

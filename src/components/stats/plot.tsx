@@ -4,6 +4,7 @@ import { useEffect, useRef, type JSX, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from 'next-themes';
 import { useShallowStore, useStore } from '~/store';
+import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 
 import { useContext } from 'react';
 import { StatsContext } from '~/app/stats/[name]/StatsContext';
@@ -85,7 +86,7 @@ function FormElement({
 }: FormElementProps) {
   const setting = stat.settings[propName];
   if (!setting) return null;
-  
+
   const value = stat.setting[propName];
   const setter = (valueFn: (val: unknown) => unknown) =>
     stat.setter((s) => ({ ...s, [propName]: valueFn(s[propName]) }));
@@ -221,14 +222,14 @@ export const SliderFormElement = ({
 
 
 export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
-  const { activityDict, filterIDs, settings, setSettings } = useShallowStore(
+  const { settings, setSettings } = useShallowStore(
     (state) => ({
-      activityDict: state.activityDict,
-      filterIDs: state.filterIDs,
       settings: state.settings,
       setSettings: state.setSettings,
     }),
   );
+
+  const { filteredActivities } = useFilteredActivities();
   const { theme } = useTheme();
 
   const figureRef = useRef<HTMLDivElement>(null);
@@ -256,7 +257,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
     // Use type assertion with unknown as intermediate step
     const plotFn = makePlot(stats as unknown as Stats<typeof name>);
     const plot = plotFn({
-      activities: filterIDs.map((id) => activityDict[id]!),
+      activities: filteredActivities,
       width,
       height,
       theme: theme === 'dark' ? 'dark' : 'light',
@@ -278,7 +279,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
       plot.remove();
       if (legend) legend.remove();
     };
-  }, [width, height, activityDict, settings[name], filterIDs, theme, name, stats, settingsRef]);
+  }, [width, height, filteredActivities, settings[name], theme, name, stats, settingsRef]);
 
   return (
     <>
@@ -291,7 +292,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
         ref={figureRef}
       />
       {settingsRef.current && createPortal(
-        <FormComponent stat={stats as unknown as Stats<typeof name>} />, 
+        <FormComponent stat={stats as unknown as Stats<typeof name>} />,
         settingsRef.current
       )}
     </>

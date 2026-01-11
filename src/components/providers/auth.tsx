@@ -15,22 +15,10 @@ export function AuthProvider({
   const searchParams = useSearchParams();
   const {
     initializeAuth,
-    loadFromDBBatched,
-    loadPhotos,
-    loadFromStrava,
     isInitialized,
-    addNotification,
-    user,
-    account,
   } = useShallowStore((state) => ({
     initializeAuth: state.initializeAuth,
-    loadFromDBBatched: state.loadFromDBBatched,
-    loadPhotos: state.loadPhotos,
-    loadFromStrava: state.loadFromStrava,
     isInitialized: state.isInitialized,
-    addNotification: state.addNotification,
-    user: state.user,
-    account: state.account,
   }));
 
   useEffect(() => {
@@ -51,76 +39,20 @@ export function AuthProvider({
             : undefined,
         } as const;
 
-
         initialAuth.guestMode = guestMode;
       }
-
-
 
       // Initialize the auth state
       initializeAuth(initialAuth);
 
-      // Load data based on mode
-      if (initialAuth.guestMode) {
-
-        if (
-          initialAuth.guestMode.type === 'activities' &&
-          initialAuth.guestMode.activityIds
-        ) {
-          loadFromDBBatched({ userId: undefined }).catch((error) => {
-            console.error('Error loading activities in guest mode:', error);
-            addNotification({
-              type: 'error',
-              title: 'Error loading activities',
-              message: 'Failed to load shared activities.',
-            });
-          });
-        } else if (
-          initialAuth.guestMode.type === 'user' &&
-          initialAuth.guestMode.userId
-        ) {
-          loadFromDBBatched({ userId: initialAuth.guestMode.userId }).catch(
-            (error) => {
-              console.error(
-                'Error loading user activities in guest mode:',
-                error,
-              );
-              addNotification({
-                type: 'error',
-                title: 'Error loading activities',
-                message: 'Failed to load user activities.',
-              });
-            },
-          );
-        }
-      } else if (initialAuth.session) {
-        // Normal auth flow - load from DB initially
-
-        loadFromDBBatched({ userId: user?.id }).catch((error) => {
-          console.error('Error loading from DB:', error);
-          addNotification({
-            type: 'error',
-            title: 'Error loading activities',
-            message: 'Failed to load activities from database.',
-          });
-        });
-
-        loadPhotos().catch((error) => {
-          console.error('Error loading photos:', error);
-        });
-      }
+      // Note: Data fetching is now handled by TanStack Query hooks (useActivities, usePhotos)
+      // in the components that need the data, rather than batched loading here.
     }
   }, [
     searchParams,
     initialAuth,
     isInitialized,
     initializeAuth,
-    loadFromDBBatched,
-    loadPhotos,
-    loadFromStrava,
-    addNotification,
-    user,
-    account,
   ]);
 
   return <>{children}</>;

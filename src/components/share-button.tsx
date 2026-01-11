@@ -19,15 +19,18 @@ import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { useToast } from '~/hooks/use-toast';
 
+import { useActivities } from '~/hooks/use-activities';
+
 export function ShareButton() {
-  const { selected, user, isGuest, activityDict } = useShallowStore(
+  const { selected, user, isGuest } = useShallowStore(
     (state) => ({
       selected: state.selected,
       user: state.user,
       isGuest: state.isGuest,
-      activityDict: state.activityDict,
     }),
   );
+
+  const { data: activities = [] } = useActivities();
 
   const [shareMode, setShareMode] = useState<'selected' | 'profile'>(
     'selected',
@@ -38,16 +41,17 @@ export function ShareButton() {
   useEffect(() => {
     const url = new URL(window.location.origin);
     if (shareMode === 'selected' && selected.length > 0) {
-      // Get public_ids from activityDict for sharing
-      const publicIds = selected
-        .map((id) => activityDict[id]?.public_id)
+      // Get public_ids from activities for sharing
+      const publicIds = activities
+        .filter((act) => selected.includes(act.id))
+        .map((act) => act.public_id)
         .filter(Boolean);
       url.searchParams.append('activities', publicIds.join(','));
     } else if (shareMode === 'profile' && user?.id) {
       url.searchParams.append('user', user.id);
     }
     setShareUrl(url.toString());
-  }, [shareMode, selected, user, activityDict]);
+  }, [shareMode, selected, user, activities]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(shareUrl);

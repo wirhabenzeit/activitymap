@@ -14,6 +14,7 @@ import type { InitialAuth } from '~/store/auth';
 import { Toaster } from '~/components/ui/toaster';
 import { ToastManager } from '~/components/providers/toast';
 import type { Viewport } from 'next';
+import { QueryProvider } from '~/providers/query-provider';
 
 // Configure these values as needed
 export const viewport: Viewport = {
@@ -253,25 +254,27 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider initialAuth={initialAuth}>
-            <SidebarProvider
-              className="flex h-dvh flex-col"
-              style={{ height: '100dvh' }}
-            >
-              <AppHeader />
-              <div className="flex min-h-0 flex-1 overflow-hidden">
-                <AppSidebar />
-                <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                  <div className="h-14 w-full" />
-                  <div className="min-h-0 w-full flex-1 overflow-hidden">
-                    {children}
-                  </div>
-                </main>
-              </div>
-            </SidebarProvider>
-            <Toaster />
-            <ToastManager />
-          </AuthProvider>
+          <QueryProvider>
+            <AuthProvider initialAuth={initialAuth}>
+              <SidebarProvider
+                className="flex h-dvh flex-col"
+                style={{ height: '100dvh' }}
+              >
+                <AppHeader />
+                <div className="flex min-h-0 flex-1 overflow-hidden">
+                  <AppSidebar />
+                  <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                    <div className="h-14 w-full" />
+                    <div className="min-h-0 w-full flex-1 overflow-hidden">
+                      {children}
+                    </div>
+                  </main>
+                </div>
+              </SidebarProvider>
+              <Toaster />
+              <ToastManager />
+            </AuthProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

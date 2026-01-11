@@ -49,15 +49,21 @@ import { LayerSwitcher } from '~/components/map/layer-switcher';
 import PhotoLayer from '~/components/map/photo';
 import { cn, groupBy } from '~/lib/utils';
 
+import { useActivityGeoJson, useActivities } from '~/hooks/use-activities';
+import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+import { usePhotos } from '~/hooks/use-photos';
+import type { Activity } from '~/server/db/schema';
+
 const RouteLayer = React.memo(function RouteLayer() {
-  const { filterIDs, selected, highlighted, geoJson } = useShallowStore(
+  const { selected, highlighted } = useShallowStore(
     (state) => ({
-      filterIDs: state.filterIDs,
       selected: state.selected,
       highlighted: state.highlighted,
-      geoJson: state.geoJson,
     }),
   );
+
+  const { filterIDs } = useFilteredActivities();
+  const geoJson = useActivityGeoJson();
 
   const color: mapboxgl.Expression = ['match', ['get', 'sport_type']];
   Object.entries(categorySettings).forEach(([, value]) => {
@@ -171,10 +177,21 @@ export default function MapPage() {
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
   const onMouseLeave = useCallback(() => setCursor('auto'), []);
 
+  // Fetch data via hooks
+  const { data: activities = [] } = useActivities();
+  const { data: photos = [] } = usePhotos();
+  const { filterIDs } = useFilteredActivities();
+
+  // Memoize activity dictionary for efficient lookup
+  const activityDict = useMemo(() =>
+    activities.reduce((acc, act) => {
+      acc[act.id] = act;
+      return acc;
+    }, {} as Record<number, Activity>),
+    [activities]);
+
   const {
     selected,
-    activityDict,
-    filterIDs,
     setSelected,
     baseMap,
     overlays,
@@ -185,26 +202,21 @@ export default function MapPage() {
     showPhotos,
     togglePhotos,
     compactList,
-    photos,
     uploadedGeoJson,
   } = useShallowStore((state) => ({
     selected: state.selected,
     setHighlighted: state.setHighlighted,
-    activityDict: state.activityDict,
     setSelected: state.setSelected,
-    filterIDs: state.filterIDs,
     baseMap: state.baseMap,
     overlays: state.overlayMaps,
     mapPosition: state.position,
     setPosition: state.setPosition,
-    updateActivity: state.updateActivity,
     threeDim: state.threeDim,
     showPhotos: state.showPhotos,
     togglePhotos: state.togglePhotos,
     toggleThreeDim: state.toggleThreeDim,
     compactList: state.compactList,
     uploadedGeoJson: state.uploadedGeoJson,
-    photos: state.photos,
   }));
   const { open } = useSidebar();
   const mapRefLoc = createRef<MapRef>();

@@ -141,84 +141,64 @@ export const getAccount = async ({
   return account;
 };
 
-export async function getActivities({
-  ids,
-  athlete_id,
-  summary = false,
-  public_ids,
-  user_id,
-  limit = 1000,
+/**
+ * Get activities for a specific user (by internal User ID).
+ * If no userId is provided, it attempts to resolve the current authenticated user.
+ */
+export async function getUserActivities({
+  userId,
+  limit = 10000, // Increased default limit for "local-first" feel
   offset = 0,
 }: {
-  ids?: number[];
-  athlete_id?: string;
-  summary?: boolean;
-  public_ids?: number[];
-  user_id?: string;
+  userId?: string;
   limit?: number;
   offset?: number;
-}) {
+} = {}) {
+  let targetUserId = userId;
 
-
-  if (!athlete_id && !ids && !summary && !public_ids && !user_id) {
-    const account = await getAccount({});
-    if (!account) throw new Error('No account found');
-    athlete_id = account.providerAccountId;
+  if (!targetUserId) {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+    if (!session?.user?.id) throw new Error('Not authenticated');
+    targetUserId = session.user.id;
   }
 
-  let result;
+  const userAccount = await db.query.accounts.findFirst({
+    where: (accounts, { eq }) => eq(accounts.userId, targetUserId),
+  });
 
-  if (public_ids) {
+  if (!userAccount) throw new Error('Account not found for user');
 
-    result = await db
-      .select()
-      .from(activities)
-      .where(inArray(activities.public_id, public_ids))
-      .orderBy(desc(activities.start_date_local));
-  } else if (user_id) {
+  return db
+    .select()
+    .from(activities)
+    .where(eq(activities.athlete, parseInt(userAccount.providerAccountId)))
+    .orderBy(desc(activities.start_date_local))
+    .limit(limit)
+    .offset(offset);
+}
 
-    const user = await db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.id, user_id),
-    });
-    if (!user) throw new Error('User not found');
+/**
+ * Get specific activities by their ID (e.g. for sharing or embedding).
+ */
+export async function getActivitiesByIds(ids: number[]) {
+  return db
+    .select()
+    .from(activities)
+    .where(inArray(activities.id, ids))
+    .orderBy(desc(activities.start_date_local));
+}
 
-    const userAccount = await db.query.accounts.findFirst({
-      where: (accounts, { eq }) => eq(accounts.userId, user_id),
-    });
-    if (!userAccount) throw new Error('Account not found');
-
-
-
-    result = await db
-      .select()
-      .from(activities)
-      .where(eq(activities.athlete, parseInt(userAccount.providerAccountId)))
-      .orderBy(desc(activities.start_date_local))
-      .limit(limit)
-      .offset(offset);
-  } else if (athlete_id) {
-
-    result = await db
-      .select()
-      .from(activities)
-      .where(eq(activities.athlete, parseInt(athlete_id)))
-      .orderBy(desc(activities.start_date_local))
-      .limit(limit)
-      .offset(offset);
-  } else if (ids) {
-
-    result = await db
-      .select()
-      .from(activities)
-      .where(inArray(activities.id, ids));
-  } else {
-
-    result = await db.select().from(activities);
-  }
-
-
-
-  return result;
+/**
+ * Get specific activities by their Public ID.
+ */
+export async function getPublicActivities(publicIds: number[]) {
+  return db
+    .select()
+    .from(activities)
+    .where(inArray(activities.public_id, publicIds))
+    .orderBy(desc(activities.start_date_local));
 }
 
 export async function getPhotos() {

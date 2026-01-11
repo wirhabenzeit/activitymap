@@ -30,8 +30,6 @@ export type FilterState = {
   values: Record<ValueColumn, ValueFilter | undefined>;
   search: string;
   binary: Record<BinaryColumn, boolean>;
-  filterIDs: number[];
-  activityDict: Record<number, Activity>;
 };
 
 export type FilterActions = {
@@ -45,7 +43,6 @@ export type FilterActions = {
   ) => void;
   setSearch: (update: SetStateAction<string>) => void;
   setBinary: (update: SetStateAction<Record<BinaryColumn, boolean>>) => void;
-  updateFilterIDs: () => void;
 };
 
 export type FilterSlice = FilterState & FilterActions;
@@ -74,7 +71,7 @@ const initializeBinary = (): Record<BinaryColumn, boolean> => ({
   flagged: false,
 });
 
-const applyFilters = (state: FilterState, activity: Activity): boolean => {
+export const applyFilters = (state: FilterState, activity: Activity): boolean => {
   // Sport type filter
   if (!state.sportType[activity.sport_type]) return false;
 
@@ -119,14 +116,6 @@ export const createFilterSlice: StateCreator<
   [],
   FilterSlice
 > = (set, get, store) => {
-  const updateFilterIDs = () => {
-    set((state) => {
-      const activities = Object.values(get().activityDict);
-      state.filterIDs = activities
-        .filter((activity) => applyFilters(state, activity))
-        .map((activity) => activity.id);
-    });
-  };
 
   const slices: FilterSlice = {
     // Initial state
@@ -136,11 +125,8 @@ export const createFilterSlice: StateCreator<
     values: initializeValues(),
     search: '',
     binary: initializeBinary(),
-    filterIDs: [],
-    activityDict: {},
 
     // Actions
-    updateFilterIDs,
     setSportGroup: (update) => {
       set((state) => {
         const newSportGroup =
@@ -199,19 +185,6 @@ export const createFilterSlice: StateCreator<
       });
     },
   };
-
-  store.subscribe((state, prevState) => {
-    if (
-      state.sportType !== prevState.sportType ||
-      state.binary !== prevState.binary ||
-      state.search !== prevState.search ||
-      state.values !== prevState.values ||
-      state.dateRange !== prevState.dateRange ||
-      state.activityDict !== prevState.activityDict
-    ) {
-      updateFilterIDs();
-    }
-  });
 
   return slices;
 };
