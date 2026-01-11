@@ -89,7 +89,8 @@ const setter =
       return { ...calendar, [name]: value };
     };
 
-function makeCalendar({ date = Plot.identity, inset = 0.5, ...options } = {}) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeCalendar({ date = Plot.identity, inset = 0.5, ...options }: any = {}) {
   let D: Date[] | null;
   return {
     fy: {
@@ -107,69 +108,45 @@ function makeCalendar({ date = Plot.identity, inset = 0.5, ...options } = {}) {
   };
 }
 
+interface MonthLineOptions extends Plot.MarkOptions {
+  x?: Plot.ChannelValue;
+  y?: Plot.ChannelValue;
+}
+
 class MonthLine extends Plot.Mark {
-  static defaults = {
-    stroke: "currentColor",
-    strokeWidth: 2,
-  };
   stroke: string;
   strokeWidth: number;
-  data: any[];
-  channels: any;
-  constructor(data: any, options: any = {}) {
-    super();
-    this.data = data;
-    const { x, y, stroke, strokeWidth, ...rest } = options;
-    this.channels = {
-      x: { value: x, scale: "x" },
-      y: { value: y, scale: "y" },
-      ...rest,
-    };
-    this.stroke = stroke ?? MonthLine.defaults.stroke;
-    this.strokeWidth = strokeWidth ?? MonthLine.defaults.strokeWidth;
+
+  static defaults = { stroke: "currentColor", strokeWidth: 1 };
+
+  constructor(data: Plot.Data, options: MonthLineOptions = {}) {
+    const { x, y } = options;
+    // @ts-expect-error The type definition for Plot.Mark is missing the constructor signature
+    super(data,
+      { x: { value: x, scale: "x" }, y: { value: y, scale: "y" } },
+      options,
+      MonthLine.defaults
+    );
+    this.stroke = String(options.stroke ?? MonthLine.defaults.stroke);
+    this.strokeWidth = Number(options.strokeWidth ?? MonthLine.defaults.strokeWidth);
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render(index: number[], { x, y }: any, { x: X, y: Y }: any, dimensions: any) {
     const { marginTop, marginBottom, height } = dimensions;
     const dx = x.bandwidth(),
       dy = y.bandwidth();
     return htl.svg`<path fill=none stroke=${this.stroke} stroke-width=${this.strokeWidth
-      } stroke-linecap="round" d=${Array.from(
+      } d=${Array.from(
         index,
-        (i: any) =>
-          `${(Y as any)[i] > marginTop + dy * 1.5 // is the first day a Monday?
-            ? `M${(X as any)[i] + dx},${marginTop}V${(Y as any)[i]}h${-dx}`
-            : `M${(X as any)[i]},${marginTop}`
+        (i) =>
+          `${Y[i] > marginTop + dy * 1.5 // is the first day a Monday?
+            ? `M${X[i] + dx},${marginTop}V${Y[i]}h${-dx}`
+            : `M${X[i]},${marginTop}`
           }V${height - marginBottom}`,
       ).join("")}>`;
   }
 }
-
-/*function on(mark, listeners = {}) {
-  const render = mark.render;
-  mark.render = function () {
-    const data = this.data;
-
-    const g = render.apply(this, arguments);
-    g.style.cursor = "pointer";
-    const r = d3.select(g).selectChildren();
-    for (const [type, callback] of Object.entries(
-      listeners
-    )) {
-      r.on(type, function (event, i) {
-        const p = d3.pointer(event, g);
-        callback(event, {
-          type,
-          p,
-          datum: data[i],
-          i,
-          data,
-        });
-      });
-    }
-    return g;
-  };
-  return mark;
-}*/
 
 export const plot =
   (calendarSetting: CalendarSetting) =>
@@ -293,15 +270,6 @@ export const plot =
               stroke: theme == "dark" ? "black" : "white",
             }),
           ) as any,
-          /*{
-              click: (e, {datum}) =>
-                setSelected(
-                  activitiesByDate
-                    .get(datum)
-                    ?.map((activity) => activity.id)
-                ),
-            }
-          ),*/
         ],
       });
     };

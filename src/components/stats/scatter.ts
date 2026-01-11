@@ -36,7 +36,8 @@ const valueOptions = {
     id: 'date',
     fun: (d: Activity) => d.start_date_local,
     tickFormatShort: d3.timeFormat("'%y"),
-    format: d3.timeFormat('%Y-%m-%d'),
+    format: d3.timeFormat('%Y/%m'),
+    tickFormat: d3.timeFormat('%Y/%m'),
     label: 'Date',
     unit: '',
   },
@@ -168,6 +169,7 @@ export const plot =
               }),
           }),
           Plot.axisX({
+            ticks: 6,
             anchor: 'top',
             label: null,
             tickSize: 12,
