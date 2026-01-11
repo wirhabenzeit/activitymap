@@ -110,7 +110,7 @@ export const createListSlice: StateCreator<
     ...createListActions(set, 'compactList'),
   },
   fullList: {
-    density: 'md',
+    density: 'sm',
     columnPinning: {
       left: ['name'],
       right: ['edit'],
