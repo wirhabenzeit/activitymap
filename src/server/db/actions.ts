@@ -174,7 +174,7 @@ export async function getUserActivities({
     .select()
     .from(activities)
     .where(eq(activities.athlete, parseInt(userAccount.providerAccountId)))
-    .orderBy(desc(activities.start_date_local))
+    .orderBy(desc(activities.start_date))
     .limit(limit)
     .offset(offset);
 }
@@ -187,7 +187,7 @@ export async function getActivitiesByIds(ids: number[]) {
     .select()
     .from(activities)
     .where(inArray(activities.id, ids))
-    .orderBy(desc(activities.start_date_local));
+    .orderBy(desc(activities.start_date));
 }
 
 /**
@@ -198,7 +198,7 @@ export async function getPublicActivities(publicIds: number[]) {
     .select()
     .from(activities)
     .where(inArray(activities.public_id, publicIds))
-    .orderBy(desc(activities.start_date_local));
+    .orderBy(desc(activities.start_date));
 }
 
 export async function getPhotos() {
