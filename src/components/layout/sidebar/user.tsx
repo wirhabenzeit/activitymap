@@ -41,6 +41,7 @@ import { useActivities } from '~/hooks/use-activities';
 
 import { useQueryClient, useIsFetching } from '@tanstack/react-query';
 import { fetchStravaActivities } from '~/server/strava/actions';
+import { SettingsDialog } from '~/components/settings/settings-dialog';
 
 export function UserSettings() {
   const { user, account, isInitialized } = useShallowStore(
@@ -216,6 +217,9 @@ export function UserSettings() {
     }
   };
 
+
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+
   return (
     <SidebarMenuItem>
       <DropdownMenu>
@@ -286,37 +290,14 @@ export function UserSettings() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger
-                disabled={loading || isFetchingActivities}
-                className="cursor-pointer gap-2"
-              >
-                {loading || isFetchingActivities ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <CircleArrowLeft className="mr-2 h-4 w-4" />
-                )}
-                <span>Get Activities</span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuPortal>
-                <DropdownMenuSubContent className="w-56 rounded-lg">
-                  <DropdownMenuItem
-                    onClick={handleLoadNewestActivities}
-                    disabled={loading || isFetchingActivities}
-                    className="cursor-pointer"
-                  >
-                    Get Newest Activities
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleLoadOlderActivities}
-                    disabled={loading || isFetchingActivities}
-                    className="cursor-pointer"
-                  >
-                    Get Older Activities
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuPortal>
-            </DropdownMenuSub>
+            <DropdownMenuItem
+              onClick={() => setSettingsOpen(true)}
+              className="cursor-pointer"
+            >
+              <Info className="mr-2 h-4 w-4" />
+              Settings & Status
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             {isDevelopment && (
               <>
                 <DropdownMenuItem
@@ -346,6 +327,8 @@ export function UserSettings() {
           </DropdownMenuContent>
         )}
       </DropdownMenu>
+
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </SidebarMenuItem>
   );
 }

@@ -51,7 +51,7 @@ export const createStatsSlice: StateCreator<
   StatsSlice
 > = (set) => ({
   // Initial state
-  activeTab: StatsPlots.scatter,
+  activeTab: StatsPlots.progress,
   settingsOpen: true,
   settings: defaultStatsSettings,
 
