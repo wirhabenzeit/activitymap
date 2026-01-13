@@ -12,7 +12,7 @@ import { getAccount } from '~/server/db/actions';
 import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type UpdatableActivity, type StravaPhoto } from './types';
-import { inArray, eq, and } from 'drizzle-orm';
+import { inArray, eq, and, sql } from 'drizzle-orm';
 import { webhooks, stravaWebhooks } from '~/server/db/schema';
 import type { StravaActivity } from './types';
 import crypto from 'crypto';
@@ -79,6 +79,9 @@ interface StravaApiError extends Error {
 export async function fetchStravaActivities({
   accessToken,
   before,
+  after,
+  page,
+  per_page,
   activityIds: requestedActivityIds,
   includePhotos = false,
   athleteId,
@@ -87,6 +90,9 @@ export async function fetchStravaActivities({
 }: {
   accessToken: string;
   before?: number;
+  after?: number;
+  page?: number;
+  per_page?: number;
   activityIds?: number[];
   includePhotos?: boolean;
   athleteId: number;
@@ -135,17 +141,14 @@ export async function fetchStravaActivities({
         }),
       );
       stravaActivitiesResult = stravaActivitiesResult;
-    } else if (before) {
-
-      const summaryActivities = await client.getActivities({
-        before,
-        per_page: limit,
-      });
-      stravaActivitiesResult = summaryActivities;
     } else {
+      // List/Summary mode
+      const params: any = { per_page: per_page ?? limit };
+      if (before) params.before = before;
+      if (after) params.after = after;
+      if (page) params.page = page;
 
-      const summaryActivities = await client.getActivities({ per_page: limit });
-      stravaActivitiesResult = summaryActivities;
+      stravaActivitiesResult = await client.getActivities(params);
     }
 
     const validStravaActivities = stravaActivitiesResult.filter(
@@ -160,12 +163,14 @@ export async function fetchStravaActivities({
     }
 
     const activitiesToProcess = fetchedActivities.map((act) => {
-      const isComplete = !!requestedActivityIds || !!act.map?.polyline || !!act.map?.summary_polyline;
+      // Only mark as complete if we explicitly requested IDs (Detail View)
+      // OR if it has a detailed polyline (strong indicator of detail view)
+      const isComplete = !!requestedActivityIds || !!act.map?.polyline;
       return transformStravaActivity(act, isComplete);
     });
 
     if (includePhotos && requestedActivityIds) {
-
+      // ... (photo logic remains same, omitting for brevity in thought but keeping in file)
       const photoFetchPromises = fetchedActivities.map(async (act) => {
         if (act.map?.polyline || act.map?.summary_polyline) {
           try {
@@ -181,7 +186,6 @@ export async function fetchStravaActivities({
             return []; // Return empty array on error for this activity
           }
         } else {
-
           return [];
         }
       });
@@ -192,15 +196,11 @@ export async function fetchStravaActivities({
       if (shouldDeletePhotos && photos.length > 0) {
         const activityIdsWithPhotos = fetchedActivities.map((act) => act.id);
         if (activityIdsWithPhotos.length > 0) {
-
           await db
             .delete(photosSchema)
             .where(inArray(photosSchema.activity_id, activityIdsWithPhotos));
         }
       }
-
-    } else if (includePhotos) {
-
     }
 
     const dbActivities = activitiesToProcess.map((act) => ({
@@ -208,77 +208,90 @@ export async function fetchStravaActivities({
       athlete: athleteId,
     }));
 
-    const activityIds: number[] = dbActivities.map((a) => a.id);
-    let existingActivities: { id: number }[] = [];
-    if (activityIds.length > 0) {
-      existingActivities = await db
-        .select({ id: activitySchema.id })
-        .from(activitySchema)
-        .where(inArray(activitySchema.id, activityIds));
-    }
-
-    const existingActivityIds = new Set(existingActivities.map((a) => a.id));
-
-    const newActivities = dbActivities.filter((a) => !existingActivityIds.has(a.id));
-    const activitiesToUpdate = requestedActivityIds
-      ? dbActivities.filter((a) => existingActivityIds.has(a.id))
-      : [];
-
-
-
     let savedActivities: Activity[] = [];
 
-    if (newActivities.length > 0) {
+    if (dbActivities.length > 0) {
+      // Prepare upsert values
+      // We want to update everything that might have changed on Strava (name, stats, etc)
+      // EXCEPT `is_complete` - we only want to set that to true if we actually fetched details.
+      // If we represent a summary fetch, we should NOT overwrite `is_complete: true` with `false`.
+      // However, the `transformStravaActivity` sets `is_complete` based on the fetch type.
 
-      const insertResult = await db
-        .insert(activitySchema)
-        .values(newActivities)
-        .onConflictDoNothing()
-        .returning();
-      savedActivities = [...insertResult];
-    }
+      // Strategy:
+      // Use onConflictDoUpdate. 
+      // We need to carefully construct the `set` clause to avoid downgrading data if possible, 
+      // though typically Strava summary data is "truth" for the things it contains.
+      // The only risk is overwriting a detailed activity with a summary one and losing `is_complete` status.
 
-    if (activitiesToUpdate.length > 0) {
+      // Actually, if we are doing a summary fetch (`!requestedActivityIds`), checking existing is_complete status is expensive 
+      // if we do it one by one. But we can just use the DB's current value for `is_complete` if we are doing a summary fetch?
+      // No, Drizzle doesn't support "use existing value" easily in `values`.
 
-      const updatePromises = activitiesToUpdate.map(async (activity) => {
-        const updateData: Partial<Activity> = {};
+      // Simpler approach for now conforming to user request "upsert immediately":
+      // Just upsert. If `is_complete` is calculated as false (summary fetch), we should ensure we don't accidentally set a true value to false.
+      // But `transformStravaActivity` was modified to set `is_complete`. 
 
-        if (activity.name) updateData.name = activity.name;
-        if (activity.description !== undefined) updateData.description = activity.description;
-        if (activity.sport_type) updateData.sport_type = activity.sport_type;
-        if (activity.start_date) updateData.start_date = activity.start_date;
-        if (activity.start_date_local) updateData.start_date_local = activity.start_date_local;
-        if (activity.elapsed_time !== undefined) updateData.elapsed_time = activity.elapsed_time;
-        if (activity.moving_time !== undefined) updateData.moving_time = activity.moving_time;
-        if (activity.distance !== undefined) updateData.distance = activity.distance;
-        if (activity.total_elevation_gain !== undefined) updateData.total_elevation_gain = activity.total_elevation_gain;
-        if (activity.commute !== undefined) updateData.commute = activity.commute;
-        if (activity.average_speed !== undefined) updateData.average_speed = activity.average_speed;
-        if (activity.max_speed !== undefined) updateData.max_speed = activity.max_speed;
-        if (activity.average_heartrate !== undefined) updateData.average_heartrate = activity.average_heartrate;
-        if (activity.max_heartrate !== undefined) updateData.max_heartrate = activity.max_heartrate;
-        if (activity.gear_id) updateData.gear_id = activity.gear_id;
-        if (activity.map_polyline) updateData.map_polyline = activity.map_polyline;
-        if (activity.map_summary_polyline) updateData.map_summary_polyline = activity.map_summary_polyline;
-        if (activity.map_bbox !== undefined) updateData.map_bbox = activity.map_bbox;
-        updateData.is_complete = true;
+      // Let's rely on the conflict target.
 
-        if (Object.keys(updateData).length === 0) {
-          return null;
-        }
-
-        const updateResult = await db
-          .update(activitySchema)
-          .set(updateData)
-          .where(eq(activitySchema.id, activity.id))
-          .returning();
-
-        return updateResult.length > 0 && updateResult[0] ? updateResult[0] : null;
+      const valuesToInsert = dbActivities.map(act => {
+        // If we are definitely fetching details (requestedActivityIds is set), act.is_complete is true.
+        // If we are summary fetching, act.is_complete is false.
+        return act;
       });
 
-      const updateResults = await Promise.all(updatePromises);
-      savedActivities.push(...updateResults.filter((res): res is Activity => res !== null));
+      const savedStats = await db
+        .insert(activitySchema)
+        .values(valuesToInsert)
+        .onConflictDoUpdate({
+          target: activitySchema.id,
+          set: {
+            name: sql`excluded.name`,
+            description: sql`COALESCE(excluded.description, ${activitySchema.description})`,
+            distance: sql`excluded.distance`,
+            moving_time: sql`excluded.moving_time`,
+            elapsed_time: sql`excluded.elapsed_time`,
+            total_elevation_gain: sql`excluded.total_elevation_gain`,
+            sport_type: sql`excluded.sport_type`,
+            start_date: sql`excluded.start_date`,
+            start_date_local: sql`excluded.start_date_local`,
+            timezone: sql`excluded.timezone`,
+            map_summary_polyline: sql`excluded.map_summary_polyline`, // Always safe to update summary
+            map_polyline: sql`COALESCE(excluded.map_polyline, ${activitySchema.map_polyline})`,
+
+            // Critical: is_complete
+            // If excluded.is_complete is true, set it.
+            // If excluded.is_complete is false (summary), keep existing is_complete (GREATEST logic works for booleans in some SQL but simpler: )
+            // actually `is_complete` is boolean. 
+            // CASE WHEN excluded.is_complete THEN true ELSE activity.is_complete END
+            is_complete: sql`CASE WHEN excluded.is_complete THEN true ELSE ${activitySchema.is_complete} END`,
+
+            average_speed: sql`excluded.average_speed`,
+            max_speed: sql`excluded.max_speed`,
+            average_heartrate: sql`excluded.average_heartrate`,
+            max_heartrate: sql`excluded.max_heartrate`,
+            elev_high: sql`excluded.elev_high`,
+            elev_low: sql`excluded.elev_low`,
+            kilojoules: sql`excluded.kilojoules`,
+            average_watts: sql`excluded.average_watts`,
+            device_watts: sql`excluded.device_watts`,
+            calories: sql`COALESCE(excluded.calories, ${activitySchema.calories})`,
+            total_photo_count: sql`excluded.total_photo_count`,
+            upload_id: sql`excluded.upload_id`,
+            pr_count: sql`excluded.pr_count`,
+            achievement_count: sql`excluded.achievement_count`,
+            kudos_count: sql`excluded.kudos_count`,
+            comment_count: sql`excluded.comment_count`,
+            athlete_count: sql`excluded.athlete_count`,
+
+            gear_id: sql`excluded.gear_id`,
+            map_bbox: sql`excluded.map_bbox`
+          }
+        })
+        .returning();
+
+      savedActivities = savedStats;
     }
+
 
 
 

@@ -23,8 +23,9 @@ import {
     TableHeader,
     TableRow,
 } from "~/components/ui/table";
-import { Loader2, RefreshCw, Activity, CheckCircle2 } from 'lucide-react';
-import { checkYear, syncMissing, repairYear } from '~/server/strava/verification';
+import { Loader2, RefreshCw, Activity, CheckCircle2, ImageOff } from 'lucide-react';
+import { syncYear, syncActivities, repairYear } from '~/server/strava/verification';
+import { deleteActivities } from '~/server/strava/actions';
 import { useToast } from '~/hooks/use-toast';
 import { cn } from '~/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -41,23 +42,18 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
         const totalActivities = activities.length;
         const incompleteActivities = activities.filter(a => !a.is_complete).length;
-        const totalPhotos = 0; // Photos are not typically eager loaded in full detail on list view, might need adjustment if we want accurate photo count
-
-        // Find last sync time (approximate based on latest update or just use what we have)
-        // Ideally we'd have a separate query for metadata, but for now we can omit or simplify
-        const lastSync = null;
+        const totalPhotos = 0; // Placeholder
 
         return {
             totalActivities,
             incompleteActivities,
             totalPhotos,
-            lastSync
         };
     }, [activities]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto w-full">
+            <DialogContent className="max-h-[75vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                         Settings & Status
@@ -81,15 +77,10 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                                 </p>
                             </CardContent>
                         </Card>
-                        {/* Removed Photo card as accurate count requires DB query, and Last Sync as it's less relevant with stream */}
                     </div>
 
-                    {/* Actions & History */}
+                    {/* Yearly History */}
                     <div className="space-y-6">
-                        {/* Maintenance Actions - ONLY SHOW IF GLOBAL REPAIR IS NEEDED OR SIMPLIFY */}
-                        {/* Keeping it simple for now, focusing on Yearly which is more granular */}
-
-                        {/* Yearly History */}
                         <YearlyHistory activities={activities || []} globalLoading={isFetching} />
                     </div>
                 </div>
@@ -102,24 +93,44 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
-    const [checkingYear, setCheckingYear] = React.useState<number | null>(null);
     const [syncingYear, setSyncingYear] = React.useState<number | null>(null);
     const [repairingYear, setRepairingYear] = React.useState<number | null>(null);
+    const [deletingYear, setDeletingYear] = React.useState<number | null>(null);
 
-    const [checkResults, setCheckResults] = React.useState<Record<number, { stravaCount: number; missingIds: number[] }>>({});
+    const [checkResults, setCheckResults] = React.useState<Record<number, { stravaCount: number; extraIds: number[] }>>({});
 
-    // Process years to include padding
+    // Process years
     const displayYears = React.useMemo(() => {
-        if (!activities.length) return [{ year: new Date().getFullYear(), count: 0, incompleteCount: 0 }];
+        if (!activities.length) return [{ year: new Date().getFullYear(), count: 0, incompleteCount: 0, missingPhotosCount: 0, ids: [], incompleteIds: [], missingPhotoIds: [] }];
 
         // Group by year
-        const statsByYear = new Map<number, { count: number; incompleteCount: number }>();
+        const statsByYear = new Map<number, {
+            count: number;
+            incompleteCount: number;
+            missingPhotosCount: number;
+            ids: number[];
+            incompleteIds: number[];
+            missingPhotoIds: number[];
+        }>();
 
         activities.forEach(act => {
             const year = new Date(act.start_date).getFullYear();
-            const current = statsByYear.get(year) || { count: 0, incompleteCount: 0 };
+            const current = statsByYear.get(year) || { count: 0, incompleteCount: 0, missingPhotosCount: 0, ids: [], incompleteIds: [], missingPhotoIds: [] };
+
             current.count++;
-            if (!act.is_complete) current.incompleteCount++;
+            current.ids.push(act.id);
+
+            if (!act.is_complete) {
+                current.incompleteCount++;
+                current.incompleteIds.push(act.id);
+
+                // Check if it has photos on Strava but is incomplete (thus missing photos locally)
+                if ((act.total_photo_count || 0) > 0) {
+                    current.missingPhotosCount++;
+                    current.missingPhotoIds.push(act.id);
+                }
+            }
+
             statsByYear.set(year, current);
         });
 
@@ -129,7 +140,6 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
         const currentYear = new Date().getFullYear();
 
         const result = new Set<number>();
-        result.add(Math.max(maxYear, currentYear) + 1);
 
         for (let y = Math.max(maxYear, currentYear); y >= minYear; y--) {
             result.add(y);
@@ -144,62 +154,44 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                 year,
                 count: stat?.count || 0,
                 incompleteCount: stat?.incompleteCount || 0,
+                missingPhotosCount: stat?.missingPhotosCount || 0,
+                ids: stat?.ids || [],
+                incompleteIds: stat?.incompleteIds || [],
+                missingPhotoIds: stat?.missingPhotoIds || []
             };
         });
     }, [activities]);
 
 
-    const checkMutation = useMutation({
-        mutationFn: (year: number) => checkYear(year),
-        onMutate: (year) => setCheckingYear(year),
-        onSettled: () => setCheckingYear(null),
-        onSuccess: (data) => {
-            if (data.success && data.year) {
+    const syncYearMutation = useMutation({
+        mutationFn: ({ year }: { year: number }) => syncYear(year),
+        onMutate: ({ year }) => setSyncingYear(year),
+        onSettled: () => setSyncingYear(null),
+        onSuccess: (data, variables) => {
+            if (data.success && data.year && data.stravaIds) {
+                // Client-side computation of extra IDs
+                // Find the local IDs for this year from our current displayYears state
+                const yearStats = displayYears.find(y => y.year === data.year);
+                const localIds = yearStats?.ids || [];
+                const stravaIdsSet = new Set(data.stravaIds);
+                const extraIds = localIds.filter(id => !stravaIdsSet.has(id));
+
                 setCheckResults(prev => ({
                     ...prev,
                     [data.year]: {
-                        stravaCount: data.stravaCount ?? 0,
-                        missingIds: data.missingIds ?? []
+                        stravaCount: data.stravaIds?.length ?? 0,
+                        extraIds: extraIds
                     }
                 }));
-                const missingCount = data.missingIds?.length ?? 0;
-                toast({
-                    title: `Check Complete for ${data.year}`,
-                    description: `Found ${data.stravaCount} activities on Strava. ${missingCount > 0 ? missingCount + ' missing in DB.' : 'All synced.'}`,
-                });
-            } else {
-                toast({
-                    title: 'Check Failed',
-                    description: data.error,
-                    variant: 'destructive',
-                });
-            }
-        }
-    });
 
-    const syncMissingMutation = useMutation({
-        mutationFn: ({ ids, year }: { ids: number[], year: number }) => syncMissing(ids).then(res => ({ ...res, year })),
-        onMutate: ({ year }) => setSyncingYear(year),
-        onSettled: () => setSyncingYear(null),
-        onSuccess: (data) => {
-            if (data.success) {
+                const extraCount = extraIds.length;
+
                 toast({
-                    title: 'Sync Complete',
-                    description: `Synced ${data.count} missing activities.`,
-                });
-                // Clear the missing IDs for this result by updating state
-                setCheckResults(prev => {
-                    if (!data.year) return prev;
-                    return {
-                        ...prev,
-                        [data.year]: {
-                            ...prev[data.year]!,
-                            stravaCount: prev[data.year]?.stravaCount ?? 0,
-                            missingIds: []
-                        }
-                    };
+                    title: `Sync Complete for ${data.year}`,
+                    description: `Synced ${data.stravaIds.length} activities. ${extraCount ? `Found ${extraCount} extra.` : 'All clear.'}`,
                 });
                 queryClient.invalidateQueries({ queryKey: ['activities'] });
+                queryClient.invalidateQueries({ queryKey: ['photos'] });
             } else {
                 toast({
                     title: 'Sync Failed',
@@ -210,9 +202,41 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
         }
     });
 
+    const deleteExtraMutation = useMutation({
+        mutationFn: ({ ids, year }: { ids: number[], year: number }) => deleteActivities(ids).then(res => ({ ...res, year })),
+        onMutate: ({ year }) => setDeletingYear(year),
+        onSettled: () => setDeletingYear(null),
+        onSuccess: (data, variables) => {
+            if (data.deletedCount > 0) {
+                toast({
+                    title: 'Cleanup Complete',
+                    description: `Removed ${data.deletedCount} obsolete activities.`,
+                });
+                setCheckResults(prev => {
+                    if (!variables.year) return prev;
+                    return {
+                        ...prev,
+                        [variables.year]: {
+                            ...prev[variables.year]!,
+                            extraIds: []
+                        }
+                    };
+                });
+                queryClient.invalidateQueries({ queryKey: ['activities'] });
+                queryClient.invalidateQueries({ queryKey: ['photos'] });
+            } else {
+                toast({
+                    title: 'Cleanup Failed',
+                    description: data.errors.join(', ') || 'Failed to delete.',
+                    variant: 'destructive',
+                });
+            }
+        }
+    });
+
     const repairMutation = useMutation({
-        mutationFn: (year: number) => repairYear(year).then(res => ({ ...res, year })),
-        onMutate: (year) => setRepairingYear(year),
+        mutationFn: ({ year, ids }: { year: number, ids: number[] }) => repairYear(year, ids).then(res => ({ ...res, year })),
+        onMutate: ({ year }) => setRepairingYear(year),
         onSettled: () => setRepairingYear(null),
         onSuccess: (data) => {
             if (data.success) {
@@ -221,6 +245,7 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                     description: `Repaired ${data.count} activities.${data.remaining ? ' More remaining.' : ''}`,
                 });
                 queryClient.invalidateQueries({ queryKey: ['activities'] });
+                queryClient.invalidateQueries({ queryKey: ['photos'] });
             } else {
                 toast({
                     title: 'Repair Failed',
@@ -236,19 +261,21 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead className="w-[100px]">Year</TableHead>
+                        <TableHead>Year</TableHead>
                         <TableHead className="text-right">ActivityMap</TableHead>
                         <TableHead className="text-right">Strava</TableHead>
-                        <TableHead className="text-right">Actions (Sync)</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {displayYears.map((stat) => {
                         const result = checkResults[stat.year];
-                        const isChecking = checkingYear === stat.year;
                         const isSyncing = syncingYear === stat.year;
                         const isRepairing = repairingYear === stat.year;
-                        const isAnyActionPending = isChecking || isSyncing || isRepairing || globalLoading;
+                        const isDeleting = deletingYear === stat.year;
+                        const isAnyActionPending = isSyncing || isRepairing || isDeleting || globalLoading;
+
+                        const extraCount = result?.extraIds?.length || 0;
 
                         return (
                             <TableRow key={stat.year}>
@@ -258,9 +285,16 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                                         <div className="flex flex-col">
                                             <span>{stat.count}</span>
                                             {stat.incompleteCount > 0 && (
-                                                <span className="text-[10px] text-amber-500 font-medium">
-                                                    ({stat.incompleteCount} incomplete)
-                                                </span>
+                                                <div className="flex flex-col text-[10px] items-end">
+                                                    <span className="text-amber-500 font-medium">
+                                                        ({stat.incompleteCount} incomplete)
+                                                    </span>
+                                                    {stat.missingPhotosCount > 0 && (
+                                                        <span className="text-blue-500 font-medium flex items-center gap-0.5">
+                                                            ({stat.missingPhotosCount} without photos)
+                                                        </span>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     ) : (
@@ -269,58 +303,78 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                                 </TableCell>
                                 <TableCell className="text-right">
                                     {result ? (
-                                        <span className={cn(
-                                            "font-mono",
-                                            result.missingIds.length > 0 ? "text-amber-500 font-bold" : "text-green-500"
-                                        )}>
-                                            {result.stravaCount}
-                                        </span>
+                                        <div className="flex flex-col items-end">
+                                            <span className="font-mono text-green-500">
+                                                {result.stravaCount}
+                                            </span>
+                                            {extraCount > 0 && (
+                                                <span className="text-[10px] text-red-500 font-medium">
+                                                    (+{extraCount} extra)
+                                                </span>
+                                            )}
+                                        </div>
                                     ) : (
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             className="h-8 px-2 text-muted-foreground hover:text-foreground"
                                             disabled={isAnyActionPending}
-                                            onClick={() => checkMutation.mutate(stat.year)}
+                                            onClick={() => syncYearMutation.mutate({ year: stat.year })}
                                         >
-                                            {isChecking ? (
+                                            {isSyncing ? (
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                             ) : (
                                                 <span className="flex items-center gap-1 text-xs">
-                                                    ?
+                                                    <RefreshCw className="h-3 w-3" />
                                                 </span>
                                             )}
                                         </Button>
                                     )}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    {stat.incompleteCount > 0 && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-7 text-xs border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400"
-                                            disabled={isAnyActionPending}
-                                            onClick={() => repairMutation.mutate(stat.year)}
-                                        >
-                                            {isRepairing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Activity className="h-3 w-3 mr-1" />}
-                                            Repair
-                                        </Button>
-                                    )}
-                                    {result && result.missingIds.length > 0 && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-7 text-xs border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400"
-                                            disabled={isAnyActionPending}
-                                            onClick={() => {
-                                                setSyncingYear(stat.year);
-                                                syncMissingMutation.mutate({ ids: result.missingIds, year: stat.year });
-                                            }}
-                                        >
-                                            {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                                            Sync {result.missingIds.length} Missing
-                                        </Button>
-                                    )}
+                                    <div className="flex justify-end gap-2 flex-wrap">
+                                        {/* Repair */}
+                                        {stat.incompleteCount > 0 && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-xs border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400"
+                                                disabled={isAnyActionPending}
+                                                onClick={() => repairMutation.mutate({ year: stat.year, ids: stat.incompleteIds })}
+                                            >
+                                                {isRepairing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Activity className="h-3 w-3 mr-1" />}
+                                                Repair
+                                            </Button>
+                                        )}
+
+                                        {/* Sync Photos (Specific Repair) */}
+                                        {stat.missingPhotosCount > 0 && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-xs border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400"
+                                                disabled={isAnyActionPending}
+                                                onClick={() => repairMutation.mutate({ year: stat.year, ids: stat.missingPhotoIds })}
+                                            >
+                                                {isRepairing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ImageOff className="h-3 w-3 mr-1" />}
+                                                Photos
+                                            </Button>
+                                        )}
+
+                                        {/* Cleanup Extra */}
+                                        {extraCount > 0 && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-xs border-red-500/50 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
+                                                disabled={isAnyActionPending}
+                                                onClick={() => deleteExtraMutation.mutate({ ids: result!.extraIds, year: stat.year })}
+                                            >
+                                                {isDeleting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                                                Clean {extraCount}
+                                            </Button>
+                                        )}
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         );
