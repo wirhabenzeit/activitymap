@@ -98,6 +98,8 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
 
     const [syncingYear, setSyncingYear] = React.useState<number | null>(null);
     const [repairingYear, setRepairingYear] = React.useState<number | null>(null);
+    const [deletingYear, setDeletingYear] = React.useState<number | null>(null);
+    const [checkResults, setCheckResults] = React.useState<Record<number, { stravaCount: number; extraIds: number[] }>>({});
     const [confirmDelete, setConfirmDelete] = React.useState<{ year: number, ids: number[] } | null>(null);
 
     const activitiesToDelete = React.useMemo(() => {
