@@ -98,9 +98,13 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
 
     const [syncingYear, setSyncingYear] = React.useState<number | null>(null);
     const [repairingYear, setRepairingYear] = React.useState<number | null>(null);
-    const [deletingYear, setDeletingYear] = React.useState<number | null>(null);
+    const [confirmDelete, setConfirmDelete] = React.useState<{ year: number, ids: number[] } | null>(null);
 
-    const [checkResults, setCheckResults] = React.useState<Record<number, { stravaCount: number; extraIds: number[] }>>({});
+    const activitiesToDelete = React.useMemo(() => {
+        if (!confirmDelete) return [];
+        const idsSet = new Set(confirmDelete.ids);
+        return activities.filter(a => idsSet.has(a.id)).sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+    }, [confirmDelete, activities]);
 
     // Process years
     const displayYears = React.useMemo(() => {
@@ -210,6 +214,7 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
         onMutate: ({ year }) => setDeletingYear(year),
         onSettled: () => setDeletingYear(null),
         onSuccess: (data, variables) => {
+            setConfirmDelete(null); // Close dialog on success
             if (data.deletedCount > 0) {
                 toast({
                     title: 'Cleanup Complete',
@@ -371,7 +376,7 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                                                 variant="outline"
                                                 className="h-7 text-xs border-red-500/50 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
                                                 disabled={isAnyActionPending}
-                                                onClick={() => deleteExtraMutation.mutate({ ids: result!.extraIds, year: stat.year })}
+                                                onClick={() => setConfirmDelete({ year: stat.year, ids: result!.extraIds })}
                                             >
                                                 {isDeleting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
                                                 Clean {extraCount}
@@ -385,6 +390,45 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                     }
                 </TableBody>
             </Table>
+
+            <Dialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Deletion</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete {confirmDelete?.ids.length} activities from {confirmDelete?.year}?
+                            These activities exist locally but were not found in the latest Strava sync.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+                        <div className="space-y-4">
+                            {activitiesToDelete.map((act) => (
+                                <div key={act.id} className="flex flex-col text-sm">
+                                    <span className="font-medium">{act.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {new Date(act.start_date).toLocaleDateString()} • {act.sport_type}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </ScrollArea>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfirmDelete(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => confirmDelete && deleteExtraMutation.mutate({ ids: confirmDelete.ids, year: confirmDelete.year })}
+                            disabled={deleteExtraMutation.isPending}
+                        >
+                            {deleteExtraMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Delete {confirmDelete?.ids.length} Activities
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
