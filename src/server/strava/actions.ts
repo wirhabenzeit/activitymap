@@ -8,22 +8,31 @@ import {
 } from '~/server/db/schema';
 
 import { db } from '~/server/db';
-import { getAccount } from '~/server/db/actions';
+import { getAuthenticatedAccount } from '~/server/db/actions';
 import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
-import { type UpdatableActivity, type StravaPhoto } from './types';
+import { type StravaPhoto } from './types';
 import { inArray, eq, and, sql } from 'drizzle-orm';
 import { webhooks, stravaWebhooks } from '~/server/db/schema';
 import type { StravaActivity } from './types';
 import crypto from 'crypto';
+import {
+  fetchActivitiesSchema,
+  type FetchActivitiesInput,
+  updateActivityInputSchema,
+  type UpdateActivityInput,
+  deleteActivitiesSchema
+} from './validators';
 
 export async function updateActivity(
-  act: UpdatableActivity,
+  input: UpdateActivityInput,
   accountInfo?: { access_token: string; providerAccountId: string },
 ) {
   try {
+    const act = updateActivityInputSchema.parse(input);
+
     // If account info is not provided, fetch it
-    const account = accountInfo ?? (await getAccount({}));
+    const account = accountInfo ?? (await getAuthenticatedAccount());
     if (!account?.access_token) {
       throw new Error('No Strava access token found');
     }
@@ -32,14 +41,17 @@ export async function updateActivity(
 
     try {
       // First update in Strava to ensure we have valid authorization
-      const stravaActivity = await client.updateActivity(act.id, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const updateData: any = {
         name: act.name,
         sport_type: act.sport_type,
         description: act.description,
         commute: act.commute,
         hide_from_home: act.hide_from_home,
         gear_id: act.gear_id,
-      });
+      };
+
+      const stravaActivity = await client.updateActivity(act.id, updateData);
 
       // Transform and update in database
       const transformedActivity = {
@@ -76,29 +88,22 @@ interface StravaApiError extends Error {
   details?: { message?: string };
 }
 
-export async function fetchStravaActivities({
-  accessToken,
-  before,
-  after,
-  page,
-  per_page,
-  activityIds: requestedActivityIds,
-  includePhotos = false,
-  athleteId,
-  shouldDeletePhotos = false,
-  limit = 50,
-}: {
-  accessToken: string;
-  before?: number;
-  after?: number;
-  page?: number;
-  per_page?: number;
-  activityIds?: number[];
-  includePhotos?: boolean;
-  athleteId: number;
-  shouldDeletePhotos?: boolean;
-  limit?: number;
-}): Promise<{ activities: Activity[]; photos: Photo[]; notFoundIds: number[] }> {
+export async function fetchStravaActivities(
+  input: FetchActivitiesInput,
+): Promise<{ activities: Activity[]; photos: Photo[]; notFoundIds: number[] }> {
+
+  const {
+    accessToken,
+    before,
+    after,
+    page,
+    per_page,
+    activityIds: requestedActivityIds,
+    includePhotos,
+    athleteId,
+    shouldDeletePhotos,
+    limit
+  } = fetchActivitiesSchema.parse(input);
 
 
   // Token refresh is now handled outside this function
@@ -143,6 +148,7 @@ export async function fetchStravaActivities({
       stravaActivitiesResult = stravaActivitiesResult;
     } else {
       // List/Summary mode
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const params: any = { per_page: per_page ?? limit };
       if (before) params.before = before;
       if (after) params.after = after;
@@ -330,10 +336,11 @@ export async function fetchStravaActivities({
   }
 }
 
-export async function deleteActivities(activityIds: number[]): Promise<{
+export async function deleteActivities(input: number[]): Promise<{
   deletedCount: number;
   errors: string[];
 }> {
+  const activityIds = deleteActivitiesSchema.parse(input);
   if (!activityIds || activityIds.length === 0) {
     return { deletedCount: 0, errors: [] };
   }
@@ -343,7 +350,7 @@ export async function deleteActivities(activityIds: number[]): Promise<{
 
   try {
     // Get current user's account info to ensure we only delete their activities
-    const account = await getAccount({});
+    const account = await getAuthenticatedAccount();
     if (!account?.providerAccountId) {
       throw new Error('User account not found or missing providerAccountId');
     }

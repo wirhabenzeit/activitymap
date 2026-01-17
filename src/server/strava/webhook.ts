@@ -2,7 +2,7 @@
 
 import { db } from '~/server/db';
 import { activities, photos } from '~/server/db/schema';
-import { getAccount } from '~/server/db/actions';
+import { getAccountInternal } from '~/server/db/internal';
 import { fetchStravaActivities } from '~/server/strava/actions';
 import { eq } from 'drizzle-orm';
 
@@ -35,7 +35,7 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
 
   let account;
   try {
-    account = await getAccount({
+    account = await getAccountInternal({
       providerAccountId: owner_id.toString(),
     });
 

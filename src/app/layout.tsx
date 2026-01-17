@@ -9,7 +9,7 @@ import { AppSidebar } from '~/components/layout/app-sidebar';
 import { AppHeader } from '~/components/layout/app-header';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
-import { getUser, getAccount } from '~/server/db/actions';
+import { getUserInternal, getAccountInternal } from '~/server/db/internal';
 import type { InitialAuth } from '~/store/auth';
 import { Toaster } from '~/components/ui/toaster';
 import { ToastManager } from '~/components/providers/toast';
@@ -47,8 +47,8 @@ export default async function RootLayout({
 
   // If we have a session, get the user and account details
   if (session?.user?.id) {
-    const user = await getUser(session.user.id);
-    const account = user ? await getAccount({ userId: user.id }) : null;
+    const user = await getUserInternal(session.user.id);
+    const account = user ? await getAccountInternal({ userId: user.id }) : null;
     initialAuth.session = session;
     initialAuth.user = user ?? null;
     initialAuth.account = account ?? null;

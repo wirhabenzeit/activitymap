@@ -3,13 +3,13 @@
 import { db } from '~/server/db';
 import { activities } from '~/server/db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
-import { getAccount } from '~/server/db/actions';
+import { getAuthenticatedAccount } from '~/server/db/actions';
 import { fetchStravaActivities } from './actions';
 import { StravaClient } from '~/server/strava/client';
 
 export async function syncYear(year: number) {
     try {
-        const account = await getAccount({});
+        const account = await getAuthenticatedAccount();
         if (!account?.access_token) throw new Error('Unauthorized');
         const athleteId = parseInt(account.providerAccountId);
 
@@ -62,7 +62,7 @@ export async function syncYear(year: number) {
 
 export async function repairYear(year: number, idsToRepair: number[]) {
     try {
-        const account = await getAccount({});
+        const account = await getAuthenticatedAccount();
         if (!account?.access_token) throw new Error('Unauthorized');
         const athleteId = parseInt(account.providerAccountId);
 
@@ -102,7 +102,7 @@ export async function repairYear(year: number, idsToRepair: number[]) {
 
 export async function syncActivities(ids: number[]) {
     try {
-        const account = await getAccount({});
+        const account = await getAuthenticatedAccount();
         if (!account?.access_token) throw new Error('Unauthorized');
 
         if (ids.length === 0) return { success: true, count: 0 };

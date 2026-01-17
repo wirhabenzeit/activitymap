@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '~/server/db';
 import { activities, photos, webhooks } from '~/server/db/schema';
 import { fetchStravaActivities } from '~/server/strava/actions';
-import { getAccount } from '~/server/db/actions';
+import { getAccountInternal } from '~/server/db/internal';
 import type { WebhookRequest } from '~/types/strava';
 import { type NextRequest } from 'next/server';
 
@@ -77,11 +77,11 @@ export async function POST(
       found: !!subscription,
       subscription_details: subscription
         ? {
-            id: subscription.id,
-            verified: subscription.verified,
-            active: subscription.active,
-            callback_url: subscription.callback_url,
-          }
+          id: subscription.id,
+          verified: subscription.verified,
+          active: subscription.active,
+          callback_url: subscription.callback_url,
+        }
         : null,
     });
 
@@ -117,7 +117,7 @@ export async function POST(
       });
 
       // Get account directly using Strava athlete ID
-      const account = await getAccount({
+      const account = await getAccountInternal({
         providerAccountId: data.owner_id.toString(),
       });
 
@@ -158,10 +158,10 @@ export async function POST(
         photo_count: result.photos.length,
         first_activity: result.activities[0]
           ? {
-              id: result.activities[0].id,
-              name: result.activities[0].name,
-              is_complete: result.activities[0].is_complete,
-            }
+            id: result.activities[0].id,
+            name: result.activities[0].name,
+            is_complete: result.activities[0].is_complete,
+          }
           : null,
       });
 
@@ -170,8 +170,7 @@ export async function POST(
       }
 
       return new Response(
-        `${data.aspect_type === 'create' ? 'Created' : 'Updated'} activity ${
-          result.activities[0].id
+        `${data.aspect_type === 'create' ? 'Created' : 'Updated'} activity ${result.activities[0].id
         } with ${result.photos.length} photos`,
       );
     }
@@ -182,10 +181,10 @@ export async function POST(
       error:
         e instanceof Error
           ? {
-              message: e.message,
-              name: e.name,
-              stack: e.stack,
-            }
+            message: e.message,
+            name: e.name,
+            stack: e.stack,
+          }
           : e,
       timestamp: new Date().toISOString(),
     });

@@ -1,7 +1,7 @@
 import { eq, isNotNull, desc, and, asc, inArray } from 'drizzle-orm';
 import { db } from '~/server/db';
 import { activities, activitySync, users } from '~/server/db/schema';
-import { getAccount } from '~/server/db/actions';
+import { getAccountInternal } from '~/server/db/internal';
 import { fetchStravaActivities } from './actions';
 
 export type SyncActivityOptions = {
@@ -89,7 +89,7 @@ export async function syncActivities(
       }
 
       // Get account with refreshed tokens using getAccount
-      const account = await getAccount({ userId: user.id });
+      const account = await getAccountInternal({ userId: user.id });
       if (!account?.access_token) {
         throw new Error(`No valid Strava token found for user ${user.id}`);
       }
