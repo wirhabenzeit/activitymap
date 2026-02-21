@@ -3,13 +3,22 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { getUserActivities } from '~/server/db/actions';
 import { createFeature } from '~/lib/activity-utils';
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import type { FeatureCollection } from 'geojson';
+import { useShallowStore } from '~/store';
 
 export function useActivities() {
+    const { userId, isInitialized, isGuest } = useShallowStore((state) => ({
+        userId: state.user?.id,
+        isInitialized: state.isInitialized,
+        isGuest: state.isGuest,
+    }));
+    const canFetchUserData = isInitialized && !!userId && !isGuest;
+
     const query = useInfiniteQuery({
-        queryKey: ['activities'],
+        queryKey: ['activities', userId ?? null],
         queryFn: ({ pageParam }) => getUserActivities({ offset: pageParam, limit: 500 }),
+        enabled: canFetchUserData,
         initialPageParam: 0,
         getNextPageParam: (lastPage, allPages) => {
             if (lastPage.length < 500) return undefined;

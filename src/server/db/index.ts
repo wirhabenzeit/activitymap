@@ -6,17 +6,20 @@ import ws from 'ws';
 
 config({ path: '.env' }); // or .env.local
 
+const connectionString =
+  process.env.DATABASE_URL ??
+  'postgres://postgres:postgres@db.localtest.me:5432/main';
+const connectionStringUrl = new URL(connectionString);
+const useLocalNeonProxy = connectionStringUrl.hostname === 'db.localtest.me';
+
 let sql;
-if (process.env.VERCEL_ENV === 'development') {
+if (useLocalNeonProxy) {
   console.log('Using localtest.me');
-  const connectionString =
-    'postgres://postgres:postgres@db.localtest.me:5432/main';
   neonConfig.fetchEndpoint = (host) => {
     const [protocol, port] =
       host === 'db.localtest.me' ? ['http', 4444] : ['https', 443];
     return `${protocol}://${host}:${port}/sql`;
   };
-  const connectionStringUrl = new URL(connectionString);
   neonConfig.useSecureWebSocket =
     connectionStringUrl.hostname !== 'db.localtest.me';
   neonConfig.wsProxy = (host) =>
@@ -24,7 +27,7 @@ if (process.env.VERCEL_ENV === 'development') {
   neonConfig.webSocketConstructor = ws;
   sql = neon(connectionString);
 } else {
-  sql = neon(process.env.DATABASE_URL!);
+  sql = neon(connectionString);
 }
 export const db = drizzle({ client: sql, schema });
 //console.log(await db.query.sessions.findFirst(), 'QUERRRRY');
