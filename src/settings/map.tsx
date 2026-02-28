@@ -122,6 +122,20 @@ export const baseMaps: Record<string, BaseMapSetting> = {
 };
 
 export const overlayMaps: Record<string, OverlaySetting> = {
+  'Friflyt Toppturer': {
+    type: 'component',
+    visible: false,
+    component: GeoJSONComponentOverlay,
+    props: {
+      id: 'friflyt-toppturer',
+      data: '/friflyt/friflyt_enriched.geojson',
+      color: '#0f766e',
+      lineWidth: 1.6,
+      opacity: 0.85,
+      interactive: true,
+    },
+    interactiveLayerIds: ['friflyt-toppturer-line-layer'],
+  },
   'Swisstopo Ski': {
     url: `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/{z}/{x}/{y}.png`,
     type: 'raster',

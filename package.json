@@ -11,7 +11,9 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:reset": "tsx drizzle/reset.ts",
-    "test:sync": "tsx src/scripts/test-sync-activities.ts"
+    "test:sync": "tsx src/scripts/test-sync-activities.ts",
+    "friflyt:enrich": "node scripts/enrich-friflyt-geojson.mjs",
+    "friflyt:enrich:translate": "node scripts/enrich-friflyt-geojson.mjs --translate"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",

@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Source, Layer, useControl } from 'react-map-gl/mapbox';
 import type { MapMouseEvent, PointLike } from 'mapbox-gl';
-import type { FeatureCollection, GeoJsonProperties } from 'geojson';
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJsonProperties,
+  Geometry,
+} from 'geojson';
 import type mapboxgl from 'mapbox-gl';
 import { FeatureInfoCard } from './feature-info-card';
 
+type OverlayFeature = Feature<Geometry, GeoJsonProperties>;
+
 type GeoJSONInteractionOptions = {
   layerId: string;
-  onFeatureClick?: (feature: GeoJsonProperties, event: MapMouseEvent) => void;
+  onFeatureClick?: (feature: OverlayFeature, event: MapMouseEvent) => void;
 };
 
 export class GeoJSONInteractionControl implements mapboxgl.IControl {
@@ -15,7 +22,7 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
   private container: HTMLElement;
   private layerId: string;
   private onFeatureClick?: (
-    feature: GeoJsonProperties,
+    feature: OverlayFeature,
     event: MapMouseEvent,
   ) => void;
 
@@ -48,6 +55,22 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
       [e.point.x + 5, e.point.y + 5],
     ];
 
+    // Prioritize activity route selection when both layers overlap.
+    const styleLayerIds = new Set(
+      this.map.getStyle().layers?.map((layer) => layer.id) ?? [],
+    );
+    const activityLayers = ['routeLayerBG', 'routeLayerBGsel'].filter((id) =>
+      styleLayerIds.has(id),
+    );
+    if (activityLayers.length > 0) {
+      const activityHits = this.map.queryRenderedFeatures(bbox, {
+        layers: activityLayers,
+      });
+      if (activityHits.length > 0) {
+        return;
+      }
+    }
+
     // Query features in the bounding box from our layer
     const selectedFeatures = this.map.queryRenderedFeatures(bbox, {
       layers: [this.layerId],
@@ -58,8 +81,16 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
       selectedFeatures[0]?.properties &&
       this.onFeatureClick
     ) {
-      // Pass the first feature's properties and the event to the callback
-      this.onFeatureClick(selectedFeatures[0].properties, e);
+      // Pass the first rendered feature with geometry and properties.
+      const firstFeature = selectedFeatures[0];
+      this.onFeatureClick(
+        {
+          type: 'Feature',
+          geometry: firstFeature.geometry as Geometry,
+          properties: (firstFeature.properties ?? {}) as GeoJsonProperties,
+        },
+        e,
+      );
 
     }
   };
@@ -91,9 +122,9 @@ export const GeoJSONComponentOverlay: React.FC<
     );
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [selectedFeature, setSelectedFeature] = useState<GeoJsonProperties | null>(null);
+    const [selectedFeature, setSelectedFeature] = useState<OverlayFeature | null>(null);
 
-    const onFeatureClick = (feature: GeoJsonProperties, event: MapMouseEvent) => {
+    const onFeatureClick = (feature: OverlayFeature, event: MapMouseEvent) => {
 
       setSelectedFeature(feature);
     };

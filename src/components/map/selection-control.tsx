@@ -45,6 +45,7 @@ export class SelectionControl implements IControl {
   current?: Point;
   box?: HTMLDivElement;
   rect?: DOMRect;
+  suppressClickUntil = 0;
   _container: HTMLElement;
 
   constructor({
@@ -80,17 +81,29 @@ export class SelectionControl implements IControl {
 
   click = (e: MapMouseEvent) => {
     if (!this.map) return;
+    if (Date.now() < this.suppressClickUntil) return;
+    if (e.originalEvent.shiftKey) return;
+
+    const layers = this.getActiveSelectionLayers();
+    if (layers.length === 0) return;
 
     const bbox: [PointLike, PointLike] = [
       [e.point.x - 5, e.point.y - 5],
       [e.point.x + 5, e.point.y + 5],
     ];
     const selectedFeatures = this.map.queryRenderedFeatures(bbox, {
-      layers: this.layers,
+      layers,
     });
     this.selectionHandler(
       selectedFeatures.map((feature) => feature.id as number),
     );
+  };
+
+  getActiveSelectionLayers = () => {
+    const styleLayerIds = new Set(
+      this.map?.getStyle().layers?.map((layer) => layer.id) ?? [],
+    );
+    return this.layers.filter((layer) => styleLayerIds.has(layer));
   };
 
   onAdd(map: mapboxgl.Map) {
@@ -135,6 +148,8 @@ export class SelectionControl implements IControl {
 
   onMouseUp = (e: MapMouseEvent) => {
     this.finish([this.start!, this.mousePos(e)]);
+    // Avoid the following click event from overriding the box selection.
+    this.suppressClickUntil = Date.now() + 250;
   };
 
   finish = (bbox: [PointLike, PointLike]) => {
@@ -149,8 +164,13 @@ export class SelectionControl implements IControl {
 
     // If bbox exists. use this value as the argument for `queryRenderedFeatures`
     if (bbox) {
+      const layers = this.getActiveSelectionLayers();
+      if (layers.length === 0) {
+        this.map?.dragPan.enable();
+        return;
+      }
       const selectedFeatures = this.map?.queryRenderedFeatures(bbox, {
-        layers: this.layers,
+        layers,
       });
       if (selectedFeatures)
         this.selectionHandler(

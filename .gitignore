@@ -17,6 +17,17 @@
 /out/
 next-env.d.ts
 
+# map data
+*.shp
+*.shp.xml
+*.dbf
+*.prj
+*.shx
+*.cpg
+*.sbn
+*.sbx
+
+
 # production
 /build
 
