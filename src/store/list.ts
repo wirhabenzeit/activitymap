@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { type WritableDraft } from 'immer';
 
-export type SummaryRowState = null | 'page' | 'all';
+export type SummaryRowState = null | 'page' | 'all' | 'selected';
 export type DensityState = 'sm' | 'md' | 'lg';
 
 export type ListState = {

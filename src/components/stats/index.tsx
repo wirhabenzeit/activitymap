@@ -56,18 +56,8 @@ export const commonSettings = {
   marginLeft: 30,
 };
 
-type ArgType<T> = T extends (arg: infer U) => string
-  ? U
-  : never;
-
-export const prepend = <
-  T extends (...args: unknown[]) => string,
->(
-  text: string,
-  func: T
-) =>
-  func != undefined
-    ? (arg: ArgType<T>) => text + func(arg)
-    : undefined;
+export const prepend = <T,>(text: string, func: (arg: T) => string) => {
+  return (arg: T) => text + func(arg);
+};
 
 export default statsPlots;
