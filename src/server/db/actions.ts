@@ -121,6 +121,31 @@ export async function getPublicActivities(publicIds: number[]) {
     .orderBy(desc(activities.start_date));
 }
 
+/**
+ * Get activities for a shared user profile by internal user ID.
+ * This intentionally does not require an authenticated session.
+ */
+export async function getPublicUserActivities({
+  userId,
+  limit = 10000,
+  offset = 0,
+}: {
+  userId: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const user = await getUserInternal(userId);
+  if (!user.athlete_id) throw new Error('User has no athlete_id linked');
+
+  return db
+    .select()
+    .from(activities)
+    .where(eq(activities.athlete, user.athlete_id))
+    .orderBy(desc(activities.start_date))
+    .limit(limit)
+    .offset(offset);
+}
+
 export async function getPhotos() {
   const user = await getUser();
   if (!user?.athlete_id) throw new Error('User not found or not linked to Strava');

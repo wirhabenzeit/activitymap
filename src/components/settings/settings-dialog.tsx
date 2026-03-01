@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Dialog,
     DialogContent,
@@ -26,23 +26,33 @@ import {
     TableHeader,
     TableRow,
 } from "~/components/ui/table";
-import { Loader2, RefreshCw, Activity, CheckCircle2, ImageOff } from 'lucide-react';
-import { syncYear, syncActivities, repairYear } from '~/server/strava/verification';
+import { Loader2, RefreshCw, Activity, ImageOff } from 'lucide-react';
+import { syncYear, repairYear } from '~/server/strava/verification';
 import { deleteActivities } from '~/server/strava/actions';
 import { useToast } from '~/hooks/use-toast';
-import { cn } from '~/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
 import { useActivities } from '~/hooks/use-activities';
+import type { Activity as DbActivity } from '~/server/db/schema';
+
+type YearlyStat = {
+    year: number;
+    count: number;
+    incompleteCount: number;
+    missingPhotosCount: number;
+    ids: number[];
+    incompleteIds: number[];
+    missingPhotoIds: number[];
+};
+
+type CheckResult = {
+    stravaCount: number;
+    extraIds: number[];
+};
 
 export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-    const { data: activities, isFetching } = useActivities();
-    const { toast } = useToast();
-    const queryClient = useQueryClient();
+    const { data: activities = [], isFetching } = useActivities();
 
     // Compute stats from local activities
     const stats = React.useMemo(() => {
-        if (!activities) return null;
-
         const totalActivities = activities.length;
         const incompleteActivities = activities.filter(a => !a.is_complete).length;
         const totalPhotos = 0; // Placeholder
@@ -84,7 +94,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
                     {/* Yearly History */}
                     <div className="space-y-6">
-                        <YearlyHistory activities={activities || []} globalLoading={isFetching} />
+                        <YearlyHistory activities={activities ?? []} globalLoading={isFetching} />
                     </div>
                 </div>
             </DialogContent>
@@ -92,14 +102,14 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     );
 }
 
-function YearlyHistory({ activities, globalLoading }: { activities: any[], globalLoading: boolean }) {
+function YearlyHistory({ activities, globalLoading }: { activities: DbActivity[]; globalLoading: boolean }) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
     const [syncingYear, setSyncingYear] = React.useState<number | null>(null);
     const [repairingYear, setRepairingYear] = React.useState<number | null>(null);
     const [deletingYear, setDeletingYear] = React.useState<number | null>(null);
-    const [checkResults, setCheckResults] = React.useState<Record<number, { stravaCount: number; extraIds: number[] }>>({});
+    const [checkResults, setCheckResults] = React.useState<Record<number, CheckResult>>({});
     const [confirmDelete, setConfirmDelete] = React.useState<{ year: number, ids: number[] } | null>(null);
 
     const activitiesToDelete = React.useMemo(() => {
@@ -110,21 +120,16 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
 
     // Process years
     const displayYears = React.useMemo(() => {
-        if (!activities.length) return [{ year: new Date().getFullYear(), count: 0, incompleteCount: 0, missingPhotosCount: 0, ids: [], incompleteIds: [], missingPhotoIds: [] }];
+        if (!activities.length) {
+            return [{ year: new Date().getFullYear(), count: 0, incompleteCount: 0, missingPhotosCount: 0, ids: [], incompleteIds: [], missingPhotoIds: [] }] satisfies YearlyStat[];
+        }
 
         // Group by year
-        const statsByYear = new Map<number, {
-            count: number;
-            incompleteCount: number;
-            missingPhotosCount: number;
-            ids: number[];
-            incompleteIds: number[];
-            missingPhotoIds: number[];
-        }>();
+        const statsByYear = new Map<number, Omit<YearlyStat, 'year'>>();
 
         activities.forEach(act => {
             const year = new Date(act.start_date).getFullYear();
-            const current = statsByYear.get(year) || { count: 0, incompleteCount: 0, missingPhotosCount: 0, ids: [], incompleteIds: [], missingPhotoIds: [] };
+            const current = statsByYear.get(year) ?? { count: 0, incompleteCount: 0, missingPhotosCount: 0, ids: [], incompleteIds: [], missingPhotoIds: [] };
 
             current.count++;
             current.ids.push(act.id);
@@ -134,7 +139,7 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                 current.incompleteIds.push(act.id);
 
                 // Check if it has photos on Strava but is incomplete (thus missing photos locally)
-                if ((act.total_photo_count || 0) > 0) {
+                if ((act.total_photo_count ?? 0) > 0) {
                     current.missingPhotosCount++;
                     current.missingPhotoIds.push(act.id);
                 }
@@ -161,12 +166,12 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
             const stat = statsByYear.get(year);
             return {
                 year,
-                count: stat?.count || 0,
-                incompleteCount: stat?.incompleteCount || 0,
-                missingPhotosCount: stat?.missingPhotosCount || 0,
-                ids: stat?.ids || [],
-                incompleteIds: stat?.incompleteIds || [],
-                missingPhotoIds: stat?.missingPhotoIds || []
+                count: stat?.count ?? 0,
+                incompleteCount: stat?.incompleteCount ?? 0,
+                missingPhotosCount: stat?.missingPhotosCount ?? 0,
+                ids: stat?.ids ?? [],
+                incompleteIds: stat?.incompleteIds ?? [],
+                missingPhotoIds: stat?.missingPhotoIds ?? []
             };
         });
     }, [activities]);
@@ -176,12 +181,12 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
         mutationFn: ({ year }: { year: number }) => syncYear(year),
         onMutate: ({ year }) => setSyncingYear(year),
         onSettled: () => setSyncingYear(null),
-        onSuccess: (data, variables) => {
+        onSuccess: (data) => {
             if (data.success && data.year && data.stravaIds) {
                 // Client-side computation of extra IDs
                 // Find the local IDs for this year from our current displayYears state
                 const yearStats = displayYears.find(y => y.year === data.year);
-                const localIds = yearStats?.ids || [];
+                const localIds = yearStats?.ids ?? [];
                 const stravaIdsSet = new Set(data.stravaIds);
                 const extraIds = localIds.filter(id => !stravaIdsSet.has(id));
 
@@ -199,12 +204,12 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                     title: `Sync Complete for ${data.year}`,
                     description: `Synced ${data.stravaIds.length} activities. ${extraCount ? `Found ${extraCount} extra.` : 'All clear.'}`,
                 });
-                queryClient.invalidateQueries({ queryKey: ['activities'] });
-                queryClient.invalidateQueries({ queryKey: ['photos'] });
+                void queryClient.invalidateQueries({ queryKey: ['activities'] });
+                void queryClient.invalidateQueries({ queryKey: ['photos'] });
             } else {
                 toast({
                     title: 'Sync Failed',
-                    description: data.error,
+                    description: data.error ?? 'Unknown sync error.',
                     variant: 'destructive',
                 });
             }
@@ -232,8 +237,8 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                         }
                     };
                 });
-                queryClient.invalidateQueries({ queryKey: ['activities'] });
-                queryClient.invalidateQueries({ queryKey: ['photos'] });
+                void queryClient.invalidateQueries({ queryKey: ['activities'] });
+                void queryClient.invalidateQueries({ queryKey: ['photos'] });
             } else {
                 toast({
                     title: 'Cleanup Failed',
@@ -254,8 +259,8 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                     title: 'Repair Complete',
                     description: `Repaired ${data.count} activities.${data.remaining ? ' More remaining.' : ''}`,
                 });
-                queryClient.invalidateQueries({ queryKey: ['activities'] });
-                queryClient.invalidateQueries({ queryKey: ['photos'] });
+                void queryClient.invalidateQueries({ queryKey: ['activities'] });
+                void queryClient.invalidateQueries({ queryKey: ['photos'] });
             } else {
                 toast({
                     title: 'Repair Failed',
@@ -285,7 +290,7 @@ function YearlyHistory({ activities, globalLoading }: { activities: any[], globa
                         const isDeleting = deletingYear === stat.year;
                         const isAnyActionPending = isSyncing || isRepairing || isDeleting || globalLoading;
 
-                        const extraCount = result?.extraIds?.length || 0;
+                        const extraCount = result?.extraIds?.length ?? 0;
 
                         return (
                             <TableRow key={stat.year}>

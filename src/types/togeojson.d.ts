@@ -1,16 +1,21 @@
 declare module '@mapbox/togeojson' {
-  export function kml(doc: Document): {
-    type: 'FeatureCollection';
-    features: Array<{
-      type: 'Feature';
-      geometry: {
-        type: string;
-        coordinates: number[][];
-      };
-      properties: {
-        name: string;
-        [key: string]: unknown;
-      };
-    }>;
+  import type {
+    FeatureCollection,
+    Geometry,
+    GeoJsonProperties,
+  } from 'geojson';
+
+  export function kml(
+    doc: Document,
+  ): FeatureCollection<Geometry, GeoJsonProperties>;
+  export function gpx(
+    doc: Document,
+  ): FeatureCollection<Geometry, GeoJsonProperties>;
+
+  const toGeoJSON: {
+    kml: typeof kml;
+    gpx: typeof gpx;
   };
+
+  export default toGeoJSON;
 }

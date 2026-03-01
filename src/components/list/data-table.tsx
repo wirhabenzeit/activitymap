@@ -47,12 +47,14 @@ interface ListState {
   summaryRow: SummaryRowState;
 }
 
+/* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
     width: string;
     title: string;
   }
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 interface ListActions {
   setSorting: (updater: Updater<SortingState>) => void;
@@ -104,6 +106,7 @@ export const DataTable = React.memo(function DataTable<
   setColumnPinning,
   setSummaryRow,
 }: DataTableProps<TData, TValue>) {
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table hook is intentionally used here.
   const table = useReactTable({
     data,
     columns,

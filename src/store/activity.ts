@@ -7,14 +7,9 @@ import {
   deleteActivities as deleteServerActivities,
 } from '~/server/strava/actions';
 
-export type ActivityState = {
-  // Pending further refactoring, we might keep some UI state here
-  // But for now, we've moved data to React Query
-};
+export type ActivityState = Record<string, never>;
 
-export type ActivityActions = {
-  // Actions that don't depend on local data cache
-};
+export type ActivityActions = Record<string, never>;
 
 export type ActivitySlice = ActivityState & ActivityActions;
 
@@ -23,7 +18,7 @@ export const createActivitySlice: StateCreator<
   [['zustand/immer', never], never],
   [],
   ActivitySlice
-> = (set, get, store) => {
+> = (_set, _get, _store) => {
   return {
     // Initial state
 
@@ -36,4 +31,3 @@ export const serverActions = {
   deleteServerActivities,
   updateStravaActivity,
 };
-

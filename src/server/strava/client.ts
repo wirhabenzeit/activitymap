@@ -173,7 +173,7 @@ export class StravaClient {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    retryCount = 0,
+    _retryCount = 0,
   ): Promise<T> {
     // Determine if this is a webhook endpoint (which doesn't need auth)
     const isWebhookEndpoint = endpoint.includes('/push_subscriptions');

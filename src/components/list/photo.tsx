@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Image from 'next/image';
 import { type Photo } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '~/components/ui/dialog';
@@ -56,9 +57,12 @@ export function PhotoLightbox({
             size="icon"
             className="p-0 h-full rounded-sm aspect-square object-cover w-auto"
           >
-            <img
+            <Image
               src={photo.url}
               alt={photo.caption}
+              width={photo.width ?? 64}
+              height={photo.height ?? 64}
+              unoptimized
               className="h-full rounded-sm aspect-square object-cover"
               onClick={() => {
                 api?.scrollTo(index);
@@ -81,9 +85,12 @@ export function PhotoLightbox({
                   key={photo.unique_id}
                   className="flex items-center justify-center pl-0"
                 >
-                  <img
+                  <Image
                     src={photo.url}
                     alt={photo.caption}
+                    width={photo.width ?? 1600}
+                    height={photo.height ?? 1200}
+                    unoptimized
                     className="max-w-[calc(100vw-4rem)] max-h-[calc(100vh-4rem)] object-contain rounded-lg border-2 border-background"
                     onClick={(e) => e.stopPropagation()}
                   />

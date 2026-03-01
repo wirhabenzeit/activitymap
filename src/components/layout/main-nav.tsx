@@ -14,13 +14,6 @@ export function MainNav() {
     router.push(path);
   };
 
-  const isActive = (path: string) => {
-    if (path === '/') return pathname === '/' || pathname === '/map';
-    if (path === '/list') return pathname === '/list';
-    if (path === '/stats') return pathname?.startsWith('/stats');
-    return false;
-  };
-
   // Get current view from pathname for highlighting
   const getCurrentView = () => {
     if (pathname === '/list') return 'list';

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { db } from '~/server/db';
 import { stravaWebhooks } from '~/server/db/schema';
 import { eq } from 'drizzle-orm';

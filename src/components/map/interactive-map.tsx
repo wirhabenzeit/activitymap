@@ -4,8 +4,8 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  createRef,
   useEffect,
+  useRef,
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
 import { Camera, Globe } from 'lucide-react';
@@ -219,7 +219,7 @@ export default function InteractiveMap() {
     uploadedGeoJson: state.uploadedGeoJson,
   }));
   const { open } = useSidebar();
-  const mapRefLoc = createRef<MapRef>();
+  const mapRefLoc = useRef<MapRef>(null);
   const columnFilters = [{ id: 'id', value: filterIDs }];
 
   useEffect(() => {
@@ -227,9 +227,49 @@ export default function InteractiveMap() {
     if (map) {
       setTimeout(() => map.resize(), 200);
     }
-  }, [open, mapRefLoc]);
+  }, [open]);
 
   const [viewport, setViewport] = useState(mapPosition);
+  const hasAutoCenteredOnLatest = useRef(false);
+
+  const tryAutoCenterOnLatestActivity = useCallback(() => {
+    if (hasAutoCenteredOnLatest.current) {
+      return;
+    }
+
+    const map = mapRefLoc.current?.getMap();
+    if (!map) {
+      return;
+    }
+
+    for (const activity of activities) {
+      const coordinates = activity.start_latlng ?? activity.end_latlng;
+      if (!coordinates || coordinates.length < 2) {
+        continue;
+      }
+
+      const [latitude, longitude] = coordinates;
+      if (
+        typeof latitude !== 'number' ||
+        typeof longitude !== 'number' ||
+        Number.isNaN(latitude) ||
+        Number.isNaN(longitude)
+      ) {
+        continue;
+      }
+
+      hasAutoCenteredOnLatest.current = true;
+      map.jumpTo({
+        center: [longitude, latitude],
+        zoom: Math.max(map.getZoom(), 12),
+      });
+      return;
+    }
+  }, [activities]);
+
+  useEffect(() => {
+    tryAutoCenterOnLatestActivity();
+  }, [tryAutoCenterOnLatestActivity]);
 
   // Collect all interactive layer IDs from active overlays
   const activeInteractiveLayerIds = useMemo(() => {
@@ -340,6 +380,7 @@ export default function InteractiveMap() {
               },
             );
           }
+          tryAutoCenterOnLatestActivity();
         }}
         projection={'globe'}
         mapStyle={
@@ -448,7 +489,7 @@ export default function InteractiveMap() {
           setSelected={setSelected}
           map={mapRefLoc}
           columnFilters={columnFilters}
-          {...(compactList as any)}
+          {...compactList}
         />
       </div>
     </div>

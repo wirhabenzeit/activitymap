@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Share as ShareIcon, Copy } from 'lucide-react';
 
@@ -35,10 +35,12 @@ export function ShareButton() {
   const [shareMode, setShareMode] = useState<'selected' | 'profile'>(
     'selected',
   );
-  const [shareUrl, setShareUrl] = useState<string>('');
   const { toast } = useToast();
 
-  useEffect(() => {
+  const shareUrl = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
     const url = new URL(window.location.origin);
     if (shareMode === 'selected' && selected.length > 0) {
       // Get public_ids from activities for sharing
@@ -50,7 +52,7 @@ export function ShareButton() {
     } else if (shareMode === 'profile' && user?.id) {
       url.searchParams.append('user', user.id);
     }
-    setShareUrl(url.toString());
+    return url.toString();
   }, [shareMode, selected, user, activities]);
 
   const handleCopy = async () => {

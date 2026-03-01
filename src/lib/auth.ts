@@ -5,6 +5,33 @@ import { createAuthMiddleware } from "better-auth/api";
 import { db } from "~/server/db";
 import { users, accounts, sessions, verification } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+
+const stravaProfileSchema = z.object({
+    id: z.union([z.string(), z.number()]),
+    email: z.string().email().nullish(),
+    firstname: z.string().nullish(),
+    lastname: z.string().nullish(),
+    profile: z.string().nullish(),
+});
+
+function getSessionUserId(value: unknown): string | null {
+    if (typeof value !== "object" || value === null) {
+        return null;
+    }
+
+    const session = value as { user?: { id?: unknown } };
+    return typeof session.user?.id === "string" ? session.user.id : null;
+}
+
+function isStravaAccount(value: unknown): value is { providerId: "strava"; accountId: string } {
+    if (typeof value !== "object" || value === null) {
+        return false;
+    }
+
+    const account = value as { providerId?: unknown; accountId?: unknown };
+    return account.providerId === "strava" && typeof account.accountId === "string";
+}
 
 export const auth = betterAuth({
     database: drizzleAdapter(db, {
@@ -41,13 +68,21 @@ export const auth = betterAuth({
                             return null;
                         }
 
-                        const profile = await response.json();
+                        const rawProfile: unknown = await response.json();
+                        const parsedProfile = stravaProfileSchema.safeParse(rawProfile);
+                        if (!parsedProfile.success) {
+                            return null;
+                        }
+
+                        const profile = parsedProfile.data;
+                        const athleteId = profile.id.toString();
+                        const fullName = `${profile.firstname ?? ""} ${profile.lastname ?? ""}`.trim();
 
                         return {
-                            id: profile.id.toString(),
-                            email: profile.email || `${profile.id}@strava.local`,
-                            name: `${profile.firstname} ${profile.lastname}`,
-                            image: profile.profile,
+                            id: athleteId,
+                            email: profile.email ?? `${athleteId}@strava.local`,
+                            name: fullName || `Strava ${athleteId}`,
+                            image: profile.profile ?? undefined,
                             emailVerified: false,
                         };
                     },
@@ -64,18 +99,20 @@ export const auth = betterAuth({
         after: createAuthMiddleware(async (ctx) => {
             // Check if this is a social sign-in callback
             if (ctx.path.startsWith("/sign-in/social/callback")) {
-                const session = ctx.context.newSession;
-                const account = ctx.context.account;
+                const userId = getSessionUserId(ctx.context.newSession as unknown);
+                const account = ctx.context.account as unknown;
 
-                if (session?.user && account && account.providerId === "strava") {
+                if (userId && isStravaAccount(account)) {
                     try {
                         const athleteId = Number(account.accountId);
+                        if (!Number.isFinite(athleteId)) {
+                            return;
+                        }
 
                         await db
                             .update(users)
                             .set({ athlete_id: athleteId })
-                            .where(eq(users.id, session.user.id));
-
+                            .where(eq(users.id, userId));
 
                     } catch (error) {
                         console.error("[Better Auth] Error updating athlete_id:", error);

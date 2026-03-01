@@ -1,26 +1,64 @@
 "use client";
 
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { getUserActivities } from '~/server/db/actions';
+import {
+    getPublicActivities,
+    getPublicUserActivities,
+    getUserActivities,
+} from '~/server/db/actions';
 import { createFeature } from '~/lib/activity-utils';
 import { useMemo } from 'react';
 import type { FeatureCollection } from 'geojson';
 import { useShallowStore } from '~/store';
 
 export function useActivities() {
-    const { userId, isInitialized, isGuest } = useShallowStore((state) => ({
+    const { userId, isInitialized, isGuest, guestMode } = useShallowStore((state) => ({
         userId: state.user?.id,
         isInitialized: state.isInitialized,
         isGuest: state.isGuest,
+        guestMode: state.guestMode,
     }));
-    const canFetchUserData = isInitialized && !!userId && !isGuest;
+    const guestActivityIds = guestMode.activityIds ?? [];
+    const canFetchAuthenticatedData = !!userId && !isGuest;
+    const canFetchGuestActivities =
+        isGuest && guestMode.type === 'activities' && guestActivityIds.length > 0;
+    const canFetchGuestUser =
+        isGuest && guestMode.type === 'user' && !!guestMode.userId;
+    const canFetchActivities =
+        isInitialized &&
+        (canFetchAuthenticatedData || canFetchGuestActivities || canFetchGuestUser);
 
     const query = useInfiniteQuery({
-        queryKey: ['activities', userId ?? null],
-        queryFn: ({ pageParam }) => getUserActivities({ offset: pageParam, limit: 500 }),
-        enabled: canFetchUserData,
+        queryKey: [
+            'activities',
+            isGuest ? 'guest' : 'auth',
+            userId ?? null,
+            guestMode.type,
+            guestMode.userId ?? null,
+            guestActivityIds.join(','),
+        ],
+        queryFn: ({ pageParam }) => {
+            if (canFetchGuestActivities) {
+                return getPublicActivities(guestActivityIds);
+            }
+
+            if (canFetchGuestUser) {
+                return getPublicUserActivities({
+                    userId: guestMode.userId!,
+                    offset: pageParam,
+                    limit: 500,
+                });
+            }
+
+            return getUserActivities({ offset: pageParam, limit: 500 });
+        },
+        enabled: canFetchActivities,
         initialPageParam: 0,
         getNextPageParam: (lastPage, allPages) => {
+            if (canFetchGuestActivities) {
+                return undefined;
+            }
+
             if (lastPage.length < 500) return undefined;
             return allPages.length * 500;
         },
@@ -33,8 +71,6 @@ export function useActivities() {
         refetchOnReconnect: false,
 
     });
-
-    const { hasNextPage, fetchNextPage, isFetching } = query;
 
     // Streaming logic moved to <ActivityStreamer /> to avoid duplicate fetches
     // when this hook is used in multiple components.
@@ -51,7 +87,7 @@ export function useActivityGeoJson() {
         return {
             type: 'FeatureCollection',
             features: activities
-                .filter((act) => act.map_polyline || act.map_summary_polyline)
+                .filter((act) => (act.map_polyline ?? act.map_summary_polyline))
                 .map(createFeature),
         };
     }, [activities]);

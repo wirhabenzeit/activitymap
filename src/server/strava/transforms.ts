@@ -281,20 +281,5 @@ export function transformStravaPhoto(
     resource_state: photo.resource_state,
   };
 
-  // Log the transformed photo for debugging
-  // Get a sample URL for logging, if available
-  let primaryUrlSample = 'none';
-  if (photo.urls && urlKeys.length > 0) {
-    const firstKey = urlKeys[0];
-    if (firstKey && photo.urls[firstKey]) {
-      const url = photo.urls[firstKey];
-      if (typeof url === 'string') {
-        primaryUrlSample = url.length > 30 ? `${url.substring(0, 30)}...` : url;
-      }
-    }
-  }
-
-
-
   return transformedPhoto;
 }

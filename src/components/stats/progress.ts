@@ -136,6 +136,8 @@ export const plot =
     }) => {
       const { by, value } = getter(setting);
       const bigPlot = width > 500;
+      const formatByTick = by.tickFormat as (value: Date) => string;
+      const formatValueTick = value.tickFormat as (value: number) => string;
 
       const cumulative = d3
         .groups(activities, (x) => by.tick(new Date(x.start_date_local)))
@@ -216,13 +218,16 @@ export const plot =
             ...(!bigPlot
               ? {
                 tickFormat: (...args: unknown[]) => {
-                  const prependedFn = prepend(' ', by.tickFormat as any);
+                  const prependedFn = prepend(' ', formatByTick);
                   return prependedFn ? prependedFn(args[0] as Date) : String(args[0]);
                 },
                 textAnchor: 'start',
                 tickPadding: -10,
               }
-              : { tickFormat: (...args: unknown[]) => (by.tickFormat as any)(args[0]) }),
+              : {
+                tickFormat: (...args: unknown[]) =>
+                  formatByTick(args[0] as Date),
+              }),
           }),
           Plot.axisY({
             label: null,
@@ -235,7 +240,7 @@ export const plot =
               : {
                 tickRotate: -90,
                 tickFormat: (...args: unknown[]) => {
-                  const prependedFn = prepend(' ', value.tickFormat as any);
+                  const prependedFn = prepend(' ', formatValueTick);
                   return prependedFn ? prependedFn(args[0] as number) : String(args[0]);
                 },
                 textAnchor: 'start',

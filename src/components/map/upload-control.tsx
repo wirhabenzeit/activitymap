@@ -22,7 +22,6 @@ export function UploadControl() {
             if (typeof text === 'string') {
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(text, 'text/xml');
-                // @ts-ignore
                 const geoJson = toGeoJSON.gpx(xmlDoc);
                 setUploadedGeoJson(geoJson);
             }

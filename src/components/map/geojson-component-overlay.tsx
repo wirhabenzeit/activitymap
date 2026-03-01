@@ -86,7 +86,7 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
       this.onFeatureClick(
         {
           type: 'Feature',
-          geometry: firstFeature.geometry as Geometry,
+          geometry: firstFeature.geometry,
           properties: (firstFeature.properties ?? {}) as GeoJsonProperties,
         },
         e,
@@ -115,16 +115,15 @@ export const GeoJSONComponentOverlay: React.FC<
   color = '#ff0000',
   lineWidth = 2,
   opacity = 0.8,
-  interactive = false,
+  interactive: _interactive = false,
 }) => {
     const [geoJSONData, setGeoJSONData] = useState<FeatureCollection | null>(
       null,
     );
-    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedFeature, setSelectedFeature] = useState<OverlayFeature | null>(null);
 
-    const onFeatureClick = (feature: OverlayFeature, event: MapMouseEvent) => {
+    const onFeatureClick = (feature: OverlayFeature, _event: MapMouseEvent) => {
 
       setSelectedFeature(feature);
     };
@@ -142,51 +141,46 @@ export const GeoJSONComponentOverlay: React.FC<
 
     // Log when component mounts/unmounts
     useEffect(() => {
+      let cancelled = false;
 
-    }, [id]);
-
-    // Fetch GeoJSON data if URL is provided
-    useEffect(() => {
       if (typeof data === 'string') {
-        setIsLoading(true);
-        setError(null);
-
-        // Handle both absolute URLs and relative paths
-        // For relative paths, ensure they're properly resolved
-        const url = data.startsWith('http') ? data : data;
-
-
-        // Use fetch with appropriate cache settings
-        fetch(url, { cache: 'no-cache' })
-          .then((response) => {
+        const loadData = async () => {
+          try {
+            const response = await fetch(data, { cache: 'no-cache' });
             if (!response.ok) {
               throw new Error(`Failed to fetch GeoJSON: ${response.status}`);
             }
-            return response.json();
-          })
-          .then((jsonData: FeatureCollection) => {
-
+            const jsonData = (await response.json()) as FeatureCollection;
+            if (cancelled) {
+              return;
+            }
             setGeoJSONData(jsonData);
-            setIsLoading(false);
-          })
-          .catch((err: Error) => {
+            setError(null);
+          } catch (err) {
+            if (cancelled) {
+              return;
+            }
+            const message =
+              err instanceof Error ? err.message : 'Failed to load GeoJSON';
             console.error('Error loading GeoJSON:', err);
-            setError(err.message);
-            setIsLoading(false);
-          });
+            setError(message);
+          }
+        };
+
+        void loadData();
       } else if (typeof data === 'object') {
         // Direct GeoJSON data provided
         setGeoJSONData(data);
+        setError(null);
       }
+
+      return () => {
+        cancelled = true;
+      };
     }, [data]);
 
     // Add debugging for the render phase
 
-
-    if (isLoading) {
-
-      return null;
-    }
 
     if (error) {
       console.error(`Error loading GeoJSON data for ${id}: ${error}`);

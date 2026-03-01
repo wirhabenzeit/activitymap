@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm';
 import {
   boolean,
   doublePrecision,
@@ -7,7 +6,6 @@ import {
   jsonb,
   pgEnum,
   pgTable,
-  primaryKey,
   text,
   timestamp,
   varchar,

@@ -1,11 +1,7 @@
 'use server';
 
-import { db } from '~/server/db';
-import { activities } from '~/server/db/schema';
-import { eq, and, inArray, sql } from 'drizzle-orm';
 import { getAuthenticatedAccount } from '~/server/db/actions';
 import { fetchStravaActivities } from './actions';
-import { StravaClient } from '~/server/strava/client';
 
 export async function syncYear(year: number) {
     try {

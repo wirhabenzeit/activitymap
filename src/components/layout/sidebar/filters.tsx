@@ -71,7 +71,7 @@ export function CategoryFilter() {
             ) as Record<keyof typeof categorySettings, boolean>,
         );
     };
-    let singleClickTimer: NodeJS.Timeout;
+    let singleClickTimer: NodeJS.Timeout | undefined;
     if (clicks === 1) {
       singleClickTimer = setTimeout(function () {
         doSingleClickThing();
@@ -79,9 +79,15 @@ export function CategoryFilter() {
       }, 250);
     } else if (clicks >= 2) {
       doDoubleClickThing();
-      setClicks(0);
+      singleClickTimer = setTimeout(() => {
+        setClicks(0);
+      }, 0);
     }
-    return () => clearTimeout(singleClickTimer);
+    return () => {
+      if (singleClickTimer) {
+        clearTimeout(singleClickTimer);
+      }
+    };
   }, [clicks, key, setSportGroup]);
 
   return (

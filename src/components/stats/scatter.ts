@@ -130,6 +130,14 @@ export const plot =
     }) => {
       const bigPlot = width > 500;
       const { xValue, yValue, rValue, group } = getter(setting);
+      const yTickFormatter = (value: Date | number) =>
+        'tickFormatShort' in yValue
+          ? yValue.tickFormatShort(value as Date)
+          : yValue.tickFormat(value as number);
+      const xTickFormatter = (value: Date | number) =>
+        'tickFormatShort' in xValue
+          ? xValue.tickFormatShort(value as Date)
+          : xValue.tickFormat(value as number);
       return Plot.plot({
         ...commonSettings,
         ...(bigPlot
@@ -161,9 +169,7 @@ export const plot =
                 tickSize: 14,
                 tickPadding: -10,
                 tickFormat: (...args: unknown[]) => {
-                  const fn = 'tickFormatShort' in yValue
-                    ? prepend(' ', yValue.tickFormatShort as any)
-                    : prepend(' ', yValue.tickFormat as any);
+                  const fn = prepend(' ', yTickFormatter);
                   return fn ? fn(args[0] as Date | number) : String(args[0]);
                 },
               }),
@@ -176,9 +182,7 @@ export const plot =
             ...(!bigPlot
               ? {
                 tickFormat: (...args: unknown[]) => {
-                  const fn = 'tickFormatShort' in xValue
-                    ? prepend(' ', xValue.tickFormatShort as any)
-                    : prepend(' ', xValue.tickFormat as any);
+                  const fn = prepend(' ', xTickFormatter);
                   return fn ? fn(args[0] as Date | number) : String(args[0]);
                 },
                 textAnchor: 'start',
@@ -186,7 +190,7 @@ export const plot =
               }
               : {
                 tickFormat: (...args: unknown[]) =>
-                  'tickFormat' in xValue ? (xValue.tickFormat as any)(args[0]) : String(args[0]),
+                  xTickFormatter(args[0] as Date | number),
               }),
           }),
           Plot.dot(

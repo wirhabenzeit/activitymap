@@ -29,6 +29,7 @@ export interface DensityInstance {
   toggleDensity: (value?: DensityState) => void;
 }
 
+/* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
   interface TableState {
     density: DensityState;
@@ -42,6 +43,7 @@ declare module '@tanstack/react-table' {
     toggleDensity: (value?: DensityState) => void;
   }
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 export const DensityFeature: TableFeature = {
   getInitialState: (state): DensityTableState => {
@@ -88,6 +90,7 @@ export interface MapInstance {
   setMap: (updater: Updater<RefObject<MapRef | null> | undefined>) => void;
 }
 
+/* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
   interface TableState {
     map?: RefObject<MapRef | null>;
@@ -99,6 +102,7 @@ declare module '@tanstack/react-table' {
     setMap: (updater: Updater<RefObject<MapRef | null> | undefined>) => void;
   }
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 export const MapFeature: TableFeature = {
   getInitialState: (state): MapTableState => {
@@ -141,6 +145,7 @@ export interface SummaryRowInstance {
   setSummaryRow: (updater: Updater<SummaryRowState>) => void;
 }
 
+/* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
   interface TableState {
     summaryRow: SummaryRowState;
@@ -153,6 +158,7 @@ declare module '@tanstack/react-table' {
     setSummaryRow: (updater: Updater<SummaryRowState>) => void;
   }
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 export const SummaryRowFeature: TableFeature = {
   getInitialState: (state): SummaryRowTableState => {

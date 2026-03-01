@@ -63,6 +63,7 @@ const addToRemoveQueue = (toastId: string) => {
   }
 
   const timeout = setTimeout(() => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
     toastTimeouts.delete(toastId)
     dispatch({
       type: "REMOVE_TOAST",

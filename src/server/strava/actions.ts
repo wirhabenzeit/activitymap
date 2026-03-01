@@ -11,7 +11,7 @@ import { db } from '~/server/db';
 import { getAuthenticatedAccount } from '~/server/db/actions';
 import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
-import { type StravaPhoto } from './types';
+import { type StravaPhoto, type UpdatableActivity } from './types';
 import { inArray, eq, and, sql } from 'drizzle-orm';
 import { webhooks, stravaWebhooks } from '~/server/db/schema';
 import type { StravaActivity } from './types';
@@ -41,8 +41,7 @@ export async function updateActivity(
 
     try {
       // First update in Strava to ensure we have valid authorization
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const updateData: any = {
+      const updateData: Omit<UpdatableActivity, 'id' | 'athlete'> = {
         name: act.name,
         sport_type: act.sport_type,
         description: act.description,
@@ -148,8 +147,9 @@ export async function fetchStravaActivities(
       stravaActivitiesResult = stravaActivitiesResult;
     } else {
       // List/Summary mode
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const params: any = { per_page: per_page ?? limit };
+      const params: Parameters<StravaClient['getActivities']>[0] = {
+        per_page: per_page ?? limit,
+      };
       if (before) params.before = before;
       if (after) params.after = after;
       if (page) params.page = page;

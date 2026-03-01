@@ -324,8 +324,11 @@ export const plot =
               : {
                 tickRotate: -90,
                 tickFormat: (...args: unknown[]) => {
-                  const fn = prepend(' ', timeline.value.format as any);
-                  return fn ? fn(args[0]) : String(args[0]);
+                  const fn = prepend(
+                    ' ',
+                    timeline.value.format as (value: number) => string,
+                  );
+                  return fn ? fn(args[0] as number) : String(args[0]);
                 },
                 textAnchor: 'start',
                 tickSize: 14,

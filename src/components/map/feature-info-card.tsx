@@ -7,6 +7,7 @@ import {
   CardFooter,
 } from '~/components/ui/card';
 import { Button } from '~/components/ui/button';
+import Image from 'next/image';
 import type { Feature, GeoJsonProperties, Geometry } from 'geojson';
 import { X, Download } from 'lucide-react';
 import Markdown from 'react-markdown';
@@ -23,31 +24,40 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
 }) => {
   if (!feature) return null;
   const properties = feature.properties ?? {};
+  const propertyMap = properties as Record<string, unknown>;
+  const getStringProperty = (key: string): string | undefined => {
+    const value = propertyMap[key];
+    return typeof value === 'string' && value.length > 0 ? value : undefined;
+  };
 
   const candidateTitle =
-    properties.Name ??
-    properties.RUTE ??
-    properties.FJELL ??
-    properties.OMRÅDE ??
-    properties.name;
+    getStringProperty('Name') ??
+    getStringProperty('RUTE') ??
+    getStringProperty('FJELL') ??
+    getStringProperty('OMRÅDE') ??
+    getStringProperty('name');
   const fallbackId =
-    properties.TUR_NR ??
-    properties.TURNUMMER ??
-    properties.TURNR ??
-    properties.ID;
-  const fallbackTitle = [properties.source, fallbackId]
+    getStringProperty('TUR_NR') ??
+    getStringProperty('TURNUMMER') ??
+    getStringProperty('TURNR') ??
+    getStringProperty('ID');
+  const fallbackTitle = [propertyMap.source, fallbackId]
     .filter((value) => value !== undefined && value !== null && value !== '')
     .join(' # ');
   const title =
-    (properties.full_title as string | undefined) ??
-    (properties.title as string | undefined) ??
-    (candidateTitle as string | undefined) ??
+    getStringProperty('full_title') ??
+    getStringProperty('title') ??
+    candidateTitle ??
     fallbackTitle ??
     'Feature Info';
   const description =
-    (properties.short_title_en as string | undefined) ??
-    (properties.short_title as string | undefined) ??
-    (properties.description as string | undefined);
+    getStringProperty('short_title_en') ??
+    getStringProperty('short_title') ??
+    getStringProperty('description');
+  const imageUrl = getStringProperty('image_url');
+  const originalUrl = getStringProperty('original_url');
+  const externalGpxUrl = getStringProperty('gpx_url');
+  const displayTitle = getStringProperty('title');
 
   const hiddenKeys = new Set([
     'title',
@@ -69,7 +79,7 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
       value !== '',
   );
   const hasGeometry = !!feature.geometry;
-  const hasExternalGpxUrl = !!properties.gpx_url;
+  const hasExternalGpxUrl = !!externalGpxUrl;
 
   const downloadGpxFromGeometry = () => {
     if (!feature.geometry) return;
@@ -100,7 +110,7 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
       return;
     }
     if (hasExternalGpxUrl) {
-      window.open(properties.gpx_url as string, '_blank');
+      window.open(externalGpxUrl, '_blank');
     }
   };
 
@@ -122,11 +132,14 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
           </div>
         </CardHeader>
         <CardContent className="pb-4">
-          {properties.image_url && (
+          {imageUrl && (
             <div className="mb-3 overflow-hidden rounded-md h-60">
-              <img
-                src={properties.image_url as string}
-                alt={(properties.title as string) ?? 'Feature image'}
+              <Image
+                src={imageUrl}
+                alt={displayTitle ?? 'Feature image'}
+                width={1200}
+                height={600}
+                unoptimized
                 className="h-full w-full object-cover"
               />
             </div>
@@ -183,13 +196,13 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
         </CardContent>
       </div>
       <CardFooter className="pt-0 flex-shrink-0 flex gap-2">
-        {properties.original_url && (
+        {originalUrl && (
           <Button
             variant="outline"
             size="sm"
             className="flex-1"
             onClick={() =>
-              window.open(properties.original_url as string, '_blank')
+              window.open(originalUrl, '_blank')
             }
           >
             View Details
@@ -199,7 +212,7 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
           <Button
             variant="outline"
             size="sm"
-            className={properties.original_url ? 'w-auto' : 'flex-1'}
+            className={originalUrl ? 'w-auto' : 'flex-1'}
             onClick={handleGpxClick}
           >
             <Download className="h-4 w-4 mr-2" />

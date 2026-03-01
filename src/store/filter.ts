@@ -115,7 +115,7 @@ export const createFilterSlice: StateCreator<
   [['zustand/immer', never], never],
   [],
   FilterSlice
-> = (set, get, store) => {
+> = (set, _get, _store) => {
 
   const slices: FilterSlice = {
     // Initial state

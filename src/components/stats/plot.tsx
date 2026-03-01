@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, type JSX, useMemo } from 'react';
+import { useEffect, useRef, type JSX, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from 'next-themes';
-import { useShallowStore, useStore } from '~/store';
+import { useShallowStore } from '~/store';
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 
 import { useContext } from 'react';
@@ -233,6 +233,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
   const { theme } = useTheme();
 
   const figureRef = useRef<HTMLDivElement>(null);
+  const [portalTarget, setPortalTarget] = useState<HTMLDivElement | null>(null);
   const { width, height, settingsRef } = useContext(StatsContext);
 
   const stats = useMemo(
@@ -250,6 +251,10 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
     }),
     [settings, name, setSettings],
   );
+
+  useEffect(() => {
+    setPortalTarget(settingsRef.current);
+  }, [settingsRef]);
 
   useEffect(() => {
     if (!figureRef.current || !settingsRef.current) return;
@@ -279,7 +284,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
       plot.remove();
       if (legend) legend.remove();
     };
-  }, [width, height, filteredActivities, settings[name], theme, name, stats, settingsRef]);
+  }, [width, height, filteredActivities, theme, name, stats, settingsRef]);
 
   return (
     <>
@@ -291,9 +296,9 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
         }}
         ref={figureRef}
       />
-      {settingsRef.current && createPortal(
+      {portalTarget && createPortal(
         <FormComponent stat={stats as unknown as Stats<typeof name>} />,
-        settingsRef.current
+        portalTarget
       )}
     </>
   );

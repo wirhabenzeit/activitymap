@@ -38,8 +38,8 @@ export function AuthProvider({
               .filter((id) => !isNaN(id))
             : undefined,
         } as const;
-
-        initialAuth.guestMode = guestMode;
+        initializeAuth({ ...initialAuth, guestMode });
+        return;
       }
 
       // Initialize the auth state

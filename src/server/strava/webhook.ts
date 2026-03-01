@@ -21,7 +21,7 @@ export type StravaWebhookEvent = {
  * This is designed to be called from the API route handler
  */
 export async function processWebhookEvent(data: StravaWebhookEvent) {
-  const { object_type, object_id, aspect_type, owner_id } = data;
+  const { object_type, object_id, owner_id } = data;
 
 
 

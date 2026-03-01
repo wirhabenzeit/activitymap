@@ -38,17 +38,6 @@ export const StatsProvider = ({
       }
     });
 
-    setState((state) => {
-      if (elementRef?.current === null) {
-        return state;
-      }
-      return {
-        ...state,
-        width: elementRef.current.offsetWidth,
-        height: elementRef.current.offsetHeight,
-      };
-    });
-
     if (elementRef.current) ro.observe(elementRef.current);
     return () => {
       if (elementRef.current)
