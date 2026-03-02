@@ -7,9 +7,9 @@ import {
   deleteActivities as deleteServerActivities,
 } from '~/server/strava/actions';
 
-export type ActivityState = Record<string, never>;
+export type ActivityState = {};
 
-export type ActivityActions = Record<string, never>;
+export type ActivityActions = {};
 
 export type ActivitySlice = ActivityState & ActivityActions;
 
