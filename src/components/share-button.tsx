@@ -20,13 +20,29 @@ import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { useToast } from '~/hooks/use-toast';
 
 import { useActivities } from '~/hooks/use-activities';
+import { appendMapShareParams } from '~/lib/map-share';
+import { defaultMapPosition } from '~/settings/map';
 
 export function ShareButton() {
-  const { selected, user, isGuest } = useShallowStore(
+  const {
+    selected,
+    user,
+    isGuest,
+    baseMap,
+    overlayMaps,
+    position,
+    threeDim,
+    showPhotos,
+  } = useShallowStore(
     (state) => ({
       selected: state.selected,
       user: state.user,
       isGuest: state.isGuest,
+      baseMap: state.baseMap,
+      overlayMaps: state.overlayMaps,
+      position: state.position,
+      threeDim: state.threeDim,
+      showPhotos: state.showPhotos,
     }),
   );
 
@@ -41,7 +57,7 @@ export function ShareButton() {
     if (typeof window === 'undefined') {
       return '';
     }
-    const url = new URL(window.location.origin);
+    const url = new URL('/map', window.location.origin);
     if (shareMode === 'selected' && selected.length > 0) {
       // Get public_ids from activities for sharing
       const publicIds = activities
@@ -52,8 +68,34 @@ export function ShareButton() {
     } else if (shareMode === 'profile' && user?.id) {
       url.searchParams.append('user', user.id);
     }
+
+    appendMapShareParams(url, {
+      baseMap,
+      overlayMaps,
+      position: {
+        longitude: position.longitude,
+        latitude: position.latitude,
+        zoom: position.zoom,
+        bearing: position.bearing ?? defaultMapPosition.bearing,
+        pitch: position.pitch ?? defaultMapPosition.pitch,
+        padding: position.padding ?? defaultMapPosition.padding,
+      },
+      threeDim,
+      showPhotos,
+    });
+
     return url.toString();
-  }, [shareMode, selected, user, activities]);
+  }, [
+    shareMode,
+    selected,
+    user,
+    activities,
+    baseMap,
+    overlayMaps,
+    position,
+    threeDim,
+    showPhotos,
+  ]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(shareUrl);

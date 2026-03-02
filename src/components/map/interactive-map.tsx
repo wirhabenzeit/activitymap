@@ -9,7 +9,6 @@ import React, {
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
 import { Camera, Globe } from 'lucide-react';
-import { Button } from '~/components/ui/button';
 import { columns } from '~/components/list/columns';
 
 import ReactMapGL, {
@@ -19,6 +18,7 @@ import ReactMapGL, {
   Layer,
   Source,
   type MapRef,
+  type ViewState,
 } from 'react-map-gl/mapbox';
 import type { SkyLayer } from 'mapbox-gl';
 
@@ -39,13 +39,20 @@ import Overlay from '~/components/map/overlay';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-import { baseMaps, overlayMaps } from '~/settings/map';
+import {
+  baseMaps,
+  defaultMapPosition,
+  overlayMaps,
+  type OverlaySetting,
+} from '~/settings/map';
 import { categorySettings } from '~/settings/category';
+import { parseMapShareParams } from '~/lib/map-share';
 
 import { Download } from '~/components/map/download-control';
 import { UploadControl } from '~/components/map/upload-control';
 import { Selection } from '~/components/map/selection-control';
 import { LayerSwitcher } from '~/components/map/layer-switcher';
+import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import PhotoLayer from '~/components/map/photo';
 import { cn, groupBy } from '~/lib/utils';
 
@@ -53,6 +60,25 @@ import { useActivityGeoJson, useActivities } from '~/hooks/use-activities';
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import { usePhotos } from '~/hooks/use-photos';
 import type { Activity } from '~/server/db/schema';
+import { useSearchParams } from 'next/navigation';
+
+type OverlayMapId = keyof typeof overlayMaps;
+
+const isDefaultViewState = (viewState: ViewState): boolean => {
+  return (
+    Math.abs(viewState.longitude - defaultMapPosition.longitude) < 1e-8 &&
+    Math.abs(viewState.latitude - defaultMapPosition.latitude) < 1e-8 &&
+    Math.abs(viewState.zoom - defaultMapPosition.zoom) < 1e-8 &&
+    Math.abs((viewState.pitch ?? 0) - defaultMapPosition.pitch) < 1e-8 &&
+    Math.abs((viewState.bearing ?? 0) - defaultMapPosition.bearing) < 1e-8
+  );
+};
+
+const getOverlayMapSetting = (
+  overlayId: OverlayMapId,
+): OverlaySetting => {
+  return overlayMaps[overlayId] as OverlaySetting;
+};
 
 const RouteLayer = React.memo(function RouteLayer() {
   const { selected, highlighted } = useShallowStore(
@@ -173,6 +199,11 @@ const RouteLayer = React.memo(function RouteLayer() {
 });
 
 export default function InteractiveMap() {
+  const searchParams = useSearchParams();
+  const sharedMapState = useMemo(
+    () => parseMapShareParams(searchParams),
+    [searchParams],
+  );
   const [cursor, setCursor] = useState('auto');
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
   const onMouseLeave = useCallback(() => setCursor('auto'), []);
@@ -197,6 +228,7 @@ export default function InteractiveMap() {
     overlays,
     mapPosition,
     setPosition,
+    hydrateMapState,
     threeDim,
     toggleThreeDim,
     showPhotos,
@@ -211,6 +243,7 @@ export default function InteractiveMap() {
     overlays: state.overlayMaps,
     mapPosition: state.position,
     setPosition: state.setPosition,
+    hydrateMapState: state.hydrateMapState,
     threeDim: state.threeDim,
     showPhotos: state.showPhotos,
     togglePhotos: state.togglePhotos,
@@ -221,6 +254,7 @@ export default function InteractiveMap() {
   const { open } = useSidebar();
   const mapRefLoc = useRef<MapRef>(null);
   const columnFilters = [{ id: 'id', value: filterIDs }];
+  const hydratedFromUrlRef = useRef(false);
 
   useEffect(() => {
     const map = mapRefLoc.current?.getMap();
@@ -229,11 +263,26 @@ export default function InteractiveMap() {
     }
   }, [open]);
 
-  const [viewport, setViewport] = useState(mapPosition);
+  const initialViewport = sharedMapState.patch.position ?? mapPosition;
+  const [viewport, setViewport] = useState(initialViewport);
   const hasAutoCenteredOnLatest = useRef(false);
+  const hasExplicitInitialView =
+    sharedMapState.hasPositionRequest || !isDefaultViewState(mapPosition);
+
+  useEffect(() => {
+    if (hydratedFromUrlRef.current || !sharedMapState.hasAnyMapParam) {
+      return;
+    }
+    hydratedFromUrlRef.current = true;
+
+    hydrateMapState(sharedMapState.patch);
+  }, [hydrateMapState, sharedMapState]);
 
   const tryAutoCenterOnLatestActivity = useCallback(() => {
     if (hasAutoCenteredOnLatest.current) {
+      return;
+    }
+    if (hasExplicitInitialView) {
       return;
     }
 
@@ -265,7 +314,7 @@ export default function InteractiveMap() {
       });
       return;
     }
-  }, [activities]);
+  }, [activities, hasExplicitInitialView]);
 
   useEffect(() => {
     tryAutoCenterOnLatestActivity();
@@ -276,9 +325,10 @@ export default function InteractiveMap() {
     const ids: string[] = ['routeLayerBG', 'routeLayerBGsel']; // Default interactive layers
 
     overlays.forEach((mapName) => {
-      const mapSetting = overlayMaps[mapName];
-      if (mapSetting?.interactiveLayerIds?.length) {
-        ids.push(...mapSetting.interactiveLayerIds);
+      const mapSetting = getOverlayMapSetting(mapName);
+      const interactiveLayerIds = mapSetting.interactiveLayerIds;
+      if (Array.isArray(interactiveLayerIds) && interactiveLayerIds.length > 0) {
+        ids.push(...interactiveLayerIds);
       }
     });
 
@@ -289,7 +339,7 @@ export default function InteractiveMap() {
     () => (
       <>
         {overlays.map((mapName) => {
-          const mapSetting = overlayMaps[mapName];
+          const mapSetting = getOverlayMapSetting(mapName);
           if (!mapSetting) return null;
 
           // Handle raster overlays
@@ -427,32 +477,27 @@ export default function InteractiveMap() {
           <LayerSwitcher />
         </Overlay>
         <Overlay position="top-left">
-          <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
-            <Button
-              onClick={() => {
-                toggleThreeDim();
-                mapRefLoc.current
-                  ?.getMap()
-                  .easeTo({ pitch: threeDim ? 0 : 60 });
-              }}
-              className="[&_svg]:size-5"
-            >
-              <Globe
-                className="mx-auto"
-                color={threeDim ? 'hsl(var(--header-background))' : 'gray'}
-              />
-            </Button>
-          </div>
+          <MapControlIconButton
+            onClick={() => {
+              toggleThreeDim();
+              mapRefLoc.current?.getMap().easeTo({ pitch: threeDim ? 0 : 60 });
+            }}
+            aria-label="Toggle 3D globe"
+          >
+            <Globe
+              color={threeDim ? 'hsl(var(--header-background))' : 'gray'}
+            />
+          </MapControlIconButton>
         </Overlay>
         <Overlay position="top-left">
-          <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
-            <Button onClick={togglePhotos} className="[&_svg]:size-5">
-              <Camera
-                className="mx-auto"
-                color={showPhotos ? 'hsl(var(--header-background))' : 'gray'}
-              />
-            </Button>
-          </div>
+          <MapControlIconButton
+            onClick={togglePhotos}
+            aria-label="Toggle photos"
+          >
+            <Camera
+              color={showPhotos ? 'hsl(var(--header-background))' : 'gray'}
+            />
+          </MapControlIconButton>
         </Overlay>
         {overlayMapComponents}
         {uploadedGeoJson && (

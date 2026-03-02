@@ -7,6 +7,7 @@ import { useShallowStore } from '~/store';
 import { baseMaps, overlayMaps as overlayMapSettings } from '~/settings/map';
 
 import { Button } from '~/components/ui/button';
+import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,38 +54,45 @@ export function LayerSwitcher() {
   }));
 
   return (
-    <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="[&_svg]:size-5">
-            <Map className="mx-auto" color="black" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-56 h-120 overflow-y-auto">
-          <DropdownMenuLabel>Base Map</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuRadioGroup value={baseMap} onValueChange={setBaseMap}>
-            {Object.entries(baseMaps).map(([key]) => (
-              <DropdownMenuRadioItem value={key} key={key}>
-                {key}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-          <DropdownMenuLabel>Overlays</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {Object.entries(overlayMapSettings).map(([key]) => (
-            <DropdownMenuCheckboxItem
-              key={key}
-              checked={activeOverlays.includes(key)}
-              onClick={() => {
-                toggleOverlayMap(key);
-              }}
-            >
-              {key}
-            </DropdownMenuCheckboxItem>
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <MapControlIconButton aria-label="Map layers">
+          <Map color="black" />
+        </MapControlIconButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56 h-120 overflow-y-auto">
+        <DropdownMenuLabel>Base Map</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={baseMap}
+          onValueChange={(value) =>
+            setBaseMap(value as keyof typeof baseMaps)
+          }
+        >
+          {(Object.entries(baseMaps) as Array<
+            [keyof typeof baseMaps, (typeof baseMaps)[keyof typeof baseMaps]]
+          >).map(([key, setting]) => (
+            <DropdownMenuRadioItem value={key} key={key}>
+              {setting.label}
+            </DropdownMenuRadioItem>
           ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuLabel>Overlays</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {(Object.entries(overlayMapSettings) as Array<
+          [keyof typeof overlayMapSettings, (typeof overlayMapSettings)[keyof typeof overlayMapSettings]]
+        >).map(([key, setting]) => (
+          <DropdownMenuCheckboxItem
+            key={key}
+            checked={activeOverlays.includes(key)}
+            onClick={() => {
+              toggleOverlayMap(key);
+            }}
+          >
+            {setting.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

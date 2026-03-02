@@ -1,10 +1,10 @@
 'use client';
 
-import { Button } from '../ui/button';
 import { Download as DownloadIcon } from 'lucide-react';
 import FileSaver from 'file-saver';
 import mapboxgl from 'mapbox-gl';
 import { useMap } from 'react-map-gl/mapbox';
+import { MapControlIconButton } from './map-control-icon-button';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
@@ -68,10 +68,8 @@ export function Download() {
   };
 
   return (
-    <div className="z-1 h-[29px] w-[29px] rounded-md bg-white">
-      <Button onClick={download} className="[&_svg]:size-5">
-        <DownloadIcon className="mx-auto" color="black" />
-      </Button>
-    </div>
+    <MapControlIconButton onClick={download} aria-label="Download map image">
+      <DownloadIcon color="black" />
+    </MapControlIconButton>
   );
 }

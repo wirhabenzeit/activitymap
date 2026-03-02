@@ -24,6 +24,11 @@ export type MapActions = {
   toggleOverlayMap: (key: keyof typeof overlayMaps) => void;
   toggleThreeDim: () => void;
   setPosition: (position: ViewState, bbox: LngLatBounds) => void;
+  hydrateMapState: (
+    mapState: Partial<
+      Pick<MapState, 'baseMap' | 'overlayMaps' | 'position' | 'threeDim' | 'showPhotos'>
+    >,
+  ) => void;
   setUploadedGeoJson: (geoJson: GeoJSON.FeatureCollection | null) => void;
 };
 
@@ -36,12 +41,12 @@ export const createMapSlice: StateCreator<
   MapSlice
 > = (set) => ({
   // Initial state
-  baseMap: Object.entries(baseMaps).find(
-    ([, map]) => map.visible
-  )![0],
+  baseMap:
+    ((Object.entries(baseMaps).find(([, map]) => map.visible)?.[0] ??
+      Object.keys(baseMaps)[0]) as keyof typeof baseMaps),
   overlayMaps: Object.entries(overlayMaps)
     .filter(([, map]) => map.visible)
-    .map(([key]) => key),
+    .map(([_key]) => _key as keyof typeof overlayMaps),
   position: defaultMapPosition,
   bbox: defaultMapBounds,
   threeDim: false,
@@ -74,6 +79,25 @@ export const createMapSlice: StateCreator<
     set((state: RootState) => {
       state.position = position;
       state.bbox = bbox;
+    }),
+
+  hydrateMapState: (mapState) =>
+    set((state: RootState) => {
+      if (mapState.baseMap !== undefined) {
+        state.baseMap = mapState.baseMap;
+      }
+      if (mapState.overlayMaps !== undefined) {
+        state.overlayMaps = mapState.overlayMaps;
+      }
+      if (mapState.position !== undefined) {
+        state.position = mapState.position;
+      }
+      if (mapState.threeDim !== undefined) {
+        state.threeDim = mapState.threeDim;
+      }
+      if (mapState.showPhotos !== undefined) {
+        state.showPhotos = mapState.showPhotos;
+      }
     }),
 
   toggleThreeDim: () =>
