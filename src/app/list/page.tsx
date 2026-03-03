@@ -20,7 +20,7 @@ export default function ListPage() {
 
   const { data: activities = [] } = useActivities();
   const { data: photos = [] } = usePhotos();
-  const { filterIDs } = useFilteredActivities();
+  const { filterIDs } = useFilteredActivities(activities);
 
   const columnFilters = [{ id: 'id', value: filterIDs }];
   const photoDict = React.useMemo(

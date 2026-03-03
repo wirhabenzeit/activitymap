@@ -1,6 +1,6 @@
-import { eq, isNotNull, desc, and, asc, inArray } from 'drizzle-orm';
+import { eq, isNotNull, desc, and, asc, inArray, sql } from 'drizzle-orm';
 import { db } from '~/server/db';
-import { activities, activitySync, users } from '~/server/db/schema';
+import { activities, activityDeletions, activitySync, users } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
 import { fetchStravaActivities } from './actions';
 
@@ -273,6 +273,24 @@ async function updateIncompleteActivities(
             ),
           )
           .returning({ deletedId: activities.id }); // Return the IDs deleted
+
+        if (deleteResult.length > 0) {
+          await db
+            .insert(activityDeletions)
+            .values(
+              deleteResult.map(({ deletedId }) => ({
+                athlete_id: athleteId,
+                activity_id: deletedId,
+                deleted_at: new Date(),
+              })),
+            )
+            .onConflictDoUpdate({
+              target: [activityDeletions.athlete_id, activityDeletions.activity_id],
+              set: {
+                deleted_at: sql`excluded.deleted_at`,
+              },
+            });
+        }
 
 
         if (deleteResult.length !== notFoundIds.length) {

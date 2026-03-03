@@ -15,6 +15,8 @@ import { Toaster } from '~/components/ui/toaster';
 import { ToastManager } from '~/components/providers/toast';
 import type { Viewport } from 'next';
 import { QueryProvider } from '~/providers/query-provider';
+import { ServiceWorkerProvider } from '~/components/providers/service-worker';
+import { OfflineSyncProvider } from '~/components/providers/offline-sync';
 
 // Configure these values as needed
 export const viewport: Viewport = {
@@ -254,6 +256,8 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ServiceWorkerProvider />
+          <OfflineSyncProvider />
           <QueryProvider>
             <AuthProvider initialAuth={initialAuth}>
               <SidebarProvider

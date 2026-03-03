@@ -56,7 +56,10 @@ import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import PhotoLayer from '~/components/map/photo';
 import { cn, groupBy } from '~/lib/utils';
 
-import { useActivityGeoJson, useActivities } from '~/hooks/use-activities';
+import {
+  useActivityGeoJsonFromActivities,
+  useActivities,
+} from '~/hooks/use-activities';
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import { usePhotos } from '~/hooks/use-photos';
 import type { Activity } from '~/server/db/schema';
@@ -88,8 +91,9 @@ const RouteLayer = React.memo(function RouteLayer() {
     }),
   );
 
-  const { filterIDs } = useFilteredActivities();
-  const geoJson = useActivityGeoJson();
+  const { data: activities = [] } = useActivities();
+  const { filterIDs } = useFilteredActivities(activities);
+  const geoJson = useActivityGeoJsonFromActivities(activities);
 
   const color: mapboxgl.Expression = ['match', ['get', 'sport_type']];
   Object.entries(categorySettings).forEach(([, value]) => {
@@ -211,7 +215,7 @@ export default function InteractiveMap() {
   // Fetch data via hooks
   const { data: activities = [] } = useActivities();
   const { data: photos = [] } = usePhotos();
-  const { filterIDs } = useFilteredActivities();
+  const { filterIDs } = useFilteredActivities(activities);
 
   // Memoize activity dictionary for efficient lookup
   const activityDict = useMemo(() =>

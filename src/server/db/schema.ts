@@ -10,6 +10,7 @@ import {
   timestamp,
   varchar,
   bigint,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 
 import { sportTypes } from '~/server/strava/types';
@@ -210,6 +211,43 @@ export const activitySync = pgTable(
   (table) => [index('activity_sync_user_id_idx').on(table.user_id)],
 );
 
+export const activityDeletions = pgTable(
+  'activity_deletions',
+  {
+    athlete_id: bigint('athlete_id', { mode: 'number' }).notNull(),
+    activity_id: bigint('activity_id', { mode: 'number' }).notNull(),
+    deleted_at: timestamp('deleted_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.athlete_id, table.activity_id],
+    }),
+    index('activity_deletions_athlete_deleted_idx').on(
+      table.athlete_id,
+      table.deleted_at,
+    ),
+  ],
+);
+
+export const photoDeletions = pgTable(
+  'photo_deletions',
+  {
+    athlete_id: bigint('athlete_id', { mode: 'number' }).notNull(),
+    photo_id: varchar('photo_id').notNull(),
+    activity_id: bigint('activity_id', { mode: 'number' }),
+    deleted_at: timestamp('deleted_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.athlete_id, table.photo_id],
+    }),
+    index('photo_deletions_athlete_deleted_idx').on(
+      table.athlete_id,
+      table.deleted_at,
+    ),
+  ],
+);
+
 // export const activitiesRelations = relations(activities, ({ many }) => ({
 //   photos: many(photos),
 // }));
@@ -242,6 +280,8 @@ export type Photo = typeof photos.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
 export type ActivitySync = typeof activitySync.$inferSelect;
+export type ActivityDeletion = typeof activityDeletions.$inferSelect;
+export type PhotoDeletion = typeof photoDeletions.$inferSelect;
 
 export const stravaWebhooks = pgTable('strava_webhooks', {
   id: text('id').notNull().primaryKey(),

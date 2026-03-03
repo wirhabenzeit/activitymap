@@ -1,10 +1,15 @@
 'use server';
 
 import { db } from '~/server/db';
-import { activities, photos } from '~/server/db/schema';
+import {
+  activities,
+  activityDeletions,
+  photoDeletions,
+  photos,
+} from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
 import { fetchStravaActivities } from '~/server/strava/actions';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 export type StravaWebhookEvent = {
   object_type: string;
@@ -68,7 +73,27 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
     if (notFoundIds.includes(object_id)) {
 
       try {
-        await db.delete(activities).where(eq(activities.id, object_id));
+        const deletedRows = await db
+          .delete(activities)
+          .where(eq(activities.id, object_id))
+          .returning({ deletedId: activities.id });
+        if (deletedRows.length > 0) {
+          await db
+            .insert(activityDeletions)
+            .values(
+              deletedRows.map(({ deletedId }) => ({
+                athlete_id: owner_id,
+                activity_id: deletedId,
+                deleted_at: new Date(),
+              })),
+            )
+            .onConflictDoUpdate({
+              target: [activityDeletions.athlete_id, activityDeletions.activity_id],
+              set: {
+                deleted_at: sql`excluded.deleted_at`,
+              },
+            });
+        }
         // Cascading delete should handle photos
 
       } catch (deleteError) {
@@ -102,17 +127,44 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
 
 
       // 2. Handle photos: Delete existing, then insert new ones
+      const existingPhotos = await tx
+        .select({
+          photo_id: photos.unique_id,
+          activity_id: photos.activity_id,
+        })
+        .from(photos)
+        .where(eq(photos.activity_id, activityToSave.id));
+      await tx.delete(photos).where(eq(photos.activity_id, activityToSave.id));
+
       if (fetchedPhotos.length > 0) {
-
-        await tx.delete(photos).where(eq(photos.activity_id, activityToSave.id));
-
-
         await tx.insert(photos).values(fetchedPhotos);
+      }
 
-      } else {
-        // If includePhotos was true but no photos were returned, ensure existing are deleted
+      const incomingPhotoIds = new Set(
+        fetchedPhotos.map((photo) => photo.unique_id),
+      );
+      const removedPhotos = existingPhotos.filter(
+        ({ photo_id }) => !incomingPhotoIds.has(photo_id),
+      );
 
-        await tx.delete(photos).where(eq(photos.activity_id, activityToSave.id));
+      if (removedPhotos.length > 0) {
+        await tx
+          .insert(photoDeletions)
+          .values(
+            removedPhotos.map(({ photo_id, activity_id }) => ({
+              athlete_id: owner_id,
+              photo_id,
+              activity_id,
+              deleted_at: new Date(),
+            })),
+          )
+          .onConflictDoUpdate({
+            target: [photoDeletions.athlete_id, photoDeletions.photo_id],
+            set: {
+              activity_id: sql`excluded.activity_id`,
+              deleted_at: sql`excluded.deleted_at`,
+            },
+          });
       }
     });
 

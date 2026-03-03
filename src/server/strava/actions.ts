@@ -2,7 +2,11 @@
 
 import {
   activities as activitySchema,
+  activityDeletions,
+  photoDeletions,
   photos as photosSchema,
+  webhooks,
+  stravaWebhooks,
   type Activity,
   type Photo,
 } from '~/server/db/schema';
@@ -13,7 +17,6 @@ import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type StravaPhoto, type UpdatableActivity } from './types';
 import { inArray, eq, and, sql } from 'drizzle-orm';
-import { webhooks, stravaWebhooks } from '~/server/db/schema';
 import type { StravaActivity } from './types';
 import crypto from 'crypto';
 import {
@@ -199,12 +202,45 @@ export async function fetchStravaActivities(
       const photoResults = await Promise.all(photoFetchPromises);
       photos.push(...photoResults.flat());
 
-      if (shouldDeletePhotos && photos.length > 0) {
+      if (shouldDeletePhotos) {
         const activityIdsWithPhotos = fetchedActivities.map((act) => act.id);
         if (activityIdsWithPhotos.length > 0) {
+          const existingPhotoRows = await db
+            .select({
+              photoId: photosSchema.unique_id,
+              activityId: photosSchema.activity_id,
+            })
+            .from(photosSchema)
+            .where(inArray(photosSchema.activity_id, activityIdsWithPhotos));
+
+          const incomingPhotoIds = new Set(photos.map((photo) => photo.unique_id));
+          const removedPhotos = existingPhotoRows.filter(
+            ({ photoId }) => !incomingPhotoIds.has(photoId),
+          );
+
           await db
             .delete(photosSchema)
             .where(inArray(photosSchema.activity_id, activityIdsWithPhotos));
+
+          if (removedPhotos.length > 0) {
+            await db
+              .insert(photoDeletions)
+              .values(
+                removedPhotos.map(({ photoId, activityId }) => ({
+                  athlete_id: athleteId,
+                  photo_id: photoId,
+                  activity_id: activityId,
+                  deleted_at: new Date(),
+                })),
+              )
+              .onConflictDoUpdate({
+                target: [photoDeletions.athlete_id, photoDeletions.photo_id],
+                set: {
+                  activity_id: sql`excluded.activity_id`,
+                  deleted_at: sql`excluded.deleted_at`,
+                },
+              });
+          }
         }
       }
     }
@@ -370,6 +406,24 @@ export async function deleteActivities(input: number[]): Promise<{
       .returning({ deletedId: activitySchema.id });
 
     deletedCount = deleteResult.length;
+
+    if (deleteResult.length > 0) {
+      await db
+        .insert(activityDeletions)
+        .values(
+          deleteResult.map(({ deletedId }) => ({
+            athlete_id: athleteId,
+            activity_id: deletedId,
+            deleted_at: new Date(),
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [activityDeletions.athlete_id, activityDeletions.activity_id],
+          set: {
+            deleted_at: sql`excluded.deleted_at`,
+          },
+        });
+    }
 
 
     // Check if any requested IDs were not deleted (e.g., didn't belong to the user)

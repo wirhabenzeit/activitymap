@@ -4,9 +4,13 @@ import { useActivities } from './use-activities';
 import { useShallowStore } from '~/store';
 import { applyFilters, type FilterState } from '~/store/filter';
 import { useMemo } from 'react';
+import type { Activity } from '~/server/db/schema';
 
-export function useFilteredActivities() {
-    const { data: activities } = useActivities();
+export function useFilteredActivities(
+    activitiesOverride?: Activity[],
+) {
+    const { data: activitiesFromHook } = useActivities();
+    const activities = activitiesOverride ?? activitiesFromHook;
 
     // We selector the entire filter state parts required for filtering
     const filterState = useShallowStore((state) => ({
