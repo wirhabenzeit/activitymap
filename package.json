@@ -112,7 +112,6 @@
     "postcss": "^8.5.14",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.7.4",
-    "pwa-asset-generator": "^8.1.4",
     "tailwindcss": "^4.3.0",
     "typescript": "5.9.3"
   },
@@ -124,8 +123,7 @@
     "overrides": {
       "kysely": "^0.28.14",
       "picomatch": ">=4.0.4",
-      "basic-ftp": ">=5.2.2",
-      "defu": ">=6.1.5",
+"defu": ">=6.1.5",
       "@xmldom/xmldom": ">=0.8.13",
       "lodash-es": ">=4.18.0"
     }
