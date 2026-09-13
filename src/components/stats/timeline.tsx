@@ -1,12 +1,15 @@
-import * as Plot from '@observablehq/plot';
+import { defineChart, areaY, lineY, crosshair, ruleY, rollingWindow, d3Curve } from '@tanstack/charts';
+import { tooltip } from '@tanstack/charts/tooltip';
 
 import { ChartLine, ChartColumn } from 'lucide-react';
 import * as d3 from 'd3';
+import * as React from 'react';
 
 import { type Activity } from '~/server/db/schema';
 import { categorySettings, aliasMap } from '~/settings/category';
+import { resolveChartCategoryColors } from './chart-colors';
 
-import { commonSettings, prepend } from './index';
+import { prepend } from './index';
 
 export const settings = {
   averaging: {
@@ -104,9 +107,7 @@ export const settings = {
         label: 'Type',
         format: (id: keyof typeof categorySettings) =>
           categorySettings[id].name,
-        fun: (d: Activity) => aliasMap[d.sport_type],
-        color: (id: keyof typeof categorySettings) =>
-          categorySettings[id].color,
+        fun: (d: Activity) => aliasMap[d.sport_type] ?? 'misc',
         icon: (id: keyof typeof categorySettings) => categorySettings[id].icon,
       },
       no_group: {
@@ -114,7 +115,6 @@ export const settings = {
         label: 'All',
         format: () => 'All',
         fun: () => 'All',
-        color: () => '#000000',
         icon: () => 'child-reaching',
       },
     },
@@ -126,24 +126,14 @@ export const settings = {
       linear: {
         id: 'linear',
         label: 'Linear',
-        prop: {
-          type: 'linear',
-        },
       },
       sqrt: {
         id: 'sqrt',
         label: 'Sqrt',
-        prop: {
-          type: 'sqrt',
-        },
       },
       cbrt: {
         id: 'cbrt',
         label: 'Cbrt',
-        prop: {
-          type: 'pow',
-          exponent: 1 / 3,
-        },
       },
     },
   },
@@ -224,213 +214,194 @@ export const setter =
       }
     };
 
-export const plot =
+type TimelineRow = {
+  date: Date;
+  value: number;
+  type: string;
+};
+
+const groupColor = (group: keyof typeof categorySettings | 'All') =>
+  group === 'All' ? '#000000' : resolveChartCategoryColors()[group];
+
+const buildRows = (activities: Activity[], setting: TimelineSetting) => {
+  const timeline = getter(setting);
+
+  const extent = d3.extent(activities, (d) =>
+    timeline.timePeriod.tick(new Date(d.start_date_local)),
+  );
+  if (extent[0] == undefined || extent[1] == undefined) return null;
+
+  const groupExtent = Array.from(new Set(activities.map(timeline.group.fun)));
+
+  const range: Date[] = timeline.timePeriod.tick.range(
+    extent[0],
+    timeline.timePeriod.tick.ceil(extent[1]),
+  );
+
+  const groups = d3.group(
+    activities,
+    (d) => timeline.timePeriod.tick(new Date(d.start_date_local)),
+    timeline.group.fun,
+  );
+
+  const data: TimelineRow[] = range.flatMap((date) =>
+    groupExtent.map((type) => ({
+      date,
+      type,
+      value:
+        groups.get(date)?.get(type) != undefined
+          ? d3.sum(groups.get(date)!.get(type)!, timeline.value.fun)
+          : 0,
+    })),
+  );
+
+  return { timeline, groupExtent, range, data };
+};
+
+export const chart =
   (setting: TimelineSetting) =>
     ({
       activities,
       width,
-      height,
     }: {
       activities: Activity[];
       width: number;
       height: number;
+      theme: 'light' | 'dark';
     }) => {
-      const timeline = getter(setting);
-
-      const extent = d3.extent(activities, (d) =>
-        timeline.timePeriod.tick(new Date(d.start_date_local)),
-      );
-
-      if (extent[0] == undefined || extent[1] == undefined) return null;
-
-      const groupExtent = Array.from(
-        new Set(
-          activities.map(timeline.group.fun) as Array<
-            keyof typeof categorySettings
-          >,
-        ),
-      );
-
-      const range = timeline.timePeriod.tick.range(
-        extent[0],
-        timeline.timePeriod.tick.ceil(extent[1]),
-      );
-
-      const groups = d3.group(
-        activities,
-        (d) => timeline.timePeriod.tick(new Date(d.start_date_local)),
-        timeline.group.fun,
-      );
-
-      const timeMap = d3.map(range, (date) => {
-        return groupExtent.map((type) => ({
-          date,
-          type,
-          value:
-            groups.get(date)?.get(type) != undefined
-              ? d3.sum(groups.get(date)!.get(type)!, timeline.value.fun)
-              : 0,
-        }));
-      });
-
-      interface Data {
-        date: Date;
-        value: number;
-        type: keyof typeof categorySettings;
-      }
-
-      const data: Data[] = timeMap
-        .flat()
-        .sort((a, b) => a.date.getTime() - b.date.getTime())
-        .map((d) => ({
-          ...d,
-          [timeline.value.label]: d.value,
-        }));
-
-      const map = new d3.InternMap(
-        timeMap.map((arr) => {
-          return [
-            arr[0]!.date,
-            new d3.InternMap(arr.map(({ value, type }) => [type, value])),
-          ];
-        }),
-      );
-
+      const built = buildRows(activities, setting);
+      if (!built) return null;
+      const { timeline, groupExtent } = built;
       const bigPlot = width > 500;
 
-      return Plot.plot({
-        ...commonSettings,
-        ...(bigPlot
-          ? {
-            marginLeft: 70,
-            marginTop: 50,
-            marginRight: 60,
-          }
-          : {}),
-        height: Math.max(height, 100),
-        width: Math.max(width, 100),
-        y: { ...timeline.yScale.prop },
+      const curve = d3Curve(d3.curveMonotoneX);
+      const smoothed = rollingWindow(built.data, {
+        by: 'type',
+        size: timeline.averaging + 1,
+        anchor: 'middle',
+        orderBy: 'date',
+        outputs: {
+          smoothed: { value: 'value', reduce: 'mean' },
+        },
+      });
+
+      const yScaleFactory =
+        timeline.yScale.id === 'sqrt'
+          ? () => d3.scaleSqrt()
+          : timeline.yScale.id === 'cbrt'
+            ? () => d3.scalePow().exponent(1 / 3)
+            : () => d3.scaleLinear();
+
+      const formatValueTick = bigPlot
+        ? timeline.value.format
+        : prepend(' ', timeline.value.format);
+
+      return defineChart({
         marks: [
-          Plot.ruleY([0]),
-          Plot.axisY({
-            tickFormat: timeline.value.format,
-            ticks: 6,
-            ...timeline.yScale.prop,
-            label: null,
-            anchor: 'left',
-            tickSize: 12,
-            ...(bigPlot
-              ? {}
-              : {
-                tickRotate: -90,
-                tickFormat: (...args: unknown[]) => {
-                  const fn = prepend(
-                    ' ',
-                    timeline.value.format,
-                  );
-                  return fn ? fn(args[0] as number) : String(args[0]);
-                },
-                textAnchor: 'start',
-                tickSize: 14,
-                tickPadding: -10,
-              }),
-          }),
-          Plot.gridX({
-            ticks: 'year',
-          }),
-          Plot.axisX({
-            anchor: 'top',
-            label: null,
-            tickSize: 12,
-            ...(!bigPlot
-              ? {
-                textAnchor: 'start',
-                tickPadding: -10,
-                tickFormat: d3.timeFormat(" '%y"),
-              }
-              : {}),
-          }),
-          ...[
-            groupExtent.flatMap((type) => [
-              ...(bigPlot
-                ? [
-                  Plot.text(
-                    range,
-                    Plot.pointerX({
-                      textAnchor: 'start',
-                      px: (d: Date) => d,
-                      y: (d: Date) => map.get(d)!.get(type),
-                      dx: 8,
-                      frameAnchor: 'right',
-                      text: (d: Date) =>
-                        timeline.value.format(map.get(d)!.get(type)!),
-                      fill: timeline.group.color(type),
-                      fontSize: 12,
-                    }),
-                  ),
-                ]
-                : []),
-              Plot.dot(
-                range,
-                Plot.pointerX({
-                  x: (d: Date) => d,
-                  y: (d: Date) => map.get(d)?.get(type),
-                  //opacity: 1,
-                  fill: timeline.group.color(type),
-                }),
-              ),
-            ]),
-          ],
-          Plot.ruleX(range, Plot.pointerX({})),
-          Plot.lineY(
-            data,
-            Plot.windowY({
-              x: 'date',
-              y: timeline.value.label,
-              k: timeline.averaging + 1,
-              curve: 'monotone-x',
-              reduce: 'mean',
-              stroke: (x: Data) => timeline.group.color(x.type),
-              channels: {
-                Date: (d: Data) =>
-                  `${d3.timeFormat(timeline.timePeriod.tickFormat)(
-                    d.date,
-                  )} ± ${timeline.averaging} ${timeline.timePeriod.id}s`,
-              },
-              tip: {
-                channels: {
-                  Date: 'date',
-                  Type: 'type',
-                },
-                format: {
-                  y: timeline.value.format,
-                  Type: timeline.group.format,
-                  x: false,
-                  stroke: false,
-                  z: false,
-                },
-              },
-            }),
-          ),
-          Plot.areaY(data, {
+          ruleY([0]),
+          areaY(built.data, {
             x: 'date',
-            y2: 'value',
             y1: 0,
-            fill: (x: Data) => timeline.group.color(x.type),
-            opacity: 0.1,
-            curve: 'step',
+            y2: 'value',
+            color: 'type',
+            fillOpacity: 0.1,
+            curve: d3Curve(d3.curveStep),
           }),
+          lineY(smoothed, {
+            x: 'date',
+            y: 'smoothed',
+            z: 'type',
+            color: 'type',
+            curve,
+            strokeWidth: 2,
+          }),
+          crosshair({ marker: true }),
         ],
+        scales: {
+          x: {
+            scale: d3.scaleUtc().domain([built.range[0]!, built.range[built.range.length - 1]!]),
+            axis: {
+              ticks: { size: 12 },
+              tickLabels: bigPlot ? undefined : { rotate: 0 },
+            },
+          },
+          y: {
+            scale: yScaleFactory,
+            nice: true,
+            axis: {
+              ticks: { size: 12, format: formatValueTick },
+              tickLabels: bigPlot ? undefined : { rotate: -90, anchor: 'start' },
+            },
+          },
+        },
+        color: {
+          domain: groupExtent,
+          range: groupExtent.map((g) => groupColor(g as keyof typeof categorySettings | 'All')),
+        },
+        tooltip: {
+          use: tooltip,
+          items: [
+            // A `group` item both renders a formatted row and suppresses
+            // the library's default tooltip title, which otherwise falls
+            // back to the raw, unformatted group key (e.g. "bcXcSki").
+            {
+              channel: 'group',
+              label: timeline.group.label,
+              text: (point) => timeline.group.format(point.group as never),
+            },
+            {
+              id: 'date',
+              label: 'Date',
+              text: (point) => d3.timeFormat(timeline.timePeriod.tickFormat)(point.datum.date),
+            },
+            {
+              id: 'value',
+              label: timeline.value.label,
+              text: (point) => {
+                const datum = point.datum as TimelineRow & { smoothed?: number };
+                return timeline.value.format(datum.smoothed ?? datum.value);
+              },
+            },
+          ],
+        },
       });
     };
 
-export const legend = () => () => null;
+export const Legend = ({
+  setting,
+  activities,
+}: {
+  setting: TimelineSetting;
+  activities: Activity[];
+  theme: 'light' | 'dark';
+}) => {
+  const built = buildRows(activities, setting);
+  if (!built) return null;
+  const { timeline, groupExtent } = built;
+  if (groupExtent.length <= 1) return null;
+
+  return React.createElement(
+    'div',
+    { className: 'flex items-center space-x-2 text-xs' },
+    groupExtent.map((group) =>
+      React.createElement(
+        'span',
+        { key: group, className: 'flex items-center space-x-1' },
+        React.createElement('span', {
+          className: 'inline-block h-2 w-2 rounded-full',
+          style: { backgroundColor: groupColor(group as keyof typeof categorySettings | 'All') },
+        }),
+        React.createElement('span', null, timeline.group.format(group as never)),
+      ),
+    ),
+  );
+};
 
 const config = {
-  plot,
+  chart,
   settings,
   defaultSettings,
-  legend,
+  Legend,
   getter,
   setter,
 };

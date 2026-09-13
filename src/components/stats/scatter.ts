@@ -1,11 +1,14 @@
 import * as d3 from 'd3';
 
-import * as Plot from '@observablehq/plot';
+import { defineChart, dot, crosshair } from '@tanstack/charts';
+import { tooltip } from '@tanstack/charts/tooltip';
+import * as React from 'react';
 
 import { type Activity } from '~/server/db/schema';
 import { categorySettings, aliasMap } from '~/settings/category';
+import { resolveChartCategoryColors } from './chart-colors';
 
-import { commonSettings, prepend } from './index';
+import { prepend } from './index';
 
 const valueOptions = {
   distance: {
@@ -18,7 +21,7 @@ const valueOptions = {
   },
   elevation: {
     id: 'elevation',
-    fun: (d: Activity) => d.total_elevation_gain,
+    fun: (d: Activity) => d.total_elevation_gain!,
     format: (v: number) => (v / 1.0).toFixed() + 'm',
     tickFormat: (v: number) => (v / 1.0).toFixed(),
     label: 'Elevation (m)',
@@ -74,8 +77,6 @@ export const settings = {
       sport_group: {
         id: 'sport_group',
         fun: (d: Activity) => aliasMap[d.sport_type]!,
-        color: (id: keyof typeof categorySettings) =>
-          categorySettings[id].color,
         icon: (id: keyof typeof categorySettings) => categorySettings[id].icon,
         label: 'Group',
       },
@@ -117,19 +118,41 @@ const setter =
       return { ...scatter, [name]: value };
     };
 
-export const plot =
+type ScatterRow = {
+  x: number | Date;
+  y: number | Date;
+  r: number;
+  group: keyof typeof categorySettings;
+  name: string;
+};
+
+const buildRows = (activities: Activity[], setting: ScatterSetting): ScatterRow[] => {
+  const { xValue, yValue, rValue, group } = getter(setting);
+  return activities.map((act) => ({
+    x: xValue.fun(act),
+    y: yValue.fun(act),
+    r: Number(rValue.fun(act)),
+    group: group.fun(act),
+    name: act.name,
+  }));
+};
+
+export const chart =
   (setting: ScatterSetting) =>
     ({
       activities,
       width,
-      height,
     }: {
       activities: Activity[];
       width: number;
       height: number;
+      theme: 'light' | 'dark';
     }) => {
       const bigPlot = width > 500;
-      const { xValue, yValue, rValue, group } = getter(setting);
+      const { xValue, yValue, rValue } = getter(setting);
+      const data = buildRows(activities, setting);
+      if (data.length === 0) return null;
+
       const yTickFormatter = (value: Date | number) =>
         'tickFormatShort' in yValue
           ? yValue.tickFormatShort(value as Date)
@@ -138,209 +161,122 @@ export const plot =
         'tickFormatShort' in xValue
           ? xValue.tickFormatShort(value as Date)
           : xValue.tickFormat(value as number);
-      return Plot.plot({
-        ...commonSettings,
-        ...(bigPlot
-          ? {
-            marginLeft: 70,
-            marginTop: 50,
-          }
-          : {}),
-        height: height,
-        width: width,
-        r: {
-          range: [0, 10],
-          domain: d3.extent(activities, (act: Activity) => rValue.fun(act)),
-        },
+
+      const rExtent = d3.extent(data, (d) => d.r) as [number, number];
+      const rScale = d3.scaleSqrt().domain(rExtent).range([2, 12]);
+
+      const groupExtent = Array.from(new Set(data.map((d) => d.group)));
+      const colors = resolveChartCategoryColors();
+
+      const isDateAxis = (value: (typeof valueOptions)[keyof typeof valueOptions]) =>
+        value.id === 'date';
+
+      return defineChart({
         marks: [
-          Plot.axisY({
-            ticks: 6,
-            label: null,
-            anchor: 'left',
-            tickSize: 12,
-            ...(bigPlot
-              ? {
-                tickFormat:
-                  'tickFormat' in yValue ? yValue.tickFormat : undefined,
-              }
-              : {
-                tickRotate: -90,
-                textAnchor: 'start',
-                tickSize: 14,
-                tickPadding: -10,
-                tickFormat: (...args: unknown[]) => {
-                  const fn = prepend(' ', yTickFormatter);
-                  return fn ? fn(args[0] as Date | number) : String(args[0]);
-                },
-              }),
+          dot(data, {
+            x: 'x',
+            y: 'y',
+            r: 'r',
+            rScale,
+            color: 'group',
+            fillOpacity: 0.7,
+            strokeOpacity: 0,
           }),
-          Plot.axisX({
-            ticks: 6,
-            anchor: 'top',
-            label: null,
-            tickSize: 12,
-            ...(!bigPlot
-              ? {
-                tickFormat: (...args: unknown[]) => {
-                  const fn = prepend(' ', xTickFormatter);
-                  return fn ? fn(args[0] as Date | number) : String(args[0]);
-                },
-                textAnchor: 'start',
-                tickPadding: -10,
-              }
-              : {
-                tickFormat: (...args: unknown[]) =>
-                  xTickFormatter(args[0] as Date | number),
-              }),
-          }),
-          Plot.dot(
-            activities,
-            Plot.pointer({
-              x: xValue.fun,
-              y: yValue.fun,
-              r: rValue.fun,
-              fill: (d: Activity) => group.color(group.fun(d)),
-            }),
-          ),
-          Plot.dot(activities, {
-            x: xValue.fun,
-            y: yValue.fun,
-            r: rValue.fun,
-            stroke: (d: Activity) => group.color(group.fun(d)),
-            opacity: 0.5,
-            channels: {
-              Activity: (d: Activity) => d.name,
-              [rValue.label]: rValue.fun,
-              [xValue.label]: xValue.fun,
-              [yValue.label]: yValue.fun,
-            },
-            tip: {
-              format: {
-                x: false,
-                y: false,
-                r: false,
-                stroke: false,
-                [rValue.label]: rValue.format,
-                [xValue.label]: xValue.format,
-                [yValue.label]: yValue.format,
-              },
-            },
-          }),
-          Plot.ruleY(
-            activities,
-            Plot.pointer({
-              px: xValue.fun,
-              y: yValue.fun,
-              stroke: (d: Activity) => group.color(group.fun(d)),
-            }),
-          ),
-          Plot.ruleX(
-            activities,
-            Plot.pointer({
-              x: xValue.fun,
-              py: yValue.fun,
-              stroke: (d: Activity) => group.color(group.fun(d)),
-            }),
-          ),
-          /*Plot.crosshair(activities, {
-            x: xValue.fun,
-            y: yValue.fun,
-            color: (d) => group.color(group.fun(d)),
-          }),*/
+          crosshair({ marker: true }),
         ],
+        scales: {
+          x: {
+            scale: isDateAxis(xValue) ? d3.scaleUtc : d3.scaleLinear,
+            nice: true,
+            axis: {
+              ticks: {
+                size: 12,
+                format: bigPlot ? xTickFormatter : prepend(' ', xTickFormatter),
+              },
+              tickLabels: bigPlot ? undefined : { rotate: -90, anchor: 'start' },
+            },
+          },
+          y: {
+            scale: isDateAxis(yValue) ? d3.scaleUtc : d3.scaleLinear,
+            nice: true,
+            axis: {
+              ticks: {
+                size: 12,
+                format: bigPlot ? yTickFormatter : prepend(' ', yTickFormatter),
+              },
+              tickLabels: bigPlot ? undefined : { rotate: -90, anchor: 'start' },
+            },
+          },
+        },
+        color: {
+          domain: groupExtent,
+          range: groupExtent.map((g) => colors[g]),
+        },
+        tooltip: {
+          use: tooltip,
+          items: [
+            { field: 'name', label: 'Activity' },
+            {
+              id: 'r',
+              label: rValue.label,
+              text: (point) => rValue.format(point.datum.r as never),
+            },
+            {
+              id: 'x',
+              label: xValue.label,
+              text: (point) => xValue.format(point.datum.x as never),
+            },
+            {
+              id: 'y',
+              label: yValue.label,
+              text: (point) => yValue.format(point.datum.y as never),
+            },
+          ],
+        },
       });
     };
 
-function isIterableNumberValue(
-  iterable: Iterable<unknown>,
-): iterable is Iterable<d3.NumberValue> {
-  for (const value of iterable) {
-    const numberValue = Number(value);
-    if (isNaN(numberValue)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-export const legend = (setting: ScatterSetting) => (plot: Plot.Plot) => {
+export const Legend = ({
+  setting,
+  activities,
+}: {
+  setting: ScatterSetting;
+  activities: Activity[];
+  theme: 'light' | 'dark';
+}) => {
   const { rValue } = getter(setting);
-  const scale = plot.scale('r');
-  if (
-    !scale?.domain ||
-    !scale.range ||
-    !Array.isArray(scale.range) ||
-    scale.range.length < 2 ||
-    !isIterableNumberValue(scale.domain)
-  )
-    return null;
-  const ticks = 4;
-  const tickFormat = rValue.format;
-  const label = rValue.label;
-  const strokeWidth = 0.5;
-  const strokeDasharray = '5,4';
-  const lineHeight = 8;
-  const gap = 20;
+  const data = buildRows(activities, setting);
+  if (data.length === 0) return null;
 
-  const r0 = scale.range[1] as number;
+  if (rValue.id === 'date') return null;
 
-  let s;
-  if (scale.type === 'pow' && scale.exponent !== undefined) {
-    s = d3.scalePow(scale.domain, scale.range).exponent(scale.exponent);
-  } else s = d3.scaleLinear(scale.domain, scale.range);
+  const rExtent = d3.extent(data, (d) => d.r) as [number, number];
+  const rScale = d3.scaleSqrt().domain(rExtent).range([2, 12]);
+  const ticks = rScale.ticks(4).filter((t) => t > 0);
 
-  const shiftY = label ? 10 : 0;
-
-  let h = Infinity;
-  const values = s
-    .ticks(ticks)
-    .reverse()
-    .filter((t: number) => h - s(t) > lineHeight / 2 && (h = s(t) as number));
-
-  return Plot.plot({
-    x: { type: 'identity', axis: null },
-    r: { type: 'identity' },
-    y: { type: 'identity', axis: null },
-    caption: '',
-    marks: [
-      Plot.link(values, {
-        x1: r0 + 2,
-        y1: (d: number) => 8 + 2 * r0 - 2 * s(d) + shiftY,
-        x2: 2 * r0 + 2 + gap,
-        y2: (d: number) => 8 + 2 * r0 - 2 * s(d) + shiftY,
-        strokeWidth: strokeWidth / 2,
-        strokeDasharray,
-      }),
-      Plot.dot(values, {
-        r: s,
-        x: r0 + 2,
-        y: (d: number) => 8 + 2 * r0 - s(d) + shiftY,
-        strokeWidth,
-      }),
-      Plot.text(values, {
-        x: 2 * r0 + 2 + gap,
-        y: (d: number) => 8 + 2 * r0 - 2 * s(d) + shiftY,
-        textAnchor: 'start',
-        dx: 4,
-        text: tickFormat,
-      }),
-      Plot.text(label ? [label] : [], {
-        x: 0,
-        y: 6,
-        textAnchor: 'start',
-        fontWeight: 'bold',
-      }),
-    ],
-    width: 100,
-    height: 40,
-  });
+  return React.createElement(
+    'div',
+    { className: 'flex items-center space-x-2 text-xs' },
+    React.createElement('span', { className: 'font-semibold' }, rValue.label),
+    ticks.map((t) =>
+      React.createElement(
+        'span',
+        { key: t, className: 'flex items-center space-x-1' },
+        React.createElement('span', {
+          className: 'inline-block rounded-full border border-current',
+          style: { width: rScale(t) * 2, height: rScale(t) * 2 },
+        }),
+        React.createElement('span', null, rValue.format(t)),
+      ),
+    ),
+  );
 };
 
 const config = {
-  plot,
+  chart,
   settings,
   defaultSettings,
-  legend,
+  Legend,
   getter,
   setter,
 };

@@ -1,8 +1,19 @@
 import progress from "./progress";
 import scatter from "./scatter";
-import calendar from "./calendar";
+import calendar from "./calendar-settings";
 import timeline from "./timeline";
 
+// The three charts rendered through the generic TanStack Charts host (plot.tsx).
+export const chartPlots = {
+  timeline,
+  progress,
+  scatter,
+} as const;
+
+export type ChartPlotName = keyof typeof chartPlots;
+
+// All four stats tabs, including the standalone calendar-heatmap component,
+// which only shares its settings/store shape with the generic host.
 const statsPlots = {
   calendar,
   timeline,
@@ -42,18 +53,6 @@ export type StatsSetter = {
     name: K,
     value: StatsSetting["scatter"][K]
   ) => void;
-};
-
-export const commonSettings = {
-  grid: true,
-  style: {
-    fontSize: "10pt",
-  },
-  figure: true,
-  marginRight: 20,
-  marginTop: 30,
-  marginBottom: 20,
-  marginLeft: 30,
 };
 
 export const prepend = <T,>(text: string, func: (arg: T) => string) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type JSX, useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, type JSX } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from 'next-themes';
 import { useShallowStore } from '~/store';
@@ -8,7 +8,9 @@ import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 
 import { useContext } from 'react';
 import { StatsContext } from '~/app/stats/[name]/StatsContext';
-import statsPlots, {
+import {
+  chartPlots,
+  type ChartPlotName,
   type StatsSetting,
   type StatsSettings,
 } from './index';
@@ -27,38 +29,40 @@ import { Slider } from '~/components/ui/slider';
 
 import { type Activity } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
-import { type Plot } from '@observablehq/plot';
+import { Chart } from '@tanstack/charts/react';
+import { type DomChartDefinition } from '@tanstack/charts';
+
+type ChartTheme = 'light' | 'dark';
+
+type ChartArgs = {
+  activities: Activity[];
+  width: number;
+  height: number;
+  theme: ChartTheme;
+};
 
 // Define a union type for all possible setting keys
-type SettingKey = keyof StatsSetting;
+type SettingKey = ChartPlotName;
+
+type LegendProps<K extends SettingKey> = {
+  setting: StatsSetting[K];
+  activities: Activity[];
+  theme: ChartTheme;
+};
 
 type Stats<K extends SettingKey> = {
   settings: StatsSettings[K];
   setting: StatsSetting[K];
   setter: (updater: (prev: StatsSetting[K]) => StatsSetting[K]) => void;
-  plot: (
+  chart: (
     setting: StatsSetting[K],
-  ) => ({
-    activities,
-    width,
-    height,
-    theme,
-  }: {
-    activities: Activity[];
-    width: number;
-    height: number;
-    theme: "light" | "dark";
-  }) => (Plot & HTMLElement) | null;
-  legend: (setting: StatsSetting[K]) => (plot: Plot) => (Plot & HTMLElement) | null;
+  ) => (args: ChartArgs) => DomChartDefinition | null;
+  Legend: (props: LegendProps<K>) => JSX.Element | null;
   kind: K;
 };
 
-function makePlot<K extends SettingKey>(stat: Stats<K>) {
-  return stat.plot(stat.setting);
-}
-
-function makeLegend<K extends SettingKey>(stat: Stats<K>) {
-  return stat.legend(stat.setting);
+function makeChart<K extends SettingKey>(stat: Stats<K>) {
+  return stat.chart(stat.setting);
 }
 
 // Define a base setting type that captures common properties
@@ -220,8 +224,7 @@ export const SliderFormElement = ({
   );
 };
 
-
-export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
+export default function StatsChart({ name }: { name: ChartPlotName }) {
   const { settings, setSettings } = useShallowStore(
     (state) => ({
       settings: state.settings,
@@ -231,18 +234,18 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
 
   const { filteredActivities } = useFilteredActivities();
   const { theme } = useTheme();
+  const resolvedTheme: ChartTheme = theme === 'dark' ? 'dark' : 'light';
 
-  const figureRef = useRef<HTMLDivElement>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLDivElement | null>(null);
   const { width, height, settingsRef } = useContext(StatsContext);
 
   const stats = useMemo(
     () => ({
-      plot: statsPlots[name].plot,
-      legend: statsPlots[name].legend,
+      chart: chartPlots[name].chart,
+      Legend: chartPlots[name].Legend,
       setting: settings[name],
       kind: name,
-      settings: statsPlots[name].settings,
+      settings: chartPlots[name].settings,
       setter: (value: (prev: StatsSetting[typeof name]) => StatsSetting[typeof name]) =>
         setSettings((setting) => ({
           ...setting,
@@ -256,35 +259,18 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
     setPortalTarget(settingsRef.current);
   }, [settingsRef]);
 
-  useEffect(() => {
-    if (!figureRef.current || !settingsRef.current) return;
-
-    // Use type assertion with unknown as intermediate step
-    const plotFn = makePlot(stats as unknown as Stats<typeof name>);
-    const plot = plotFn({
+  const definition = useMemo(() => {
+    if (width <= 0 || height <= 0) return null;
+    const chartFn = makeChart(stats as unknown as Stats<typeof name>);
+    return chartFn({
       activities: filteredActivities,
       width,
       height,
-      theme: theme === 'dark' ? 'dark' : 'light',
+      theme: resolvedTheme,
     });
+  }, [stats, filteredActivities, width, height, resolvedTheme]);
 
-    if (!plot) return;
-
-    plot.setAttribute('style', 'margin: 0;');
-    figureRef.current.append(plot);
-
-    const legendFn = makeLegend(stats as unknown as Stats<typeof name>);
-    const legend = legendFn(plot);
-    if (legend) {
-      legend.setAttribute('style', 'min-height: 0; display: block; margin-bottom: 0 !important;');
-      settingsRef.current.append(legend);
-    }
-
-    return () => {
-      plot.remove();
-      if (legend) legend.remove();
-    };
-  }, [width, height, filteredActivities, theme, name, stats, settingsRef]);
+  const Legend = stats.Legend as (props: LegendProps<typeof name>) => JSX.Element | null;
 
   return (
     <>
@@ -294,11 +280,26 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
           height: height,
           width: width,
         }}
-        ref={figureRef}
-      />
+      >
+        {definition && (
+          <Chart
+            definition={definition}
+            width={width}
+            height={height}
+            ariaLabel={`${String(name)} chart`}
+          />
+        )}
+      </div>
       {portalTarget && createPortal(
-        <FormComponent stat={stats as unknown as Stats<typeof name>} />,
-        portalTarget
+        <>
+          <Legend
+            setting={stats.setting}
+            activities={filteredActivities}
+            theme={resolvedTheme}
+          />
+          <FormComponent stat={stats as unknown as Stats<typeof name>} />
+        </>,
+        portalTarget,
       )}
     </>
   );

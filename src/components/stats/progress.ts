@@ -1,9 +1,12 @@
 import type { Activity } from '~/server/db/schema';
 
-import * as Plot from '@observablehq/plot';
+import { defineChart, lineY, dot, crosshair, d3Curve } from '@tanstack/charts';
+import { scaleLinear } from '@tanstack/charts/scales/linear';
+import { tooltip } from '@tanstack/charts/tooltip';
 import * as d3 from 'd3';
+import * as React from 'react';
 
-import { commonSettings, prepend } from './index';
+import { prepend } from './index';
 
 type ProgressSetting = {
   value: keyof typeof settings.value.options;
@@ -14,6 +17,11 @@ type Spec = {
   by: (typeof settings.by.options)[keyof typeof settings.by.options];
   value: (typeof settings.value.options)[keyof typeof settings.value.options];
 };
+
+const curveByName = {
+  'step-after': d3.curveStepAfter,
+  basis: d3.curveBasis,
+} as const;
 
 export const settings = {
   value: {
@@ -123,212 +131,228 @@ const setter =
       return { ...progress, [name]: value };
     };
 
-export const plot =
+type ProgressRow = {
+  start_date_local: Date;
+  by: Date;
+  byKey: string;
+  cumsum: number;
+  virtualDate: Date;
+  currentPeriod: boolean;
+  name: string;
+};
+
+const buildRows = (activities: Activity[], setting: ProgressSetting): ProgressRow[] => {
+  const { by, value } = getter(setting);
+
+  const cumulative = d3
+    .groups(activities, (x) => by.tick(new Date(x.start_date_local)))
+    .flatMap(([dateKey, acts]): ProgressRow[] => {
+      const sorted = acts
+        .slice()
+        .sort((a, b) => a.start_date_local.getTime() - b.start_date_local.getTime());
+      if (sorted.length == 0) return [];
+      const cumsum = d3.cumsum(sorted, value.fun);
+      const firstDate = sorted[0]!.start_date_local;
+      const toVirtualDate = (date: Date) =>
+        new Date(
+          new Date('2024-01-01').getTime() +
+          date.getTime() -
+          by.tick(date).getTime(),
+        );
+      return [
+        {
+          start_date_local: by.tick(firstDate),
+          by: dateKey,
+          byKey: dateKey.toISOString(),
+          cumsum: 0,
+          virtualDate: toVirtualDate(by.tick(firstDate)),
+          currentPeriod: false,
+          name: '',
+        },
+        ...sorted.map((act, i) => ({
+          start_date_local: act.start_date_local,
+          by: dateKey,
+          byKey: dateKey.toISOString(),
+          cumsum: cumsum[i]!,
+          virtualDate: toVirtualDate(act.start_date_local),
+          currentPeriod: false,
+          name: act.name,
+        })),
+      ];
+    });
+
+  const keys = Array.from(new d3.InternSet(cumulative.map((x) => x.by)))
+    .sort((a, b) => a.getTime() - b.getTime())
+    .slice(-5);
+  const keyTimes = new Set(keys.map((k) => k.getTime()));
+  const lastKeyTime = keys[keys.length - 1]?.getTime();
+
+  return cumulative
+    .filter((x) => keyTimes.has(x.by.getTime()))
+    .map((x) => ({ ...x, currentPeriod: x.by.getTime() === lastKeyTime }));
+};
+
+export const chart =
   (setting: ProgressSetting) =>
     ({
       activities,
       width,
-      height,
     }: {
       activities: Activity[];
       width: number;
       height: number;
+      theme: 'light' | 'dark';
     }) => {
       const { by, value } = getter(setting);
       const bigPlot = width > 500;
-      const formatByTick = by.tickFormat;
-      const formatValueTick = value.tickFormat;
+      const data = buildRows(activities, setting);
+      if (data.length === 0) return null;
 
-      const cumulative = d3
-        .groups(activities, (x) => by.tick(new Date(x.start_date_local)))
-        .flatMap(([dateKey, acts]) => {
-          acts = acts.sort(
-            (a, b) => a.start_date_local.getTime() - b.start_date_local.getTime(),
-          );
-          if (acts.length == 0) return [];
-          const cumsum = d3.cumsum(acts, value.fun);
-          return [
-            {
-              start_date_local: by.tick(acts[0]!.start_date_local),
-              by: dateKey,
-              cumsum: 0,
-            },
-            ...acts.map((act, i) => ({
-              ...act,
-              by: dateKey,
-              cumsum: cumsum[i],
-            })),
-          ];
-        });
+      const byKeys = Array.from(new Set(data.map((d) => d.byKey)));
+      const colorRange = d3
+        .quantize(d3.interpolateViridis, Math.max(byKeys.length, 2))
+        .reverse();
 
-      let data = cumulative.map((entry) => ({
-        ...entry,
-        virtualDate: new Date(
-          new Date('2024-01-01').getTime() +
-          entry.start_date_local.getTime() -
-          by.tick(entry.start_date_local).getTime(),
-        ),
-      }));
+      const formatByTick = bigPlot
+        ? by.tickFormat
+        : prepend(' ', by.tickFormat);
+      const formatValueTick = bigPlot
+        ? value.tickFormat
+        : prepend(' ', value.tickFormat);
 
-      const keys = Array.from(
-        new d3.InternSet(data.map((x) => by.tick(x.by))),
-      ).sort((a, b) => a.getTime() - b.getTime());
+      const curve = d3Curve(curveByName[by.curve]);
+      const pastRows = data.filter((d) => !d.currentPeriod);
+      const currentRows = data.filter((d) => d.currentPeriod);
 
-      if (keys.length == 0) return Plot.plot({});
-
-      data = data
-        .filter((x) =>
-          keys
-            .slice(-5)
-            .map((y) => y.getTime())
-            .includes(x.by.getTime()),
-        )
-        .map((x) => ({
-          ...x,
-          currentPeriod: x.by.getTime() == keys[keys.length - 1]!.getTime(),
-        }));
-
-      return Plot.plot({
-        ...commonSettings,
-        ...(bigPlot
-          ? {
-            //marginBottom: 40,
-            marginLeft: 70,
-            marginTop: 40,
-          }
-          : {}),
-        width,
-        height,
-        color: {
-          //type: "categorical",
-          scheme: 'viridis',
-          reverse: true,
-          type: 'ordinal',
-          legend: false,
-          tickFormat: by.legendFormat,
-        },
-        x: { domain: by.domain },
+      return defineChart({
         marks: [
-          //Plot.frame(),
-          Plot.axisX({
-            anchor: 'top',
-            label: null,
-            ticks: by.ticks,
-            tickSize: 12,
-            ...(!bigPlot
-              ? {
-                tickFormat: (...args: unknown[]) => {
-                  const prependedFn = prepend(' ', formatByTick);
-                  return prependedFn ? prependedFn(args[0] as Date) : String(args[0]);
-                },
-                textAnchor: 'start',
-                tickPadding: -10,
-              }
-              : {
-                tickFormat: (...args: unknown[]) =>
-                  formatByTick(args[0] as Date),
-              }),
-          }),
-          Plot.axisY({
-            label: null,
-            tickFormat: value.tickFormat,
-            tickSize: 12,
-            tickSpacing: 120,
-            //anchor: "right",
-            ...(bigPlot
-              ? {}
-              : {
-                tickRotate: -90,
-                tickFormat: (...args: unknown[]) => {
-                  const prependedFn = prepend(' ', formatValueTick);
-                  return prependedFn ? prependedFn(args[0] as number) : String(args[0]);
-                },
-                textAnchor: 'start',
-                tickSize: 14,
-                tickPadding: -10,
-              }),
-            //tickSpacing: 60,
-          }),
-          //Plot.ruleY([0]),
-          //Plot.ruleX([by.domain[0]]),
-          Plot.ruleY(
-            data,
-            Plot.pointer({
-              px: 'virtualDate',
-              y: 'cumsum',
-              stroke: 'by',
-            }),
-          ),
-          Plot.ruleX(
-            data,
-            Plot.pointer({
-              x: 'virtualDate',
-              py: 'cumsum',
-              stroke: 'by',
-            }),
-          ),
-          Plot.gridX({
-            ticks: by.gridTicks,
-          }),
-          Plot.line(data, {
-            y: 'cumsum',
-            x: 'virtualDate',
-            stroke: 'by',
-            curve: by.curve,
-            opacity: 0.3,
-            strokeWidth: (X: { currentPeriod: number }) =>
-              X.currentPeriod ? 4 : 2,
-          }),
           ...(by.dots
             ? [
-              Plot.dot(data, {
-                y: 'cumsum',
+              dot(pastRows, {
                 x: 'virtualDate',
-                stroke: 'by',
-                opacity: (x: { currentPeriod: number }) =>
-                  x.currentPeriod ? 1 : 0.5,
+                y: 'cumsum',
+                z: 'byKey',
+                color: 'byKey',
+                r: 2,
+                fillOpacity: 0.5,
               }),
             ]
             : []),
-          Plot.dot(
-            data,
-            Plot.pointer({
-              y: 'cumsum',
-              x: 'virtualDate',
-              fill: 'by',
-            }),
-          ),
-          Plot.tip(
-            data,
-            Plot.pointer({
-              y: 'cumsum',
-              x: 'virtualDate',
-              stroke: 'by',
-              channels: {
-                Date: 'start_date_local',
-                Name: 'name',
-                [value.label]: value.fun,
-              },
-              format: {
-                x: false,
-                stroke: false,
-                y: false,
-                [value.label]: value.format,
-                Date: (x: Date) => d3.timeFormat('%Y-%m-%d')(x),
-              },
-            }),
-          ),
+          lineY(pastRows, {
+            x: 'virtualDate',
+            y: 'cumsum',
+            z: 'byKey',
+            color: 'byKey',
+            curve,
+            strokeWidth: 2,
+            strokeOpacity: 0.6,
+          }),
+          lineY(currentRows, {
+            x: 'virtualDate',
+            y: 'cumsum',
+            z: 'byKey',
+            color: 'byKey',
+            curve,
+            strokeWidth: 4,
+            strokeOpacity: 0.9,
+          }),
+          dot(currentRows, {
+            x: 'virtualDate',
+            y: 'cumsum',
+            z: 'byKey',
+            color: 'byKey',
+            r: 3,
+            fillOpacity: 1,
+          }),
+          crosshair({ marker: true }),
         ],
+        scales: {
+          x: {
+            scale: d3.scaleUtc().domain(by.domain),
+            axis: {
+              ticks: { size: 12, format: formatByTick },
+              tickLabels: bigPlot
+                ? undefined
+                : { rotate: -90, anchor: 'start' },
+            },
+          },
+          y: {
+            scale: scaleLinear,
+            nice: true,
+            axis: {
+              ticks: { format: formatValueTick },
+              tickLabels: bigPlot ? undefined : { rotate: -90, anchor: 'start' },
+            },
+          },
+        },
+        color: {
+          domain: byKeys,
+          range: colorRange,
+        },
+        tooltip: {
+          use: tooltip,
+          items: [
+            // A `group` item both renders a formatted "Period" row and
+            // suppresses the library's default tooltip title, which
+            // otherwise falls back to the raw, unformatted group key
+            // (the ISO date string backing `byKey`).
+            {
+              channel: 'group',
+              label: 'Period',
+              text: (point) =>
+                by.legendFormat(new Date(point.group as string)),
+            },
+            {
+              field: 'start_date_local',
+              label: 'Date',
+              text: (point) => d3.timeFormat('%Y-%m-%d')(point.datum.start_date_local),
+            },
+            { field: 'name', label: 'Name' },
+            {
+              id: 'value',
+              label: value.label,
+              text: (point) => value.format(point.datum.cumsum),
+            },
+          ],
+        },
       });
     };
 
-export const legend = () => (plot: Plot.Plot) => plot.legend('color');
+export const Legend = ({
+  setting,
+  activities,
+}: {
+  setting: ProgressSetting;
+  activities: Activity[];
+  theme: 'light' | 'dark';
+}) => {
+  const { by } = getter(setting);
+  const data = buildRows(activities, setting);
+  const byKeys = Array.from(new Set(data.map((d) => d.by.getTime()))).sort((a, b) => a - b);
+  const colors = d3.quantize(d3.interpolateViridis, Math.max(byKeys.length, 2)).reverse();
+
+  return React.createElement(
+    'div',
+    { className: 'flex items-center space-x-2 text-xs' },
+    byKeys.map((time, i) =>
+      React.createElement(
+        'span',
+        { key: time, className: 'flex items-center space-x-1' },
+        React.createElement('span', {
+          className: 'inline-block h-2 w-2 rounded-full',
+          style: { backgroundColor: colors[i] },
+        }),
+        React.createElement('span', null, by.legendFormat(new Date(time))),
+      ),
+    ),
+  );
+};
 
 const config = {
   settings,
   defaultSettings,
-  plot,
-  legend,
+  chart,
+  Legend,
   getter,
   setter,
 };
