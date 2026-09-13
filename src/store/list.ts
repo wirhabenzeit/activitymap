@@ -3,7 +3,7 @@ import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
 import {
   type SortingState,
-  type VisibilityState,
+  type ColumnVisibilityState,
   type Updater,
   type ColumnPinningState,
 } from '@tanstack/react-table';
@@ -16,7 +16,7 @@ export type ListState = {
   sorting: SortingState;
   density: DensityState;
   summaryRow: SummaryRowState;
-  columnVisibility: VisibilityState;
+  columnVisibility: ColumnVisibilityState;
   columnPinning: ColumnPinningState;
 };
 
@@ -24,7 +24,7 @@ export type ListActions = {
   setDensity: Dispatch<SetStateAction<DensityState>>;
   setSorting: Dispatch<SetStateAction<SortingState>>;
   setSummaryRow: Dispatch<SetStateAction<SummaryRowState>>;
-  setColumnVisibility: Dispatch<Updater<VisibilityState>>;
+  setColumnVisibility: Dispatch<Updater<ColumnVisibilityState>>;
   setColumnPinning: Dispatch<Updater<ColumnPinningState>>;
 };
 
@@ -83,8 +83,8 @@ export const createListSlice: StateCreator<
   compactList: {
     density: 'sm',
     columnPinning: {
-      left: ['name'],
-      right: ['edit'],
+      start: ['name'],
+      end: ['edit'],
     },
     sorting: [{ id: 'id', desc: true }],
     columnVisibility: {
@@ -112,8 +112,8 @@ export const createListSlice: StateCreator<
   fullList: {
     density: 'sm',
     columnPinning: {
-      left: ['name'],
-      right: ['edit'],
+      start: ['name'],
+      end: ['edit'],
     },
     sorting: [{ id: 'id', desc: true }],
     columnVisibility: {

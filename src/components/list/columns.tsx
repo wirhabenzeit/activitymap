@@ -17,18 +17,19 @@ import {
 import { ActivityCard, DescriptionCard } from './card';
 import { EditActivity } from './edit';
 import { PhotoLightbox } from './photo';
+import { type Features } from './table-extensions';
 
 function columnFromField<K extends ActivityValueType>(
   id: keyof typeof activityFields,
   spec: ActivityField<K>,
-): ColumnDef<Activity> {
-  const footer = ({ table }: { table: Table<Activity> }) => {
+): ColumnDef<Features, Activity> {
+  const footer = ({ table }: { table: Table<Features, Activity> }) => {
     const rows =
-      table.getState().summaryRow == null
+      table.store.state.summaryRow == null
         ? []
-        : table.getState().summaryRow == 'page'
+        : table.store.state.summaryRow == 'page'
           ? table.getRowModel().rows
-          : table.getState().summaryRow == 'all'
+          : table.store.state.summaryRow == 'all'
             ? table.getFilteredRowModel().rows
             : table.getSelectedRowModel().rows;
     const values: K[] = rows.map((row) => row.getValue(id));
@@ -57,14 +58,13 @@ function columnFromField<K extends ActivityValueType>(
         </div>
       </DataTableColumnHeader>
     ),
-    enableResizing: true,
     ...(spec.accessorFn && { accessorFn: spec.accessorFn }),
     ...(!spec.accessorFn && { accessorKey: id }),
     ...((spec.reducer ?? spec.summary) && { footer }),
   };
 }
 
-export const columns: ColumnDef<Activity>[] = [
+export const columns: ColumnDef<Features, Activity>[] = [
   {
     id: 'id',
     accessorKey: 'id',
@@ -102,7 +102,9 @@ export const columns: ColumnDef<Activity>[] = [
               variant={column.getIsPinned() ? 'outline' : 'ghost'}
               size="sm"
               className="p-1 border"
-              onClick={() => column.pin(column.getIsPinned() ? false : 'left')}
+              onClick={() =>
+                column.pin(column.getIsPinned() ? false : 'start')
+              }
             >
               <Pin />
             </Button>
@@ -111,7 +113,7 @@ export const columns: ColumnDef<Activity>[] = [
       </DataTableColumnHeader>
     ),
     cell: ({ row, table }) => {
-      const mapRef = table.getState().map;
+      const mapRef = table.store.state.map;
       return (
         <ActivityCard
           row={row}
@@ -134,7 +136,6 @@ export const columns: ColumnDef<Activity>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Description" />
     ),
-    enableResizing: true,
     cell: ({ row }) => <DescriptionCard row={row} />,
   },
   {
@@ -172,8 +173,6 @@ export const columns: ColumnDef<Activity>[] = [
       <DataTableColumnHeader column={column} title="Edit" />
     ),
     cell: ({ row }) => <EditActivity row={row} trigger={true} />,
-    enableResizing: false,
-    size: 40,
     accessorFn: (row) => row.id,
   },
 ];

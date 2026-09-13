@@ -26,6 +26,7 @@ import {
 } from '~/components/ui/dialog';
 import { Edit } from 'lucide-react';
 import { type Row } from '@tanstack/react-table';
+import { type Features } from './table-extensions';
 import { type Activity } from '~/server/db/schema';
 import { type UpdatableActivity, type SportType } from '~/server/strava/types';
 import { sportType } from 'drizzle/schema';
@@ -65,7 +66,7 @@ export function ProfileForm({
   row,
   setOpen,
 }: {
-  row: Row<Activity>;
+  row: Row<Features, Activity>;
   setOpen?: (open: boolean) => void;
 }) {
   const [loading, setLoading] = useState(false);
@@ -210,7 +211,7 @@ export function EditActivity({
   setOpen,
   trigger = true,
 }: {
-  row: Row<Activity>;
+  row: Row<Features, Activity>;
   open?: boolean;
   setOpen?: (open: boolean) => void;
   trigger: boolean;

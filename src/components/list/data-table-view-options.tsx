@@ -1,8 +1,11 @@
 'use client';
-'use no memo';
 
-import { type Table as TableType } from '@tanstack/react-table';
-import { type DensityState, type SummaryRowState } from './table-extensions';
+import { type Table as TableType, type RowData } from '@tanstack/react-table';
+import {
+  type DensityState,
+  type SummaryRowState,
+  type Features,
+} from './table-extensions';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -18,11 +21,11 @@ import { Button } from '~/components/ui/button';
 import { Columns, FileSpreadsheet, FileStack, LineChart } from 'lucide-react';
 import { MixerHorizontalIcon } from '@radix-ui/react-icons';
 
-interface DataTableViewOptionsProps<TData> {
-  table: TableType<TData>;
+interface DataTableViewOptionsProps<TData extends RowData> {
+  table: TableType<Features, TData>;
 }
 
-export function DataTableViewOptions<TData>({
+export function DataTableViewOptions<TData extends RowData>({
   table,
 }: DataTableViewOptionsProps<TData>) {
   return (
@@ -70,7 +73,7 @@ export function DataTableViewOptions<TData>({
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="gap-2">
               <FileStack className="size-4" />
-              <span>{`${table.getState().pagination.pageSize} per page`}</span>
+              <span>{`${table.store.state.pagination.pageSize} per page`}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent>
@@ -98,7 +101,7 @@ export function DataTableViewOptions<TData>({
                     onClick={() =>
                       table.setSummaryRow(() => value as SummaryRowState)
                     }
-                    checked={table.getState().summaryRow === value}
+                    checked={table.store.state.summaryRow === value}
                   >
                     {value === null
                       ? 'None'
@@ -125,7 +128,7 @@ export function DataTableViewOptions<TData>({
                     onClick={() =>
                       table.setDensity(() => value as DensityState)
                     }
-                    checked={table.getState().density === value}
+                    checked={table.store.state.density === value}
                   >
                     {value === 'sm'
                       ? 'Dense'

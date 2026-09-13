@@ -1,7 +1,6 @@
 'use client';
-'use no memo';
 
-import { type Column } from '@tanstack/react-table';
+import { type Column, type RowData } from '@tanstack/react-table';
 import {
   CaretSortIcon,
   CaretDownIcon,
@@ -9,14 +8,15 @@ import {
 } from '@radix-ui/react-icons';
 import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
+import { type Features } from './table-extensions';
 
-interface DataTableColumnHeaderProps<TData, TValue>
+interface DataTableColumnHeaderProps<TData extends RowData, TValue>
   extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
-  column: Column<TData, TValue>;
+  column: Column<Features, TData, TValue>;
   title?: string;
 }
 
-export function DataTableColumnHeader<TData, TValue>({
+export function DataTableColumnHeader<TData extends RowData, TValue>({
   column,
   className,
   children,

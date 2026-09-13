@@ -4,10 +4,21 @@ import {
   type TableFeature,
   type OnChangeFn,
   type Updater,
-  type Table,
   type RowData,
+  type TableFeatures,
+  assignTableAPIs,
   makeStateUpdater,
-  functionalUpdate,
+  setStateSlice,
+  tableFeatures,
+  rowSortingFeature,
+  columnFilteringFeature,
+  columnVisibilityFeature,
+  columnPinningFeature,
+  rowSelectionFeature,
+  rowPaginationFeature,
+  createSortedRowModel,
+  createFilteredRowModel,
+  createPaginatedRowModel,
 } from '@tanstack/react-table';
 import type { MapRef } from 'react-map-gl/mapbox';
 import { type RefObject } from 'react';
@@ -31,49 +42,56 @@ export interface DensityInstance {
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
-  interface TableState {
-    density: DensityState;
+  interface Plugins {
+    densityFeature: TableFeature;
   }
-  interface TableOptionsResolved<TData extends RowData> {
-    enableDensity?: boolean;
-    onDensityChange?: OnChangeFn<DensityState>;
+  interface TableState_FeatureMap {
+    densityFeature: DensityTableState;
   }
-  interface Table<TData extends RowData> {
-    setDensity: (updater: Updater<DensityState>) => void;
-    toggleDensity: (value?: DensityState) => void;
+  interface TableOptions_FeatureMap<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+  > {
+    densityFeature: DensityOptions;
+  }
+  interface Table_FeatureMap<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+  > {
+    densityFeature: DensityInstance;
   }
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
-export const DensityFeature: TableFeature = {
-  getInitialState: (state): DensityTableState => {
+export const densityFeature: TableFeature = {
+  getInitialState: (state) => {
     return {
       density: 'md',
       ...state,
     };
   },
-  getDefaultOptions: <TData extends RowData>(
-    table: Table<TData>,
-  ): DensityOptions => {
+  getDefaultTableOptions: (table) => {
     return {
       enableDensity: true,
       onDensityChange: makeStateUpdater('density', table),
     };
   },
-  createTable: <TData extends RowData>(table: Table<TData>): void => {
-    table.setDensity = (updater) => {
-      const safeUpdater: Updater<DensityState> = (old) => {
-        const newState = functionalUpdate(updater, old);
-        return newState;
-      };
-      return table.options.onDensityChange?.(safeUpdater);
-    };
-    table.toggleDensity = (value) => {
-      table.setDensity((old) => {
-        if (value) return value;
-        return old === 'lg' ? 'md' : old === 'md' ? 'sm' : 'lg'; //cycle through the 3 options
-      });
-    };
+  constructTableAPIs: (table) => {
+    assignTableAPIs('densityFeature', table, {
+      table_setDensity: {
+        fn: (updater: Updater<DensityState>) => {
+          setStateSlice(table, 'density', updater);
+        },
+      },
+      table_toggleDensity: {
+        fn: (value?: DensityState) => {
+          setStateSlice(table, 'density', (old) => {
+            if (value) return value;
+            return old === 'lg' ? 'md' : old === 'md' ? 'sm' : 'lg'; //cycle through the 3 options
+          });
+        },
+      },
+    });
   },
 };
 
@@ -92,40 +110,47 @@ export interface MapInstance {
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
-  interface TableState {
-    map?: RefObject<MapRef | null>;
+  interface Plugins {
+    mapFeature: TableFeature;
   }
-  interface TableOptionsResolved<TData extends RowData> {
-    onMapChange?: OnChangeFn<RefObject<MapRef | null> | undefined>;
+  interface TableState_FeatureMap {
+    mapFeature: MapTableState;
   }
-  interface Table<TData extends RowData> {
-    setMap: (updater: Updater<RefObject<MapRef | null> | undefined>) => void;
+  interface TableOptions_FeatureMap<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+  > {
+    mapFeature: MapOptions;
+  }
+  interface Table_FeatureMap<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+  > {
+    mapFeature: MapInstance;
   }
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
-export const MapFeature: TableFeature = {
-  getInitialState: (state): MapTableState => {
+export const mapFeature: TableFeature = {
+  getInitialState: (state) => {
     return {
       map: undefined,
       ...state,
     };
   },
-  getDefaultOptions: <TData extends RowData>(
-    table: Table<TData>,
-  ): MapOptions => {
+  getDefaultTableOptions: (table) => {
     return {
       onMapChange: makeStateUpdater('map', table),
     };
   },
-  createTable: <TData extends RowData>(table: Table<TData>): void => {
-    table.setMap = (updater) => {
-      const safeUpdater: Updater<RefObject<MapRef | null> | undefined> = (old) => {
-        const newState = functionalUpdate(updater, old);
-        return newState;
-      };
-      return table.options.onMapChange?.(safeUpdater);
-    };
+  constructTableAPIs: (table) => {
+    assignTableAPIs('mapFeature', table, {
+      table_setMap: {
+        fn: (updater: Updater<RefObject<MapRef | null> | undefined>) => {
+          setStateSlice(table, 'map', updater);
+        },
+      },
+    });
   },
 };
 
@@ -147,41 +172,65 @@ export interface SummaryRowInstance {
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
-  interface TableState {
-    summaryRow: SummaryRowState;
+  interface Plugins {
+    summaryRowFeature: TableFeature;
   }
-  interface TableOptionsResolved<TData extends RowData> {
-    enableSummaryRow?: boolean;
-    onSummaryRowChange?: OnChangeFn<SummaryRowState>;
+  interface TableState_FeatureMap {
+    summaryRowFeature: SummaryRowTableState;
   }
-  interface Table<TData extends RowData> {
-    setSummaryRow: (updater: Updater<SummaryRowState>) => void;
+  interface TableOptions_FeatureMap<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+  > {
+    summaryRowFeature: SummaryRowOptions;
+  }
+  interface Table_FeatureMap<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+  > {
+    summaryRowFeature: SummaryRowInstance;
   }
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
-export const SummaryRowFeature: TableFeature = {
-  getInitialState: (state): SummaryRowTableState => {
+export const summaryRowFeature: TableFeature = {
+  getInitialState: (state) => {
     return {
       summaryRow: 'page',
       ...state,
     };
   },
-  getDefaultOptions: <TData extends RowData>(
-    table: Table<TData>,
-  ): SummaryRowOptions => {
+  getDefaultTableOptions: (table) => {
     return {
       enableSummaryRow: true,
       onSummaryRowChange: makeStateUpdater('summaryRow', table),
     };
   },
-  createTable: <TData extends RowData>(table: Table<TData>): void => {
-    table.setSummaryRow = (updater) => {
-      const safeUpdater: Updater<SummaryRowState> = (old) => {
-        const newState = functionalUpdate(updater, old);
-        return newState;
-      };
-      return table.options.onSummaryRowChange?.(safeUpdater);
-    };
+  constructTableAPIs: (table) => {
+    assignTableAPIs('summaryRowFeature', table, {
+      table_setSummaryRow: {
+        fn: (updater: Updater<SummaryRowState>) => {
+          setStateSlice(table, 'summaryRow', updater);
+        },
+      },
+    });
   },
 };
+
+// Table feature composition, kept static/module-scope per TanStack's guidance.
+export const features = tableFeatures({
+  rowSortingFeature,
+  columnFilteringFeature,
+  columnVisibilityFeature,
+  columnPinningFeature,
+  rowSelectionFeature,
+  rowPaginationFeature,
+  densityFeature,
+  mapFeature,
+  summaryRowFeature,
+  sortedRowModel: createSortedRowModel(),
+  filteredRowModel: createFilteredRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+});
+
+export type Features = typeof features;

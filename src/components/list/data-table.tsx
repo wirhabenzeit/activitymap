@@ -1,21 +1,18 @@
 'use client';
-'use no memo';
 
 import * as React from 'react';
 
 import {
   type ColumnDef,
-  type VisibilityState,
+  type ColumnVisibilityState,
+  type ColumnPinningState,
   type SortingState,
   type ColumnFiltersState,
   type Updater,
   type RowSelectionState,
   type RowData,
-  useReactTable,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
+  type TableFeatures,
+  useTable,
   flexRender,
 } from '@tanstack/react-table';
 import { type MapRef } from 'react-map-gl/mapbox';
@@ -36,20 +33,19 @@ import { DataTablePagination } from './data-table-pagination';
 import {
   type DensityState,
   type SummaryRowState,
-  DensityFeature,
-  MapFeature,
-  SummaryRowFeature,
+  type Features,
+  features,
 } from './table-extensions';
 
 interface ListState {
   density: DensityState;
-  columnPinning: { left?: string[]; right?: string[] };
+  columnPinning: ColumnPinningState;
   summaryRow: SummaryRowState;
 }
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
-  interface ColumnMeta<TData extends RowData, TValue> {
+  interface ColumnMeta<TFeatures extends TableFeatures, TData extends RowData, TValue> {
     width: string;
     title: string;
   }
@@ -58,19 +54,17 @@ declare module '@tanstack/react-table' {
 
 interface ListActions {
   setSorting: (updater: Updater<SortingState>) => void;
-  setColumnVisibility: (updater: Updater<VisibilityState>) => void;
+  setColumnVisibility: (updater: Updater<ColumnVisibilityState>) => void;
   setDensity: (updater: Updater<DensityState>) => void;
-  setColumnPinning: (
-    updater: Updater<{ left?: string[]; right?: string[] }>,
-  ) => void;
+  setColumnPinning: (updater: Updater<ColumnPinningState>) => void;
   setSummaryRow: (updater: Updater<SummaryRowState>) => void;
 }
 
-interface DataTableProps<TData, TValue> extends ListState, ListActions {
-  columns: ColumnDef<TData, TValue>[];
+interface DataTableProps<TData extends RowData> extends ListState, ListActions {
+  columns: ColumnDef<Features, TData>[];
   data: TData[];
   className?: string;
-  columnVisibility: VisibilityState;
+  columnVisibility: ColumnVisibilityState;
   sorting: SortingState;
   paginationControl?: boolean;
   selected: number[];
@@ -84,8 +78,7 @@ interface RowWithId {
 }
 
 export const DataTable = React.memo(function DataTable<
-  TData extends RowWithId,
-  TValue,
+  TData extends RowWithId & RowData,
 >({
   className,
   columns,
@@ -105,18 +98,14 @@ export const DataTable = React.memo(function DataTable<
   setDensity,
   setColumnPinning,
   setSummaryRow,
-}: DataTableProps<TData, TValue>) {
-   
-  const table = useReactTable({
+}: DataTableProps<TData>) {
+  const table = useTable({
+    features,
     data,
     columns,
-    getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => row.id.toString(),
-    getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
-    getSortedRowModel: getSortedRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    getFilteredRowModel: getFilteredRowModel(),
     onRowSelectionChange: (updater: Updater<RowSelectionState>) => {
       const selection =
         typeof updater === 'function'
@@ -128,7 +117,7 @@ export const DataTable = React.memo(function DataTable<
     onSummaryRowChange: setSummaryRow,
     onColumnPinningChange: setColumnPinning,
     initialState: {
-      pagination: { pageSize: 200 },
+      pagination: { pageIndex: 0, pageSize: 200 },
       columnVisibility,
       sorting,
       columnFilters,
@@ -144,7 +133,6 @@ export const DataTable = React.memo(function DataTable<
       map,
       rowSelection: Object.fromEntries(selected.map((id) => [id, true])),
     },
-    _features: [DensityFeature, MapFeature, SummaryRowFeature],
   });
 
   return (
@@ -171,9 +159,9 @@ export const DataTable = React.memo(function DataTable<
                   <TableHead
                     className={cn(
                       'py-0 flex items-center',
-                      header.column.getIsPinned() == 'left' &&
+                      header.column.getIsPinned() == 'start' &&
                         'sticky left-0 bg-muted border-border border-r',
-                      header.column.getIsPinned() == 'right' &&
+                      header.column.getIsPinned() == 'end' &&
                         'sticky right-0 bg-muted border-border border-l',
                     )}
                     key={header.id}
@@ -203,9 +191,9 @@ export const DataTable = React.memo(function DataTable<
                     key={footer.id}
                     className={cn(
                       'h-8 border-b border-t border-border text-xs font-bold flex items-center',
-                      footer.column.getIsPinned() == 'left' &&
+                      footer.column.getIsPinned() == 'start' &&
                         'sticky left-0 bg-muted border-r border-border',
-                      footer.column.getIsPinned() == 'right' &&
+                      footer.column.getIsPinned() == 'end' &&
                         'sticky right-0 bg-muted border-l border-border',
                     )}
                   >
@@ -231,9 +219,9 @@ export const DataTable = React.memo(function DataTable<
                   <TableCell
                     className={cn(
                       'bg-background group-data-[state=selected]:bg-muted flex items-center',
-                      cell.column.getIsPinned() == 'left' &&
+                      cell.column.getIsPinned() == 'start' &&
                         'sticky left-0 border-border border-r',
-                      cell.column.getIsPinned() == 'right' &&
+                      cell.column.getIsPinned() == 'end' &&
                         'sticky right-0 border-border border-l',
                       density == 'sm'
                         ? 'py-1 px-1'
@@ -260,6 +248,6 @@ export const DataTable = React.memo(function DataTable<
       {paginationControl && <DataTablePagination table={table} />}
     </div>
   );
-}) as <TData extends RowWithId, TValue>(
-  props: DataTableProps<TData, TValue>,
+}) as <TData extends RowWithId & RowData>(
+  props: DataTableProps<TData>,
 ) => React.ReactElement;

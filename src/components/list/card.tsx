@@ -26,6 +26,7 @@ import {
 } from '@radix-ui/react-icons';
 
 import { type Row } from '@tanstack/react-table';
+import { type Features } from './table-extensions';
 
 import {
   Card,
@@ -55,14 +56,14 @@ import { useRouter } from 'next/navigation';
 type CardProps = React.ComponentProps<typeof Card>;
 
 interface ActivityCardProps extends CardProps {
-  row: Row<Activity>;
+  row: Row<Features, Activity>;
   map?: RefObject<MapRef | null>;
 }
 
-const formattedValue = (key: keyof typeof activityFields, row: Row<Activity>) =>
+const formattedValue = (key: keyof typeof activityFields, row: Row<Features, Activity>) =>
   activityFields[key].formatter(row.getValue(key));
 
-export function DescriptionCard({ row }: { row: Row<Activity> }) {
+export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
   const [open, setOpen] = useState(false);
   const isGuest = useShallowStore((state) => state.isGuest);
 

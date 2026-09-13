@@ -1,7 +1,6 @@
 'use client';
-'use no memo';
 
-import { type Table } from '@tanstack/react-table';
+import { type Table, type RowData } from '@tanstack/react-table';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -11,13 +10,14 @@ import {
 import { Button } from '~/components/ui/button';
 import { DataTableViewOptions } from './data-table-view-options';
 import { cn } from '~/lib/utils';
+import { type Features } from './table-extensions';
 
-interface DataTablePaginationProps<TData> {
-  table: Table<TData>;
+interface DataTablePaginationProps<TData extends RowData> {
+  table: Table<Features, TData>;
   className?: string;
 }
 
-export function DataTablePagination<TData>({
+export function DataTablePagination<TData extends RowData>({
   table,
   className,
 }: DataTablePaginationProps<TData>) {
@@ -53,7 +53,7 @@ export function DataTablePagination<TData>({
             <ChevronLeftIcon className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium">
-            {`${table.getState().pagination.pageIndex + 1}/${table.getPageCount()}`}
+            {`${table.store.state.pagination.pageIndex + 1}/${table.getPageCount()}`}
           </span>
           <Button
             variant="outline"
