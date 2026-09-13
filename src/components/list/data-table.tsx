@@ -106,7 +106,7 @@ export const DataTable = React.memo(function DataTable<
   setColumnPinning,
   setSummaryRow,
 }: DataTableProps<TData, TValue>) {
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table hook is intentionally used here.
+   
   const table = useReactTable({
     data,
     columns,

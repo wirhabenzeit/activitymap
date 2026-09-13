@@ -52,7 +52,9 @@ type PersistedUiState = Pick<
 
 const noopStorage: StateStorage = {
   getItem: () => null,
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   setItem: () => {},
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   removeItem: () => {},
 };
 

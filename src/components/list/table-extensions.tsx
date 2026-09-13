@@ -58,7 +58,7 @@ export const DensityFeature: TableFeature = {
     return {
       enableDensity: true,
       onDensityChange: makeStateUpdater('density', table),
-    } as DensityOptions;
+    };
   },
   createTable: <TData extends RowData>(table: Table<TData>): void => {
     table.setDensity = (updater) => {
@@ -173,7 +173,7 @@ export const SummaryRowFeature: TableFeature = {
     return {
       enableSummaryRow: true,
       onSummaryRowChange: makeStateUpdater('summaryRow', table),
-    } as SummaryRowOptions;
+    };
   },
   createTable: <TData extends RowData>(table: Table<TData>): void => {
     table.setSummaryRow = (updater) => {

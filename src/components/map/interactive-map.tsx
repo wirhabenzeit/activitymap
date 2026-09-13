@@ -80,7 +80,7 @@ const isDefaultViewState = (viewState: ViewState): boolean => {
 const getOverlayMapSetting = (
   overlayId: OverlayMapId,
 ): OverlaySetting => {
-  return overlayMaps[overlayId] as OverlaySetting;
+  return overlayMaps[overlayId];
 };
 
 const RouteLayer = React.memo(function RouteLayer() {

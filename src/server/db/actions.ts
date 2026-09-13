@@ -17,14 +17,14 @@ export const getUser = async (id?: string) => {
  * This is kept temporarily if needed but should not be used directly from client without session check.
  */
 export const getAccount = async (params: {
-  providerAccountId?: string;
+  accountId?: string;
   userId?: string;
   forceRefresh?: boolean;
 }) => {
   // If called from client with explicit IDs, this is UNSAFE.
   // We should enforce session check if we want to expose this.
   // BUT for now, let's redirect to getAuthenticatedAccount logic if params are empty
-  if (!params.providerAccountId && !params.userId) {
+  if (!params.accountId && !params.userId) {
     return getAuthenticatedAccount();
   }
 

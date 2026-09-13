@@ -207,7 +207,8 @@ function MonthRangeCal({
   const [menuYear, setMenuYear] = React.useState<number>(startYear);
   const setDateRange = useStore((state) => state.setDateRange);
 
-  if (minDate && maxDate && minDate > maxDate) minDate = maxDate;
+  const effectiveMinDate =
+    minDate && maxDate && minDate > maxDate ? maxDate : minDate;
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row">
@@ -348,12 +349,12 @@ function MonthRangeCal({
                                   maxDate?.getFullYear() &&
                                   m.number > maxDate.getMonth())
                               : false) ||
-                            (minDate
+                            (effectiveMinDate
                               ? menuYear + m.yearOffset <
-                                  minDate?.getFullYear() ||
+                                  effectiveMinDate?.getFullYear() ||
                                 (menuYear + m.yearOffset ==
-                                  minDate?.getFullYear() &&
-                                  m.number < minDate.getMonth())
+                                  effectiveMinDate?.getFullYear() &&
+                                  m.number < effectiveMinDate.getMonth())
                               : false)
                           }
                           className={cn(

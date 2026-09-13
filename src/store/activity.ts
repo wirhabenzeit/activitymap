@@ -7,11 +7,7 @@ import {
   deleteActivities as deleteServerActivities,
 } from '~/server/strava/actions';
 
-export type ActivityState = {};
-
-export type ActivityActions = {};
-
-export type ActivitySlice = ActivityState & ActivityActions;
+export type ActivitySlice = object;
 
 export const createActivitySlice: StateCreator<
   RootState,

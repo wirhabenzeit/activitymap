@@ -29,7 +29,7 @@ import {
 
 export async function updateActivity(
   input: UpdateActivityInput,
-  accountInfo?: { access_token: string; providerAccountId: string },
+  accountInfo?: { access_token: string; accountId: string },
 ) {
   try {
     const act = updateActivityInputSchema.parse(input);
@@ -58,7 +58,7 @@ export async function updateActivity(
       // Transform and update in database
       const transformedActivity = {
         ...transformStravaActivity(stravaActivity),
-        athlete: parseInt(account.providerAccountId),
+        athlete: parseInt(account.accountId),
       } satisfies Activity;
 
       const [updatedActivity] = await db
@@ -387,10 +387,10 @@ export async function deleteActivities(input: number[]): Promise<{
   try {
     // Get current user's account info to ensure we only delete their activities
     const account = await getAuthenticatedAccount();
-    if (!account?.providerAccountId) {
-      throw new Error('User account not found or missing providerAccountId');
+    if (!account?.accountId) {
+      throw new Error('User account not found or missing accountId');
     }
-    const athleteId = parseInt(account.providerAccountId);
+    const athleteId = parseInt(account.accountId);
 
 
 

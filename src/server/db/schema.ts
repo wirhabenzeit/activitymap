@@ -40,17 +40,22 @@ export const accounts = pgTable(
     userId: text('userId')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    type: text('type').notNull(),
-    provider: text('provider').notNull(),
+    type: text('type'), // Legacy NextAuth column; Better Auth never writes this
+    provider: text('provider'), // Legacy NextAuth column; Better Auth never writes this
     providerId: text('providerId').notNull(), // Better Auth uses providerId
-    providerAccountId: text('providerAccountId').notNull(),
+    providerAccountId: text('providerAccountId'), // Legacy NextAuth column; Better Auth never writes this
     accountId: text('accountId').notNull(), // Better Auth uses accountId
     refresh_token: text('refresh_token'),
     refreshToken: text('refreshToken'), // Better Auth format
     access_token: text('access_token'),
     accessToken: text('accessToken'), // Better Auth format
     expires_at: integer('expires_at'),
-    expiresAt: timestamp('expiresAt', { mode: 'date' }), // Better Auth format
+    expiresAt: timestamp('expiresAt', { mode: 'date' }), // Better Auth <1.7 format
+    accessTokenExpiresAt: timestamp('accessTokenExpiresAt', { mode: 'date' }), // Better Auth 1.7+ format
+    refreshTokenExpiresAt: timestamp('refreshTokenExpiresAt', {
+      mode: 'date',
+    }), // Better Auth 1.7+ format
+    password: text('password'), // Better Auth credential accounts; unused for OAuth
     token_type: text('token_type'),
     scope: text('scope'),
     id_token: text('id_token'),

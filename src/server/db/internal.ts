@@ -22,11 +22,11 @@ export const getUserInternal = async (id?: string) => {
 };
 
 export const getAccountInternal = async ({
-    providerAccountId,
+    accountId,
     userId,
     forceRefresh = false,
 }: {
-    providerAccountId?: string;
+    accountId?: string;
     userId?: string;
     forceRefresh?: boolean;
 }) => {
@@ -34,13 +34,13 @@ export const getAccountInternal = async ({
     let account: Account | null = null;
 
     try {
-        if (providerAccountId) {
+        if (accountId) {
 
             const result = await db.query.accounts.findFirst({
                 where: (accounts, { eq }) =>
-                    eq(accounts.providerAccountId, providerAccountId),
+                    eq(accounts.accountId, accountId),
             });
-            // If account not found by providerAccountId, this is likely a webhook request
+            // If account not found by accountId, this is likely a webhook request
             // We should not throw an error, but return null to handle this case appropriately
             if (!result) {
                 return null;
@@ -85,8 +85,8 @@ export const getAccountInternal = async ({
     }
 
     // Only throw if we were looking up by userId or through session
-    if (!account && !providerAccountId) throw new Error('Account not found');
-    // Return null if we were looking up by providerAccountId and didn't find anything
+    if (!account && !accountId) throw new Error('Account not found');
+    // Return null if we were looking up by accountId and didn't find anything
     if (!account) return null;
 
     const currentTime = Math.floor(Date.now() / 1000);
@@ -116,7 +116,7 @@ export const getAccountInternal = async ({
                     await db
                         .update(accounts)
                         .set(updatedAccount)
-                        .where(eq(accounts.providerAccountId, account.providerAccountId));
+                        .where(eq(accounts.accountId, account.accountId));
 
                     // Update our local copy of the account
                     account = updatedAccount;

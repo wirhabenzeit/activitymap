@@ -7,7 +7,7 @@ export async function syncYear(year: number) {
     try {
         const account = await getAuthenticatedAccount();
         if (!account?.access_token) throw new Error('Unauthorized');
-        const athleteId = parseInt(account.providerAccountId);
+        const athleteId = parseInt(account.accountId);
 
         const startOfYear = new Date(year, 0, 1).getTime() / 1000;
         const endOfYear = new Date(year + 1, 0, 1).getTime() / 1000;
@@ -60,7 +60,7 @@ export async function repairYear(year: number, idsToRepair: number[]) {
     try {
         const account = await getAuthenticatedAccount();
         if (!account?.access_token) throw new Error('Unauthorized');
-        const athleteId = parseInt(account.providerAccountId);
+        const athleteId = parseInt(account.accountId);
 
         if (idsToRepair.length === 0) {
             return {
@@ -105,7 +105,7 @@ export async function syncActivities(ids: number[]) {
 
         const result = await fetchStravaActivities({
             accessToken: account.access_token,
-            athleteId: parseInt(account.providerAccountId),
+            athleteId: parseInt(account.accountId),
             activityIds: ids,
             includePhotos: true,
         });

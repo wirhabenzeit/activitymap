@@ -2,7 +2,7 @@
 
 import { useActivities } from './use-activities';
 import { useShallowStore } from '~/store';
-import { applyFilters, type FilterState } from '~/store/filter';
+import { applyFilters } from '~/store/filter';
 import { useMemo } from 'react';
 import type { Activity } from '~/server/db/schema';
 
@@ -24,8 +24,7 @@ export function useFilteredActivities(
 
     const filteredActivities = useMemo(() => {
         if (!activities) return [];
-        // Cast filterState to FilterState type as it matches the shape required by applyFilters
-        return activities.filter((act) => applyFilters(filterState as FilterState, act));
+        return activities.filter((act) => applyFilters(filterState, act));
     }, [activities, filterState]);
 
     const filterIDs = useMemo(() => {

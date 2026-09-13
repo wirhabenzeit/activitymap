@@ -238,7 +238,7 @@ const Sidebar = React.forwardRef<
               style={
                 {
                   width: openMobile ? SIDEBAR_WIDTH_MOBILE : SIDEBAR_WIDTH_ICON,
-                } as React.CSSProperties
+                }
               }
               {...props}
             >

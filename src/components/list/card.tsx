@@ -154,7 +154,7 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
     try {
       await fetchStravaActivities({
         accessToken: account.access_token!,
-        athleteId: parseInt(account.providerAccountId),
+        athleteId: parseInt(account.accountId),
         activityIds: [row.original.id],
         includePhotos: true,
       });

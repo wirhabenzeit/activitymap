@@ -99,7 +99,7 @@ export function ProfileForm({
 
       await updateActivity(activityUpdate, {
         access_token: account.access_token!,
-        providerAccountId: account.providerAccountId,
+        accountId: account.accountId,
       });
 
       await queryClient.invalidateQueries({ queryKey: ['activities'] });

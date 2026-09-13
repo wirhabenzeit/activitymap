@@ -326,7 +326,7 @@ export const plot =
                 tickFormat: (...args: unknown[]) => {
                   const fn = prepend(
                     ' ',
-                    timeline.value.format as (value: number) => string,
+                    timeline.value.format,
                   );
                   return fn ? fn(args[0] as number) : String(args[0]);
                 },

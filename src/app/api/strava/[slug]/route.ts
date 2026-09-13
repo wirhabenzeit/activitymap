@@ -118,7 +118,7 @@ export async function POST(
 
       // Get account directly using Strava athlete ID
       const account = await getAccountInternal({
-        providerAccountId: data.owner_id.toString(),
+        accountId: data.owner_id.toString(),
       });
 
       console.log('Account lookup result:', {

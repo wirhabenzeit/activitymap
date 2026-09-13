@@ -99,8 +99,8 @@ export const auth = betterAuth({
         after: createAuthMiddleware(async (ctx) => {
             // Check if this is a social sign-in callback
             if (ctx.path.startsWith("/sign-in/social/callback")) {
-                const userId = getSessionUserId(ctx.context.newSession as unknown);
-                const account = ctx.context.account as unknown;
+                const userId = getSessionUserId(ctx.context.newSession);
+                const account = (ctx.context as Record<string, unknown>).account;
 
                 if (userId && isStravaAccount(account)) {
                     try {

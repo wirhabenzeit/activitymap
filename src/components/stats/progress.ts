@@ -136,8 +136,8 @@ export const plot =
     }) => {
       const { by, value } = getter(setting);
       const bigPlot = width > 500;
-      const formatByTick = by.tickFormat as (value: Date) => string;
-      const formatValueTick = value.tickFormat as (value: number) => string;
+      const formatByTick = by.tickFormat;
+      const formatValueTick = value.tickFormat;
 
       const cumulative = d3
         .groups(activities, (x) => by.tick(new Date(x.start_date_local)))

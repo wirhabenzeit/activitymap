@@ -41,7 +41,7 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
   let account;
   try {
     account = await getAccountInternal({
-      providerAccountId: owner_id.toString(),
+      accountId: owner_id.toString(),
     });
 
     if (!account?.access_token) {

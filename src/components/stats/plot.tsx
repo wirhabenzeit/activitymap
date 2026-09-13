@@ -148,7 +148,7 @@ export const SelectFormElement = <K extends string, T>({
 }) => {
   if (Object.keys(setting.options).length == 1) return null;
   return (
-    <Select value={value} onValueChange={(val) => setter(() => val as K)}>
+    <Select value={value} onValueChange={(val) => setter(() => val)}>
       <SelectTrigger className="w-[140px]">
         <SelectValue placeholder="Theme" />
       </SelectTrigger>
@@ -271,7 +271,7 @@ export default function ObsPlot({ name }: { name: keyof StatsSetting }) {
     if (!plot) return;
 
     plot.setAttribute('style', 'margin: 0;');
-    figureRef.current.append(plot as Node);
+    figureRef.current.append(plot);
 
     const legendFn = makeLegend(stats as unknown as Stats<typeof name>);
     const legend = legendFn(plot);

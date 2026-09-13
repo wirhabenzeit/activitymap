@@ -95,7 +95,7 @@ export async function syncActivities(
       }
 
       // Get athlete ID from account
-      const athleteId = parseInt(account.providerAccountId);
+      const athleteId = parseInt(account.accountId);
 
       // --- Sync most recent activity ---
       try {
