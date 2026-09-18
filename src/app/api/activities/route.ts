@@ -1,5 +1,6 @@
 import { getActivitiesByIds } from '~/server/db/actions';
 import { NextResponse } from 'next/server';
+import { logger } from '~/server/logging/logger';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
       })),
     );
   } catch (error) {
-    console.error('Error fetching activities:', error);
+    logger.error('Error fetching activities:', error);
     return NextResponse.json(
       { error: 'Failed to fetch activities' },
       { status: 500 },

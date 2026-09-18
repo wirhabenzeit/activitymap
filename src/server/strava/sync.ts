@@ -2,6 +2,7 @@ import { eq, isNotNull, desc, and, asc, inArray, sql } from 'drizzle-orm';
 import { db } from '~/server/db';
 import { activities, activityDeletions, activitySync, users } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
+import { logger } from '~/server/logging/logger';
 import { fetchStravaActivities } from './service';
 
 export type SyncActivityOptions = {
@@ -120,7 +121,7 @@ export async function syncActivities(
 
         }
       } catch (recentSyncError) {
-        console.error(
+        logger.error(
           `[User ${user.id}/${athleteId}] Error syncing most recent activity:`,
           recentSyncError,
         );
@@ -179,7 +180,7 @@ export async function syncActivities(
           .where(eq(activitySync.id, syncStatus.id));
       }
     } catch (error) {
-      console.error(`Error processing user ${user.id}:`, error);
+      logger.error(`Error processing user ${user.id}:`, error);
       errors[user.id] = error instanceof Error ? error.message : String(error);
 
       // Update sync status with error
@@ -294,12 +295,12 @@ async function updateIncompleteActivities(
 
 
         if (deleteResult.length !== notFoundIds.length) {
-          console.warn(
+          logger.warn(
             `Mismatch in deleted count. Expected ${notFoundIds.length}, got ${deleteResult.length}`,
           );
         }
       } catch (deleteError) {
-        console.error(
+        logger.error(
           `Error during database delete operation for athlete ${athleteId}:`,
           deleteError,
         );
@@ -310,7 +311,7 @@ async function updateIncompleteActivities(
 
     return updatedActivities.length;
   } catch (error) {
-    console.error(
+    logger.error(
       `Error updating incomplete activities for athlete ${athleteId}:`,
       error,
     );
@@ -374,7 +375,7 @@ async function fetchOlderActivities(
       reachedOldest,
     };
   } catch (error) {
-    console.error(
+    logger.error(
       `Error fetching older activities for athlete ${athleteId}:`,
       error,
     );

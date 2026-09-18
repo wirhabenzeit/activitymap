@@ -91,11 +91,15 @@ export const auth = betterAuth({
                 },
             ],
         }),
-        // Accepts an `Authorization: Bearer <session-token>` header as an
-        // alternative to the secure cookie, so non-browser clients (e.g. a
+        // Accepts an `Authorization: Bearer <signed-session-token>` header as
+        // an alternative to the secure cookie, so non-browser clients (e.g. a
         // future mobile app) can authenticate through the same safe
         // interface without any endpoint accepting a credential in a URL.
-        bearer(),
+        // `requireSignature: true` rejects a raw (unsigned) session token in
+        // the header: only the signed cookie value better-auth issues is
+        // accepted, so a raw `sessions.sessionToken` value leaked some other
+        // way (e.g. serialized into client state) can't be replayed here.
+        bearer({ requireSignature: true }),
     ],
     session: {
         expiresIn: 60 * 60 * 24 * 30, // 30 days

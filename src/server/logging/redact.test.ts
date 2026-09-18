@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { redact, redactHeaders } from './redact.ts';
+import { redact, redactHeaders, redactString } from './redact.ts';
 
 void test('redacts session and token values by key name', () => {
   const result = redact({
@@ -79,4 +79,60 @@ void test('handles circular references without throwing', () => {
   obj.self = obj;
 
   assert.doesNotThrow(() => redact(obj));
+});
+
+void test('handles a self-referential array without throwing', () => {
+  const arr: unknown[] = [1, 2];
+  arr.push(arr);
+
+  assert.doesNotThrow(() => redact(arr));
+  const result = redact(arr) as unknown[];
+  assert.equal(result[2], '[circular]');
+});
+
+void test('redacts credential-shaped key=value pairs embedded in strings', () => {
+  assert.equal(
+    redactString('Bearer super-secret-token'),
+    'Bearer [redacted]',
+  );
+  assert.equal(
+    redactString('Authorization: Bearer super-secret-token'),
+    'Authorization: [redacted]',
+  );
+  assert.equal(
+    redactString('Cookie: better-auth.session_token=super-secret-cookie; Path=/'),
+    'Cookie: [redacted]; Path=/',
+  );
+  assert.equal(
+    redactString('sessionToken=abc123&other=1'),
+    'sessionToken=[redacted]&other=1',
+  );
+  assert.equal(
+    redactString('no secrets in this plain message'),
+    'no secrets in this plain message',
+  );
+});
+
+void test('redacts secrets embedded in string log arguments passed through redact()', () => {
+  const result = redact(
+    'Refreshing failed for verify_token=super-secret and access_token=another-secret',
+  );
+
+  assert.equal(
+    result,
+    'Refreshing failed for verify_token=[redacted] and access_token=[redacted]',
+  );
+});
+
+void test('redacts secrets embedded in Error message and stack', () => {
+  const error = new Error('request failed with Authorization: Bearer super-secret-token');
+  error.stack = `Error: request failed\n    at fetch (session_token=leaked-secret-value)`;
+
+  const result = redact(error) as { message: string; stack: string };
+
+  assert.equal(
+    result.message,
+    'request failed with Authorization: [redacted]',
+  );
+  assert.ok(!result.stack.includes('leaked-secret-value'));
 });

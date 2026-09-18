@@ -51,5 +51,15 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Server/API code must log through src/server/logging so authorization
+    // headers, session/token values, and personal activity data are
+    // redacted before anything reaches the log output.
+    files: ['src/server/**/*.{ts,tsx}', 'src/app/api/**/*.{ts,tsx}'],
+    ignores: ['src/server/logging/**'],
+    rules: {
+      'no-console': 'error',
+    },
+  },
   prettier,
 );

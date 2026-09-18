@@ -1,7 +1,7 @@
 import { redact } from './redact';
 
 function withRedaction(args: unknown[]): unknown[] {
-  return args.map((arg) => (typeof arg === 'string' ? arg : redact(arg)));
+  return args.map((arg) => redact(arg));
 }
 
 /**
