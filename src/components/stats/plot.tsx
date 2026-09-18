@@ -39,6 +39,8 @@ type ChartArgs = {
   width: number;
   height: number;
   theme: ChartTheme;
+  selected: number[];
+  setSelected: (ids: number[]) => void;
 };
 
 // Define a union type for all possible setting keys
@@ -225,10 +227,12 @@ export const SliderFormElement = ({
 };
 
 export default function StatsChart({ name }: { name: ChartPlotName }) {
-  const { settings, setSettings } = useShallowStore(
+  const { settings, setSettings, selected, setSelected } = useShallowStore(
     (state) => ({
       settings: state.settings,
       setSettings: state.setSettings,
+      selected: state.selected,
+      setSelected: state.setSelected,
     }),
   );
 
@@ -267,8 +271,10 @@ export default function StatsChart({ name }: { name: ChartPlotName }) {
       width,
       height,
       theme: resolvedTheme,
+      selected,
+      setSelected,
     });
-  }, [stats, filteredActivities, width, height, resolvedTheme]);
+  }, [stats, filteredActivities, width, height, resolvedTheme, selected, setSelected]);
 
   const Legend = stats.Legend as (props: LegendProps<typeof name>) => JSX.Element | null;
 

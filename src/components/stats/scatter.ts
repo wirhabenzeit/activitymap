@@ -2,6 +2,8 @@ import * as d3 from 'd3';
 
 import { defineChart, dot, crosshair } from '@tanstack/charts';
 import { tooltip } from '@tanstack/charts/tooltip';
+import { keyedSelection } from '@tanstack/charts/selection';
+import { controlledSignal } from '@tanstack/charts/interaction/signal';
 import * as React from 'react';
 
 import { type Activity } from '~/server/db/schema';
@@ -119,6 +121,7 @@ const setter =
     };
 
 type ScatterRow = {
+  id: number;
   x: number | Date;
   y: number | Date;
   r: number;
@@ -129,6 +132,7 @@ type ScatterRow = {
 const buildRows = (activities: Activity[], setting: ScatterSetting): ScatterRow[] => {
   const { xValue, yValue, rValue, group } = getter(setting);
   return activities.map((act) => ({
+    id: act.id,
     x: xValue.fun(act),
     y: yValue.fun(act),
     r: Number(rValue.fun(act)),
@@ -142,16 +146,35 @@ export const chart =
     ({
       activities,
       width,
+      selected,
+      setSelected,
     }: {
       activities: Activity[];
       width: number;
       height: number;
       theme: 'light' | 'dark';
+      selected: number[];
+      setSelected: (ids: number[]) => void;
     }) => {
       const bigPlot = width > 500;
       const { xValue, yValue, rValue } = getter(setting);
       const data = buildRows(activities, setting);
       if (data.length === 0) return null;
+
+      const selectedIds = new Set(selected);
+      const hasSelection = selectedIds.size > 0;
+      const selectedData = data.filter((d) => selectedIds.has(d.id));
+
+      // Click selects a single activity; the store's `selected` can also
+      // hold a multi-select made elsewhere (e.g. the list), which the
+      // highlight layer above already reflects regardless of this key.
+      const selectedKey = selectedIds.size === 1 ? [...selectedIds][0]! : null;
+      const selection = keyedSelection<ScatterRow, number>({
+        selected: controlledSignal(selectedKey, (next) => {
+          setSelected(next === null ? [] : [next]);
+        }),
+        key: (datum) => datum.id,
+      });
 
       const yTickFormatter = (value: Date | number) =>
         'tickFormatShort' in yValue
@@ -179,11 +202,28 @@ export const chart =
             r: 'r',
             rScale,
             color: 'group',
-            fillOpacity: 0.7,
+            key: 'id',
+            fillOpacity: hasSelection ? 0.15 : 0.7,
             strokeOpacity: 0,
           }),
+          ...(hasSelection
+            ? [
+                dot(selectedData, {
+                  x: 'x',
+                  y: 'y',
+                  r: 'r',
+                  rScale,
+                  color: 'group',
+                  fillOpacity: 1,
+                  stroke: 'currentColor',
+                  strokeWidth: 1.5,
+                  strokeOpacity: 0.8,
+                }),
+              ]
+            : []),
           crosshair({ marker: true }),
         ],
+        selection,
         scales: {
           x: {
             scale: isDateAxis(xValue) ? d3.scaleUtc : d3.scaleLinear,

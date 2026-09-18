@@ -81,10 +81,13 @@ function useCalendarData(activities: Activity[], setting: CalendarSetting) {
     if (!start || !maxDate) return null;
     const end = d3.utcDay.offset(maxDate, 1);
 
-    const years = d3.utcYears(d3.utcYear(start), end).map((date) => ({
-      year: date.getUTCFullYear(),
-      label: yearLabel(date),
-    }));
+    const years = d3
+      .utcYears(d3.utcYear(start), end)
+      .map((date) => ({
+        year: date.getUTCFullYear(),
+        label: yearLabel(date),
+      }))
+      .reverse();
 
     const monthStarts = d3
       .utcMonths(d3.utcMonth(start), end)
@@ -120,7 +123,13 @@ function useCalendarData(activities: Activity[], setting: CalendarSetting) {
   }, [activities, setting]);
 }
 
-function CalendarLegend({ value }: { value: CalendarSpec['value'] }) {
+function CalendarLegend({
+  value,
+  numericDomain,
+}: {
+  value: CalendarSpec['value'];
+  numericDomain: [number, number] | null;
+}) {
   if (isTypeValueOption(value)) {
     const { domain, range } = value.colorDomain();
     return (
@@ -137,18 +146,34 @@ function CalendarLegend({ value }: { value: CalendarSpec['value'] }) {
       </div>
     );
   }
-  const scale = d3.scaleSequentialSqrt(d3.interpolateReds).domain([0, 1]);
-  const stops = d3.range(0, 1.001, 0.25);
+  const [min, max] = numericDomain ?? [0, 1];
+  const mid = (min + max) / 2;
+  const scale = d3.scaleSequentialSqrt(d3.interpolateReds).domain([min, max]);
+  // The scale is sqrt-transformed, so the color ramp moves fastest at the low
+  // end of the domain — a plain min/max legend hides that. Splitting the bar
+  // at the domain midpoint and labeling it shows where the color actually is.
+  const gradient = (fromFrac: number, toFrac: number) =>
+    d3
+      .range(0, 1.0001, 1 / 10)
+      .map((s) => {
+        const frac = fromFrac + s * (toFrac - fromFrac);
+        return `${scale(min + frac * (max - min))} ${(s * 100).toFixed(1)}%`;
+      })
+      .join(', ');
   return (
     <div className="flex items-center space-x-2 text-xs">
       <span className="font-semibold">{value.label}</span>
-      {stops.map((t) => (
-        <span
-          key={t}
-          className="inline-block h-2 w-4"
-          style={{ backgroundColor: scale(t) }}
-        />
-      ))}
+      <span className="tabular-nums">{value.format(min)}</span>
+      <span
+        className="inline-block h-2 w-12 rounded-l-sm"
+        style={{ background: `linear-gradient(to right, ${gradient(0, 0.5)})` }}
+      />
+      <span className="tabular-nums text-muted-foreground">{value.format(mid)}</span>
+      <span
+        className="inline-block h-2 w-12 rounded-r-sm"
+        style={{ background: `linear-gradient(to right, ${gradient(0.5, 1)})` }}
+      />
+      <span className="tabular-nums">{value.format(max)}</span>
     </div>
   );
 }
@@ -233,7 +258,7 @@ export default function CalendarHeatmap() {
 
   return (
     <>
-      <div ref={containerRef} className="relative w-full overflow-auto">
+      <div ref={containerRef} className="relative h-full w-full overflow-auto">
         <svg width={width} height={height} className="block">
           {years.map((y) => (
             <text
@@ -243,6 +268,7 @@ export default function CalendarHeatmap() {
               textAnchor="end"
               fontWeight="bold"
               fontSize={11}
+              fill="currentColor"
             >
               {y.label}
             </text>
@@ -254,6 +280,7 @@ export default function CalendarHeatmap() {
               y={yOffset(m.year) - 6}
               textAnchor="start"
               fontSize={10}
+              fill="currentColor"
             >
               {m.label}
             </text>
@@ -330,7 +357,7 @@ export default function CalendarHeatmap() {
       {portalTarget &&
         createPortal(
           <>
-            <CalendarLegend value={value} />
+            <CalendarLegend value={value} numericDomain={numericDomain} />
             <SelectFormElement
               setting={settings.value}
               value={setting.value}
