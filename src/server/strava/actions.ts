@@ -9,7 +9,7 @@ import {
 } from '~/server/db/schema';
 
 import { db } from '~/server/db';
-import { getAuthenticatedAccount } from '~/server/db/actions';
+import { getAuthenticatedAccountInternal } from '~/server/db/internal';
 import { StravaClient } from './client';
 import { transformStravaActivity } from './transforms';
 import { type UpdatableActivity } from './types';
@@ -28,7 +28,7 @@ export async function updateActivity(input: UpdateActivityInput) {
 
     // Always resolve the Strava credential from the authenticated session.
     // Never accept a client-supplied access token/account ID here - see issue #116.
-    const account = await getAuthenticatedAccount();
+    const account = await getAuthenticatedAccountInternal();
     if (!account?.access_token) {
       throw new Error('No Strava access token found');
     }
@@ -85,7 +85,7 @@ export async function updateActivity(input: UpdateActivityInput) {
  * or athlete ID. See issue #116.
  */
 export async function refreshActivity(activityId: number) {
-  const account = await getAuthenticatedAccount();
+  const account = await getAuthenticatedAccountInternal();
   if (!account?.access_token) {
     throw new Error('No Strava access token found');
   }
@@ -112,7 +112,7 @@ export async function deleteActivities(input: number[]): Promise<{
 
   try {
     // Get current user's account info to ensure we only delete their activities
-    const account = await getAuthenticatedAccount();
+    const account = await getAuthenticatedAccountInternal();
     if (!account?.accountId) {
       throw new Error('User account not found or missing accountId');
     }

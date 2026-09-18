@@ -5,25 +5,12 @@ import { activities, photos } from './schema';
 import { db } from './index';
 import { auth } from '~/lib/auth';
 import { headers } from 'next/headers';
-import { getAccountInternal, getUserInternal } from './internal';
+import { getUserInternal } from './internal';
 
 // Safe wrapper for getUser
 export const getUser = async (id?: string) => {
   return getUserInternal(id);
 };
-
-export const getAuthenticatedAccount = async () => {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session?.user?.id) {
-    return null;
-  }
-
-  // Safe: we trust the session ID
-  return getAccountInternal({ userId: session.user.id });
-}
 
 /**
  * Get activities for a specific user (by internal User ID).

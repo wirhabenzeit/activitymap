@@ -21,7 +21,7 @@ import { fetchActivitiesSchema, type FetchActivitiesInput } from './validators';
  * directive: it accepts a caller-supplied Strava access token and athlete ID,
  * so it must only ever be invoked from trusted server-side code (webhook
  * processing, scheduled sync, or a Server Action that has already resolved
- * these values itself via getAuthenticatedAccount/getAccountInternal).
+ * these values itself via getAuthenticatedAccountInternal/getAccountInternal).
  * It must never be exported from a 'use server' file, which would make it
  * directly network-callable with client-supplied credentials. See issue #116.
  */
