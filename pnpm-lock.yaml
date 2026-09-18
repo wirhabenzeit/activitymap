@@ -207,6 +207,9 @@ importers:
       react-scan:
         specifier: ^0.5.7
         version: 0.5.7(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(eslint@9.39.5(jiti@2.7.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
       tailwind-merge:
         specifier: ^3.7.0
         version: 3.7.0
@@ -301,6 +304,9 @@ importers:
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5530,6 +5536,9 @@ packages:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
     engines: {node: '>=10'}
     hasBin: true
+
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
 
   set-cookie-parser@3.1.2:
     resolution: {integrity: sha512-5/r/lTwbJ3zQ+qwdUFZYeRNqda7P5HD8zQKqlSjdGt1/S0cjLAphHusj4Y58ahDtWn/g32xrIS58/ikOvwl0Lw==}
@@ -11194,6 +11203,8 @@ snapshots:
   semver@6.3.1: {}
 
   semver@7.8.5: {}
+
+  server-only@0.0.1: {}
 
   set-cookie-parser@3.1.2: {}
 

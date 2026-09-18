@@ -18,7 +18,6 @@ export type FetchActivitiesInput = z.input<typeof fetchActivitiesSchema>;
 
 export const updateActivityInputSchema = z.object({
     id: z.number(),
-    athlete: z.number(),
     name: z.string().optional(),
     description: z.string().optional(),
     sport_type: z.enum(sportTypes).optional(),

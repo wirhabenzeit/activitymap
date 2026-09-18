@@ -43,16 +43,16 @@ export default async function RootLayout({
     headers: await headers(),
   });
   const initialAuth: InitialAuth = {
-    session: null,
     currentUser: null,
   };
 
   // If we have a session, resolve a safe, client-visible user summary.
-  // Never pass the raw Account record (Strava tokens) to the client - see issue #116.
+  // Never pass the raw Account record (Strava tokens) or the Better Auth
+  // session (which carries a reusable session token) to the client - see
+  // issue #116.
   if (session?.user?.id) {
     const user = await getUserInternal(session.user.id);
     const account = user ? await getAccountInternal({ userId: user.id }) : null;
-    initialAuth.session = session;
     initialAuth.currentUser = user ? toCurrentUserDTO(user, account) : null;
   }
 

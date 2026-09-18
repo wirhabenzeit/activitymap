@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import { toCurrentUserDTO } from './dto';
 import type { Account, User } from './schema';
+import type { InitialAuth } from '~/store/auth';
 
 const SENSITIVE = 'super-secret-strava-credential';
 
@@ -80,6 +81,33 @@ void test('CurrentUserDTO never serializes Strava credentials to the client', ()
       Object.prototype.hasOwnProperty.call(dto, field),
       false,
       `CurrentUserDTO must not expose the "${field}" field`,
+    );
+  }
+});
+
+void test('the full InitialAuth client payload never serializes a session token or account credentials', () => {
+  const currentUser = toCurrentUserDTO(buildUser(), buildAccount());
+  // This mirrors exactly what src/app/layout.tsx hands to <AuthProvider>.
+  const initialAuth: InitialAuth = { currentUser };
+  const serialized = JSON.stringify(initialAuth);
+
+  assert.equal(
+    serialized.includes(SENSITIVE),
+    false,
+    'serialized InitialAuth payload must not contain any Strava credential',
+  );
+
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(initialAuth, 'session'),
+    false,
+    'InitialAuth must not carry a Better Auth session - its reusable session token would leak to the client',
+  );
+
+  for (const field of [...CREDENTIAL_FIELDS, 'session', 'token']) {
+    assert.equal(
+      serialized.includes(`"${field}"`),
+      false,
+      `serialized InitialAuth payload must not expose the "${field}" field`,
     );
   }
 });

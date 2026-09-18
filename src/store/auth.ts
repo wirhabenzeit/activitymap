@@ -1,10 +1,8 @@
 import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
 import type { CurrentUserDTO } from '~/server/db/dto';
-import type { Session } from '~/lib/auth';
 
 export type InitialAuth = {
-  session: Session | null;
   currentUser: CurrentUserDTO | null;
   guestMode?: {
     type: 'user' | 'activities';
@@ -15,7 +13,6 @@ export type InitialAuth = {
 
 export type AuthState = {
   user: CurrentUserDTO | undefined;
-  session: Session | undefined;
   isInitialized: boolean;
   isGuest: boolean;
   guestMode: {
@@ -39,7 +36,6 @@ export const createAuthSlice: StateCreator<
 > = (set) => ({
   // Initial state
   user: undefined,
-  session: undefined,
   isInitialized: false,
   isGuest: false,
   guestMode: {
@@ -60,7 +56,6 @@ export const createAuthSlice: StateCreator<
           activityIds: auth.guestMode.activityIds,
         };
       } else {
-        state.session = auth.session ?? undefined;
         state.user = auth.currentUser ?? undefined;
       }
       state.isInitialized = true;

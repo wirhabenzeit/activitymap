@@ -28,7 +28,8 @@ import { Edit } from 'lucide-react';
 import { type Row } from '@tanstack/react-table';
 import { type Features } from './table-extensions';
 import { type Activity } from '~/server/db/schema';
-import { type UpdatableActivity, type SportType } from '~/server/strava/types';
+import { type SportType } from '~/server/strava/types';
+import { type UpdateActivityInput } from '~/server/strava/validators';
 import { sportType } from 'drizzle/schema';
 import { Select } from '../ui/select';
 import {
@@ -85,11 +86,10 @@ export function ProfileForm({
   async function onSubmit(values: FormValues) {
     setLoading(true);
     try {
-      const activityUpdate: UpdatableActivity = {
+      const activityUpdate: UpdateActivityInput = {
         name: values.name,
         sport_type: values.sportType,
         id: row.original.id,
-        athlete: row.original.athlete,
         ...(values.description && { description: values.description }),
       };
 
