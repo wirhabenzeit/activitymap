@@ -72,10 +72,6 @@ export function ProfileForm({
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  // We removed updateActivity from the store, so no need to select it
-  const { account } = useShallowStore((state) => ({
-    account: state.account,
-  }));
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -87,7 +83,6 @@ export function ProfileForm({
   });
 
   async function onSubmit(values: FormValues) {
-    if (!account) return;
     setLoading(true);
     try {
       const activityUpdate: UpdatableActivity = {
@@ -98,10 +93,7 @@ export function ProfileForm({
         ...(values.description && { description: values.description }),
       };
 
-      await updateActivity(activityUpdate, {
-        access_token: account.access_token!,
-        accountId: account.accountId,
-      });
+      await updateActivity(activityUpdate);
 
       await queryClient.invalidateQueries({ queryKey: ['activities'] });
 

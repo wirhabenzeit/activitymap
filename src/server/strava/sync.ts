@@ -2,7 +2,7 @@ import { eq, isNotNull, desc, and, asc, inArray, sql } from 'drizzle-orm';
 import { db } from '~/server/db';
 import { activities, activityDeletions, activitySync, users } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
-import { fetchStravaActivities } from './actions';
+import { fetchStravaActivities } from './service';
 
 export type SyncActivityOptions = {
   maxActivities?: number; // Total max activities to process (default: 50)

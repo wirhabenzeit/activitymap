@@ -1,7 +1,7 @@
 'use server';
 
 import { getAuthenticatedAccount } from '~/server/db/actions';
-import { fetchStravaActivities } from './actions';
+import { fetchStravaActivities } from './service';
 
 export async function syncYear(year: number) {
     try {

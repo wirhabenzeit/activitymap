@@ -1,5 +1,3 @@
-'use server';
-
 import { db } from '~/server/db';
 import {
   activities,
@@ -8,8 +6,15 @@ import {
   photos,
 } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
-import { fetchStravaActivities } from '~/server/strava/actions';
+import { fetchStravaActivities } from '~/server/strava/service';
 import { eq, sql } from 'drizzle-orm';
+
+/**
+ * No 'use server' directive here: this module is only invoked from the
+ * webhook Route Handler, and must never become a directly network-callable
+ * Server Action (it resolves credentials from a caller-supplied owner_id).
+ * See issue #116.
+ */
 
 export type StravaWebhookEvent = {
   object_type: string;
