@@ -1,11 +1,13 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { bearer } from "better-auth/plugins";
 import { createAuthMiddleware } from "better-auth/api";
 import { db } from "~/server/db";
 import { users, accounts, sessions, verification } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { logger } from "~/server/logging/logger";
 
 const stravaProfileSchema = z.object({
     id: z.union([z.string(), z.number()]),
@@ -89,6 +91,11 @@ export const auth = betterAuth({
                 },
             ],
         }),
+        // Accepts an `Authorization: Bearer <session-token>` header as an
+        // alternative to the secure cookie, so non-browser clients (e.g. a
+        // future mobile app) can authenticate through the same safe
+        // interface without any endpoint accepting a credential in a URL.
+        bearer(),
     ],
     session: {
         expiresIn: 60 * 60 * 24 * 30, // 30 days
@@ -115,7 +122,7 @@ export const auth = betterAuth({
                             .where(eq(users.id, userId));
 
                     } catch (error) {
-                        console.error("[Better Auth] Error updating athlete_id:", error);
+                        logger.error("[Better Auth] Error updating athlete_id:", error);
                     }
                 }
             }

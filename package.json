@@ -8,6 +8,7 @@
     "dev": "next dev --turbo",
     "lint": "eslint .",
     "start": "next start",
+    "test": "node --experimental-strip-types --test src/**/*.test.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:reset": "tsx drizzle/reset.ts",
