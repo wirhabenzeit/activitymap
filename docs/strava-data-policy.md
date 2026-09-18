@@ -1,0 +1,320 @@
+# Strava Data Retention, Deauthorization, and Sharing Policy
+
+Status: **Accepted**. This is the architecture/policy decision required by
+[#118](https://github.com/wirhabenzeit/activitymap/issues/118), part of the
+[SwiftUI backend preparation plan](swiftui-backend-preparation-plan.md) and
+its epic, [#115](https://github.com/wirhabenzeit/activitymap/issues/115).
+
+It records what the applicable Strava API policy requires, what ActivityMap's
+retention/expiry/deauthorization/sharing behavior must therefore be, which
+server-side representation of Strava OAuth tokens is canonical, and the
+migration plan to get there. It is a decision record, not an implementation
+ticket: several of the behaviors it specifies are implemented by later issues
+in the epic (noted inline) and are written here precisely enough to drive
+those implementations and their tests.
+
+## 1. Applicable Strava API policy
+
+Per Strava's [API Agreement](https://www.strava.com/legal/api) and
+[API Policy](https://www.strava.com/legal/api_policy) (2026 revision):
+
+- **Cache duration**: "No data shall remain in your cache longer than seven
+  days." If a cached resource is checked against Strava and is no longer
+  available, it must be removed from the cache immediately, regardless of the
+  configured refresh interval.
+- **Deletion propagation**: An application "may not continue displaying or
+  disclosing ... any Strava Data that a Strava user has deleted from Strava."
+  Deletions must be reflected within the application "expeditiously but in
+  all cases within forty-eight (48) hours."
+- **Deauthorization / revocation**: revoking access invalidates all of the
+  application's access and refresh tokens for that athlete immediately on
+  Strava's side. Strava's currently-recommended revocation endpoint is
+  `POST /oauth/revoke` (the older `/oauth/deauthorize` remains supported but
+  is deprecated and will stop being the interface described in new
+  integration guidance).
+- **Full data deletion**: on a user's request, a user's revocation of
+  authorization, or a user's deletion of their Strava account, the
+  application must "promptly and permanently delete all Strava Data and
+  Personal Data derived from Strava Data relating to that user," with
+  deletion completed within **thirty (30) days**.
+- **Display is limited to the authenticated athlete**: §2.3 permits Strava
+  Data supplied by a user to be displayed or disclosed only to that same
+  user. §6.2 separately prohibits providing or displaying cached Strava Data
+  or an associated service to any third party. User consent does not create
+  an exception for public or user-to-user sharing inside a third-party app.
+
+These are binding constraints on the product, not merely on the SwiftUI
+client, so the rules below apply to both the existing web app and the future
+native app.
+
+## 2. Cache duration and staleness: `lastValidatedAt` / `expiresAt`
+
+**Decision**: every Strava-derived record (activities, photos, and the
+athlete profile) carries two timestamps once the sync layer ([#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123))
+adds them:
+
+- `lastValidatedAt`: the last time the record's contents were confirmed
+  against the Strava API — either by a direct fetch/refresh or by processing
+  a webhook event that carries the current state of that record. Any value
+  written by the batch sync/verification jobs (`src/server/strava/sync.ts`,
+  `src/server/strava/verification.ts`) or by webhook processing
+  (`src/server/strava/webhook.ts`) counts as validation.
+- `expiresAt`: `lastValidatedAt + 7 days`. This is the enforced cache-duration
+  ceiling from §1, not a soft hint.
+
+Semantics:
+
+- A record with `now() > expiresAt` is **stale**. Stale records must not be
+  served to a client (web or iOS) without first being re-validated. In
+  practice this means the read path either (a) refreshes the record from
+  Strava synchronously before responding, or (b) responds with a
+  `stale`/`refresh_required` signal and lets the client decide whether to
+  show a "last synced N days ago, offline" indicator or trigger a refresh —
+  the choice belongs to whichever issue implements the read path ([#123](https://github.com/wirhabenzeit/activitymap/issues/123)
+  for the sync API, existing Server Actions for the web app today), but
+  **silently continuing to display data past `expiresAt` is not permitted**.
+- A record that Strava reports as gone (activity/photo no longer resolvable,
+  `notFoundIds` in `fetchStravaActivities`) must be removed from local
+  storage immediately regardless of `expiresAt`, per the "no longer
+  available" clause in §1. `processWebhookEvent`'s existing delete-on-404
+  handling (`src/server/strava/webhook.ts:72-104`) already implements this
+  for the activity case; it should be treated as the template for any other
+  resource type added later.
+- Offline/local caches (IndexedDB on web, SQLite on iOS) are bound by the
+  same 7-day ceiling as the server cache — the API Agreement does not
+  distinguish server-side and client-side caches. `src/lib/offline/db.ts`
+  currently stores `lastUpdatedMs` per row but nothing reads it to expire
+  entries, and `src/hooks/use-activities.ts` sets
+  `staleTime: Infinity, gcTime: Infinity`, i.e. the web offline cache today
+  has no enforced expiry. This is a known gap; closing it (both purging
+  entries older than 7 days and wiring up the already-defined but unused
+  `clearCachedUserScope` helper for logout/account switch) is in scope for
+  the offline sync work in [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#126](https://github.com/wirhabenzeit/activitymap/issues/126), not this issue, and is recorded here so it is
+  covered by that work's acceptance criteria.
+
+Adding the `lastValidatedAt`/`expiresAt` columns themselves is deferred to
+the sync/change-feed migration ([#122](https://github.com/wirhabenzeit/activitymap/issues/122)) so that they land alongside the
+other schema changes that migration already needs to make, rather than as an
+independent, unreviewed schema change here.
+
+## 3. Deletion and deauthorization: required handling and current gap
+
+**Decision**: deletion and deauthorization events are **high priority** and
+must be processed ahead of routine activity create/update events, consistent
+with their 48-hour (deletion) and 30-day (full erasure) deadlines being much
+tighter guarantees than the 7-day cache ceiling.
+
+Required behavior, to be implemented as part of the webhook consolidation and
+processing work ([#124](https://github.com/wirhabenzeit/activitymap/issues/124)/[#125](https://github.com/wirhabenzeit/activitymap/issues/125)):
+
+- **Activity/photo deletion** (`aspect_type: "delete"`): delete the local
+  copy and record a tombstone, as `processWebhookEvent` already does via the
+  `activityDeletions`/`photoDeletions` tables. This path is priority-1 in any
+  future retry/dead-letter queue — it must not be starved behind a backlog of
+  create/update events, and must complete well inside the 48-hour deadline
+  even under retry/backoff.
+- **Athlete deauthorization** (`object_type: "athlete"`, Strava's revocation
+  webhook): on receipt, the application must, before anything else,
+  **stop using the stored token** — do not attempt another refresh or API
+  call with it, since Strava has already invalidated it and a refresh
+  attempt will fail anyway. It must then mark the account's Strava
+  connection as revoked (so `CurrentUserDTO.stravaConnected` — see [#116](https://github.com/wirhabenzeit/activitymap/issues/116) —
+  correctly reflects it and the UI can prompt the user to reconnect), and
+  schedule the 30-day full-erasure deletion of that athlete's activities,
+  photos, and stored tokens described in §1.
+- **User-initiated disconnect**: there is currently no "disconnect Strava" or
+  "delete my data" action anywhere in the app (no settings/account page
+  exists). The same deauthorization handling above is the mechanism this
+  feature would use once built; building the UI itself is out of scope for
+  this issue.
+
+**Current gap** (evidence, so the fix in #124/#125 has a concrete starting
+point): neither existing webhook handler processes deauthorization —
+`src/server/strava/webhook.ts:33-37` returns immediately for any
+`object_type !== 'activity'`, and `src/app/api/strava/[slug]/route.ts:96-99`
+explicitly logs `"Received athlete webhook, skipping"` and returns `200 OK`.
+Today, a user who revokes ActivityMap's access from Strava's side has their
+token invalidated by Strava but ActivityMap keeps the row, keeps trying to
+use it (each such attempt fails at the Strava token endpoint), and never
+deletes their cached data. This is a policy violation under §1 (no 30-day
+erasure) and should be treated as a bug to close, not a style preference, by
+whichever PR implements #124/#125.
+
+## 4. Token storage: canonical representation and migration plan
+
+### Inventory
+
+The `account` table (`src/server/db/schema.ts:36-72`) stores Strava OAuth
+tokens in **two parallel column sets** on the same row, left over from the
+NextAuth → Better Auth migration (`drizzle/better-auth-migration.sql`):
+
+| Concern | Legacy (NextAuth) column | Better Auth-native column |
+| --- | --- | --- |
+| Access token | `access_token` | `accessToken` |
+| Refresh token | `refresh_token` | `refreshToken` |
+| Access token expiry | `expires_at` (unix seconds) | `accessTokenExpiresAt` (timestamp); `expiresAt` is the pre-1.7 Better Auth name for the same thing |
+| Refresh token expiry | — | `refreshTokenExpiresAt` |
+| ID token | `id_token` | `idToken` |
+
+Every reader/writer of these columns today:
+
+- **Writer, refresh path**: `getAccountInternal` in `src/server/db/internal.ts`
+  is the sole place the app refreshes an expired Strava token. Before this
+  change it read/wrote only the legacy columns; see "Fix landed with this
+  decision" below.
+- **Writer, initial sign-in**: Better Auth's `genericOAuth` plugin
+  (`src/lib/auth.ts`) writes the Better Auth-native columns via the Drizzle
+  adapter when a user completes the Strava OAuth flow. It does not know
+  about the legacy column names, so it never populates them.
+- **Readers**: `src/server/strava/actions.ts` (`updateActivity`,
+  `fetchStravaActivities`'s callers), `src/server/strava/sync.ts`
+  (`syncYear`, `repairYear`, `syncActivities`), `src/server/strava/verification.ts`,
+  `src/server/strava/webhook.ts`, and `src/app/api/strava/[slug]/route.ts` all
+  resolve the token via `getAuthenticatedAccount()`/`getAccountInternal()`
+  and read `account.access_token` (legacy) directly.
+- **One-time migration**: `drizzle/better-auth-migration.sql` copied
+  legacy → Better Auth-native values for rows that existed at migration
+  time. Nothing has kept the two in sync since.
+
+### The drift is an active bug, not just duplication
+
+Because sign-in populates only the Better Auth-native columns and the app's
+refresh logic previously read only the legacy columns, an account created
+*after* the Better Auth migration has `refresh_token` (legacy) as `NULL`
+while `refreshToken` (Better Auth) holds the real value. The old
+`getAccountInternal` treated a `NULL` `expires_at` as "expired" and then
+called `StravaClient.withRefreshToken(account.refresh_token!, ...)` —
+i.e. with `undefined` — which fails at Strava's token endpoint. In other
+words, before this fix, **newly-signed-up users' token refresh was broken**.
+This is exactly the "no ambiguous source of truth" risk #118 calls out, made
+concrete.
+
+### Decision: Better Auth-native columns are canonical, legacy columns are a compatibility mirror
+
+Rather than pick a brand-new representation, the decision is:
+
+1. **Canonical source of truth today: the Better Auth-native columns**
+   (`accessToken`/`refreshToken`/`accessTokenExpiresAt`). Better Auth owns the
+   sign-in and reauthorization flow and writes these fields whenever Strava
+   issues new credentials. Therefore, when both representations exist and
+   disagree, the Better Auth-native value wins. Treating legacy fields as
+   authoritative could replay a revoked refresh token after reauthorization.
+2. **Expand (this issue)**: every `getAccountInternal` read resolves tokens
+   from either column set, preferring Better Auth-native values, then writes
+   the resolved values to **both** sets before returning—even when the access
+   token has not expired. The refresh callback also writes both sets. This
+   fixes native-only accounts immediately rather than waiting for expiry and
+   keeps existing callers of `account.access_token` working during migration.
+3. **Backfill**: any existing row where `refresh_token`/`access_token` is
+   `NULL` but the Better Auth-native columns are populated (i.e. accounts
+   created after the Better Auth migration but before this fix) is
+   corrected automatically on the next `getAccountInternal` read. Conversely,
+   a legacy-only row is copied into the Better Auth-native columns on its next
+   read. No manual backfill script or wait for token expiry is required.
+4. **Switch** (future issue, likely alongside [#120](https://github.com/wirhabenzeit/activitymap/issues/120)'s application-service
+   extraction or [#121](https://github.com/wirhabenzeit/activitymap/issues/121)'s mobile auth work): once it is confirmed that Better
+   Auth's own APIs (e.g. any future use of `auth.api.getAccessToken`, an
+   admin plugin, or a first-party Strava provider if one ever ships) are the
+   preferred long-term integration point, move the remaining readers over to
+   the Better Auth-native columns and stop writing the legacy mirror.
+5. **Contract** (future issue, only after §4 has been deployed and verified
+   with no remaining reader of the legacy columns): drop `access_token`,
+   `refresh_token`, `expires_at`, `type`, `provider`, and
+   `providerAccountId` from the `account` table in a dedicated migration.
+
+No contract step happens in this change: per the epic's rollout rule, an old
+path is never removed in the same deployment that introduces its
+replacement, and here there isn't yet a replacement to switch to — only a
+fix to stop the drift.
+
+`drizzle/schema.ts` (the drizzle-kit introspection snapshot checked into the
+repo) is stale relative to `src/server/db/schema.ts` and still shows the
+pre-Better-Auth `account` shape; it should not be used as a reference for
+this table.
+
+### No client-visible change
+
+This normalization is entirely server-side (`src/server/db/internal.ts`).
+Nothing about it changes what crosses the server/client boundary. The raw
+account/session exposure was removed separately in
+[#116](https://github.com/wirhabenzeit/activitymap/issues/116).
+
+## 5. Public sharing review
+
+### Current behavior
+
+ActivityMap has a "share" feature (`src/components/share-button.tsx`) with no
+dedicated share-link table. It works by embedding a durable identifier
+directly in a `/map` URL query string:
+
+- **Share entire profile**: `/map?user=<Better Auth user.id>`. The
+  server-side reader, `getPublicUserActivities` (`src/server/db/actions.ts`),
+  is explicitly documented as not requiring an authenticated session and
+  returns every activity for that athlete (default limit 10000).
+- **Share selected activities**: `/map?activities=<public_id,...>`, read by
+  `getPublicActivities`, again with no ownership/auth check.
+- `public_id` (`src/server/strava/transforms.ts`) is generated with FNV-1a, a
+  fast non-cryptographic hash of `strava_<activity.id>_<athlete.id>`. It is
+  **deterministic and not a secret** — it is unsuitable as a capability token
+  even though it currently functions as the only "access control" for
+  per-activity sharing.
+- There is no expiry and no revocation: once a `/map?user=...` link has been
+  shared, it grants standing, permanent, full read access to that athlete's
+  entire activity history (route, name, description, heart rate, power,
+  etc.) to anyone who has the link, until the user deletes their account
+  (which is itself not implemented — see §3). There is no way for a user to
+  invalidate a link without also cutting off any other consumer relying on
+  the same durable identifier.
+
+### Assessment against §1
+
+The existing feature is not permitted by the current Strava API Policy. §2.3
+allows a user's Strava Data to be shown only to that same user, and §6.2
+prohibits displaying cached Strava Data or an associated service to a third
+party. The fact that the athlete clicked "Share" does not create an exception.
+The implementation also has independent access-control weaknesses:
+
+- "Entire profile" sharing has no bound on how much data or how far back it
+  exposes, and the athlete cannot revoke it later. This is a materially
+  larger exposure than the athlete likely intends when clicking "Share", and
+  is the kind of behavior that should not be extended to a new, larger
+  audience (the native API) without a revocation mechanism.
+- Because `public_id` is guessable/enumerable (a hash of two integers that
+  are each individually low-entropy and, for `activity.id`, sequential and
+  partially public), it should not be treated as an access-control secret in
+  any new surface that assumes it is one.
+
+### Decision
+
+- **Do not add a `/api/v1` sharing endpoint as part of the native API's
+  initial scope** (this matches the "Bulk repair, administrative
+  synchronization, public sharing, and CSV export do not need to be part of
+  the first native API" note already in the SwiftUI backend preparation
+  plan).
+- **Disable the existing unauthenticated web sharing paths for Strava-derived
+  data.** Keeping them web-only does not make them compliant. This is an
+  urgent product remediation, not an optional enhancement to the native API.
+- Do not design a replacement public-share token system unless Strava grants
+  an explicit written exception or its policy changes. Cryptographically
+  random, scoped, revocable tokens would fix the current access-control
+  weaknesses, but they would not by themselves satisfy §§2.3 and 6.2.
+
+## 6. Summary of what this issue changes vs. what it defines for later issues
+
+Implemented now:
+
+- `src/server/db/internal.ts`: every account read prefers Better Auth-native
+  credentials and synchronizes both representations before returning; token
+  refresh writes both as well. This removes the drift described in §4 and
+  fixes fresh native-only and reauthorized accounts.
+- This document, linked from `docs/swiftui-backend-preparation-plan.md`.
+
+Defined here, implemented by later issues in the [#115](https://github.com/wirhabenzeit/activitymap/issues/115) epic:
+
+- `lastValidatedAt`/`expiresAt` columns and enforcement (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123).
+- Offline-cache expiry and scoped-clear wiring (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#126](https://github.com/wirhabenzeit/activitymap/issues/126).
+- Deauthorization handling, priority processing, 30-day erasure (§3) →
+  [#124](https://github.com/wirhabenzeit/activitymap/issues/124)/[#125](https://github.com/wirhabenzeit/activitymap/issues/125).
+- Switch/contract steps for token columns (§4) → alongside [#120](https://github.com/wirhabenzeit/activitymap/issues/120)/[#121](https://github.com/wirhabenzeit/activitymap/issues/121).
+- Disable unauthenticated sharing of Strava-derived data (§5) → urgent
+  follow-up; do not add native sharing unless Strava explicitly permits it.

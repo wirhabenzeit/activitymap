@@ -7,6 +7,11 @@ import { StravaClient, type StravaTokens } from '~/server/strava/client';
 import { headers } from 'next/headers';
 import { auth } from '~/lib/auth';
 import { logger } from '~/server/logging/logger';
+import {
+    accountTokenColumnsNeedNormalization,
+    buildAccountTokenColumnUpdate,
+    resolveAccountTokens,
+} from './account-token-normalization';
 
 export const getUserInternal = async (id?: string) => {
     if (!id) {
@@ -111,34 +116,62 @@ export const getAccountInternal = async ({
     // Return null if we were looking up by accountId and didn't find anything
     if (!account) return null;
 
+    // Better Auth owns sign-in and reauthorization, so its native columns are
+    // authoritative when both representations exist. Mirror the resolved
+    // values into both column sets on every read, including while the access
+    // token is still fresh. This keeps legacy callers working without letting
+    // stale legacy credentials override a newer authorization.
+    let resolvedTokens = resolveAccountTokens(account);
+    if (accountTokenColumnsNeedNormalization(account, resolvedTokens)) {
+        const tokenUpdate = buildAccountTokenColumnUpdate(resolvedTokens);
+        await db
+            .update(accounts)
+            .set(tokenUpdate)
+            .where(eq(accounts.id, account.id));
+        account = { ...account, ...tokenUpdate };
+        resolvedTokens = resolveAccountTokens(account);
+    }
+
     const currentTime = Math.floor(Date.now() / 1000);
     const isExpired =
         forceRefresh ||
-        (account.expires_at ? currentTime >= account.expires_at : true);
+        !resolvedTokens.accessToken ||
+        (resolvedTokens.expiresAtSeconds
+            ? currentTime >= resolvedTokens.expiresAtSeconds
+            : true);
 
     if (isExpired) {
+
+        const refreshToken = resolvedTokens.refreshToken;
+        if (!refreshToken) {
+            throw new Error('Account has no refresh token');
+        }
 
         try {
             // Create a Strava client with the refresh token
             const stravaClient = StravaClient.withRefreshToken(
-                account.refresh_token!, // We know refresh_token exists if we got here
+                refreshToken,
                 async (tokens: StravaTokens) => {
                     if (!account) return; // Safety check
 
-                    // This callback will be called after token refresh
-                    // Update the account with the new tokens
-                    const updatedAccount = {
-                        ...account,
-                        access_token: tokens.access_token,
-                        expires_at: tokens.expires_at,
-                        refresh_token: tokens.refresh_token || account.refresh_token,
+                    // This callback will be called after token refresh.
+                    // Write both token representations so they never drift
+                    // (see docs/strava-data-policy.md).
+                    const expiresAtDate = new Date(tokens.expires_at * 1000);
+                    const refreshedTokens = {
+                        accessToken: tokens.access_token,
+                        refreshToken: tokens.refresh_token || refreshToken,
+                        expiresAtSeconds: tokens.expires_at,
+                        expiresAtDate,
                     };
+                    const tokenUpdate = buildAccountTokenColumnUpdate(refreshedTokens);
+                    const updatedAccount = { ...account, ...tokenUpdate };
 
                     // Update the account in the database
                     await db
                         .update(accounts)
-                        .set(updatedAccount)
-                        .where(eq(accounts.accountId, account.accountId));
+                        .set(tokenUpdate)
+                        .where(eq(accounts.id, account.id));
 
                     // Update our local copy of the account
                     account = updatedAccount;
