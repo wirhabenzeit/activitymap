@@ -113,6 +113,29 @@ void test('redacts credential-shaped key=value pairs embedded in strings', () =>
   );
 });
 
+void test('redacts quoted JSON keys, non-Bearer auth schemes, and connection-string credentials', () => {
+  assert.equal(
+    redactString('{"access_token":"json-secret"}'),
+    '{"access_token":"[redacted]"}',
+  );
+  assert.equal(
+    redactString('{"sessionToken":"session-secret"}'),
+    '{"sessionToken":"[redacted]"}',
+  );
+  assert.equal(
+    redactString('Authorization: Basic basic-secret'),
+    'Authorization: [redacted]',
+  );
+  assert.ok(!redactString('Authorization: Basic basic-secret').includes('basic-secret'));
+  assert.equal(
+    redactString('database_url=postgres://user:db-secret@host/db'),
+    'database_url=postgres://[redacted]@host/db',
+  );
+  assert.ok(
+    !redactString('database_url=postgres://user:db-secret@host/db').includes('db-secret'),
+  );
+});
+
 void test('redacts secrets embedded in string log arguments passed through redact()', () => {
   const result = redact(
     'Refreshing failed for verify_token=super-secret and access_token=another-secret',
