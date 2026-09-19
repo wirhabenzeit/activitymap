@@ -1,0 +1,650 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ActivityMap API",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/activities": {
+      "get": {
+        "summary": "Fetch activities by id",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated list of activity ids"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested activities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "serverTime": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                              },
+                              "public_id": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                              },
+                              "athlete": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "distance": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "moving_time": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "elapsed_time": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "total_elevation_gain": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "sport_type": {
+                                "type": "string",
+                                "enum": [
+                                  "AlpineSki",
+                                  "BackcountrySki",
+                                  "Badminton",
+                                  "Canoeing",
+                                  "Crossfit",
+                                  "EBikeRide",
+                                  "EMountainBikeRide",
+                                  "Elliptical",
+                                  "Golf",
+                                  "GravelRide",
+                                  "Handcycle",
+                                  "HighIntensityIntervalTraining",
+                                  "Hike",
+                                  "IceSkate",
+                                  "InlineSkate",
+                                  "Kayaking",
+                                  "Kitesurf",
+                                  "MountainBikeRide",
+                                  "NordicSki",
+                                  "Pickleball",
+                                  "Pilates",
+                                  "Racquetball",
+                                  "Ride",
+                                  "RockClimbing",
+                                  "RollerSki",
+                                  "Rowing",
+                                  "Run",
+                                  "Sail",
+                                  "Skateboard",
+                                  "Snowboard",
+                                  "Snowshoe",
+                                  "Soccer",
+                                  "Squash",
+                                  "StairStepper",
+                                  "StandUpPaddling",
+                                  "Surfing",
+                                  "Swim",
+                                  "TableTennis",
+                                  "Tennis",
+                                  "TrailRun",
+                                  "Velomobile",
+                                  "VirtualRide",
+                                  "VirtualRow",
+                                  "VirtualRun",
+                                  "Walk",
+                                  "WeightTraining",
+                                  "Wheelchair",
+                                  "Windsurf",
+                                  "Workout",
+                                  "Yoga"
+                                ]
+                              },
+                              "start_date": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              "start_date_local": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              "timezone": {
+                                "type": "string"
+                              },
+                              "start_latlng": {
+                                "anyOf": [
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "end_latlng": {
+                                "anyOf": [
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "achievement_count": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "kudos_count": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "comment_count": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "athlete_count": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "photo_count": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "total_photo_count": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "map_id": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "map_polyline": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "map_summary_polyline": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "map_bbox": {
+                                "anyOf": [
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "trainer": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "commute": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "manual": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "private": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "flagged": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "workout_type": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "upload_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^\\d+$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "average_speed": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "max_speed": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "calories": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "has_heartrate": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "average_heartrate": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "max_heartrate": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "heartrate_opt_out": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "display_hide_heartrate_option": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "elev_high": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "elev_low": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "pr_count": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "has_kudoed": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "hide_from_home": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "gear_id": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "device_watts": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "average_watts": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "max_watts": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "weighted_average_watts": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "kilojoules": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "last_updated": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "is_complete": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "public_id",
+                              "athlete",
+                              "name",
+                              "description",
+                              "distance",
+                              "moving_time",
+                              "elapsed_time",
+                              "total_elevation_gain",
+                              "sport_type",
+                              "start_date",
+                              "start_date_local",
+                              "timezone",
+                              "start_latlng",
+                              "end_latlng",
+                              "achievement_count",
+                              "kudos_count",
+                              "comment_count",
+                              "athlete_count",
+                              "photo_count",
+                              "total_photo_count",
+                              "map_id",
+                              "map_polyline",
+                              "map_summary_polyline",
+                              "map_bbox",
+                              "trainer",
+                              "commute",
+                              "manual",
+                              "private",
+                              "flagged",
+                              "workout_type",
+                              "upload_id",
+                              "average_speed",
+                              "max_speed",
+                              "calories",
+                              "has_heartrate",
+                              "average_heartrate",
+                              "max_heartrate",
+                              "heartrate_opt_out",
+                              "display_hide_heartrate_option",
+                              "elev_high",
+                              "elev_low",
+                              "pr_count",
+                              "has_kudoed",
+                              "hide_from_home",
+                              "gear_id",
+                              "device_watts",
+                              "average_watts",
+                              "max_watts",
+                              "weighted_average_watts",
+                              "kilojoules",
+                              "last_updated",
+                              "is_complete"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "serverTime",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The `ids` parameter is missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
