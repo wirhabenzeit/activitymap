@@ -78,6 +78,30 @@ void test('toActivityDTO never leaks a null last_updated as anything but null', 
   assert.equal(dto.last_updated, null);
 });
 
+void test('toActivityDTO excludes the raw is_complete field', () => {
+  const dto = toActivityDTO(fixtureActivity);
+  assert.equal('is_complete' in dto, false);
+});
+
+void test('toActivityDTO derives geometry_state "detailed" from is_complete: true', () => {
+  const dto = toActivityDTO({ ...fixtureActivity, is_complete: true });
+  assert.equal(dto.geometry_state, 'detailed');
+});
+
+void test('toActivityDTO derives geometry_state "summary" from is_complete: false', () => {
+  const dto = toActivityDTO({ ...fixtureActivity, is_complete: false });
+  assert.equal(dto.geometry_state, 'summary');
+});
+
+void test('toActivityDTO has no real signal yet for photos_state or the freshness timestamps', () => {
+  // Bridge behavior pending issue #122's real component-freshness columns:
+  // these must not be invented, so they are null regardless of is_complete.
+  const dto = toActivityDTO({ ...fixtureActivity, is_complete: true });
+  assert.equal(dto.photos_state, null);
+  assert.equal(dto.last_summary_seen_at, null);
+  assert.equal(dto.last_detailed_fetched_at, null);
+});
+
 void test('activityDTOSchema rejects a raw Drizzle row (numeric id) passed through unmapped', () => {
   const result = activityDTOSchema.safeParse({
     ...fixtureActivity,

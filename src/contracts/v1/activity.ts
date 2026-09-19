@@ -14,7 +14,24 @@ import { idString, isoDateTime, toIdString, toIsoDateTime } from './primitives';
  * capability token for the legacy sharing feature that issue #132 plans to
  * retire in favor of a random, revocable, hashed token, and has no other
  * use as a general activity attribute for a native client.
+ *
+ * The raw `is_complete` boolean is deliberately excluded too. Per
+ * `docs/swiftui-backend-preparation-plan.md` ("Strava retention rules
+ * affect the offline design") and `docs/strava-data-policy.md` ("Cache
+ * freshness through summary reconciliation"), the monolithic completeness
+ * flag is being replaced by component-level freshness during the sync
+ * migration (issue #122): `geometryState`, `photosState`,
+ * `lastSummarySeenAt`, and `lastDetailedFetchedAt`. This DTO commits to that
+ * target shape now so the wire contract (and any generated Swift client) is
+ * forward-compatible; `toActivityDTO` below derives best-effort values from
+ * today's single `is_complete` column until #122 lands the real columns.
  */
+export const geometryStateSchema = z.enum(['summary', 'detailed', 'refresh_required']);
+export type GeometryState = z.infer<typeof geometryStateSchema>;
+
+export const photosStateSchema = z.enum(['current', 'refresh_required']);
+export type PhotosState = z.infer<typeof photosStateSchema>;
+
 export const activityDTOSchema = z.object({
   id: idString,
   athlete: idString,
@@ -67,7 +84,10 @@ export const activityDTOSchema = z.object({
   weighted_average_watts: z.number().int().nullable(),
   kilojoules: z.number().nullable(),
   last_updated: isoDateTime.nullable(),
-  is_complete: z.boolean(),
+  geometry_state: geometryStateSchema,
+  photos_state: photosStateSchema.nullable(),
+  last_summary_seen_at: isoDateTime.nullable(),
+  last_detailed_fetched_at: isoDateTime.nullable(),
 });
 
 export type ActivityDTO = z.infer<typeof activityDTOSchema>;
@@ -128,6 +148,20 @@ export function toActivityDTO(activity: Activity): ActivityDTO {
     weighted_average_watts: activity.weighted_average_watts,
     kilojoules: activity.kilojoules,
     last_updated: activity.last_updated ? toIsoDateTime(activity.last_updated) : null,
-    is_complete: activity.is_complete,
+    // Lossy bridge pending issue #122's real component-freshness columns
+    // (see docs/swiftui-backend-preparation-plan.md "Strava retention rules
+    // affect the offline design" and docs/strava-data-policy.md "Cache
+    // freshness through summary reconciliation"). `schema.ts` today only has
+    // the single `is_complete` boolean, which can approximate whether
+    // detailed geometry has ever been fetched (`'detailed'` vs `'summary'`),
+    // but has no signal at all for `refresh_required`, for photo freshness,
+    // or for either timestamp below — so those are left `null` rather than
+    // inventing a value the client would wrongly trust. Once #122 lands the
+    // real columns, only this mapping changes; the DTO shape (and anything
+    // already generated for the Swift client) stays stable.
+    geometry_state: activity.is_complete ? 'detailed' : 'summary',
+    photos_state: null,
+    last_summary_seen_at: null,
+    last_detailed_fetched_at: null,
   });
 }
