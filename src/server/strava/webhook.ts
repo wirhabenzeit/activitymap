@@ -154,30 +154,31 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
       limit: 2, // Ensure we only fetch the specific activity
     });
 
-  // Handle case where activity was not found (e.g., deleted)
+  // Handle case where activity was not found (e.g., deleted). The delete and
+  // its tombstone must commit together: writing the tombstone unconditionally
+  // from the webhook payload's own owner_id/object_id (rather than only when
+  // the delete itself returns a row) makes a retried or repeated delivery
+  // idempotent - including the case where a prior attempt deleted the
+  // activity but failed before recording the tombstone, which would
+  // otherwise delete zero rows on retry and skip the tombstone forever.
   if (notFoundIds.includes(object_id)) {
-    const deletedRows = await db
-      .delete(activities)
-      .where(eq(activities.id, object_id))
-      .returning({ deletedId: activities.id });
-    if (deletedRows.length > 0) {
-      await db
+    await db.transaction(async (tx) => {
+      await tx.delete(activities).where(eq(activities.id, object_id));
+      // Cascading delete should handle photos.
+      await tx
         .insert(activityDeletions)
-        .values(
-          deletedRows.map(({ deletedId }) => ({
-            athlete_id: owner_id,
-            activity_id: deletedId,
-            deleted_at: new Date(),
-          })),
-        )
+        .values({
+          athlete_id: owner_id,
+          activity_id: object_id,
+          deleted_at: new Date(),
+        })
         .onConflictDoUpdate({
           target: [activityDeletions.athlete_id, activityDeletions.activity_id],
           set: {
             deleted_at: sql`excluded.deleted_at`,
           },
         });
-    }
-    // Cascading delete should handle photos.
+    });
     return; // Genuinely completed: deletion recorded.
   }
 
