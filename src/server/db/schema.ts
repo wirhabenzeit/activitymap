@@ -339,6 +339,13 @@ export const stravaWebhookEvents = pgTable(
   {
     id: text('id').notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
     subscriptionId: bigint('subscription_id', { mode: 'number' }).notNull(),
+    // `objectType`/`aspectType` are Strava's own small closed vocabularies
+    // (`WebhookRequest`'s `object_type`/`aspect_type` unions), but are kept
+    // as `text` rather than a `pgEnum` on purpose: the payload is already
+    // validated against that union at the route boundary before a row is
+    // ever inserted (see `webhook-schema.ts`), and Strava adding a new
+    // value in the future would otherwise require a schema migration
+    // before webhooks could be accepted at all.
     objectType: text('object_type').notNull(),
     objectId: bigint('object_id', { mode: 'number' }).notNull(),
     aspectType: text('aspect_type').notNull(),
