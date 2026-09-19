@@ -27,10 +27,9 @@ import {
 import { Edit } from 'lucide-react';
 import { type Row } from '@tanstack/react-table';
 import { type Features } from './table-extensions';
-import { type Activity } from '~/server/db/schema';
+import { sportTypeEnum, type Activity } from '~/server/db/schema';
 import { type SportType } from '~/server/strava/types';
 import { type UpdateActivityInput } from '~/server/strava/validators';
-import { sportType } from 'drizzle/schema';
 import { Select } from '../ui/select';
 import {
   SelectContent,
@@ -115,19 +114,17 @@ export function ProfileForm({
     }
   }
 
-  const activtyTypes = sportType.enumValues
+  const activtyTypes = sportTypeEnum.enumValues
     .filter(
       (value): value is SportType =>
         value in iconMap && value in aliasMap && value in colorMap,
     )
-    .map(
-      (value): ActivityTypeInfo => ({
-        name: value,
-        Icon: iconMap[value]!,
-        color: colorMap[value]!,
-        group: aliasMap[value]!,
-      }),
-    )
+    .map((value): ActivityTypeInfo => ({
+      name: value,
+      Icon: iconMap[value]!,
+      color: colorMap[value]!,
+      group: aliasMap[value]!,
+    }))
     .sort((a, b) => a.group.localeCompare(b.group));
 
   return (

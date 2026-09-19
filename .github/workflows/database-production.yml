@@ -1,0 +1,69 @@
+name: Production database migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect, migrate, or adopt the verified baseline
+        required: true
+        type: choice
+        options:
+          - status
+          - fingerprint
+          - migrate
+          - adopt-baseline
+      confirmation:
+        description: Use MIGRATE, or the full baseline SHA-256 for adoption
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    environment: Production
+    env:
+      MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+      MIGRATION_EXPECTED_BRANCH_ID: ${{ vars.MIGRATION_EXPECTED_BRANCH_ID }}
+      MIGRATION_EXPECTED_DATABASE: ${{ vars.MIGRATION_EXPECTED_DATABASE }}
+      MIGRATION_EXPECTED_HOST: ${{ vars.MIGRATION_EXPECTED_HOST }}
+      MIGRATION_REQUIRE_TARGET_GUARDS: 'true'
+      REQUESTED_CONFIRMATION: ${{ inputs.confirmation }}
+      REQUESTED_OPERATION: ${{ inputs.operation }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Show target and pending migrations
+        run: pnpm db:migrate:status
+      - name: Fingerprint live schema
+        if: ${{ inputs.operation == 'fingerprint' }}
+        run: pnpm db:schema:fingerprint
+      - name: Apply pending migrations
+        if: ${{ inputs.operation == 'migrate' }}
+        run: |
+          test "$REQUESTED_CONFIRMATION" = "MIGRATE"
+          pnpm db:migrate
+          pnpm db:migrate:check
+      - name: Adopt verified baseline
+        if: ${{ inputs.operation == 'adopt-baseline' }}
+        run: |
+          pnpm db:baseline:adopt -- --confirm "$REQUESTED_CONFIRMATION"
+          pnpm db:migrate:check
+      - name: Record workflow result
+        if: ${{ always() }}
+        run: |
+          echo "### Production database operation" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Operation: $REQUESTED_OPERATION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Job status: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"

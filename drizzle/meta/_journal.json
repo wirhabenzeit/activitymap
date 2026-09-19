@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1742736399612,
-      "tag": "0000_lean_warbound",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1764827561394,
-      "tag": "0001_flippant_talon",
+      "when": 1789825473579,
+      "tag": "0000_baseline",
       "breakpoints": true
     }
   ]

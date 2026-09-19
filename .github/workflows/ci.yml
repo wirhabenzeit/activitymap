@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm lint
+
+  migrations:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: activitymap_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d activitymap_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MIGRATION_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/activitymap_test
+      MIGRATION_EXPECTED_DATABASE: activitymap_test
+      MIGRATION_EXPECTED_HOST: 127.0.0.1
+      MIGRATION_REQUIRE_TARGET_GUARDS: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate migration journal
+        run: pnpm db:migrations:check
+      - name: Apply all migrations to empty Postgres
+        run: pnpm db:migrate
+      - name: Verify current migration state
+        run: pnpm db:migrate:check
+      - name: Prove a second migration run is a no-op
+        run: pnpm db:migrate
+      - name: Verify schema fingerprint
+        run: pnpm db:schema:fingerprint
+      - name: Verify schema changes have a generated migration
+        run: |
+          pnpm db:generate --name ci-drift-check
+          git diff --exit-code -- drizzle
