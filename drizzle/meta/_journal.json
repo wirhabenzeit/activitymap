@@ -15,6 +15,20 @@
       "when": 1764827561394,
       "tag": "0001_flippant_talon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789801049643,
+      "tag": "0002_strava_webhook_additive",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789801076068,
+      "tag": "0003_drop_legacy_webhook_table",
+      "breakpoints": true
     }
   ]
 }
