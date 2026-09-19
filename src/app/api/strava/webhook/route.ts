@@ -6,9 +6,14 @@ import {
   findActiveSubscription,
   processInboxEvent,
   recordWebhookEvent,
+  type RecordedWebhookEvent,
 } from '~/server/strava/webhook';
 import { webhookEventSchema } from '~/server/strava/webhook-schema';
 import { logger } from '~/server/logging/logger';
+import {
+  EXTERNAL_EFFECTS_DISABLED_MESSAGE,
+  externalEffectsEnabled,
+} from '~/server/config/external-effects';
 
 /**
  * GET handler for Strava webhook verification
@@ -19,6 +24,10 @@ import { logger } from '~/server/logging/logger';
  * - hub.challenge: A random string that we need to echo back
  */
 export async function GET(request: NextRequest) {
+  if (!externalEffectsEnabled()) {
+    return new NextResponse(EXTERNAL_EFFECTS_DISABLED_MESSAGE, { status: 503 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');
@@ -83,6 +92,10 @@ export async function GET(request: NextRequest) {
  * dead-lettering, and reconciliation on top of these inbox rows.
  */
 export async function POST(request: NextRequest) {
+  if (!externalEffectsEnabled()) {
+    return new NextResponse(EXTERNAL_EFFECTS_DISABLED_MESSAGE, { status: 503 });
+  }
+
   let json: unknown;
   try {
     json = await request.json();
@@ -115,16 +128,16 @@ export async function POST(request: NextRequest) {
     return new NextResponse('Unknown or inactive subscription', { status: 403 });
   }
 
-  let eventId: string | null;
+  let recorded: RecordedWebhookEvent | null;
   try {
-    eventId = await recordWebhookEvent(data);
+    recorded = await recordWebhookEvent(data);
   } catch (error) {
     logger.error('[Webhook] Failed to durably record event:', error);
     return new NextResponse('Error recording event', { status: 500 });
   }
 
-  if (eventId) {
-    after(() => processInboxEvent(eventId));
+  if (recorded) {
+    after(() => processInboxEvent(recorded.id, recorded.payload));
   } else {
     logger.info('[Webhook] Duplicate delivery ignored', {
       object_type: data.object_type,

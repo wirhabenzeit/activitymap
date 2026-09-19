@@ -36,14 +36,20 @@ export async function findActiveSubscription(subscriptionId: number) {
   });
 }
 
+export type RecordedWebhookEvent = {
+  id: string;
+  payload: StravaWebhookEvent;
+};
+
 /**
  * Durably record an inbound webhook delivery before the route responds.
- * Returns the inbox row id, or `null` when this exact delivery was already
- * recorded (duplicate deliveries must not create a second inbox item).
+ * Returns the inbox row id and payload, or `null` when this exact delivery
+ * was already recorded (duplicate deliveries must not create a second
+ * inbox item).
  */
 export async function recordWebhookEvent(
   data: StravaWebhookEvent,
-): Promise<string | null> {
+): Promise<RecordedWebhookEvent | null> {
   const eventTime = new Date(data.event_time * 1000);
   const [inserted] = await db
     .insert(stravaWebhookEvents)
@@ -65,9 +71,9 @@ export async function recordWebhookEvent(
         stravaWebhookEvents.eventTime,
       ],
     })
-    .returning({ id: stravaWebhookEvents.id });
+    .returning({ id: stravaWebhookEvents.id, payload: stravaWebhookEvents.payload });
 
-  return inserted?.id ?? null;
+  return inserted ?? null;
 }
 
 /**
@@ -77,12 +83,25 @@ export async function recordWebhookEvent(
  * making the response wait on Strava/DB latency. It intentionally does not
  * retry: durable retry/backoff, dead-lettering, and reconciliation for rows
  * left `pending` or `failed` here are #125's job.
+ *
+ * `payload` is optional: the route handler already has it from the insert
+ * that just happened and passes it through to skip a redundant read, but
+ * a future caller that only has the row id (e.g. #125's reconciliation
+ * worker, which discovers rows to retry by querying for `pending`/`failed`
+ * status rather than from a fresh insert) can omit it and let this function
+ * load the row itself.
  */
-export async function processInboxEvent(eventId: string) {
-  const event = await db.query.stravaWebhookEvents.findFirst({
-    where: eq(stravaWebhookEvents.id, eventId),
-  });
-  if (!event) return;
+export async function processInboxEvent(
+  eventId: string,
+  payload?: StravaWebhookEvent,
+) {
+  if (!payload) {
+    const event = await db.query.stravaWebhookEvents.findFirst({
+      where: eq(stravaWebhookEvents.id, eventId),
+    });
+    if (!event) return;
+    payload = event.payload;
+  }
 
   await db
     .update(stravaWebhookEvents)
@@ -90,7 +109,7 @@ export async function processInboxEvent(eventId: string) {
     .where(eq(stravaWebhookEvents.id, eventId));
 
   try {
-    await processWebhookEvent(event.payload);
+    await processWebhookEvent(payload);
     await db
       .update(stravaWebhookEvents)
       .set({
