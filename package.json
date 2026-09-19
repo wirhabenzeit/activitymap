@@ -13,6 +13,7 @@
     "db:reset": "tsx drizzle/reset.ts",
     "test": "tsx --test src/**/*.test.ts",
     "test:sync": "tsx src/scripts/test-sync-activities.ts",
+    "openapi:generate": "tsx scripts/generate-openapi.ts",
     "friflyt:enrich": "node scripts/enrich-friflyt-geojson.mjs",
     "friflyt:enrich:translate": "node scripts/enrich-friflyt-geojson.mjs --translate"
   },
