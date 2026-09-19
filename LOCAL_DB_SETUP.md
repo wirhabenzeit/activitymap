@@ -37,16 +37,29 @@ Add this to your `.env` file:
 VERCEL_ENV=development
 ```
 
-This will make your app use the local database at `db.localtest.me:5432` instead of production.
+This points the schema tooling (`db:push`, `db:generate`, `db:migrate`,
+`db:baseline`, `db:studio`) at the local database.
+
+> **Note:** it does *not* redirect the app itself. `src/server/db/index.ts`
+> reads `DATABASE_URL` and only falls back to `db.localtest.me` when that
+> variable is unset — so to run the app against the local database, comment
+> out `DATABASE_URL` in `.env` as well. Otherwise your migrations go to the
+> local database while the app keeps reading production.
 
 ### Step 4: Initialize the Local Database
 
-Run the existing migrations to set up the schema:
-
 ```bash
-# Apply existing schema
-pnpm drizzle-kit push
+# Create the schema
+pnpm db:push
+
+# Record it in Drizzle's migration history, so `db:migrate` knows what
+# already exists instead of trying to replay migration 0000 over it
+pnpm db:baseline --through 0001_flippant_talon
 ```
+
+From then on, keep the database current with `pnpm db:migrate`. See
+[docs/database-migrations.md](docs/database-migrations.md) for why the
+baseline step is needed and how schema changes reach production.
 
 ### Step 5: Run Better Auth Migration
 
@@ -99,9 +112,10 @@ VERCEL_ENV=development
 1. Start Docker Desktop
 2. Run `docker compose up -d`
 3. Add `VERCEL_ENV=development` to `.env`
-4. Run `pnpm drizzle-kit push` to initialize schema
-5. Test the Better Auth migration on local database
-6. Once verified, we can apply to production
+4. Run `pnpm db:push` to initialize schema
+5. Run `pnpm db:baseline --through 0001_flippant_talon` to record it
+6. Test the Better Auth migration on local database
+7. Once verified, we can apply to production
 
 ---
 
