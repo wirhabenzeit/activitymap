@@ -7,7 +7,8 @@ export const env = createEnv({
    * isn't built with invalid env vars.
    */
   server: {
-    CRON_SECRET: z.string(),
+    ACTIVITYMAP_EXTERNAL_EFFECTS: z.literal('enabled').optional(),
+    CRON_SECRET: z.string().optional(),
     NEON_DATABASE_URL: z.string().url().optional(),
     DATABASE_URL: z.string().url().optional(),
     PGHOST: z.string(),
@@ -24,10 +25,10 @@ export const env = createEnv({
     POSTGRES_DATABASE: z.string(),
     POSTGRES_PASSWORD: z.string(),
     AUTH_SECRET: z.string(),
-    AUTH_STRAVA_ID: z.string(),
-    AUTH_STRAVA_SECRET: z.string(),
-    STRAVA_WEBHOOK_VERIFY_TOKEN: z.string(),
-    PUBLIC_URL: z.string().url(),
+    AUTH_STRAVA_ID: z.string().optional(),
+    AUTH_STRAVA_SECRET: z.string().optional(),
+    STRAVA_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
+    PUBLIC_URL: z.string().url().optional(),
     NODE_ENV: z
       .enum(['development', 'test', 'production'])
       .default('development'),
@@ -49,6 +50,7 @@ export const env = createEnv({
    * middlewares) or client-side so we need to destruct manually.
    */
   runtimeEnv: {
+    ACTIVITYMAP_EXTERNAL_EFFECTS: process.env.ACTIVITYMAP_EXTERNAL_EFFECTS,
     CRON_SECRET: process.env.CRON_SECRET,
     STRAVA_WEBHOOK_VERIFY_TOKEN: process.env.STRAVA_WEBHOOK_VERIFY_TOKEN,
     POSTGRES_URL: process.env.POSTGRES_URL,
@@ -83,6 +85,28 @@ export const env = createEnv({
           path: ['NEON_DATABASE_URL'],
           message: 'NEON_DATABASE_URL or DATABASE_URL is required on Vercel',
         });
+      }
+
+      if (values.ACTIVITYMAP_EXTERNAL_EFFECTS === 'enabled') {
+        const externalEffectVariables = {
+          AUTH_STRAVA_ID: values.AUTH_STRAVA_ID,
+          AUTH_STRAVA_SECRET: values.AUTH_STRAVA_SECRET,
+          STRAVA_WEBHOOK_VERIFY_TOKEN: values.STRAVA_WEBHOOK_VERIFY_TOKEN,
+          CRON_SECRET: values.CRON_SECRET,
+          PUBLIC_URL: values.PUBLIC_URL,
+        };
+
+        for (const [variable, value] of Object.entries(
+          externalEffectVariables,
+        )) {
+          if (!value) {
+            context.addIssue({
+              code: 'custom',
+              path: [variable],
+              message: `${variable} is required when external effects are enabled`,
+            });
+          }
+        }
       }
     }),
   /**

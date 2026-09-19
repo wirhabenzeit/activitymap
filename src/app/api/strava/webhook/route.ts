@@ -2,18 +2,29 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { db } from '~/server/db';
 import { stravaWebhooks } from '~/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { processWebhookEvent, type StravaWebhookEvent } from '~/server/strava/webhook';
+import {
+  processWebhookEvent,
+  type StravaWebhookEvent,
+} from '~/server/strava/webhook';
 import { logger } from '~/server/logging/logger';
+import {
+  EXTERNAL_EFFECTS_DISABLED_MESSAGE,
+  externalEffectsEnabled,
+} from '~/server/config/external-effects';
 
 /**
  * GET handler for Strava webhook verification
- * 
+ *
  * Strava sends a GET request to verify the webhook endpoint with the following parameters:
  * - hub.mode: Always 'subscribe'
  * - hub.verify_token: The token we provided when creating the subscription
  * - hub.challenge: A random string that we need to echo back
  */
 export async function GET(request: NextRequest) {
+  if (!externalEffectsEnabled()) {
+    return new NextResponse(EXTERNAL_EFFECTS_DISABLED_MESSAGE, { status: 503 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');
@@ -41,7 +52,9 @@ export async function GET(request: NextRequest) {
         });
 
         if (webhookRecord) {
-          logger.info('Webhook verification successful, responding with challenge');
+          logger.info(
+            'Webhook verification successful, responding with challenge',
+          );
           // Respond with the challenge to confirm the subscription
           return NextResponse.json({ 'hub.challenge': challenge });
         } else {
@@ -54,7 +67,9 @@ export async function GET(request: NextRequest) {
       logger.error('No verification token provided');
     }
   } else {
-    logger.error('Invalid webhook verification request, missing required parameters');
+    logger.error(
+      'Invalid webhook verification request, missing required parameters',
+    );
   }
 
   // If we get here, something went wrong with the verification
@@ -63,7 +78,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST handler for Strava webhook events
- * 
+ *
  * Strava sends a POST request when an event occurs, with a JSON body containing:
  * - object_type: 'activity' or 'athlete'
  * - object_id: ID of the activity or athlete
@@ -74,8 +89,12 @@ export async function GET(request: NextRequest) {
  * - updates: Object containing the updated fields (for 'update' events)
  */
 export async function POST(request: NextRequest) {
+  if (!externalEffectsEnabled()) {
+    return new NextResponse(EXTERNAL_EFFECTS_DISABLED_MESSAGE, { status: 503 });
+  }
+
   try {
-    const data = await request.json() as StravaWebhookEvent;
+    const data = (await request.json()) as StravaWebhookEvent;
     // `data.updates` may carry a renamed activity title; never log it verbatim.
     const eventId = `${data.object_type}_${data.object_id}_${data.event_time}`;
     logger.info(`[Webhook] Processing event: ${eventId}`, {
@@ -91,7 +110,10 @@ export async function POST(request: NextRequest) {
       logger.info(`[Webhook] Successfully processed event: ${eventId}`);
       return new NextResponse('Event processed successfully', { status: 200 });
     } catch (processingError) {
-      logger.error(`[Webhook] Error processing event ${eventId}:`, processingError);
+      logger.error(
+        `[Webhook] Error processing event ${eventId}:`,
+        processingError,
+      );
       return new NextResponse('Error processing event', { status: 500 });
     }
   } catch (error) {
