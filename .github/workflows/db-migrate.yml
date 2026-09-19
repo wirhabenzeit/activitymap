@@ -1,0 +1,70 @@
+name: Database migrations
+
+# Applies pending Drizzle migrations to the production database.
+#
+# Runs on merge to main whenever the migration folder changes, and can be
+# triggered by hand for a re-run. Migrations must be additive (expand →
+# backfill → switch → contract) because this job and the Vercel deployment
+# for the same commit run concurrently — neither waits for the other, so the
+# old code must tolerate the new schema and vice versa.
+#
+# Required repository configuration:
+#   - An environment named `production` (add required reviewers there if you
+#     want a manual approval gate before any schema change lands).
+#   - A secret `DATABASE_URL_UNPOOLED` on that environment, set to Neon's
+#     *non-pooling* connection string. Migrations run in a single transaction
+#     and must not go through the pooled endpoint.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'drizzle/**'
+      - 'drizzle.config.ts'
+      - '.github/workflows/db-migrate.yml'
+  workflow_dispatch:
+
+# Never let two migration runs overlap; queue them instead of cancelling,
+# since a cancelled migration is worse than a delayed one.
+concurrency:
+  group: db-migrate-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply pending migrations
+    runs-on: ubuntu-22.04
+    environment: production
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Show migration status
+        env:
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        run: pnpm db:baseline --list
+
+      - name: Apply pending migrations
+        env:
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        run: pnpm db:migrate
+
+      - name: Confirm resulting status
+        if: always()
+        env:
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        run: pnpm db:baseline --list
