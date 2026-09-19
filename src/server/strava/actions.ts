@@ -10,6 +10,7 @@ import {
 
 import { db } from '~/server/db';
 import { getAuthenticatedAccountInternal } from '~/server/db/internal';
+import { logger } from '~/server/logging/logger';
 import { StravaClient } from './client';
 import { transformStravaActivity } from './transforms';
 import { type UpdatableActivity } from './types';
@@ -69,11 +70,11 @@ export async function updateActivity(input: UpdateActivityInput) {
 
       return updatedActivity;
     } catch (error) {
-      console.error('Failed to update activity:', error);
+      logger.error('Failed to update activity:', error);
       throw new Error('Failed to update activity');
     }
   } catch (error) {
-    console.error('Failed to update activity:', error);
+    logger.error('Failed to update activity:', error);
     throw new Error('Failed to update activity');
   }
 }
@@ -157,13 +158,13 @@ export async function deleteActivities(input: number[]): Promise<{
       const deletedSet = new Set(deleteResult.map(r => r.deletedId));
       const notDeleted = activityIds.filter(id => !deletedSet.has(id));
       const errorMsg = `Failed to delete some activities (possible permission issue or already deleted): ${notDeleted.join(', ')}`;
-      console.warn(errorMsg);
+      logger.warn(errorMsg);
       errors.push(errorMsg);
     }
 
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('Error deleting activities:', errorMsg);
+    logger.error('Error deleting activities:', errorMsg);
     errors.push(`Server error during deletion: ${errorMsg}`);
     // Return partial success if some were deleted before the error
   }
@@ -231,7 +232,7 @@ export async function checkWebhookStatus() {
       matchingSubscription,
     };
   } catch (error) {
-    console.error('Failed to manage webhook subscription:', error);
+    logger.error('Failed to manage webhook subscription:', error);
     throw error;
   }
 }
@@ -315,7 +316,7 @@ export async function createWebhookSubscription() {
       message: 'Created new subscription',
     };
   } catch (error) {
-    console.error('Failed to create webhook subscription:', error);
+    logger.error('Failed to create webhook subscription:', error);
 
     return {
       success: false,

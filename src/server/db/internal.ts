@@ -6,6 +6,7 @@ import { accounts, type Account } from './schema';
 import { StravaClient, type StravaTokens } from '~/server/strava/client';
 import { headers } from 'next/headers';
 import { auth } from '~/lib/auth';
+import { logger } from '~/server/logging/logger';
 
 export const getUserInternal = async (id?: string) => {
     if (!id) {
@@ -90,17 +91,17 @@ export const getAccountInternal = async ({
                 }
 
             } catch (sessionError) {
-                console.error(`[DB] Error resolving user from session:`, sessionError);
+                logger.error(`[DB] Error resolving user from session:`, sessionError);
                 throw new Error('Failed to resolve user from session');
             }
         }
     } catch (dbError) {
-        console.error(`[DB] Database error in getAccount:`, dbError);
+        logger.error(`[DB] Database error in getAccount:`, dbError);
         if (dbError instanceof Error) {
-            console.error(
+            logger.error(
                 `[DB] Error name: ${dbError.name}, message: ${dbError.message}`,
             );
-            console.error(`[DB] Error stack: ${dbError.stack}`);
+            logger.error(`[DB] Error stack: ${dbError.stack}`);
         }
         throw new Error('Database error in getAccount');
     }
@@ -151,7 +152,7 @@ export const getAccountInternal = async ({
 
             return account;
         } catch (error) {
-            console.error('Error refreshing access token:', error);
+            logger.error('Error refreshing access token:', error);
             throw new Error('Failed to refresh access token');
         }
     }

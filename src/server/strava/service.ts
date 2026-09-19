@@ -9,6 +9,7 @@ import {
 } from '~/server/db/schema';
 
 import { db } from '~/server/db';
+import { logger } from '~/server/logging/logger';
 import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type StravaPhoto } from './types';
@@ -76,11 +77,11 @@ export async function fetchStravaActivities(
             }
 
             if (isNotFoundError) {
-              console.warn(`Activity ${id} not found on Strava (404). Marked for removal.`);
+              logger.warn(`Activity ${id} not found on Strava (404). Marked for removal.`);
               notFoundIds.push(id);
               return null;
             }
-            console.error('Failed to fetch individual activity:', {
+            logger.error('Failed to fetch individual activity:', {
               id,
               error: error instanceof Error ? error.message : String(error),
             });
@@ -132,7 +133,7 @@ export async function fetchStravaActivities(
               transformStravaPhoto(photo, athleteId),
             ).filter((photo): photo is Photo => photo !== null); // Filter out nulls
           } catch (error) {
-            console.error(`Failed to fetch photos for activity ${act.id}:`, error);
+            logger.error(`Failed to fetch photos for activity ${act.id}:`, error);
             return []; // Return empty array on error for this activity
           }
         } else {
@@ -308,7 +309,7 @@ export async function fetchStravaActivities(
 
     return { activities: savedActivities, photos, notFoundIds };
   } catch (error) {
-    console.error('Error in fetchStravaActivities:', error);
+    logger.error('Error in fetchStravaActivities:', error);
     return { activities: [], photos: [], notFoundIds };
   }
 }

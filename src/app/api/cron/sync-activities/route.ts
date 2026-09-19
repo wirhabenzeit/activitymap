@@ -1,5 +1,6 @@
 import { syncActivities } from '~/server/strava/sync';
 import { type NextRequest, NextResponse } from 'next/server';
+import { logger } from '~/server/logging/logger';
 
 // Define type for configuration options
 interface SyncConfig {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     // Authenticate the request
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) {
-      console.error('CRON_SECRET is not set in environment variables');
+      logger.error('CRON_SECRET is not set in environment variables');
       return NextResponse.json(
         { error: 'CRON_SECRET is not configured' },
         { status: 500 }
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     const providedSecret = request.headers.get('x-cron-secret');
     if (providedSecret !== cronSecret) {
-      console.error('Invalid cron secret provided');
+      logger.error('Invalid cron secret provided');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
       }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_) {
-      console.log('Failed to parse request body, using defaults');
+      logger.info('Failed to parse request body, using defaults');
     }
 
     // Type-safe extraction of config values
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
     // Return the results
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error syncing activities:', error);
+    logger.error('Error syncing activities:', error);
     return NextResponse.json(
       { 
         error: 'Failed to sync activities',

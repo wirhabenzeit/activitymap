@@ -1,6 +1,7 @@
 'use server';
 
 import { getAuthenticatedAccountInternal } from '~/server/db/internal';
+import { logger } from '~/server/logging/logger';
 import { fetchStravaActivities } from './service';
 
 export async function syncYear(year: number) {
@@ -12,7 +13,7 @@ export async function syncYear(year: number) {
         const startOfYear = new Date(year, 0, 1).getTime() / 1000;
         const endOfYear = new Date(year + 1, 0, 1).getTime() / 1000;
 
-        console.log(`[SyncYear] Starting sync for ${year}`, { startOfYear, endOfYear, year });
+        logger.info(`[SyncYear] Starting sync for ${year}`, { startOfYear, endOfYear, year });
 
         let page = 1;
         const per_page = 200; // Max per page
@@ -21,7 +22,7 @@ export async function syncYear(year: number) {
         // Loop through all pages and upsert summary activities
         // This effectively "Syncs" the year's summary data
         while (true) {
-            console.log(`[SyncYear] Fetching page ${page}`);
+            logger.info(`[SyncYear] Fetching page ${page}`);
             const result = await fetchStravaActivities({
                 accessToken: account.access_token,
                 athleteId,
@@ -31,7 +32,7 @@ export async function syncYear(year: number) {
                 per_page,
             });
 
-            console.log(`[SyncYear] Page ${page} returned ${result.activities.length} activities`);
+            logger.info(`[SyncYear] Page ${page} returned ${result.activities.length} activities`);
             if (result.activities.length === 0) break;
 
             stravaIds.push(...result.activities.map((a) => a.id));
@@ -40,7 +41,7 @@ export async function syncYear(year: number) {
             page++;
         }
 
-        console.log(`[SyncYear] Finished sync. Total ids: ${stravaIds.length}`);
+        logger.info(`[SyncYear] Finished sync. Total ids: ${stravaIds.length}`);
 
         return {
             year,
@@ -48,7 +49,7 @@ export async function syncYear(year: number) {
             success: true,
         };
     } catch (error) {
-        console.error(`Failed to sync year ${year}:`, error);
+        logger.error(`Failed to sync year ${year}:`, error);
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Sync failed',
@@ -88,7 +89,7 @@ export async function repairYear(year: number, idsToRepair: number[]) {
             remaining: remainingIds.length > 0,
         };
     } catch (error) {
-        console.error(`Failed to repair year ${year}:`, error);
+        logger.error(`Failed to repair year ${year}:`, error);
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Repair failed',
@@ -112,7 +113,7 @@ export async function syncActivities(ids: number[]) {
 
         return { success: true, count: result.activities.length };
     } catch (error) {
-        console.error('Failed to sync activities:', error);
+        logger.error('Failed to sync activities:', error);
         return { success: false, error: 'Sync failed' };
     }
 }

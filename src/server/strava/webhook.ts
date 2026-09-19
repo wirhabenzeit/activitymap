@@ -8,6 +8,7 @@ import {
 import { getAccountInternal } from '~/server/db/internal';
 import { fetchStravaActivities } from '~/server/strava/service';
 import { eq, sql } from 'drizzle-orm';
+import { logger } from '~/server/logging/logger';
 
 /**
  * No 'use server' directive here: this module is only invoked from the
@@ -50,11 +51,11 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
     });
 
     if (!account?.access_token) {
-      console.error(`[Webhook] No account or valid access token found for athlete ID: ${owner_id}`);
+      logger.error(`[Webhook] No account or valid access token found for athlete ID: ${owner_id}`);
       return;
     }
   } catch (accountError) {
-    console.error(
+    logger.error(
       `[Webhook] Error getting account for athlete ID: ${owner_id}:`,
       accountError,
     );
@@ -102,7 +103,7 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
         // Cascading delete should handle photos
 
       } catch (deleteError) {
-        console.error(`[Webhook] Error deleting activity ${object_id}:`, deleteError);
+        logger.error(`[Webhook] Error deleting activity ${object_id}:`, deleteError);
         // Log error but potentially continue if needed, or return
       }
       return; // Exit after handling deletion
@@ -112,7 +113,7 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
     const activityToSave = fetchedActivities.find(act => act.id === object_id);
 
     if (!activityToSave) {
-      console.error(`[Webhook] Failed to fetch details for activity ${object_id} even though it wasn't in notFoundIds.`);
+      logger.error(`[Webhook] Failed to fetch details for activity ${object_id} even though it wasn't in notFoundIds.`);
       return;
     }
 
@@ -176,7 +177,7 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
 
 
   } catch (fetchError) {
-    console.error(
+    logger.error(
       `[Webhook] Error during fetch or database operation for activity ${object_id}:`,
       fetchError,
     );

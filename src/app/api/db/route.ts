@@ -1,33 +1,19 @@
 import { auth } from '~/lib/auth';
-import { headers } from 'next/headers';
 import { db } from '~/server/db';
 import { stringify } from 'csv-stringify/sync';
 import { type NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
-  let userID: string | undefined;
-  if (request.nextUrl.searchParams.has('session')) {
-    const sessionToken = request.nextUrl.searchParams.get('session');
-    console.log('looking for session', sessionToken);
-    const session = await db.query.sessions.findFirst({
-      where: (sessions, { eq }) => eq(sessions.sessionToken, sessionToken!),
+  // Authenticate via the secure session cookie or an `Authorization: Bearer`
+  // header only. No credential is ever accepted in the URL.
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
+  if (!session?.user?.id)
+    return new Response('Not authenticated', {
+      status: 401,
     });
-    if (!session)
-      return new Response('Session not found', {
-        status: 404,
-      });
-    userID = session?.userId;
-    console.log('found session', session);
-  } else {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session?.user?.id)
-      return new Response('Not authenticated', {
-        status: 401,
-      });
-    userID = session.user.id!;
-  }
+  const userID = session.user.id;
 
   const account = await db.query.accounts.findFirst({
     where: (accounts, { eq }) => eq(accounts.userId, userID),

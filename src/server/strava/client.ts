@@ -6,6 +6,7 @@ import type {
   UpdatableActivity,
 } from './types';
 import { mergeAndProcessStravaPhotos } from './transforms';
+import { logger } from '~/server/logging/logger';
 
 const STRAVA_API_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token';
@@ -150,7 +151,7 @@ export class StravaClient {
 
       return tokens;
     } catch (error) {
-      console.error('Error refreshing access token:', error);
+      logger.error('Error refreshing access token:', error);
       throw new Error('Failed to refresh access token');
     }
   }
@@ -238,17 +239,17 @@ export class StravaClient {
           errorDetails = { rawResponse: errorMessage };
         }
       } catch (parseError) {
-        console.error('Error parsing error response:', parseError);
+        logger.error('Error parsing error response:', parseError);
         errorMessage = `Failed to parse error response: ${String(parseError)}`;
         errorDetails = { parseError };
       }
 
       // Log the full error response for debugging
       if (errorDetails.errors) {
-        console.error('Strava API error details:', JSON.stringify(errorDetails.errors, null, 2));
+        logger.error('Strava API error details:', JSON.stringify(errorDetails.errors, null, 2));
       }
 
-      console.error('Strava API error:', {
+      logger.error('Strava API error:', {
         message: errorMessage,
         status: response.status,
         statusText: response.statusText,
@@ -276,7 +277,7 @@ export class StravaClient {
     try {
       return (await response.json()) as T;
     } catch (parseError) {
-      console.error('Error parsing successful response:', {
+      logger.error('Error parsing successful response:', {
         parseError,
         status: response.status,
         contentType: response.headers.get('content-type'),
@@ -339,7 +340,7 @@ export class StravaClient {
 
       // Check for mismatches in photo counts
       if (smallPhotos.length !== largePhotos.length) {
-        console.warn(
+        logger.warn(
           `[DEBUG] Photo count mismatch: small=${smallPhotos.length}, large=${largePhotos.length}`,
         );
       }
@@ -353,7 +354,7 @@ export class StravaClient {
 
       return mergedPhotos;
     } catch (error) {
-      console.error(`[DEBUG] Error fetching photos for activity ${id}:`, error);
+      logger.error(`[DEBUG] Error fetching photos for activity ${id}:`, error);
       throw error;
     }
   }
