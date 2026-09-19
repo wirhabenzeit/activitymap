@@ -69,14 +69,39 @@ The sync layer ([#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[
   not claim the dataset is current.
 - Use a stable upper bound for each scan so newly-created activities do not
   shift page boundaries while older pages are being processed.
-- Upsert every returned summary and compare its summary fields with the
-  stored version. Strava's documented `SummaryActivity` schema does not
-  expose an `updated_at` field, so change detection must compare a stable
-  summary fingerprint or the relevant fields directly.
-- When a summary materially changes, mark any cached detailed representation
-  as needing refresh and selectively fetch that activity if the affected
-  feature needs detailed data. Do not perform detail fetches solely because
-  time has passed.
+- Upsert every returned summary and compare the relevant fields directly with
+  the stored version. Strava's documented `SummaryActivity` schema does not
+  expose an `updated_at` field. A single fingerprint over the complete summary
+  would be too coarse because not every summary change invalidates the same
+  cached components.
+- Classify changed fields and invalidate only the affected component:
+
+  | Change class | Example summary fields | Reconciliation action |
+  | --- | --- | --- |
+  | Engagement | `kudos_count`, `comment_count`, `achievement_count`, `athlete_count`, `pr_count`, `has_kudoed` | Update the stored summary fields. Do not refresh detail, photos, or geometry. |
+  | Metadata and summary metrics | `name`, `sport_type`, `gear_id`, `commute`, `trainer`, `private`, `hide_from_home`, `total_elevation_gain`, `average_speed`, `max_speed` | Update the stored summary fields. Do not refresh detail or geometry. |
+  | Photos | `photo_count`, `total_photo_count` | Mark only the cached photo collection as needing refresh. Do not refresh geometry. |
+  | Geometry and core timing | `map.summary_polyline`, `distance`, `moving_time`, `elapsed_time`, `start_date`, `start_latlng`, `end_latlng` | Store the new summary immediately, mark detailed geometry as needing refresh, and selectively fetch the detailed activity when a feature requires it. The new summary polyline remains usable while that refresh is pending. |
+
+  These groups are an implementation baseline, not a claim that every field in
+  `SummaryActivity` has been enumerated. A newly stored field must be assigned
+  an explicit invalidation class when it is added.
+- Track component freshness separately rather than using one activity-wide
+  completeness flag. The sync migration should introduce at least
+  `geometryState` (`summary`, `detailed`, or `refresh_required`), `photosState`
+  (`current` or `refresh_required`), `lastSummarySeenAt`, and
+  `lastDetailedFetchedAt`. Existing `is_complete` behavior can be retained
+  during migration, but must not remain the sole invalidation signal.
+- If hashes later make comparisons or change-feed writes cheaper, keep them
+  component-specific (for example, `geometrySourceHash` and `photoSourceHash`).
+  An optional whole-summary hash may suppress no-op writes, but must not drive
+  geometry invalidation; engagement counters must never be inputs to the
+  geometry hash.
+- Fields absent from `SummaryActivity`, such as a detailed description, cannot
+  be detected by the periodic summary scan. Refresh them from a webhook or
+  another explicit signal, or when a feature deliberately requests current
+  detail. This is an accepted trade-off; it is not a reason to refetch every
+  detailed activity periodically.
 - Treat an activity missing from a completed scan as a deletion, privacy, or
   authorization candidate. Confirm it selectively when necessary, then
   purge it if Strava reports it unavailable.
@@ -92,8 +117,8 @@ They do not expire or individually refetch every activity on a seven-day
 timer. Logout, account switching, deauthorization, and server tombstones must
 still clear the applicable IndexedDB/SQLite data promptly.
 
-The reconciliation timestamp, summary fingerprint/change marker, and
-client-freshness metadata are deferred to the sync/change-feed migration
+The reconciliation timestamp, grouped comparison/component-freshness state,
+and client-freshness metadata are deferred to the sync/change-feed migration
 ([#122](https://github.com/wirhabenzeit/activitymap/issues/122)) so they land
 with its other schema changes.
 

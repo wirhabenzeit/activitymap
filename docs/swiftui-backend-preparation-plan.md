@@ -192,9 +192,14 @@ Required correction:
 
 - record `lastSummaryReconciledAt` and advance it only after a complete
   paginated summary scan;
-- compare returned summaries and selectively refresh detail only for
-  materially changed activities or features that require it; Strava's
-  `SummaryActivity` does not provide an `updated_at` field;
+- compare returned summaries directly because Strava's `SummaryActivity` does
+  not provide an `updated_at` field, and classify changes by affected
+  component: engagement and metadata update summary columns only, photo-count
+  changes invalidate only photos, and geometry/core-timing changes invalidate
+  detailed geometry;
+- replace the monolithic `is_complete` signal with component-level freshness
+  during the sync migration, including `geometryState`, `photosState`,
+  `lastSummarySeenAt`, and `lastDetailedFetchedAt`;
 - process delete and deauthorization webhooks with high priority;
 - propagate dataset freshness and tombstones through the native change feed
   without imposing per-activity seven-day detail refreshes on the iOS client;
@@ -426,7 +431,8 @@ Estimated effort: 5–8 developer days.
 - Implement paginated bootstrap and delta endpoints.
 - Add cursor versioning, rebootstrap responses, schema versioning, and expiry
   metadata.
-- Add full-reconciliation support.
+- Add resumable full-reconciliation support with direct, grouped summary-field
+  comparisons and component-level geometry/photo invalidation.
 - Generate the Swift API client and prove bootstrap into a temporary SQLite
   database.
 
@@ -434,6 +440,11 @@ Exit criteria:
 
 - concurrent changes during bootstrap are not lost;
 - sync is idempotent and resumes after interruption;
+- engagement-only and metadata-only changes never cause detailed activity,
+  photo, or GeoJSON refreshes;
+- photo-count changes invalidate only photos, while geometry/core-timing
+  changes downgrade detailed geometry and enqueue at most one selective detail
+  refresh;
 - deletion propagation is covered by integration tests.
 
 ### Phase 4: Durable webhook ingestion
@@ -499,6 +510,12 @@ Minimum coverage:
 - Bootstrap pagination survives inserts and deletes between pages.
 - Equal-timestamp mutations cannot be lost.
 - Replaying a change page is harmless.
+- Engagement-only changes update counters without fetching activity detail,
+  photos, or GeoJSON.
+- Photo-count changes invalidate only the photo component.
+- Geometry/core-timing changes retain the new summary polyline, mark detailed
+  geometry for refresh, and coalesce duplicate selective-detail work.
+- Summary fields without a detail dependency do not downgrade geometry state.
 - Webhook duplicates, out-of-order events, and transient failures are handled.
 - Deletions create both tombstones and change-feed entries transactionally.
 - Expired/revoked sessions and stale sync cursors return stable error codes.
