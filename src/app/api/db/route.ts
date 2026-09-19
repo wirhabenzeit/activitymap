@@ -1,14 +1,15 @@
 import { auth } from '~/lib/auth';
 import { db } from '~/server/db';
+import { resolveRequestSession } from '~/server/auth/request-session';
 import { stringify } from 'csv-stringify/sync';
 import { type NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
   // Authenticate via the secure session cookie or an `Authorization: Bearer`
   // header only. No credential is ever accepted in the URL.
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
+  const session = await resolveRequestSession(request, ({ headers }) =>
+    auth.api.getSession({ headers }),
+  );
   if (!session?.user?.id)
     return new Response('Not authenticated', {
       status: 401,
