@@ -17,6 +17,7 @@ export interface MigrationTarget {
   connectionString: string;
   database: string;
   expectedBranchId?: string;
+  forbiddenBranchId?: string;
   hostname: string;
   identity: string;
   isLocal: boolean;
@@ -110,6 +111,7 @@ export function resolveMigrationTarget(
   const expectedHost = nonEmpty(environment.MIGRATION_EXPECTED_HOST);
   const expectedDatabase = nonEmpty(environment.MIGRATION_EXPECTED_DATABASE);
   const expectedBranchId = nonEmpty(environment.MIGRATION_EXPECTED_BRANCH_ID);
+  const forbiddenBranchId = nonEmpty(environment.MIGRATION_FORBIDDEN_BRANCH_ID);
 
   if (expectedHost && hostname !== expectedHost.toLowerCase()) {
     throw new Error(
@@ -132,9 +134,14 @@ export function resolveMigrationTarget(
       'Guarded migrations require MIGRATION_EXPECTED_HOST and MIGRATION_EXPECTED_DATABASE',
     );
   }
-  if (requiresGuards && hostname.endsWith('.neon.tech') && !expectedBranchId) {
+  if (
+    requiresGuards &&
+    hostname.endsWith('.neon.tech') &&
+    !expectedBranchId &&
+    !forbiddenBranchId
+  ) {
     throw new Error(
-      'Guarded Neon migrations require MIGRATION_EXPECTED_BRANCH_ID',
+      'Guarded Neon migrations require MIGRATION_EXPECTED_BRANCH_ID or MIGRATION_FORBIDDEN_BRANCH_ID',
     );
   }
 
@@ -143,6 +150,7 @@ export function resolveMigrationTarget(
     connectionString,
     database,
     expectedBranchId,
+    forbiddenBranchId,
     hostname,
     identity: `${hostname}${port}/${database}`,
     isLocal,
@@ -238,6 +246,16 @@ export async function verifyConnectedTarget(
   `;
   const actual = rows[0];
   if (!actual) throw new Error('Could not identify the connected database');
+  validateConnectedTargetIdentity(actual, target);
+}
+
+export function validateConnectedTargetIdentity(
+  actual: { branch_id: string | null; database_name: string },
+  target: Pick<
+    MigrationTarget,
+    'database' | 'expectedBranchId' | 'forbiddenBranchId'
+  >,
+): void {
   if (actual.database_name !== target.database) {
     throw new Error(
       `Connected database mismatch: expected ${target.database}, received ${actual.database_name}`,
@@ -246,6 +264,14 @@ export async function verifyConnectedTarget(
   if (target.expectedBranchId && actual.branch_id !== target.expectedBranchId) {
     throw new Error(
       `Connected Neon branch mismatch: expected ${target.expectedBranchId}, received ${actual.branch_id ?? 'unknown'}`,
+    );
+  }
+  if (
+    target.forbiddenBranchId &&
+    actual.branch_id === target.forbiddenBranchId
+  ) {
+    throw new Error(
+      `Connected Neon branch is forbidden: ${target.forbiddenBranchId}`,
     );
   }
 }

@@ -53,5 +53,7 @@ pnpm db:migrate
 ```
 
 Schema changes use checked-in Drizzle migrations; `db:push` is intentionally
-not supported. See [Database migrations](docs/database-migrations.md) for the
-local, CI, baseline-adoption, and Production workflows.
+not supported. Vercel Preview branches migrate automatically before their
+builds, while Production migrations are automatically queued on `main` and
+remain approval-gated. See [Database migrations](docs/database-migrations.md)
+for the complete workflow.

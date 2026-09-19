@@ -5,6 +5,7 @@ import {
   hashCatalogSnapshot,
   resolveMigrationTarget,
   validateAppliedMigrations,
+  validateConnectedTargetIdentity,
   type MigrationDescriptor,
 } from './migration-tooling';
 
@@ -51,6 +52,44 @@ void test('migration tooling rejects a database-name mismatch', () => {
         MIGRATION_EXPECTED_HOST: 'example.neon.tech',
       }),
     /database mismatch/,
+  );
+});
+
+void test('guarded Neon migrations accept a production-branch deny guard', () => {
+  const target = resolveMigrationTarget({
+    CI: 'true',
+    MIGRATION_DATABASE_URL: 'postgres://user:secret@example.neon.tech/main',
+    MIGRATION_EXPECTED_DATABASE: 'main',
+    MIGRATION_EXPECTED_HOST: 'example.neon.tech',
+    MIGRATION_FORBIDDEN_BRANCH_ID: 'br-production',
+  });
+
+  assert.equal(target.forbiddenBranchId, 'br-production');
+});
+
+void test('connected-target validation rejects the forbidden Neon branch', () => {
+  assert.throws(
+    () =>
+      validateConnectedTargetIdentity(
+        { branch_id: 'br-production', database_name: 'main' },
+        {
+          database: 'main',
+          forbiddenBranchId: 'br-production',
+        },
+      ),
+    /branch is forbidden/,
+  );
+});
+
+void test('connected-target validation accepts a different Neon branch', () => {
+  assert.doesNotThrow(() =>
+    validateConnectedTargetIdentity(
+      { branch_id: 'br-preview', database_name: 'main' },
+      {
+        database: 'main',
+        forbiddenBranchId: 'br-production',
+      },
+    ),
   );
 });
 

@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { pathToFileURL } from 'node:url';
 import postgres from 'postgres';
 
 import {
@@ -17,7 +18,7 @@ import {
 
 config({ path: '.env', override: false, quiet: true });
 
-type Operation =
+export type Operation =
   'adopt-baseline' | 'apply' | 'check' | 'fingerprint' | 'status';
 
 function parseOperation(value: string | undefined): Operation {
@@ -114,9 +115,12 @@ async function adoptBaseline(
   });
 }
 
-async function run(): Promise<void> {
-  const operation = parseOperation(process.argv[2]);
-  const target = resolveMigrationTarget(process.env);
+export async function runMigrationOperation(
+  operation: Operation,
+  environment: NodeJS.ProcessEnv = process.env,
+  confirmation?: string,
+): Promise<void> {
+  const target = resolveMigrationTarget(environment);
   const client = postgres(target.connectionString, {
     max: 1,
     onnotice: () => undefined,
@@ -139,7 +143,7 @@ async function run(): Promise<void> {
     }
 
     if (operation === 'adopt-baseline') {
-      await adoptBaseline(client, confirmationArgument());
+      await adoptBaseline(client, confirmation);
       return;
     }
 
@@ -189,8 +193,21 @@ async function run(): Promise<void> {
   }
 }
 
-run().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`Migration failed: ${message}`);
-  process.exitCode = 1;
-});
+async function runCli(): Promise<void> {
+  await runMigrationOperation(
+    parseOperation(process.argv[2]),
+    process.env,
+    confirmationArgument(),
+  );
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  runCli().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Migration failed: ${message}`);
+    process.exitCode = 1;
+  });
+}
