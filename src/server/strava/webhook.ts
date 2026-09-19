@@ -4,11 +4,14 @@ import {
   activityDeletions,
   photoDeletions,
   photos,
+  stravaWebhookEvents,
+  stravaWebhooks,
 } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
 import { fetchStravaActivities } from '~/server/strava/service';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, and } from 'drizzle-orm';
 import { logger } from '~/server/logging/logger';
+import type { WebhookRequest } from '~/types/strava';
 
 /**
  * No 'use server' directive here: this module is only invoked from the
@@ -17,19 +20,104 @@ import { logger } from '~/server/logging/logger';
  * See issue #116.
  */
 
-export type StravaWebhookEvent = {
-  object_type: string;
-  object_id: number;
-  aspect_type: string;
-  owner_id: number;
-  subscription_id: number;
-  event_time: number;
-  updates?: Record<string, unknown>;
-};
+export type StravaWebhookEvent = WebhookRequest;
+
+/**
+ * Look up an active subscription matching the delivered `subscription_id`.
+ * Deliveries for an unknown or deactivated subscription are rejected before
+ * they ever reach the durable inbox (see issue #124).
+ */
+export async function findActiveSubscription(subscriptionId: number) {
+  return db.query.stravaWebhooks.findFirst({
+    where: and(
+      eq(stravaWebhooks.subscriptionId, subscriptionId),
+      eq(stravaWebhooks.active, true),
+    ),
+  });
+}
+
+/**
+ * Durably record an inbound webhook delivery before the route responds.
+ * Returns the inbox row id, or `null` when this exact delivery was already
+ * recorded (duplicate deliveries must not create a second inbox item).
+ */
+export async function recordWebhookEvent(
+  data: StravaWebhookEvent,
+): Promise<string | null> {
+  const eventTime = new Date(data.event_time * 1000);
+  const [inserted] = await db
+    .insert(stravaWebhookEvents)
+    .values({
+      subscriptionId: data.subscription_id,
+      objectType: data.object_type,
+      objectId: data.object_id,
+      aspectType: data.aspect_type,
+      ownerId: data.owner_id,
+      eventTime,
+      payload: data,
+    })
+    .onConflictDoNothing({
+      target: [
+        stravaWebhookEvents.subscriptionId,
+        stravaWebhookEvents.objectType,
+        stravaWebhookEvents.objectId,
+        stravaWebhookEvents.aspectType,
+        stravaWebhookEvents.eventTime,
+      ],
+    })
+    .returning({ id: stravaWebhookEvents.id });
+
+  return inserted?.id ?? null;
+}
+
+/**
+ * Best-effort, single-attempt processing of a just-recorded inbox row, run
+ * after the route has already responded to Strava (see `after()` in the
+ * route handler). This keeps activities updating close to real time without
+ * making the response wait on Strava/DB latency. It intentionally does not
+ * retry: durable retry/backoff, dead-lettering, and reconciliation for rows
+ * left `pending` or `failed` here are #125's job.
+ */
+export async function processInboxEvent(eventId: string) {
+  const event = await db.query.stravaWebhookEvents.findFirst({
+    where: eq(stravaWebhookEvents.id, eventId),
+  });
+  if (!event) return;
+
+  await db
+    .update(stravaWebhookEvents)
+    .set({ status: 'processing', updatedAt: new Date() })
+    .where(eq(stravaWebhookEvents.id, eventId));
+
+  try {
+    await processWebhookEvent(event.payload);
+    await db
+      .update(stravaWebhookEvents)
+      .set({
+        status: 'succeeded',
+        attemptCount: sql`${stravaWebhookEvents.attemptCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(stravaWebhookEvents.id, eventId));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Webhook] Failed to process inbox event ${eventId}:`, error);
+    await db
+      .update(stravaWebhookEvents)
+      .set({
+        status: 'failed',
+        attemptCount: sql`${stravaWebhookEvents.attemptCount} + 1`,
+        lastError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(stravaWebhookEvents.id, eventId));
+  }
+}
 
 /**
  * Process a Strava webhook event
- * This is designed to be called from the API route handler
+ * This is designed to be called from `processInboxEvent` (after durable
+ * receipt) or from the reconciliation worker added in #125.
  */
 export async function processWebhookEvent(data: StravaWebhookEvent) {
   const { object_type, object_id, owner_id } = data;

@@ -3,7 +3,6 @@
 import {
   activities as activitySchema,
   activityDeletions,
-  webhooks,
   stravaWebhooks,
   type Activity,
 } from '~/server/db/schema';
@@ -15,7 +14,6 @@ import { StravaClient } from './client';
 import { transformStravaActivity } from './transforms';
 import { type UpdatableActivity } from './types';
 import { inArray, eq, and, sql } from 'drizzle-orm';
-import crypto from 'crypto';
 import {
   updateActivityInputSchema,
   type UpdateActivityInput,
@@ -195,27 +193,32 @@ export async function checkWebhookStatus() {
     let databaseStatus = 'no_matching_subscription';
 
     if (matchingSubscription) {
-
+      const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN;
+      if (!verifyToken) {
+        throw new Error('STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set');
+      }
 
       await db
-        .insert(webhooks)
+        .insert(stravaWebhooks)
         .values({
-          id: matchingSubscription.id,
-          resource_state: matchingSubscription.resource_state,
-          application_id: matchingSubscription.application_id,
-          callback_url: matchingSubscription.callback_url,
-          created_at: new Date(matchingSubscription.created_at),
-          updated_at: new Date(matchingSubscription.updated_at),
+          subscriptionId: matchingSubscription.id,
+          verifyToken,
+          callbackUrl: matchingSubscription.callback_url,
+          resourceState: matchingSubscription.resource_state,
+          applicationId: matchingSubscription.application_id,
+          createdAt: new Date(matchingSubscription.created_at),
+          updatedAt: new Date(matchingSubscription.updated_at),
           verified: true,
           active: true,
         })
         .onConflictDoUpdate({
-          target: webhooks.id,
+          target: stravaWebhooks.callbackUrl,
           set: {
-            resource_state: matchingSubscription.resource_state,
-            application_id: matchingSubscription.application_id,
-            callback_url: matchingSubscription.callback_url,
-            updated_at: new Date(matchingSubscription.updated_at),
+            subscriptionId: matchingSubscription.id,
+            verifyToken,
+            resourceState: matchingSubscription.resource_state,
+            applicationId: matchingSubscription.application_id,
+            updatedAt: new Date(matchingSubscription.updated_at),
             verified: true,
             active: true,
           },
@@ -270,15 +273,17 @@ export async function createWebhookSubscription() {
       await db
         .insert(stravaWebhooks)
         .values({
-          id: crypto.randomUUID(),
           subscriptionId: existingSubscription.id,
           verifyToken,
           callbackUrl,
+          active: true,
         })
         .onConflictDoUpdate({
           target: [stravaWebhooks.callbackUrl],
           set: {
+            subscriptionId: existingSubscription.id,
             verifyToken,
+            active: true,
             updatedAt: new Date(),
           },
         });
@@ -296,16 +301,17 @@ export async function createWebhookSubscription() {
     await db
       .insert(stravaWebhooks)
       .values({
-        id: crypto.randomUUID(),
         subscriptionId: subscription.id,
         verifyToken,
         callbackUrl,
+        active: true,
       })
       .onConflictDoUpdate({
         target: [stravaWebhooks.callbackUrl],
         set: {
           subscriptionId: subscription.id,
           verifyToken,
+          active: true,
           updatedAt: new Date(),
         },
       });
