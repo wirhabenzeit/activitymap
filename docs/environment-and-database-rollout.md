@@ -79,12 +79,16 @@ identities only. No credential value is recorded in this document.
   rather than sending all previews to one shared database. Its Preview parent,
   synchronization with Production, cleanup policy, and credential ownership
   remain unverified.
-- Vercel's Update Project Connection form offers deployment-time database
-  branching for Preview, but the visible `NEON`-prefixed connection does not
-  currently show that action as selected. Do not enable or replace it until
-  the owner of the unprefixed branch-specific variables is understood; an
-  additional prefixed connection would not affect the application's current
-  `DATABASE_URL` consumer.
+- The Vercel-managed account is the selected canonical Neon account. On
+  2026-09-19, its existing `NEON`-prefixed project connection was updated to
+  require the resource to be active before deployment and to create a database
+  branch for Preview deployments. Production branching remains disabled.
+- A fresh redeployment of this audit branch completed successfully after the
+  connection change. Vercel's provisioning step created Neon branch
+  `preview/codex/environment-inventory` (`br-raspy-tooth-a2f0xjwi`) before the
+  build continued. This proves that native deployment branching is working;
+  it does not yet prove that the application uses the injected connection,
+  because the application still consumes the unprefixed `DATABASE_URL`.
 - The manually configured project variables inspected during the audit are
   scoped to **All Environments**, including `OPENAI_API_KEY`,
   `OPENAI_ASSISTANT_ID`, `AUTH_SECRET`, `AUTH_STRAVA_ID`,
@@ -117,11 +121,14 @@ identities only. No credential value is recorded in this document.
   `recovery/pre-environment-isolation-2026-09-19` was created from the current
   `main` head. It has no automatic expiration and showed zero usage immediately
   after creation.
-- Database roles and the separate Neon endpoint used by Preview remain to be
-  audited. Per-PR endpoints are being provisioned outside this Vercel-managed
-  account, while Production remains here. The account's one-day history window
-  makes the recovery branch an important temporary safety measure; remove it
-  only after the rollout is verified.
+- Vercel created `preview/codex/environment-inventory` from `main` for the
+  verification deployment. Neon reports Vercel as its creator, no expiry, and
+  a distinct compute endpoint (`ep-summer-poetry-a230l1gy`).
+- Database roles and the separate Neon project that currently supplies the
+  unprefixed Preview overrides remain to be audited. Those overrides are now a
+  transitional configuration, not the intended canonical Preview service. The
+  account's one-day history window makes the recovery branch an important
+  temporary safety measure; remove it only after the rollout is verified.
 
 ### GitHub
 
@@ -192,6 +199,14 @@ Exit criterion: every retained variable has one consumer, owner, and scope.
 
 Exit criterion: each preview uses an independently identifiable database
 branch and cannot trigger production side effects.
+
+Current rollout state (2026-09-19): native Vercel-to-Neon Preview branch
+creation is verified. The next change is to make the application prefer the
+managed `NEON_DATABASE_URL` while retaining `DATABASE_URL` as a temporary
+fallback. After that deployment is verified against the managed branch, remove
+the external branch-specific Preview overrides and the all-environment
+unprefixed fallback from Preview scope. External-effect isolation remains a
+separate required check before Phase 2 is complete.
 
 ### Phase 3: Replayable migration baseline
 
