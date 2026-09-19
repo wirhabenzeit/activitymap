@@ -1,11 +1,11 @@
 'use server';
 
-import { getAuthenticatedAccount } from '~/server/db/actions';
-import { fetchStravaActivities } from './actions';
+import { getAuthenticatedAccountInternal } from '~/server/db/internal';
+import { fetchStravaActivities } from './service';
 
 export async function syncYear(year: number) {
     try {
-        const account = await getAuthenticatedAccount();
+        const account = await getAuthenticatedAccountInternal();
         if (!account?.access_token) throw new Error('Unauthorized');
         const athleteId = parseInt(account.accountId);
 
@@ -58,7 +58,7 @@ export async function syncYear(year: number) {
 
 export async function repairYear(year: number, idsToRepair: number[]) {
     try {
-        const account = await getAuthenticatedAccount();
+        const account = await getAuthenticatedAccountInternal();
         if (!account?.access_token) throw new Error('Unauthorized');
         const athleteId = parseInt(account.accountId);
 
@@ -98,7 +98,7 @@ export async function repairYear(year: number, idsToRepair: number[]) {
 
 export async function syncActivities(ids: number[]) {
     try {
-        const account = await getAuthenticatedAccount();
+        const account = await getAuthenticatedAccountInternal();
         if (!account?.access_token) throw new Error('Unauthorized');
 
         if (ids.length === 0) return { success: true, count: 0 };

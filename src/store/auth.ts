@@ -1,12 +1,9 @@
 import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
-import type { User, Account } from '~/server/db/schema';
-import type { Session } from '~/lib/auth';
+import type { CurrentUserDTO } from '~/server/db/dto';
 
 export type InitialAuth = {
-  session: Session | null;
-  user: User | null;
-  account: Account | null;
+  currentUser: CurrentUserDTO | null;
   guestMode?: {
     type: 'user' | 'activities';
     userId?: string;
@@ -15,9 +12,7 @@ export type InitialAuth = {
 };
 
 export type AuthState = {
-  user: User | undefined;
-  session: Session | undefined;
-  account: Account | undefined;
+  user: CurrentUserDTO | undefined;
   isInitialized: boolean;
   isGuest: boolean;
   guestMode: {
@@ -41,8 +36,6 @@ export const createAuthSlice: StateCreator<
 > = (set) => ({
   // Initial state
   user: undefined,
-  session: undefined,
-  account: undefined,
   isInitialized: false,
   isGuest: false,
   guestMode: {
@@ -63,13 +56,9 @@ export const createAuthSlice: StateCreator<
           activityIds: auth.guestMode.activityIds,
         };
       } else {
-        state.session = auth.session ?? undefined;
-        state.user = auth.user ?? undefined;
-        state.account = auth.account ?? undefined;
+        state.user = auth.currentUser ?? undefined;
       }
       state.isInitialized = true;
-
-
     });
   },
 });

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '~/server/db';
 import { activities, photos, webhooks } from '~/server/db/schema';
-import { fetchStravaActivities } from '~/server/strava/actions';
+import { fetchStravaActivities } from '~/server/strava/service';
 import { getAccountInternal } from '~/server/db/internal';
 import type { WebhookRequest } from '~/types/strava';
 import { type NextRequest } from 'next/server';

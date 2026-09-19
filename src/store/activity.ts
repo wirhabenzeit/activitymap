@@ -2,7 +2,6 @@ import { type StateCreator } from 'zustand';
 
 import { type RootState } from './index';
 import {
-  fetchStravaActivities,
   updateActivity as updateStravaActivity,
   deleteActivities as deleteServerActivities,
 } from '~/server/strava/actions';
@@ -23,7 +22,6 @@ export const createActivitySlice: StateCreator<
 };
 
 export const serverActions = {
-  fetchStravaActivities,
   deleteServerActivities,
   updateStravaActivity,
 };

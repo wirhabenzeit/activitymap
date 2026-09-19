@@ -82,15 +82,15 @@ export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
 
 import { usePhotos } from '~/hooks/use-photos';
 import { useQueryClient } from '@tanstack/react-query';
-import { fetchStravaActivities } from '~/server/strava/actions';
+import { refreshActivity } from '~/server/strava/actions';
 import { useToast } from '~/hooks/use-toast';
 
 export function ActivityCardContent({ row }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { isGuest, account } = useShallowStore((state) => ({
+  const { isGuest, stravaConnected } = useShallowStore((state) => ({
     isGuest: state.isGuest,
-    account: state.account,
+    stravaConnected: state.user?.stravaConnected ?? false,
   }));
   const { data: allPhotos = [] } = usePhotos();
   const queryClient = useQueryClient();
@@ -150,15 +150,10 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
   ];
 
   const handleRefresh = async () => {
-    if (!account) return;
+    if (!stravaConnected) return;
     setLoading(true);
     try {
-      await fetchStravaActivities({
-        accessToken: account.access_token!,
-        athleteId: parseInt(account.accountId),
-        activityIds: [row.original.id],
-        includePhotos: true,
-      });
+      await refreshActivity(row.original.id);
 
       await queryClient.invalidateQueries({ queryKey: ['activities'] });
       await queryClient.invalidateQueries({ queryKey: ['photos'] });

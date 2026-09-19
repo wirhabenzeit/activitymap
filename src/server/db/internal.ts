@@ -1,3 +1,4 @@
+import 'server-only';
 
 import { eq } from 'drizzle-orm';
 import { db } from './index';
@@ -19,6 +20,26 @@ export const getUserInternal = async (id?: string) => {
     });
     if (!user) throw new Error('User not found');
     return user;
+};
+
+/**
+ * Resolve the Strava account (including credentials) for the currently
+ * authenticated session. This returns the raw Account row - including
+ * access/refresh tokens - so it must only be called from trusted
+ * server-side code, never re-exported from a 'use server' file. See
+ * issue #116.
+ */
+export const getAuthenticatedAccountInternal = async () => {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+        return null;
+    }
+
+    // Safe: we trust the session ID
+    return getAccountInternal({ userId: session.user.id });
 };
 
 export const getAccountInternal = async ({

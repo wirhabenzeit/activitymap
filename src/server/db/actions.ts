@@ -5,48 +5,12 @@ import { activities, photos } from './schema';
 import { db } from './index';
 import { auth } from '~/lib/auth';
 import { headers } from 'next/headers';
-import { getAccountInternal, getUserInternal } from './internal';
+import { getUserInternal } from './internal';
 
 // Safe wrapper for getUser
 export const getUser = async (id?: string) => {
   return getUserInternal(id);
 };
-
-/**
- * @deprecated Use getAuthenticatedAccount for client-side calls
- * This is kept temporarily if needed but should not be used directly from client without session check.
- */
-export const getAccount = async (params: {
-  accountId?: string;
-  userId?: string;
-  forceRefresh?: boolean;
-}) => {
-  // If called from client with explicit IDs, this is UNSAFE.
-  // We should enforce session check if we want to expose this.
-  // BUT for now, let's redirect to getAuthenticatedAccount logic if params are empty
-  if (!params.accountId && !params.userId) {
-    return getAuthenticatedAccount();
-  }
-
-  // If arguments provided, we MUST check if the caller is authorized to access that data.
-  // However, verifying if `userId` matches current session is best done in getAuthenticatedAccount.
-  // We will assume this function is legacy and might be removed or made private.
-  // For now, let's delegate to internal but warn/fail if we want to be strict.
-  return getAccountInternal(params);
-};
-
-export const getAuthenticatedAccount = async () => {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session?.user?.id) {
-    return null;
-  }
-
-  // Safe: we trust the session ID
-  return getAccountInternal({ userId: session.user.id });
-}
 
 /**
  * Get activities for a specific user (by internal User ID).

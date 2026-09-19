@@ -10,6 +10,7 @@ import { AppHeader } from '~/components/layout/app-header';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { getUserInternal, getAccountInternal } from '~/server/db/internal';
+import { toCurrentUserDTO } from '~/server/db/dto';
 import type { InitialAuth } from '~/store/auth';
 import { Toaster } from '~/components/ui/toaster';
 import { ToastManager } from '~/components/providers/toast';
@@ -42,19 +43,17 @@ export default async function RootLayout({
     headers: await headers(),
   });
   const initialAuth: InitialAuth = {
-    session: null,
-    user: null,
-    account: null,
+    currentUser: null,
   };
 
-  // If we have a session, get the user and account details
+  // If we have a session, resolve a safe, client-visible user summary.
+  // Never pass the raw Account record (Strava tokens) or the Better Auth
+  // session (which carries a reusable session token) to the client - see
+  // issue #116.
   if (session?.user?.id) {
     const user = await getUserInternal(session.user.id);
     const account = user ? await getAccountInternal({ userId: user.id }) : null;
-    initialAuth.session = session;
-    initialAuth.user = user ?? null;
-    initialAuth.account = account ?? null;
-
+    initialAuth.currentUser = user ? toCurrentUserDTO(user, account) : null;
   }
 
   return (

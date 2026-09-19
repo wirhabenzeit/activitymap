@@ -28,7 +28,8 @@ import { Edit } from 'lucide-react';
 import { type Row } from '@tanstack/react-table';
 import { type Features } from './table-extensions';
 import { type Activity } from '~/server/db/schema';
-import { type UpdatableActivity, type SportType } from '~/server/strava/types';
+import { type SportType } from '~/server/strava/types';
+import { type UpdateActivityInput } from '~/server/strava/validators';
 import { sportType } from 'drizzle/schema';
 import { Select } from '../ui/select';
 import {
@@ -72,10 +73,6 @@ export function ProfileForm({
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  // We removed updateActivity from the store, so no need to select it
-  const { account } = useShallowStore((state) => ({
-    account: state.account,
-  }));
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -87,21 +84,16 @@ export function ProfileForm({
   });
 
   async function onSubmit(values: FormValues) {
-    if (!account) return;
     setLoading(true);
     try {
-      const activityUpdate: UpdatableActivity = {
+      const activityUpdate: UpdateActivityInput = {
         name: values.name,
         sport_type: values.sportType,
         id: row.original.id,
-        athlete: row.original.athlete,
         ...(values.description && { description: values.description }),
       };
 
-      await updateActivity(activityUpdate, {
-        access_token: account.access_token!,
-        accountId: account.accountId,
-      });
+      await updateActivity(activityUpdate);
 
       await queryClient.invalidateQueries({ queryKey: ['activities'] });
 
