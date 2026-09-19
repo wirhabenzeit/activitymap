@@ -29,6 +29,12 @@ export function resolveDatabaseConnection(environment: DatabaseEnvironment): {
     return { connectionString: legacyUrl, source: 'DATABASE_URL' };
   }
 
+  if (nonEmpty(environment.VERCEL)) {
+    throw new Error(
+      'NEON_DATABASE_URL or DATABASE_URL is required when running on Vercel',
+    );
+  }
+
   return {
     connectionString: LOCAL_DATABASE_URL,
     source: 'local-default',

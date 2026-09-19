@@ -36,3 +36,10 @@ void test('ignores empty values and retains the local development default', () =
     source: 'local-default',
   });
 });
+
+void test('fails closed on Vercel when no database connection is configured', () => {
+  assert.throws(
+    () => resolveDatabaseConnection({ VERCEL: '1' }),
+    /NEON_DATABASE_URL or DATABASE_URL is required/,
+  );
+});
