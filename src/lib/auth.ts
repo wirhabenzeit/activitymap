@@ -41,6 +41,16 @@ function isStravaAccount(
 }
 
 export const auth = betterAuth({
+  baseURL: {
+    allowedHosts: [
+      'activitymap.dominik.page',
+      '*.vercel.app',
+      'localhost',
+      '127.0.0.1',
+    ],
+    fallback: process.env.BETTER_AUTH_URL,
+    protocol: process.env.NODE_ENV === 'development' ? 'http' : 'https',
+  },
   database: drizzleAdapter(db, {
     provider: 'pg',
     schema: {
