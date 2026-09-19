@@ -54,8 +54,8 @@ This table records names and consumers only. Never add values to this document.
 
 ## Initial platform audit (2026-09-19)
 
-The following observations record names and scopes only. No credential values
-were copied or revealed.
+The following observations record names, scopes, and redacted resource
+identities only. No credential value is recorded in this document.
 
 ### Vercel
 
@@ -68,9 +68,12 @@ were copied or revealed.
   `DATABASE_URL_UNPOOLED` fallbacks plus branch-specific Preview overrides for
   active pull-request branches. The branch-specific pairs are created at the
   same time as their Preview deployments, including this audit's own branch.
-  This is strong evidence that Preview database branching is already active
-  for those deployments, but it is not proof of isolation until the target
-  Neon branch or PostgreSQL identity has been compared with Production.
+- A redacted endpoint-identity comparison established that the all-environment
+  fallback targets `main` in the Vercel-managed Neon project, while this
+  audit's branch-specific Preview override targets a different endpoint. That
+  endpoint does not belong to any branch in the Vercel-managed Neon account,
+  so a second Neon project or account is involved. Its ownership and lifecycle
+  must be established before relying on it as the canonical Preview database.
 - Vercel's Update Project Connection form offers deployment-time database
   branching for Preview, but the visible `NEON`-prefixed connection does not
   currently show that action as selected. Do not enable or replace it until
@@ -98,10 +101,21 @@ were copied or revealed.
 ### Neon
 
 - Vercel identifies the resource as `neon-indigo-mountain`.
-- Opening the Neon console currently stops at required email verification, so
-  branch names, roles, restore coverage, and branch-expiration settings remain
-  unverified. Do not resend the verification email or alter the account as
-  part of a read-only audit without explicit approval.
+- The Vercel-managed account contains exactly one project. Its default branch
+  is `main`; the project is on the Free plan in AWS Frankfurt and has one day
+  of history retention.
+- A long-lived child branch named `preview` was created from `main` on
+  2026-09-19. Its compute endpoint does not match the current PR's
+  branch-specific Vercel database override, so this branch is not serving that
+  deployment.
+- With explicit approval, a full data-and-schema recovery branch named
+  `recovery/pre-environment-isolation-2026-09-19` was created from the current
+  `main` head. It has no automatic expiration and showed zero usage immediately
+  after creation.
+- Database roles and the separate Neon endpoint used by Preview remain to be
+  audited. The account's one-day history window makes the recovery branch an
+  important temporary safety measure; remove it only after the rollout is
+  verified.
 
 ### GitHub
 
