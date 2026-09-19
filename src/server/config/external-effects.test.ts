@@ -5,6 +5,7 @@ import {
   externalEffectsEnabled,
   requireExternalEffectsEnabled,
 } from './external-effects.ts';
+import { StravaClient } from '~/server/strava/client';
 
 void test('external effects default to disabled', () => {
   assert.equal(externalEffectsEnabled({}), false);
@@ -28,4 +29,22 @@ void test('only the explicit enabled value permits external effects', () => {
       ACTIVITYMAP_EXTERNAL_EFFECTS: 'enabled',
     }),
   );
+});
+
+void test('the Strava client cannot be constructed without the opt-in', () => {
+  const previousValue = process.env.ACTIVITYMAP_EXTERNAL_EFFECTS;
+  delete process.env.ACTIVITYMAP_EXTERNAL_EFFECTS;
+
+  try {
+    assert.throws(
+      () => StravaClient.withAccessToken('test-token'),
+      new RegExp(EXTERNAL_EFFECTS_DISABLED_MESSAGE),
+    );
+  } finally {
+    if (previousValue === undefined) {
+      delete process.env.ACTIVITYMAP_EXTERNAL_EFFECTS;
+    } else {
+      process.env.ACTIVITYMAP_EXTERNAL_EFFECTS = previousValue;
+    }
+  }
 });
