@@ -6,6 +6,10 @@ import { getAccountInternal } from '~/server/db/internal';
 import type { WebhookRequest } from '~/types/strava';
 import { type NextRequest } from 'next/server';
 import { logger } from '~/server/logging/logger';
+import {
+  EXTERNAL_EFFECTS_DISABLED_MESSAGE,
+  externalEffectsEnabled,
+} from '~/server/config/external-effects';
 
 export async function GET(
   req: NextRequest,
@@ -14,6 +18,10 @@ export async function GET(
   const params = await props.params;
   if (params.slug !== 'webhook')
     return new Response('Invalid endpoint', { status: 404 });
+
+  if (!externalEffectsEnabled()) {
+    return new Response(EXTERNAL_EFFECTS_DISABLED_MESSAGE, { status: 503 });
+  }
 
   const mode = req.nextUrl.searchParams.get('hub.mode');
   const token = req.nextUrl.searchParams.get('hub.verify_token');
@@ -50,6 +58,10 @@ export async function POST(
   if (params.slug !== 'webhook')
     return new Response('Invalid endpoint', { status: 404 });
 
+  if (!externalEffectsEnabled()) {
+    return new Response(EXTERNAL_EFFECTS_DISABLED_MESSAGE, { status: 503 });
+  }
+
   try {
     const data = (await req.json()) as WebhookRequest;
     // `data.updates` may carry a renamed activity title; never log it verbatim.
@@ -78,11 +90,11 @@ export async function POST(
       found: !!subscription,
       subscription_details: subscription
         ? {
-          id: subscription.id,
-          verified: subscription.verified,
-          active: subscription.active,
-          callback_url: subscription.callback_url,
-        }
+            id: subscription.id,
+            verified: subscription.verified,
+            active: subscription.active,
+            callback_url: subscription.callback_url,
+          }
         : null,
     });
 
@@ -133,7 +145,9 @@ export async function POST(
       // If no account found, this user hasn't connected their Strava account to our app
       if (!account) {
         logger.info('No account found for athlete ID:', data.owner_id);
-        return new Response('No account found for this athlete', { status: 404 });
+        return new Response('No account found for this athlete', {
+          status: 404,
+        });
       }
 
       if (!account.access_token) {
@@ -158,9 +172,9 @@ export async function POST(
         photo_count: result.photos.length,
         first_activity: result.activities[0]
           ? {
-            id: result.activities[0].id,
-            is_complete: result.activities[0].is_complete,
-          }
+              id: result.activities[0].id,
+              is_complete: result.activities[0].is_complete,
+            }
           : null,
       });
 
@@ -169,7 +183,8 @@ export async function POST(
       }
 
       return new Response(
-        `${data.aspect_type === 'create' ? 'Created' : 'Updated'} activity ${result.activities[0].id
+        `${data.aspect_type === 'create' ? 'Created' : 'Updated'} activity ${
+          result.activities[0].id
         } with ${result.photos.length} photos`,
       );
     }

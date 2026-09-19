@@ -1,8 +1,8 @@
-import { createAuthClient } from "better-auth/react";
+import { createAuthClient } from 'better-auth/react';
 
-export const authClient = createAuthClient({
-    baseURL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-});
+// Resolve the auth API relative to the current deployment. A shared absolute
+// URL would allow a Preview client to send auth requests to Production.
+export const authClient = createAuthClient();
 
 // Export commonly used methods for convenience
 export const { signIn, signOut, useSession } = authClient;

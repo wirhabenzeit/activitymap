@@ -19,9 +19,10 @@ import crypto from 'crypto';
 import {
   updateActivityInputSchema,
   type UpdateActivityInput,
-  deleteActivitiesSchema
+  deleteActivitiesSchema,
 } from './validators';
 import { fetchStravaActivities } from './service';
+import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
 
 export async function updateActivity(input: UpdateActivityInput) {
   try {
@@ -119,8 +120,6 @@ export async function deleteActivities(input: number[]): Promise<{
     }
     const athleteId = parseInt(account.accountId);
 
-
-
     // Perform the deletion
     const deleteResult = await db
       .delete(activitySchema)
@@ -152,16 +151,14 @@ export async function deleteActivities(input: number[]): Promise<{
         });
     }
 
-
     // Check if any requested IDs were not deleted (e.g., didn't belong to the user)
     if (deletedCount < activityIds.length) {
-      const deletedSet = new Set(deleteResult.map(r => r.deletedId));
-      const notDeleted = activityIds.filter(id => !deletedSet.has(id));
+      const deletedSet = new Set(deleteResult.map((r) => r.deletedId));
+      const notDeleted = activityIds.filter((id) => !deletedSet.has(id));
       const errorMsg = `Failed to delete some activities (possible permission issue or already deleted): ${notDeleted.join(', ')}`;
       logger.warn(errorMsg);
       errors.push(errorMsg);
     }
-
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error('Error deleting activities:', errorMsg);
@@ -173,6 +170,8 @@ export async function deleteActivities(input: number[]): Promise<{
 }
 
 export async function checkWebhookStatus() {
+  requireExternalEffectsEnabled();
+
   if (!process.env.PUBLIC_URL) {
     throw new Error('PUBLIC_URL environment variable is not set');
   }
@@ -187,7 +186,6 @@ export async function checkWebhookStatus() {
   try {
     const stravaSubscriptions = await client.getSubscriptions();
 
-
     const matchingSubscription = stravaSubscriptions.find(
       (sub) => sub.callback_url === expectedUrl,
     );
@@ -195,8 +193,6 @@ export async function checkWebhookStatus() {
     let databaseStatus = 'no_matching_subscription';
 
     if (matchingSubscription) {
-
-
       await db
         .insert(webhooks)
         .values({
@@ -238,6 +234,8 @@ export async function checkWebhookStatus() {
 }
 
 export async function createWebhookSubscription() {
+  requireExternalEffectsEnabled();
+
   if (!process.env.PUBLIC_URL) {
     throw new Error('PUBLIC_URL environment variable is not set');
   }
@@ -250,10 +248,10 @@ export async function createWebhookSubscription() {
   const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN;
 
   if (!verifyToken) {
-    throw new Error('STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set');
+    throw new Error(
+      'STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set',
+    );
   }
-
-
 
   const client = StravaClient.withoutAuth();
 
@@ -265,8 +263,6 @@ export async function createWebhookSubscription() {
     );
 
     if (existingSubscription) {
-
-
       await db
         .insert(stravaWebhooks)
         .values({
@@ -290,8 +286,10 @@ export async function createWebhookSubscription() {
       };
     }
 
-    const subscription = await client.createSubscription(callbackUrl, verifyToken);
-
+    const subscription = await client.createSubscription(
+      callbackUrl,
+      verifyToken,
+    );
 
     await db
       .insert(stravaWebhooks)
@@ -321,7 +319,8 @@ export async function createWebhookSubscription() {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-      details: 'Make sure your callback URL is publicly accessible and your Strava API credentials are correct',
+      details:
+        'Make sure your callback URL is publicly accessible and your Strava API credentials are correct',
     };
   }
 }

@@ -7,6 +7,7 @@ import type {
 } from './types';
 import { mergeAndProcessStravaPhotos } from './transforms';
 import { logger } from '~/server/logging/logger';
+import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
 
 const STRAVA_API_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token';
@@ -45,6 +46,8 @@ export class StravaClient {
     refreshToken?: string;
     tokenRefreshCallback?: (tokens: StravaTokens) => Promise<void>;
   }) {
+    requireExternalEffectsEnabled();
+
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
     this.tokenRefreshCallback = tokenRefreshCallback;
@@ -63,8 +66,6 @@ export class StravaClient {
     // Now we know these are non-null
     this.clientId = clientId;
     this.clientSecret = clientSecret;
-
-
   }
 
   /**
@@ -115,8 +116,6 @@ export class StravaClient {
       throw new Error('No refresh token available');
     }
 
-
-
     try {
       const response = await fetch(STRAVA_TOKEN_URL, {
         method: 'POST',
@@ -132,7 +131,6 @@ export class StravaClient {
       });
 
       const tokens = (await response.json()) as StravaTokens;
-
 
       if (!response.ok) {
         throw new Error(`Failed to refresh access token: ${response.status}`);
@@ -195,8 +193,6 @@ export class StravaClient {
       }
     }
 
-
-
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
@@ -216,8 +212,6 @@ export class StravaClient {
       ...options,
       headers,
     });
-
-
 
     if (!response.ok) {
       const contentType = response.headers.get('content-type');
@@ -246,7 +240,10 @@ export class StravaClient {
 
       // Log the full error response for debugging
       if (errorDetails.errors) {
-        logger.error('Strava API error details:', JSON.stringify(errorDetails.errors, null, 2));
+        logger.error(
+          'Strava API error details:',
+          JSON.stringify(errorDetails.errors, null, 2),
+        );
       }
 
       logger.error('Strava API error:', {
@@ -257,11 +254,13 @@ export class StravaClient {
         details: errorDetails,
         endpoint,
         method: options.method ?? 'GET',
-        bodyType: options.body instanceof FormData ? 'FormData' : typeof options.body,
+        bodyType:
+          options.body instanceof FormData ? 'FormData' : typeof options.body,
         // If it's FormData, log the keys (but not values for security)
-        formDataKeys: options.body instanceof FormData
-          ? Array.from(options.body.keys())
-          : undefined,
+        formDataKeys:
+          options.body instanceof FormData
+            ? Array.from(options.body.keys())
+            : undefined,
       });
 
       // Token management is now handled outside this class
@@ -324,8 +323,6 @@ export class StravaClient {
   }
 
   async getActivityPhotos(id: number): Promise<StravaPhoto[]> {
-
-
     try {
       const [smallPhotos, largePhotos] = await Promise.all([
         this.request<StravaPhoto[]>(
@@ -335,8 +332,6 @@ export class StravaClient {
           `/activities/${id}/photos?size=5000&photo_sources=true`,
         ),
       ]);
-
-
 
       // Check for mismatches in photo counts
       if (smallPhotos.length !== largePhotos.length) {
@@ -350,7 +345,6 @@ export class StravaClient {
         smallPhotos,
         largePhotos,
       );
-
 
       return mergedPhotos;
     } catch (error) {
@@ -369,7 +363,6 @@ export class StravaClient {
       `/push_subscriptions?${searchParams}`,
     );
 
-
     return subscriptions;
   }
 
@@ -385,7 +378,6 @@ export class StravaClient {
     formData.append('verify_token', verifyToken);
 
     // Log the request details
-
 
     return this.request<StravaSubscription>('/push_subscriptions', {
       method: 'POST',
