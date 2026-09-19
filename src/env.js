@@ -1,5 +1,5 @@
-import {createEnv} from "@t3-oss/env-nextjs";
-import {z} from "zod";
+import { createEnv } from '@t3-oss/env-nextjs';
+import { z } from 'zod';
 
 export const env = createEnv({
   /**
@@ -8,8 +8,8 @@ export const env = createEnv({
    */
   server: {
     CRON_SECRET: z.string(),
-    DATABASE_URL: z.string().url(),
-    DATABASE_URL_UNPOOLED: z.string().url(),
+    NEON_DATABASE_URL: z.string().url().optional(),
+    DATABASE_URL: z.string().url().optional(),
     PGHOST: z.string(),
     PGHOST_UNPOOLED: z.string(),
     PGUSER: z.string(),
@@ -18,7 +18,7 @@ export const env = createEnv({
     POSTGRES_URL: z.string().url(),
     POSTGRES_URL_NO_SSL: z.string().url(),
     POSTGRES_URL_NON_POOLING: z.string().url(),
-    POSTGRES_PRISMA_URL : z.string().url(),
+    POSTGRES_PRISMA_URL: z.string().url(),
     POSTGRES_USER: z.string(),
     POSTGRES_HOST: z.string(),
     POSTGRES_DATABASE: z.string(),
@@ -29,8 +29,9 @@ export const env = createEnv({
     STRAVA_WEBHOOK_VERIFY_TOKEN: z.string(),
     PUBLIC_URL: z.string().url(),
     NODE_ENV: z
-      .enum(["development", "test", "production"])
-      .default("development"),
+      .enum(['development', 'test', 'production'])
+      .default('development'),
+    VERCEL: z.string().optional(),
   },
 
   /**
@@ -51,30 +52,39 @@ export const env = createEnv({
     CRON_SECRET: process.env.CRON_SECRET,
     STRAVA_WEBHOOK_VERIFY_TOKEN: process.env.STRAVA_WEBHOOK_VERIFY_TOKEN,
     POSTGRES_URL: process.env.POSTGRES_URL,
+    NEON_DATABASE_URL: process.env.NEON_DATABASE_URL,
     DATABASE_URL: process.env.DATABASE_URL,
-    DATABASE_URL_UNPOOLED: process.env.DATABASE_URL_UNPOOLED,
     PGHOST: process.env.PGHOST,
     PGHOST_UNPOOLED: process.env.PGHOST_UNPOOLED,
     PGUSER: process.env.PGUSER,
     PGDATABASE: process.env.PGDATABASE,
     PGPASSWORD: process.env.PGPASSWORD,
     NODE_ENV: process.env.NODE_ENV,
+    VERCEL: process.env.VERCEL,
     POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
     POSTGRES_USER: process.env.POSTGRES_USER,
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
     POSTGRES_HOST: process.env.POSTGRES_HOST,
     POSTGRES_PRISMA_URL: process.env.POSTGRES_PRISMA_URL,
     POSTGRES_URL_NO_SSL: process.env.POSTGRES_URL_NO_SSL,
-    POSTGRES_URL_NON_POOLING:
-      process.env.POSTGRES_URL_NON_POOLING,
+    POSTGRES_URL_NON_POOLING: process.env.POSTGRES_URL_NON_POOLING,
     AUTH_SECRET: process.env.AUTH_SECRET,
     AUTH_STRAVA_ID: process.env.AUTH_STRAVA_ID,
     AUTH_STRAVA_SECRET: process.env.AUTH_STRAVA_SECRET,
     PUBLIC_URL: process.env.PUBLIC_URL,
-    NEXT_PUBLIC_MAPBOX_TOKEN:
-      process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
+    NEXT_PUBLIC_MAPBOX_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
     NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV,
   },
+  createFinalSchema: (shape) =>
+    z.object(shape).superRefine((values, context) => {
+      if (values.VERCEL && !values.NEON_DATABASE_URL && !values.DATABASE_URL) {
+        context.addIssue({
+          code: 'custom',
+          path: ['NEON_DATABASE_URL'],
+          message: 'NEON_DATABASE_URL or DATABASE_URL is required on Vercel',
+        });
+      }
+    }),
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
    * useful for Docker builds.

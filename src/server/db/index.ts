@@ -4,12 +4,14 @@ import { neon, neonConfig } from '@neondatabase/serverless';
 import { config } from 'dotenv';
 import ws from 'ws';
 import { logger } from '~/server/logging/logger';
+import { resolveDatabaseConnection } from './connection';
 
 config({ path: '.env' }); // or .env.local
 
-const connectionString =
-  process.env.DATABASE_URL ??
-  'postgres://postgres:postgres@db.localtest.me:5432/main';
+const { connectionString, source: databaseConnectionSource } =
+  resolveDatabaseConnection(process.env);
+logger.info({ databaseConnectionSource });
+
 const connectionStringUrl = new URL(connectionString);
 const useLocalNeonProxy = connectionStringUrl.hostname === 'db.localtest.me';
 
