@@ -95,3 +95,61 @@ void test('schema fingerprints are deterministic', () => {
   };
   assert.equal(hashCatalogSnapshot(snapshot), hashCatalogSnapshot(snapshot));
 });
+
+void test('schema fingerprints ignore physical column order', () => {
+  const snapshot = {
+    columns: [
+      {
+        table_name: 'account',
+        ordinal_position: 1,
+        column_name: 'id',
+        data_type: 'text',
+      },
+      {
+        table_name: 'account',
+        ordinal_position: 2,
+        column_name: 'userId',
+        data_type: 'text',
+      },
+    ],
+    constraints: [],
+    enums: [],
+    indexes: [],
+    relations: [{ relation_kind: 'r', relation_name: 'account' }],
+  };
+  const physicallyReordered = {
+    ...snapshot,
+    columns: [
+      { ...snapshot.columns[1], ordinal_position: 1 },
+      { ...snapshot.columns[0], ordinal_position: 2 },
+    ],
+  };
+
+  assert.equal(
+    hashCatalogSnapshot(snapshot),
+    hashCatalogSnapshot(physicallyReordered),
+  );
+});
+
+void test('schema fingerprints retain semantic column differences', () => {
+  const snapshot = {
+    columns: [
+      {
+        table_name: 'account',
+        ordinal_position: 1,
+        column_name: 'id',
+        data_type: 'text',
+      },
+    ],
+    constraints: [],
+    enums: [],
+    indexes: [],
+    relations: [{ relation_kind: 'r', relation_name: 'account' }],
+  };
+  const changed = {
+    ...snapshot,
+    columns: [{ ...snapshot.columns[0], data_type: 'bigint' }],
+  };
+
+  assert.notEqual(hashCatalogSnapshot(snapshot), hashCatalogSnapshot(changed));
+});

@@ -26,7 +26,9 @@ Useful commands:
 - `pnpm db:generate --name <description>` generates SQL after a schema change.
 - `pnpm db:migrations:check` validates the Drizzle journal.
 - `pnpm db:schema:fingerprint` prints a hash of public tables, columns,
-  constraints, indexes, and enums.
+  constraints, indexes, and enums. Physical column order is intentionally
+  excluded because PostgreSQL preserves column-creation history even when two
+  schemas are otherwise equivalent.
 
 Never edit an applied migration. The runner verifies that database history is
 an exact checksum-matching prefix of the checked-in history.
