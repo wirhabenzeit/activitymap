@@ -161,16 +161,12 @@ identities only. No credential value is recorded in this document.
 
 ### GitHub
 
-- A `Production` environment exists, has no protection rules, and contains no
-  environment secrets.
-- Repository Actions secrets currently include `CRON_SECRET` plus obsolete or
-  currently unreferenced Mapbox, Strava-client, and Supabase names. Only
-  `CRON_SECRET` is referenced by a workflow in the current repository.
-- Repository Actions variables include `ALLOWED_ATHLETES` and a
-  secret-looking `CIPHERKEY`. Neither has a current repository consumer.
-  Because Actions variables are plaintext configuration rather than secrets,
-  confirm their history and rotate/remove `CIPHERKEY` rather than merely
-  moving its existing value.
+- The `Production` environment now restricts deployments to `main`, requires
+  approval, and contains the direct `MIGRATION_DATABASE_URL` plus expected
+  host, database, and Neon branch guards.
+- The obsolete repository-level Mapbox, Strava-client, and Supabase secrets
+  and the unused `ALLOWED_ATHLETES`/`CIPHERKEY` variables were removed.
+  `CRON_SECRET` remains because the scheduled sync workflow consumes it.
 
 ## Target environment matrix
 
@@ -235,15 +231,14 @@ creation and the PR #137 runtime preference for `NEON_DATABASE_URL` are
 verified. Application validation accepts the managed variable, fails closed on
 Vercel when neither supported runtime URL is present, and no longer requires an
 unpooled URL. The legacy external Neon previews integration and its owned
-variables have been removed. Both manually configured unprefixed database URLs
-are Production-only, and a final fallback-free Preview redeployment selected
-`NEON_DATABASE_URL` and passed both Vercel checks. PR #138 implements an explicit
-Production-only opt-in for Strava OAuth/API calls, webhook handling, and cron,
-with the related credentials restricted to Production. Managed branch cleanup
-is tied to deletion of the final Vercel Preview deployment rather than directly
-to PR closure; the configured Deployment Retention policy still needs to be
-observed deleting a deployment and its matching Neon branch before Phase 2 is
-complete.
+variables have been removed. The manually configured unprefixed database URLs
+and obsolete `POSTGRES_*`/`PG*` compatibility variables have also been removed;
+Production and Preview both use only the managed `NEON_*` runtime variables.
+PR #138 implements an explicit Production-only opt-in for Strava OAuth/API
+calls, webhook handling, and cron, with the related credentials restricted to
+Production. Five stale merged-PR branches were deleted, leaving `main`, the
+manual `preview` branch, and the dated recovery branch. Automatic expiration or
+retention-driven cleanup remains a separate lifecycle improvement.
 
 ### Phase 3: Replayable migration baseline
 
@@ -302,14 +297,12 @@ Exit criterion: a fresh clone needs neither `db:push` nor manual SQL.
 
 ### Phase 5: Production migration runner
 
-The manual `Production database migration` workflow is checked in but remains
-inert until the GitHub `Production` environment receives its direct migration
-credential, expected host/database/Neon branch variables, and deliberate
-approval protection. It supports read-only status/fingerprint operations,
-verified baseline adoption, and locked migration application.
+The `Production database migration` workflow is active behind the protected
+GitHub `Production` environment. It has a verified direct credential and exact
+host/database/Neon branch guards. Manual status and baseline-adoption runs have
+completed successfully.
 
-Start with a manually dispatched workflow protected by the GitHub `Production`
-environment. It must:
+The workflow:
 
 1. use only `MIGRATION_DATABASE_URL`;
 2. reject pooled URLs;
@@ -320,8 +313,10 @@ environment. It must:
 7. migrate and run a health query;
 8. record the commit SHA and final status.
 
-Enable automatic execution only after several successful manual runs and only
-for expand/contract-compatible changes.
+Changes under `drizzle/**` on `main` now queue the migration operation
+automatically, but the Production environment approval remains mandatory.
+Application changes must still use expand/backfill/switch/contract ordering
+because Vercel deployment and GitHub workflow execution are independent.
 
 Exit criterion: the runner fails closed when its target, baseline, or lock is
 wrong.
@@ -340,6 +335,12 @@ After healthy Production and Preview redeployments:
 2. remove obsolete GitHub secrets;
 3. rotate credentials where their provenance or exposure warrants it;
 4. document ownership and rotation for every remaining secret.
+
+Completed 2026-09-19: the obsolete Vercel database/OpenAI variables, unused
+GitHub Actions secrets, and unused repository variables were removed. The Neon
+owner credential was rotated, Production redeployed successfully, and the
+guarded migration status workflow confirmed one applied and zero pending
+migrations.
 
 ## Dashboard audit checklist
 
@@ -373,6 +374,5 @@ Record only presence and scope, never values.
 - Workflow permissions
 - Whether migration jobs are manual or automatic
 
-As of the initial audit, the GitHub `Production` environment exists but has no
-environment secrets configured. No production migration workflow should be
-enabled until its protections and migration credential are set deliberately.
+The GitHub `Production` environment is configured and verified. Automatic
+workflow creation does not remove its approval requirement.

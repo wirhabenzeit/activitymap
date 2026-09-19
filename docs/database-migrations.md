@@ -48,6 +48,27 @@ Schema changes should use expand/backfill/switch/contract migrations. A pull
 request that starts using a new column must not deploy before its additive
 migration is safe to run.
 
+### Vercel Preview databases
+
+Every Vercel Preview build runs `pnpm db:migrate:preview` before `next build`.
+The command is inert outside Vercel Preview. In Preview it uses the
+branch-specific `NEON_DATABASE_URL_UNPOOLED` supplied by the managed Neon
+integration, applies pending migrations under the normal advisory lock, and
+then lets the application build continue.
+
+Configure `MIGRATION_FORBIDDEN_BRANCH_ID` in the Vercel Preview environment to
+the Neon Production branch ID. The Preview runner fails closed unless all of
+the following are true:
+
+- `VERCEL_ENV` is `preview`;
+- `VERCEL_GIT_COMMIT_REF` is not the Production git branch (`main` by default);
+- the connection is a direct Neon endpoint;
+- the connected database is not the configured Production branch.
+
+This deliberately makes a broken migration fail the Preview deployment. It
+does not grant Preview builds a separate credential: it reuses only the
+ephemeral branch credential that the Neon integration injects for that build.
+
 ## Existing database baseline adoption
 
 The initial `0000_baseline` creates the canonical schema from scratch. Existing
@@ -69,8 +90,12 @@ fingerprint and the complete migration SHA-256.
 
 ## Production
 
-Production uses the manually dispatched `Production database migration`
-workflow and the protected GitHub `Production` environment. Configure:
+Production uses the `Production database migration` workflow and the protected
+GitHub `Production` environment. A push to `main` that changes `drizzle/**`
+starts the workflow automatically with the `migrate` operation, but the job
+still waits for an explicit Production-environment approval. The workflow also
+supports manual dispatch for status, fingerprint, migration, and baseline
+adoption. Configure:
 
 - secret `MIGRATION_DATABASE_URL`: direct, unpooled migration-role connection;
 - variable `MIGRATION_EXPECTED_HOST`: exact hostname from that URL;
@@ -83,5 +108,10 @@ health query, and records the commit and outcome in the workflow summary.
 
 Use `status` and `fingerprint` freely. `migrate` requires the confirmation text
 `MIGRATE`. `adopt-baseline` requires the full `migrationSha256` from the
-baseline manifest. Do not configure the migration secret until the Production
-environment has deliberate approval protection.
+baseline manifest.
+
+Because Vercel and GitHub react independently to a merge, automatic workflow
+creation is not a deployment-ordering guarantee. Keep using expand/backfill/
+switch/contract changes. Merge an additive migration before merging code that
+requires it, approve the Production migration, and only then deploy the
+dependent application change.

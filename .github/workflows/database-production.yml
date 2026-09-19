@@ -1,6 +1,10 @@
 name: Production database migration
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'drizzle/**'
   workflow_dispatch:
     inputs:
       operation:
@@ -34,8 +38,8 @@ jobs:
       MIGRATION_EXPECTED_DATABASE: ${{ vars.MIGRATION_EXPECTED_DATABASE }}
       MIGRATION_EXPECTED_HOST: ${{ vars.MIGRATION_EXPECTED_HOST }}
       MIGRATION_REQUIRE_TARGET_GUARDS: 'true'
-      REQUESTED_CONFIRMATION: ${{ inputs.confirmation }}
-      REQUESTED_OPERATION: ${{ inputs.operation }}
+      REQUESTED_CONFIRMATION: ${{ github.event_name == 'push' && 'MIGRATE' || inputs.confirmation }}
+      REQUESTED_OPERATION: ${{ github.event_name == 'push' && 'migrate' || inputs.operation }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -47,16 +51,16 @@ jobs:
       - name: Show target and pending migrations
         run: pnpm db:migrate:status
       - name: Fingerprint live schema
-        if: ${{ inputs.operation == 'fingerprint' }}
+        if: ${{ env.REQUESTED_OPERATION == 'fingerprint' }}
         run: pnpm db:schema:fingerprint
       - name: Apply pending migrations
-        if: ${{ inputs.operation == 'migrate' }}
+        if: ${{ env.REQUESTED_OPERATION == 'migrate' }}
         run: |
           test "$REQUESTED_CONFIRMATION" = "MIGRATE"
           pnpm db:migrate
           pnpm db:migrate:check
       - name: Adopt verified baseline
-        if: ${{ inputs.operation == 'adopt-baseline' }}
+        if: ${{ env.REQUESTED_OPERATION == 'adopt-baseline' }}
         run: |
           pnpm db:baseline:adopt -- --confirm "$REQUESTED_CONFIRMATION"
           pnpm db:migrate:check
