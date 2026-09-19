@@ -119,15 +119,21 @@ This work is independent of SwiftUI and should be the first implementation PR.
 
 ### 2. A session credential is accepted in a query string
 
-`/api/db` accepts `?session=...` and logs the supplied token and session.
+Before [#117](https://github.com/wirhabenzeit/activitymap/issues/117),
+`/api/db` accepted `?session=...` and logged the supplied token and session.
 Credentials in URLs can appear in browser history, analytics, proxy logs, and
-server logs.
+server logs, so that behavior was removed as part of the security baseline.
 
-Required correction:
+Implemented baseline:
 
-- remove query-string session authentication;
-- accept only the normal secure cookie or an `Authorization: Bearer` header;
-- redact authentication headers, tokens, and personal activity data from logs.
+- `/api/db` resolves sessions from request headers only; a regression test
+  proves that `?session=...` cannot authenticate a request;
+- normal secure cookies and signed `Authorization: Bearer` sessions remain the
+  only supported request credentials;
+- server logging centrally redacts authentication headers, tokens, webhook
+  verification secrets, and personal activity data;
+- diagnostic scripts select only non-secret webhook metadata and send errors
+  through the same redacting logger.
 
 ### 3. Server Actions are being used as the data API
 
