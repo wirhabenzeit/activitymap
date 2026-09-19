@@ -177,22 +177,27 @@ Required correction:
 ### 6. Strava retention rules affect the offline design
 
 The current Strava API Policy limits cached Strava data to seven days and
-requires deleted data to stop being displayed within 48 hours. This should be
-confirmed for the intended product and encoded as an explicit retention policy,
-not left as an implementation detail.
+requires deleted data to stop being displayed within 48 hours. ActivityMap's
+adopted product interpretation is that a complete periodic reconciliation of
+the paginated activity-summary feed, combined with durable webhook handling,
+renews the actively authorized athlete's cached dataset. It does not require a
+weekly detail fetch for every historical activity.
 
-This has been confirmed and recorded in
+This adopted interpretation is recorded in
 [`strava-data-policy.md`](strava-data-policy.md), which also selects the
 canonical server-side representation for Strava OAuth tokens and reviews the
 existing public sharing behavior.
 
 Required correction:
 
-- record `lastValidatedAt` and `expiresAt` for cached datasets;
-- require a refresh or purge after the permitted cache window;
+- record `lastSummaryReconciledAt` and advance it only after a complete
+  paginated summary scan;
+- compare returned summaries and selectively refresh detail only for
+  materially changed activities or features that require it; Strava's
+  `SummaryActivity` does not provide an `updated_at` field;
 - process delete and deauthorization webhooks with high priority;
-- make the iOS app refuse to display expired Strava-derived data until it has
-  been refreshed, if that is the policy interpretation adopted for the product;
+- propagate dataset freshness and tombstones through the native change feed
+  without imposing per-activity seven-day detail refreshes on the iOS client;
 - review the existing public sharing behavior against the current policy before
   exposing it in the native client.
 
@@ -471,8 +476,8 @@ Estimated effort: 3–5 developer days.
 - Add per-session and per-user API rate limits.
 - Add request IDs, structured redacted logs, job metrics, and sync lag metrics.
 - Add OpenAPI compatibility checks in CI.
-- Test large accounts, pagination, token expiry, revoked Strava access, stale
-  mobile cursors, and seven-day offline expiry.
+- Test large accounts, resumable summary reconciliation, page-boundary
+  stability, token expiry, revoked Strava access, and stale mobile cursors.
 - Write the operational runbook for webhook backlog and forced rebootstrap.
 
 Exit criteria:
@@ -526,7 +531,8 @@ approximately **12–18 developer days**:
 
 The full preparation described above is approximately **23–40 developer days**,
 or roughly **5–8 weeks for one developer**, depending mainly on mobile OAuth,
-webhook job infrastructure, test fixtures, and the retention-policy decision.
+webhook job infrastructure, test fixtures, and large-account reconciliation
+volume.
 
 These estimates exclude SwiftUI screen implementation, Mapbox offline-region
 UX, App Store work, and production privacy/legal review.

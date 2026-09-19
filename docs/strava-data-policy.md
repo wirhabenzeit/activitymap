@@ -47,55 +47,55 @@ These are binding constraints on the product, not merely on the SwiftUI
 client, so the rules below apply to both the existing web app and the future
 native app.
 
-## 2. Cache duration and staleness: `lastValidatedAt` / `expiresAt`
+## 2. Cache freshness through summary reconciliation
 
-**Decision**: every Strava-derived record (activities, photos, and the
-athlete profile) carries two timestamps once the sync layer ([#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123))
-adds them:
+**Product interpretation**: an actively authorized athlete's activity cache
+is kept current by combining durable webhook processing with a complete,
+periodic reconciliation of Strava's paginated `GET /athlete/activities`
+summary feed. Completing that reconciliation at least once in each seven-day
+window renews the cached activity dataset. It does **not** require fetching
+the detailed representation of every historical activity every seven days.
 
-- `lastValidatedAt`: the last time the record's contents were confirmed
-  against the Strava API — either by a direct fetch/refresh or by processing
-  a webhook event that carries the current state of that record. Any value
-  written by the batch sync/verification jobs (`src/server/strava/sync.ts`,
-  `src/server/strava/verification.ts`) or by webhook processing
-  (`src/server/strava/webhook.ts`) counts as validation.
-- `expiresAt`: `lastValidatedAt + 7 days`. This is the enforced cache-duration
-  ceiling from §1, not a soft hint.
+This is the interpretation ActivityMap is adopting for implementation. It is
+consistent with operating the database as a synchronized application cache
+rather than an unmaintained archive. Deauthorization, explicit deletion, and
+loss of visibility still require prompt removal as described in §3.
 
-Semantics:
+The sync layer ([#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123)) should implement the following model:
 
-- A record with `now() > expiresAt` is **stale**. Stale records must not be
-  served to a client (web or iOS) without first being re-validated. In
-  practice this means the read path either (a) refreshes the record from
-  Strava synchronously before responding, or (b) responds with a
-  `stale`/`refresh_required` signal and lets the client decide whether to
-  show a "last synced N days ago, offline" indicator or trigger a refresh —
-  the choice belongs to whichever issue implements the read path ([#123](https://github.com/wirhabenzeit/activitymap/issues/123)
-  for the sync API, existing Server Actions for the web app today), but
-  **silently continuing to display data past `expiresAt` is not permitted**.
-- A record that Strava reports as gone (activity/photo no longer resolvable,
-  `notFoundIds` in `fetchStravaActivities`) must be removed from local
-  storage immediately regardless of `expiresAt`, per the "no longer
-  available" clause in §1. `processWebhookEvent`'s existing delete-on-404
-  handling (`src/server/strava/webhook.ts:72-104`) already implements this
-  for the activity case; it should be treated as the template for any other
-  resource type added later.
-- Offline/local caches (IndexedDB on web, SQLite on iOS) are bound by the
-  same 7-day ceiling as the server cache — the API Agreement does not
-  distinguish server-side and client-side caches. `src/lib/offline/db.ts`
-  currently stores `lastUpdatedMs` per row but nothing reads it to expire
-  entries, and `src/hooks/use-activities.ts` sets
-  `staleTime: Infinity, gcTime: Infinity`, i.e. the web offline cache today
-  has no enforced expiry. This is a known gap; closing it (both purging
-  entries older than 7 days and wiring up the already-defined but unused
-  `clearCachedUserScope` helper for logout/account switch) is in scope for
-  the offline sync work in [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#126](https://github.com/wirhabenzeit/activitymap/issues/126), not this issue, and is recorded here so it is
-  covered by that work's acceptance criteria.
+- Store `lastSummaryReconciledAt` for each athlete. Advance it only after a
+  complete paginated summary scan succeeds, using the existing
+  `per_page: 200` request size; a partial scan must remain resumable and must
+  not claim the dataset is current.
+- Use a stable upper bound for each scan so newly-created activities do not
+  shift page boundaries while older pages are being processed.
+- Upsert every returned summary and compare its summary fields with the
+  stored version. Strava's documented `SummaryActivity` schema does not
+  expose an `updated_at` field, so change detection must compare a stable
+  summary fingerprint or the relevant fields directly.
+- When a summary materially changes, mark any cached detailed representation
+  as needing refresh and selectively fetch that activity if the affected
+  feature needs detailed data. Do not perform detail fetches solely because
+  time has passed.
+- Treat an activity missing from a completed scan as a deletion, privacy, or
+  authorization candidate. Confirm it selectively when necessary, then
+  purge it if Strava reports it unavailable.
+- Use webhooks as the prompt path between reconciliations: delete events
+  purge immediately; create/update events upsert the supplied changes and
+  fetch the affected activity only when the application needs fields not
+  present in the event or cached summary. Receiving no webhook is not, by
+  itself, a complete reconciliation.
 
-Adding the `lastValidatedAt`/`expiresAt` columns themselves is deferred to
-the sync/change-feed migration ([#122](https://github.com/wirhabenzeit/activitymap/issues/122)) so that they land alongside the
-other schema changes that migration already needs to make, rather than as an
-independent, unreviewed schema change here.
+Offline clients receive the server's `lastSummaryReconciledAt` with their
+bootstrap/change feed and request synchronization when connectivity returns.
+They do not expire or individually refetch every activity on a seven-day
+timer. Logout, account switching, deauthorization, and server tombstones must
+still clear the applicable IndexedDB/SQLite data promptly.
+
+The reconciliation timestamp, summary fingerprint/change marker, and
+client-freshness metadata are deferred to the sync/change-feed migration
+([#122](https://github.com/wirhabenzeit/activitymap/issues/122)) so they land
+with its other schema changes.
 
 ## 3. Deletion and deauthorization: required handling and current gap
 
@@ -311,8 +311,9 @@ Implemented now:
 
 Defined here, implemented by later issues in the [#115](https://github.com/wirhabenzeit/activitymap/issues/115) epic:
 
-- `lastValidatedAt`/`expiresAt` columns and enforcement (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123).
-- Offline-cache expiry and scoped-clear wiring (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#126](https://github.com/wirhabenzeit/activitymap/issues/126).
+- Periodic paginated summary reconciliation, summary change detection, and
+  dataset freshness metadata (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123).
+- Offline freshness propagation and scoped-clear wiring (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#126](https://github.com/wirhabenzeit/activitymap/issues/126).
 - Deauthorization handling, priority processing, 30-day erasure (§3) →
   [#124](https://github.com/wirhabenzeit/activitymap/issues/124)/[#125](https://github.com/wirhabenzeit/activitymap/issues/125).
 - Switch/contract steps for token columns (§4) → alongside [#120](https://github.com/wirhabenzeit/activitymap/issues/120)/[#121](https://github.com/wirhabenzeit/activitymap/issues/121).
