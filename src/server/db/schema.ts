@@ -11,10 +11,12 @@ import {
   varchar,
   bigint,
   primaryKey,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 import { sportTypes } from '~/server/strava/types';
 import type { SportType } from '~/server/strava/types';
+import type { WebhookRequest } from '~/types/strava';
 
 export const sportTypeEnum = pgEnum('sport_type', sportTypes);
 
@@ -288,13 +290,85 @@ export type ActivitySync = typeof activitySync.$inferSelect;
 export type ActivityDeletion = typeof activityDeletions.$inferSelect;
 export type PhotoDeletion = typeof photoDeletions.$inferSelect;
 
-export const stravaWebhooks = pgTable('strava_webhooks', {
-  id: text('id').notNull().primaryKey(),
-  subscriptionId: integer('subscription_id'),
-  verifyToken: text('verify_token').notNull(),
-  callbackUrl: text('callback_url').notNull().unique(),
-  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
-});
+// Canonical record of our Strava webhook subscription. The columns below
+// (`resourceState`, `applicationId`, `verified`, `active`, and the unique
+// index on `subscriptionId`) mirror what the legacy `webhook` table (Strava's
+// own subscription metadata, see above) also tracks. This is an additive,
+// expand-only step toward consolidating the two (see issue #124): the
+// legacy `webhook` table is intentionally left in place and unused code
+// paths are removed separately, once nothing depends on it (see
+// docs/swiftui-backend-preparation-plan.md's expand/backfill/switch/contract
+// rollout rule — dropping it is a later, separate "contract" change).
+export const stravaWebhooks = pgTable(
+  'strava_webhooks',
+  {
+    id: text('id').notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+    subscriptionId: bigint('subscription_id', { mode: 'number' }),
+    verifyToken: text('verify_token').notNull(),
+    callbackUrl: text('callback_url').notNull().unique(),
+    resourceState: integer('resource_state'),
+    applicationId: integer('application_id'),
+    verified: boolean('verified').notNull().default(false),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('strava_webhooks_subscription_id_idx').on(table.subscriptionId),
+  ],
+);
+
+export type StravaWebhookSubscription = typeof stravaWebhooks.$inferSelect;
+
+export const webhookEventStatusEnum = pgEnum('webhook_event_status', [
+  'pending',
+  'processing',
+  'succeeded',
+  'failed',
+  'dead_letter',
+]);
+
+// Durable inbox for inbound Strava webhook deliveries (see issue #124). A
+// unique key on (subscriptionId, objectType, objectId, aspectType,
+// eventTime) makes duplicate Strava deliveries create exactly one row.
+// This table is purely additive in this migration; the application code
+// that reads/writes it lands in a follow-up change once this migration has
+// shipped.
+export const stravaWebhookEvents = pgTable(
+  'strava_webhook_events',
+  {
+    id: text('id').notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+    subscriptionId: bigint('subscription_id', { mode: 'number' }).notNull(),
+    objectType: text('object_type').notNull(),
+    objectId: bigint('object_id', { mode: 'number' }).notNull(),
+    aspectType: text('aspect_type').notNull(),
+    ownerId: bigint('owner_id', { mode: 'number' }).notNull(),
+    eventTime: timestamp('event_time', { mode: 'date' }).notNull(),
+    payload: jsonb('payload').$type<WebhookRequest>().notNull(),
+    status: webhookEventStatusEnum('status').notNull().default('pending'),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { mode: 'date' })
+      .defaultNow()
+      .notNull(),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('strava_webhook_events_delivery_idx').on(
+      table.subscriptionId,
+      table.objectType,
+      table.objectId,
+      table.aspectType,
+      table.eventTime,
+    ),
+    index('strava_webhook_events_status_idx').on(
+      table.status,
+      table.nextAttemptAt,
+    ),
+  ],
+);
+
+export type StravaWebhookEventRow = typeof stravaWebhookEvents.$inferSelect;
 
 export { sportTypes, type SportType };

@@ -8,6 +8,13 @@
       "when": 1789825473579,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789852174455,
+      "tag": "0001_strava_webhook_inbox_additive",
+      "breakpoints": true
     }
   ]
 }
