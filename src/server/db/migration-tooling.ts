@@ -308,7 +308,24 @@ function normalizeCatalogRows(
 }
 
 export function hashCatalogSnapshot(snapshot: CatalogSnapshot): string {
-  return createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
+  // PostgreSQL preserves the physical order in which columns were added, but
+  // that order does not affect queries, constraints, or application behavior.
+  // Existing databases can therefore be semantically identical to a freshly
+  // materialized baseline while reporting different ordinal positions.
+  const semanticSnapshot = {
+    columns: normalizeCatalogRows(
+      snapshot.columns.map(
+        ({ ordinal_position: _ordinalPosition, ...column }) => column,
+      ),
+    ),
+    constraints: normalizeCatalogRows(snapshot.constraints),
+    enums: normalizeCatalogRows(snapshot.enums),
+    indexes: normalizeCatalogRows(snapshot.indexes),
+    relations: normalizeCatalogRows(snapshot.relations),
+  };
+  return createHash('sha256')
+    .update(JSON.stringify(semanticSnapshot))
+    .digest('hex');
 }
 
 export async function fingerprintPublicSchema(
