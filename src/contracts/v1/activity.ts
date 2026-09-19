@@ -9,10 +9,14 @@ import { idString, isoDateTime, toIdString, toIsoDateTime } from './primitives';
  * Drizzle `Activity` row itself (see issue #119/#116). Field names are kept
  * snake_case to match the existing web client and Strava's own vocabulary;
  * only the transport encoding (ids, dates) changes.
+ *
+ * `public_id` is deliberately excluded: it is a deterministic, guessable
+ * capability token for the legacy sharing feature that issue #132 plans to
+ * retire in favor of a random, revocable, hashed token, and has no other
+ * use as a general activity attribute for a native client.
  */
 export const activityDTOSchema = z.object({
   id: idString,
-  public_id: idString,
   athlete: idString,
   name: z.string(),
   description: z.string().nullable(),
@@ -74,7 +78,6 @@ export type ActivityDTO = z.infer<typeof activityDTOSchema>;
 export function toActivityDTO(activity: Activity): ActivityDTO {
   return activityDTOSchema.parse({
     id: toIdString(activity.id),
-    public_id: toIdString(activity.public_id),
     athlete: toIdString(activity.athlete),
     name: activity.name,
     description: activity.description,

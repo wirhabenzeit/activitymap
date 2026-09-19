@@ -62,11 +62,15 @@ const fixtureActivity: Activity = {
 void test('toActivityDTO encodes large ids as strings and dates as ISO 8601', () => {
   const dto = toActivityDTO(fixtureActivity);
   assert.equal(dto.id, '12345678901234');
-  assert.equal(dto.public_id, '42');
   assert.equal(dto.athlete, '123456789');
   assert.equal(dto.start_date, '2024-01-31T08:00:00.000Z');
   assert.equal(dto.last_updated, '2024-01-31T10:00:00.000Z');
   assert.equal(typeof dto.id, 'string');
+});
+
+void test('toActivityDTO excludes the legacy public_id capability token', () => {
+  const dto = toActivityDTO(fixtureActivity);
+  assert.equal('public_id' in dto, false);
 });
 
 void test('toActivityDTO never leaks a null last_updated as anything but null', () => {
