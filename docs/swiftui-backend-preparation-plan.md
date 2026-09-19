@@ -181,6 +181,11 @@ requires deleted data to stop being displayed within 48 hours. This should be
 confirmed for the intended product and encoded as an explicit retention policy,
 not left as an implementation detail.
 
+This has been confirmed and recorded in
+[`strava-data-policy.md`](strava-data-policy.md), which also selects the
+canonical server-side representation for Strava OAuth tokens and reviews the
+existing public sharing behavior.
+
 Required correction:
 
 - record `lastValidatedAt` and `expiresAt` for cached datasets;
