@@ -44,3 +44,14 @@ Map, list, and analyze all your Strava activities.
 - `src/server` — Strava sync, offline import, and database access
 - `src/store` — client-side state (Zustand)
 - `src/cron` — scheduled sync jobs
+
+## Local database
+
+```bash
+docker compose up -d
+pnpm db:migrate
+```
+
+Schema changes use checked-in Drizzle migrations; `db:push` is intentionally
+not supported. See [Database migrations](docs/database-migrations.md) for the
+local, CI, baseline-adoption, and Production workflows.

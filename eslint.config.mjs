@@ -4,6 +4,9 @@ import drizzle from 'eslint-plugin-drizzle';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
+  {
+    ignores: ['.claude/**'],
+  },
   ...nextVitals,
   ...tseslint.configs.recommendedTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
