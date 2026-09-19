@@ -37,11 +37,19 @@ Per Strava's [API Agreement](https://www.strava.com/legal/api) and
   application must "promptly and permanently delete all Strava Data and
   Personal Data derived from Strava Data relating to that user," with
   deletion completed within **thirty (30) days**.
-- **Display is limited to the authenticated athlete**: §2.3 permits Strava
-  Data supplied by a user to be displayed or disclosed only to that same
-  user. §6.2 separately prohibits providing or displaying cached Strava Data
-  or an associated service to any third party. User consent does not create
-  an exception for public or user-to-user sharing inside a third-party app.
+- **Consent and third-party display are textually ambiguous**: §§2.3 and 6.2
+  describe display as limited to the authenticated athlete, while the API
+  Agreement summary and §5.13 prohibit sharing or granting another person
+  access *without* the athlete's prior explicit consent. Strava's
+  [support guidance](https://support.strava.com/en-us/articles/15401608-api-agreement-update-how-data-appears-on-3rd-party-apps)
+  states the authenticated-user-only rule more categorically. ActivityMap's
+  adopted product interpretation is that displaying one athlete's data to
+  other ActivityMap users, feeds, search results, or the public is prohibited,
+  but a private capability link deliberately created and shared by the athlete
+  for a selected subset is an athlete-directed disclosure with explicit
+  consent, not ActivityMap displaying the data to other users. Because the
+  source texts pull in different directions, obtain written confirmation from
+  Strava before shipping the replacement sharing flow broadly.
 
 These are binding constraints on the product, not merely on the SwiftUI
 client, so the rules below apply to both the existing web app and the future
@@ -264,7 +272,7 @@ Nothing about it changes what crosses the server/client boundary. The raw
 account/session exposure was removed separately in
 [#116](https://github.com/wirhabenzeit/activitymap/issues/116).
 
-## 5. Public sharing review
+## 5. Athlete-directed private sharing review
 
 ### Current behavior
 
@@ -293,11 +301,27 @@ directly in a `/map` URL query string:
 
 ### Assessment against §1
 
-The existing feature is not permitted by the current Strava API Policy. §2.3
-allows a user's Strava Data to be shown only to that same user, and §6.2
-prohibits displaying cached Strava Data or an associated service to a third
-party. The fact that the athlete clicked "Share" does not create an exception.
-The implementation also has independent access-control weaknesses:
+The current wording is not cleanly resolved by consent alone. §§2.3 and 6.2
+state an authenticated-user-only display rule, while the API Agreement summary
+and §5.13 expressly frame third-party access *without prior explicit consent*
+as the prohibited case. ActivityMap adopts the following distinction:
+
+- ActivityMap must not independently display an athlete's data to another
+  ActivityMap user, put it into a social feed or search result, or expose it
+  through a generally accessible public-data endpoint.
+- When the authenticated athlete intentionally selects specific activities,
+  reviews what will be disclosed, creates a private link, and gives that link
+  to a recipient, the resulting disclosure is treated as the athlete's own
+  explicit, directed sharing action. Possession of the unguessable link is the
+  recipient's narrowly scoped capability; it does not make the data public or
+  make the recipient an ActivityMap user with access to the athlete's account.
+
+This is a product interpretation of ambiguous contract language, not a claim
+that Strava has expressly approved the design. The implementation should be
+presented to Strava for written confirmation before broad production rollout.
+
+Irrespective of that interpretation, the existing implementation does not
+provide an acceptable consent or access-control boundary:
 
 - "Entire profile" sharing has no bound on how much data or how far back it
   exposes, and the athlete cannot revoke it later. This is a materially
@@ -316,13 +340,32 @@ The implementation also has independent access-control weaknesses:
   synchronization, public sharing, and CSV export do not need to be part of
   the first native API" note already in the SwiftUI backend preparation
   plan).
-- **Disable the existing unauthenticated web sharing paths for Strava-derived
-  data.** Keeping them web-only does not make them compliant. This is an
-  urgent product remediation, not an optional enhancement to the native API.
-- Do not design a replacement public-share token system unless Strava grants
-  an explicit written exception or its policy changes. Cryptographically
-  random, scoped, revocable tokens would fix the current access-control
-  weaknesses, but they would not by themselves satisfy §§2.3 and 6.2.
+- **Retire the existing permanent sharing identifiers.** Whole-profile links
+  and deterministic `public_id` values are not valid capability tokens and do
+  not adequately express the athlete's intended scope.
+- Replace them through
+  [#132](https://github.com/wirhabenzeit/activitymap/issues/132) with a private
+  athlete-created capability link that:
+  - contains a cryptographically random token whose server-side value is
+    stored only as a hash;
+  - covers only activities explicitly selected in the creation flow;
+  - clearly lists the fields being disclosed and excludes sensitive/social
+    fields by default, including health data, comments, kudos, and precise
+    start/end locations;
+  - has a mandatory finite expiry, a bounded maximum lifetime, and immediate
+    athlete-controlled revocation;
+  - is not indexed, searchable, enumerable, or exposed to other ActivityMap
+    users, and does not grant API or account access;
+  - is invalidated when a selected activity is deleted or loses visibility,
+    and when the athlete deauthorizes ActivityMap.
+- The share-confirmation screen must explain that anyone possessing the link
+  can view the selected data until expiry or revocation. Creating the link is
+  a separate, affirmative action; ordinary OAuth consent or merely using the
+  application is not consent to share.
+- Seek written confirmation from Strava for this exact private-link flow. If
+  Strava rejects the interpretation, keep hosted recipient access disabled and
+  limit the feature to an athlete download/export that ActivityMap does not
+  continue to host for third parties.
 
 ## 6. Summary of what this issue changes vs. what it defines for later issues
 
@@ -342,5 +385,8 @@ Defined here, implemented by later issues in the [#115](https://github.com/wirha
 - Deauthorization handling, priority processing, 30-day erasure (§3) →
   [#124](https://github.com/wirhabenzeit/activitymap/issues/124)/[#125](https://github.com/wirhabenzeit/activitymap/issues/125).
 - Switch/contract steps for token columns (§4) → alongside [#120](https://github.com/wirhabenzeit/activitymap/issues/120)/[#121](https://github.com/wirhabenzeit/activitymap/issues/121).
-- Disable unauthenticated sharing of Strava-derived data (§5) → urgent
-  follow-up; do not add native sharing unless Strava explicitly permits it.
+- Replace permanent/guessable sharing with explicitly consented, scoped,
+  expiring private links (§5) →
+  [#132](https://github.com/wirhabenzeit/activitymap/issues/132); keep it out
+  of the initial native API and obtain Strava's written confirmation before a
+  broad production rollout.
