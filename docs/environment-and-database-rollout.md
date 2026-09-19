@@ -52,6 +52,55 @@ This table records names and consumers only. Never add values to this document.
 | `OPENAI_ASSISTANT_ID`                                                                                                    | No repository consumer found                              | Obsolete                                              | Confirm and retire                                                                                                                         |
 | `FRIFLYT_TRANSLATION_CACHE`, `OPENAI_MODEL`, `FRIFLYT_TRANSLATION_BATCH_SIZE`                                            | Friflyt enrichment script                                 | Optional script configuration                         | Document with the script, not as application runtime variables                                                                             |
 
+## Initial platform audit (2026-09-19)
+
+The following observations record names and scopes only. No credential values
+were copied or revealed.
+
+### Vercel
+
+- Project: `activity-map` in the `wirhabenzeit's projects` team, connected to
+  `wirhabenzeit/activitymap`.
+- The Vercel-managed Neon resource `neon-indigo-mountain` is connected to
+  `activity-map` with the scope **All Environments**. It supplies
+  `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, the five `PG*` variables, and the
+  seven `POSTGRES*` compatibility variables from one resource. This confirms
+  that Production and Preview currently resolve to the same database.
+- The manually configured project variables are also all scoped to **All
+  Environments**: `NEON_POSTGRES_URL`, `OPENAI_API_KEY`,
+  `OPENAI_ASSISTANT_ID`, `AUTH_SECRET`, `AUTH_STRAVA_ID`,
+  `AUTH_STRAVA_SECRET`, and `NEXT_PUBLIC_MAPBOX_TOKEN`.
+- No team Shared variables are linked to the project.
+- System environment variables are enabled.
+- Vercel Authentication is enabled with legacy standard protection, so
+  Preview deployments require a Vercel team login unless an explicit bypass
+  applies. This reduces public exposure but does not make sharing the
+  Production database safe.
+- The installed Neon product is the Vercel-managed database integration. It is
+  not currently the separate "Link Existing Neon Account" previews
+  integration described by the installation page.
+
+### Neon
+
+- Vercel identifies the resource as `neon-indigo-mountain`.
+- Opening the Neon console currently stops at required email verification, so
+  branch names, roles, restore coverage, and branch-expiration settings remain
+  unverified. Do not resend the verification email or alter the account as
+  part of a read-only audit without explicit approval.
+
+### GitHub
+
+- A `Production` environment exists, has no protection rules, and contains no
+  environment secrets.
+- Repository Actions secrets currently include `CRON_SECRET` plus obsolete or
+  currently unreferenced Mapbox, Strava-client, and Supabase names. Only
+  `CRON_SECRET` is referenced by a workflow in the current repository.
+- Repository Actions variables include `ALLOWED_ATHLETES` and a
+  secret-looking `CIPHERKEY`. Neither has a current repository consumer.
+  Because Actions variables are plaintext configuration rather than secrets,
+  confirm their history and rotate/remove `CIPHERKEY` rather than merely
+  moving its existing value.
+
 ## Target environment matrix
 
 | Environment        | Runtime database                                   | Migration connection                                   | External effects                                                    |
