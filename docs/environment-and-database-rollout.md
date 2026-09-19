@@ -29,8 +29,8 @@ This table records names and consumers only. Never add values to this document.
 
 | Variable                                                                                                                 | Current consumer                                          | Current assessment                                    | Target                                                                                                                                     |
 | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                                                                                                           | `src/server/db/index.ts`                                  | Actual application runtime database                   | Keep in Vercel, scoped separately to Production and Preview                                                                                |
-| `DATABASE_URL_UNPOOLED`                                                                                                  | `src/env.js` validation only on `main`                    | Required despite no runtime consumer                  | Remove from application validation and Vercel; replace with a GitHub-only migration credential                                             |
+| `DATABASE_URL`                                                                                                           | `src/server/db/connection.ts` compatibility fallback      | Production-only legacy runtime fallback               | Retire after the managed `NEON_DATABASE_URL` cutover is verified in Production                                                             |
+| `DATABASE_URL_UNPOOLED`                                                                                                  | No application consumer after PR #137                     | Production-only legacy dashboard variable             | Remove from Vercel; replace with a GitHub-only migration credential                                                                        |
 | `POSTGRES_URL`                                                                                                           | `drizzle.config.ts`; presence check in `drizzle/reset.ts` | Legacy schema-tooling name                            | Retire after migration tooling uses one explicit URL                                                                                       |
 | `POSTGRES_URL_NON_POOLING`                                                                                               | `src/env.js` validation only                              | Provider-generated duplicate                          | Retire from application configuration                                                                                                      |
 | `PGHOST`, `PGHOST_UNPOOLED`, `PGUSER`, `PGDATABASE`, `PGPASSWORD`                                                        | No direct repository consumer                             | Provider-generated compatibility variables            | Remove from validation; retain in a dashboard only if an external tool demonstrably needs them                                             |
@@ -90,10 +90,16 @@ identities only. No credential value is recorded in this document.
   at that point the application still consumed the unprefixed `DATABASE_URL`,
   so a runtime cutover remained necessary.
 - PR #137 changes the runtime preference to `NEON_DATABASE_URL`, retaining
-  `DATABASE_URL` as a temporary fallback. Its Preview build selected
-  `NEON_DATABASE_URL` and used managed branch
-  `preview/codex/neon-runtime-cutover` (`br-patient-shape-a2csvn17`). A clean
-  redeployment completed with both Vercel checks passing.
+  `DATABASE_URL` only as a Production-scoped compatibility fallback. It also
+  makes both runtime URL names optional during schema parsing but fails closed
+  on Vercel when neither is present, and removes `DATABASE_URL_UNPOOLED` from
+  application validation. Its Preview build used managed branch
+  `preview/codex/neon-runtime-cutover` (`br-patient-shape-a2csvn17`).
+- The manually configured `DATABASE_URL` and `DATABASE_URL_UNPOOLED` were then
+  restricted to **Production**. A final cache-free Preview redeployment
+  (`Fvp5phnZPHtLkB3ZHTozfvZ4XBUj`) completed successfully with both Vercel
+  checks passing, and its build logs show that the application selected
+  `NEON_DATABASE_URL`. Preview therefore has no unprefixed database fallback.
 - The manually configured project variables inspected during the audit are
   scoped to **All Environments**, including `OPENAI_API_KEY`,
   `OPENAI_ASSISTANT_ID`, `AUTH_SECRET`, `AUTH_STRAVA_ID`,
@@ -212,12 +218,14 @@ branch and cannot trigger production side effects.
 
 Current rollout state (2026-09-19): native Vercel-to-Neon Preview branch
 creation and the PR #137 runtime preference for `NEON_DATABASE_URL` are
-verified. The legacy external Neon previews integration and its owned variables
-have been removed. The next configuration change is to update application
-validation so `DATABASE_URL` is no longer mandatory, then remove the remaining
-all-environment unprefixed fallback from Preview scope. External-effect
-isolation and branch cleanup when a pull request closes remain separate required
-checks before Phase 2 is complete.
+verified. Application validation accepts the managed variable, fails closed on
+Vercel when neither supported runtime URL is present, and no longer requires an
+unpooled URL. The legacy external Neon previews integration and its owned
+variables have been removed. Both manually configured unprefixed database URLs
+are Production-only, and a final fallback-free Preview redeployment selected
+`NEON_DATABASE_URL` and passed both Vercel checks. External-effect isolation and
+branch cleanup when a pull request closes remain separate required checks before
+Phase 2 is complete.
 
 ### Phase 3: Replayable migration baseline
 
