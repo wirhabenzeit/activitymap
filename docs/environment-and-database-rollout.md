@@ -74,6 +74,11 @@ identities only. No credential value is recorded in this document.
   endpoint does not belong to any branch in the Vercel-managed Neon account,
   so a second Neon project or account is involved. Its ownership and lifecycle
   must be established before relying on it as the canonical Preview database.
+- Comparing two active pull-request overrides showed different endpoint
+  identities. The second Neon account is therefore providing per-PR isolation,
+  rather than sending all previews to one shared database. Its Preview parent,
+  synchronization with Production, cleanup policy, and credential ownership
+  remain unverified.
 - Vercel's Update Project Connection form offers deployment-time database
   branching for Preview, but the visible `NEON`-prefixed connection does not
   currently show that action as selected. Do not enable or replace it until
@@ -113,9 +118,10 @@ identities only. No credential value is recorded in this document.
   `main` head. It has no automatic expiration and showed zero usage immediately
   after creation.
 - Database roles and the separate Neon endpoint used by Preview remain to be
-  audited. The account's one-day history window makes the recovery branch an
-  important temporary safety measure; remove it only after the rollout is
-  verified.
+  audited. Per-PR endpoints are being provisioned outside this Vercel-managed
+  account, while Production remains here. The account's one-day history window
+  makes the recovery branch an important temporary safety measure; remove it
+  only after the rollout is verified.
 
 ### GitHub
 
