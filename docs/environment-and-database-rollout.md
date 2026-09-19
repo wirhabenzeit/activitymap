@@ -61,15 +61,30 @@ were copied or revealed.
 
 - Project: `activity-map` in the `wirhabenzeit's projects` team, connected to
   `wirhabenzeit/activitymap`.
-- The Vercel-managed Neon resource `neon-indigo-mountain` is connected to
-  `activity-map` with the scope **All Environments**. It supplies
-  `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, the five `PG*` variables, and the
-  seven `POSTGRES*` compatibility variables from one resource. This confirms
-  that Production and Preview currently resolve to the same database.
-- The manually configured project variables are also all scoped to **All
-  Environments**: `NEON_POSTGRES_URL`, `OPENAI_API_KEY`,
+- The Vercel-managed Neon resource `neon-indigo-mountain` has one visible
+  project connection scoped to **All Environments** with the custom prefix
+  `NEON`. That connection supplies the `NEON_*` compatibility variables.
+- The project also contains unprefixed, all-environment `DATABASE_URL` and
+  `DATABASE_URL_UNPOOLED` fallbacks plus branch-specific Preview overrides for
+  active pull-request branches. The branch-specific pairs are created at the
+  same time as their Preview deployments, including this audit's own branch.
+  This is strong evidence that Preview database branching is already active
+  for those deployments, but it is not proof of isolation until the target
+  Neon branch or PostgreSQL identity has been compared with Production.
+- Vercel's Update Project Connection form offers deployment-time database
+  branching for Preview, but the visible `NEON`-prefixed connection does not
+  currently show that action as selected. Do not enable or replace it until
+  the owner of the unprefixed branch-specific variables is understood; an
+  additional prefixed connection would not affect the application's current
+  `DATABASE_URL` consumer.
+- The manually configured project variables inspected during the audit are
+  scoped to **All Environments**, including `OPENAI_API_KEY`,
   `OPENAI_ASSISTANT_ID`, `AUTH_SECRET`, `AUTH_STRAVA_ID`,
-  `AUTH_STRAVA_SECRET`, and `NEXT_PUBLIC_MAPBOX_TOKEN`.
+  `AUTH_STRAVA_SECRET`, `NEXT_PUBLIC_MAPBOX_TOKEN`, `NEXT_PUBLIC_APP_URL`,
+  `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `STRAVA_WEBHOOK_VERIFY_TOKEN`,
+  `CRON_SECRET`, `NEXT_PUBLIC_ENV`, `VERCEL_ENV`, and `PUBLIC_URL`. These need
+  to be split by actual runtime scope; database cleanup alone will not prevent
+  Preview OAuth, webhook, or cron side effects.
 - No team Shared variables are linked to the project.
 - System environment variables are enabled.
 - Vercel Authentication is enabled with legacy standard protection, so
@@ -121,10 +136,13 @@ variable.
 1. Pause #133 and #135.
 2. Create a Neon recovery branch or restore point from Production.
 3. Audit Vercel variable names and scopes without copying their values.
-4. Remove production database variables from the Preview scope, then redeploy
-   an existing preview. A temporarily broken preview is safer than a preview
-   that writes Production.
-5. Confirm no Preview cron or webhook can run against Production.
+4. Verify that an active Preview's branch-specific `DATABASE_URL` identifies a
+   Neon branch distinct from Production. Do this by inspecting redacted branch
+   metadata or a PostgreSQL identity query; do not reveal connection strings.
+5. After that proof, remove the all-environment database fallback from Preview
+   scope and redeploy an existing preview. A temporarily broken preview is
+   safer than a preview that silently falls back to Production.
+6. Confirm no Preview cron or webhook can run against Production.
 
 Exit criterion: no Preview deployment can read or write Production.
 
