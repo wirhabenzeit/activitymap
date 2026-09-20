@@ -172,7 +172,7 @@ by Strava but ActivityMap kept the row, kept trying to use it (each such
 attempt failing at the Strava token endpoint), and never deleted their
 cached data.
 
-**Status (issue #125): implemented, with one execution step deferred.**
+**Status (issue #125): implemented.**
 `processWebhookEvent`'s `object_type: "athlete"` branch
 (`src/server/strava/webhook.ts`) now handles deauthorization per the
 required behavior above: transactionally and idempotently, it clears the
@@ -188,13 +188,13 @@ and dead-letters permanent ones — see that route and
 `src/server/strava/webhook-drain.ts` for the retry/backoff/dead-letter and
 reconciliation design.
 
-**Deferred**: this issue records that the 30-day erasure deadline is due and
-excludes the account from ordinary token refresh/sync (`getAccountInternal`
-never calls Strava for a revoked account), but it does not itself execute
-the erasure — no job yet deletes a revoked athlete's activities/photos/
-tokens when `scheduledErasureAt` arrives. A scheduled erasure-execution job
-reading `accounts.scheduledErasureAt` is the natural follow-up and is
-tracked as such rather than implemented here.
+The production-only `/api/cron/erase-revoked-athletes` route runs hourly via
+GitHub Actions. It reads due `scheduledErasureAt` markers in bounded batches,
+rechecks each marker under a database row lock, cancels erasure if a fresh
+Strava credential proves the athlete reconnected, and otherwise deletes the
+athlete's Strava-derived identity, cached activities/photos, tokens, sessions,
+change feed, tombstones, webhook payloads, and mobile login codes in one
+transaction. Overlapping or replayed runs are therefore safe no-ops.
 
 ## 4. Token storage: canonical representation and migration plan
 
@@ -403,16 +403,14 @@ Implemented now:
   deletion/deauthorization events, athlete-deauthorization handling
   (token-stop, `revokedAt`, `scheduledErasureAt`), and the reconciliation
   safety net for the inbox/drain system itself — see §3's "Status" note.
-  Executing the 30-day erasure once `scheduledErasureAt` arrives is not yet
-  implemented; see that note for what is deferred.
+  The hourly production erasure executor now also completes the 30-day
+  deletion once `scheduledErasureAt` arrives.
 
 Defined here, implemented by later issues in the [#115](https://github.com/wirhabenzeit/activitymap/issues/115) epic:
 
 - Periodic paginated summary reconciliation, summary change detection, and
   dataset freshness metadata (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123).
 - Offline freshness propagation and scoped-clear wiring (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#126](https://github.com/wirhabenzeit/activitymap/issues/126).
-- Scheduled execution of the 30-day full-erasure deletion once due (§3) →
-  follow-up issue (not yet filed).
 - Switch/contract steps for token columns (§4) → alongside [#120](https://github.com/wirhabenzeit/activitymap/issues/120)/[#121](https://github.com/wirhabenzeit/activitymap/issues/121).
 - Replace permanent/guessable sharing with explicitly consented, scoped,
   expiring private links (§5) →

@@ -70,6 +70,8 @@ jobs:
         run: pnpm db:migrate
       - name: Verify current migration state
         run: pnpm db:migrate:check
+      - name: Prove revoked-athlete erasure against Postgres
+        run: pnpm db:test-erasure
       - name: Prove a second migration run is a no-op
         run: pnpm db:migrate
       - name: Verify schema fingerprint
