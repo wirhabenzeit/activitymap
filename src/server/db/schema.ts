@@ -378,4 +378,44 @@ export const stravaWebhookEvents = pgTable(
 
 export type StravaWebhookEventRow = typeof stravaWebhookEvents.$inferSelect;
 
+// One-time codes for the mobile OAuth exchange (issue #121, see
+// docs/swiftui-backend-preparation-plan.md, "Authentication design"). A
+// row is created after the Strava OAuth round trip completes for a browser
+// session started by `/api/v1/auth/mobile/start`, and is consumed exactly
+// once by `POST /api/v1/auth/mobile/exchange`.
+//
+// `codeHash` (never the plaintext code) is what a lookup matches against,
+// the same "store a hash, not the secret" rule already used for Strava
+// webhook verification. `sessionBearerToken` holds the already-signed
+// Better Auth bearer session token that `/mobile/callback` obtained via
+// `getSessionCookie()` from the just-completed OAuth sign-in - this table
+// is what carries that value from the callback redirect (issue #121 does
+// not put it in the redirect URL or expose it before the code is
+// exchanged) through to the exchange response. It is cleared the moment
+// the row is consumed or found expired, so it never outlives the code's
+// own short TTL.
+export const mobileLoginCodes = pgTable(
+  'mobile_login_codes',
+  {
+    id: text('id').notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+    codeHash: text('code_hash').notNull(),
+    state: text('state').notNull(),
+    pkceChallenge: text('pkce_challenge').notNull(),
+    redirectUri: text('redirect_uri').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sessionBearerToken: text('session_bearer_token'),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+    consumedAt: timestamp('consumed_at', { mode: 'date' }),
+  },
+  (table) => [
+    uniqueIndex('mobile_login_codes_code_hash_idx').on(table.codeHash),
+    index('mobile_login_codes_expires_at_idx').on(table.expiresAt),
+  ],
+);
+
+export type MobileLoginCode = typeof mobileLoginCodes.$inferSelect;
+
 export { sportTypes, type SportType };
