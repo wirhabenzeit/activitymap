@@ -6,6 +6,28 @@
   },
   "components": {
     "schemas": {
+      "Authentication": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "cookie",
+              "bearer"
+            ]
+          },
+          "sessionExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "method",
+          "sessionExpiresAt"
+        ],
+        "additionalProperties": false
+      },
       "CurrentUser": {
         "type": "object",
         "properties": {
@@ -43,6 +65,9 @@
           },
           "stravaConnected": {
             "type": "boolean"
+          },
+          "authentication": {
+            "$ref": "#/components/schemas/Authentication"
           }
         },
         "required": [
@@ -51,7 +76,8 @@
           "email",
           "image",
           "athleteId",
-          "stravaConnected"
+          "stravaConnected",
+          "authentication"
         ],
         "additionalProperties": false
       },
@@ -840,7 +866,7 @@
         ],
         "additionalProperties": false
       },
-      "Error": {
+      "FailureResponse": {
         "type": "object",
         "properties": {
           "error": {
@@ -852,11 +878,20 @@
               "message": {
                 "type": "string"
               },
+              "retryable": {
+                "type": "boolean"
+              },
+              "requestId": {
+                "type": "string",
+                "minLength": 1
+              },
               "details": {}
             },
             "required": [
               "code",
-              "message"
+              "message",
+              "retryable",
+              "requestId"
             ],
             "additionalProperties": false
           }
@@ -870,8 +905,8 @@
         "type": "object",
         "properties": {
           "schemaVersion": {
-            "type": "number",
-            "const": 1
+            "type": "string",
+            "const": "1"
           },
           "serverTime": {
             "type": "string",
@@ -893,8 +928,8 @@
         "type": "object",
         "properties": {
           "schemaVersion": {
-            "type": "number",
-            "const": 1
+            "type": "string",
+            "const": "1"
           },
           "serverTime": {
             "type": "string",
@@ -935,8 +970,8 @@
         "type": "object",
         "properties": {
           "schemaVersion": {
-            "type": "number",
-            "const": 1
+            "type": "string",
+            "const": "1"
           },
           "serverTime": {
             "type": "string",
@@ -991,6 +1026,7 @@
   "paths": {
     "/api/v1/me": {
       "get": {
+        "operationId": "getCurrentUser",
         "summary": "Get the authenticated user",
         "security": [
           {
@@ -1016,7 +1052,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The server could not serialize a valid contract response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
                 }
               }
             }
@@ -1026,6 +1072,7 @@
     },
     "/api/v1/activities": {
       "get": {
+        "operationId": "listActivities",
         "summary": "List the authenticated user's activities",
         "security": [
           {
@@ -1073,7 +1120,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/FailureResponse"
                 }
               }
             }
@@ -1083,7 +1130,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/FailureResponse"
                 }
               }
             }
@@ -1093,6 +1140,7 @@
     },
     "/api/v1/photos": {
       "get": {
+        "operationId": "listPhotos",
         "summary": "List the authenticated user's photos",
         "security": [
           {
@@ -1140,7 +1188,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/FailureResponse"
                 }
               }
             }
@@ -1150,7 +1198,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/FailureResponse"
                 }
               }
             }

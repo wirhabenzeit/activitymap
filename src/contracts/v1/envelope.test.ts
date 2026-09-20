@@ -24,7 +24,7 @@ void test('responseEnvelope validates a matching payload', () => {
 void test('responseEnvelope rejects a mismatched schemaVersion', () => {
   const schema = responseEnvelope(z.object({ items: z.array(z.string()) }));
   const result = schema.safeParse({
-    schemaVersion: SCHEMA_VERSION + 1,
+    schemaVersion: '2',
     serverTime: new Date().toISOString(),
     data: { items: ['a'] },
   });

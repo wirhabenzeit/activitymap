@@ -1,4 +1,5 @@
 export * from './primitives';
+export * from './auth';
 export * from './error';
 export * from './pagination';
 export * from './envelope';

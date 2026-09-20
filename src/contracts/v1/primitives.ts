@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Bumped whenever a v1 DTO shape changes in a way a client should notice.
  * Included in every top-level v1 response envelope (see `envelope.ts`).
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = '1';
 
 /**
  * Potentially-large numeric identifiers (activity/photo/athlete ids can

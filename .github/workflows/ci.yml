@@ -23,6 +23,16 @@ jobs:
       - run: pnpm exec tsc --noEmit
       - run: pnpm lint
 
+  swift-client:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Generate and compile the Swift client
+        run: bash scripts/verify-swift-client.sh
+
   migrations:
     runs-on: ubuntu-24.04
     services:

@@ -13,8 +13,8 @@ export const responseEnvelope = <T extends z.ZodTypeAny>(data: T) =>
     data,
   });
 
-export const makeEnvelope = <T>(data: T) => ({
+export const makeEnvelope = <T>(data: T, now = new Date()) => ({
   schemaVersion: SCHEMA_VERSION,
-  serverTime: new Date().toISOString(),
+  serverTime: now.toISOString(),
   data,
 });

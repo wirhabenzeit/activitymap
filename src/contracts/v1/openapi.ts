@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SCHEMA_VERSION } from './primitives';
+import { authenticationDTOSchema } from './auth';
 import { activityDTOSchema } from './activity';
 import { photoDTOSchema } from './photo';
 import { currentUserDTOSchema } from './user';
@@ -13,22 +14,21 @@ import { paginatedSchema, MAX_PAGE_SIZE } from './pagination';
  * handlers validate against, so the checked-in document and the runtime
  * contract cannot drift silently (see issue #119).
  *
- * This documents the planned `/api/v1` surface as a contract, ahead of the
- * routes that implement it: `/api/v1/me`, `/api/v1/activities`, and
- * `/api/v1/photos` are not live yet (they need the Actor/session
- * resolution from #120 and #121), but publishing the contract now lets
- * native-client work start from a stable, generated Swift client instead
- * of waiting on those tickets. #120/#121/#123/#126 wire real route
- * handlers to this same contract as they land.
+ * `/api/v1/me` is the first live boundary using this contract. The activity,
+ * photo, and sync operations remain contract-first until their corresponding
+ * versioned routes land.
  */
 export function buildOpenApiDocument() {
   const registry = z.registry<{ id: string }>();
+  registry.add(authenticationDTOSchema, { id: 'Authentication' });
   registry.add(currentUserDTOSchema, { id: 'CurrentUser' });
   registry.add(activityDTOSchema, { id: 'Activity' });
   registry.add(photoDTOSchema, { id: 'Photo' });
   registry.add(offlineSyncPayloadDTOSchema, { id: 'OfflineSyncPayload' });
-  registry.add(errorEnvelopeSchema, { id: 'Error' });
-  registry.add(responseEnvelope(currentUserDTOSchema), { id: 'CurrentUserResponse' });
+  registry.add(errorEnvelopeSchema, { id: 'FailureResponse' });
+  registry.add(responseEnvelope(currentUserDTOSchema), {
+    id: 'CurrentUserResponse',
+  });
   registry.add(responseEnvelope(paginatedSchema(activityDTOSchema)), {
     id: 'ActivityPageResponse',
   });
@@ -57,7 +57,7 @@ export function buildOpenApiDocument() {
 
   const errorResponse = (description: string) => ({
     description,
-    content: { 'application/json': { schema: ref('Error') } },
+    content: { 'application/json': { schema: ref('FailureResponse') } },
   });
 
   const security = [{ cookieAuth: [] }, { bearerAuth: [] }];
@@ -88,20 +88,29 @@ export function buildOpenApiDocument() {
     paths: {
       '/api/v1/me': {
         get: {
+          operationId: 'getCurrentUser',
           summary: 'Get the authenticated user',
           security,
           responses: {
             '200': {
               description: 'The current user',
-              content: { 'application/json': { schema: ref('CurrentUserResponse') } },
+              content: {
+                'application/json': { schema: ref('CurrentUserResponse') },
+              },
             },
-            '401': errorResponse('No valid session or bearer credential was presented'),
+            '401': errorResponse(
+              'No valid session or bearer credential was presented',
+            ),
+            '500': errorResponse(
+              'The server could not serialize a valid contract response',
+            ),
           },
         },
       },
       '/api/v1/activities': {
         get: {
-          summary: 'List the authenticated user\'s activities',
+          operationId: 'listActivities',
+          summary: "List the authenticated user's activities",
           security,
           parameters: [
             {
@@ -126,16 +135,23 @@ export function buildOpenApiDocument() {
           responses: {
             '200': {
               description: 'A page of activities',
-              content: { 'application/json': { schema: ref('ActivityPageResponse') } },
+              content: {
+                'application/json': { schema: ref('ActivityPageResponse') },
+              },
             },
-            '400': errorResponse('The `cursor` or `limit` parameter is invalid'),
-            '401': errorResponse('No valid session or bearer credential was presented'),
+            '400': errorResponse(
+              'The `cursor` or `limit` parameter is invalid',
+            ),
+            '401': errorResponse(
+              'No valid session or bearer credential was presented',
+            ),
           },
         },
       },
       '/api/v1/photos': {
         get: {
-          summary: 'List the authenticated user\'s photos',
+          operationId: 'listPhotos',
+          summary: "List the authenticated user's photos",
           security,
           parameters: [
             {
@@ -160,10 +176,16 @@ export function buildOpenApiDocument() {
           responses: {
             '200': {
               description: 'A page of photos',
-              content: { 'application/json': { schema: ref('PhotoPageResponse') } },
+              content: {
+                'application/json': { schema: ref('PhotoPageResponse') },
+              },
             },
-            '400': errorResponse('The `cursor` or `limit` parameter is invalid'),
-            '401': errorResponse('No valid session or bearer credential was presented'),
+            '400': errorResponse(
+              'The `cursor` or `limit` parameter is invalid',
+            ),
+            '401': errorResponse(
+              'No valid session or bearer credential was presented',
+            ),
           },
         },
       },
