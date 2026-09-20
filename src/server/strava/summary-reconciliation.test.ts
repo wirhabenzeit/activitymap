@@ -271,7 +271,119 @@ void test('a bounded scan resumes with the same upper bound, confirms omissions,
   assert.deepEqual(repository.confirmations, [3]);
 });
 
-void test('a transient confirmation failure preserves the checkpoint for a later run', async () => {
+void test('a short non-empty Strava page does not terminate the scan', async () => {
+  const repository = fakeRepository();
+  const source: SummaryReconciliationSource = {
+    async listPage({ page }) {
+      return page === 1 ? [stravaActivity(1), stravaActivity(4)] : [];
+    },
+    async getActivity(id) {
+      return stravaActivity(id);
+    },
+  };
+
+  const result = await reconcileStravaSummaries({
+    now: NOW,
+    pageSize: 3,
+    pagesPerAthlete: 3,
+    repository,
+    resolveAccount: async () => ({
+      accessToken: 'token',
+      access_token: 'token',
+      revokedAt: null,
+    }) as Account,
+    createSource: () => source,
+  });
+
+  assert.equal(result.pages, 2);
+  assert.equal(result.summaries, 2);
+  assert.equal(result.completed, 1);
+  assert.deepEqual(repository.pageCalls, [1, 2]);
+});
+
+void test('the invocation time budget checkpoints and releases partial work', async () => {
+  const repository = fakeRepository();
+  let currentTime = 0;
+  const source: SummaryReconciliationSource = {
+    async listPage() {
+      currentTime = 45_000;
+      return [stravaActivity(1), stravaActivity(4)];
+    },
+    async getActivity(id) {
+      return stravaActivity(id);
+    },
+  };
+
+  const result = await reconcileStravaSummaries({
+    now: NOW,
+    pageSize: 2,
+    pagesPerAthlete: 3,
+    timeBudgetMs: 45_000,
+    clock: () => currentTime,
+    repository,
+    resolveAccount: async () => ({
+      accessToken: 'token',
+      access_token: 'token',
+      revokedAt: null,
+    }) as Account,
+    createSource: () => source,
+  });
+
+  assert.equal(result.pages, 1);
+  assert.equal(result.partial, 1);
+  assert.equal(result.stoppedForTimeBudget, 1);
+  assert.equal(result.stoppedForRateLimit, 0);
+  assert.equal(result.elapsedMs, 45_000);
+  assert.equal(repository.releases, 1);
+});
+
+void test('low Strava rate-limit headroom stops before another API request', async () => {
+  const repository = fakeRepository();
+  let rateLimitUsage: ReturnType<
+    NonNullable<SummaryReconciliationSource['getRateLimitUsage']>
+  > = null;
+  let requests = 0;
+  const source: SummaryReconciliationSource = {
+    async listPage() {
+      requests += 1;
+      rateLimitUsage = {
+        read: {
+          limit15Minutes: 100,
+          limitDaily: 1000,
+          usage15Minutes: 75,
+          usageDaily: 400,
+        },
+      };
+      return [stravaActivity(1), stravaActivity(4)];
+    },
+    async getActivity(id) {
+      return stravaActivity(id);
+    },
+    getRateLimitUsage: () => rateLimitUsage,
+  };
+
+  const result = await reconcileStravaSummaries({
+    now: NOW,
+    pageSize: 2,
+    pagesPerAthlete: 3,
+    repository,
+    resolveAccount: async () => ({
+      accessToken: 'token',
+      access_token: 'token',
+      revokedAt: null,
+    }) as Account,
+    createSource: () => source,
+  });
+
+  assert.equal(requests, 1);
+  assert.equal(result.pages, 1);
+  assert.equal(result.partial, 1);
+  assert.equal(result.failed, 0);
+  assert.equal(result.stoppedForRateLimit, 1);
+  assert.equal(repository.releases, 1);
+});
+
+void test('a Strava 429 preserves the checkpoint and yields without failing the cron', async () => {
   const repository = fakeRepository();
   const source: SummaryReconciliationSource = {
     async listPage() {
@@ -291,8 +403,10 @@ void test('a transient confirmation failure preserves the checkpoint for a later
     }) as Account,
     createSource: () => source,
   });
-  assert.equal(result.failed, 1);
+  assert.equal(result.failed, 0);
   assert.equal(result.completed, 0);
+  assert.equal(result.partial, 1);
+  assert.equal(result.stoppedForRateLimit, 1);
   assert.equal(repository.releases, 1);
   assert.deepEqual(repository.deletions, []);
 });

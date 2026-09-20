@@ -19,6 +19,63 @@ export interface StravaTokens {
   expires_in: number;
 }
 
+export interface StravaRateLimitWindow {
+  limit15Minutes: number;
+  limitDaily: number;
+  usage15Minutes: number;
+  usageDaily: number;
+}
+
+export interface StravaRateLimitUsage {
+  overall?: StravaRateLimitWindow;
+  read?: StravaRateLimitWindow;
+}
+
+function parseRateLimitPair(value: string | null): [number, number] | null {
+  if (!value) return null;
+  const values = value.split(',').map((part) => Number(part.trim()));
+  if (
+    values.length !== 2 ||
+    values.some((item) => !Number.isInteger(item) || item < 0)
+  ) {
+    return null;
+  }
+  return [values[0]!, values[1]!];
+}
+
+function parseRateLimitWindow(
+  limit: string | null,
+  usage: string | null,
+): StravaRateLimitWindow | null {
+  const parsedLimit = parseRateLimitPair(limit);
+  const parsedUsage = parseRateLimitPair(usage);
+  if (!parsedLimit || !parsedUsage) return null;
+  return {
+    limit15Minutes: parsedLimit[0],
+    limitDaily: parsedLimit[1],
+    usage15Minutes: parsedUsage[0],
+    usageDaily: parsedUsage[1],
+  };
+}
+
+export function parseStravaRateLimitUsage(
+  headers: Pick<Headers, 'get'>,
+): StravaRateLimitUsage | null {
+  const overall = parseRateLimitWindow(
+    headers.get('x-ratelimit-limit'),
+    headers.get('x-ratelimit-usage'),
+  );
+  const read = parseRateLimitWindow(
+    headers.get('x-readratelimit-limit'),
+    headers.get('x-readratelimit-usage'),
+  );
+  if (!overall && !read) return null;
+  return {
+    ...(overall ? { overall } : {}),
+    ...(read ? { read } : {}),
+  };
+}
+
 export class StravaApiError extends Error {
   constructor(
     message: string,
@@ -36,21 +93,25 @@ export class StravaClient {
   private clientId: string;
   private clientSecret: string;
   private tokenRefreshCallback?: (tokens: StravaTokens) => Promise<void>;
+  private rateLimitCallback?: (usage: StravaRateLimitUsage) => void;
 
   private constructor({
     accessToken,
     refreshToken,
     tokenRefreshCallback,
+    rateLimitCallback,
   }: {
     accessToken?: string;
     refreshToken?: string;
     tokenRefreshCallback?: (tokens: StravaTokens) => Promise<void>;
+    rateLimitCallback?: (usage: StravaRateLimitUsage) => void;
   }) {
     requireExternalEffectsEnabled();
 
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
     this.tokenRefreshCallback = tokenRefreshCallback;
+    this.rateLimitCallback = rateLimitCallback;
 
     // Parse environment variables for client credentials
     const clientId = process.env.AUTH_STRAVA_ID;
@@ -71,8 +132,13 @@ export class StravaClient {
   /**
    * Create a StravaClient with an access token for authenticated user operations
    */
-  static withAccessToken(accessToken: string): StravaClient {
-    return new StravaClient({ accessToken });
+  static withAccessToken(
+    accessToken: string,
+    {
+      onRateLimit,
+    }: { onRateLimit?: (usage: StravaRateLimitUsage) => void } = {},
+  ): StravaClient {
+    return new StravaClient({ accessToken, rateLimitCallback: onRateLimit });
   }
 
   /**
@@ -212,6 +278,8 @@ export class StravaClient {
       ...options,
       headers,
     });
+    const rateLimitUsage = parseStravaRateLimitUsage(response.headers);
+    if (rateLimitUsage) this.rateLimitCallback?.(rateLimitUsage);
 
     if (!response.ok) {
       const contentType = response.headers.get('content-type');

@@ -1,6 +1,8 @@
 import {
   DEFAULT_RECONCILIATION_BATCH_SIZE,
+  DEFAULT_PAGES_PER_ATHLETE,
   MAX_RECONCILIATION_BATCH_SIZE,
+  MAX_PAGES_PER_ATHLETE,
   type SummaryReconciliationRunResult,
 } from '~/server/strava/summary-reconciliation';
 
@@ -10,31 +12,50 @@ export interface SummaryReconciliationCronHandlerDependencies {
   getCronSecret: () => string | undefined;
   reconcile: (options: {
     batchSize: number;
+    pagesPerAthlete: number;
   }) => Promise<SummaryReconciliationRunResult>;
   onError?: (message: string, error?: unknown) => void;
 }
 
-async function parseBatchSize(request: Request): Promise<number | null> {
+type ReconciliationParameters = {
+  batchSize: number;
+  pagesPerAthlete: number;
+};
+
+async function parseParameters(
+  request: Request,
+): Promise<ReconciliationParameters | null> {
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return DEFAULT_RECONCILIATION_BATCH_SIZE;
+    return {
+      batchSize: DEFAULT_RECONCILIATION_BATCH_SIZE,
+      pagesPerAthlete: DEFAULT_PAGES_PER_ATHLETE,
+    };
   }
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
     return null;
   }
-  const value = (body as Record<string, unknown>).batchSize;
-  if (value === undefined) return DEFAULT_RECONCILIATION_BATCH_SIZE;
+  const batchSize =
+    (body as Record<string, unknown>).batchSize ??
+    DEFAULT_RECONCILIATION_BATCH_SIZE;
+  const pagesPerAthlete =
+    (body as Record<string, unknown>).pagesPerAthlete ??
+    DEFAULT_PAGES_PER_ATHLETE;
   if (
-    typeof value !== 'number' ||
-    !Number.isInteger(value) ||
-    value < 1 ||
-    value > MAX_RECONCILIATION_BATCH_SIZE
+    typeof batchSize !== 'number' ||
+    !Number.isInteger(batchSize) ||
+    batchSize < 1 ||
+    batchSize > MAX_RECONCILIATION_BATCH_SIZE ||
+    typeof pagesPerAthlete !== 'number' ||
+    !Number.isInteger(pagesPerAthlete) ||
+    pagesPerAthlete < 1 ||
+    pagesPerAthlete > MAX_PAGES_PER_ATHLETE
   ) {
     return null;
   }
-  return value;
+  return { batchSize, pagesPerAthlete };
 }
 
 export function createSummaryReconciliationCronHandler({
@@ -63,18 +84,20 @@ export function createSummaryReconciliationCronHandler({
       onError('Invalid cron secret provided for reconcile-strava-summaries');
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const batchSize = await parseBatchSize(request);
-    if (batchSize === null) {
+    const parameters = await parseParameters(request);
+    if (parameters === null) {
       return Response.json(
         {
-          error: `batchSize must be an integer between 1 and ${MAX_RECONCILIATION_BATCH_SIZE}`,
+          error:
+            `batchSize must be an integer between 1 and ${MAX_RECONCILIATION_BATCH_SIZE}; ` +
+            `pagesPerAthlete must be an integer between 1 and ${MAX_PAGES_PER_ATHLETE}`,
         },
         { status: 400 },
       );
     }
 
     try {
-      const result = await reconcile({ batchSize });
+      const result = await reconcile(parameters);
       if (result.failed > 0) {
         return Response.json(
           { error: 'One or more summary reconciliations failed', ...result },
