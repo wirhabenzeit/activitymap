@@ -52,32 +52,42 @@ function createFakeRepository(rows: StravaWebhookEventRow[]): WebhookEventsRepos
       return { ...claimed };
     },
 
-    async complete(id, now) {
-      const row = byId.get(id);
-      if (!row) return;
-      byId.set(id, {
+    async complete(lease, now) {
+      const row = byId.get(lease.id);
+      if (
+        row?.status !== 'processing' ||
+        row.updatedAt.getTime() !== lease.updatedAt.getTime()
+      ) {
+        return false;
+      }
+      byId.set(lease.id, {
         ...row,
         status: 'succeeded',
         attemptCount: row.attemptCount + 1,
         lastError: null,
         updatedAt: now,
       });
+      return true;
     },
 
-    async fail(id, attemptCountBeforeThisAttempt, error, now) {
-      const row = byId.get(id);
-      const classification = classifyWebhookError(error);
-      const decision = computeRetryDecision({ attemptCount: attemptCountBeforeThisAttempt, classification, now });
-      if (row) {
-        byId.set(id, {
-          ...row,
-          status: decision.status,
-          attemptCount: decision.attemptCount,
-          nextAttemptAt: decision.nextAttemptAt,
-          lastError: error instanceof Error ? error.message : String(error),
-          updatedAt: now,
-        });
+    async fail(lease, error, now) {
+      const row = byId.get(lease.id);
+      if (
+        row?.status !== 'processing' ||
+        row.updatedAt.getTime() !== lease.updatedAt.getTime()
+      ) {
+        return null;
       }
+      const classification = classifyWebhookError(error);
+      const decision = computeRetryDecision({ attemptCount: lease.attemptCount, classification, now });
+      byId.set(lease.id, {
+        ...row,
+        status: decision.status,
+        attemptCount: decision.attemptCount,
+        nextAttemptAt: decision.nextAttemptAt,
+        lastError: error instanceof Error ? error.message : String(error),
+        updatedAt: now,
+      });
       return decision;
     },
 
@@ -346,4 +356,42 @@ void test('reconcileStuckWebhookEvents leaves recently-updated processing rows a
 
   assert.equal(resetCount, 0);
   assert.equal((await repository.listByStatus('processing')).length, 1);
+});
+
+void test('a worker that finishes after stale reconciliation cannot overwrite the released lease', async () => {
+  const claimedAt = new Date('2026-01-01T01:00:00.000Z');
+  const reconciledAt = new Date(claimedAt.getTime() + 20 * 60 * 1000);
+  const repository = createFakeRepository([makeRow({ id: 'expired-lease' })]);
+  let releaseWorker!: () => void;
+  const workerPaused = new Promise<void>((resolve) => {
+    releaseWorker = resolve;
+  });
+  let workerStarted!: () => void;
+  const workerDidStart = new Promise<void>((resolve) => {
+    workerStarted = resolve;
+  });
+
+  const drainPromise = drainWebhookInbox({
+    repository,
+    now: claimedAt,
+    processEvent: async () => {
+      workerStarted();
+      await workerPaused;
+    },
+  });
+  await workerDidStart;
+
+  const resetCount = await reconcileStuckWebhookEvents({
+    repository,
+    now: reconciledAt,
+    staleAfterMs: 10 * 60 * 1000,
+  });
+  assert.equal(resetCount, 1);
+
+  releaseWorker();
+  const result = await drainPromise;
+  assert.equal(result.succeeded, 0);
+  assert.equal(result.lostLease, 1);
+  assert.equal((await repository.listByStatus('failed')).length, 1);
+  assert.equal((await repository.listByStatus('succeeded')).length, 0);
 });

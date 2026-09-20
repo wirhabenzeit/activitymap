@@ -24,6 +24,11 @@ export type WebhookInboxBacklogMetrics = {
   oldestPendingEventTime: Date | null;
 };
 
+export type WebhookEventLease = Pick<
+  StravaWebhookEventRow,
+  'id' | 'attemptCount' | 'updatedAt'
+>;
+
 /**
  * Repository boundary for `strava_webhook_events` drain/retry bookkeeping
  * (issue #125), following the same pattern as
@@ -53,21 +58,24 @@ export interface WebhookEventsRepository {
    */
   claim(id: string, now: Date): Promise<StravaWebhookEventRow | null>;
 
-  /** Marks a claimed row `succeeded`. */
-  complete(id: string, now: Date): Promise<void>;
+  /**
+   * Marks a claimed row `succeeded` only while `lease` still owns the
+   * current `processing` attempt. Returns false if stale reconciliation has
+   * already released/reclaimed it.
+   */
+  complete(lease: WebhookEventLease, now: Date): Promise<boolean>;
 
   /**
    * Marks a claimed row `failed` (with backoff) or `dead_letter`
    * (permanent error, or max attempts reached) per `computeRetryDecision`.
-   * `attemptCountBeforeThisAttempt` is the row's attempt count before this
-   * failure.
+   * Returns null if stale reconciliation has already released/reclaimed the
+   * lease before this worker records the failure.
    */
   fail(
-    id: string,
-    attemptCountBeforeThisAttempt: number,
+    lease: WebhookEventLease,
     error: unknown,
     now: Date,
-  ): Promise<BackoffDecision>;
+  ): Promise<BackoffDecision | null>;
 
   /**
    * Resets rows stuck in `processing` past `cutoff` (a worker crashed
@@ -91,20 +99,19 @@ export function createWebhookEventsRepository(
   database: DrizzleDb = defaultDb,
 ): WebhookEventsRepository {
   async function applyFailure(
-    id: string,
-    attemptCountBeforeThisAttempt: number,
+    lease: WebhookEventLease,
     error: unknown,
     now: Date,
-  ): Promise<BackoffDecision> {
+  ): Promise<BackoffDecision | null> {
     const message = error instanceof Error ? error.message : String(error);
     const classification = classifyWebhookError(error);
     const decision = computeRetryDecision({
-      attemptCount: attemptCountBeforeThisAttempt,
+      attemptCount: lease.attemptCount,
       classification,
       now,
     });
 
-    await database
+    const [updated] = await database
       .update(stravaWebhookEvents)
       .set({
         status: decision.status,
@@ -113,9 +120,16 @@ export function createWebhookEventsRepository(
         lastError: message,
         updatedAt: now,
       })
-      .where(eq(stravaWebhookEvents.id, id));
+      .where(
+        and(
+          eq(stravaWebhookEvents.id, lease.id),
+          eq(stravaWebhookEvents.status, 'processing'),
+          eq(stravaWebhookEvents.updatedAt, lease.updatedAt),
+        ),
+      )
+      .returning({ id: stravaWebhookEvents.id });
 
-    return decision;
+    return updated ? decision : null;
   }
 
   return {
@@ -160,8 +174,8 @@ export function createWebhookEventsRepository(
       return claimed ?? null;
     },
 
-    async complete(id, now) {
-      await database
+    async complete(lease, now) {
+      const [updated] = await database
         .update(stravaWebhookEvents)
         .set({
           status: 'succeeded',
@@ -169,7 +183,15 @@ export function createWebhookEventsRepository(
           lastError: null,
           updatedAt: now,
         })
-        .where(eq(stravaWebhookEvents.id, id));
+        .where(
+          and(
+            eq(stravaWebhookEvents.id, lease.id),
+            eq(stravaWebhookEvents.status, 'processing'),
+            eq(stravaWebhookEvents.updatedAt, lease.updatedAt),
+          ),
+        )
+        .returning({ id: stravaWebhookEvents.id });
+      return Boolean(updated);
     },
 
     fail: applyFailure,
@@ -179,6 +201,7 @@ export function createWebhookEventsRepository(
         .select({
           id: stravaWebhookEvents.id,
           attemptCount: stravaWebhookEvents.attemptCount,
+          updatedAt: stravaWebhookEvents.updatedAt,
         })
         .from(stravaWebhookEvents)
         .where(
@@ -188,18 +211,19 @@ export function createWebhookEventsRepository(
           ),
         );
 
+      let resetCount = 0;
       for (const row of stale) {
-        await applyFailure(
-          row.id,
-          row.attemptCount,
+        const decision = await applyFailure(
+          row,
           new Error(
             'Stuck in "processing" past the stale-lock timeout; the worker handling it likely crashed mid-attempt',
           ),
           now,
         );
+        if (decision) resetCount++;
       }
 
-      return stale.length;
+      return resetCount;
     },
 
     async listByStatus(status, limit = 100) {

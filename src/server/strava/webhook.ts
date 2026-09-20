@@ -124,10 +124,16 @@ export async function processInboxEvent(
 
   try {
     await processWebhookEvent(payload ?? claimed.payload, database);
-    await repository.complete(eventId, new Date());
+    const completed = await repository.complete(claimed, new Date());
+    if (!completed) {
+      logger.warn(`[Webhook] Processing lease expired before event ${eventId} completed`);
+    }
   } catch (error) {
     logger.error(`[Webhook] Failed to process inbox event ${eventId}:`, error);
-    await repository.fail(eventId, claimed.attemptCount, error, new Date());
+    const decision = await repository.fail(claimed, error, new Date());
+    if (!decision) {
+      logger.warn(`[Webhook] Processing lease expired before event ${eventId} failed`);
+    }
   }
 }
 

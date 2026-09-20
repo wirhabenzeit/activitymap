@@ -43,6 +43,8 @@ export type DrainResult = {
   deadLettered: number;
   /** Candidates another concurrent drain run (or the route's best-effort attempt) claimed first. */
   lostRace: number;
+  /** Claimed work that finished only after stale reconciliation released its lease. */
+  lostLease: number;
 };
 
 export type DrainWebhookInboxOptions = {
@@ -91,6 +93,7 @@ export async function drainWebhookInbox({
     retrying: 0,
     deadLettered: 0,
     lostRace: 0,
+    lostLease: 0,
   };
 
   await runWithConcurrencyLimit(candidates, concurrency, async (candidate) => {
@@ -108,7 +111,14 @@ export async function drainWebhookInbox({
     const startedAt = Date.now();
     try {
       await processEvent(claimed.payload);
-      await repository.complete(claimed.id, now);
+      const completed = await repository.complete(claimed, now);
+      if (!completed) {
+        result.lostLease++;
+        logger.warn('[WebhookDrain] completed work after its processing lease expired', {
+          eventId: claimed.id,
+        });
+        return;
+      }
       result.succeeded++;
       logger.info('[WebhookDrain] event processed', {
         eventId: claimed.id,
@@ -121,7 +131,14 @@ export async function drainWebhookInbox({
         syncLagMs: now.getTime() - claimed.eventTime.getTime(),
       });
     } catch (error) {
-      const decision = await repository.fail(claimed.id, claimed.attemptCount, error, now);
+      const decision = await repository.fail(claimed, error, now);
+      if (!decision) {
+        result.lostLease++;
+        logger.warn('[WebhookDrain] failed work after its processing lease expired', {
+          eventId: claimed.id,
+        });
+        return;
+      }
       if (decision.status === 'dead_letter') result.deadLettered++;
       else result.retrying++;
       logger.error('[WebhookDrain] event failed', {
