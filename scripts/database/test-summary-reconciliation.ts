@@ -160,7 +160,7 @@ async function seed(): Promise<void> {
       total_elevation_gain: 100,
       sport_type: 'Run',
       start_date: new Date('2026-01-01T08:00:00Z'),
-      start_date_local: new Date('2026-01-01T08:00:00Z'),
+      start_date_local: new Date('2026-01-01T09:00:00Z'),
       timezone: '(GMT+01:00) Europe/Zurich',
       start_latlng: [47, 8],
       end_latlng: [47.1, 8.1],

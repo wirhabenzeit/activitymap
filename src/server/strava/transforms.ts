@@ -9,11 +9,9 @@ export function transformStravaActivity(
 ): Omit<Activity, 'athlete'> {
   const observedAt = options.observedAt ?? new Date();
   const start_date = new Date(activity.start_date);
-  const local_date = new Date(
-    start_date.toLocaleString('en-US', {
-      timeZone: activity.timezone.split(' ').pop(),
-    }),
-  );
+  // Strava supplies the activity's local wall-clock time directly. Parsing
+  // that value avoids making persisted data depend on the server's own TZ.
+  const local_date = new Date(activity.start_date_local);
 
   let bbox: [number, number, number, number] = [0, 0, 0, 0];
   if (activity.map?.summary_polyline) {

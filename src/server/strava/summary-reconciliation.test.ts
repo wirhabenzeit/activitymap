@@ -94,6 +94,15 @@ function stravaActivity(
   };
 }
 
+void test('activity local time is deterministic across server timezones', () => {
+  const transformed = transformStravaActivity(stravaActivity(1));
+
+  assert.equal(
+    transformed.start_date_local.toISOString(),
+    '2026-01-01T09:00:00.000Z',
+  );
+});
+
 void test('summary comparison invalidates only the affected component', () => {
   const detail = stravaActivity(1);
   const existing = {
