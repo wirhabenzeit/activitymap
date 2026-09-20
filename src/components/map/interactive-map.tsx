@@ -63,6 +63,8 @@ import {
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import { usePhotos } from '~/hooks/use-photos';
 import type { Activity } from '~/server/db/schema';
+import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
+import { LegacySharingDisabledNotice } from '~/components/map/legacy-sharing-disabled-notice';
 import { useSearchParams } from 'next/navigation';
 
 type OverlayMapId = keyof typeof overlayMaps;
@@ -239,6 +241,8 @@ export default function InteractiveMap() {
     togglePhotos,
     compactList,
     uploadedGeoJson,
+    isGuest,
+    guestModeType,
   } = useShallowStore((state) => ({
     selected: state.selected,
     setHighlighted: state.setHighlighted,
@@ -254,6 +258,8 @@ export default function InteractiveMap() {
     toggleThreeDim: state.toggleThreeDim,
     compactList: state.compactList,
     uploadedGeoJson: state.uploadedGeoJson,
+    isGuest: state.isGuest,
+    guestModeType: state.guestMode.type,
   }));
   const { open } = useSidebar();
   const mapRefLoc = useRef<MapRef>(null);
@@ -402,6 +408,15 @@ export default function InteractiveMap() {
       .filter((x) => x != undefined),
     [selected, activityDict, photoDict]
   );
+
+  // Part of #132: a visitor who arrived via a legacy `/map?user=`/
+  // `/map?activities=` share link gets an explicit "no longer works"
+  // message instead of a silently empty map - see
+  // `~/lib/legacy-sharing.ts` and docs/strava-data-policy.md §5. All hooks
+  // above still run unconditionally; only the rendered output branches.
+  if (!LEGACY_SHARING_ENABLED && isGuest) {
+    return <LegacySharingDisabledNotice guestModeType={guestModeType} />;
+  }
 
   return (
     <div className="relative h-full w-full">

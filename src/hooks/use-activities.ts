@@ -20,6 +20,7 @@ import {
     getCachedActivities,
     upsertCachedActivities,
 } from '~/lib/offline/db';
+import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 
 const memoryActivitiesByScope = new Map<string, Activity[]>();
 
@@ -76,9 +77,16 @@ export function useActivities() {
         [guestMode.activityIds],
     );
     const canFetchAuthenticatedData = !!userId && !isGuest;
+    // Legacy sharing (`/map?activities=`/`/map?user=`) is disabled - Part of
+    // #132, see `~/lib/legacy-sharing.ts` and docs/strava-data-policy.md §5.
+    // These stay `false` while the flag is off so a guest-mode visit never
+    // calls the now-disabled `getPublicActivities`/`getPublicUserActivities`
+    // server actions at all.
     const canFetchGuestActivities =
+        LEGACY_SHARING_ENABLED &&
         isGuest && guestMode.type === 'activities' && guestActivityIds.length > 0;
     const canFetchGuestUser =
+        LEGACY_SHARING_ENABLED &&
         isGuest && guestMode.type === 'user' && !!guestMode.userId;
     const canFetchActivities =
         isInitialized &&

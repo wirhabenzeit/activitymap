@@ -7,6 +7,7 @@ import { headers } from 'next/headers';
 import { getUserInternal } from './internal';
 import { requireActor } from '~/server/auth/actor';
 import * as activitiesService from '~/server/application/activities';
+import { assertLegacySharingEnabled } from '~/lib/legacy-sharing';
 
 // Safe wrapper for getUser
 export const getUser = async (id?: string) => {
@@ -58,13 +59,18 @@ export async function getActivitiesByIds(ids: number[]) {
 /**
  * Get specific activities by their Public ID.
  *
- * Intentionally unauthenticated: `public_id` is the sharing identifier for
- * the "share selected activities" flow (see docs/strava-data-policy.md §5).
- * Do not add a session/ownership check here - that would break the existing
- * public sharing behavior, which is deliberately being replaced by #132
- * rather than patched in place.
+ * This was the "share selected activities" flow (see
+ * docs/strava-data-policy.md §5) and is intentionally unauthenticated by
+ * design - `public_id` was meant to be the access-control identifier. It is
+ * disabled (Part of #132): `public_id` is a deterministic, non-cryptographic
+ * hash (see `~/server/strava/transforms.ts`) and therefore not a valid
+ * capability token, and this flow has no expiry or revocation. Do not add a
+ * session/ownership check here to "fix" it in place - the whole identifier
+ * scheme is being replaced by #132, not patched.
  */
 export async function getPublicActivities(publicIds: number[]) {
+  assertLegacySharingEnabled();
+
   return db
     .select()
     .from(activities)
@@ -74,11 +80,14 @@ export async function getPublicActivities(publicIds: number[]) {
 
 /**
  * Get activities for a shared user profile by internal user ID.
- * This intentionally does not require an authenticated session.
  *
- * Intentionally unauthenticated: this is the "share entire profile" flow
- * (see docs/strava-data-policy.md §5). Do not add a session/ownership check
- * here for the same reason as `getPublicActivities` above.
+ * This was the "share entire profile" flow (see
+ * docs/strava-data-policy.md §5) and is intentionally unauthenticated by
+ * design. It is disabled (Part of #132): it grants permanent, non-revocable,
+ * unbounded read access to an athlete's entire activity history to anyone
+ * who has the link. Do not add a session/ownership check here to "fix" it in
+ * place - it is being replaced by #132's scoped, expiring private links, not
+ * patched.
  */
 export async function getPublicUserActivities({
   userId,
@@ -89,6 +98,8 @@ export async function getPublicUserActivities({
   limit?: number;
   offset?: number;
 }) {
+  assertLegacySharingEnabled();
+
   const user = await getUserInternal(userId);
   if (!user.athlete_id) throw new Error('User has no athlete_id linked');
 

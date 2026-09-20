@@ -22,8 +22,74 @@ import { useToast } from '~/hooks/use-toast';
 import { useActivities } from '~/hooks/use-activities';
 import { appendMapShareParams } from '~/lib/map-share';
 import { defaultMapPosition } from '~/settings/map';
+import {
+  LEGACY_SHARING_ENABLED,
+  LEGACY_SHARING_ISSUE_URL,
+} from '~/lib/legacy-sharing';
+
+/**
+ * Part of #132: the legacy `/map?user=`/`/map?activities=` sharing flow is
+ * disabled (see `~/lib/legacy-sharing.ts` and docs/strava-data-policy.md
+ * §5) because it produced permanent, non-revocable, guessable-identifier
+ * links. Rather than offer a button that generates a link that no longer
+ * works, this renders a disabled state explaining why while the real
+ * replacement (scoped, expiring, revocable private links) is built.
+ */
+function DisabledShareButton() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 px-0">
+          <ShareIcon className="h-4 w-4" />
+          <span className="sr-only">Share</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Sharing is being redesigned</DialogTitle>
+          <DialogDescription>
+            Link-based sharing is temporarily disabled. The previous links
+            never expired and could not be revoked, so they have been turned
+            off while they are replaced with secure, expiring private links
+            you control. Any share link created earlier no longer grants
+            access.{' '}
+            <a
+              href={LEGACY_SHARING_ISSUE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Track progress in issue #132.
+            </a>
+          </DialogDescription>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function ShareButton() {
+  const isGuest = useShallowStore((state) => state.isGuest);
+
+  // A guest (someone viewing via a - now-disabled - shared link) never had
+  // a share button of their own; preserve that regardless of the flag.
+  if (isGuest) {
+    return null;
+  }
+
+  if (!LEGACY_SHARING_ENABLED) {
+    return <DisabledShareButton />;
+  }
+
+  return <LegacyShareButton />;
+}
+
+/**
+ * Original share-link implementation, kept in place (not deleted) so it is
+ * easy to re-enable or reuse once it is replaced. See `ShareButton` above
+ * for the current, disabled entry point.
+ */
+function LegacyShareButton() {
   const {
     selected,
     user,
