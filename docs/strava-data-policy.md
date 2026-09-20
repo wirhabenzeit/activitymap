@@ -161,17 +161,40 @@ processing work ([#124](https://github.com/wirhabenzeit/activitymap/issues/124)/
   feature would use once built; building the UI itself is out of scope for
   this issue.
 
-**Current gap** (evidence, so the fix in #124/#125 has a concrete starting
-point): neither existing webhook handler processes deauthorization —
-`src/server/strava/webhook.ts:33-37` returns immediately for any
-`object_type !== 'activity'`, and `src/app/api/strava/[slug]/route.ts:96-99`
-explicitly logs `"Received athlete webhook, skipping"` and returns `200 OK`.
-Today, a user who revokes ActivityMap's access from Strava's side has their
-token invalidated by Strava but ActivityMap keeps the row, keeps trying to
-use it (each such attempt fails at the Strava token endpoint), and never
-deletes their cached data. This is a policy violation under §1 (no 30-day
-erasure) and should be treated as a bug to close, not a style preference, by
-whichever PR implements #124/#125.
+**Historical gap** (the evidence that motivated #124/#125, kept here for
+context): neither webhook handler used to process deauthorization —
+`src/server/strava/webhook.ts` returned immediately for any
+`object_type !== 'activity'`, and the legacy
+`src/app/api/strava/[slug]/route.ts` explicitly logged
+`"Received athlete webhook, skipping"` and returned `200 OK`. A user who
+revoked ActivityMap's access from Strava's side had their token invalidated
+by Strava but ActivityMap kept the row, kept trying to use it (each such
+attempt failing at the Strava token endpoint), and never deleted their
+cached data.
+
+**Status (issue #125): implemented, with one execution step deferred.**
+`processWebhookEvent`'s `object_type: "athlete"` branch
+(`src/server/strava/webhook.ts`) now handles deauthorization per the
+required behavior above: transactionally and idempotently, it clears the
+account's stored tokens (both column sets — see §4) without ever attempting
+a refresh or calling Strava, sets `accounts.revokedAt`, and sets
+`accounts.scheduledErasureAt` to 30 days out. Clearing the tokens also makes
+`CurrentUserDTO.stravaConnected` correctly report `false` (it derives from
+the same columns; no separate flag was needed there). Deletion/
+deauthorization events are prioritized ahead of routine create/update events
+in the drain's `ORDER BY`, and a scheduled cron
+(`/api/cron/drain-webhook-inbox`) retries transient failures with backoff
+and dead-letters permanent ones — see that route and
+`src/server/strava/webhook-drain.ts` for the retry/backoff/dead-letter and
+reconciliation design.
+
+**Deferred**: this issue records that the 30-day erasure deadline is due and
+excludes the account from ordinary token refresh/sync (`getAccountInternal`
+never calls Strava for a revoked account), but it does not itself execute
+the erasure — no job yet deletes a revoked athlete's activities/photos/
+tokens when `scheduledErasureAt` arrives. A scheduled erasure-execution job
+reading `accounts.scheduledErasureAt` is the natural follow-up and is
+tracked as such rather than implemented here.
 
 ## 4. Token storage: canonical representation and migration plan
 
@@ -376,14 +399,20 @@ Implemented now:
   refresh writes both as well. This removes the drift described in §4 and
   fixes fresh native-only and reauthorized accounts.
 - This document, linked from `docs/swiftui-backend-preparation-plan.md`.
+- **(#125)** Webhook retry/backoff/dead-lettering, priority processing of
+  deletion/deauthorization events, athlete-deauthorization handling
+  (token-stop, `revokedAt`, `scheduledErasureAt`), and the reconciliation
+  safety net for the inbox/drain system itself — see §3's "Status" note.
+  Executing the 30-day erasure once `scheduledErasureAt` arrives is not yet
+  implemented; see that note for what is deferred.
 
 Defined here, implemented by later issues in the [#115](https://github.com/wirhabenzeit/activitymap/issues/115) epic:
 
 - Periodic paginated summary reconciliation, summary change detection, and
   dataset freshness metadata (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123).
 - Offline freshness propagation and scoped-clear wiring (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#126](https://github.com/wirhabenzeit/activitymap/issues/126).
-- Deauthorization handling, priority processing, 30-day erasure (§3) →
-  [#124](https://github.com/wirhabenzeit/activitymap/issues/124)/[#125](https://github.com/wirhabenzeit/activitymap/issues/125).
+- Scheduled execution of the 30-day full-erasure deletion once due (§3) →
+  follow-up issue (not yet filed).
 - Switch/contract steps for token columns (§4) → alongside [#120](https://github.com/wirhabenzeit/activitymap/issues/120)/[#121](https://github.com/wirhabenzeit/activitymap/issues/121).
 - Replace permanent/guessable sharing with explicitly consented, scoped,
   expiring private links (§5) →

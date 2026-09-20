@@ -1,5 +1,6 @@
 import { db as defaultDb } from '~/server/db';
 import {
+  accounts,
   activities,
   activityDeletions,
   photoDeletions,
@@ -14,6 +15,11 @@ import { eq, sql, and } from 'drizzle-orm';
 import { logger } from '~/server/logging/logger';
 import type { WebhookRequest } from '~/types/strava';
 import { createChangesRepository } from '~/server/repositories/changes';
+import { createWebhookEventsRepository } from '~/server/repositories/webhook-events';
+import { PermanentWebhookError } from '~/server/strava/webhook-retry';
+
+/** Full erasure of a deauthorized athlete's data must complete within 30 days of revocation (docs/strava-data-policy.md §1/§3). */
+const ERASURE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 const db = defaultDb;
 export type DrizzleDb = typeof defaultDb;
@@ -85,71 +91,137 @@ export async function recordWebhookEvent(
  * Best-effort, single-attempt processing of a just-recorded inbox row, run
  * after the route has already responded to Strava (see `after()` in the
  * route handler). This keeps activities updating close to real time without
- * making the response wait on Strava/DB latency. It intentionally does not
- * retry: durable retry/backoff, dead-lettering, and reconciliation for rows
- * left `pending` or `failed` here are #125's job.
+ * making the response wait on Strava/DB latency.
  *
- * `payload` is optional: the route handler already has it from the insert
- * that just happened and passes it through to skip a redundant read, but
- * a future caller that only has the row id (e.g. #125's reconciliation
- * worker, which discovers rows to retry by querying for `pending`/`failed`
- * status rather than from a fresh insert) can omit it and let this function
- * load the row itself.
+ * It claims the row atomically (via `WebhookEventsRepository.claim`, the
+ * same claim used by #125's scheduled drain in
+ * `~/server/strava/webhook-drain.ts`) rather than unconditionally setting
+ * `status = 'processing'`: without that, this best-effort attempt could
+ * race a concurrent drain cycle for the same row (the delivery is
+ * durable and `nextAttemptAt` defaults to "now", so a drain cycle can see
+ * it as due before this call gets to it) and both would call
+ * `processWebhookEvent` for the same delivery at once. If the claim finds
+ * the row already claimed, already terminal, or not yet due, this is a
+ * no-op - the row is either already being handled or will be picked up by
+ * the scheduled drain. On failure it applies the same retry/backoff/
+ * dead-letter decision the drain uses (`WebhookEventsRepository.fail`),
+ * so even this very first attempt contributes correctly to the retry
+ * budget instead of leaving the row `failed` forever with no backoff.
+ *
+ * `payload` is accepted for the route handler's convenience (it already
+ * has it from the insert that just happened) but is no longer required to
+ * avoid an extra read: `claim`'s `UPDATE ... RETURNING *` already returns
+ * the full row, payload included.
  */
 export async function processInboxEvent(
   eventId: string,
   payload?: StravaWebhookEvent,
+  database: DrizzleDb = defaultDb,
 ) {
-  if (!payload) {
-    const event = await db.query.stravaWebhookEvents.findFirst({
-      where: eq(stravaWebhookEvents.id, eventId),
-    });
-    if (!event) return;
-    payload = event.payload;
-  }
-
-  await db
-    .update(stravaWebhookEvents)
-    .set({ status: 'processing', updatedAt: new Date() })
-    .where(eq(stravaWebhookEvents.id, eventId));
+  const repository = createWebhookEventsRepository(database);
+  const claimed = await repository.claim(eventId, new Date());
+  if (!claimed) return;
 
   try {
-    await processWebhookEvent(payload);
-    await db
-      .update(stravaWebhookEvents)
-      .set({
-        status: 'succeeded',
-        attemptCount: sql`${stravaWebhookEvents.attemptCount} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(stravaWebhookEvents.id, eventId));
+    await processWebhookEvent(payload ?? claimed.payload, database);
+    await repository.complete(eventId, new Date());
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
     logger.error(`[Webhook] Failed to process inbox event ${eventId}:`, error);
-    await db
-      .update(stravaWebhookEvents)
-      .set({
-        status: 'failed',
-        attemptCount: sql`${stravaWebhookEvents.attemptCount} + 1`,
-        lastError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(stravaWebhookEvents.id, eventId));
+    await repository.fail(eventId, claimed.attemptCount, error, new Date());
   }
 }
 
 /**
+ * Handles a Strava athlete-deauthorization webhook (`object_type:
+ * "athlete"`), per docs/strava-data-policy.md §3. Per policy, on receipt
+ * the application must, before anything else, stop using the stored
+ * token: no refresh attempt, no API call, since Strava has already
+ * invalidated it and any such attempt will just fail at Strava's end. This
+ * function therefore never calls `resolveAccount`/`fetchActivities` (or
+ * any other Strava-calling dependency) at all - it only reads/writes the
+ * local `account` row.
+ *
+ * It is transactional (the token-clearing, `revokedAt`, and
+ * `scheduledErasureAt` writes commit or roll back together) and
+ * idempotent: a repeated deauthorization delivery for an already-revoked
+ * account (e.g. a redelivered webhook, or one retried before the first
+ * attempt's DB write was visible) is a safe no-op rather than an error
+ * that would keep the row retrying forever, and it never re-extends the
+ * erasure deadline on replay.
+ *
+ * This does not itself execute the 30-day full-erasure deletion (see the
+ * PR description's "deferred" section) - it durably records that erasure
+ * is due and by when (`accounts.scheduledErasureAt`), and clears the
+ * stored tokens so the account is excluded from ordinary token
+ * refresh/sync going forward (`getAccountInternal` throws before ever
+ * calling Strava once `access_token`/`accessToken` are both null and there
+ * is no refresh token to fall back to).
+ */
+async function handleAthleteDeauthorization(
+  data: StravaWebhookEvent,
+  database: DrizzleDb,
+) {
+  const ownerId = data.owner_id;
+  await database.transaction(async (tx) => {
+    const [account] = await tx
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.accountId, ownerId.toString()), eq(accounts.providerId, 'strava')));
+
+    if (!account) {
+      logger.info('[Webhook] Deauthorization received for unknown/unlinked account; nothing to revoke', {
+        owner_id: ownerId,
+      });
+      return;
+    }
+
+    if (account.revokedAt) {
+      // Idempotent no-op: a replayed/redelivered deauthorization for an
+      // account already marked revoked must not re-extend the erasure
+      // deadline or redo work.
+      logger.info('[Webhook] Deauthorization already recorded for this account; ignoring replay', {
+        owner_id: ownerId,
+      });
+      return;
+    }
+
+    const now = new Date();
+    const scheduledErasureAt = new Date(now.getTime() + ERASURE_WINDOW_MS);
+
+    await tx
+      .update(accounts)
+      .set({
+        access_token: null,
+        accessToken: null,
+        refresh_token: null,
+        refreshToken: null,
+        revokedAt: now,
+        scheduledErasureAt,
+        updatedAt: now,
+      })
+      .where(eq(accounts.id, account.id));
+
+    logger.info('[Webhook] Recorded athlete deauthorization; tokens cleared and erasure scheduled', {
+      owner_id: ownerId,
+      scheduledErasureAt,
+    });
+  });
+}
+
+/**
  * Process a Strava webhook event. This is designed to be called from
- * `processInboxEvent` (after durable receipt) or from the reconciliation
- * worker added in #125, both of which mark the inbox row `succeeded` only
- * if this function returns normally.
+ * `processInboxEvent` (after durable receipt) or from the drain worker
+ * added in #125 (`~/server/strava/webhook-drain.ts`), both of which mark
+ * the inbox row `succeeded` only if this function returns normally.
  *
  * It therefore never swallows a failure: every path that does not end in a
- * genuinely completed mutation (an activity upsert or a recorded deletion)
- * throws instead of returning, including unsupported event types like
- * athlete/deauthorization, so those rows stay visible as `failed` — and
- * therefore actionable for #125 — instead of being marked done. See the
- * review on issue #124.
+ * genuinely completed mutation (an activity upsert, a recorded deletion,
+ * or a recorded deauthorization) throws instead of returning, so those
+ * rows stay visible as `failed`/`dead_letter` - and therefore actionable -
+ * instead of being marked done. See the review on issue #124. Failures
+ * that will never resolve on their own (e.g. no local account for this
+ * athlete) throw `PermanentWebhookError` so #125's retry classification
+ * dead-letters them immediately instead of spending the retry budget.
  */
 export type ProcessWebhookEventDeps = {
   resolveAccount?: typeof getAccountInternal;
@@ -166,18 +238,22 @@ export async function processWebhookEvent(
   const resolveAccount = deps.resolveAccount ?? getAccountInternal;
   const fetchActivities = deps.fetchActivities ?? fetchStravaActivities;
 
-  // Athlete (e.g. deauthorization) events are not handled yet; #125 is
-  // expected to prioritize them. Throwing keeps the inbox row `failed`
-  // rather than falsely `succeeded` so it stays actionable.
-  if (object_type !== 'activity') {
-    throw new Error(
-      `Unsupported webhook object_type "${object_type}" for athlete ${owner_id}; athlete/deauthorization handling is not implemented yet (see issue #125)`,
-    );
+  if (object_type === 'athlete') {
+    await handleAthleteDeauthorization(data, database);
+    return; // Genuinely completed: deauthorization recorded (or a no-op replay).
   }
+
+  // `object_type` (`WebhookRequest['object_type']`, enforced by
+  // `webhookEventSchema` before a delivery is ever durably recorded) is
+  // exactly `'activity' | 'athlete'`, and the branch above already handles
+  // `'athlete'` - so everything from here on is genuinely an activity
+  // event; TypeScript narrows `object_type` to `'activity'` accordingly.
 
   const account = await resolveAccount({ accountId: owner_id.toString() });
   if (!account?.access_token) {
-    throw new Error(`No account or valid access token found for athlete ${owner_id}`);
+    throw new PermanentWebhookError(
+      `No account or valid access token found for athlete ${owner_id}`,
+    );
   }
 
   const { activities: fetchedActivities, photos: fetchedPhotos, notFoundIds } =

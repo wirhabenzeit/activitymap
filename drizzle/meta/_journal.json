@@ -29,6 +29,13 @@
       "when": 1789891366082,
       "tag": "0003_sync_change_feed_additive",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789911981807,
+      "tag": "0004_brown_metal_master",
+      "breakpoints": true
     }
   ]
 }
