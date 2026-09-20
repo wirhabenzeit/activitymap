@@ -37,18 +37,7 @@ void test('the activities Server Actions and the /api/activities Route Handler b
   }
 });
 
-void test('both /api/offline Route Handlers call ~/server/application/sync', () => {
-  const bootstrapRoute = read('src/app/api/offline/bootstrap/route.ts');
-  const changesRoute = read('src/app/api/offline/changes/route.ts');
-
-  for (const [label, source] of [
-    ['src/app/api/offline/bootstrap/route.ts', bootstrapRoute],
-    ['src/app/api/offline/changes/route.ts', changesRoute],
-  ] as const) {
-    assert.match(
-      source,
-      /['"]~\/server\/application\/sync['"]/,
-      `${label} must import the shared application service`,
-    );
-  }
-});
+// The former "both /api/offline Route Handlers call
+// ~/server/application/sync" test was removed alongside those routes and
+// that module in issue #126 phase 3 (see `~/app/api/v1/sync/*` and
+// `~/lib/sync/v1-sync.ts` for their replacement).

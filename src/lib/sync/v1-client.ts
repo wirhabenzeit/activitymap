@@ -1,9 +1,10 @@
 /**
  * Typed web client for the v1 sync API (`GET /api/v1/sync/bootstrap` and
  * `GET /api/v1/sync/changes`, issue #123) — the paginated, sequence-cursor
- * protocol the SwiftUI client already speaks. Issue #126 migrates the web
- * client onto the same contract instead of the legacy timestamp-cursor
- * `/api/offline/*` routes (`~/lib/offline/sync.ts`).
+ * protocol the SwiftUI client already speaks. Issue #126 migrated the web
+ * client onto this contract, replacing a legacy timestamp-cursor
+ * `/api/offline/*` protocol (removed in that issue's phase 3) that could
+ * miss equal-timestamp mutations.
  *
  * This module only knows the v1 envelope/error/DTO shapes from
  * `~/contracts/v1/*` — it never imports Drizzle row types
