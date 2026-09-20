@@ -43,7 +43,23 @@ ALTER TABLE "strava_webhooks" ADD COLUMN "active" boolean DEFAULT true NOT NULL;
 -- Strava itself reports — "verify_token" (never held by the legacy table)
 -- is preserved on existing rows and only defaulted to a placeholder when
 -- inserting a brand new row, which the next checkWebhookStatus/
--- createWebhookSubscription run repairs.
+-- createWebhookSubscription run repairs. Legacy rows are deduplicated before
+-- the upsert because PostgreSQL rejects an INSERT ... ON CONFLICT statement
+-- when two source rows would update the same target row. The newest legacy row
+-- wins, with the subscription id as a deterministic tie-breaker.
+WITH deduplicated_webhooks AS (
+	SELECT DISTINCT ON (w."callback_url")
+		w."id",
+		w."resource_state",
+		w."application_id",
+		w."callback_url",
+		w."created_at",
+		w."updated_at",
+		w."verified",
+		w."active"
+	FROM "webhook" w
+	ORDER BY w."callback_url", w."updated_at" DESC, w."id" DESC
+)
 INSERT INTO "strava_webhooks" (
 	"id", "subscription_id", "verify_token", "callback_url",
 	"resource_state", "application_id", "verified", "active",
@@ -53,7 +69,7 @@ SELECT
 	gen_random_uuid()::text, w."id", '', w."callback_url",
 	w."resource_state", w."application_id", w."verified", w."active",
 	w."created_at", w."updated_at"
-FROM "webhook" w
+FROM deduplicated_webhooks w
 ON CONFLICT ("callback_url") DO UPDATE SET
 	"subscription_id" = excluded."subscription_id",
 	"resource_state" = excluded."resource_state",
