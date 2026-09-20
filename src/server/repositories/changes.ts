@@ -47,9 +47,9 @@ export type NewSyncChange = {
  * repository, the Strava webhook processor, the periodic Strava sync) calls
  * from *inside its own transaction*, passing that transaction as `tx` - see
  * the `syncChanges` doc comment in `~/server/db/schema.ts` for why that
- * matters. The read methods (`findAfter`, `latestSequence`,
- * `isCursorRetained`) are for #123 and for tests; they always read through
- * the repository's own injected `database`.
+ * matters. The read methods (`findAfter`, `latestSequence`) are for #123
+ * and for tests; they always read through the repository's own injected
+ * `database`.
  */
 export interface ChangesRepository {
   /**
@@ -72,24 +72,11 @@ export interface ChangesRepository {
   latestSequence(athleteId: number): Promise<number>;
 
   /**
-   * Whether a "changes after `sequence`" read for this cursor would be
-   * complete, i.e. retention has not compacted away any row the client
-   * hasn't seen yet. See the retention-policy doc comment on
-   * `compactOlderThan` below for the invariant this relies on. This is the
-   * cheap, well-defined query the plan doc's `409 sync_rebootstrap_required`
-   * contract needs; #123 builds the actual response on top of it - this PR
-   * only makes the check possible.
-   */
-  isCursorRetained(sequence: number): Promise<boolean>;
-
-  /**
    * Delete change rows older than `cutoff`. Retention policy: a `sync_change`
    * row is only ever eligible for deletion once it is older than the
-   * retention window (see `DEFAULT_RETENTION_DAYS`), and compaction always
-   * removes the oldest surviving rows first (a contiguous prefix by
-   * `sequence`), never an arbitrary subset. That invariant is what makes
-   * `isCursorRetained`'s single `MIN(sequence)` check sufficient: if a row
-   * survives, every row after it survives too.
+   * retention window (see `DEFAULT_RETENTION_DAYS`). The changes API embeds
+   * the cursor's issuance time and rejects it at that same deadline before
+   * reading this feed, including when compaction has removed every row.
    *
    * Nothing in this codebase calls this yet - no scheduled job exists in
    * this PR (see the PR description's retention-policy section). It is
@@ -151,27 +138,6 @@ export function createChangesRepository(
         .from(syncChanges)
         .where(eq(syncChanges.athleteId, athleteId));
       return row?.max ?? 0;
-    },
-
-    async isCursorRetained(sequence) {
-      // `0` ("nothing applied yet") is always a valid starting cursor,
-      // regardless of what retention has compacted away.
-      if (sequence <= 0) return true;
-
-      const [row] = await database
-        .select({ min: sql<number | null>`min(${syncChanges.sequence})` })
-        .from(syncChanges);
-      const oldestRetained = row?.min ?? null;
-
-      // No rows at all: nothing has ever been recorded, so there is nothing
-      // a cursor could have missed.
-      if (oldestRetained === null) return true;
-
-      // Valid iff nothing between `sequence + 1` and the oldest surviving
-      // row was compacted away - i.e. the cursor is at or after the oldest
-      // row compaction has left in place (see `compactOlderThan`'s
-      // contiguous-prefix invariant).
-      return sequence >= oldestRetained - 1;
     },
 
     async compactOlderThan(cutoff) {

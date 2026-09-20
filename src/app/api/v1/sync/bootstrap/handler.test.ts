@@ -160,8 +160,10 @@ void test('GET /api/v1/sync/bootstrap first page returns a snapshotCursor at the
   const data = (body as { data: { snapshotCursor: string | null } }).data;
   assert.ok(data.snapshotCursor);
   assert.deepEqual(decodeSyncCursor(data.snapshotCursor), {
-    version: 1,
+    version: 2,
     sequence: 17,
+    athleteId: ACTOR.athleteId,
+    issuedAt: now.toISOString(),
   });
 });
 

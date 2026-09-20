@@ -192,7 +192,7 @@ class FakeServer {
     };
   }
 
-  changesRepo(opts: { retainedFromSequence?: number } = {}) {
+  changesRepo() {
     return {
       latestSequence: async () => this.changes.at(-1)?.sequence ?? 0,
       findAfter: async (
@@ -204,19 +204,17 @@ class FakeServer {
           .filter((c) => c.athleteId === athleteId && c.sequence > afterSequence)
           .sort((a, b) => a.sequence - b.sequence)
           .slice(0, limit),
-      isCursorRetained: async (sequence: number) =>
-        opts.retainedFromSequence === undefined || sequence >= opts.retainedFromSequence,
     };
   }
 }
 
-function buildHandlers(server: FakeServer, opts: { retainedFromSequence?: number } = {}) {
+function buildHandlers(server: FakeServer) {
   const deps = {
     now: () => NOW,
     resolveActor: async () => ACTOR,
     activitiesRepo: server.activitiesRepo(),
     photosRepo: server.photosRepo(),
-    changesRepo: server.changesRepo(opts),
+    changesRepo: server.changesRepo(),
   };
   return {
     bootstrapGET: createSyncBootstrapHandler(deps),
@@ -329,6 +327,7 @@ async function bootstrapResource(
   db: DatabaseSync,
   resource: 'activities' | 'photos',
   pageLimit: number,
+  afterPage?: (pageCount: number) => void | Promise<void>,
 ): Promise<BootstrapResult> {
   let cursor: string | undefined;
   let snapshotCursor: string | null = null;
@@ -353,6 +352,7 @@ async function bootstrapResource(
     applyBootstrapPage(db, resource, body.data.items);
     pageCount += 1;
     if (body.data.snapshotCursor) snapshotCursor = body.data.snapshotCursor;
+    await afterPage?.(pageCount);
 
     if (body.data.nextCursor === null) break;
     cursor = body.data.nextCursor;
@@ -433,22 +433,26 @@ void test('a mutation that happens during bootstrap is not lost: snapshotCursor 
   const { bootstrapGET, changesGET } = buildHandlers(server);
   const db = createClientDb();
 
-  // `snapshotCursor` is captured on bootstrap's very first request, before
-  // any page has been read - so it already covers everything from here on,
-  // even though the mutations below happen only after every page has been
-  // fetched and applied.
-  const { snapshotCursor } = await bootstrapResource(bootstrapGET, db, 'activities', 1);
-  assert.deepEqual(activityIds(db), ['1', '2', '3', '4']);
+  // Pause between the first and second real HTTP-shaped bootstrap requests.
+  // The first page has captured the snapshot and delivered activity 1; the
+  // mutations therefore happen while keyset pagination is genuinely still
+  // in progress, rather than merely before the later catch-up begins.
+  const { snapshotCursor } = await bootstrapResource(
+    bootstrapGET,
+    db,
+    'activities',
+    1,
+    (pageCount) => {
+      if (pageCount !== 1) return;
 
-  // Three concurrent mutations "during bootstrap" (i.e. after the snapshot
-  // was taken, before the client finishes catching up):
-  // - an update to a row bootstrap already delivered and will never
-  //   re-read (keyset pagination only moves forward);
-  // - a delete of a row bootstrap already delivered;
-  // - a brand new row.
-  server.upsertActivity(buildActivity({ id: 1, name: 'Updated mid-bootstrap' }));
-  server.deleteActivity(2);
-  server.upsertActivity(buildActivity({ id: 5, name: 'Created mid-bootstrap' }));
+      // - update the already-delivered row (bootstrap will not read it again)
+      // - delete the next not-yet-delivered row
+      // - insert a new row that a later bootstrap page may also see
+      server.upsertActivity(buildActivity({ id: 1, name: 'Updated mid-bootstrap' }));
+      server.deleteActivity(2);
+      server.upsertActivity(buildActivity({ id: 5, name: 'Created mid-bootstrap' }));
+    },
+  );
 
   const { totalItems } = await drainChanges(changesGET, db, snapshotCursor);
 
@@ -480,7 +484,13 @@ void test('delta pages are safe to replay: applying the same page twice does not
 
   const response = await changesGET(
     new Request(
-      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encodeSyncCursor(0))}`,
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(
+        encodeSyncCursor({
+          sequence: 0,
+          athleteId: ACTOR.athleteId,
+          issuedAt: NOW,
+        }),
+      )}`,
     ),
   );
   const body = (await response.json()) as { data: { items: SyncChangeItemDTO[]; nextCursor: string } };

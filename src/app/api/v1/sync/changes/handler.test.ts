@@ -12,6 +12,10 @@ import { createSyncChangesHandler } from './handler.ts';
 const now = new Date('2026-09-20T12:00:00.000Z');
 const ACTOR: Actor = { userId: 'user-1', athleteId: 42, authentication: 'cookie' };
 
+function encode(sequence: number, athleteId = ACTOR.athleteId, issuedAt = now) {
+  return encodeSyncCursor({ sequence, athleteId, issuedAt });
+}
+
 function buildActivity(overrides: Partial<Activity> & { id: number }): Activity {
   return {
     athlete: ACTOR.athleteId,
@@ -120,7 +124,7 @@ function fakePhotosRepo(rows: Photo[]) {
   };
 }
 
-function fakeChangesRepo(opts: { changes: SyncChange[]; retained?: boolean }) {
+function fakeChangesRepo(opts: { changes: SyncChange[]; latestSequence?: number }) {
   return {
     async findAfter(athleteId: number, afterSequence: number, { limit = 500 }: { limit?: number } = {}) {
       return opts.changes
@@ -128,8 +132,16 @@ function fakeChangesRepo(opts: { changes: SyncChange[]; retained?: boolean }) {
         .sort((a, b) => a.sequence - b.sequence)
         .slice(0, limit);
     },
-    async isCursorRetained() {
-      return opts.retained ?? true;
+    async latestSequence(athleteId: number) {
+      return (
+        opts.latestSequence ??
+        Math.max(
+          0,
+          ...opts.changes
+            .filter((change) => change.athleteId === athleteId)
+            .map((change) => change.sequence),
+        )
+      );
     },
   };
 }
@@ -181,18 +193,59 @@ void test('GET /api/v1/sync/changes returns 409 sync_rebootstrap_required for a 
   assert.equal(body.error.code, 'sync_rebootstrap_required');
 });
 
-void test('GET /api/v1/sync/changes returns 409 sync_rebootstrap_required when the cursor is no longer retained', async () => {
+void test('GET /api/v1/sync/changes returns 409 when the cursor retention window has expired', async () => {
   const GET = createSyncChangesHandler({
     now: () => now,
     resolveActor: async () => ACTOR,
     activitiesRepo: fakeActivitiesRepo([]),
     photosRepo: fakePhotosRepo([]),
-    changesRepo: fakeChangesRepo({ changes: [], retained: false }),
+    changesRepo: fakeChangesRepo({ changes: [] }),
+  });
+
+  const expiredAt = new Date(now.getTime() - 91 * 24 * 60 * 60 * 1000);
+  const response = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(3, ACTOR.athleteId, expiredAt))}`,
+    ),
+  );
+  const body = (await response.json()) as { error: { code: string } };
+
+  assert.equal(response.status, 409);
+  assert.equal(body.error.code, 'sync_rebootstrap_required');
+});
+
+void test('GET /api/v1/sync/changes returns 409 for a cursor issued to another athlete', async () => {
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo([]),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo({ changes: [] }),
   });
 
   const response = await GET(
     new Request(
-      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encodeSyncCursor(3))}`,
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0, 99))}`,
+    ),
+  );
+  const body = (await response.json()) as { error: { code: string } };
+
+  assert.equal(response.status, 409);
+  assert.equal(body.error.code, 'sync_rebootstrap_required');
+});
+
+void test('GET /api/v1/sync/changes returns 409 for a cursor beyond the athlete high-water mark', async () => {
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo([]),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo({ changes: [], latestSequence: 3 }),
+  });
+
+  const response = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(4))}`,
     ),
   );
   const body = (await response.json()) as { error: { code: string } };
@@ -219,7 +272,7 @@ void test('GET /api/v1/sync/changes returns ordered upserts and tombstones after
 
   const response = await GET(
     new Request(
-      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encodeSyncCursor(0))}`,
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0))}`,
     ),
   );
   const body: unknown = await response.json();
@@ -262,14 +315,14 @@ void test('GET /api/v1/sync/changes drops an upsert whose current row is already
 
   const response = await GET(
     new Request(
-      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encodeSyncCursor(0))}`,
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0))}`,
     ),
   );
   const body = (await response.json()) as { data: { items: unknown[]; nextCursor: string } };
 
   assert.deepEqual(body.data.items, []);
   // The cursor still advances past the dropped change, so it is never re-delivered.
-  assert.equal(body.data.nextCursor, encodeSyncCursor(1));
+  assert.equal(body.data.nextCursor, encode(1));
 });
 
 void test('GET /api/v1/sync/changes returns the same cursor back when there is nothing new (poll, do not error)', async () => {
@@ -278,17 +331,29 @@ void test('GET /api/v1/sync/changes returns the same cursor back when there is n
     resolveActor: async () => ACTOR,
     activitiesRepo: fakeActivitiesRepo([]),
     photosRepo: fakePhotosRepo([]),
-    changesRepo: fakeChangesRepo({ changes: [] }),
+    changesRepo: fakeChangesRepo({ changes: [], latestSequence: 5 }),
   });
 
-  const cursor = encodeSyncCursor(5);
+  const issuedAt = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const cursor = encode(5, ACTOR.athleteId, issuedAt);
   const response = await GET(
     new Request(`https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`),
   );
-  const body = (await response.json()) as { data: { items: unknown[]; nextCursor: string } };
+  const body = (await response.json()) as {
+    data: {
+      items: unknown[];
+      nextCursor: string;
+      retention: { cursorValidUntil: string };
+    };
+  };
 
   assert.deepEqual(body.data.items, []);
   assert.equal(body.data.nextCursor, cursor);
+  assert.equal(
+    body.data.retention.cursorValidUntil,
+    new Date(issuedAt.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+    'an empty poll must not renew the same cursor beyond its original retention deadline',
+  );
 });
 
 void test('GET /api/v1/sync/changes replaying the same page is idempotent (same input cursor -> same output)', async () => {
@@ -302,7 +367,7 @@ void test('GET /api/v1/sync/changes replaying the same page is idempotent (same 
     changesRepo: fakeChangesRepo({ changes }),
   });
 
-  const cursor = encodeSyncCursor(0);
+  const cursor = encode(0);
   const first = await GET(new Request(`https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`));
   const second = await GET(new Request(`https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`));
 

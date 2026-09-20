@@ -26,7 +26,7 @@ export interface SyncChangesHandlerDependencies {
   resolveActor: (request: Request) => Promise<Actor | null>;
   activitiesRepo: Pick<ActivitiesRepository, 'findManyByIds'>;
   photosRepo: Pick<PhotosRepository, 'findManyByIds'>;
-  changesRepo: Pick<ChangesRepository, 'findAfter' | 'isCursorRetained'>;
+  changesRepo: Pick<ChangesRepository, 'findAfter' | 'latestSequence'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
   retentionDays?: number;
 }
@@ -48,11 +48,10 @@ function requestIdFor(request: Request, createRequestId: () => string): string {
  * offline sync this replaces) - always by `sequence`, via
  * `ChangesRepository.findAfter`.
  *
- * A cursor that is malformed, from an unsupported version, or that
- * retention has compacted past (`ChangesRepository.isCursorRetained`)
- * always gets `409 sync_rebootstrap_required`, never a partial or
- * best-effort result - see docs/swiftui-backend-preparation-plan.md,
- * "Delta synchronization".
+ * A cursor that is malformed, from an unsupported version, belongs to a
+ * different athlete, is older than the retention window, or points beyond
+ * this athlete's current high-water mark always gets
+ * `409 sync_rebootstrap_required`, never a partial or best-effort result.
  */
 export function createSyncChangesHandler({
   createRequestId = randomUUID,
@@ -99,11 +98,29 @@ export function createSyncChangesHandler({
         return rebootstrapRequired(requestId, 'The `cursor` parameter is invalid.');
       }
 
-      const retained = await changesRepo.isCursorRetained(decoded.sequence);
-      if (!retained) {
+      if (decoded.athleteId !== actor.athleteId) {
+        return rebootstrapRequired(
+          requestId,
+          'The requested cursor belongs to a different athlete.',
+        );
+      }
+
+      const nowValue = now();
+      const cursorValidUntil = new Date(
+        Date.parse(decoded.issuedAt) + retentionDays * 24 * 60 * 60 * 1000,
+      );
+      if (nowValue.getTime() >= cursorValidUntil.getTime()) {
         return rebootstrapRequired(
           requestId,
           'The requested cursor is older than the retained change history.',
+        );
+      }
+
+      const latestSequence = await changesRepo.latestSequence(actor.athleteId);
+      if (decoded.sequence > latestSequence) {
+        return rebootstrapRequired(
+          requestId,
+          'The requested cursor is beyond the current change-feed high-water mark.',
         );
       }
 
@@ -119,15 +136,26 @@ export function createSyncChangesHandler({
       });
 
       const lastSequence = changes.at(-1)?.sequence ?? decoded.sequence;
-      const nowValue = now();
+      const nextCursor =
+        changes.length === 0
+          ? cursor
+          : encodeSyncCursor({
+              sequence: lastSequence,
+              athleteId: actor.athleteId,
+              issuedAt: nowValue,
+            });
+      const nextCursorValidUntil =
+        changes.length === 0
+          ? cursorValidUntil
+          : new Date(
+              nowValue.getTime() + retentionDays * 24 * 60 * 60 * 1000,
+            );
       const payload = {
         items,
-        nextCursor: encodeSyncCursor(lastSequence),
+        nextCursor,
         retention: {
           retentionDays,
-          cursorValidUntil: new Date(
-            nowValue.getTime() + retentionDays * 24 * 60 * 60 * 1000,
-          ).toISOString(),
+          cursorValidUntil: nextCursorValidUntil.toISOString(),
         },
       };
 

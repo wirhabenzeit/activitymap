@@ -4,36 +4,41 @@ import test from 'node:test';
 import {
   InvalidSyncCursorError,
   SYNC_CURSOR_VERSION,
-  ZERO_SYNC_CURSOR,
   decodeSyncCursor,
   encodeSyncCursor,
   tryDecodeSyncCursor,
 } from './cursor.ts';
 
-void test('encodeSyncCursor/decodeSyncCursor round-trip a sequence number', () => {
+const ISSUED_AT = new Date('2026-09-20T12:00:00.000Z');
+
+function encode(sequence: number, athleteId = 42, issuedAt = ISSUED_AT) {
+  return encodeSyncCursor({ sequence, athleteId, issuedAt });
+}
+
+void test('encodeSyncCursor/decodeSyncCursor round-trip sequence, athlete scope, and issuance time', () => {
   for (const sequence of [0, 1, 42, 1_000_000]) {
-    const token = encodeSyncCursor(sequence);
-    const decoded = decodeSyncCursor(token);
-    assert.deepEqual(decoded, { version: SYNC_CURSOR_VERSION, sequence });
+    assert.deepEqual(decodeSyncCursor(encode(sequence)), {
+      version: SYNC_CURSOR_VERSION,
+      sequence,
+      athleteId: 42,
+      issuedAt: ISSUED_AT.toISOString(),
+    });
   }
 });
 
-void test('the same sequence always encodes to the same opaque token (replaying a cursor is safe)', () => {
-  // The plan doc's "replaying a change page is harmless" property, applied
-  // to the cursor itself: decoding (and, if a caller re-derives it,
-  // re-encoding) the same cursor repeatedly must be idempotent - never
-  // produce a different token or a different decoded value - so a client
-  // that retries a request with the same cursor after an interruption is
-  // safe.
-  const token = encodeSyncCursor(7);
-  assert.equal(encodeSyncCursor(7), token);
+void test('identical cursor inputs encode deterministically (replaying a cursor is safe)', () => {
+  const token = encode(7);
+  assert.equal(encode(7), token);
   assert.deepEqual(decodeSyncCursor(token), decodeSyncCursor(token));
 });
 
-void test('encodeSyncCursor rejects a negative or non-integer sequence', () => {
-  assert.throws(() => encodeSyncCursor(-1), RangeError);
-  assert.throws(() => encodeSyncCursor(1.5), RangeError);
-  assert.throws(() => encodeSyncCursor(Number.NaN), RangeError);
+void test('encodeSyncCursor rejects invalid sequence, athlete, or issuance inputs', () => {
+  assert.throws(() => encode(-1), RangeError);
+  assert.throws(() => encode(1.5), RangeError);
+  assert.throws(() => encode(Number.NaN), RangeError);
+  assert.throws(() => encode(1, 0), RangeError);
+  assert.throws(() => encode(1, 1.5), RangeError);
+  assert.throws(() => encode(1, 42, new Date(Number.NaN)), RangeError);
 });
 
 void test('decodeSyncCursor rejects an empty or non-string token', () => {
@@ -49,48 +54,63 @@ void test('decodeSyncCursor rejects a token with no recognizable version prefix'
   assert.throws(() => decodeSyncCursor('42'), InvalidSyncCursorError);
 });
 
-void test('decodeSyncCursor rejects a wrong-version token explicitly rather than misinterpreting it', () => {
-  // A future v2 cursor format must not be silently parsed as v1 (or vice
-  // versa) - it must fail loudly so the caller can map it to
-  // `409 sync_rebootstrap_required` per the plan doc, not quietly resync
-  // from the wrong point.
-  const v1Token = encodeSyncCursor(5);
-  const fakeV2Token = 'sc2.' + v1Token.slice('sc1.'.length);
-  assert.throws(() => decodeSyncCursor(fakeV2Token), InvalidSyncCursorError);
+void test('decodeSyncCursor rejects a wrong-version token explicitly', () => {
+  const v2Token = encode(5);
+  const fakeV3Token = 'sc3.' + v2Token.slice('sc2.'.length);
+  assert.throws(() => decodeSyncCursor(fakeV3Token), InvalidSyncCursorError);
 
-  // Same payload, but with an internal version tag from a hypothetical
-  // future format - also rejected, even though the outer prefix matches.
-  const payload = Buffer.from(JSON.stringify({ v: 2, seq: 5 }), 'utf8').toString(
-    'base64url',
+  const payload = Buffer.from(
+    JSON.stringify({ v: 3, seq: 5, aid: 42, iat: ISSUED_AT.toISOString() }),
+    'utf8',
+  ).toString('base64url');
+  assert.throws(() => decodeSyncCursor('sc2.' + payload), InvalidSyncCursorError);
+});
+
+void test('decodeSyncCursor rejects malformed base64/JSON payloads', () => {
+  assert.throws(
+    () => decodeSyncCursor('sc2.not-valid-base64!!!'),
+    InvalidSyncCursorError,
   );
-  assert.throws(() => decodeSyncCursor('sc1.' + payload), InvalidSyncCursorError);
-});
-
-void test('decodeSyncCursor rejects malformed base64/JSON payloads instead of throwing an unrelated error', () => {
-  assert.throws(() => decodeSyncCursor('sc1.not-valid-base64!!!'), InvalidSyncCursorError);
   const notJson = Buffer.from('not json', 'utf8').toString('base64url');
-  assert.throws(() => decodeSyncCursor('sc1.' + notJson), InvalidSyncCursorError);
+  assert.throws(() => decodeSyncCursor('sc2.' + notJson), InvalidSyncCursorError);
 });
 
-void test('decodeSyncCursor rejects a payload missing or mistyping its sequence', () => {
-  const cases = [{ v: 1 }, { v: 1, seq: 'seven' }, { v: 1, seq: -1 }, { v: 1, seq: 1.5 }, null, 42];
+void test('decodeSyncCursor rejects a payload with invalid fields', () => {
+  const valid = {
+    v: SYNC_CURSOR_VERSION,
+    seq: 7,
+    aid: 42,
+    iat: ISSUED_AT.toISOString(),
+  };
+  const cases = [
+    { ...valid, seq: 'seven' },
+    { ...valid, seq: -1 },
+    { ...valid, aid: 0 },
+    { ...valid, aid: '42' },
+    { ...valid, iat: 'not-a-date' },
+    { ...valid, iat: '2026-09-20' },
+    { v: SYNC_CURSOR_VERSION, seq: 7 },
+    null,
+    42,
+  ];
+
   for (const payload of cases) {
-    const token = 'sc1.' + Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
-    assert.throws(() => decodeSyncCursor(token), InvalidSyncCursorError, JSON.stringify(payload));
+    const token =
+      'sc2.' + Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+    assert.throws(
+      () => decodeSyncCursor(token),
+      InvalidSyncCursorError,
+      JSON.stringify(payload),
+    );
   }
 });
 
 void test('tryDecodeSyncCursor returns null instead of throwing for an invalid token', () => {
   assert.equal(tryDecodeSyncCursor('garbage'), null);
-  assert.deepEqual(tryDecodeSyncCursor(encodeSyncCursor(3)), {
+  assert.deepEqual(tryDecodeSyncCursor(encode(3)), {
     version: SYNC_CURSOR_VERSION,
     sequence: 3,
-  });
-});
-
-void test('ZERO_SYNC_CURSOR decodes to sequence 0 - the correct starting point before a fresh bootstrap', () => {
-  assert.deepEqual(decodeSyncCursor(ZERO_SYNC_CURSOR), {
-    version: SYNC_CURSOR_VERSION,
-    sequence: 0,
+    athleteId: 42,
+    issuedAt: ISSUED_AT.toISOString(),
   });
 });

@@ -134,7 +134,11 @@ export function createSyncBootstrapHandler({
 
       const nowValue = now();
       const snapshotCursor = isFirstPage
-        ? encodeSyncCursor(await changesRepo.latestSequence(actor.athleteId))
+        ? encodeSyncCursor({
+            sequence: await changesRepo.latestSequence(actor.athleteId),
+            athleteId: actor.athleteId,
+            issuedAt: nowValue,
+          })
         : null;
       const retention = {
         retentionDays,

@@ -11,21 +11,17 @@
  * `~/server/application/sync.ts`.
  *
  * The token is intentionally opaque (clients must not parse or construct
- * it) and carries an explicit version tag, so a future change to the cursor
- * format (e.g. adding a schema/shard identifier) does not require bespoke
- * migration logic for cursors already issued to clients: an old-version
- * token is rejected outright (`InvalidSyncCursorError`) rather than silently
- * misinterpreted, and the caller (a future #123 endpoint) can map that
- * rejection onto the `409 sync_rebootstrap_required` response described in
- * docs/swiftui-backend-preparation-plan.md.
+ * it) and carries an explicit version tag, athlete scope, and issuance time.
+ * Scope prevents a locally retained cursor from one signed-in athlete from
+ * silently skipping another athlete's earlier changes. Issuance time gives
+ * the API a stable retention deadline that an empty poll cannot renew.
  *
  * This module has no database dependency - #123's bootstrap/delta endpoints
- * import it directly to encode/decode cursors, and combine it with
- * `~/server/repositories/changes.ts`'s `isCursorRetained` to decide whether
- * a decoded cursor is still inside the retained change history.
+ * import it directly and validate the decoded scope, issuance time, and
+ * sequence against the authenticated actor and current feed high-water mark.
  */
 
-export const SYNC_CURSOR_VERSION = 1;
+export const SYNC_CURSOR_VERSION = 2;
 
 export type SyncCursor = {
   /** The cursor encoding's own version - see the module doc comment. */
@@ -37,6 +33,10 @@ export type SyncCursor = {
    * bootstrap's starting cursor) - `sync_change.sequence` starts at 1.
    */
   sequence: number;
+  /** The Strava athlete this cursor was issued for. */
+  athleteId: number;
+  /** Canonical ISO instant from which the cursor retention window starts. */
+  issuedAt: string;
 };
 
 /** Thrown by `decodeSyncCursor` for anything that is not a well-formed, current-version cursor. */
@@ -53,18 +53,49 @@ export class InvalidSyncCursorError extends Error {
 // already issued under v1.
 const CURSOR_PREFIX = `sc${SYNC_CURSOR_VERSION}.`;
 
-function isNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
-/** Encode a `sync_change.sequence` into an opaque, versioned cursor token. */
-export function encodeSyncCursor(sequence: number): string {
-  if (!isNonNegativeInteger(sequence)) {
+function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+function isCanonicalIsoInstant(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const milliseconds = Date.parse(value);
+  return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
+}
+
+/** Encode a scoped `sync_change.sequence` into an opaque, versioned cursor token. */
+export function encodeSyncCursor({
+  sequence,
+  athleteId,
+  issuedAt,
+}: {
+  sequence: number;
+  athleteId: number;
+  issuedAt: Date;
+}): string {
+  if (!isNonNegativeSafeInteger(sequence)) {
     throw new RangeError(
-      `Cursor sequence must be a non-negative integer, got ${String(sequence)}`,
+      `Cursor sequence must be a non-negative safe integer, got ${String(sequence)}`,
     );
   }
-  const payload = JSON.stringify({ v: SYNC_CURSOR_VERSION, seq: sequence });
+  if (!isPositiveSafeInteger(athleteId)) {
+    throw new RangeError(
+      `Cursor athleteId must be a positive safe integer, got ${String(athleteId)}`,
+    );
+  }
+  if (!Number.isFinite(issuedAt.getTime())) {
+    throw new RangeError('Cursor issuedAt must be a valid Date');
+  }
+  const payload = JSON.stringify({
+    v: SYNC_CURSOR_VERSION,
+    seq: sequence,
+    aid: athleteId,
+    iat: issuedAt.toISOString(),
+  });
   return CURSOR_PREFIX + Buffer.from(payload, 'utf8').toString('base64url');
 }
 
@@ -102,15 +133,26 @@ export function decodeSyncCursor(token: string): SyncCursor {
   if (typeof parsed !== 'object' || parsed === null) {
     throw new InvalidSyncCursorError('payload is not an object');
   }
-  const { v, seq } = parsed as Record<string, unknown>;
+  const { v, seq, aid, iat } = parsed as Record<string, unknown>;
   if (v !== SYNC_CURSOR_VERSION) {
     throw new InvalidSyncCursorError(`unsupported cursor payload version ${String(v)}`);
   }
-  if (!isNonNegativeInteger(seq)) {
-    throw new InvalidSyncCursorError('sequence must be a non-negative integer');
+  if (!isNonNegativeSafeInteger(seq)) {
+    throw new InvalidSyncCursorError('sequence must be a non-negative safe integer');
+  }
+  if (!isPositiveSafeInteger(aid)) {
+    throw new InvalidSyncCursorError('athleteId must be a positive safe integer');
+  }
+  if (!isCanonicalIsoInstant(iat)) {
+    throw new InvalidSyncCursorError('issuedAt must be a canonical ISO instant');
   }
 
-  return { version: SYNC_CURSOR_VERSION, sequence: seq };
+  return {
+    version: SYNC_CURSOR_VERSION,
+    sequence: seq,
+    athleteId: aid,
+    issuedAt: iat,
+  };
 }
 
 /** `decodeSyncCursor`, returning `null` instead of throwing on an invalid token. */
@@ -121,6 +163,3 @@ export function tryDecodeSyncCursor(token: string): SyncCursor | null {
     return null;
   }
 }
-
-/** The cursor for "no changes applied yet" - the correct starting point before a fresh bootstrap. */
-export const ZERO_SYNC_CURSOR = encodeSyncCursor(0);

@@ -17,14 +17,14 @@ import { createChangesRepository, type ChangesRepository } from './changes.ts';
  * exist to prove - lives in the repository's own JS code, not in SQL.
  *
  * Real filtering correctness (`findAfter`'s `athleteId`/`sequence`
- * predicate, `isCursorRetained`/`compactOlderThan`'s date/aggregate
- * queries) is ordinary, well-understood single-column SQL and is not
+ * predicate and `compactOlderThan`'s date query) is ordinary,
+ * well-understood single-column SQL and is not
  * independently re-verified here; there is no live Postgres in this
  * sandbox to run it against (see the PR description).
  */
 function buildFakeDb(opts: {
   selectResult?: unknown[];
-  aggregateResult?: { max?: number | null; min?: number | null };
+  aggregateResult?: { max?: number | null };
   deletedRows?: { sequence: number }[];
 } = {}) {
   const rows: {
@@ -60,21 +60,20 @@ function buildFakeDb(opts: {
       };
     },
     select(columns?: Record<string, unknown>) {
-      // Both `latestSequence`/`isCursorRetained`'s aggregate queries
-      // (`select({ max: sql\`...\` })`/`select({ min: sql\`...\` })`) and
-      // `findAfter`'s full-row query (`select()`, no columns) go through
+      // Both `latestSequence`'s aggregate query
+      // (`select({ max: sql\`...\` })`) and `findAfter`'s full-row query
+      // (`select()`, no columns) go through
       // this same fake chain; which canned result to resolve to is decided
       // by which shape of `columns` this call was given.
-      const isAggregate = !!columns && ('max' in columns || 'min' in columns);
+      const isAggregate = !!columns && 'max' in columns;
       const resolved = isAggregate
-        ? [{ max: opts.aggregateResult?.max ?? null, min: opts.aggregateResult?.min ?? null }]
+        ? [{ max: opts.aggregateResult?.max ?? null }]
         : (opts.selectResult ?? []);
 
       // A real drizzle query builder is itself a thenable at every stage
       // (`select().from()`, `...where()`, `...where().orderBy().limit()`
       // are all directly awaitable), which is what lets `latestSequence`
-      // await `.where(...)` with no further chaining and `isCursorRetained`
-      // await `.from(...)` with none at all. This object mimics that:
+      // await `.where(...)` with no further chaining. This object mimics that:
       // chaining is optional, and awaiting it at any point resolves to the
       // same canned `resolved` array.
       function makeChainable(): {
@@ -227,25 +226,6 @@ void test('latestSequence returns the reported max sequence', async () => {
   assert.equal(await repoWith(db).latestSequence(1), 42);
 });
 
-void test('isCursorRetained: cursor 0 ("nothing applied yet") is always retained', async () => {
-  const { db } = repoBackedByAggregate({ min: 500 });
-  assert.equal(await repoWith(db).isCursorRetained(0), true);
-});
-
-void test('isCursorRetained: any cursor is retained when nothing has ever been recorded', async () => {
-  const { db } = repoBackedByAggregate({ min: null });
-  assert.equal(await repoWith(db).isCursorRetained(999), true);
-});
-
-void test('isCursorRetained: retained at or after the oldest surviving sequence, stale strictly before it', async () => {
-  const { db: dbAtFloor } = repoBackedByAggregate({ min: 100 });
-  assert.equal(await repoWith(dbAtFloor).isCursorRetained(99), true); // floor - 1
-  assert.equal(await repoWith(dbAtFloor).isCursorRetained(100), true);
-
-  const { db: dbBelowFloor } = repoBackedByAggregate({ min: 100 });
-  assert.equal(await repoWith(dbBelowFloor).isCursorRetained(50), false);
-});
-
 void test('compactOlderThan reports how many rows the delete removed', async () => {
   const { db } = buildFakeDb({ deletedRows: [{ sequence: 1 }, { sequence: 2 }] });
   const deletedCount = await repoWith(db).compactOlderThan(new Date('2020-01-01'));
@@ -258,6 +238,6 @@ void test('compactOlderThan reports 0 when nothing was old enough to remove', as
   assert.equal(deletedCount, 0);
 });
 
-function repoBackedByAggregate(aggregateResult: { max?: number | null; min?: number | null }) {
+function repoBackedByAggregate(aggregateResult: { max?: number | null }) {
   return buildFakeDb({ aggregateResult });
 }
