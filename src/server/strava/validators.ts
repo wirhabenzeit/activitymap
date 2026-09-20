@@ -12,6 +12,13 @@ export const fetchActivitiesSchema = z.object({
     athleteId: z.number(),
     shouldDeletePhotos: z.boolean().default(false),
     limit: z.number().default(50),
+    // Whether this call should itself persist the fetched activities/photos
+    // (transactionally, emitting `sync_change` entries - see issue #122).
+    // `false` for a caller (the Strava webhook processor) that performs its
+    // own persistence and change-feed recording immediately afterward in one
+    // transaction, so the same mutation is not written - and change-recorded
+    // - twice.
+    persist: z.boolean().default(true),
 });
 
 export type FetchActivitiesInput = z.input<typeof fetchActivitiesSchema>;
