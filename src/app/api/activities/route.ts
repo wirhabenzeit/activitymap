@@ -1,5 +1,7 @@
-import { getActivitiesByIds } from '~/server/db/actions';
 import { NextResponse } from 'next/server';
+
+import { getActivitiesForActor } from '~/server/application/activities';
+import { requireActor, UnauthenticatedError } from '~/server/auth/actor';
 import { logger } from '~/server/logging/logger';
 
 export async function GET(request: Request) {
@@ -11,7 +13,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const activities = await getActivitiesByIds(ids.split(',').map(Number));
+    const actor = await requireActor(request.headers);
+    const activities = await getActivitiesForActor(
+      actor,
+      ids.split(',').map(Number),
+    );
 
     return NextResponse.json(
       activities.map((activity) => ({
@@ -20,6 +26,9 @@ export async function GET(request: Request) {
       })),
     );
   } catch (error) {
+    if (error instanceof UnauthenticatedError) {
+      return NextResponse.json({ error: error.message }, { status: 401 });
+    }
     logger.error('Error fetching activities:', error);
     return NextResponse.json(
       { error: 'Failed to fetch activities' },

@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
-import { headers } from 'next/headers';
+import 'server-only';
 
-import { auth } from '~/lib/auth';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
+
 import { db } from '~/server/db';
 import {
   activities,
@@ -11,7 +11,22 @@ import {
   type Activity,
   type Photo,
 } from '~/server/db/schema';
-import { getUserInternal } from '~/server/db/internal';
+
+import type { Actor } from '~/server/auth/actor';
+
+/**
+ * Application service for the offline bootstrap/changes reads used by the
+ * `/api/offline/*` Route Handlers (issue #120's "synchronization queries").
+ *
+ * This is a timestamp-cursor stopgap, not the lossless, sequence-numbered
+ * change feed described in docs/swiftui-backend-preparation-plan.md - that
+ * feed (and the `changes` repository it would justify) is issue #122/#123's
+ * job. Moved here unchanged in behavior from the former
+ * `~/server/offline/sync.ts`, except that it now takes an already-resolved
+ * `Actor` instead of reading `next/headers`/the Better Auth session itself,
+ * so it has no framework dependency and Route Handlers and Server Actions
+ * can call it identically.
+ */
 
 const EPOCH_ISO = new Date(0).toISOString();
 
@@ -41,24 +56,10 @@ const getPhotoWatermark = (photo: Photo): string =>
 
 const maxIso = (a: string, b: string): string => (a >= b ? a : b);
 
-const getAthleteIdForSession = async (): Promise<number> => {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session?.user?.id) {
-    throw new Error('Not authenticated');
-  }
-
-  const user = await getUserInternal(session.user.id);
-  if (!user?.athlete_id) {
-    throw new Error('User has no athlete_id linked');
-  }
-
-  return user.athlete_id;
-};
-
-export const getOfflineBootstrap = async (): Promise<OfflineSyncPayload> => {
-  const athleteId = await getAthleteIdForSession();
+export const getOfflineBootstrap = async (
+  actor: Actor,
+): Promise<OfflineSyncPayload> => {
+  const athleteId = actor.athleteId;
   const serverTime = new Date().toISOString();
 
   const [activityRows, photoRows] = await Promise.all([
@@ -96,9 +97,10 @@ export const getOfflineBootstrap = async (): Promise<OfflineSyncPayload> => {
 };
 
 export const getOfflineChanges = async (
+  actor: Actor,
   sinceRaw: string | null,
 ): Promise<OfflineSyncPayload> => {
-  const athleteId = await getAthleteIdForSession();
+  const athleteId = actor.athleteId;
   const since = parseSinceCursor(sinceRaw);
   const serverTime = new Date().toISOString();
 

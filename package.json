@@ -17,7 +17,7 @@
     "db:migrate:preview": "tsx scripts/database/migrate-preview.ts",
     "db:schema:fingerprint": "tsx scripts/database/migrate.ts fingerprint",
     "db:baseline:adopt": "tsx scripts/database/migrate.ts adopt-baseline",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --conditions=react-server --test src/**/*.test.ts",
     "test:sync": "tsx src/scripts/test-sync-activities.ts",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
     "openapi:verify-swift": "bash scripts/verify-swift-client.sh",

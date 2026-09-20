@@ -1,81 +1,26 @@
 'use server';
 
-import {
-  activities as activitySchema,
-  activityDeletions,
-  stravaWebhooks,
-  type Activity,
-} from '~/server/db/schema';
+import { stravaWebhooks } from '~/server/db/schema';
 
 import { db } from '~/server/db';
-import { getAuthenticatedAccountInternal } from '~/server/db/internal';
 import { logger } from '~/server/logging/logger';
 import { StravaClient } from './client';
-import { transformStravaActivity } from './transforms';
-import { type UpdatableActivity } from './types';
-import { inArray, eq, and, sql } from 'drizzle-orm';
-import {
-  updateActivityInputSchema,
-  type UpdateActivityInput,
-  deleteActivitiesSchema,
-} from './validators';
-import { fetchStravaActivities } from './service';
+import { type UpdateActivityInput } from './validators';
 import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
+import { headers } from 'next/headers';
+import { requireActor } from '~/server/auth/actor';
+import * as activitiesService from '~/server/application/activities';
 
+/**
+ * Thin compatibility adapter: resolves the caller's `Actor` from the current
+ * request context and delegates to the application service
+ * (`~/server/application/activities.ts`), which resolves the Strava
+ * credential itself and enforces ownership. Never accepts a client-supplied
+ * access token/account ID here - see issue #116.
+ */
 export async function updateActivity(input: UpdateActivityInput) {
-  try {
-    const act = updateActivityInputSchema.parse(input);
-
-    // Always resolve the Strava credential from the authenticated session.
-    // Never accept a client-supplied access token/account ID here - see issue #116.
-    const account = await getAuthenticatedAccountInternal();
-    if (!account?.access_token) {
-      throw new Error('No Strava access token found');
-    }
-
-    const client = StravaClient.withAccessToken(account.access_token);
-
-    try {
-      // First update in Strava to ensure we have valid authorization
-      const updateData: Omit<UpdatableActivity, 'id' | 'athlete'> = {
-        name: act.name,
-        sport_type: act.sport_type,
-        description: act.description,
-        commute: act.commute,
-        hide_from_home: act.hide_from_home,
-        gear_id: act.gear_id,
-      };
-
-      const stravaActivity = await client.updateActivity(act.id, updateData);
-
-      // Transform and update in database
-      const transformedActivity = {
-        ...transformStravaActivity(stravaActivity),
-        athlete: parseInt(account.accountId),
-      } satisfies Activity;
-
-      const [updatedActivity] = await db
-        .insert(activitySchema)
-        .values(transformedActivity)
-        .onConflictDoUpdate({
-          target: activitySchema.id,
-          set: transformedActivity,
-        })
-        .returning();
-
-      if (!updatedActivity) {
-        throw new Error('Failed to update activity in database');
-      }
-
-      return updatedActivity;
-    } catch (error) {
-      logger.error('Failed to update activity:', error);
-      throw new Error('Failed to update activity');
-    }
-  } catch (error) {
-    logger.error('Failed to update activity:', error);
-    throw new Error('Failed to update activity');
-  }
+  const actor = await requireActor(await headers());
+  return activitiesService.updateActivityForActor(actor, input);
 }
 
 /**
@@ -83,88 +28,23 @@ export async function updateActivity(input: UpdateActivityInput) {
  * authenticated user. This is the only client-callable entry point to the
  * fetchStravaActivities service - it never accepts a caller-supplied token
  * or athlete ID. See issue #116.
+ *
+ * Thin compatibility adapter over `refreshActivityForActor`.
  */
 export async function refreshActivity(activityId: number) {
-  const account = await getAuthenticatedAccountInternal();
-  if (!account?.access_token) {
-    throw new Error('No Strava access token found');
-  }
-
-  return fetchStravaActivities({
-    accessToken: account.access_token,
-    athleteId: parseInt(account.accountId),
-    activityIds: [activityId],
-    includePhotos: true,
-  });
+  const actor = await requireActor(await headers());
+  return activitiesService.refreshActivityForActor(actor, activityId);
 }
 
+/**
+ * Thin compatibility adapter over `deleteActivitiesForActor`.
+ */
 export async function deleteActivities(input: number[]): Promise<{
   deletedCount: number;
   errors: string[];
 }> {
-  const activityIds = deleteActivitiesSchema.parse(input);
-  if (!activityIds || activityIds.length === 0) {
-    return { deletedCount: 0, errors: [] };
-  }
-
-  const errors: string[] = [];
-  let deletedCount = 0;
-
-  try {
-    // Get current user's account info to ensure we only delete their activities
-    const account = await getAuthenticatedAccountInternal();
-    if (!account?.accountId) {
-      throw new Error('User account not found or missing accountId');
-    }
-    const athleteId = parseInt(account.accountId);
-
-    // Perform the deletion
-    const deleteResult = await db
-      .delete(activitySchema)
-      .where(
-        and(
-          eq(activitySchema.athlete, athleteId),
-          inArray(activitySchema.id, activityIds),
-        ),
-      )
-      .returning({ deletedId: activitySchema.id });
-
-    deletedCount = deleteResult.length;
-
-    if (deleteResult.length > 0) {
-      await db
-        .insert(activityDeletions)
-        .values(
-          deleteResult.map(({ deletedId }) => ({
-            athlete_id: athleteId,
-            activity_id: deletedId,
-            deleted_at: new Date(),
-          })),
-        )
-        .onConflictDoUpdate({
-          target: [activityDeletions.athlete_id, activityDeletions.activity_id],
-          set: {
-            deleted_at: sql`excluded.deleted_at`,
-          },
-        });
-    }
-
-    // Check if any requested IDs were not deleted (e.g., didn't belong to the user)
-    if (deletedCount < activityIds.length) {
-      const deletedSet = new Set(deleteResult.map((r) => r.deletedId));
-      const notDeleted = activityIds.filter((id) => !deletedSet.has(id));
-      const errorMsg = `Failed to delete some activities (possible permission issue or already deleted): ${notDeleted.join(', ')}`;
-      logger.warn(errorMsg);
-      errors.push(errorMsg);
-    }
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    logger.error('Error deleting activities:', errorMsg);
-    errors.push(`Server error during deletion: ${errorMsg}`);
-    // Return partial success if some were deleted before the error
-  }
-
-  return { deletedCount, errors };
+  const actor = await requireActor(await headers());
+  return activitiesService.deleteActivitiesForActor(actor, input);
 }
 
 export async function checkWebhookStatus() {

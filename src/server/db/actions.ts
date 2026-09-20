@@ -1,11 +1,12 @@
 'use server';
 
 import { inArray, desc, eq } from 'drizzle-orm';
-import { activities, photos } from './schema';
+import { activities } from './schema';
 import { db } from './index';
-import { auth } from '~/lib/auth';
 import { headers } from 'next/headers';
 import { getUserInternal } from './internal';
+import { requireActor } from '~/server/auth/actor';
+import * as activitiesService from '~/server/application/activities';
 
 // Safe wrapper for getUser
 export const getUser = async (id?: string) => {
@@ -15,6 +16,13 @@ export const getUser = async (id?: string) => {
 /**
  * Get activities for a specific user (by internal User ID).
  * If no userId is provided, it attempts to resolve the current authenticated user.
+ *
+ * Thin compatibility adapter: resolves the caller's `Actor` from the current
+ * request context and delegates to the application service
+ * (`~/server/application/activities.ts`). The optional `userId` parameter is
+ * kept only for call-site compatibility - it was always required to match
+ * the authenticated session, so it is now validated against the resolved
+ * `Actor` rather than trusted on its own.
  */
 export async function getUserActivities({
   userId,
@@ -25,57 +33,36 @@ export async function getUserActivities({
   limit?: number;
   offset?: number;
 } = {}) {
-  let targetUserId = userId;
+  const actor = await requireActor(await headers());
 
-  if (!targetUserId) {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session?.user?.id) throw new Error('Not authenticated');
-    targetUserId = session.user.id;
-  } else {
-    // If userId IS provided from client, we should theoretically check if they are allowed to see it.
-    // Assuming for now data is private to user, we should enforce session check == targetUserId
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (session?.user?.id !== targetUserId) {
-      // allow only if admin? or just strict private?
-      // For now, let's strict check:
-      if (!session?.user?.id) throw new Error('Not authenticated');
-      if (session.user.id !== targetUserId) throw new Error('Unauthorized');
-    }
+  if (userId && userId !== actor.userId) {
+    throw new Error('Unauthorized');
   }
 
-  // Optimization: We don't need the full account (and potentially trigger token refresh)
-  // just to query local activities. We only need the athlete_id from the user record.
-  const user = await getUserInternal(targetUserId);
-
-  if (!user) throw new Error('User not found');
-  if (!user.athlete_id) throw new Error('User has no athlete_id linked');
-
-  return db
-    .select()
-    .from(activities)
-    .where(eq(activities.athlete, user.athlete_id))
-    .orderBy(desc(activities.start_date))
-    .limit(limit)
-    .offset(offset);
+  return activitiesService.getUserActivities(actor, { limit, offset });
 }
 
 /**
- * Get specific activities by their ID (e.g. for sharing or embedding).
+ * Get specific activities by their internal ID, scoped to the caller.
+ *
+ * Thin compatibility adapter over `getActivitiesForActor`, which enforces
+ * ownership - see issue #120. Previously this queried by id with no
+ * session/ownership check at all, so any caller who knew or guessed an
+ * activity id could fetch it.
  */
 export async function getActivitiesByIds(ids: number[]) {
-  return db
-    .select()
-    .from(activities)
-    .where(inArray(activities.id, ids))
-    .orderBy(desc(activities.start_date));
+  const actor = await requireActor(await headers());
+  return activitiesService.getActivitiesForActor(actor, ids);
 }
 
 /**
  * Get specific activities by their Public ID.
+ *
+ * Intentionally unauthenticated: `public_id` is the sharing identifier for
+ * the "share selected activities" flow (see docs/strava-data-policy.md §5).
+ * Do not add a session/ownership check here - that would break the existing
+ * public sharing behavior, which is deliberately being replaced by #132
+ * rather than patched in place.
  */
 export async function getPublicActivities(publicIds: number[]) {
   return db
@@ -88,6 +75,10 @@ export async function getPublicActivities(publicIds: number[]) {
 /**
  * Get activities for a shared user profile by internal user ID.
  * This intentionally does not require an authenticated session.
+ *
+ * Intentionally unauthenticated: this is the "share entire profile" flow
+ * (see docs/strava-data-policy.md §5). Do not add a session/ownership check
+ * here for the same reason as `getPublicActivities` above.
  */
 export async function getPublicUserActivities({
   userId,
@@ -110,11 +101,12 @@ export async function getPublicUserActivities({
     .offset(offset);
 }
 
+/**
+ * Get photos for the currently authenticated user.
+ *
+ * Thin compatibility adapter over `getPhotosForActor`.
+ */
 export async function getPhotos() {
-  const user = await getUser();
-  if (!user?.athlete_id) throw new Error('User not found or not linked to Strava');
-  return db
-    .select()
-    .from(photos)
-    .where(inArray(photos.athlete_id, [user.athlete_id]));
+  const actor = await requireActor(await headers());
+  return activitiesService.getPhotosForActor(actor);
 }
