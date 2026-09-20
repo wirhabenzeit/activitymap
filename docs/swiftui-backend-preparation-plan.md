@@ -210,9 +210,9 @@ Required correction:
 - propagate dataset freshness and tombstones through the native change feed
   without imposing per-activity seven-day detail refreshes on the iOS client;
 - replace the existing permanent/guessable sharing behavior through #132 with
-  explicitly consented, scoped, expiring private links; keep sharing out of the
-  initial native client and seek Strava's written confirmation before broad
-  rollout.
+  explicitly consented, scoped, expiring private links under the adopted
+  athlete-directed-disclosure interpretation; keep sharing out of the initial
+  native client.
 
 ## API design
 
