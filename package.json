@@ -13,6 +13,7 @@
     "db:migrate": "tsx scripts/database/migrate.ts apply",
     "db:migrate:status": "tsx scripts/database/migrate.ts status",
     "db:migrate:check": "tsx scripts/database/migrate.ts check",
+    "db:migrate:test-webhook": "tsx scripts/database/test-webhook-inbox-migration.ts",
     "db:migrate:preview": "tsx scripts/database/migrate-preview.ts",
     "db:schema:fingerprint": "tsx scripts/database/migrate.ts fingerprint",
     "db:baseline:adopt": "tsx scripts/database/migrate.ts adopt-baseline",
