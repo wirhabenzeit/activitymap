@@ -418,4 +418,79 @@ export const mobileLoginCodes = pgTable(
 
 export type MobileLoginCode = typeof mobileLoginCodes.$inferSelect;
 
+// Small closed vocabularies for the change feed below, following the same
+// `pgEnum` convention as `sport_type`/`webhook_event_status` rather than
+// `text` (unlike `strava_webhook_events.objectType`/`aspectType`, these are
+// this application's own vocabulary, not an external API's, so there is no
+// risk of a third party adding a new value out from under a migration).
+export const syncEntityTypeEnum = pgEnum('sync_entity_type', [
+  'activity',
+  'photo',
+]);
+export const syncOperationEnum = pgEnum('sync_operation', ['upsert', 'delete']);
+
+// Append-only, monotonically-sequenced change feed for the native sync
+// protocol (issue #122; see docs/swiftui-backend-preparation-plan.md's
+// "Synchronization protocol" section). `sequence` - never `changedAt` alone -
+// is the source of truth for ordering: two mutations committed within the
+// same clock tick (or across a clock adjustment) can share a `changed_at`
+// value, so a "changes after cursor X" query that compared timestamps could
+// silently skip or duplicate a row at a page boundary. `generatedAlwaysAsIdentity()`
+// guarantees `sequence` is strictly increasing and gap-tolerant (a rolled-back
+// insert simply burns a value, which is fine for ordering purposes).
+//
+// Every insert into this table must happen in the same database transaction
+// as the `activities`/`photos` mutation it records - see the call sites
+// wired up in `src/server/repositories/activities.ts` (`upsertOne`,
+// `deleteManyForAthlete`), `src/server/strava/webhook.ts`
+// (`processWebhookEvent`), and `src/server/strava/sync.ts` (the
+// not-found/tombstone branch) - so that a mutation can never commit without
+// its change entry, and a failed change-entry insert always rolls the
+// mutation back with it.
+//
+// Scoped by `athlete_id` (bigint), not `user_id` (text) as the plan doc's
+// illustrative schema shows: `activities.athlete` and `photos.athlete_id`
+// are already the athlete-scoping column everywhere in this schema (and
+// `Actor.athleteId` is what every mutation call site already has on hand),
+// so keying the change feed the same way avoids an extra `users` join on
+// every single mutation. `users.athlete_id` is unique, so this is a 1:1
+// substitution for `user_id`.
+export const syncChanges = pgTable(
+  'sync_change',
+  {
+    sequence: bigint('sequence', { mode: 'number' })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    athleteId: bigint('athlete_id', { mode: 'number' })
+      .notNull()
+      .references(() => users.athlete_id, { onDelete: 'cascade' }),
+    entityType: syncEntityTypeEnum('entity_type').notNull(),
+    // `text`, not a typed id column: this one column has to hold both
+    // `activities.id` (bigint-as-number) and `photos.unique_id` (varchar)
+    // entity ids depending on `entityType`, and the plan doc's schema
+    // specifies `entity_id text` for exactly this reason. It intentionally
+    // carries no foreign key - a deletion's change row must stay queryable
+    // (see the "deletions remain observable" test) after the row it refers
+    // to no longer exists.
+    entityId: text('entity_id').notNull(),
+    operation: syncOperationEnum('operation').notNull(),
+    changedAt: timestamp('changed_at', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (table) => [
+    // Primary access pattern for the future #123 delta endpoint: "changes
+    // for this athlete after sequence N", strictly ordered by `sequence`.
+    index('sync_change_athlete_sequence_idx').on(
+      table.athleteId,
+      table.sequence,
+    ),
+    // Supports the retention policy's age-based compaction/eligibility
+    // query (see `src/server/repositories/changes.ts`).
+    index('sync_change_changed_at_idx').on(table.changedAt),
+  ],
+);
+
+export type SyncChange = typeof syncChanges.$inferSelect;
+export type SyncEntityType = (typeof syncEntityTypeEnum.enumValues)[number];
+export type SyncOperation = (typeof syncOperationEnum.enumValues)[number];
+
 export { sportTypes, type SportType };

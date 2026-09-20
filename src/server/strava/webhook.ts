@@ -1,4 +1,4 @@
-import { db } from '~/server/db';
+import { db as defaultDb } from '~/server/db';
 import {
   activities,
   activityDeletions,
@@ -13,6 +13,10 @@ import { activityOwnershipFilter } from '~/server/strava/webhook-filters';
 import { eq, sql, and } from 'drizzle-orm';
 import { logger } from '~/server/logging/logger';
 import type { WebhookRequest } from '~/types/strava';
+import { createChangesRepository } from '~/server/repositories/changes';
+
+const db = defaultDb;
+export type DrizzleDb = typeof defaultDb;
 
 /**
  * No 'use server' directive here: this module is only invoked from the
@@ -147,8 +151,20 @@ export async function processInboxEvent(
  * therefore actionable for #125 — instead of being marked done. See the
  * review on issue #124.
  */
-export async function processWebhookEvent(data: StravaWebhookEvent) {
+export type ProcessWebhookEventDeps = {
+  resolveAccount?: typeof getAccountInternal;
+  fetchActivities?: typeof fetchStravaActivities;
+};
+
+export async function processWebhookEvent(
+  data: StravaWebhookEvent,
+  database: DrizzleDb = defaultDb,
+  deps: ProcessWebhookEventDeps = {},
+) {
   const { object_type, object_id, owner_id } = data;
+  const changesRepo = createChangesRepository(database);
+  const resolveAccount = deps.resolveAccount ?? getAccountInternal;
+  const fetchActivities = deps.fetchActivities ?? fetchStravaActivities;
 
   // Athlete (e.g. deauthorization) events are not handled yet; #125 is
   // expected to prioritize them. Throwing keeps the inbox row `failed`
@@ -159,30 +175,48 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
     );
   }
 
-  const account = await getAccountInternal({ accountId: owner_id.toString() });
+  const account = await resolveAccount({ accountId: owner_id.toString() });
   if (!account?.access_token) {
     throw new Error(`No account or valid access token found for athlete ${owner_id}`);
   }
 
   const { activities: fetchedActivities, photos: fetchedPhotos, notFoundIds } =
-    await fetchStravaActivities({
+    await fetchActivities({
       accessToken: account.access_token,
       activityIds: [object_id],
       includePhotos: true,
       athleteId: owner_id,
       shouldDeletePhotos: true, // Indicate intent to replace photos
       limit: 2, // Ensure we only fetch the specific activity
+      // This function performs its own transactional upsert/photo-replace
+      // below and records the change feed for it - `persist: false` stops
+      // `fetchStravaActivities` from separately (and non-transactionally)
+      // writing the same activity/photos first, which would otherwise
+      // produce a duplicate, non-atomic write and a duplicate change record
+      // for one logical webhook delivery. See issue #122.
+      persist: false,
     });
 
-  // Handle case where activity was not found (e.g., deleted). The delete and
-  // its tombstone must commit together: writing the tombstone unconditionally
-  // from the webhook payload's own owner_id/object_id (rather than only when
-  // the delete itself returns a row) makes a retried or repeated delivery
-  // idempotent - including the case where a prior attempt deleted the
-  // activity but failed before recording the tombstone, which would
-  // otherwise delete zero rows on retry and skip the tombstone forever.
+  // Handle case where activity was not found (e.g., deleted). The delete,
+  // its tombstone, and its change record must commit together: writing the
+  // tombstone unconditionally from the webhook payload's own
+  // owner_id/object_id (rather than only when the delete itself returns a
+  // row) makes a retried or repeated delivery idempotent - including the
+  // case where a prior attempt deleted the activity but failed before
+  // recording the tombstone, which would otherwise delete zero rows on
+  // retry and skip the tombstone (and the change record) forever.
   if (notFoundIds.includes(object_id)) {
-    await db.transaction(async (tx) => {
+    await database.transaction(async (tx) => {
+      // `photos.activity_id` cascades on delete, so this also silently
+      // deletes any photos for this activity. Read which ones before the
+      // delete so each gets its own change record too - see the identical
+      // reasoning in `~/server/repositories/activities.ts`'s
+      // `deleteManyForAthlete`.
+      const cascadedPhotos = await tx
+        .select({ id: photos.unique_id })
+        .from(photos)
+        .where(eq(photos.activity_id, object_id));
+
       await tx
         .delete(activities)
         .where(activityOwnershipFilter(object_id, owner_id));
@@ -200,6 +234,24 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
             deleted_at: sql`excluded.deleted_at`,
           },
         });
+
+      await changesRepo.record(
+        [
+          {
+            athleteId: owner_id,
+            entityType: 'activity',
+            entityId: object_id,
+            operation: 'delete',
+          },
+          ...cascadedPhotos.map(({ id }) => ({
+            athleteId: owner_id,
+            entityType: 'photo' as const,
+            entityId: id,
+            operation: 'delete' as const,
+          })),
+        ],
+        tx,
+      );
     });
     return; // Genuinely completed: deletion recorded.
   }
@@ -213,7 +265,7 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
   }
 
   // Database Operations within a transaction for atomicity
-  await db.transaction(async (tx) => {
+  await database.transaction(async (tx) => {
     // 1. Upsert the activity
     await tx
       .insert(activities)
@@ -263,6 +315,33 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
           },
         });
     }
+
+    // 3. Record the change feed entries for everything this transaction
+    // just did: the activity upsert, a delete for every photo that was
+    // replaced away, and an upsert for every photo now current.
+    await changesRepo.record(
+      [
+        {
+          athleteId: owner_id,
+          entityType: 'activity',
+          entityId: activityToSave.id,
+          operation: 'upsert',
+        },
+        ...removedPhotos.map(({ photo_id }) => ({
+          athleteId: owner_id,
+          entityType: 'photo' as const,
+          entityId: photo_id,
+          operation: 'delete' as const,
+        })),
+        ...fetchedPhotos.map((photo) => ({
+          athleteId: owner_id,
+          entityType: 'photo' as const,
+          entityId: photo.unique_id,
+          operation: 'upsert' as const,
+        })),
+      ],
+      tx,
+    );
   });
   // Genuinely completed: activity/photos transaction committed.
 }

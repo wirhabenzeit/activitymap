@@ -1,9 +1,13 @@
-import { eq, isNotNull, desc, and, asc, inArray, sql } from 'drizzle-orm';
+import { eq, isNotNull, desc, and, asc } from 'drizzle-orm';
 import { db } from '~/server/db';
-import { activities, activityDeletions, activitySync, users } from '~/server/db/schema';
+import { activities, activitySync, users } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
 import { logger } from '~/server/logging/logger';
 import { fetchStravaActivities } from './service';
+import {
+  activitiesRepository,
+  type ActivitiesRepository,
+} from '~/server/repositories/activities';
 
 export type SyncActivityOptions = {
   maxActivities?: number; // Total max activities to process (default: 50)
@@ -220,27 +224,52 @@ export async function syncActivities(
   };
 }
 
-/**
- * Update incomplete activities for a user using fetchStravaActivities
- */
-async function updateIncompleteActivities(
+async function findIncompleteActivityIdsInDb(
   athleteId: number,
-  accessToken: string,
   limit: number,
-): Promise<number> {
-
-
-  // Get incomplete activities, prioritizing recent ones
+): Promise<number[]> {
   const incompleteActivities = await db
-    .select()
+    .select({ id: activities.id })
     .from(activities)
     .where(
       and(eq(activities.athlete, athleteId), eq(activities.is_complete, false)),
     )
     .orderBy(desc(activities.start_date_local))
     .limit(limit);
+  return incompleteActivities.map((activity) => activity.id);
+}
 
-  if (incompleteActivities.length === 0) {
+export type UpdateIncompleteActivitiesDeps = {
+  activitiesRepo?: ActivitiesRepository;
+  fetchActivities?: typeof fetchStravaActivities;
+  findIncompleteActivityIds?: typeof findIncompleteActivityIdsInDb;
+};
+
+/**
+ * Update incomplete activities for a user using fetchStravaActivities.
+ *
+ * Exported (and given an injectable `deps`) so
+ * `~/server/strava/sync.test.ts` can prove the not-found/delete branch below
+ * delegates to `ActivitiesRepository.deleteManyForAthlete` - and therefore
+ * gets the same one-transaction delete+tombstone+change-record atomicity
+ * that repository method already has - without a live database or a real
+ * Strava API call.
+ */
+export async function updateIncompleteActivities(
+  athleteId: number,
+  accessToken: string,
+  limit: number,
+  deps: UpdateIncompleteActivitiesDeps = {},
+): Promise<number> {
+  const activitiesRepo = deps.activitiesRepo ?? activitiesRepository;
+  const fetchActivities = deps.fetchActivities ?? fetchStravaActivities;
+  const findIncompleteActivityIds =
+    deps.findIncompleteActivityIds ?? findIncompleteActivityIdsInDb;
+
+  // Get incomplete activities, prioritizing recent ones
+  const activityIds = await findIncompleteActivityIds(athleteId, limit);
+
+  if (activityIds.length === 0) {
 
     return 0;
   }
@@ -248,12 +277,9 @@ async function updateIncompleteActivities(
 
 
   try {
-    // Extract activity IDs to fetch complete versions
-    const activityIds = incompleteActivities.map((activity) => activity.id);
-
     // Use fetchStravaActivities to get complete activities with full details
     const { activities: updatedActivities, notFoundIds } =
-      await fetchStravaActivities({
+      await fetchActivities({
         accessToken,
         activityIds,
         athleteId,
@@ -261,42 +287,25 @@ async function updateIncompleteActivities(
         limit,
       });
 
-    // Delete activities that were not found on Strava
+    // Delete activities that were not found on Strava. This delegates to
+    // `ActivitiesRepository.deleteManyForAthlete`, which performs the
+    // delete, its tombstone insert, and its `sync_change` change-feed
+    // entries (including for any photo cascade-deleted with it) inside one
+    // database transaction - fixing the same non-atomic
+    // delete-then-separately-tombstone bug already fixed for the webhook
+    // path (#133) and for this same method's own former inline duplicate of
+    // it (issue #120's review), rather than re-implementing that
+    // transaction a third time here. See issue #122.
     if (notFoundIds && notFoundIds.length > 0) {
-
       try {
-        const deleteResult = await db
-          .delete(activities)
-          .where(
-            and(
-              eq(activities.athlete, athleteId),
-              inArray(activities.id, notFoundIds),
-            ),
-          )
-          .returning({ deletedId: activities.id }); // Return the IDs deleted
+        const deletedIds = await activitiesRepo.deleteManyForAthlete(
+          athleteId,
+          notFoundIds,
+        );
 
-        if (deleteResult.length > 0) {
-          await db
-            .insert(activityDeletions)
-            .values(
-              deleteResult.map(({ deletedId }) => ({
-                athlete_id: athleteId,
-                activity_id: deletedId,
-                deleted_at: new Date(),
-              })),
-            )
-            .onConflictDoUpdate({
-              target: [activityDeletions.athlete_id, activityDeletions.activity_id],
-              set: {
-                deleted_at: sql`excluded.deleted_at`,
-              },
-            });
-        }
-
-
-        if (deleteResult.length !== notFoundIds.length) {
+        if (deletedIds.length !== notFoundIds.length) {
           logger.warn(
-            `Mismatch in deleted count. Expected ${notFoundIds.length}, got ${deleteResult.length}`,
+            `Mismatch in deleted count. Expected ${notFoundIds.length}, got ${deletedIds.length}`,
           );
         }
       } catch (deleteError) {
