@@ -4,7 +4,11 @@ import { authenticationDTOSchema } from './auth';
 import { activityDTOSchema } from './activity';
 import { photoDTOSchema } from './photo';
 import { currentUserDTOSchema } from './user';
-import { offlineSyncPayloadDTOSchema } from './sync';
+import {
+  offlineSyncPayloadDTOSchema,
+  syncBootstrapPageDTOSchema,
+  syncChangesPageDTOSchema,
+} from './sync';
 import { errorEnvelopeSchema } from './error';
 import { responseEnvelope } from './envelope';
 import { paginatedSchema, MAX_PAGE_SIZE } from './pagination';
@@ -31,6 +35,12 @@ export function buildOpenApiDocument() {
   registry.add(activityDTOSchema, { id: 'Activity' });
   registry.add(photoDTOSchema, { id: 'Photo' });
   registry.add(offlineSyncPayloadDTOSchema, { id: 'OfflineSyncPayload' });
+  registry.add(responseEnvelope(syncBootstrapPageDTOSchema), {
+    id: 'SyncBootstrapPageResponse',
+  });
+  registry.add(responseEnvelope(syncChangesPageDTOSchema), {
+    id: 'SyncChangesPageResponse',
+  });
   registry.add(errorEnvelopeSchema, { id: 'FailureResponse' });
   registry.add(responseEnvelope(currentUserDTOSchema), {
     id: 'CurrentUserResponse',
@@ -117,6 +127,101 @@ export function buildOpenApiDocument() {
             ),
             '500': errorResponse(
               'The server could not serialize a valid contract response',
+            ),
+          },
+        },
+      },
+      '/api/v1/sync/bootstrap': {
+        get: {
+          operationId: 'syncBootstrap',
+          summary: "Paginated snapshot of the caller's activities or photos",
+          description:
+            'Stable keyset pagination, never offset - see docs/swiftui-backend-preparation-plan.md, "Synchronization protocol". Page through `resource=activities` (the default) until `nextCursor` is null, then repeat with `resource=photos`. The first page of a bootstrap run (no `cursor`) returns `snapshotCursor`, the change-feed high-water mark at that moment; once every page has been applied locally, call `/api/v1/sync/changes?cursor=<snapshotCursor>` to catch anything that changed during bootstrap.',
+          security,
+          parameters: [
+            {
+              name: 'resource',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', enum: ['activities', 'photos'] },
+              description: 'Which entity type to page through (default `activities`)',
+            },
+            {
+              name: 'cursor',
+              in: 'query',
+              required: false,
+              schema: { type: 'string' },
+              description: 'Opaque pagination cursor from a previous response',
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: {
+                type: 'integer',
+                minimum: 1,
+                maximum: MAX_PAGE_SIZE,
+              },
+              description: 'Maximum number of items to return',
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'A page of the bootstrap snapshot',
+              content: {
+                'application/json': { schema: ref('SyncBootstrapPageResponse') },
+              },
+            },
+            '400': errorResponse(
+              'The `resource`, `cursor`, or `limit` parameter is invalid',
+            ),
+            '401': errorResponse(
+              'No valid session or bearer credential was presented',
+            ),
+          },
+        },
+      },
+      '/api/v1/sync/changes': {
+        get: {
+          operationId: 'syncChanges',
+          summary: 'Ordered activity/photo upserts and deletions after a cursor',
+          description:
+            'Never driven by `changed_at` - always by `sync_change.sequence` - so no change can be skipped or duplicated at a page boundary. See docs/swiftui-backend-preparation-plan.md, "Delta synchronization". Safe to replay: applying the same page twice, or resuming after an interruption with the last cursor a client actually committed, produces the same end state.',
+          security,
+          parameters: [
+            {
+              name: 'cursor',
+              in: 'query',
+              required: true,
+              schema: { type: 'string' },
+              description:
+                'Opaque cursor from a prior bootstrap `snapshotCursor` or a prior changes page `nextCursor`',
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: {
+                type: 'integer',
+                minimum: 1,
+                maximum: MAX_PAGE_SIZE,
+              },
+              description: 'Maximum number of changes to return',
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'A page of changes after the given cursor',
+              content: {
+                'application/json': { schema: ref('SyncChangesPageResponse') },
+              },
+            },
+            '400': errorResponse('The `cursor` or `limit` parameter is invalid'),
+            '401': errorResponse(
+              'No valid session or bearer credential was presented',
+            ),
+            '409': errorResponse(
+              'The cursor is malformed, unsupported, or older than the retained change history (`sync_rebootstrap_required`); call `/api/v1/sync/bootstrap` again',
             ),
           },
         },
