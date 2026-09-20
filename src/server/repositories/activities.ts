@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 
 import { db as defaultDb } from '~/server/db';
 import {
@@ -26,6 +26,18 @@ export interface ActivitiesRepository {
     opts?: { limit?: number; offset?: number },
   ): Promise<Activity[]>;
   findManyByIds(ids: number[]): Promise<Activity[]>;
+  /**
+   * A stable keyset page of `athleteId`'s activities ordered by `id`
+   * ascending, strictly after `afterId` (default `0`, i.e. the beginning).
+   * Used by `/api/v1/sync/bootstrap` (issue #123), which must never use
+   * offset pagination - `id` is immutable and monotonically assigned by
+   * Strava, so a page boundary here is stable even as rows are inserted or
+   * deleted elsewhere in the table.
+   */
+  findPageByAthlete(
+    athleteId: number,
+    opts: { afterId?: number; limit: number },
+  ): Promise<Activity[]>;
   /** Deletes only the rows that belong to `athleteId`; returns the deleted ids. */
   deleteManyForAthlete(athleteId: number, ids: number[]): Promise<number[]>;
   upsertOne(activity: Activity): Promise<Activity>;
@@ -54,6 +66,17 @@ export function createActivitiesRepository(
         .from(activities)
         .where(inArray(activities.id, ids))
         .orderBy(desc(activities.start_date));
+    },
+
+    async findPageByAthlete(athleteId, { afterId = 0, limit }) {
+      return database
+        .select()
+        .from(activities)
+        .where(
+          and(eq(activities.athlete, athleteId), gt(activities.id, afterId)),
+        )
+        .orderBy(asc(activities.id))
+        .limit(limit);
     },
 
     async deleteManyForAthlete(athleteId, ids) {

@@ -24,6 +24,7 @@ function fakeActivitiesRepo(
   const repo: ActivitiesRepository = {
     findManyByAthlete: async () => [],
     findManyByIds: async () => [],
+    findPageByAthlete: async () => [],
     deleteManyForAthlete: async (athleteId, ids) => {
       deleteCalls.push({ athleteId, ids });
       return ids;

@@ -145,6 +145,12 @@ function createFakeActivitiesRepository(seed: Activity[] = []): ActivitiesReposi
       }
       return activity;
     },
+    async findPageByAthlete(athleteId, { afterId = 0, limit }) {
+      return rows
+        .filter((row) => row.athlete === athleteId && row.id > afterId)
+        .sort((a, b) => a.id - b.id)
+        .slice(0, limit);
+    },
   };
 }
 
@@ -152,6 +158,18 @@ function createFakePhotosRepository(seed: Photo[] = []): PhotosRepository {
   return {
     async findManyByAthlete(athleteId) {
       return seed.filter((photo) => photo.athlete_id === athleteId);
+    },
+    async findManyByIds(ids) {
+      const idSet = new Set(ids);
+      return seed.filter((photo) => idSet.has(photo.unique_id));
+    },
+    async findPageByAthlete(athleteId, { afterId = '', limit }) {
+      return seed
+        .filter(
+          (photo) => photo.athlete_id === athleteId && photo.unique_id > afterId,
+        )
+        .sort((a, b) => (a.unique_id < b.unique_id ? -1 : 1))
+        .slice(0, limit);
     },
   };
 }
