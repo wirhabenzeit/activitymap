@@ -7,7 +7,7 @@ import { useShallowStore } from '~/store';
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 
 import { useContext } from 'react';
-import { StatsContext } from '~/app/stats/[name]/StatsContext';
+import { StatsContext } from '~/app/(app)/stats/[name]/StatsContext';
 import {
   chartPlots,
   type ChartPlotName,

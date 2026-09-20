@@ -1,23 +1,8 @@
 import '~/styles/globals.css';
 
 import { ThemeProvider } from '~/components/theme-provider';
-import { AuthProvider } from '~/components/providers/auth';
-import { auth } from '~/lib/auth';
-import { headers } from 'next/headers';
-import { SidebarProvider } from '~/components/ui/sidebar';
-import { AppSidebar } from '~/components/layout/app-sidebar';
-import { AppHeader } from '~/components/layout/app-header';
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/next';
-import { getUserInternal, getAccountInternal } from '~/server/db/internal';
-import { toCurrentUserDTO } from '~/server/db/dto';
-import type { InitialAuth } from '~/store/auth';
-import { Toaster } from '~/components/ui/toaster';
-import { ToastManager } from '~/components/providers/toast';
+import { AnalyticsGuarded } from '~/components/analytics-guarded';
 import type { Viewport } from 'next';
-import { QueryProvider } from '~/providers/query-provider';
-import { ServiceWorkerProvider } from '~/components/providers/service-worker';
-import { OfflineSyncProvider } from '~/components/providers/offline-sync';
 
 // Configure these values as needed
 export const viewport: Viewport = {
@@ -34,28 +19,31 @@ export const metadata = {
   icons: [{ rel: 'icon', url: '/favicon.ico' }],
 };
 
-export default async function RootLayout({
+/**
+ * Deliberately minimal (issue #132). Everything specific to the
+ * authenticated web app - the sidebar/header chrome (which includes its own
+ * Share button), React Query, the current-user session lookup, offline
+ * sync, and the toaster - now lives in `(app)/layout.tsx`, nested only under
+ * the app's own routes (`/`, `/map`, `/list`, `/stats/*`).
+ *
+ * `/share/[token]` (a private, non-indexed capability page - see that
+ * route's own doc comment) sits outside the `(app)` group specifically so it
+ * never inherits that chrome: an anonymous recipient should see a
+ * standalone page, not the authenticated app shell (which would otherwise
+ * render, among other things, the athlete's own "Share" button around
+ * someone else's shared link).
+ *
+ * `AnalyticsGuarded` still loads Vercel's Analytics/Speed Insights scripts
+ * here at the true root - they are genuinely site-wide - but wraps them with
+ * a `beforeSend` guard that drops any event for a `/share/...` URL. See that
+ * component's own doc comment for why the guard lives there instead of
+ * being passed in as a prop from this Server Component.
+ */
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const initialAuth: InitialAuth = {
-    currentUser: null,
-  };
-
-  // If we have a session, resolve a safe, client-visible user summary.
-  // Never pass the raw Account record (Strava tokens) or the Better Auth
-  // session (which carries a reusable session token) to the client - see
-  // issue #116.
-  if (session?.user?.id) {
-    const user = await getUserInternal(session.user.id);
-    const account = user ? await getAccountInternal({ userId: user.id }) : null;
-    initialAuth.currentUser = user ? toCurrentUserDTO(user, account) : null;
-  }
-
   return (
     <html
       lang="en"
@@ -245,39 +233,16 @@ export default async function RootLayout({
           href="/apple-splash-1136-640.jpg"
           media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"
         />
-        <Analytics />
-        <SpeedInsights />
+        <AnalyticsGuarded />
       </head>
-      <body style={{ width: '100dvw', height: '100dvh', overflow: 'hidden' }}>
+      <body style={{ width: '100dvw', minHeight: '100dvh' }}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <ServiceWorkerProvider />
-          <OfflineSyncProvider />
-          <QueryProvider>
-            <AuthProvider initialAuth={initialAuth}>
-              <SidebarProvider
-                className="flex h-dvh flex-col"
-                style={{ height: '100dvh' }}
-              >
-                <AppHeader />
-                <div className="flex min-h-0 flex-1 overflow-hidden">
-                  <AppSidebar />
-                  <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                    <div className="h-14 w-full" />
-                    <div className="min-h-0 w-full flex-1 overflow-hidden">
-                      {children}
-                    </div>
-                  </main>
-                </div>
-              </SidebarProvider>
-              <Toaster />
-              <ToastManager />
-            </AuthProvider>
-          </QueryProvider>
+          {children}
         </ThemeProvider>
       </body>
     </html>

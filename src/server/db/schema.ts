@@ -17,6 +17,7 @@ import {
 import { sportTypes } from '~/server/strava/types';
 import type { SportType } from '~/server/strava/types';
 import type { WebhookRequest } from '~/types/strava';
+import type { ShareLinkFieldOptions } from '~/lib/sharing/fields';
 
 export const sportTypeEnum = pgEnum('sport_type', sportTypes);
 
@@ -566,5 +567,86 @@ export const syncChanges = pgTable(
 export type SyncChange = typeof syncChanges.$inferSelect;
 export type SyncEntityType = (typeof syncEntityTypeEnum.enumValues)[number];
 export type SyncOperation = (typeof syncOperationEnum.enumValues)[number];
+
+// Athlete-created, scoped, expiring private share links (issue #132; see
+// docs/strava-data-policy.md §5). Replaces the retired `/map?user=...` and
+// `/map?activities=<public_id,...>` flows, which had no expiry, no
+// revocation, and used `public_id` - a deterministic, guessable hash - as
+// their only "access control".
+//
+// `tokenHash` is the *only* representation of the capability token this
+// table ever stores - the raw, high-entropy token
+// (`~/server/sharing/tokens.ts`) is returned to the creating athlete exactly
+// once, at creation, and is never persisted anywhere. `expiresAt` is
+// `NOT NULL`: every share has a mandatory, bounded-maximum expiry enforced
+// by `~/server/sharing/validators.ts`, never an unbounded or optional one.
+// `revokedAt` records immediate, athlete-initiated revocation, independent
+// of `expiresAt`.
+//
+// `athleteId` follows the same `users.athlete_id`-scoped, `onDelete:
+// 'cascade'` convention as `activities.athlete`/`syncChanges.athleteId`
+// above, so the 30-day deauthorization erasure transaction
+// (`~/server/repositories/erasure.ts`) deletes every share row for an
+// erased athlete automatically, with no separate delete statement needed -
+// see `~/server/db/schema.share-links.test.ts`, which asserts this cascade
+// wiring directly against the Drizzle table config. Immediate invalidation
+// on deauthorization (before the 30-day erasure runs) is a separate,
+// read-time check in `~/server/application/share-links.ts`
+// (`isAthleteRevoked`), since `accounts.revokedAt` is set the moment Strava
+// reports the deauthorization, well before erasure is due.
+export const shareLinks = pgTable(
+  'share_links',
+  {
+    id: text('id').notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+    athleteId: bigint('athlete_id', { mode: 'number' })
+      .notNull()
+      .references(() => users.athlete_id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+    revokedAt: timestamp('revoked_at', { mode: 'date' }),
+    // Explicit, athlete-chosen field-disclosure groups
+    // (`ShareLinkFieldOptions`) - every group defaults to `false` (excluded)
+    // both here and in the creation input schema. See
+    // `~/lib/sharing/fields.ts`.
+    fields: jsonb('fields').$type<ShareLinkFieldOptions>().notNull(),
+  },
+  (table) => [
+    uniqueIndex('share_links_token_hash_idx').on(table.tokenHash),
+    index('share_links_athlete_idx').on(table.athleteId, table.createdAt),
+  ],
+);
+
+export type ShareLink = typeof shareLinks.$inferSelect;
+
+// The explicit activity subset a share link covers - a join table, never an
+// "everything" wildcard, so issue #132's "every share covers an explicit
+// activity subset" acceptance criterion is a schema-level guarantee, not
+// just an application-layer convention. `activityId` has a real foreign key
+// (`onDelete: 'cascade'`) to `activities.id`: when
+// `~/server/repositories/activities.ts`'s `deleteManyForAthlete` hard-deletes
+// an activity, the row here disappears in the same transaction, which is
+// what makes "invalidate affected links when an activity is deleted" happen
+// automatically rather than needing a manual cleanup step. "Loses
+// visibility" (an activity later marked `private`) does *not* delete
+// anything here - it has no tombstone - so that case is instead a read-time
+// filter in `~/server/application/share-links.ts`'s `getShareView`.
+export const shareLinkActivities = pgTable(
+  'share_link_activities',
+  {
+    shareId: text('share_id')
+      .notNull()
+      .references(() => shareLinks.id, { onDelete: 'cascade' }),
+    activityId: bigint('activity_id', { mode: 'number' })
+      .notNull()
+      .references(() => activities.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.shareId, table.activityId] }),
+    index('share_link_activities_activity_idx').on(table.activityId),
+  ],
+);
+
+export type ShareLinkActivity = typeof shareLinkActivities.$inferSelect;
 
 export { sportTypes, type SportType };

@@ -17,52 +17,62 @@ import {
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { useToast } from '~/hooks/use-toast';
 
 import { useActivities } from '~/hooks/use-activities';
 import { appendMapShareParams } from '~/lib/map-share';
 import { defaultMapPosition } from '~/settings/map';
-import {
-  LEGACY_SHARING_ENABLED,
-  LEGACY_SHARING_ISSUE_URL,
-} from '~/lib/legacy-sharing';
+import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
+import { CreateShareDialog } from '~/components/share/create-share-dialog';
+import { ManageSharesDialog } from '~/components/share/manage-shares-dialog';
 
 /**
- * Part of #132: the legacy `/map?user=`/`/map?activities=` sharing flow is
- * disabled (see `~/lib/legacy-sharing.ts` and docs/strava-data-policy.md
- * §5) because it produced permanent, non-revocable, guessable-identifier
- * links. Rather than offer a button that generates a link that no longer
- * works, this renders a disabled state explaining why while the real
- * replacement (scoped, expiring, revocable private links) is built.
+ * The real replacement for the retired legacy sharing flow (issue #132; see
+ * `~/lib/legacy-sharing.ts` and docs/strava-data-policy.md §5): athlete-
+ * created, scoped, expiring, revocable private links for an explicit
+ * activity subset. There is no "share entire profile" mode any more - the
+ * old `/map?user=...`/`/map?activities=...` identifiers are retired
+ * entirely (see `LegacyShareButton` below, kept only behind the flag).
+ *
+ * The two tabs correspond to the two flows the issue calls for: creating a
+ * new link (`CreateShareDialog`, which itself has its own configure ->
+ * confirm -> created-link-shown-once steps) and managing/revoking existing
+ * ones (`ManageSharesDialog`). Reopening the dialog always lands back on
+ * "Create" with fresh state - a just-created token is never re-shown, only
+ * the "My links" tab's metadata about it.
  */
-function DisabledShareButton() {
+function ShareLinksDialog() {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<'create' | 'manage'>('create');
+
   return (
-    <Dialog>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setTab('create');
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="ghost" className="h-8 w-8 px-0">
           <ShareIcon className="h-4 w-4" />
           <span className="sr-only">Share</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Sharing is being redesigned</DialogTitle>
-          <DialogDescription>
-            Link-based sharing is temporarily disabled. The previous links
-            never expired and could not be revoked, so they have been turned
-            off while they are replaced with secure, expiring private links
-            you control. Any share link created earlier no longer grants
-            access.{' '}
-            <a
-              href={LEGACY_SHARING_ISSUE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-            >
-              Track progress in issue #132.
-            </a>
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[480px]">
+        <Tabs value={tab} onValueChange={(value) => setTab(value as 'create' | 'manage')}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="create">Create link</TabsTrigger>
+            <TabsTrigger value="manage">My links</TabsTrigger>
+          </TabsList>
+          <TabsContent value="create">
+            <CreateShareDialog onCreated={() => undefined} />
+          </TabsContent>
+          <TabsContent value="manage">
+            <ManageSharesDialog />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
@@ -71,17 +81,17 @@ function DisabledShareButton() {
 export function ShareButton() {
   const isGuest = useShallowStore((state) => state.isGuest);
 
-  // A guest (someone viewing via a - now-disabled - shared link) never had
-  // a share button of their own; preserve that regardless of the flag.
+  // A guest (someone viewing via a shared link) never had a share button of
+  // their own.
   if (isGuest) {
     return null;
   }
 
-  if (!LEGACY_SHARING_ENABLED) {
-    return <DisabledShareButton />;
+  if (LEGACY_SHARING_ENABLED) {
+    return <LegacyShareButton />;
   }
 
-  return <LegacyShareButton />;
+  return <ShareLinksDialog />;
 }
 
 /**

@@ -147,6 +147,38 @@ void test('redacts secrets embedded in string log arguments passed through redac
   );
 });
 
+void test('redacts share link tokens by key name and embedded in URLs (issue #132)', () => {
+  const objectResult = redact({
+    shareToken: 'raw-capability-token',
+    share_token: 'raw-capability-token-2',
+    tokenHash: 'sha256-hash-of-token',
+  }) as Record<string, unknown>;
+
+  assert.equal(objectResult.shareToken, '[redacted]');
+  assert.equal(objectResult.share_token, '[redacted]');
+  assert.equal(objectResult.tokenHash, '[redacted]');
+
+  assert.equal(
+    redactString('shareToken=abcDEF012-_34567890'),
+    'shareToken=[redacted]',
+  );
+  assert.equal(
+    redactString('share_token: "abcDEF012-_34567890"'),
+    'share_token: "[redacted]"',
+  );
+
+  const urlMessage =
+    'Failed to notify recipient of https://app.example.com/share/QWxhZGRpbjpvcGVuU2VzYW1l-_012345 - retrying';
+  const redactedUrl = redactString(urlMessage);
+  assert.ok(!redactedUrl.includes('QWxhZGRpbjpvcGVuU2VzYW1l-_012345'));
+  assert.ok(redactedUrl.includes('/share/[redacted]'));
+
+  const bareMessage = 'GET /share/QWxhZGRpbjpvcGVuU2VzYW1l-_012345 200';
+  const redactedBare = redactString(bareMessage);
+  assert.ok(!redactedBare.includes('QWxhZGRpbjpvcGVuU2VzYW1l-_012345'));
+  assert.ok(redactedBare.includes('/share/[redacted]'));
+});
+
 void test('redacts secrets embedded in Error message and stack', () => {
   const error = new Error('request failed with Authorization: Bearer super-secret-token');
   error.stack = `Error: request failed\n    at fetch (session_token=leaked-secret-value)`;

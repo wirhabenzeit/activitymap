@@ -6,7 +6,7 @@ import * as d3 from 'd3';
 
 import { useShallowStore } from '~/store';
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
-import { StatsContext } from '~/app/stats/[name]/StatsContext';
+import { StatsContext } from '~/app/(app)/stats/[name]/StatsContext';
 import { SelectFormElement } from './plot';
 import calendarSettings, {
   settings,
