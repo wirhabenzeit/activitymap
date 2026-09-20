@@ -155,13 +155,11 @@ export async function processInboxEvent(
  * that would keep the row retrying forever, and it never re-extends the
  * erasure deadline on replay.
  *
- * This does not itself execute the 30-day full-erasure deletion (see the
- * PR description's "deferred" section) - it durably records that erasure
- * is due and by when (`accounts.scheduledErasureAt`), and clears the
- * stored tokens so the account is excluded from ordinary token
- * refresh/sync going forward (`getAccountInternal` throws before ever
- * calling Strava once `access_token`/`accessToken` are both null and there
- * is no refresh token to fall back to).
+ * This handler records when the 30-day full erasure is due
+ * (`accounts.scheduledErasureAt`). The production-only
+ * `/api/cron/erase-revoked-athletes` executor later performs that deletion;
+ * until then the cleared credentials exclude this account from ordinary
+ * token refresh/sync.
  */
 async function handleAthleteDeauthorization(
   data: StravaWebhookEvent,

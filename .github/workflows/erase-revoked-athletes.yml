@@ -1,0 +1,31 @@
+name: Erase Revoked Athletes
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: erase-revoked-athletes
+  cancel-in-progress: false
+
+jobs:
+  erase_revoked_athletes:
+    name: Erase Due Revoked Athletes
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Erase due revoked athletes
+        id: eraseRequest
+        uses: fjogeleit/http-request-action@v1
+        with:
+          method: POST
+          url: https://activitymap.dominik.page/api/cron/erase-revoked-athletes
+          customHeaders: '{"x-cron-secret": "${{ secrets.CRON_SECRET }}"}'
+          timeout: 60000
+      - name: Show response
+        run: |
+          echo "Status: ${{ steps.eraseRequest.outputs.status }}"
+          echo "Response: ${{ steps.eraseRequest.outputs.response }}"

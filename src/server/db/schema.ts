@@ -71,13 +71,10 @@ export const accounts = pgTable(
     // Strava `object_type: "athlete"` webhook is processed for this
     // account - at the same time the stored tokens are cleared, so a
     // non-null `revokedAt` and a live access token never coexist.
-    // `scheduledErasureAt` records the 30-day full-erasure deadline the
-    // API policy requires; nothing in this change executes that deletion
-    // yet (see the PR description's "deferred" section) - it is recorded
-    // here so the deadline is durable and queryable, and so the account is
-    // excluded from ordinary token refresh/sync once revoked (see
-    // `getAccountInternal`, which never attempts a refresh or API call for
-    // a revoked account).
+    // `scheduledErasureAt` records the 30-day full-erasure deadline the API
+    // policy requires. The production-only erasure cron consumes this value
+    // and deletes the athlete's Strava-derived data once it is due; until
+    // then the account remains excluded from ordinary token refresh/sync.
     revokedAt: timestamp('revoked_at', { mode: 'date' }),
     scheduledErasureAt: timestamp('scheduled_erasure_at', { mode: 'date' }),
   },
