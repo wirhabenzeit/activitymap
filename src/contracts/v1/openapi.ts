@@ -4,11 +4,7 @@ import { authenticationDTOSchema } from './auth';
 import { activityDTOSchema } from './activity';
 import { photoDTOSchema } from './photo';
 import { currentUserDTOSchema } from './user';
-import {
-  offlineSyncPayloadDTOSchema,
-  syncBootstrapPageDTOSchema,
-  syncChangesPageDTOSchema,
-} from './sync';
+import { syncBootstrapPageDTOSchema, syncChangesPageDTOSchema } from './sync';
 import { errorEnvelopeSchema } from './error';
 import { responseEnvelope } from './envelope';
 import { paginatedSchema, MAX_PAGE_SIZE } from './pagination';
@@ -34,7 +30,6 @@ export function buildOpenApiDocument() {
   registry.add(currentUserDTOSchema, { id: 'CurrentUser' });
   registry.add(activityDTOSchema, { id: 'Activity' });
   registry.add(photoDTOSchema, { id: 'Photo' });
-  registry.add(offlineSyncPayloadDTOSchema, { id: 'OfflineSyncPayload' });
   registry.add(responseEnvelope(syncBootstrapPageDTOSchema), {
     id: 'SyncBootstrapPageResponse',
   });

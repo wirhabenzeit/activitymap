@@ -132,16 +132,13 @@ export const verification = pgTable('verification', {
 });
 
 
-export const webhooks = pgTable('webhook', {
-  id: bigint('id', { mode: 'number' }).primaryKey(),
-  resource_state: integer('resource_state'),
-  application_id: integer('application_id'),
-  callback_url: text('callback_url').notNull(),
-  created_at: timestamp('created_at', { mode: 'date' }).notNull(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).notNull(),
-  verified: boolean('verified').notNull().default(false),
-  active: boolean('active').notNull().default(true),
-});
+// The legacy `webhook` table (superseded by `stravaWebhooks`/
+// `stravaWebhookEvents` from issue #124's durable webhook inbox) was dropped
+// in issue #126 phase 3 - see that migration and PR for the "nothing reads
+// it" verification (grepped for the `webhooks` export across `src/`; the
+// only other hits were the unrelated `checkWebhookStatus`/
+// `createWebhookSubscription` Strava-subscription actions, which use
+// `stravaWebhooks`, not this table).
 
 export const activities = pgTable(
   'activities',
@@ -361,7 +358,6 @@ export type User = typeof users.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type Photo = typeof photos.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
-export type Webhook = typeof webhooks.$inferSelect;
 export type ActivitySync = typeof activitySync.$inferSelect;
 export type StravaSummaryReconciliation =
   typeof stravaSummaryReconciliations.$inferSelect;

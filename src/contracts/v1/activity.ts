@@ -149,6 +149,20 @@ export function toActivityDTO(activity: Activity): ActivityDTO {
     weighted_average_watts: activity.weighted_average_watts,
     kilojoules: activity.kilojoules,
     last_updated: activity.last_updated ? toIsoDateTime(activity.last_updated) : null,
+    // Issue #126 phase 3 investigated retiring this `is_complete` fallback
+    // (per PR #151's description, which flagged it as this issue's job) and
+    // deliberately kept it. This service has no way to query production to
+    // confirm every pre-#123 row has since been through summary
+    // reconciliation and gotten a real `geometryState` - the cron job that
+    // backfills it (`~/app/api/cron/reconcile-strava-summaries`, per #123/
+    // #151/#153/#154) runs on an ongoing schedule, not as a one-time
+    // migration step, so some
+    // rows can legitimately still be unreconciled at any point in time.
+    // Removing this fallback would silently turn every such row's
+    // `geometry_state` from a defensible "detailed"/"summary" guess into a
+    // validation failure (the schema requires a value). Safe to revisit
+    // once there is a way to confirm reconciliation coverage (e.g. a cron
+    // metric or a one-off audit query), but not from static analysis alone.
     geometry_state:
       activity.geometryState ?? (activity.is_complete ? 'detailed' : 'summary'),
     photos_state: activity.photosState,

@@ -3,20 +3,20 @@
 /**
  * IndexedDB-backed local cache for the v1 sync protocol (issue #126).
  *
- * Unlike the legacy cache (`~/lib/offline/db.ts`), every row stored here is
- * the wire DTO itself (`~/contracts/v1/activity.ts`'s `ActivityDTO` /
- * `~/contracts/v1/photo.ts`'s `PhotoDTO`) — decimal-string ids, ISO-string
- * timestamps — never a Drizzle row type. That is the acceptance criterion
- * this module exists to satisfy: the local store's own types come from
- * `~/contracts/v1/*`, not `~/server/db/schema`. Callers that need the
- * app-wide `Activity`/`Photo` view-model shape convert at the boundary via
- * `~/lib/sync/v1-mappers.ts`.
+ * Every row stored here is the wire DTO itself (`~/contracts/v1/activity.ts`'s
+ * `ActivityDTO` / `~/contracts/v1/photo.ts`'s `PhotoDTO`) — decimal-string
+ * ids, ISO-string timestamps — never a Drizzle row type. That is the
+ * acceptance criterion this module exists to satisfy: the local store's own
+ * types come from `~/contracts/v1/*`, not `~/server/db/schema`. Callers that
+ * need the app-wide `Activity`/`Photo` view-model shape convert at the
+ * boundary via `~/lib/sync/v1-mappers.ts`.
  *
- * This is a separate IndexedDB database (`activitymap-sync-v1`) from the
- * legacy cache, deliberately: issue #126 phase 1 is purely additive and
- * must not touch the legacy cache's schema or data while it is still the
- * one actually serving the app. Phase 2 switches the hooks over to this
- * store; phase 3 removes the legacy one.
+ * This was introduced as a separate IndexedDB database
+ * (`activitymap-sync-v1`) from the now-removed legacy cache, deliberately:
+ * issue #126 phase 1 was purely additive and could not touch the legacy
+ * cache's schema or data while it was still serving the app. Phase 2
+ * switched the hooks over to this store; phase 3 removed the legacy one
+ * entirely (this is now the only client-side activity/photo cache).
  */
 
 import type { ActivityDTO } from '~/contracts/v1/activity';
@@ -24,6 +24,7 @@ import type { PhotoDTO } from '~/contracts/v1/photo';
 
 const DB_NAME = 'activitymap-sync-v1';
 const DB_VERSION = 1;
+const LEGACY_DB_NAME = 'activitymap-offline';
 
 const ACTIVITIES_STORE = 'activities';
 const PHOTOS_STORE = 'photos';
@@ -52,6 +53,43 @@ let dbPromise: Promise<IDBDatabase | null> | null = null;
 
 const isIndexedDbAvailable = (): boolean =>
   typeof window !== 'undefined' && 'indexedDB' in window;
+
+export type LegacyOfflineDatabaseCleanupResult =
+  | 'deleted'
+  | 'blocked'
+  | 'failed'
+  | 'unavailable';
+
+/**
+ * Remove the pre-v1 cache after a complete v1 sync has proven the replacement
+ * store is usable. This intentionally lives beside the surviving v1 store,
+ * rather than importing the legacy module that phase 3 deletes.
+ *
+ * Deletion is best-effort and never rejects: another open tab can temporarily
+ * block IndexedDB deletion, and cache cleanup must not turn an otherwise
+ * successful sync into an application failure. The browser keeps a blocked
+ * delete request pending and completes it once the old connection closes.
+ */
+export const deleteLegacyOfflineDatabase = async (
+  factory: Pick<IDBFactory, 'deleteDatabase'> | undefined =
+    isIndexedDbAvailable() ? window.indexedDB : undefined,
+): Promise<LegacyOfflineDatabaseCleanupResult> => {
+  if (!factory) return 'unavailable';
+
+  return new Promise((resolve) => {
+    let request: IDBOpenDBRequest;
+    try {
+      request = factory.deleteDatabase(LEGACY_DB_NAME);
+    } catch {
+      resolve('failed');
+      return;
+    }
+
+    request.onsuccess = () => resolve('deleted');
+    request.onerror = () => resolve('failed');
+    request.onblocked = () => resolve('blocked');
+  });
+};
 
 const requestToPromise = <T>(request: IDBRequest<T>): Promise<T> =>
   new Promise((resolve, reject) => {

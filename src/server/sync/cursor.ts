@@ -6,9 +6,10 @@
  * `sync_change.sequence` value (see `~/server/db/schema.ts`) - never a
  * timestamp, since two mutations can share a `changed_at` value and a
  * timestamp-based cursor can silently skip or duplicate rows at a page
- * boundary. That is exactly the bug this issue exists to fix; see the
- * legacy timestamp-cursor implementation this replaces at
- * `~/server/application/sync.ts`.
+ * boundary. That is exactly the bug this issue exists to fix; the legacy
+ * timestamp-cursor implementation this replaced (formerly
+ * `~/server/application/sync.ts`) was removed once issue #126 finished
+ * migrating the web client off it.
  *
  * The token is intentionally opaque (clients must not parse or construct
  * it) and carries an explicit version tag, athlete scope, and issuance time.

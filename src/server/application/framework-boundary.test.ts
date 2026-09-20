@@ -81,7 +81,11 @@ void test('application services and repositories have no framework-layer imports
 });
 
 void test('application service files exist for the extracted use cases', () => {
-  const expected = ['activities.ts', 'sync.ts'];
+  // `sync.ts` (the legacy timestamp-cursor `/api/offline/*` service) was
+  // removed in issue #126 phase 3, once the web client fully cut over to
+  // `/api/v1/sync/*` (`~/lib/sync/v1-sync.ts`) - it is intentionally not
+  // expected here any more.
+  const expected = ['activities.ts'];
   const actual = listSourceFiles(applicationDir);
   for (const name of expected) {
     assert.ok(
