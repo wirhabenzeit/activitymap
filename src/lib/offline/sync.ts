@@ -11,7 +11,7 @@ import {
   upsertCachedPhotos,
 } from '~/lib/offline/db';
 
-type SerializedActivity = Omit<
+export type SerializedActivity = Omit<
   Activity,
   'start_date' | 'start_date_local' | 'last_updated'
 > & {
@@ -20,7 +20,7 @@ type SerializedActivity = Omit<
   last_updated: string | null;
 };
 
-type SerializedPhoto = Omit<Photo, 'uploaded_at' | 'created_at'> & {
+export type SerializedPhoto = Omit<Photo, 'uploaded_at' | 'created_at'> & {
   uploaded_at: string | null;
   created_at: string | null;
 };
@@ -53,14 +53,23 @@ const toDate = (value: string | null): Date | null => {
   return parsed;
 };
 
-const toActivity = (raw: SerializedActivity): Activity => ({
+/**
+ * Deserializes one `/api/offline/*` wire row back into the local `Activity`
+ * shape (dates parsed back from the JSON-serialized ISO strings the legacy
+ * route returns). Exported so `~/lib/sync/legacy-cutover-parity.test.ts`
+ * (issue #126 phase 2) can drive this real legacy code path directly when
+ * comparing it against the v1 adapters' `dtoToActivity`, rather than
+ * reimplementing it.
+ */
+export const toActivity = (raw: SerializedActivity): Activity => ({
   ...raw,
   start_date: new Date(raw.start_date),
   start_date_local: new Date(raw.start_date_local),
   last_updated: toDate(raw.last_updated),
 });
 
-const toPhoto = (raw: SerializedPhoto): Photo => ({
+/** See `toActivity`'s doc comment. */
+export const toPhoto = (raw: SerializedPhoto): Photo => ({
   ...raw,
   uploaded_at: toDate(raw.uploaded_at),
   created_at: toDate(raw.created_at),

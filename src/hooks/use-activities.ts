@@ -16,11 +16,22 @@ import { useEffect, useMemo } from 'react';
 import type { FeatureCollection } from 'geojson';
 import { useShallowStore } from '~/store';
 import type { Activity } from '~/server/db/schema';
-import {
-    getCachedActivities,
-    upsertCachedActivities,
-} from '~/lib/offline/db';
+import { toActivityDTO } from '~/contracts/v1/activity';
+import { getCachedActivityDTOs, upsertActivityDTOs } from '~/lib/sync/v1-store';
+import { dtoToActivity } from '~/lib/sync/v1-mappers';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
+
+// Issue #126 (phase 2): this cache used to read/write
+// `~/lib/offline/db.ts`'s Drizzle-shaped `Activity` rows directly. It now
+// goes through the v1 sync adapters' DTO-typed store instead - converting
+// at this boundary via `toActivityDTO`/`dtoToActivity` - so the local
+// cache's own persisted type is `~/contracts/v1/activity.ts`'s
+// `ActivityDTO`, not a Drizzle model, while every consumer of this hook
+// keeps seeing plain `Activity[]` exactly as before.
+const getCachedActivities = async (scope: string): Promise<Activity[]> =>
+    (await getCachedActivityDTOs(scope)).map(dtoToActivity);
+const upsertCachedActivities = (scope: string, activities: Activity[]): Promise<void> =>
+    upsertActivityDTOs(scope, activities.map(toActivityDTO));
 
 const memoryActivitiesByScope = new Map<string, Activity[]>();
 

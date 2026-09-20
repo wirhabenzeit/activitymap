@@ -5,7 +5,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getPhotos } from '~/server/db/actions';
 import { useShallowStore } from '~/store';
 import type { Photo } from '~/server/db/schema';
-import { getCachedPhotos, upsertCachedPhotos } from '~/lib/offline/db';
+import { toPhotoDTO } from '~/contracts/v1/photo';
+import { getCachedPhotoDTOs, upsertPhotoDTOs } from '~/lib/sync/v1-store';
+import { dtoToPhoto } from '~/lib/sync/v1-mappers';
+
+// Issue #126 (phase 2): see the matching comment in `~/hooks/use-activities.ts` -
+// the local cache backing this hook is now the v1 sync adapters' DTO-typed
+// store, converted at this boundary, not `~/lib/offline/db.ts`'s
+// Drizzle-shaped `Photo` rows.
+const getCachedPhotos = async (scope: string): Promise<Photo[]> =>
+    (await getCachedPhotoDTOs(scope)).map(dtoToPhoto);
+const upsertCachedPhotos = (scope: string, photos: Photo[]): Promise<void> =>
+    upsertPhotoDTOs(scope, photos.map(toPhotoDTO));
 
 const memoryPhotosByScope = new Map<string, Photo[]>();
 
