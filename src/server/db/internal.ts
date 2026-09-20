@@ -148,6 +148,22 @@ export const getAccountInternal = async ({
         resolvedTokens = resolveAccountTokens(account);
     }
 
+    // A previously-deauthorized account (see `~/server/strava/webhook.ts`'s
+    // athlete-deauthorization handling, issue #125) that now has a live
+    // access token again has necessarily been reconnected through a fresh
+    // OAuth sign-in - Better Auth is the only writer of that column, and it
+    // only writes it during sign-in. Clear the stale revocation/erasure
+    // markers so the reconnected account is not left permanently
+    // (mis)reported as revoked, and so it is not later swept into a
+    // 30-day-erasure job it no longer belongs in.
+    if (account.revokedAt && resolvedTokens.accessToken) {
+        await db
+            .update(accounts)
+            .set({ revokedAt: null, scheduledErasureAt: null })
+            .where(eq(accounts.id, account.id));
+        account = { ...account, revokedAt: null, scheduledErasureAt: null };
+    }
+
     const currentTime = Math.floor(Date.now() / 1000);
     const isExpired =
         forceRefresh ||

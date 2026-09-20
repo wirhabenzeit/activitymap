@@ -47,6 +47,8 @@ function buildAccount(overrides: Partial<Account> = {}): Account {
     session_state: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    revokedAt: null,
+    scheduledErasureAt: null,
     ...overrides,
   };
 }

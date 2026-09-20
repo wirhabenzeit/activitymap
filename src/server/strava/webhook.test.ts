@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { activities, photos, syncChanges } from '~/server/db/schema';
+import { accounts, activities, photos, syncChanges } from '~/server/db/schema';
 
 import { processWebhookEvent, type ProcessWebhookEventDeps } from './webhook.ts';
 import type { StravaWebhookEvent } from './webhook.ts';
@@ -217,4 +217,180 @@ void test('replaying the same webhook delivery (idempotent retry) upserts the ac
     { athleteId: 42, entityType: 'activity', entityId: '100', operation: 'upsert' },
     { athleteId: 42, entityType: 'activity', entityId: '100', operation: 'upsert' },
   ]);
+});
+
+// --- Athlete deauthorization (issue #125) ---
+
+type FakeAccountRow = {
+  id: string;
+  accountId: string;
+  providerId: string;
+  access_token: string | null;
+  accessToken: string | null;
+  refresh_token: string | null;
+  refreshToken: string | null;
+  revokedAt: Date | null;
+  scheduledErasureAt: Date | null;
+  updatedAt: Date;
+};
+
+type AccountUpdateCall = { via: 'outer' | 'tx'; values: Partial<FakeAccountRow> };
+
+/**
+ * A minimal stand-in for the drizzle `db`/`tx` handle, deep enough to
+ * exercise `handleAthleteDeauthorization`'s call shape against the
+ * `account` table - same spirit as `buildFakeDb` above, but for the one
+ * table that path touches. Ignores `where` conditions (same limitation as
+ * the other fakes in this file/`activities.test.ts`) and just returns the
+ * single seeded account row, if any.
+ */
+function buildFakeAccountsDb(initialAccount: FakeAccountRow | null) {
+  let account = initialAccount ? { ...initialAccount } : null;
+  const updateCalls: AccountUpdateCall[] = [];
+
+  function makeHandle(via: 'outer' | 'tx') {
+    return {
+      select(_columns?: unknown) {
+        return {
+          from(table: unknown) {
+            return {
+              where: async () => {
+                if (table !== accounts) return [];
+                return account ? [account] : [];
+              },
+            };
+          },
+        };
+      },
+      update(table: unknown) {
+        if (table !== accounts) throw new Error('unexpected update target in this fake');
+        return {
+          set(values: Partial<FakeAccountRow>) {
+            return {
+              where: async () => {
+                updateCalls.push({ via, values });
+                if (account) account = { ...account, ...values };
+              },
+            };
+          },
+        };
+      },
+    };
+  }
+
+  const outerHandle = makeHandle('outer');
+  const fakeDb = {
+    ...outerHandle,
+    async transaction<T>(cb: (tx: ReturnType<typeof makeHandle>) => Promise<T>) {
+      return cb(makeHandle('tx'));
+    },
+  };
+
+  return { db: fakeDb, updateCalls, getAccount: () => account };
+}
+
+const deauthorizationEvent: StravaWebhookEvent = {
+  object_type: 'athlete',
+  object_id: 42,
+  aspect_type: 'update',
+  owner_id: 42,
+  subscription_id: 1,
+  event_time: 1_700_000_000,
+};
+
+/** Fails the test if either Strava-calling dependency is ever invoked. */
+function neverCallStravaDeps(): ProcessWebhookEventDeps {
+  return {
+    resolveAccount: async () => {
+      throw new Error('resolveAccount must not be called while handling deauthorization');
+    },
+    fetchActivities: async () => {
+      throw new Error('fetchActivities must not be called while handling deauthorization');
+    },
+  };
+}
+
+function freshAccount(overrides: Partial<FakeAccountRow> = {}): FakeAccountRow {
+  return {
+    id: 'account-1',
+    accountId: '42',
+    providerId: 'strava',
+    access_token: 'legacy-token',
+    accessToken: 'better-auth-token',
+    refresh_token: 'legacy-refresh',
+    refreshToken: 'better-auth-refresh',
+    revokedAt: null,
+    scheduledErasureAt: null,
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+void test('processWebhookEvent handles athlete deauthorization: stops using the token, marks the account revoked, and schedules 30-day erasure - transactionally, without any Strava call', async () => {
+  const { db, updateCalls, getAccount } = buildFakeAccountsDb(freshAccount());
+
+  await processWebhookEvent(
+    deauthorizationEvent,
+    db as unknown as Parameters<typeof processWebhookEvent>[1],
+    neverCallStravaDeps(),
+  );
+
+  assert.equal(updateCalls.length, 1);
+  assert.equal(updateCalls[0]?.via, 'tx');
+
+  const account = getAccount();
+  assert.ok(account);
+  assert.equal(account.access_token, null);
+  assert.equal(account.accessToken, null);
+  assert.equal(account.refresh_token, null);
+  assert.equal(account.refreshToken, null);
+  assert.ok(account.revokedAt instanceof Date);
+
+  // 30-day erasure deadline, per docs/strava-data-policy.md §1/§3.
+  assert.ok(account.scheduledErasureAt instanceof Date);
+  const scheduledDays =
+    (account.scheduledErasureAt.getTime() - account.revokedAt.getTime()) / (24 * 60 * 60 * 1000);
+  assert.equal(scheduledDays, 30);
+});
+
+void test('processWebhookEvent deauthorization is idempotent: replaying it for an already-revoked account is a safe no-op that never re-extends the erasure deadline', async () => {
+  const originalRevokedAt = new Date('2026-01-01T00:00:00.000Z');
+  const originalErasureAt = new Date('2026-01-31T00:00:00.000Z');
+  const { db, updateCalls, getAccount } = buildFakeAccountsDb(
+    freshAccount({
+      access_token: null,
+      accessToken: null,
+      refresh_token: null,
+      refreshToken: null,
+      revokedAt: originalRevokedAt,
+      scheduledErasureAt: originalErasureAt,
+    }),
+  );
+
+  await processWebhookEvent(
+    deauthorizationEvent,
+    db as unknown as Parameters<typeof processWebhookEvent>[1],
+    neverCallStravaDeps(),
+  );
+
+  // No write at all on replay - not even a no-op update - and the
+  // original deadline is untouched.
+  assert.equal(updateCalls.length, 0);
+  const account = getAccount();
+  assert.equal(account?.revokedAt?.getTime(), originalRevokedAt.getTime());
+  assert.equal(account?.scheduledErasureAt?.getTime(), originalErasureAt.getTime());
+});
+
+void test('processWebhookEvent deauthorization for an unknown/unlinked account is a safe no-op', async () => {
+  const { db, updateCalls } = buildFakeAccountsDb(null);
+
+  await assert.doesNotReject(() =>
+    processWebhookEvent(
+      deauthorizationEvent,
+      db as unknown as Parameters<typeof processWebhookEvent>[1],
+      neverCallStravaDeps(),
+    ),
+  );
+
+  assert.equal(updateCalls.length, 0);
 });
