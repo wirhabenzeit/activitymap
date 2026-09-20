@@ -51,6 +51,12 @@ export const syncRetentionMetaSchema = z.object({
 });
 export type SyncRetentionMeta = z.infer<typeof syncRetentionMetaSchema>;
 
+/** Dataset-level freshness from the last fully completed Strava summary scan. */
+export const syncFreshnessMetaSchema = z.object({
+  lastSummaryReconciledAt: isoDateTime.nullable(),
+});
+export type SyncFreshnessMeta = z.infer<typeof syncFreshnessMetaSchema>;
+
 export const syncBootstrapQuerySchema = z.object({
   resource: syncResourceSchema.default('activities'),
   cursor: z.string().min(1).optional(),
@@ -78,6 +84,7 @@ export const syncBootstrapPageDTOSchema = z.discriminatedUnion('resource', [
     nextCursor: z.string().nullable(),
     snapshotCursor: z.string().nullable(),
     retention: syncRetentionMetaSchema,
+    freshness: syncFreshnessMetaSchema,
   }),
   z.object({
     resource: z.literal('photos'),
@@ -85,6 +92,7 @@ export const syncBootstrapPageDTOSchema = z.discriminatedUnion('resource', [
     nextCursor: z.string().nullable(),
     snapshotCursor: z.string().nullable(),
     retention: syncRetentionMetaSchema,
+    freshness: syncFreshnessMetaSchema,
   }),
 ]);
 export type SyncBootstrapPageDTO = z.infer<typeof syncBootstrapPageDTOSchema>;
@@ -155,5 +163,6 @@ export const syncChangesPageDTOSchema = z.object({
   items: z.array(syncChangeItemDTOSchema),
   nextCursor: z.string(),
   retention: syncRetentionMetaSchema,
+  freshness: syncFreshnessMetaSchema,
 });
 export type SyncChangesPageDTO = z.infer<typeof syncChangesPageDTOSchema>;

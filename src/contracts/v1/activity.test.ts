@@ -56,6 +56,10 @@ const fixtureActivity: Activity = {
   weighted_average_watts: null,
   kilojoules: null,
   last_updated: new Date('2024-01-31T10:00:00.000Z'),
+  geometryState: null,
+  photosState: null,
+  lastSummarySeenAt: null,
+  lastDetailedFetchedAt: null,
   is_complete: true,
 };
 
@@ -93,13 +97,18 @@ void test('toActivityDTO derives geometry_state "summary" from is_complete: fals
   assert.equal(dto.geometry_state, 'summary');
 });
 
-void test('toActivityDTO has no real signal yet for photos_state or the freshness timestamps', () => {
-  // Bridge behavior pending issue #122's real component-freshness columns:
-  // these must not be invented, so they are null regardless of is_complete.
-  const dto = toActivityDTO({ ...fixtureActivity, is_complete: true });
-  assert.equal(dto.photos_state, null);
-  assert.equal(dto.last_summary_seen_at, null);
-  assert.equal(dto.last_detailed_fetched_at, null);
+void test('toActivityDTO serializes real component freshness when present', () => {
+  const dto = toActivityDTO({
+    ...fixtureActivity,
+    geometryState: 'refresh_required',
+    photosState: 'current',
+    lastSummarySeenAt: new Date('2024-02-01T10:00:00.000Z'),
+    lastDetailedFetchedAt: new Date('2024-01-31T10:00:00.000Z'),
+  });
+  assert.equal(dto.geometry_state, 'refresh_required');
+  assert.equal(dto.photos_state, 'current');
+  assert.equal(dto.last_summary_seen_at, '2024-02-01T10:00:00.000Z');
+  assert.equal(dto.last_detailed_fetched_at, '2024-01-31T10:00:00.000Z');
 });
 
 void test('activityDTOSchema rejects a raw Drizzle row (numeric id) passed through unmapped', () => {

@@ -34,7 +34,7 @@ Make the web app offline-usable with an **offline read-first** approach:
 - [x] Add delta endpoint (`changes since cursor`)
 - [x] Persist sync cursor in `sync_meta`
 - [x] Handle deletions explicitly (tombstones/deleted IDs feed)
-- [ ] Add periodic full reconciliation fallback
+- [x] Add periodic full reconciliation fallback
 
 ### 4. Offline UX Policy
 - [ ] Add global online/offline status indicator

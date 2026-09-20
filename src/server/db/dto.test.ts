@@ -62,6 +62,7 @@ function buildUser(overrides: Partial<User> = {}): User {
     image: null,
     athlete_id: 12345,
     oldest_activity_reached: false,
+    lastSummaryReconciledAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

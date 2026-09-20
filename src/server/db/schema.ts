@@ -20,6 +20,22 @@ import type { WebhookRequest } from '~/types/strava';
 
 export const sportTypeEnum = pgEnum('sport_type', sportTypes);
 
+export const geometryStateEnum = pgEnum('geometry_state', [
+  'summary',
+  'detailed',
+  'refresh_required',
+]);
+
+export const photosStateEnum = pgEnum('photos_state', [
+  'current',
+  'refresh_required',
+]);
+
+export const summaryReconciliationPhaseEnum = pgEnum(
+  'summary_reconciliation_phase',
+  ['scanning', 'confirming'],
+);
+
 export const users = pgTable('user', {
   id: text('id').notNull().primaryKey(),
   name: text('name'),
@@ -30,6 +46,12 @@ export const users = pgTable('user', {
   oldest_activity_reached: boolean('oldest_activity_reached')
     .notNull()
     .default(false),
+  // Advanced only after a complete, bounded Strava summary scan and its
+  // missing-activity confirmation pass have both committed. A partial or
+  // failed scan must never make the dataset appear current (issue #123).
+  lastSummaryReconciledAt: timestamp('last_summary_reconciled_at', {
+    mode: 'date',
+  }),
   // Better Auth additions
   createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
@@ -178,6 +200,16 @@ export const activities = pgTable(
     weighted_average_watts: integer('weighted_average_watts'),
     kilojoules: doublePrecision('kilojoules'),
     last_updated: timestamp('last_updated', { mode: 'date' }).defaultNow(),
+    // Expand-only component freshness contract for the v1 sync API. These
+    // remain nullable during the #126 web migration so pre-existing rows can
+    // safely fall back to `is_complete` until the first summary
+    // reconciliation observes them.
+    geometryState: geometryStateEnum('geometry_state'),
+    photosState: photosStateEnum('photos_state'),
+    lastSummarySeenAt: timestamp('last_summary_seen_at', { mode: 'date' }),
+    lastDetailedFetchedAt: timestamp('last_detailed_fetched_at', {
+      mode: 'date',
+    }),
     is_complete: boolean('is_complete').notNull().default(false),
   },
   (table) => [
@@ -227,6 +259,39 @@ export const activitySync = pgTable(
     last_error: text('last_error'),
   },
   (table) => [index('activity_sync_user_id_idx').on(table.user_id)],
+);
+
+// Durable, resumable state for the periodic Strava summary reconciliation
+// required by issue #123. `scanBefore` is fixed when a scan starts so newer
+// activities cannot shift page boundaries; `nextPage` and
+// `candidateAfterId` make both the scan and the missing-activity confirmation
+// pass resumable. A short lease prevents overlapping cron invocations from
+// processing the same athlete concurrently, while still recovering after a
+// crashed worker.
+export const stravaSummaryReconciliations = pgTable(
+  'strava_summary_reconciliation',
+  {
+    athleteId: bigint('athlete_id', { mode: 'number' })
+      .primaryKey()
+      .references(() => users.athlete_id, { onDelete: 'cascade' }),
+    scanStartedAt: timestamp('scan_started_at', { mode: 'date' }).notNull(),
+    scanBefore: bigint('scan_before', { mode: 'number' }).notNull(),
+    nextPage: integer('next_page').notNull().default(1),
+    phase: summaryReconciliationPhaseEnum('phase')
+      .notNull()
+      .default('scanning'),
+    candidateAfterId: bigint('candidate_after_id', { mode: 'number' }),
+    leaseToken: text('lease_token'),
+    leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('strava_summary_reconciliation_lease_idx').on(
+      table.leaseExpiresAt,
+      table.updatedAt,
+    ),
+  ],
 );
 
 export const activityDeletions = pgTable(
@@ -298,6 +363,8 @@ export type Photo = typeof photos.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
 export type ActivitySync = typeof activitySync.$inferSelect;
+export type StravaSummaryReconciliation =
+  typeof stravaSummaryReconciliations.$inferSelect;
 export type ActivityDeletion = typeof activityDeletions.$inferSelect;
 export type PhotoDeletion = typeof photoDeletions.$inferSelect;
 

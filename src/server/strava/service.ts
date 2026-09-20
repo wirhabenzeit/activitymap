@@ -120,13 +120,7 @@ export async function fetchStravaActivities(
       return { activities: [], photos: [], notFoundIds };
     }
 
-    const activitiesToProcess = fetchedActivities.map((act) => {
-      // Only mark as complete if we explicitly requested IDs (Detail View)
-      // OR if it has a detailed polyline (strong indicator of detail view)
-      const isComplete = !!requestedActivityIds || !!act.map?.polyline;
-      return transformStravaActivity(act, isComplete);
-    });
-
+    const photoRefreshSucceeded = new Set<number>();
     if (includePhotos && requestedActivityIds) {
       // ... (photo logic remains same, omitting for brevity in thought but keeping in file)
       const photoFetchPromises = fetchedActivities.map(async (act) => {
@@ -135,6 +129,7 @@ export async function fetchStravaActivities(
             const activityPhotos: StravaPhoto[] = await client.getActivityPhotos(
               act.id,
             );
+            photoRefreshSucceeded.add(act.id);
 
             return activityPhotos.map((photo) =>
               transformStravaPhoto(photo, athleteId),
@@ -151,6 +146,15 @@ export async function fetchStravaActivities(
       const photoResults = await Promise.all(photoFetchPromises);
       photos.push(...photoResults.flat());
     }
+
+    const activitiesToProcess = fetchedActivities.map((act) => {
+      // Only mark as complete if we explicitly requested IDs (Detail View)
+      // OR if it has a detailed polyline (strong indicator of detail view).
+      const isComplete = !!requestedActivityIds || !!act.map?.polyline;
+      return transformStravaActivity(act, isComplete, {
+        photosCurrent: photoRefreshSucceeded.has(act.id),
+      });
+    });
 
     const dbActivities = activitiesToProcess.map((act) => ({
       ...act,
@@ -282,6 +286,10 @@ export async function fetchStravaActivities(
                 // actually `is_complete` is boolean.
                 // CASE WHEN excluded.is_complete THEN true ELSE activity.is_complete END
                 is_complete: sql`CASE WHEN excluded.is_complete THEN true ELSE ${activitySchema.is_complete} END`,
+                geometryState: sql`CASE WHEN excluded.is_complete THEN excluded.geometry_state ELSE COALESCE(${activitySchema.geometryState}, excluded.geometry_state) END`,
+                photosState: sql`CASE WHEN ${photoRefreshSucceeded.size > 0} THEN excluded.photos_state ELSE COALESCE(${activitySchema.photosState}, excluded.photos_state) END`,
+                lastSummarySeenAt: sql`excluded.last_summary_seen_at`,
+                lastDetailedFetchedAt: sql`COALESCE(excluded.last_detailed_fetched_at, ${activitySchema.lastDetailedFetchedAt})`,
 
                 average_speed: sql`excluded.average_speed`,
                 max_speed: sql`excluded.max_speed`,

@@ -155,7 +155,7 @@ export async function updateActivityForActor(
     const stravaActivity = await client.updateActivity(act.id, updateData);
 
     const transformedActivity = {
-      ...transformStravaActivity(stravaActivity),
+      ...transformStravaActivity(stravaActivity, true),
       athlete: actor.athleteId,
     } satisfies Activity;
 

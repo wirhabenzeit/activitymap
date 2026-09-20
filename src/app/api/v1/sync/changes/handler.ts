@@ -17,6 +17,7 @@ import type { PhotosRepository } from '~/server/repositories/photos';
 import type { ChangesRepository } from '~/server/repositories/changes';
 import { DEFAULT_RETENTION_DAYS } from '~/server/repositories/changes';
 import type { SyncChange } from '~/server/db/schema';
+import type { SummaryReconciliationRepository } from '~/server/repositories/summary-reconciliation';
 
 export interface SyncChangesHandlerDependencies {
   createRequestId?: () => string;
@@ -27,6 +28,7 @@ export interface SyncChangesHandlerDependencies {
   activitiesRepo: Pick<ActivitiesRepository, 'findManyByIds'>;
   photosRepo: Pick<PhotosRepository, 'findManyByIds'>;
   changesRepo: Pick<ChangesRepository, 'findAfter' | 'latestSequence'>;
+  freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
   retentionDays?: number;
 }
@@ -61,6 +63,7 @@ export function createSyncChangesHandler({
   activitiesRepo,
   photosRepo,
   changesRepo,
+  freshnessRepo = { lastCompletedAt: async () => null },
   retentionDays = DEFAULT_RETENTION_DAYS,
 }: SyncChangesHandlerDependencies) {
   return async function GET(request: Request): Promise<Response> {
@@ -156,6 +159,11 @@ export function createSyncChangesHandler({
         retention: {
           retentionDays,
           cursorValidUntil: nextCursorValidUntil.toISOString(),
+        },
+        freshness: {
+          lastSummaryReconciledAt: (
+            await freshnessRepo.lastCompletedAt(actor.athleteId)
+          )?.toISOString() ?? null,
         },
       };
 

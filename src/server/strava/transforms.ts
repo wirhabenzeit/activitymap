@@ -5,13 +5,13 @@ import type { StravaActivity, StravaPhoto } from './types';
 export function transformStravaActivity(
   activity: StravaActivity,
   isComplete = false,
+  options: { photosCurrent?: boolean; observedAt?: Date } = {},
 ): Omit<Activity, 'athlete'> {
+  const observedAt = options.observedAt ?? new Date();
   const start_date = new Date(activity.start_date);
-  const local_date = new Date(
-    start_date.toLocaleString('en-US', {
-      timeZone: activity.timezone.split(' ').pop(),
-    }),
-  );
+  // Strava supplies the activity's local wall-clock time directly. Parsing
+  // that value avoids making persisted data depend on the server's own TZ.
+  const local_date = new Date(activity.start_date_local);
 
   let bbox: [number, number, number, number] = [0, 0, 0, 0];
   if (activity.map?.summary_polyline) {
@@ -97,7 +97,14 @@ export function transformStravaActivity(
     display_hide_heartrate_option: false,
     calories: activity.calories,
     pr_count: activity.pr_count,
-    last_updated: new Date(),
+    last_updated: observedAt,
+    geometryState: isComplete ? 'detailed' : 'summary',
+    photosState:
+      options.photosCurrent || activity.total_photo_count === 0
+        ? 'current'
+        : 'refresh_required',
+    lastSummarySeenAt: observedAt,
+    lastDetailedFetchedAt: isComplete ? observedAt : null,
     is_complete: isComplete,
   };
 }
