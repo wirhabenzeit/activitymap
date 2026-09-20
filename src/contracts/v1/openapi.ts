@@ -8,6 +8,12 @@ import { offlineSyncPayloadDTOSchema } from './sync';
 import { errorEnvelopeSchema } from './error';
 import { responseEnvelope } from './envelope';
 import { paginatedSchema, MAX_PAGE_SIZE } from './pagination';
+import {
+  mobileExchangeRequestSchema,
+  mobileExchangeResponseDTOSchema,
+  mobileSessionListDTOSchema,
+  revokeSessionRequestSchema,
+} from './mobile-auth';
 
 /**
  * Builds the v1 OpenAPI 3.1 document from the same Zod schemas the route
@@ -35,6 +41,14 @@ export function buildOpenApiDocument() {
   registry.add(responseEnvelope(paginatedSchema(photoDTOSchema)), {
     id: 'PhotoPageResponse',
   });
+  registry.add(mobileExchangeRequestSchema, { id: 'MobileExchangeRequest' });
+  registry.add(responseEnvelope(mobileExchangeResponseDTOSchema), {
+    id: 'MobileExchangeResponse',
+  });
+  registry.add(responseEnvelope(mobileSessionListDTOSchema), {
+    id: 'MobileSessionListResponse',
+  });
+  registry.add(revokeSessionRequestSchema, { id: 'RevokeSessionRequest' });
 
   const { schemas: rawSchemas } = z.toJSONSchema(registry, {
     target: 'draft-2020-12',
@@ -183,6 +197,137 @@ export function buildOpenApiDocument() {
             '400': errorResponse(
               'The `cursor` or `limit` parameter is invalid',
             ),
+            '401': errorResponse(
+              'No valid session or bearer credential was presented',
+            ),
+          },
+        },
+      },
+      '/api/v1/auth/mobile/start': {
+        get: {
+          operationId: 'startMobileAuth',
+          summary: 'Start the mobile Strava sign-in flow',
+          description:
+            'Opened by `ASWebAuthenticationSession`. Starts the existing server-side Strava OAuth flow and, on completion, redirects to `redirect_uri` (which must be allow-listed) with a one-time code and the original `state` - never a session credential. See issue #121.',
+          parameters: [
+            {
+              name: 'state',
+              in: 'query',
+              required: true,
+              schema: { type: 'string' },
+              description: 'Client-generated CSRF state, echoed back on the final redirect',
+            },
+            {
+              name: 'code_challenge',
+              in: 'query',
+              required: true,
+              schema: { type: 'string' },
+              description: 'RFC 7636 PKCE S256 challenge',
+            },
+            {
+              name: 'redirect_uri',
+              in: 'query',
+              required: true,
+              schema: { type: 'string' },
+              description: 'The allow-listed universal link to redirect to once sign-in completes',
+            },
+          ],
+          responses: {
+            '302': { description: 'Redirect to the Strava authorization URL' },
+            '400': errorResponse(
+              'A required parameter is missing, or `redirect_uri` is not allow-listed',
+            ),
+            '500': errorResponse('Starting the Strava sign-in flow failed'),
+          },
+        },
+      },
+      '/api/v1/auth/mobile/callback': {
+        get: {
+          operationId: 'mobileAuthCallback',
+          summary: "Strava's OAuth callback, redirected here for a mobile sign-in",
+          description:
+            'Not called directly by a client. Mints a one-time login code bound to the just-completed browser session and redirects to the mobile universal link with that code and the original `state`.',
+          responses: {
+            '302': {
+              description: 'Redirect to the mobile universal link with a one-time code',
+            },
+            '400': errorResponse(
+              'A required parameter is missing, or `redirect_uri` is not allow-listed',
+            ),
+            '401': errorResponse('The Strava sign-in did not produce a session'),
+            '500': errorResponse('The request could not be completed'),
+          },
+        },
+      },
+      '/api/v1/auth/mobile/exchange': {
+        post: {
+          operationId: 'exchangeMobileLoginCode',
+          summary: 'Exchange a one-time mobile login code for a bearer session token',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('MobileExchangeRequest') },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'The ActivityMap bearer session token',
+              content: {
+                'application/json': { schema: ref('MobileExchangeResponse') },
+              },
+            },
+            '400': errorResponse('The request body is invalid'),
+            '401': errorResponse(
+              'The code is invalid, expired, already used, or its state/PKCE verifier does not match',
+            ),
+          },
+        },
+      },
+      '/api/v1/auth/logout': {
+        post: {
+          operationId: 'logout',
+          summary: "Revoke the caller's current session",
+          security,
+          responses: {
+            '200': { description: 'The session was revoked' },
+            '401': errorResponse(
+              'No valid session or bearer credential was presented',
+            ),
+          },
+        },
+      },
+      '/api/v1/auth/sessions': {
+        get: {
+          operationId: 'listSessions',
+          summary: "List the caller's active sessions",
+          security,
+          responses: {
+            '200': {
+              description: 'The active sessions for the current user',
+              content: {
+                'application/json': { schema: ref('MobileSessionListResponse') },
+              },
+            },
+            '401': errorResponse(
+              'No valid session or bearer credential was presented',
+            ),
+          },
+        },
+      },
+      '/api/v1/auth/sessions/revoke': {
+        post: {
+          operationId: 'revokeSession',
+          summary: 'Revoke one of the caller\'s own sessions by token (per-device sign-out)',
+          security,
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('RevokeSessionRequest') },
+            },
+          },
+          responses: {
+            '200': { description: 'The session was revoked' },
+            '400': errorResponse('The request body is invalid'),
             '401': errorResponse(
               'No valid session or bearer credential was presented',
             ),

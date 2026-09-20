@@ -15,6 +15,13 @@
       "when": 1789852174455,
       "tag": "0001_strava_webhook_inbox_additive",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789889970375,
+      "tag": "0002_mobile_login_codes",
+      "breakpoints": true
     }
   ]
 }
