@@ -19,6 +19,8 @@
     "db:baseline:adopt": "tsx scripts/database/migrate.ts adopt-baseline",
     "test": "tsx --test src/**/*.test.ts",
     "test:sync": "tsx src/scripts/test-sync-activities.ts",
+    "openapi:generate": "tsx scripts/generate-openapi.ts",
+    "openapi:verify-swift": "bash scripts/verify-swift-client.sh",
     "friflyt:enrich": "node scripts/enrich-friflyt-geojson.mjs",
     "friflyt:enrich:translate": "node scripts/enrich-friflyt-geojson.mjs --translate"
   },
