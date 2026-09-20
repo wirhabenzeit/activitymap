@@ -54,6 +54,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Validate migration journal
         run: pnpm db:migrations:check
+      - name: Exercise webhook backfill with legacy duplicates
+        run: pnpm db:migrate:test-webhook
       - name: Apply all migrations to empty Postgres
         run: pnpm db:migrate
       - name: Verify current migration state
