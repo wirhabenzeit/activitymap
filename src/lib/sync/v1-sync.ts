@@ -163,6 +163,7 @@ async function applyChangesPage(
 
 async function runChangesCatchup(
   scope: string,
+  bootstrapCursor: string,
   cursor: string,
   signal: AbortSignal | undefined,
   store: V1SyncStoreDeps,
@@ -187,7 +188,7 @@ async function runChangesCatchup(
 
   await store.setV1SyncState({
     scope,
-    bootstrapCursor: cursor,
+    bootstrapCursor,
     bootstrapComplete: true,
     changesCursor: nextCursor,
     lastSyncAt: nowIso(),
@@ -201,6 +202,41 @@ async function runChangesCatchup(
     activityDeletes,
     photoDeletes,
     cursor: nextCursor,
+  };
+}
+
+async function runFreshBootstrap(
+  scope: string,
+  signal: AbortSignal | undefined,
+  store: V1SyncStoreDeps,
+  fetchImpl: FetchLike | undefined,
+): Promise<V1SyncResult> {
+  // A failed bootstrap can leave pages in IndexedDB without a completed
+  // state record. Always restart from a clean scope so rows deleted between
+  // attempts cannot survive as ghosts in the local cache.
+  await store.clearV1Scope(scope);
+
+  const bootstrap = await runBootstrap(scope, signal, store, fetchImpl);
+
+  // The snapshot cursor is captured before all bootstrap pages have been
+  // read. Drain changes immediately so mutations concurrent with bootstrap
+  // are visible before this sync pass reports success.
+  const catchup = await runChangesCatchup(
+    scope,
+    bootstrap.cursor,
+    bootstrap.cursor,
+    signal,
+    store,
+    fetchImpl,
+  );
+
+  return {
+    mode: 'bootstrap',
+    activityUpserts: bootstrap.activityUpserts + catchup.activityUpserts,
+    photoUpserts: bootstrap.photoUpserts + catchup.photoUpserts,
+    activityDeletes: catchup.activityDeletes,
+    photoDeletes: catchup.photoDeletes,
+    cursor: catchup.cursor,
   };
 }
 
@@ -223,13 +259,19 @@ export async function runV1Sync({
 
   try {
     if (!state?.bootstrapComplete || !state.changesCursor) {
-      return await runBootstrap(scope, signal, store, fetchImpl);
+      return await runFreshBootstrap(scope, signal, store, fetchImpl);
     }
-    return await runChangesCatchup(scope, state.changesCursor, signal, store, fetchImpl);
+    return await runChangesCatchup(
+      scope,
+      state.bootstrapCursor ?? state.changesCursor,
+      state.changesCursor,
+      signal,
+      store,
+      fetchImpl,
+    );
   } catch (error) {
     if (error instanceof SyncRebootstrapRequiredError) {
-      await store.clearV1Scope(scope);
-      return runBootstrap(scope, signal, store, fetchImpl);
+      return runFreshBootstrap(scope, signal, store, fetchImpl);
     }
     throw error;
   }

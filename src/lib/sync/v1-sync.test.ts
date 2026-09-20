@@ -246,6 +246,80 @@ void test('runV1Sync bootstraps a scope with no prior state', async () => {
   assert.equal(states.get(SCOPE)?.changesCursor, result.cursor);
 });
 
+void test('runV1Sync catches up mutations that happen during bootstrap before returning', async () => {
+  const server = new FakeServer();
+  server.upsertActivity(buildActivity({ id: 1 }));
+  const { deps, activities } = createFakeStore();
+  const serverFetch = buildFetchImpl(server);
+  let mutatedDuringBootstrap = false;
+  const fetchImpl: FetchLike = async (input, init) => {
+    const url = new URL(input, 'https://example.test');
+    if (
+      !mutatedDuringBootstrap &&
+      url.pathname === '/api/v1/sync/bootstrap' &&
+      url.searchParams.get('resource') === 'photos'
+    ) {
+      mutatedDuringBootstrap = true;
+      server.upsertActivity(buildActivity({ id: 2 }));
+      server.deleteActivity(1);
+    }
+    return serverFetch(input, init);
+  };
+
+  const result = await runV1Sync({ scope: SCOPE, store: deps, fetchImpl });
+
+  assert.equal(result.mode, 'bootstrap');
+  assert.equal(result.activityUpserts, 2);
+  assert.equal(result.activityDeletes, 1);
+  assert.deepEqual(
+    [...activities.get(SCOPE)!.keys()],
+    ['2'],
+    'the completed sync pass must include changes after its bootstrap snapshot',
+  );
+});
+
+void test('runV1Sync clears partial rows before retrying an interrupted bootstrap', async () => {
+  const server = new FakeServer();
+  server.upsertActivity(buildActivity({ id: 1 }));
+  const { deps, activities } = createFakeStore();
+  let interruptOnce = true;
+  const interruptedStore: V1SyncStoreDeps = {
+    ...deps,
+    upsertActivityDTOs: async (scope, items) => {
+      await deps.upsertActivityDTOs(scope, items);
+      if (interruptOnce) {
+        interruptOnce = false;
+        throw new Error('simulated browser interruption');
+      }
+    },
+  };
+
+  await assert.rejects(
+    runV1Sync({
+      scope: SCOPE,
+      store: interruptedStore,
+      fetchImpl: buildFetchImpl(server),
+    }),
+    /simulated browser interruption/,
+  );
+  assert.deepEqual([...activities.get(SCOPE)!.keys()], ['1']);
+
+  server.deleteActivity(1);
+  server.upsertActivity(buildActivity({ id: 2 }));
+
+  await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+  });
+
+  assert.deepEqual(
+    [...activities.get(SCOPE)!.keys()],
+    ['2'],
+    'a row deleted between bootstrap attempts must not survive locally',
+  );
+});
+
 void test('runV1Sync catches up via /sync/changes once a scope has already bootstrapped', async () => {
   const server = new FakeServer();
   server.upsertActivity(buildActivity({ id: 1 }));
