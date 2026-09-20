@@ -8,12 +8,13 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Inspect, migrate, or adopt the verified baseline
+        description: Inspect, audit, migrate, or adopt the verified baseline
         required: true
         type: choice
         options:
           - status
           - fingerprint
+          - sync-audit
           - migrate
           - adopt-baseline
       confirmation:
@@ -53,6 +54,9 @@ jobs:
       - name: Fingerprint live schema
         if: ${{ env.REQUESTED_OPERATION == 'fingerprint' }}
         run: pnpm db:schema:fingerprint
+      - name: Audit v1 sync migration coverage
+        if: ${{ env.REQUESTED_OPERATION == 'sync-audit' }}
+        run: pnpm db:audit-sync-migration
       - name: Apply pending migrations
         if: ${{ env.REQUESTED_OPERATION == 'migrate' }}
         run: |
