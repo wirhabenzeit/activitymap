@@ -5,8 +5,7 @@ import {
   ShareLinkUnavailableError,
   getShareView,
 } from '~/server/application/share-links';
-import type { SharedActivityDTO } from '~/contracts/share/activity';
-import { polylineToSvgPath } from '~/lib/sharing/polyline-preview';
+import { SharedActivityMap } from '~/components/share/shared-activity-map';
 
 /**
  * The private share-link capability view (issue #132).
@@ -29,11 +28,11 @@ import { polylineToSvgPath } from '~/lib/sharing/polyline-preview';
  * the same ordinary Next.js 404 via `notFound()`, so a guessed or
  * incremented token cannot be distinguished from a URL typo.
  *
- * This page also renders no map tiles, external images, fonts, or scripts:
- * `polylineToSvgPath` draws each activity's route entirely inline from the
- * decoded polyline, so nothing on this page ever sends a third-party
- * request that would carry the current URL (and therefore the capability
- * token) in its `Referer` header - see that helper's doc comment.
+ * This page renders the shared subset on the same map presentation as the
+ * authenticated app, but without the app shell, List/Stats navigation, or
+ * access to unrelated account data. The route metadata and response headers
+ * both enforce `no-referrer`, so map-tile requests cannot receive the raw
+ * capability URL.
  */
 
 export const dynamic = 'force-dynamic';
@@ -41,6 +40,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Shared activities · ActivityMap',
   description: 'A private, time-limited ActivityMap share link.',
+  referrer: 'no-referrer',
   robots: {
     index: false,
     follow: false,
@@ -48,102 +48,6 @@ export const metadata: Metadata = {
     googleBot: { index: false, follow: false },
   },
 };
-
-function formatDistance(meters: number | null): string {
-  if (meters === null) return '—';
-  return `${(meters / 1000).toFixed(2)} km`;
-}
-
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return '—';
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  return hours > 0
-    ? `${hours}h ${minutes.toString().padStart(2, '0')}m`
-    : `${minutes}m ${secs.toString().padStart(2, '0')}s`;
-}
-
-function formatElevation(meters: number | null): string {
-  if (meters === null) return '—';
-  return `${Math.round(meters)} m`;
-}
-
-function ActivityCard({ activity }: { activity: SharedActivityDTO }) {
-  const preview = activity.map_summary_polyline
-    ? polylineToSvgPath(activity.map_summary_polyline)
-    : null;
-
-  return (
-    <li className="flex gap-4 rounded-lg border border-border p-4">
-      {preview && (
-        <svg
-          viewBox={preview.viewBox}
-          width={72}
-          height={72}
-          className="shrink-0 text-primary"
-          aria-hidden="true"
-        >
-          <path
-            d={preview.path}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={3}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{activity.name}</p>
-        <p className="text-sm text-muted-foreground">
-          {activity.sport_type} ·{' '}
-          {new Date(activity.start_date_local).toLocaleString()}
-        </p>
-        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
-          <div>
-            <dt className="text-xs text-muted-foreground">Distance</dt>
-            <dd>{formatDistance(activity.distance)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Moving time</dt>
-            <dd>{formatDuration(activity.moving_time)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Elevation</dt>
-            <dd>{formatElevation(activity.total_elevation_gain)}</dd>
-          </div>
-          {activity.average_heartrate !== undefined && (
-            <div>
-              <dt className="text-xs text-muted-foreground">Avg heart rate</dt>
-              <dd>
-                {activity.average_heartrate !== null
-                  ? `${Math.round(activity.average_heartrate)} bpm`
-                  : '—'}
-              </dd>
-            </div>
-          )}
-          {activity.average_watts !== undefined && (
-            <div>
-              <dt className="text-xs text-muted-foreground">Avg power</dt>
-              <dd>
-                {activity.average_watts !== null
-                  ? `${Math.round(activity.average_watts)} W`
-                  : '—'}
-              </dd>
-            </div>
-          )}
-          {activity.kudos_count !== undefined && (
-            <div>
-              <dt className="text-xs text-muted-foreground">Kudos</dt>
-              <dd>{activity.kudos_count ?? '—'}</dd>
-            </div>
-          )}
-        </dl>
-      </div>
-    </li>
-  );
-}
 
 export default async function SharePage({
   params,
@@ -163,26 +67,9 @@ export default async function SharePage({
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold">Shared activities</h1>
-        <p className="text-sm text-muted-foreground">
-          Shared privately via ActivityMap. This link expires{' '}
-          {new Date(view.expiresAt).toLocaleString()} and can be revoked by
-          its owner at any time.
-        </p>
-      </header>
-      {view.activities.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          None of the shared activities are currently available.
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {view.activities.map((activity) => (
-            <ActivityCard key={activity.id} activity={activity} />
-          ))}
-        </ul>
-      )}
-    </main>
+    <SharedActivityMap
+      activities={view.activities}
+      expiresAt={view.expiresAt.toISOString()}
+    />
   );
 }
