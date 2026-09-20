@@ -97,6 +97,25 @@ export interface ChangesRepository {
  */
 export const DEFAULT_RETENTION_DAYS = 90;
 
+function normalizeSequence(value: number | string | bigint | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+
+  // PostgreSQL's `max(bigint)` aggregate is returned as text by the Neon
+  // driver even though the underlying column uses Drizzle's `mode: 'number'`.
+  // An `sql<number>` annotation only changes TypeScript's view of that value;
+  // it does not install a runtime decoder. Normalize at the repository
+  // boundary so cursor construction never receives a string masquerading as
+  // a number, while still rejecting sequences JavaScript cannot represent
+  // without precision loss.
+  const sequence = typeof value === 'number' ? value : Number(value);
+  if (!Number.isSafeInteger(sequence) || sequence < 0) {
+    throw new RangeError(
+      `Change-feed sequence must be a non-negative safe integer, got ${String(value)}`,
+    );
+  }
+  return sequence;
+}
+
 export function createChangesRepository(
   database: DrizzleDb = defaultDb,
 ): ChangesRepository {
@@ -134,10 +153,12 @@ export function createChangesRepository(
 
     async latestSequence(athleteId) {
       const [row] = await database
-        .select({ max: sql<number | null>`max(${syncChanges.sequence})` })
+        .select({
+          max: sql<number | string | bigint | null>`max(${syncChanges.sequence})`,
+        })
         .from(syncChanges)
         .where(eq(syncChanges.athleteId, athleteId));
-      return row?.max ?? 0;
+      return normalizeSequence(row?.max);
     },
 
     async compactOlderThan(cutoff) {

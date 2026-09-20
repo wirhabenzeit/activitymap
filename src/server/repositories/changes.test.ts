@@ -24,7 +24,7 @@ import { createChangesRepository, type ChangesRepository } from './changes.ts';
  */
 function buildFakeDb(opts: {
   selectResult?: unknown[];
-  aggregateResult?: { max?: number | null };
+  aggregateResult?: { max?: number | string | bigint | null };
   deletedRows?: { sequence: number }[];
 } = {}) {
   const rows: {
@@ -226,6 +226,19 @@ void test('latestSequence returns the reported max sequence', async () => {
   assert.equal(await repoWith(db).latestSequence(1), 42);
 });
 
+void test('latestSequence normalizes PostgreSQL bigint aggregate strings', async () => {
+  const { db } = repoBackedByAggregate({ max: '205' });
+  assert.equal(await repoWith(db).latestSequence(1), 205);
+});
+
+void test('latestSequence rejects bigint aggregates outside JavaScript safe-integer range', async () => {
+  const { db } = repoBackedByAggregate({ max: '9007199254740992' });
+  await assert.rejects(
+    repoWith(db).latestSequence(1),
+    /Change-feed sequence must be a non-negative safe integer/,
+  );
+});
+
 void test('compactOlderThan reports how many rows the delete removed', async () => {
   const { db } = buildFakeDb({ deletedRows: [{ sequence: 1 }, { sequence: 2 }] });
   const deletedCount = await repoWith(db).compactOlderThan(new Date('2020-01-01'));
@@ -238,6 +251,8 @@ void test('compactOlderThan reports 0 when nothing was old enough to remove', as
   assert.equal(deletedCount, 0);
 });
 
-function repoBackedByAggregate(aggregateResult: { max?: number | null }) {
+function repoBackedByAggregate(aggregateResult: {
+  max?: number | string | bigint | null;
+}) {
   return buildFakeDb({ aggregateResult });
 }
