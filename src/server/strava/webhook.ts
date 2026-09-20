@@ -9,6 +9,7 @@ import {
 } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
 import { fetchStravaActivities } from '~/server/strava/service';
+import { activityOwnershipFilter } from '~/server/strava/webhook-filters';
 import { eq, sql, and } from 'drizzle-orm';
 import { logger } from '~/server/logging/logger';
 import type { WebhookRequest } from '~/types/strava';
@@ -182,7 +183,9 @@ export async function processWebhookEvent(data: StravaWebhookEvent) {
   // otherwise delete zero rows on retry and skip the tombstone forever.
   if (notFoundIds.includes(object_id)) {
     await db.transaction(async (tx) => {
-      await tx.delete(activities).where(eq(activities.id, object_id));
+      await tx
+        .delete(activities)
+        .where(activityOwnershipFilter(object_id, owner_id));
       // Cascading delete should handle photos.
       await tx
         .insert(activityDeletions)
