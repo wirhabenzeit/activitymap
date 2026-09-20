@@ -226,7 +226,7 @@ Exit criterion: every retained variable has one consumer, owner, and scope.
 Exit criterion: each preview uses an independently identifiable database
 branch and cannot trigger production side effects.
 
-Current rollout state (2026-09-19): native Vercel-to-Neon Preview branch
+Current rollout state (2026-09-20): native Vercel-to-Neon Preview branch
 creation and the PR #137 runtime preference for `NEON_DATABASE_URL` are
 verified. Application validation accepts the managed variable, fails closed on
 Vercel when neither supported runtime URL is present, and no longer requires an
@@ -236,9 +236,20 @@ and obsolete `POSTGRES_*`/`PG*` compatibility variables have also been removed;
 Production and Preview both use only the managed `NEON_*` runtime variables.
 PR #138 implements an explicit Production-only opt-in for Strava OAuth/API
 calls, webhook handling, and cron, with the related credentials restricted to
-Production. Five stale merged-PR branches were deleted, leaving `main`, the
-manual `preview` branch, and the dated recovery branch. Automatic expiration or
-retention-driven cleanup remains a separate lifecycle improvement.
+Production. The Vercel Pre-Production deployment retention policy is one day,
+and GitHub's `delete_branch_on_merge` repository setting is enabled. Active Git
+branches retain their current Preview deployment; after a pull request merges,
+GitHub removes its head branch and Vercel can retire its Preview deployments.
+When the last deployment for that Git branch is deleted, the managed Neon
+integration deletes the corresponding database branch. Retention processing is
+asynchronous and can take a few days.
+
+The twelve merged head branches that predated automatic deletion were removed
+manually. Closed-but-unmerged branches were preserved. The managed Neon project
+was cleaned to `main`, the manual `preview` branch, and the dated recovery
+branch. Verify the full automatic chain after the next pull request merges:
+GitHub head branch deleted, Vercel Preview deployment retired, and Neon Preview
+branch deleted without manual intervention.
 
 ### Phase 3: Replayable migration baseline
 
