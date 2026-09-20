@@ -50,6 +50,13 @@
       "when": 1789932830305,
       "tag": "0006_drop-legacy-webhook-table",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789936472058,
+      "tag": "0007_add-scoped-share-links",
+      "breakpoints": true
     }
   ]
 }

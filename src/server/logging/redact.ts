@@ -45,7 +45,7 @@ const AUTH_SCHEMES =
 // groups: key, an optional closing quote on the key (JSON), the `:`/`=`
 // separator, an optional opening quote on the value, and the value itself.
 const KEY_VALUE_PATTERN = new RegExp(
-  '\\b(session(?:[_-]?token)?|access[_-]?token|refresh[_-]?token|authorization|cookie|password|secret|client[_-]?secret|verify[_-]?token|api[_-]?key)' +
+  '\\b(session(?:[_-]?token)?|access[_-]?token|refresh[_-]?token|share[_-]?token|code[_-]?hash|authorization|cookie|password|secret|client[_-]?secret|verify[_-]?token|api[_-]?key)' +
     '("?)(\\s*[:=]\\s*)("?)' +
     `((?:${AUTH_SCHEMES})\\s+[^\\s"'&,;)}\\]]+|[^\\s"'&,;)}\\]]+)\\4`,
   'gi',
@@ -60,6 +60,18 @@ const BEARER_TOKEN_PATTERN = /\bBearer\s+([A-Za-z0-9._~+/-]+=*)/gi;
 // precedes it.
 const CONNECTION_STRING_CREDENTIAL_PATTERN =
   /(:\/\/)([^\s"'/@]+):([^\s"'@]+)@/gi;
+
+// Matches a private share link's capability token embedded in a `/share/...`
+// URL path (bare, or as part of a full `https://.../share/<token>` link) -
+// issue #132's "never let the raw token leak ... into application logs"
+// requirement. The token itself is the only credential for a share
+// (docs/strava-data-policy.md §5), so a log line that merely interpolated a
+// share URL - e.g. "failed to notify recipient of
+// https://app.example/share/<token>" - must not leave the token readable
+// even though no `key=value`/`Bearer` shape is present. Matches
+// base64url-ish tokens of 16+ characters, the same alphabet
+// `~/server/sharing/tokens.ts` generates.
+const SHARE_LINK_PATH_PATTERN = /(\/share\/)([A-Za-z0-9_-]{16,})/g;
 
 function normalize(key: string): string {
   return key.toLowerCase().replace(/[_-]/g, '');
@@ -92,7 +104,8 @@ export function redactString(value: string): string {
       ) => `${key}${closeKeyQuote}${sep}${valueQuote}${REDACTED}${valueQuote}`,
     )
     .replace(CONNECTION_STRING_CREDENTIAL_PATTERN, (_match, scheme: string) => `${scheme}${REDACTED}@`)
-    .replace(BEARER_TOKEN_PATTERN, `Bearer ${REDACTED}`);
+    .replace(BEARER_TOKEN_PATTERN, `Bearer ${REDACTED}`)
+    .replace(SHARE_LINK_PATH_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`);
 }
 
 /**

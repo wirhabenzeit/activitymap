@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { columns } from '../../components/list/columns';
-import { DataTable } from '../../components/list/data-table';
+import { columns } from '~/components/list/columns';
+import { DataTable } from '~/components/list/data-table';
 import { groupBy } from '~/lib/utils';
 import { useShallowStore } from '~/store';
 
