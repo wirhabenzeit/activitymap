@@ -67,6 +67,10 @@ function buildActivity(overrides: Partial<Activity> & { id: number }): Activity 
     weighted_average_watts: null,
     kilojoules: null,
     last_updated: new Date('2026-01-01T00:00:00.000Z'),
+    geometryState: null,
+    photosState: null,
+    lastSummarySeenAt: null,
+    lastDetailedFetchedAt: null,
     is_complete: false,
     ...overrides,
   };
@@ -291,13 +295,15 @@ void test('GET /api/v1/sync/bootstrap rejects a cursor encoded for the wrong res
   assert.equal(errorEnvelopeSchema.safeParse(body).success, true);
 });
 
-void test('GET /api/v1/sync/bootstrap includes retention metadata', async () => {
+void test('GET /api/v1/sync/bootstrap includes retention and completed-summary freshness metadata', async () => {
+  const reconciledAt = new Date('2026-09-19T06:00:00.000Z');
   const GET = createSyncBootstrapHandler({
     now: () => now,
     resolveActor: async () => ACTOR,
     activitiesRepo: fakeActivitiesRepo([]),
     photosRepo: fakePhotosRepo([]),
     changesRepo: fakeChangesRepo(0),
+    freshnessRepo: { lastCompletedAt: async () => reconciledAt },
     retentionDays: 90,
   });
 
@@ -305,12 +311,19 @@ void test('GET /api/v1/sync/bootstrap includes retention metadata', async () => 
     new Request('https://example.test/api/v1/sync/bootstrap'),
   );
   const body = (await response.json()) as {
-    data: { retention: { retentionDays: number; cursorValidUntil: string } };
+    data: {
+      retention: { retentionDays: number; cursorValidUntil: string };
+      freshness: { lastSummaryReconciledAt: string | null };
+    };
   };
 
   assert.equal(body.data.retention.retentionDays, 90);
   assert.equal(
     body.data.retention.cursorValidUntil,
     new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+  );
+  assert.equal(
+    body.data.freshness.lastSummaryReconciledAt,
+    reconciledAt.toISOString(),
   );
 });

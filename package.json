@@ -15,6 +15,7 @@
     "db:migrate:check": "tsx scripts/database/migrate.ts check",
     "db:migrate:test-webhook": "tsx scripts/database/test-webhook-inbox-migration.ts",
     "db:test-erasure": "tsx --conditions=react-server scripts/database/test-erasure-executor.ts",
+    "db:test-summary-reconciliation": "tsx --conditions=react-server scripts/database/test-summary-reconciliation.ts",
     "db:migrate:preview": "tsx scripts/database/migrate-preview.ts",
     "db:schema:fingerprint": "tsx scripts/database/migrate.ts fingerprint",
     "db:baseline:adopt": "tsx scripts/database/migrate.ts adopt-baseline",

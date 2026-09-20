@@ -69,6 +69,10 @@ function buildActivity(overrides: Partial<Activity> & { id: number }): Activity 
     weighted_average_watts: null,
     kilojoules: null,
     last_updated: new Date('2026-01-01T00:00:00.000Z'),
+    geometryState: null,
+    photosState: null,
+    lastSummarySeenAt: null,
+    lastDetailedFetchedAt: null,
     is_complete: false,
     ...overrides,
   };
@@ -326,12 +330,14 @@ void test('GET /api/v1/sync/changes drops an upsert whose current row is already
 });
 
 void test('GET /api/v1/sync/changes returns the same cursor back when there is nothing new (poll, do not error)', async () => {
+  const reconciledAt = new Date('2026-09-19T06:00:00.000Z');
   const GET = createSyncChangesHandler({
     now: () => now,
     resolveActor: async () => ACTOR,
     activitiesRepo: fakeActivitiesRepo([]),
     photosRepo: fakePhotosRepo([]),
     changesRepo: fakeChangesRepo({ changes: [], latestSequence: 5 }),
+    freshnessRepo: { lastCompletedAt: async () => reconciledAt },
   });
 
   const issuedAt = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -344,6 +350,7 @@ void test('GET /api/v1/sync/changes returns the same cursor back when there is n
       items: unknown[];
       nextCursor: string;
       retention: { cursorValidUntil: string };
+      freshness: { lastSummaryReconciledAt: string | null };
     };
   };
 
@@ -353,6 +360,10 @@ void test('GET /api/v1/sync/changes returns the same cursor back when there is n
     body.data.retention.cursorValidUntil,
     new Date(issuedAt.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString(),
     'an empty poll must not renew the same cursor beyond its original retention deadline',
+  );
+  assert.equal(
+    body.data.freshness.lastSummaryReconciledAt,
+    reconciledAt.toISOString(),
   );
 });
 

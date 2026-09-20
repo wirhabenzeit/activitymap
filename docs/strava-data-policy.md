@@ -69,7 +69,7 @@ consistent with operating the database as a synchronized application cache
 rather than an unmaintained archive. Deauthorization, explicit deletion, and
 loss of visibility still require prompt removal as described in §3.
 
-The sync layer ([#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123)) should implement the following model:
+The sync layer ([#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123)) implements the following model:
 
 - Store `lastSummaryReconciledAt` for each athlete. Advance it only after a
   complete paginated summary scan succeeds, using the existing
@@ -125,10 +125,14 @@ They do not expire or individually refetch every activity on a seven-day
 timer. Logout, account switching, deauthorization, and server tombstones must
 still clear the applicable IndexedDB/SQLite data promptly.
 
-The reconciliation timestamp, grouped comparison/component-freshness state,
-and client-freshness metadata are deferred to the sync/change-feed migration
-([#122](https://github.com/wirhabenzeit/activitymap/issues/122)) so they land
-with its other schema changes.
+**Status**: the expand-only `0005_summary-reconciliation-additive` migration
+adds the component-freshness fields, dataset timestamp, and durable scan
+checkpoint. The production-only `/api/cron/reconcile-strava-summaries` route
+runs hourly in bounded batches. It fixes a scan's `before` bound, resumes by
+page, leases each athlete against overlapping workers, confirms activities
+missing from the completed summary feed, and advances
+`lastSummaryReconciledAt` only after the confirmation pass completes. Both v1
+sync responses expose that completed timestamp; partial scans never do.
 
 ## 3. Deletion and deauthorization: required handling and current gap
 
@@ -405,11 +409,12 @@ Implemented now:
   safety net for the inbox/drain system itself — see §3's "Status" note.
   The hourly production erasure executor now also completes the 30-day
   deletion once `scheduledErasureAt` arrives.
+- **(#123)** Periodic paginated summary reconciliation, grouped
+  component-freshness invalidation, deletion confirmation/tombstones,
+  resumable checkpoints, and dataset freshness metadata (§2).
 
 Defined here, implemented by later issues in the [#115](https://github.com/wirhabenzeit/activitymap/issues/115) epic:
 
-- Periodic paginated summary reconciliation, summary change detection, and
-  dataset freshness metadata (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#123](https://github.com/wirhabenzeit/activitymap/issues/123).
 - Offline freshness propagation and scoped-clear wiring (§2) → [#122](https://github.com/wirhabenzeit/activitymap/issues/122)/[#126](https://github.com/wirhabenzeit/activitymap/issues/126).
 - Switch/contract steps for token columns (§4) → alongside [#120](https://github.com/wirhabenzeit/activitymap/issues/120)/[#121](https://github.com/wirhabenzeit/activitymap/issues/121).
 - Replace permanent/guessable sharing with explicitly consented, scoped,

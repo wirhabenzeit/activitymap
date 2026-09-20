@@ -18,6 +18,7 @@ import type { ActivitiesRepository } from '~/server/repositories/activities';
 import type { PhotosRepository } from '~/server/repositories/photos';
 import type { ChangesRepository } from '~/server/repositories/changes';
 import { DEFAULT_RETENTION_DAYS } from '~/server/repositories/changes';
+import type { SummaryReconciliationRepository } from '~/server/repositories/summary-reconciliation';
 
 export interface SyncBootstrapHandlerDependencies {
   createRequestId?: () => string;
@@ -28,6 +29,7 @@ export interface SyncBootstrapHandlerDependencies {
   activitiesRepo: Pick<ActivitiesRepository, 'findPageByAthlete'>;
   photosRepo: Pick<PhotosRepository, 'findPageByAthlete'>;
   changesRepo: Pick<ChangesRepository, 'latestSequence'>;
+  freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
   retentionDays?: number;
 }
@@ -62,6 +64,7 @@ export function createSyncBootstrapHandler({
   activitiesRepo,
   photosRepo,
   changesRepo,
+  freshnessRepo = { lastCompletedAt: async () => null },
   retentionDays = DEFAULT_RETENTION_DAYS,
 }: SyncBootstrapHandlerDependencies) {
   return async function GET(request: Request): Promise<Response> {
@@ -146,6 +149,11 @@ export function createSyncBootstrapHandler({
           nowValue.getTime() + retentionDays * 24 * 60 * 60 * 1000,
         ).toISOString(),
       };
+      const freshness = {
+        lastSummaryReconciledAt: (
+          await freshnessRepo.lastCompletedAt(actor.athleteId)
+        )?.toISOString() ?? null,
+      };
 
       const payload =
         resource === 'activities'
@@ -156,6 +164,7 @@ export function createSyncBootstrapHandler({
               limit,
               snapshotCursor,
               retention,
+              freshness,
             })
           : await buildPhotosPage({
               photosRepo,
@@ -164,6 +173,7 @@ export function createSyncBootstrapHandler({
               limit,
               snapshotCursor,
               retention,
+              freshness,
             });
 
       const body = responseEnvelope(syncBootstrapPageDTOSchema).parse(
@@ -184,6 +194,7 @@ export function createSyncBootstrapHandler({
 }
 
 type RetentionMeta = { retentionDays: number; cursorValidUntil: string };
+type FreshnessMeta = { lastSummaryReconciledAt: string | null };
 
 async function buildActivitiesPage({
   activitiesRepo,
@@ -192,6 +203,7 @@ async function buildActivitiesPage({
   limit,
   snapshotCursor,
   retention,
+  freshness,
 }: {
   activitiesRepo: Pick<ActivitiesRepository, 'findPageByAthlete'>;
   athleteId: number;
@@ -199,6 +211,7 @@ async function buildActivitiesPage({
   limit: number;
   snapshotCursor: string | null;
   retention: RetentionMeta;
+  freshness: FreshnessMeta;
 }) {
   const afterId = afterKey === undefined ? undefined : Number(afterKey);
   if (afterId !== undefined && !Number.isInteger(afterId)) {
@@ -221,6 +234,7 @@ async function buildActivitiesPage({
     nextCursor,
     snapshotCursor,
     retention,
+    freshness,
   };
 }
 
@@ -231,6 +245,7 @@ async function buildPhotosPage({
   limit,
   snapshotCursor,
   retention,
+  freshness,
 }: {
   photosRepo: Pick<PhotosRepository, 'findPageByAthlete'>;
   athleteId: number;
@@ -238,6 +253,7 @@ async function buildPhotosPage({
   limit: number;
   snapshotCursor: string | null;
   retention: RetentionMeta;
+  freshness: FreshnessMeta;
 }) {
   const rows = await photosRepo.findPageByAthlete(athleteId, {
     afterId: afterKey,
@@ -255,5 +271,6 @@ async function buildPhotosPage({
     nextCursor,
     snapshotCursor,
     retention,
+    freshness,
   };
 }

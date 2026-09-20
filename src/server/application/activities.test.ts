@@ -87,6 +87,10 @@ function buildActivity(overrides: Partial<Activity> & { id: number; athlete: num
     weighted_average_watts: null,
     kilojoules: null,
     last_updated: new Date('2026-01-01T00:00:00.000Z'),
+    geometryState: null,
+    photosState: null,
+    lastSummarySeenAt: null,
+    lastDetailedFetchedAt: null,
     is_complete: false,
     ...overrides,
   };

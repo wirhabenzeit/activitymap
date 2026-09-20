@@ -1,0 +1,29 @@
+name: Reconcile Strava Summaries
+
+on:
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reconcile-strava-summaries
+  cancel-in-progress: false
+
+jobs:
+  reconcile_strava_summaries:
+    name: Reconcile Strava Summaries
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reconcile due athlete summaries
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "x-cron-secret: ${CRON_SECRET}" \
+            --header "content-type: application/json" \
+            --data '{"batchSize":5}' \
+            https://activitymap.dominik.page/api/cron/reconcile-strava-summaries
