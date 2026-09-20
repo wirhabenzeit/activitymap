@@ -51,30 +51,37 @@ export function createActivitiesRepository(
     async deleteManyForAthlete(athleteId, ids) {
       if (ids.length === 0) return [];
 
-      const deleted = await database
-        .delete(activities)
-        .where(
-          and(eq(activities.athlete, athleteId), inArray(activities.id, ids)),
-        )
-        .returning({ deletedId: activities.id });
-
-      if (deleted.length > 0) {
-        await database
-          .insert(activityDeletions)
-          .values(
-            deleted.map(({ deletedId }) => ({
-              athlete_id: athleteId,
-              activity_id: deletedId,
-              deleted_at: new Date(),
-            })),
+      // The delete and its tombstone must commit together: if the tombstone
+      // insert failed after the delete had already committed separately, a
+      // retry would find nothing left to delete and silently skip the
+      // tombstone forever - the same lost-deletion failure mode fixed for
+      // the webhook path in #133. See the review on issue #120.
+      return database.transaction(async (tx) => {
+        const deleted = await tx
+          .delete(activities)
+          .where(
+            and(eq(activities.athlete, athleteId), inArray(activities.id, ids)),
           )
-          .onConflictDoUpdate({
-            target: [activityDeletions.athlete_id, activityDeletions.activity_id],
-            set: { deleted_at: sql`excluded.deleted_at` },
-          });
-      }
+          .returning({ deletedId: activities.id });
 
-      return deleted.map((row) => row.deletedId);
+        if (deleted.length > 0) {
+          await tx
+            .insert(activityDeletions)
+            .values(
+              deleted.map(({ deletedId }) => ({
+                athlete_id: athleteId,
+                activity_id: deletedId,
+                deleted_at: new Date(),
+              })),
+            )
+            .onConflictDoUpdate({
+              target: [activityDeletions.athlete_id, activityDeletions.activity_id],
+              set: { deleted_at: sql`excluded.deleted_at` },
+            });
+        }
+
+        return deleted.map((row) => row.deletedId);
+      });
     },
 
     async upsertOne(activity) {

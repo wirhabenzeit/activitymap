@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { auth } from '~/lib/auth';
-import { getUserInternal } from '~/server/db/internal';
+import { getUserInternal, UserNotFoundError } from '~/server/db/internal';
 
 /**
  * The authenticated caller of an application service.
@@ -49,10 +49,16 @@ export async function resolveActor(headers: Headers): Promise<Actor | null> {
   try {
     const user = await getUserInternal(session.user.id);
     athleteId = user?.athlete_id ?? null;
-  } catch {
-    // No local user row for this session - treat as unauthenticated rather
-    // than throwing, so callers get a uniform "no actor" result.
-    return null;
+  } catch (error) {
+    if (error instanceof UserNotFoundError) {
+      // No local user row for this session - treat as unauthenticated
+      // rather than throwing, so callers get a uniform "no actor" result.
+      return null;
+    }
+    // A database outage or query failure is not "unauthenticated" - let it
+    // propagate so the caller surfaces a 5xx instead of misclassifying a
+    // valid session as invalid. See the review on issue #120.
+    throw error;
   }
 
   if (!athleteId) {

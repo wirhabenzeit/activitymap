@@ -13,6 +13,22 @@ import {
     resolveAccountTokens,
 } from './account-token-normalization';
 
+/**
+ * Thrown by `getUserInternal` specifically when the session/id is valid but
+ * no local `users` row exists for it - as opposed to a database or network
+ * failure while looking it up. Callers that want to treat "no such user" as
+ * a normal, expected outcome (e.g. `resolveActor` mapping it to "no actor")
+ * must check for this type specifically rather than catching every error,
+ * so an infrastructure failure still propagates instead of being
+ * misclassified as an authentication failure. See the review on issue #120.
+ */
+export class UserNotFoundError extends Error {
+    constructor() {
+        super('User not found');
+        this.name = 'UserNotFoundError';
+    }
+}
+
 export const getUserInternal = async (id?: string) => {
     if (!id) {
         const session = await auth.api.getSession({
@@ -24,7 +40,7 @@ export const getUserInternal = async (id?: string) => {
     const user = await db.query.users.findFirst({
         where: (users, { eq }) => eq(users.id, id),
     });
-    if (!user) throw new Error('User not found');
+    if (!user) throw new UserNotFoundError();
     return user;
 };
 
