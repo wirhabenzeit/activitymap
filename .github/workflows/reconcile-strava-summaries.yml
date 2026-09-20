@@ -25,5 +25,5 @@ jobs:
             --request POST \
             --header "x-cron-secret: ${CRON_SECRET}" \
             --header "content-type: application/json" \
-            --data '{"batchSize":5}' \
+            --data '{"batchSize":1}' \
             https://activitymap.dominik.page/api/cron/reconcile-strava-summaries

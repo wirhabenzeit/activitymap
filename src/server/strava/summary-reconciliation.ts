@@ -105,6 +105,13 @@ export async function reconcileStravaSummaries({
     partial: 0,
     failed: 0,
   };
+  logger.info('[Summary reconciliation] Cycle started', {
+    candidates: candidates.length,
+    batchSize,
+    pagesPerAthlete,
+    confirmationsPerAthlete,
+    pageSize,
+  });
 
   // Sequential by design: Strava's API limits are global to the application,
   // and each page can create hundreds of transactional change-feed writes.
@@ -120,6 +127,10 @@ export async function reconcileStravaSummaries({
       );
       if (!claim) continue;
       result.claimed += 1;
+      logger.info('[Summary reconciliation] Candidate claimed', {
+        phase: claim.phase,
+        nextPage: claim.nextPage,
+      });
 
       const account = await resolveAccount({
         accountId: candidate.athleteId.toString(),
@@ -147,6 +158,12 @@ export async function reconcileStravaSummaries({
         claim = await repository.applySummaryPage(claim, summaries, terminal);
         result.pages += 1;
         result.summaries += summaries.length;
+        logger.info('[Summary reconciliation] Page checkpointed', {
+          summaries: summaries.length,
+          terminal,
+          nextPhase: claim.phase,
+          nextPage: claim.nextPage,
+        });
       }
 
       if (claim.phase === 'confirming') {
