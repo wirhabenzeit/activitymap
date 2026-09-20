@@ -188,7 +188,9 @@ export async function reconcileStravaSummaries({
         }
       }
       logger.error('[Summary reconciliation] One athlete failed', {
-        errorName: error instanceof Error ? error.name : 'UnknownError',
+        // The logger redacts credentials and personal data, while retaining
+        // the message/stack needed to diagnose production adapter failures.
+        error,
       });
     }
   }
