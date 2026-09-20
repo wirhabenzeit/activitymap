@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { DEFAULT_RECONCILIATION_BATCH_SIZE } from '~/server/strava/summary-reconciliation.ts';
+import {
+  DEFAULT_PAGES_PER_ATHLETE,
+  DEFAULT_RECONCILIATION_BATCH_SIZE,
+} from '~/server/strava/summary-reconciliation.ts';
 import { createSummaryReconciliationCronHandler } from './handler.ts';
 
 const SUCCESS = {
@@ -14,6 +17,9 @@ const SUCCESS = {
   completed: 1,
   partial: 0,
   failed: 0,
+  stoppedForTimeBudget: 0,
+  stoppedForRateLimit: 0,
+  elapsedMs: 1,
 };
 
 function request(secret = 'correct', body?: unknown): Request {
@@ -67,19 +73,43 @@ void test('summary reconciliation cron requires the configured secret', async ()
 
 void test('summary reconciliation cron uses a bounded default batch', async () => {
   let receivedBatchSize: number | null = null;
+  let receivedPagesPerAthlete: number | null = null;
   const POST = createSummaryReconciliationCronHandler({
     externalEffectsEnabled: () => true,
     externalEffectsDisabledMessage: 'disabled',
     getCronSecret: () => 'correct',
-    reconcile: async ({ batchSize }) => {
+    reconcile: async ({ batchSize, pagesPerAthlete }) => {
       receivedBatchSize = batchSize;
+      receivedPagesPerAthlete = pagesPerAthlete;
       return SUCCESS;
     },
   });
   const response = await POST(request());
   assert.equal(response.status, 200);
   assert.equal(receivedBatchSize, DEFAULT_RECONCILIATION_BATCH_SIZE);
+  assert.equal(receivedPagesPerAthlete, DEFAULT_PAGES_PER_ATHLETE);
   assert.deepEqual(await response.json(), SUCCESS);
+});
+
+void test('summary reconciliation cron accepts explicit throughput bounds', async () => {
+  let received:
+    | { batchSize: number; pagesPerAthlete: number }
+    | undefined;
+  const POST = createSummaryReconciliationCronHandler({
+    externalEffectsEnabled: () => true,
+    externalEffectsDisabledMessage: 'disabled',
+    getCronSecret: () => 'correct',
+    reconcile: async (options) => {
+      received = options;
+      return SUCCESS;
+    },
+  });
+
+  const response = await POST(
+    request('correct', { batchSize: 1, pagesPerAthlete: 3 }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(received, { batchSize: 1, pagesPerAthlete: 3 });
 });
 
 void test('summary reconciliation cron rejects an invalid batch', async () => {
@@ -94,6 +124,24 @@ void test('summary reconciliation cron rejects an invalid batch', async () => {
     },
   });
   const response = await POST(request('correct', { batchSize: 21 }));
+  assert.equal(response.status, 400);
+  assert.equal(called, false);
+});
+
+void test('summary reconciliation cron rejects an excessive page budget', async () => {
+  let called = false;
+  const POST = createSummaryReconciliationCronHandler({
+    externalEffectsEnabled: () => true,
+    externalEffectsDisabledMessage: 'disabled',
+    getCronSecret: () => 'correct',
+    reconcile: async () => {
+      called = true;
+      return SUCCESS;
+    },
+  });
+  const response = await POST(
+    request('correct', { batchSize: 1, pagesPerAthlete: 6 }),
+  );
   assert.equal(response.status, 400);
   assert.equal(called, false);
 });

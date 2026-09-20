@@ -128,9 +128,12 @@ still clear the applicable IndexedDB/SQLite data promptly.
 **Status**: the expand-only `0005_summary-reconciliation-additive` migration
 adds the component-freshness fields, dataset timestamp, and durable scan
 checkpoint. The production-only `/api/cron/reconcile-strava-summaries` route
-runs hourly in bounded batches. It fixes a scan's `before` bound, resumes by
-page, leases each athlete against overlapping workers, confirms activities
-missing from the completed summary feed, and advances
+runs hourly in bounded batches. Each invocation processes one athlete and up
+to three 200-item pages, stops starting API work after 45 seconds, and yields
+early when Strava's response headers show less than the reserved rate-limit
+headroom. It fixes a scan's `before` bound, resumes by page, treats only an
+empty Strava page as terminal, leases each athlete against overlapping
+workers, confirms activities missing from the completed summary feed, and advances
 `lastSummaryReconciledAt` only after the confirmation pass completes. Both v1
 sync responses expose that completed timestamp; partial scans never do.
 
