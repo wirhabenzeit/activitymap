@@ -97,7 +97,12 @@ void test('toActivityDTO ignores the legacy is_complete flag', () => {
 });
 
 void test('toActivityDTO rejects a missing component freshness state', () => {
-  assert.throws(() => toActivityDTO({ ...fixtureActivity, geometryState: null }));
+  assert.throws(() =>
+    toActivityDTO({
+      ...fixtureActivity,
+      geometryState: null,
+    } as unknown as Activity),
+  );
 });
 
 void test('toActivityDTO serializes real component freshness when present', () => {

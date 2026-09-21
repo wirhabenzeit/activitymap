@@ -450,9 +450,9 @@ Exit criteria:
 - sync is idempotent and resumes after interruption;
 - engagement-only and metadata-only changes never cause detailed activity,
   photo, or GeoJSON refreshes;
-- photo-count changes invalidate only photos, while geometry/core-timing
-  changes downgrade detailed geometry and enqueue at most one selective detail
-  refresh;
+- photo-count changes invalidate only photos, while a changed route identity
+  or summary polyline downgrades detailed geometry and enqueues at most one
+  selective detail refresh;
 - deletion propagation is covered by integration tests.
 
 ### Phase 4: Durable webhook ingestion
@@ -521,8 +521,9 @@ Minimum coverage:
 - Engagement-only changes update counters without fetching activity detail,
   photos, or GeoJSON.
 - Photo-count changes invalidate only the photo component.
-- Geometry/core-timing changes retain the new summary polyline, mark detailed
-  geometry for refresh, and coalesce duplicate selective-detail work.
+- Route identity or summary-polyline changes retain the new summary polyline,
+  mark detailed geometry for refresh, and coalesce duplicate selective-detail
+  work.
 - Summary fields without a detail dependency do not downgrade geometry state.
 - Webhook duplicates, out-of-order events, and transient failures are handled.
 - Deletions create both tombstones and change-feed entries transactionally.

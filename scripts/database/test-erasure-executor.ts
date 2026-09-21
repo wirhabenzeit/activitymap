@@ -145,6 +145,7 @@ async function seed(): Promise<void> {
     start_date: new Date('2026-01-01T00:00:00.000Z'),
     start_date_local: new Date('2026-01-01T00:00:00.000Z'),
     timezone: 'UTC',
+    geometryState: 'summary',
   });
   await testDb.insert(photos).values({
     unique_id: 'erasure-proof-photo',

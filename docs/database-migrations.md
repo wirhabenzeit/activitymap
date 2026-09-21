@@ -6,13 +6,17 @@ or Production databases.
 
 ## Local development
 
-Start Postgres, apply all migrations, and then start the application:
+Start Postgres and then start the application. `pnpm dev` applies pending
+migrations before starting Next.js, so a stale local schema fails before the
+server can serve requests:
 
 ```bash
 docker compose up -d
-pnpm db:migrate
 pnpm dev
 ```
+
+Use `pnpm db:migrate:status` before a risky migration when you want to inspect
+the pending set without applying it.
 
 Local migration tooling defaults to the direct Docker connection at
 `postgres://postgres:postgres@localhost:5432/main`. Override it with the
@@ -35,14 +39,19 @@ an exact checksum-matching prefix of the checked-in history.
 
 ## Pull requests
 
+The required order is local Docker migration and server checks, then Preview,
+then Production. Migration PRs must exercise representative existing rows
+locally; an empty-database apply alone is not sufficient for a backfill.
+
 The `CI` workflow:
 
 1. validates the migration journal;
-2. applies the complete history to empty Postgres;
-3. checks that a second run is a no-op;
-4. prints the resulting schema fingerprint;
-5. runs generation and rejects uncommitted migration output;
-6. runs tests, TypeScript, and lint.
+2. exercises production-shaped legacy migration fixtures;
+3. applies the complete history to empty Postgres;
+4. checks that a second run is a no-op;
+5. prints the resulting schema fingerprint;
+6. runs generation and rejects uncommitted migration output;
+7. runs tests, TypeScript, and lint.
 
 Schema changes should use expand/backfill/switch/contract migrations. A pull
 request that starts using a new column must not deploy before its additive

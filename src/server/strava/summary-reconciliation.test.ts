@@ -133,9 +133,54 @@ void test('summary comparison invalidates only the affected component', () => {
   assert.equal(photoChange.photosState, 'refresh_required');
   assert.equal(photoChange.is_complete, true);
 
+  const metadataChange = mergeSummaryActivity(
+    existing,
+    stravaActivity(1, {
+      distance: 11_000,
+      moving_time: 3_700,
+      elapsed_time: 3_900,
+      total_elevation_gain: 120,
+      start_date: '2026-01-01T10:00:00Z',
+      start_date_local: '2026-01-01T11:00:00Z',
+      start_latlng: [46.9, 7.9],
+      end_latlng: [47.2, 8.2],
+    }),
+    ATHLETE_ID,
+    NOW,
+  );
+  assert.equal(metadataChange.geometryState, 'detailed');
+  assert.equal(metadataChange.distance, 11_000);
+  assert.equal(
+    metadataChange.start_date_local.toISOString(),
+    '2026-01-01T11:00:00.000Z',
+  );
+  assert.equal(metadataChange.map_polyline, 'detailed-polyline');
+
+  const legacyTimestampEncoding = mergeSummaryActivity(
+    {
+      ...existing,
+      geometryState: 'detailed',
+      lastSummarySeenAt: null,
+      lastDetailedFetchedAt: null,
+      start_date_local: new Date('2026-01-01T08:00:00Z'),
+      is_complete: true,
+    },
+    stravaActivity(1),
+    ATHLETE_ID,
+    NOW,
+  );
+  assert.equal(legacyTimestampEncoding.geometryState, 'detailed');
+  assert.equal(legacyTimestampEncoding.is_complete, true);
+  assert.equal(
+    legacyTimestampEncoding.start_date_local.toISOString(),
+    '2026-01-01T09:00:00.000Z',
+  );
+
   const geometryChange = mergeSummaryActivity(
     existing,
-    stravaActivity(1, { distance: 11_000 }),
+    stravaActivity(1, {
+      map: { ...stravaActivity(1).map, id: 'changed-map' },
+    }),
     ATHLETE_ID,
     NOW,
   );
@@ -143,6 +188,20 @@ void test('summary comparison invalidates only the affected component', () => {
   assert.equal(geometryChange.photosState, 'current');
   assert.equal(geometryChange.is_complete, false);
   assert.equal(geometryChange.map_polyline, 'detailed-polyline');
+
+  const summaryPolylineChange = mergeSummaryActivity(
+    existing,
+    stravaActivity(1, {
+      map: {
+        ...stravaActivity(1).map,
+        summary_polyline: '_ibE_seK_ibE_ibE',
+      },
+    }),
+    ATHLETE_ID,
+    NOW,
+  );
+  assert.equal(summaryPolylineChange.geometryState, 'refresh_required');
+  assert.equal(summaryPolylineChange.map_polyline, 'detailed-polyline');
 });
 
 function fakeRepository(): SummaryReconciliationRepository & {
