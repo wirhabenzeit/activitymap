@@ -238,6 +238,56 @@ void test('GET /api/v1/sync/changes returns 409 for a cursor issued to another a
   assert.equal(body.error.code, 'sync_rebootstrap_required');
 });
 
+void test('GET /api/v1/sync/changes offline-expiry boundary: a cursor exactly at the retention deadline is rejected', async () => {
+  // "Offline-expiry" for this API (issue #127; #126 removed the legacy
+  // offline sync path entirely, so there is no separate offline-mode state
+  // to test) is this cursor-retention boundary: how long a client may stay
+  // offline before it must rebootstrap rather than resume. `cursorValidUntil`
+  // is computed as `issuedAt + retentionDays`, and the handler's own
+  // comparison is `now >= cursorValidUntil` - so a client that returns
+  // *exactly* on the deadline (not a moment before or after) must already be
+  // rejected, not accepted for one more request.
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo([]),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo({ changes: [] }),
+    retentionDays: 90,
+  });
+
+  const issuedExactlyAtBoundary = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const response = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0, ACTOR.athleteId, issuedExactlyAtBoundary))}`,
+    ),
+  );
+  const body = (await response.json()) as { error: { code: string } };
+
+  assert.equal(response.status, 409);
+  assert.equal(body.error.code, 'sync_rebootstrap_required');
+});
+
+void test('GET /api/v1/sync/changes offline-expiry boundary: a cursor one millisecond inside the retention window is still accepted', async () => {
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo([]),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo({ changes: [], latestSequence: 0 }),
+    retentionDays: 90,
+  });
+
+  const issuedOneMsInsideWindow = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000 + 1);
+  const response = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0, ACTOR.athleteId, issuedOneMsInsideWindow))}`,
+    ),
+  );
+
+  assert.equal(response.status, 200);
+});
+
 void test('GET /api/v1/sync/changes returns 409 for a cursor beyond the athlete high-water mark', async () => {
   const GET = createSyncChangesHandler({
     now: () => now,
@@ -383,4 +433,89 @@ void test('GET /api/v1/sync/changes replaying the same page is idempotent (same 
   const second = await GET(new Request(`https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`));
 
   assert.deepEqual(await first.json(), await second.json());
+});
+
+void test('GET /api/v1/sync/changes pagination boundary: a page exactly filling the limit is followed by an empty page returning the same cursor back', async () => {
+  const limit = 5;
+  const changes = Array.from({ length: limit }, (_, i) =>
+    buildChange({ sequence: i + 1, entityType: 'activity', entityId: String(i + 1), operation: 'delete' }),
+  );
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo([]),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo({ changes, latestSequence: limit }),
+  });
+
+  const first = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/changes?limit=${limit}&cursor=${encodeURIComponent(encode(0))}`,
+    ),
+  );
+  const firstBody = (await first.json()) as {
+    data: { items: unknown[]; nextCursor: string };
+  };
+  assert.equal(firstBody.data.items.length, limit);
+  assert.equal(firstBody.data.nextCursor, encode(limit));
+
+  const second = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/changes?limit=${limit}&cursor=${encodeURIComponent(firstBody.data.nextCursor)}`,
+    ),
+  );
+  const secondBody = (await second.json()) as {
+    data: { items: unknown[]; nextCursor: string };
+  };
+  assert.deepEqual(secondBody.data.items, []);
+  assert.equal(secondBody.data.nextCursor, firstBody.data.nextCursor);
+});
+
+void test('GET /api/v1/sync/changes holds up for a large account: thousands of changes paginate completely, in strict sequence order, with no duplicates or gaps', async () => {
+  const TOTAL = 4531; // Deliberately not a round number or a multiple of the page size.
+  const limit = 250;
+  const changes = Array.from({ length: TOTAL }, (_, i) =>
+    buildChange({
+      sequence: i + 1,
+      entityType: 'activity',
+      entityId: String((i % 500) + 1),
+      operation: i % 7 === 0 ? 'delete' : 'upsert',
+    }),
+  );
+  const activities = Array.from({ length: 500 }, (_, i) => buildActivity({ id: i + 1 }));
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo(activities),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo({ changes, latestSequence: TOTAL }),
+  });
+
+  const seenSequences: number[] = [];
+  let cursor = encode(0);
+  let pages = 0;
+  const MAX_PAGES = Math.ceil(TOTAL / limit) + 1;
+  for (;;) {
+    const response = await GET(
+      new Request(
+        `https://example.test/api/v1/sync/changes?limit=${limit}&cursor=${encodeURIComponent(cursor)}`,
+      ),
+    );
+    const body = (await response.json()) as {
+      data: { items: { sequence: string }[]; nextCursor: string };
+    };
+    if (body.data.items.length === 0) break;
+    for (const item of body.data.items) seenSequences.push(Number(item.sequence));
+    cursor = body.data.nextCursor;
+    pages += 1;
+    assert.ok(pages <= MAX_PAGES, 'pagination must terminate within the expected number of pages');
+  }
+
+  assert.equal(seenSequences.length, TOTAL, 'every change must be delivered exactly once');
+  assert.equal(new Set(seenSequences).size, TOTAL, 'no sequence may repeat across pages');
+  assert.deepEqual(
+    seenSequences,
+    [...seenSequences].sort((a, b) => a - b),
+    'changes must be strictly ordered by sequence across page boundaries',
+  );
 });

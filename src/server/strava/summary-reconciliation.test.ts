@@ -469,3 +469,60 @@ void test('a Strava 429 preserves the checkpoint and yields without failing the 
   assert.equal(repository.releases, 1);
   assert.deepEqual(repository.deletions, []);
 });
+
+void test('a revoked (deauthorized) account is never used to call Strava, even if a stale access token is still present', async () => {
+  // Issue #127: an athlete's account.revokedAt set by #125's deauthorization
+  // handling must stop this cycle from ever calling Strava for them, not
+  // just from refreshing an already-cleared token - this proves the
+  // defense-in-depth check that runs regardless of whether an access token
+  // value happens to still be present on the row.
+  const repository = fakeRepository();
+  let sourceCreated = false;
+  const source: SummaryReconciliationSource = {
+    async listPage() {
+      sourceCreated = true;
+      return [];
+    },
+    async getActivity() {
+      sourceCreated = true;
+      throw new Error('must not be called for a revoked account');
+    },
+  };
+
+  const result = await reconcileStravaSummaries({
+    now: NOW,
+    repository,
+    resolveAccount: async () =>
+      ({
+        accessToken: 'stale-but-still-present-token',
+        access_token: 'stale-but-still-present-token',
+        revokedAt: new Date('2026-01-01T00:00:00.000Z'),
+      }) as Account,
+    createSource: () => {
+      sourceCreated = true;
+      return source;
+    },
+  });
+
+  assert.equal(sourceCreated, false, 'a Strava-calling source must never be created for a revoked account');
+  assert.equal(result.failed, 1);
+  assert.equal(result.completed, 0);
+  assert.equal(result.partial, 0);
+  assert.equal(repository.releases, 1, 'the claim must be released so a future cycle can retry once un-revoked');
+});
+
+void test('an account with no resolvable access token at all is treated the same as a revoked one', async () => {
+  const repository = fakeRepository();
+  const result = await reconcileStravaSummaries({
+    now: NOW,
+    repository,
+    resolveAccount: async () =>
+      ({ accessToken: null, access_token: null, revokedAt: null }) as unknown as Account,
+    createSource: () => {
+      throw new Error('must not be called with no access token');
+    },
+  });
+
+  assert.equal(result.failed, 1);
+  assert.equal(repository.releases, 1);
+});

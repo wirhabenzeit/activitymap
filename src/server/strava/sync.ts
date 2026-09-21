@@ -1,6 +1,6 @@
-import { eq, isNotNull, desc, and, asc } from 'drizzle-orm';
+import { eq, isNotNull, desc, and, asc, notExists, sql } from 'drizzle-orm';
 import { db } from '~/server/db';
-import { activities, activitySync, users } from '~/server/db/schema';
+import { accounts, activities, activitySync, users } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
 import { logger } from '~/server/logging/logger';
 import { fetchStravaActivities } from './service';
@@ -43,11 +43,44 @@ export async function syncActivities(
   const reachedOldest: string[] = [];
   const errors: Record<string, string> = {};
 
-  // Step 1: Get all users with Strava accounts to process
+  // Step 1: Get all users with Strava accounts to process.
+  //
+  // Excludes an athlete whose Strava account has been deauthorized
+  // (`accounts.revokedAt` set - see `~/server/strava/webhook.ts`'s
+  // `handleAthleteDeauthorization`, issue #125): per
+  // docs/strava-data-policy.md §3, once revoked this application must
+  // "stop using the stored token - do not attempt another refresh or API
+  // call with it". Filtering here, before `getAccountInternal` is ever
+  // called for this user, is what actually enforces that - by the time a
+  // token-refresh attempt inside `getAccountInternal` could fail, the
+  // no-refresh rule has already been violated. This mirrors the same
+  // `isNull(accounts.revokedAt)` guard
+  // `~/server/repositories/summary-reconciliation.ts`'s `listDue`/`claim`
+  // already apply to the periodic summary-reconciliation cron.
+  //
+  // A `NOT EXISTS` subquery, not a join, so this query's result shape stays
+  // exactly the flat `users` row the rest of this function already expects
+  // (a join would nest the result under per-table keys).
   const usersToProcess = await db
     .select()
     .from(users)
-    .where(isNotNull(users.athlete_id));
+    .where(
+      and(
+        isNotNull(users.athlete_id),
+        notExists(
+          db
+            .select({ one: sql`1` })
+            .from(accounts)
+            .where(
+              and(
+                eq(accounts.userId, users.id),
+                eq(accounts.providerId, 'strava'),
+                isNotNull(accounts.revokedAt),
+              ),
+            ),
+        ),
+      ),
+    );
 
 
 
