@@ -29,7 +29,14 @@ function fixture() {
   const getOperation: OperationLike = {
     parameters,
     responses: {
-      '200': { description: 'ok' },
+      '200': {
+        description: 'ok',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Widget' },
+          },
+        },
+      },
       '400': { description: 'bad request' },
     },
     security: [{ cookieAuth: [] }],
@@ -48,6 +55,18 @@ function fixture() {
     components: { schemas: { Widget: widgetSchema } },
   };
   return { doc, getOperation, parameters, widgetSchema, cursorParam };
+}
+
+function useWidgetOnlyAsRequest(operation: OperationLike): void {
+  operation.requestBody = {
+    required: true,
+    content: {
+      'application/json': {
+        schema: { $ref: '#/components/schemas/Widget' },
+      },
+    },
+  };
+  operation.responses = { '200': { description: 'ok' } };
 }
 
 void test('findBreakingChanges reports nothing between two identical documents', () => {
@@ -118,15 +137,16 @@ void test('detects a removed required parameter', () => {
   afterOp.parameters = [];
 
   const findings = findBreakingChanges(before, after);
-  assert.ok(findings.some((f) => f.message.includes('required parameter `cursor`')));
+  assert.ok(findings.some((f) => f.message.includes('parameter `cursor`')));
 });
 
-void test('does not flag a removed optional parameter', () => {
+void test('detects a removed optional parameter because existing clients may still send it', () => {
   const { doc: before } = fixture();
   const { doc: after, getOperation: afterOp } = fixture();
   afterOp.parameters = [];
 
-  assert.deepEqual(findBreakingChanges(before, after), []);
+  const findings = findBreakingChanges(before, after);
+  assert.ok(findings.some((f) => f.message.includes('parameter `cursor`')));
 });
 
 void test('detects a parameter type change', () => {
@@ -147,40 +167,94 @@ void test('detects a removed response schema field', () => {
   assert.ok(findings.some((f) => f.message.includes('Widget.name: field removed')));
 });
 
-void test('detects a schema field tightened from optional to required', () => {
+void test('does not flag a response field tightened from optional to required', () => {
   const { doc: before } = fixture();
   const { doc: after, widgetSchema } = fixture();
   widgetSchema.required = ['id', 'name'];
 
-  const findings = findBreakingChanges(before, after);
-  assert.ok(
-    findings.some((f) => f.message.includes('Widget.name: tightened from optional to required')),
-  );
+  assert.deepEqual(findBreakingChanges(before, after), []);
 });
 
-void test('does not flag a schema field loosened from required to optional', () => {
+void test('detects a response field loosened from required to optional', () => {
   const { doc: before } = fixture();
   const { doc: after, widgetSchema } = fixture();
   widgetSchema.required = [];
 
-  assert.deepEqual(findBreakingChanges(before, after), []);
+  const findings = findBreakingChanges(before, after);
+  assert.ok(
+    findings.some((f) =>
+      f.message.includes('Widget.id: response field loosened from required to optional'),
+    ),
+  );
 });
 
-void test('detects a field that stopped allowing null', () => {
+void test('does not flag a response field that stops allowing null', () => {
   const { doc: before } = fixture();
   const { doc: after, widgetSchema } = fixture();
   widgetSchema.properties!.note = { type: 'string' };
 
-  const findings = findBreakingChanges(before, after);
-  assert.ok(findings.some((f) => f.message.includes('Widget.note: no longer nullable')));
+  assert.deepEqual(findBreakingChanges(before, after), []);
 });
 
-void test('does not flag a field that newly allows null (loosening)', () => {
+void test('detects a response field that newly allows null', () => {
   const { doc: before } = fixture();
   const { doc: after, widgetSchema } = fixture();
   widgetSchema.properties!.name = { type: ['string', 'null'] };
 
-  assert.deepEqual(findBreakingChanges(before, after), []);
+  const findings = findBreakingChanges(before, after);
+  assert.ok(
+    findings.some((f) => f.message.includes('Widget.name: response output may now be null')),
+  );
+});
+
+void test('detects request fields tightened to required or non-null, but not loosened request input', () => {
+  const { doc: before, getOperation: beforeOperation } = fixture();
+  useWidgetOnlyAsRequest(beforeOperation);
+  const { doc: after, getOperation: afterOperation, widgetSchema } = fixture();
+  useWidgetOnlyAsRequest(afterOperation);
+  widgetSchema.required = ['id', 'name'];
+  widgetSchema.properties!.note = { type: 'string' };
+
+  const findings = findBreakingChanges(before, after);
+  assert.ok(
+    findings.some((f) =>
+      f.message.includes('Widget.name: request field tightened from optional to required'),
+    ),
+  );
+  assert.ok(
+    findings.some((f) => f.message.includes('Widget.note: request input no longer accepts null')),
+  );
+
+  const { doc: loosenedAfter, getOperation: loosenedOperation, widgetSchema: loosened } = fixture();
+  useWidgetOnlyAsRequest(loosenedOperation);
+  loosened.required = [];
+  loosened.properties!.name = { type: ['string', 'null'] };
+  assert.deepEqual(findBreakingChanges(before, loosenedAfter), []);
+});
+
+void test('detects a newly-required request field and a removed referenced component', () => {
+  const { doc: before, getOperation: beforeOperation } = fixture();
+  useWidgetOnlyAsRequest(beforeOperation);
+  const { doc: after, getOperation: afterOperation, widgetSchema } = fixture();
+  useWidgetOnlyAsRequest(afterOperation);
+  widgetSchema.properties!.extra = { type: 'string' };
+  widgetSchema.required = ['id', 'extra'];
+
+  const addedFindings = findBreakingChanges(before, after);
+  assert.ok(
+    addedFindings.some((finding) =>
+      finding.message.includes('Widget.extra: new required request field'),
+    ),
+  );
+
+  const { doc: removed } = fixture();
+  removed.components = { schemas: {} };
+  const removedFindings = findBreakingChanges(before, removed);
+  assert.ok(
+    removedFindings.some((finding) =>
+      finding.message.includes('Widget: referenced component schema removed'),
+    ),
+  );
 });
 
 void test('detects a schema field type change', () => {

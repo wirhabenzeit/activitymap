@@ -1,56 +1,13 @@
 /**
- * Detects breaking changes between two versions of the v1 OpenAPI document
- * (issue #127). This is deliberately narrower than full OpenAPI semantics -
- * see the module doc comment below for exactly what it does and does not
- * catch - and is meant as CI's second check alongside `openapi.test.ts`'s
- * existing drift test: that test proves the checked-in
- * `openapi/v1.json` matches what the current contracts generate (drift
- * detection); this module instead compares *two different* documents (the
- * merge-base's `openapi/v1.json` vs the current one) to catch changes that
- * would break an already-shipped native client.
+ * Focused OpenAPI compatibility checks for the v1 native-client contract.
  *
- * No general-purpose OpenAPI-diff npm package was adopted here: none of the
- * actively maintained ones on the npm registry both (a) support OpenAPI
- * 3.1/JSON Schema 2020-12 (this document's dialect, since it's generated
- * directly from Zod via `z.toJSONSchema`) and (b) are usable as a plain
- * library call in this sandbox without extra native/Java tooling (`oasdiff`
- * is a standalone Go binary, not an npm package). A small, purpose-built
- * comparison - honestly scoped to the patterns #127 calls out - is more
- * reliable here than a heavier dependency of uncertain fit.
- *
- * **What this catches:**
- * - A path removed entirely.
- * - An operation (HTTP method) removed from a path that still exists.
- * - A documented response status code removed from an operation.
- * - Security requirements added to an operation that had none (a
- *   previously-public endpoint now requires auth).
- * - A request parameter that was optional (or absent) now marked required,
- *   or a previously-required parameter removed outright.
- * - A request parameter's declared JSON Schema type changed.
- * - A named component schema (`components.schemas.*`) losing a property
- *   that used to exist (whether or not it was `required`).
- * - A component schema property that was optional now marked `required`.
- * - A component schema property that allowed `null` (`type` includes
- *   `"null"`, or an `anyOf`/`oneOf` branch does) no longer allowing it.
- * - A component schema property's declared JSON Schema `type` changed.
- *
- * **What this deliberately does NOT catch** (honest limitations, not full
- * OpenAPI/JSON-Schema semantics):
- * - Changes reachable only through deeply nested `allOf`/`oneOf`/`anyOf`
- *   composition beyond the single-level nullable check above.
- * - Enum value removal (a previously-valid enum member disappearing) -
- *   only `type` and nullability are compared, not `enum`/`const`.
- * - Numeric/string constraint tightening (e.g. a smaller `maximum`, a
- *   stricter `pattern`) - only presence, requiredness, type, and
- *   nullability are compared.
- * - Renaming a `$ref` target that has otherwise identical shape (this
- *   library resolves `$ref`s by their target schema name only for
- *   equality; a same-shape schema under a new name is still reported once,
- *   as the two schemas being compared no longer resolve to the same name).
- * - Additive changes are, correctly, never flagged: new paths, new
- *   operations, new optional parameters/fields, new response codes, and a
- *   previously-required field becoming optional are all backward
- *   compatible and produce no findings.
+ * The important distinction is variance: tightening accepted request input
+ * breaks existing callers, while loosening a response breaks existing
+ * consumers. Component schemas are therefore classified from their actual
+ * request/response references before requiredness and nullability are
+ * compared. This is intentionally narrower than a complete OpenAPI 3.1 / JSON
+ * Schema 2020-12 implementation; enum and constraint changes, discriminator
+ * semantics, and arbitrarily deep composition still require review.
  */
 
 export type JsonSchemaLike = {
@@ -59,10 +16,17 @@ export type JsonSchemaLike = {
   required?: readonly string[];
   items?: JsonSchemaLike;
   $ref?: string;
+  allOf?: readonly JsonSchemaLike[];
   anyOf?: readonly JsonSchemaLike[];
   oneOf?: readonly JsonSchemaLike[];
+  additionalProperties?: boolean | JsonSchemaLike;
   [key: string]: unknown;
 };
+
+type MediaTypeLike = { schema?: JsonSchemaLike };
+type ContentLike = Record<string, MediaTypeLike>;
+type RequestBodyLike = { required?: boolean; content?: ContentLike };
+type ResponseLike = { content?: ContentLike; [key: string]: unknown };
 
 export type ParameterLike = {
   name: string;
@@ -73,23 +37,32 @@ export type ParameterLike = {
 
 export type OperationLike = {
   parameters?: readonly ParameterLike[];
-  responses?: Record<string, unknown>;
+  requestBody?: RequestBodyLike;
+  responses?: Record<string, ResponseLike>;
   security?: readonly unknown[];
   [key: string]: unknown;
 };
 
 export type OpenApiDocumentLike = {
   paths: Record<string, Record<string, OperationLike>>;
-  components?: { schemas?: Record<string, unknown> };
+  components?: { schemas?: Record<string, JsonSchemaLike> };
 };
 
-/** One human-readable breaking-change finding. */
 export type BreakingChange = { message: string };
 
+type SchemaUsage = 'request' | 'response';
+type SchemaUsageMap = Map<string, Set<SchemaUsage>>;
+
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
+const COMPONENT_SCHEMA_PREFIX = '#/components/schemas/';
 
 function isOperationKey(key: string): boolean {
   return HTTP_METHODS.includes(key);
+}
+
+function componentNameForRef(ref: string | undefined): string | undefined {
+  if (!ref?.startsWith(COMPONENT_SCHEMA_PREFIX)) return undefined;
+  return decodeURIComponent(ref.slice(COMPONENT_SCHEMA_PREFIX.length));
 }
 
 function typesOf(schema: JsonSchemaLike | undefined): Set<string> {
@@ -98,10 +71,13 @@ function typesOf(schema: JsonSchemaLike | undefined): Set<string> {
   const types = new Set<string>(
     direct === undefined ? [] : Array.isArray(direct) ? direct : [direct],
   );
-  for (const branch of [...(schema.anyOf ?? []), ...(schema.oneOf ?? [])]) {
-    for (const t of typesOf(branch)) types.add(t);
+  for (const branch of [
+    ...(schema.allOf ?? []),
+    ...(schema.anyOf ?? []),
+    ...(schema.oneOf ?? []),
+  ]) {
+    for (const type of typesOf(branch)) types.add(type);
   }
-  if (schema.$ref) types.add(`$ref:${schema.$ref}`);
   return types;
 }
 
@@ -109,89 +85,198 @@ function allowsNull(schema: JsonSchemaLike | undefined): boolean {
   return typesOf(schema).has('null');
 }
 
-/** Non-null, non-$ref primitive/structural types, for a type-change comparison that ignores nullability (checked separately) and ref identity (checked as part of property/schema comparison). */
 function coreTypes(schema: JsonSchemaLike | undefined): string[] {
   return Array.from(typesOf(schema))
-    .filter((t) => t !== 'null' && !t.startsWith('$ref:'))
+    .filter((type) => type !== 'null')
     .sort();
 }
 
-function refTarget(schema: JsonSchemaLike | undefined): string | undefined {
-  return schema?.$ref;
+function sameArray(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function sameArray(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
+function schemasInContent(content: ContentLike | undefined): JsonSchemaLike[] {
+  return Object.values(content ?? {}).flatMap((mediaType) =>
+    mediaType.schema ? [mediaType.schema] : [],
+  );
+}
+
+function collectSchemaUsage(
+  schema: JsonSchemaLike | undefined,
+  usage: SchemaUsage,
+  schemas: Record<string, JsonSchemaLike>,
+  usages: SchemaUsageMap,
+  visited: Set<string>,
+): void {
+  if (!schema) return;
+
+  const componentName = componentNameForRef(schema.$ref);
+  if (componentName) {
+    const existing = usages.get(componentName) ?? new Set<SchemaUsage>();
+    existing.add(usage);
+    usages.set(componentName, existing);
+
+    const visitKey = `${usage}:${componentName}`;
+    if (visited.has(visitKey)) return;
+    visited.add(visitKey);
+    collectSchemaUsage(schemas[componentName], usage, schemas, usages, visited);
+    return;
+  }
+
+  for (const property of Object.values(schema.properties ?? {})) {
+    collectSchemaUsage(property, usage, schemas, usages, visited);
+  }
+  collectSchemaUsage(schema.items, usage, schemas, usages, visited);
+  for (const branch of [
+    ...(schema.allOf ?? []),
+    ...(schema.anyOf ?? []),
+    ...(schema.oneOf ?? []),
+  ]) {
+    collectSchemaUsage(branch, usage, schemas, usages, visited);
+  }
+  if (
+    schema.additionalProperties &&
+    typeof schema.additionalProperties === 'object'
+  ) {
+    collectSchemaUsage(
+      schema.additionalProperties,
+      usage,
+      schemas,
+      usages,
+      visited,
+    );
+  }
+}
+
+function collectDocumentSchemaUsages(document: OpenApiDocumentLike): SchemaUsageMap {
+  const schemas = document.components?.schemas ?? {};
+  const usages: SchemaUsageMap = new Map();
+  const visited = new Set<string>();
+
+  for (const pathItem of Object.values(document.paths ?? {})) {
+    for (const [method, operation] of Object.entries(pathItem)) {
+      if (!isOperationKey(method)) continue;
+      for (const parameter of operation.parameters ?? []) {
+        collectSchemaUsage(parameter.schema, 'request', schemas, usages, visited);
+      }
+      for (const schema of schemasInContent(operation.requestBody?.content)) {
+        collectSchemaUsage(schema, 'request', schemas, usages, visited);
+      }
+      for (const response of Object.values(operation.responses ?? {})) {
+        for (const schema of schemasInContent(response.content)) {
+          collectSchemaUsage(schema, 'response', schemas, usages, visited);
+        }
+      }
+    }
+  }
+  return usages;
+}
+
+function compareSchemaContract(
+  label: string,
+  before: JsonSchemaLike | undefined,
+  after: JsonSchemaLike | undefined,
+  usage: SchemaUsage,
+  out: BreakingChange[],
+): void {
+  if (!before || !after) return;
+
+  if (before.$ref !== after.$ref && (before.$ref || after.$ref)) {
+    out.push({
+      message: `${label}: referenced schema changed (${before.$ref ?? 'inline'} -> ${after.$ref ?? 'inline'})`,
+    });
+    return;
+  }
+
+  const beforeTypes = coreTypes(before);
+  const afterTypes = coreTypes(after);
+  if (
+    beforeTypes.length > 0 &&
+    afterTypes.length > 0 &&
+    !sameArray(beforeTypes, afterTypes)
+  ) {
+    out.push({
+      message: `${label}: type changed (${beforeTypes.join('|')} -> ${afterTypes.join('|')})`,
+    });
+  }
+
+  const beforeNullable = allowsNull(before);
+  const afterNullable = allowsNull(after);
+  if (usage === 'request' && beforeNullable && !afterNullable) {
+    out.push({ message: `${label}: request input no longer accepts null` });
+  }
+  if (usage === 'response' && !beforeNullable && afterNullable) {
+    out.push({ message: `${label}: response output may now be null` });
+  }
 }
 
 function compareSchemaProperty(
   schemaName: string,
-  propName: string,
+  propertyName: string,
   before: JsonSchemaLike,
   after: JsonSchemaLike,
+  usages: ReadonlySet<SchemaUsage>,
   out: BreakingChange[],
 ): void {
-  const beforeRequired = (before.required ?? []).includes(propName);
-  const afterRequired = (after.required ?? []).includes(propName);
-  const beforeProp = before.properties?.[propName];
-  const afterProp = after.properties?.[propName];
+  const beforeRequired = (before.required ?? []).includes(propertyName);
+  const afterRequired = (after.required ?? []).includes(propertyName);
+  const beforeProperty = before.properties?.[propertyName];
+  const afterProperty = after.properties?.[propertyName];
+  const label = `${schemaName}.${propertyName}`;
 
-  if (beforeProp && !afterProp) {
-    out.push({
-      message: `${schemaName}.${propName}: field removed`,
-    });
+  if (beforeProperty && !afterProperty) {
+    out.push({ message: `${label}: field removed` });
     return;
   }
-  if (!beforeProp || !afterProp) return;
-
-  if (!beforeRequired && afterRequired) {
-    out.push({
-      message: `${schemaName}.${propName}: tightened from optional to required`,
-    });
-  }
-
-  if (allowsNull(beforeProp) && !allowsNull(afterProp)) {
-    out.push({
-      message: `${schemaName}.${propName}: no longer nullable (was nullable)`,
-    });
-  }
-
-  const beforeRef = refTarget(beforeProp);
-  const afterRef = refTarget(afterProp);
-  if (beforeRef !== undefined || afterRef !== undefined) {
-    if (beforeRef !== afterRef) {
-      out.push({
-        message: `${schemaName}.${propName}: referenced schema changed (${beforeRef ?? 'inline'} -> ${afterRef ?? 'inline'})`,
-      });
+  if (!beforeProperty && afterProperty) {
+    if (usages.has('request') && afterRequired) {
+      out.push({ message: `${label}: new required request field` });
     }
     return;
   }
+  if (!beforeProperty || !afterProperty) return;
 
-  const beforeTypes = coreTypes(beforeProp);
-  const afterTypes = coreTypes(afterProp);
-  if (beforeTypes.length > 0 && afterTypes.length > 0 && !sameArray(beforeTypes, afterTypes)) {
-    out.push({
-      message: `${schemaName}.${propName}: type changed (${beforeTypes.join('|')} -> ${afterTypes.join('|')})`,
-    });
+  if (usages.has('request') && !beforeRequired && afterRequired) {
+    out.push({ message: `${label}: request field tightened from optional to required` });
+  }
+  if (usages.has('response') && beforeRequired && !afterRequired) {
+    out.push({ message: `${label}: response field loosened from required to optional` });
+  }
+
+  for (const usage of usages) {
+    compareSchemaContract(label, beforeProperty, afterProperty, usage, out);
   }
 }
 
 function compareComponentSchemas(
-  before: Record<string, unknown>,
-  after: Record<string, unknown>,
+  before: Record<string, JsonSchemaLike>,
+  after: Record<string, JsonSchemaLike>,
+  usages: SchemaUsageMap,
   out: BreakingChange[],
 ): void {
-  for (const [name, beforeSchemaRaw] of Object.entries(before)) {
-    const afterSchemaRaw = after[name];
-    if (!afterSchemaRaw) continue; // Schema removal is covered indirectly via the operations that referenced it.
-    const beforeSchema = beforeSchemaRaw as JsonSchemaLike;
-    const afterSchema = afterSchemaRaw as JsonSchemaLike;
-    const propNames = new Set([
+  for (const [name, beforeSchema] of Object.entries(before)) {
+    const componentUsages = usages.get(name);
+    if (!componentUsages || componentUsages.size === 0) continue;
+
+    const afterSchema = after[name];
+    if (!afterSchema) {
+      out.push({ message: `${name}: referenced component schema removed` });
+      continue;
+    }
+
+    const propertyNames = new Set([
       ...Object.keys(beforeSchema.properties ?? {}),
       ...Object.keys(afterSchema.properties ?? {}),
     ]);
-    for (const propName of propNames) {
-      compareSchemaProperty(name, propName, beforeSchema, afterSchema, out);
+    for (const propertyName of propertyNames) {
+      compareSchemaProperty(
+        name,
+        propertyName,
+        beforeSchema,
+        afterSchema,
+        componentUsages,
+        out,
+      );
     }
   }
 }
@@ -202,30 +287,64 @@ function compareParameters(
   after: readonly ParameterLike[],
   out: BreakingChange[],
 ): void {
-  const afterByKey = new Map(after.map((p) => [`${p.in}:${p.name}`, p]));
-  for (const beforeParam of before) {
-    const key = `${beforeParam.in}:${beforeParam.name}`;
-    const afterParam = afterByKey.get(key);
-    if (!afterParam) {
-      if (beforeParam.required) {
-        out.push({
-          message: `${routeLabel}: required parameter \`${beforeParam.name}\` (${beforeParam.in}) removed`,
-        });
-      }
+  const beforeByKey = new Map(before.map((parameter) => [`${parameter.in}:${parameter.name}`, parameter]));
+  const afterByKey = new Map(after.map((parameter) => [`${parameter.in}:${parameter.name}`, parameter]));
+
+  for (const [key, beforeParameter] of beforeByKey) {
+    const afterParameter = afterByKey.get(key);
+    if (!afterParameter) {
+      out.push({
+        message: `${routeLabel}: parameter \`${beforeParameter.name}\` (${beforeParameter.in}) removed`,
+      });
       continue;
     }
-    if (!beforeParam.required && afterParam.required) {
+    if (!beforeParameter.required && afterParameter.required) {
       out.push({
-        message: `${routeLabel}: parameter \`${beforeParam.name}\` (${beforeParam.in}) tightened from optional to required`,
+        message: `${routeLabel}: parameter \`${beforeParameter.name}\` (${beforeParameter.in}) tightened from optional to required`,
       });
     }
-    const beforeTypes = coreTypes(beforeParam.schema);
-    const afterTypes = coreTypes(afterParam.schema);
-    if (beforeTypes.length > 0 && afterTypes.length > 0 && !sameArray(beforeTypes, afterTypes)) {
+    compareSchemaContract(
+      `${routeLabel}: parameter \`${beforeParameter.name}\` (${beforeParameter.in})`,
+      beforeParameter.schema,
+      afterParameter.schema,
+      'request',
+      out,
+    );
+  }
+
+  for (const [key, afterParameter] of afterByKey) {
+    if (!beforeByKey.has(key) && afterParameter.required) {
       out.push({
-        message: `${routeLabel}: parameter \`${beforeParam.name}\` (${beforeParam.in}) type changed (${beforeTypes.join('|')} -> ${afterTypes.join('|')})`,
+        message: `${routeLabel}: new required parameter \`${afterParameter.name}\` (${afterParameter.in})`,
       });
     }
+  }
+}
+
+function compareContent(
+  label: string,
+  before: ContentLike | undefined,
+  after: ContentLike | undefined,
+  usage: SchemaUsage,
+  out: BreakingChange[],
+): void {
+  for (const [mediaType, beforeMedia] of Object.entries(before ?? {})) {
+    const afterMedia = after?.[mediaType];
+    if (!afterMedia) {
+      out.push({ message: `${label}: media type \`${mediaType}\` removed` });
+      continue;
+    }
+    if (beforeMedia.schema && !afterMedia.schema) {
+      out.push({ message: `${label}: schema for \`${mediaType}\` removed` });
+      continue;
+    }
+    compareSchemaContract(
+      `${label} (${mediaType})`,
+      beforeMedia.schema,
+      afterMedia.schema,
+      usage,
+      out,
+    );
   }
 }
 
@@ -237,12 +356,39 @@ function compareOperation(
 ): void {
   compareParameters(routeLabel, before.parameters ?? [], after.parameters ?? [], out);
 
-  const beforeResponses = Object.keys(before.responses ?? {});
-  const afterResponses = new Set(Object.keys(after.responses ?? {}));
-  for (const status of beforeResponses) {
-    if (!afterResponses.has(status)) {
-      out.push({ message: `${routeLabel}: response \`${status}\` removed` });
+  const beforeBody = before.requestBody;
+  const afterBody = after.requestBody;
+  if (!beforeBody && afterBody?.required) {
+    out.push({ message: `${routeLabel}: now requires a request body` });
+  } else if (beforeBody && !afterBody) {
+    out.push({ message: `${routeLabel}: request body removed` });
+  } else if (beforeBody && afterBody) {
+    if (!beforeBody.required && afterBody.required) {
+      out.push({ message: `${routeLabel}: request body tightened from optional to required` });
     }
+    compareContent(
+      `${routeLabel}: request body`,
+      beforeBody.content,
+      afterBody.content,
+      'request',
+      out,
+    );
+  }
+
+  const afterResponses = after.responses ?? {};
+  for (const [status, beforeResponse] of Object.entries(before.responses ?? {})) {
+    const afterResponse = afterResponses[status];
+    if (!afterResponse) {
+      out.push({ message: `${routeLabel}: response \`${status}\` removed` });
+      continue;
+    }
+    compareContent(
+      `${routeLabel}: response \`${status}\``,
+      beforeResponse.content,
+      afterResponse.content,
+      'response',
+      out,
+    );
   }
 
   const hadSecurity = (before.security ?? []).length > 0;
@@ -254,12 +400,6 @@ function compareOperation(
   }
 }
 
-/**
- * Compares two versions of the v1 OpenAPI document and returns every
- * breaking change found, in a stable, human-readable form. An empty array
- * means no breaking change was detected (additive/non-breaking changes,
- * including none at all, are not reported).
- */
 export function findBreakingChanges(
   before: OpenApiDocumentLike,
   after: OpenApiDocumentLike,
@@ -272,21 +412,22 @@ export function findBreakingChanges(
       out.push({ message: `${path}: path removed` });
       continue;
     }
-    for (const [method, beforeOp] of Object.entries(beforeMethods)) {
+    for (const [method, beforeOperation] of Object.entries(beforeMethods)) {
       if (!isOperationKey(method)) continue;
       const routeLabel = `${method.toUpperCase()} ${path}`;
-      const afterOp = afterMethods[method];
-      if (!afterOp) {
+      const afterOperation = afterMethods[method];
+      if (!afterOperation) {
         out.push({ message: `${routeLabel}: operation removed` });
         continue;
       }
-      compareOperation(routeLabel, beforeOp, afterOp, out);
+      compareOperation(routeLabel, beforeOperation, afterOperation, out);
     }
   }
 
   compareComponentSchemas(
     before.components?.schemas ?? {},
     after.components?.schemas ?? {},
+    collectDocumentSchemaUsages(before),
     out,
   );
 
