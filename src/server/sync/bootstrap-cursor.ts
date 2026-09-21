@@ -1,6 +1,6 @@
 /**
- * Opaque row-keyset cursor for `/api/v1/sync/bootstrap`'s per-resource
- * pagination (issue #123).
+ * Opaque row-keyset cursor shared by `/api/v1/sync/bootstrap` and the v1
+ * activity/photo list endpoints.
  *
  * This wraps the last-seen primary key of an `activities`/`photos` page -
  * `activities.id` (numeric) or `photos.unique_id` (string), both carried as

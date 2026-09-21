@@ -1727,6 +1727,26 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too many requests; see `Retry-After`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1788,6 +1808,26 @@
           },
           "401": {
             "description": "No valid session or bearer credential was presented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; see `Retry-After`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The request could not be completed",
             "content": {
               "application/json": {
                 "schema": {

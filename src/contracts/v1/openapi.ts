@@ -20,9 +20,8 @@ import {
  * handlers validate against, so the checked-in document and the runtime
  * contract cannot drift silently (see issue #119).
  *
- * `/api/v1/me` is the first live boundary using this contract. The activity,
- * photo, and sync operations remain contract-first until their corresponding
- * versioned routes land.
+ * Every operation below has a matching Route Handler; the parity test beside
+ * this file prevents either side from drifting independently.
  */
 export function buildOpenApiDocument() {
   const registry = z.registry<{ id: string }>();
@@ -262,6 +261,8 @@ export function buildOpenApiDocument() {
             '401': errorResponse(
               'No valid session or bearer credential was presented',
             ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
+            '500': errorResponse('The request could not be completed'),
           },
         },
       },
@@ -303,6 +304,8 @@ export function buildOpenApiDocument() {
             '401': errorResponse(
               'No valid session or bearer credential was presented',
             ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
+            '500': errorResponse('The request could not be completed'),
           },
         },
       },
