@@ -95,29 +95,50 @@ function chunks<T>(values: readonly T[], size: number): T[][] {
 async function readHistoricalDetailedRows(
   client: postgres.Sql,
 ): Promise<GeometryFingerprint[]> {
-  const rows = await client<
-    Array<{
-      athlete_id: string;
-      detailed_polyline: string;
-      id: string;
-      map_id: string | null;
-      summary_polyline: string | null;
-    }>
-  >`
-    SELECT
-      id::text,
-      athlete::text AS athlete_id,
-      map_id,
-      map_summary_polyline AS summary_polyline,
-      map_polyline AS detailed_polyline
-    FROM activities
-    WHERE map_polyline IS NOT NULL
-      AND (
-        geometry_state = 'detailed'::geometry_state
-        OR (geometry_state IS NULL AND is_complete)
-      )
-    ORDER BY id
+  type HistoricalRow = {
+    athlete_id: string;
+    detailed_polyline: string;
+    id: string;
+    map_id: string | null;
+    summary_polyline: string | null;
+  };
+  const [schema] = await client<Array<{ has_geometry_state: boolean }>>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'activities'
+        AND column_name = 'geometry_state'
+    ) AS has_geometry_state
   `;
+  const rows = schema?.has_geometry_state
+    ? await client<Array<HistoricalRow>>`
+        SELECT
+          id::text,
+          athlete::text AS athlete_id,
+          map_id,
+          map_summary_polyline AS summary_polyline,
+          map_polyline AS detailed_polyline
+        FROM activities
+        WHERE map_polyline IS NOT NULL
+          AND (
+            geometry_state = 'detailed'::geometry_state
+            OR (geometry_state IS NULL AND is_complete)
+          )
+        ORDER BY id
+      `
+    : await client<Array<HistoricalRow>>`
+        SELECT
+          id::text,
+          athlete::text AS athlete_id,
+          map_id,
+          map_summary_polyline AS summary_polyline,
+          map_polyline AS detailed_polyline
+        FROM activities
+        WHERE map_polyline IS NOT NULL
+          AND is_complete
+        ORDER BY id
+      `;
   return rows.map((row) => ({
     athleteId: row.athlete_id,
     detailedPolyline: row.detailed_polyline,
