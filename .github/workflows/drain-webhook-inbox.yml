@@ -1,6 +1,7 @@
 on:
   schedule:
     - cron: "*/5 * * * *" # every 5 minutes
+  workflow_dispatch:
 jobs:
   drain_webhook_inbox:
     name: Drain Strava Webhook Inbox

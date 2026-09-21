@@ -51,3 +51,30 @@ void test('component schemas do not leak JSON Schema $id/$schema keys', () => {
   assert.equal(serialized.includes('"$id"'), false);
   assert.equal(serialized.includes('"$schema"'), false);
 });
+
+void test('every implemented rate-limited v1 operation documents 429', () => {
+  const document = buildOpenApiDocument() as unknown as {
+    paths: Record<
+      string,
+      Record<string, { responses: Record<string, unknown> } | undefined>
+    >;
+  };
+  const operations = [
+    ['get', '/api/v1/me'],
+    ['get', '/api/v1/sync/bootstrap'],
+    ['get', '/api/v1/sync/changes'],
+    ['get', '/api/v1/auth/mobile/start'],
+    ['get', '/api/v1/auth/mobile/callback'],
+    ['post', '/api/v1/auth/mobile/exchange'],
+    ['post', '/api/v1/auth/logout'],
+    ['get', '/api/v1/auth/sessions'],
+    ['post', '/api/v1/auth/sessions/revoke'],
+  ] as const;
+
+  for (const [method, path] of operations) {
+    assert.ok(
+      document.paths[path]?.[method]?.responses['429'],
+      `${method.toUpperCase()} ${path} must document its rate-limit response`,
+    );
+  }
+});

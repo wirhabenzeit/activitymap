@@ -1460,7 +1460,7 @@
             }
           },
           "429": {
-            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
+            "description": "Too many requests; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1562,7 +1562,7 @@
             }
           },
           "429": {
-            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
+            "description": "Too many requests; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1642,6 +1642,16 @@
           },
           "409": {
             "description": "The cursor is malformed, unsupported, or older than the retained change history (`sync_rebootstrap_required`); call `/api/v1/sync/bootstrap` again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1838,7 +1848,7 @@
             }
           },
           "429": {
-            "description": "Too many requests from this client IP; see `Retry-After` (issue #127)",
+            "description": "Too many requests; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1890,7 +1900,7 @@
             }
           },
           "429": {
-            "description": "Too many requests from this client IP; see `Retry-After` (issue #127)",
+            "description": "Too many requests; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1958,7 +1968,7 @@
             }
           },
           "429": {
-            "description": "Too many requests from this client IP; see `Retry-After` (issue #127)",
+            "description": "Too many requests; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1997,7 +2007,7 @@
             }
           },
           "429": {
-            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
+            "description": "Too many requests; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {
@@ -2043,7 +2053,7 @@
             }
           },
           "429": {
-            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
+            "description": "Too many requests; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {
@@ -2102,7 +2112,7 @@
             }
           },
           "429": {
-            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
+            "description": "Too many requests; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {
