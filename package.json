@@ -17,6 +17,8 @@
     "db:migrate:test-webhook": "tsx scripts/database/test-webhook-inbox-migration.ts",
     "db:test-erasure": "tsx --conditions=react-server scripts/database/test-erasure-executor.ts",
     "db:test-summary-reconciliation": "tsx --conditions=react-server scripts/database/test-summary-reconciliation.ts",
+    "db:recover:geometry": "tsx scripts/database/recover-geometry-freshness.ts",
+    "db:test-geometry-recovery": "tsx scripts/database/test-geometry-freshness-recovery.ts",
     "db:audit-sync-migration": "tsx scripts/database/audit-sync-migration.ts",
     "db:migrate:preview": "tsx scripts/database/migrate-preview.ts",
     "db:schema:fingerprint": "tsx scripts/database/migrate.ts fingerprint",
