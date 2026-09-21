@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "baseMaps": {
+    "mapboxStreet": {
+      "label": "Mapbox Street",
+      "type": "style",
+      "url": "mapbox://styles/mapbox/streets-v12",
+      "visible": true
+    },
+    "mapboxStreet3d": {
+      "label": "Mapbox Street 3D",
+      "type": "style",
+      "url": "mapbox://styles/wirhabenzeit/clk6y6c1q00lk01pe8fqs0urn",
+      "visible": false
+    },
+    "mapboxOutdoors": {
+      "label": "Mapbox Outdoors",
+      "type": "style",
+      "url": "mapbox://styles/mapbox/outdoors-v12",
+      "visible": false
+    },
+    "mapboxLight": {
+      "label": "Mapbox Light",
+      "type": "style",
+      "url": "mapbox://styles/mapbox/light-v11",
+      "visible": false
+    },
+    "mapboxTopolight": {
+      "label": "Mapbox Topolight",
+      "type": "style",
+      "url": "mapbox://styles/wirhabenzeit/clk0tpduc00ab01qyguzi09gv",
+      "visible": false
+    },
+    "mapboxDark": {
+      "label": "Mapbox Dark",
+      "type": "style",
+      "url": "mapbox://styles/mapbox/dark-v11",
+      "visible": false
+    },
+    "mapboxSatellite": {
+      "label": "Mapbox Satellite",
+      "type": "style",
+      "url": "mapbox://styles/mapbox/satellite-v9",
+      "visible": false
+    },
+    "swisstopoVectorBasemap": {
+      "label": "Swisstopo Vector Basemap",
+      "type": "style",
+      "url": "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json",
+      "visible": false,
+      "attribution": "© swisstopo"
+    },
+    "swisstopoVectorLight": {
+      "label": "Swisstopo Vector Light",
+      "type": "style",
+      "url": "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json",
+      "visible": false,
+      "attribution": "© swisstopo"
+    },
+    "swisstopoVectorWinter": {
+      "label": "Swisstopo Vector Winter",
+      "type": "style",
+      "url": "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap-winter.vt/style.json",
+      "visible": false,
+      "attribution": "© swisstopo"
+    },
+    "swisstopoSatellite": {
+      "label": "Swisstopo Satellite",
+      "type": "style",
+      "url": "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.leichte-basiskarte-imagery.vt/style.json",
+      "visible": false,
+      "attribution": "© swisstopo"
+    },
+    "swisstopoPixelkarte": {
+      "label": "Swisstopo Pixelkarte",
+      "type": "raster",
+      "url": "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg",
+      "tileSize": 256,
+      "visible": false,
+      "attribution": "© swisstopo"
+    },
+    "swisstopoWinter": {
+      "label": "Swisstopo Winter",
+      "type": "raster",
+      "url": "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe-winter/default/current/3857/{z}/{x}/{y}.jpeg",
+      "tileSize": 256,
+      "visible": false,
+      "attribution": "© swisstopo"
+    },
+    "norgeskart": {
+      "label": "NorgesKart",
+      "type": "raster",
+      "url": "https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png",
+      "tileSize": 256,
+      "visible": false,
+      "attribution": "© Kartverket"
+    }
+  },
+  "rasterOverlays": {
+    "swisstopoSki": {
+      "label": "Swisstopo Ski",
+      "url": "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/{z}/{x}/{y}.png",
+      "tileSize": 256,
+      "visible": false,
+      "opacity": 0.8,
+      "attribution": "© swisstopo"
+    },
+    "nveAvalanche": {
+      "label": "NVE Avalanche",
+      "url": "https://gis3.nve.no/arcgis/rest/services/wmts/Bratthet_med_utlop_2024/MapServer/tile/{z}/{y}/{x}",
+      "tileSize": 256,
+      "visible": false,
+      "opacity": 0.2,
+      "attribution": "© NVE"
+    },
+    "swisstopoSlope": {
+      "label": "Swisstopo Slope",
+      "url": "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/{z}/{x}/{y}.png",
+      "tileSize": 256,
+      "visible": false,
+      "opacity": 0.4,
+      "attribution": "© swisstopo"
+    },
+    "veloland": {
+      "label": "Veloland",
+      "url": "https://wmts.geo.admin.ch/1.0.0/ch.astra.veloland/default/current/3857/{z}/{x}/{y}.png",
+      "tileSize": 256,
+      "visible": false,
+      "opacity": 0.4,
+      "attribution": "© swisstopo"
+    },
+    "wanderland": {
+      "label": "Wanderland",
+      "url": "https://wmts.geo.admin.ch/1.0.0/ch.astra.wanderland/default/current/3857/{z}/{x}/{y}.png",
+      "tileSize": 256,
+      "visible": false,
+      "opacity": 0.4,
+      "attribution": "© swisstopo"
+    }
+  }
+}

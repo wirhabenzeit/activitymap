@@ -15,6 +15,6 @@ The bundle identifier, signing team, production authentication, legal links, and
 
 ## Shared configuration direction
 
-Cross-client product data should live in a language-neutral, validated catalog. Map source IDs, URLs, source types, attribution, ordering, defaults, opacity, and capability flags are good candidates. TypeScript and Swift should each adapt that catalog to their native map SDK.
+Portable map sources live in the validated `shared/map-catalog.json` catalogue. The web client reads it directly, while `pnpm map-catalog:generate` produces the committed Swift representation.
 
-UI implementation, icons, gestures, and locale-aware date, duration, measurement, and number formatting should remain native to each client. API payloads remain defined by OpenAPI.
+Each client composes those sources with platform-native additions. The React-based Friflyt GeoJSON layer therefore stays in the web adapter, and Mapbox Standard stays native to iOS. UI implementation, icons, gestures, and locale-aware date, duration, measurement, and number formatting remain native. API payloads remain defined by OpenAPI.
