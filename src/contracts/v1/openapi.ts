@@ -120,9 +120,7 @@ export function buildOpenApiDocument() {
             '401': errorResponse(
               'No valid session or bearer credential was presented',
             ),
-            '429': errorResponse(
-              'Too many requests for this session or client IP; see `Retry-After` (issue #127)',
-            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
             '500': errorResponse(
               'The server could not serialize a valid contract response',
             ),
@@ -176,9 +174,7 @@ export function buildOpenApiDocument() {
             '401': errorResponse(
               'No valid session or bearer credential was presented',
             ),
-            '429': errorResponse(
-              'Too many requests for this session or client IP; see `Retry-After` (issue #127)',
-            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
           },
         },
       },
@@ -224,6 +220,7 @@ export function buildOpenApiDocument() {
             '409': errorResponse(
               'The cursor is malformed, unsupported, or older than the retained change history (`sync_rebootstrap_required`); call `/api/v1/sync/bootstrap` again',
             ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
           },
         },
       },
@@ -343,9 +340,7 @@ export function buildOpenApiDocument() {
             '400': errorResponse(
               'A required parameter is missing, or `redirect_uri` is not allow-listed',
             ),
-            '429': errorResponse(
-              'Too many requests from this client IP; see `Retry-After` (issue #127)',
-            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
             '500': errorResponse('Starting the Strava sign-in flow failed'),
           },
         },
@@ -364,9 +359,7 @@ export function buildOpenApiDocument() {
               'A required parameter is missing, or `redirect_uri` is not allow-listed',
             ),
             '401': errorResponse('The Strava sign-in did not produce a session'),
-            '429': errorResponse(
-              'Too many requests from this client IP; see `Retry-After` (issue #127)',
-            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
             '500': errorResponse('The request could not be completed'),
           },
         },
@@ -392,9 +385,7 @@ export function buildOpenApiDocument() {
             '401': errorResponse(
               'The code is invalid, expired, already used, or its state/PKCE verifier does not match',
             ),
-            '429': errorResponse(
-              'Too many requests from this client IP; see `Retry-After` (issue #127)',
-            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
           },
         },
       },
@@ -408,9 +399,7 @@ export function buildOpenApiDocument() {
             '401': errorResponse(
               'No valid session or bearer credential was presented',
             ),
-            '429': errorResponse(
-              'Too many requests for this session or client IP; see `Retry-After` (issue #127)',
-            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
           },
         },
       },
@@ -429,9 +418,7 @@ export function buildOpenApiDocument() {
             '401': errorResponse(
               'No valid session or bearer credential was presented',
             ),
-            '429': errorResponse(
-              'Too many requests for this session or client IP; see `Retry-After` (issue #127)',
-            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
           },
         },
       },
@@ -452,9 +439,7 @@ export function buildOpenApiDocument() {
             '401': errorResponse(
               'No valid session or bearer credential was presented',
             ),
-            '429': errorResponse(
-              'Too many requests for this session or client IP; see `Retry-After` (issue #127)',
-            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
           },
         },
       },
