@@ -1459,6 +1459,16 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "The server could not serialize a valid contract response",
             "content": {
@@ -1543,6 +1553,16 @@
           },
           "401": {
             "description": "No valid session or bearer credential was presented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1817,6 +1837,16 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests from this client IP; see `Retry-After` (issue #127)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Starting the Strava sign-in flow failed",
             "content": {
@@ -1851,6 +1881,16 @@
           },
           "401": {
             "description": "The Strava sign-in did not produce a session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this client IP; see `Retry-After` (issue #127)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1916,6 +1956,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too many requests from this client IP; see `Retry-After` (issue #127)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1938,6 +1988,16 @@
           },
           "401": {
             "description": "No valid session or bearer credential was presented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1974,6 +2034,16 @@
           },
           "401": {
             "description": "No valid session or bearer credential was presented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2023,6 +2093,16 @@
           },
           "401": {
             "description": "No valid session or bearer credential was presented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests for this session or client IP; see `Retry-After` (issue #127)",
             "content": {
               "application/json": {
                 "schema": {

@@ -648,4 +648,32 @@ export const shareLinkActivities = pgTable(
 
 export type ShareLinkActivity = typeof shareLinkActivities.$inferSelect;
 
+// Fixed-window rate-limit counters for the `/api/v1/*` boundary (issue
+// #127). This stack has no Redis in its dependency tree, so a small
+// Postgres-backed table - consistent with this codebase's repository
+// pattern - is the self-hosted primitive rather than a new managed
+// service. `key` already encodes which limit it belongs to (e.g.
+// `session:<hash>`, `user:<hash>`, or `ip:<hash>`, see
+// `~/server/http/rate-limit.ts`),
+// and `windowStart` is the fixed-window boundary a request's timestamp
+// falls into, so `(key, windowStart)` is exactly the counter a request
+// needs to atomically increment-and-read. Rows age out on their own; the
+// `/api/cron/cleanup-rate-limits` job (see that route) periodically deletes
+// windows old enough that no in-flight request could still reference them.
+export const apiRateLimitBuckets = pgTable(
+  'api_rate_limit_bucket',
+  {
+    key: text('key').notNull(),
+    windowStart: timestamp('window_start', { mode: 'date' }).notNull(),
+    count: integer('count').notNull().default(0),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.key, table.windowStart] }),
+    index('api_rate_limit_bucket_window_start_idx').on(table.windowStart),
+  ],
+);
+
+export type ApiRateLimitBucket = typeof apiRateLimitBuckets.$inferSelect;
+
 export { sportTypes, type SportType };

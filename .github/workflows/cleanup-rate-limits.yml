@@ -1,0 +1,21 @@
+on:
+  schedule:
+    - cron: "0 * * * *" # hourly
+jobs:
+  cleanup_rate_limits:
+    name: Clean Up Expired Rate-Limit Buckets
+    runs-on: ubuntu-22.04
+    # No need for environment variables as we can access secrets directly
+    steps:
+      - name: Clean Up Rate-Limit Buckets
+        id: cleanupRequest
+        uses: fjogeleit/http-request-action@v1
+        with:
+          method: "POST"
+          url: "https://activitymap.dominik.page/api/cron/cleanup-rate-limits"
+          customHeaders: '{"x-cron-secret": "${{ secrets.CRON_SECRET }}"}'
+          timeout: 60000
+      - name: Show Response
+        run: |
+          echo "Status: ${{ steps.cleanupRequest.outputs.status }}"
+          echo "Response: ${{ steps.cleanupRequest.outputs.response }}"
