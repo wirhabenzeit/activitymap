@@ -4,5 +4,35 @@
 <dict>
 	<key>MBXAccessToken</key>
 	<string>$(MAPBOX_ACCESS_TOKEN)</string>
+	<key>ActivityMapAPIBaseURL</key>
+	<string>$(ACTIVITYMAP_API_BASE_URL)</string>
+	<key>ActivityMapAuthRedirectURI</key>
+	<string>$(ACTIVITYMAP_AUTH_REDIRECT_URI)</string>
+	<key>ActivityMapAuthCallbackScheme</key>
+	<string>$(ACTIVITYMAP_AUTH_CALLBACK_SCHEME)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(ACTIVITYMAP_AUTH_CALLBACK_SCHEME)</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>
