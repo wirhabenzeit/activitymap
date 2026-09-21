@@ -24,6 +24,8 @@ jobs:
       - run: pnpm lint
       - name: Validate shared map catalogue and generated Swift
         run: pnpm map-catalog:check
+      - name: Check the generated Swift API DTOs match the Zod contracts
+        run: pnpm api-dtos:check
       - name: Fetch main for the OpenAPI breaking-change comparison
         run: git fetch origin +refs/heads/main:refs/remotes/origin/main --depth=1
       - name: Check for breaking OpenAPI changes vs main
