@@ -54,7 +54,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     // Compute stats from local activities
     const stats = React.useMemo(() => {
         const totalActivities = activities.length;
-        const incompleteActivities = activities.filter(a => !a.is_complete).length;
+        const incompleteActivities = activities.filter(a => a.geometryState !== 'detailed').length;
         const totalPhotos = 0; // Placeholder
 
         return {
@@ -134,7 +134,7 @@ function YearlyHistory({ activities, globalLoading }: { activities: DbActivity[]
             current.count++;
             current.ids.push(act.id);
 
-            if (!act.is_complete) {
+            if (act.geometryState !== 'detailed') {
                 current.incompleteCount++;
                 current.incompleteIds.push(act.id);
 

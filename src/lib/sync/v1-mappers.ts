@@ -21,10 +21,9 @@
  *    numeric activity id, which is unique and stable but must not be
  *    treated as a real public id if legacy sharing is ever re-enabled.
  *  - `is_complete`: superseded by `geometry_state`/`photos_state` (see the
- *    same doc comment). No app code outside the v1 DTO mapper reads
- *    `is_complete` (verified by grep across `src/components`, `src/hooks`,
- *    `src/store`, `src/lib`), so an approximate bridge value — "has this
- *    activity's detailed geometry been fetched" — is good enough here.
+ *    same doc comment). The app reads component freshness directly; this
+ *    derived value exists only while the in-memory type still mirrors the
+ *    database row ahead of the final contract migration.
  */
 
 import type { Activity, Photo } from '~/server/db/schema';

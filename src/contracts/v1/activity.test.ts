@@ -56,7 +56,7 @@ const fixtureActivity: Activity = {
   weighted_average_watts: null,
   kilojoules: null,
   last_updated: new Date('2024-01-31T10:00:00.000Z'),
-  geometryState: null,
+  geometryState: 'detailed',
   photosState: null,
   lastSummarySeenAt: null,
   lastDetailedFetchedAt: null,
@@ -87,14 +87,17 @@ void test('toActivityDTO excludes the raw is_complete field', () => {
   assert.equal('is_complete' in dto, false);
 });
 
-void test('toActivityDTO derives geometry_state "detailed" from is_complete: true', () => {
-  const dto = toActivityDTO({ ...fixtureActivity, is_complete: true });
-  assert.equal(dto.geometry_state, 'detailed');
+void test('toActivityDTO ignores the legacy is_complete flag', () => {
+  const dto = toActivityDTO({
+    ...fixtureActivity,
+    geometryState: 'summary',
+    is_complete: true,
+  });
+  assert.equal(dto.geometry_state, 'summary');
 });
 
-void test('toActivityDTO derives geometry_state "summary" from is_complete: false', () => {
-  const dto = toActivityDTO({ ...fixtureActivity, is_complete: false });
-  assert.equal(dto.geometry_state, 'summary');
+void test('toActivityDTO rejects a missing component freshness state', () => {
+  assert.throws(() => toActivityDTO({ ...fixtureActivity, geometryState: null }));
 });
 
 void test('toActivityDTO serializes real component freshness when present', () => {
