@@ -6,6 +6,7 @@ import {
   ipKeyFor,
   sessionKeyFor,
   type RateLimitRule,
+  userKeyFor,
 } from './rate-limit.ts';
 
 /** In-memory fake standing in for `RateLimitRepository`, keyed the same way the real Postgres upsert is: `(key, windowStart)`. */
@@ -54,7 +55,8 @@ void test('evaluateRateLimit denies once the limit is exceeded, within the same 
 void test('evaluateRateLimit resets once the fixed window rolls over', async () => {
   const repo = fakeRepo();
   const windowStart = new Date('2026-01-01T00:00:00.000Z');
-  for (let i = 0; i < 3; i++) await evaluateRateLimit(repo, 'k', RULE, windowStart);
+  for (let i = 0; i < 3; i++)
+    await evaluateRateLimit(repo, 'k', RULE, windowStart);
   const stillDenied = await evaluateRateLimit(repo, 'k', RULE, windowStart);
   assert.equal(stillDenied.allowed, false);
 
@@ -76,7 +78,8 @@ void test('evaluateRateLimit retryAfterSeconds counts down to the window boundar
   const repo = fakeRepo();
   const windowStart = new Date('2026-01-01T00:00:00.000Z');
   const midWindow = new Date(windowStart.getTime() + 45_000);
-  for (let i = 0; i < 3; i++) await evaluateRateLimit(repo, 'k', RULE, midWindow);
+  for (let i = 0; i < 3; i++)
+    await evaluateRateLimit(repo, 'k', RULE, midWindow);
   const denied = await evaluateRateLimit(repo, 'k', RULE, midWindow);
 
   // Window is [00:00:00, 00:01:00); at 00:00:45 there are 15s left.
@@ -94,13 +97,19 @@ void test('sessionKeyFor derives a key from the Authorization header, never the 
 
 void test('sessionKeyFor is stable for the same credential and different for different ones', () => {
   const a = sessionKeyFor(
-    new Request('https://example.com', { headers: { authorization: 'Bearer aaa' } }),
+    new Request('https://example.com', {
+      headers: { authorization: 'Bearer aaa' },
+    }),
   );
   const aAgain = sessionKeyFor(
-    new Request('https://example.com', { headers: { authorization: 'Bearer aaa' } }),
+    new Request('https://example.com', {
+      headers: { authorization: 'Bearer aaa' },
+    }),
   );
   const b = sessionKeyFor(
-    new Request('https://example.com', { headers: { authorization: 'Bearer bbb' } }),
+    new Request('https://example.com', {
+      headers: { authorization: 'Bearer bbb' },
+    }),
   );
   assert.equal(a, aAgain);
   assert.notEqual(a, b);
@@ -129,18 +138,39 @@ void test('sessionKeyFor returns null when there is no session credential at all
   assert.equal(sessionKeyFor(request), null);
 });
 
-void test('ipKeyFor reads the first address from x-forwarded-for', () => {
+void test('userKeyFor is stable and never includes the raw user id', () => {
+  const key = userKeyFor('user-sensitive-id');
+  assert.ok(key);
+  assert.equal(key, userKeyFor('user-sensitive-id'));
+  assert.ok(!key.includes('user-sensitive-id'));
+  assert.notEqual(key, userKeyFor('another-user'));
+  assert.equal(userKeyFor('   '), null);
+});
+
+void test('ipKeyFor hashes the first address from x-forwarded-for', () => {
   const request = new Request('https://example.com', {
     headers: { 'x-forwarded-for': '203.0.113.5, 10.0.0.1' },
   });
-  assert.equal(ipKeyFor(request), 'ip:203.0.113.5');
+  const key = ipKeyFor(request);
+  assert.ok(key);
+  assert.ok(!key.includes('203.0.113.5'));
+  assert.equal(
+    key,
+    ipKeyFor(
+      new Request('https://example.com', {
+        headers: { 'x-forwarded-for': '203.0.113.5' },
+      }),
+    ),
+  );
 });
 
 void test('ipKeyFor falls back to x-real-ip', () => {
   const request = new Request('https://example.com', {
     headers: { 'x-real-ip': '203.0.113.9' },
   });
-  assert.equal(ipKeyFor(request), 'ip:203.0.113.9');
+  const key = ipKeyFor(request);
+  assert.ok(key);
+  assert.ok(!key.includes('203.0.113.9'));
 });
 
 void test('ipKeyFor returns null with no proxy headers present', () => {

@@ -92,21 +92,33 @@ export function sessionKeyFor(request: Request): string | null {
 }
 
 /**
+ * Per-user rate-limit key. User ids are stable identifiers, so hash them
+ * before persisting the bucket key just as we do session credentials and IP
+ * addresses.
+ */
+export function userKeyFor(userId: string): string | null {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) return null;
+  return `user:${hash(normalizedUserId)}`;
+}
+
+/**
  * Per-IP rate-limit key from the standard reverse-proxy forwarded-for
  * header (Vercel sets `x-forwarded-for`), falling back to `x-real-ip`. This
  * is the only signal available before a request presents any credential
  * (e.g. `/api/v1/auth/mobile/start`), and is also applied as a floor
- * alongside the per-session limit everywhere else. Returns `null` when
- * neither header is present (e.g. a direct local request with no proxy in
- * front of it) rather than guessing.
+ * alongside the per-session limit everywhere else. The address is hashed
+ * before it is persisted as part of a bucket key. Returns `null` when neither
+ * header is present (e.g. a direct local request with no proxy in front of it)
+ * rather than guessing.
  */
 export function ipKeyFor(request: Request): string | null {
   const forwardedFor = request.headers.get('x-forwarded-for');
   if (forwardedFor) {
-    const first = forwardedFor.split(',')[0]?.trim();
-    if (first) return `ip:${first}`;
+    const first = forwardedFor.split(',')[0]?.trim().toLowerCase();
+    if (first) return `ip:${hash(first)}`;
   }
-  const realIp = request.headers.get('x-real-ip')?.trim();
-  if (realIp) return `ip:${realIp}`;
+  const realIp = request.headers.get('x-real-ip')?.trim().toLowerCase();
+  if (realIp) return `ip:${hash(realIp)}`;
   return null;
 }

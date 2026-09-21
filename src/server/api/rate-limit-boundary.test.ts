@@ -1,13 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { withApiV1RateLimit, type RateLimitRule } from './rate-limit-boundary.ts';
+import { withApiV1Observability } from './observability.ts';
+import {
+  withApiV1RateLimit,
+  type RateLimitRule,
+} from './rate-limit-boundary.ts';
 
 function fakeRepo() {
   const buckets = new Map<string, number>();
   return {
     calls: 0,
-    async incrementAndGet(this: { calls: number }, key: string, windowStart: Date) {
+    async incrementAndGet(
+      this: { calls: number },
+      key: string,
+      windowStart: Date,
+    ) {
       this.calls++;
       const bucketKey = `${key}@${windowStart.toISOString()}`;
       const next = (buckets.get(bucketKey) ?? 0) + 1;
@@ -75,7 +83,11 @@ void test('withApiV1RateLimit rejects with the stable v1 rate_limited envelope o
   assert.equal(body.error.code, 'rate_limited');
   assert.equal(body.error.requestId, 'req-1');
   assert.equal(body.error.retryable, true);
-  assert.equal(handlerCalls, 2, 'the third, rejected call must not reach the inner handler');
+  assert.equal(
+    handlerCalls,
+    2,
+    'the third, rejected call must not reach the inner handler',
+  );
 });
 
 void test('withApiV1RateLimit keeps distinct sessions in independent buckets', async () => {
@@ -90,7 +102,9 @@ void test('withApiV1RateLimit keeps distinct sessions in independent buckets', a
   });
 
   const forToken = (token: string) =>
-    new Request('https://example.com', { headers: { authorization: `Bearer ${token}` } });
+    new Request('https://example.com', {
+      headers: { authorization: `Bearer ${token}` },
+    });
 
   await wrapped(forToken('a'));
   await wrapped(forToken('a'));
@@ -113,13 +127,69 @@ void test('withApiV1RateLimit falls back to per-IP limiting when no session cred
   });
 
   const request = () =>
-    new Request('https://example.com', { headers: { 'x-forwarded-for': '203.0.113.5' } });
+    new Request('https://example.com', {
+      headers: { 'x-forwarded-for': '203.0.113.5' },
+    });
 
   await wrapped(request());
   await wrapped(request());
   const third = await wrapped(request());
 
   assert.equal(third.status, 429);
+});
+
+void test('withApiV1RateLimit aggregates distinct sessions into one per-user bucket', async () => {
+  const handler = async () => Response.json({ ok: true });
+  const repo = fakeRepo();
+  const limitedScopes: string[] = [];
+  const wrapped = withApiV1RateLimit(handler, {
+    route: 'GET /api/v1/test',
+    repo,
+    sessionRule: { limit: 1000, windowMs: 60_000 },
+    userRule: TIGHT_RULE,
+    ipRule: { limit: 1000, windowMs: 60_000 },
+    resolveUserId: async () => 'shared-user',
+    onLimited: ({ scope }) => limitedScopes.push(scope),
+    now: () => new Date('2026-01-01T00:00:00.000Z'),
+  });
+
+  const forToken = (token: string) =>
+    new Request('https://example.com', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+  assert.equal((await wrapped(forToken('session-a'))).status, 200);
+  assert.equal((await wrapped(forToken('session-b'))).status, 200);
+  assert.equal((await wrapped(forToken('session-c'))).status, 429);
+  assert.deepEqual(limitedScopes, ['user']);
+});
+
+void test('observability remains the outer boundary for a rate-limited response', async () => {
+  const rateLimited = withApiV1RateLimit(
+    async () => Response.json({ ok: true }),
+    {
+      route: 'GET /api/v1/test',
+      repo: fakeRepo(),
+      sessionRule: { limit: 0, windowMs: 60_000 },
+      ipRule: { limit: 1000, windowMs: 60_000 },
+      now: () => new Date('2026-01-01T00:00:00.000Z'),
+    },
+  );
+  const wrapped = withApiV1Observability(rateLimited, {
+    route: 'GET /api/v1/test',
+    createRequestId: () => 'observed-rate-limit',
+  });
+
+  const response = await wrapped(
+    new Request('https://example.com', {
+      headers: { authorization: 'Bearer x' },
+    }),
+  );
+  const body = (await response.json()) as { error: { requestId: string } };
+
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get('x-request-id'), 'observed-rate-limit');
+  assert.equal(body.error.requestId, 'observed-rate-limit');
 });
 
 void test('withApiV1RateLimit generates a requestId when none was supplied', async () => {
@@ -134,7 +204,9 @@ void test('withApiV1RateLimit generates a requestId when none was supplied', asy
   });
 
   const response = await wrapped(
-    new Request('https://example.com', { headers: { authorization: 'Bearer x' } }),
+    new Request('https://example.com', {
+      headers: { authorization: 'Bearer x' },
+    }),
   );
   assert.equal(response.status, 429);
   const body = (await response.json()) as { error: { requestId: string } };

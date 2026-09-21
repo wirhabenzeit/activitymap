@@ -1,4 +1,5 @@
 import { auth } from '~/lib/auth';
+import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
 import { logger } from '~/server/logging/logger';
 import { withApiV1Observability } from '~/server/api/observability';
 import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
@@ -20,7 +21,7 @@ export const POST = withApiV1Observability(
         logger.error('POST /api/v1/auth/logout failed', { error, requestId });
       },
     }),
-    { route: ROUTE },
+    { route: ROUTE, resolveUserId: resolveRateLimitUserId },
   ),
   { route: ROUTE },
 );

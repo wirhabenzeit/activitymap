@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import { errorEnvelope } from '~/contracts/v1/error';
 import { logger } from '~/server/logging/logger';
 import {
@@ -7,17 +5,24 @@ import {
   ipKeyFor,
   sessionKeyFor,
   type RateLimitRule,
+  userKeyFor,
 } from '~/server/http/rate-limit';
-
-export type { RateLimitRule };
+import { requestIdFor } from '~/server/http/request-id';
 import {
   rateLimitRepository,
   type RateLimitRepository,
 } from '~/server/repositories/rate-limit';
 
+export type { RateLimitRule };
+
 /** Generous default: a native client can legitimately poll `/api/v1/sync/*` fairly often. */
 export const DEFAULT_SESSION_RATE_LIMIT: RateLimitRule = {
   limit: 300,
+  windowMs: 5 * 60 * 1000,
+};
+/** Aggregates traffic across all sessions and devices for one authenticated user. */
+export const DEFAULT_USER_RATE_LIMIT: RateLimitRule = {
+  limit: 600,
   windowMs: 5 * 60 * 1000,
 };
 /** Applied everywhere as a floor alongside the per-session limit. */
@@ -31,21 +36,18 @@ export const STRICT_IP_RATE_LIMIT: RateLimitRule = {
   windowMs: 5 * 60 * 1000,
 };
 
-function requestIdFor(request: Request): string {
-  const suppliedRequestId = request.headers.get('x-request-id')?.trim();
-  if (suppliedRequestId) return suppliedRequestId;
-  return randomUUID();
-}
-
 export interface RateLimitBoundaryOptions {
   /** A human-readable `"METHOD /path"` label, used only for logging. */
   route: string;
   repo?: Pick<RateLimitRepository, 'incrementAndGet'>;
   now?: () => Date;
   sessionRule?: RateLimitRule;
+  userRule?: RateLimitRule;
   ipRule?: RateLimitRule;
+  /** Resolve an authenticated user for routes that have one; omit on pre-auth routes. */
+  resolveUserId?: (request: Request) => Promise<string | null>;
   onLimited?: (info: {
-    scope: 'session' | 'ip';
+    scope: 'session' | 'user' | 'ip';
     requestId: string;
     route: string;
   }) => void;
@@ -60,20 +62,16 @@ export interface RateLimitBoundaryOptions {
  * docs/api-compatibility-and-deprecation.md for the full design and its
  * documented limitations.
  *
- * Two independent limits apply, either of which can reject a request:
+ * Three independent limits apply to authenticated routes, any of which can
+ * reject a request:
  * - **Per-session**: keyed by a hash of the caller's credential (bearer
  *   token or session cookie) - see `sessionKeyFor`.
+ * - **Per-user**: keyed by a hash of the authenticated user id and shared by
+ *   all of that user's sessions/devices. Routes opt into this check by
+ *   providing `resolveUserId`; genuinely pre-auth routes omit it.
  * - **Per-IP**: a floor that also covers requests with no credential yet
  *   (the mobile OAuth endpoints use a stricter rule here, since IP is the
  *   only signal available pre-auth).
- *
- * This is deliberately *not* a true global per-user limit aggregated across
- * every session/device a user has: doing that would require resolving the
- * full `Actor` (an extra DB round trip) before this check even runs, ahead
- * of the inner handler doing the same resolution again. Keying by session
- * is a reasonable proxy - a compromised/abusive client is normally a single
- * session - and is documented as a known limitation rather than silently
- * assumed to be equivalent.
  *
  * A rejected request never reaches the inner handler and always uses the
  * stable v1 error envelope with the documented `rate_limited` code (`429`,
@@ -86,6 +84,7 @@ export function withApiV1RateLimit(
   const repo = options.repo ?? rateLimitRepository;
   const now = options.now ?? (() => new Date());
   const sessionRule = options.sessionRule ?? DEFAULT_SESSION_RATE_LIMIT;
+  const userRule = options.userRule ?? DEFAULT_USER_RATE_LIMIT;
   const ipRule = options.ipRule ?? DEFAULT_IP_RATE_LIMIT;
   const onLimited = options.onLimited ?? (() => undefined);
 
@@ -93,21 +92,29 @@ export function withApiV1RateLimit(
     const requestId = requestIdFor(request);
     const nowValue = now();
 
-    const checks: Array<{ scope: 'session' | 'ip'; key: string; rule: RateLimitRule }> =
-      [];
+    const checks: Array<{
+      scope: 'session' | 'ip';
+      key: string;
+      rule: RateLimitRule;
+    }> = [];
     const sessionKey = sessionKeyFor(request);
-    if (sessionKey) checks.push({ scope: 'session', key: sessionKey, rule: sessionRule });
+    if (sessionKey)
+      checks.push({ scope: 'session', key: sessionKey, rule: sessionRule });
     const ipKey = ipKeyFor(request);
     if (ipKey) checks.push({ scope: 'ip', key: ipKey, rule: ipRule });
 
-    for (const check of checks) {
-      const decision = await evaluateRateLimit(repo, check.key, check.rule, nowValue);
-      if (decision.allowed) continue;
+    const enforce = async (
+      scope: 'session' | 'user' | 'ip',
+      key: string,
+      rule: RateLimitRule,
+    ): Promise<Response | null> => {
+      const decision = await evaluateRateLimit(repo, key, rule, nowValue);
+      if (decision.allowed) return null;
 
-      onLimited({ scope: check.scope, requestId, route: options.route });
+      onLimited({ scope, requestId, route: options.route });
       logger.warn('[ApiV1] rate limit exceeded', {
         route: options.route,
-        scope: check.scope,
+        scope,
         requestId,
         limit: decision.limit,
         retryAfterSeconds: decision.retryAfterSeconds,
@@ -123,6 +130,20 @@ export function withApiV1RateLimit(
           headers: { 'Retry-After': String(decision.retryAfterSeconds) },
         },
       );
+    };
+
+    for (const check of checks) {
+      const limitedResponse = await enforce(check.scope, check.key, check.rule);
+      if (limitedResponse) return limitedResponse;
+    }
+
+    if (options.resolveUserId) {
+      const userId = await options.resolveUserId(request);
+      const userKey = userId ? userKeyFor(userId) : null;
+      if (userKey) {
+        const limitedResponse = await enforce('user', userKey, userRule);
+        if (limitedResponse) return limitedResponse;
+      }
     }
 
     return handler(request);

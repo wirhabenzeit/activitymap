@@ -2,6 +2,7 @@ import { getSessionCookie } from 'better-auth/cookies';
 
 import { auth } from '~/lib/auth';
 import { issueMobileLoginCode } from '~/server/auth/mobile';
+import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
 import { logger } from '~/server/logging/logger';
 import { withApiV1Observability } from '~/server/api/observability';
 import {
@@ -34,7 +35,11 @@ export const GET = withApiV1Observability(
         });
       },
     }),
-    { route: ROUTE, ipRule: STRICT_IP_RATE_LIMIT },
+    {
+      route: ROUTE,
+      ipRule: STRICT_IP_RATE_LIMIT,
+      resolveUserId: resolveRateLimitUserId,
+    },
   ),
   { route: ROUTE },
 );

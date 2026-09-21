@@ -1,4 +1,5 @@
 import { resolveActor } from '~/server/auth/actor';
+import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
 import { activitiesRepository } from '~/server/repositories/activities';
 import { changesRepository } from '~/server/repositories/changes';
 import { photosRepository } from '~/server/repositories/photos';
@@ -22,7 +23,7 @@ export const GET = withApiV1Observability(
         logger.error('GET /api/v1/sync/changes failed', { error, requestId });
       },
     }),
-    { route: ROUTE },
+    { route: ROUTE, resolveUserId: resolveRateLimitUserId },
   ),
   { route: ROUTE },
 );

@@ -2,6 +2,7 @@ import { toAuthenticationDTO } from '~/contracts/v1/auth';
 import { toCurrentUserDTOv1 } from '~/contracts/v1/user';
 import { auth } from '~/lib/auth';
 import { resolveRequestSession } from '~/server/auth/request-session';
+import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
 import { db } from '~/server/db';
 import { logger } from '~/server/logging/logger';
 import { withApiV1Observability } from '~/server/api/observability';
@@ -48,7 +49,9 @@ export const GET = withApiV1Observability(
             email: user.email,
             image: user.image,
             athleteId: user.athlete_id,
-            stravaConnected: Boolean(account?.accessToken ?? account?.access_token),
+            stravaConnected: Boolean(
+              account?.accessToken ?? account?.access_token,
+            ),
           },
           authentication,
         );
@@ -57,7 +60,7 @@ export const GET = withApiV1Observability(
         logger.error('GET /api/v1/me failed', { error, requestId });
       },
     }),
-    { route: ROUTE },
+    { route: ROUTE, resolveUserId: resolveRateLimitUserId },
   ),
   { route: ROUTE },
 );

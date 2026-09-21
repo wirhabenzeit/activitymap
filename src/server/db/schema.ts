@@ -653,7 +653,8 @@ export type ShareLinkActivity = typeof shareLinkActivities.$inferSelect;
 // Postgres-backed table - consistent with this codebase's repository
 // pattern - is the self-hosted primitive rather than a new managed
 // service. `key` already encodes which limit it belongs to (e.g.
-// `session:<hash>` or `ip:<address>`, see `~/server/http/rate-limit.ts`),
+// `session:<hash>`, `user:<hash>`, or `ip:<hash>`, see
+// `~/server/http/rate-limit.ts`),
 // and `windowStart` is the fixed-window boundary a request's timestamp
 // falls into, so `(key, windowStart)` is exactly the counter a request
 // needs to atomically increment-and-read. Rows age out on their own; the
