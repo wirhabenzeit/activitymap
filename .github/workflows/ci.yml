@@ -22,6 +22,8 @@ jobs:
       - run: pnpm test
       - run: pnpm exec tsc --noEmit
       - run: pnpm lint
+      - name: Validate shared map catalogue and generated Swift
+        run: pnpm map-catalog:check
       - name: Fetch main for the OpenAPI breaking-change comparison
         run: git fetch origin +refs/heads/main:refs/remotes/origin/main --depth=1
       - name: Check for breaking OpenAPI changes vs main

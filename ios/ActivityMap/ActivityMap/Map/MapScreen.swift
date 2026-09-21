@@ -11,19 +11,29 @@ struct MapScreen: View {
     @State private var viewport: Viewport = .camera(center: defaultCenter, zoom: 6.5)
     @State private var isPitched = false
     @State private var baseStyle = BaseStyle.standard
-    @State private var activeOverlays: Set<OverlayStyle> = []
+    @State private var activeOverlays = Set(
+        SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault)
+    )
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Map(viewport: $viewport) {
                 if let raster = baseStyle.rasterSource {
-                    rasterSource(id: "selected-raster-base", url: raster.url)
+                    rasterSource(
+                        id: "selected-raster-base",
+                        url: raster.url,
+                        tileSize: raster.tileSize
+                    )
 
                     RasterLayer(id: "selected-raster-base-layer", source: "selected-raster-base")
                 }
 
-                ForEvery(OverlayStyle.allCases.filter(activeOverlays.contains)) { overlay in
-                    rasterSource(id: overlay.sourceID, url: overlay.url)
+                ForEvery(SharedMapCatalog.rasterOverlays.filter(activeOverlays.contains)) { overlay in
+                    rasterSource(
+                        id: overlay.sourceID,
+                        url: overlay.url,
+                        tileSize: overlay.tileSize
+                    )
 
                     RasterLayer(id: overlay.layerID, source: overlay.sourceID)
                         .rasterOpacity(overlay.opacity)
@@ -64,7 +74,7 @@ struct MapScreen: View {
             Menu {
                 Section("Base Map") {
                     Picker("Base Map", selection: $baseStyle) {
-                        ForEach(BaseStyle.allCases) { style in
+                        ForEach(BaseStyle.all) { style in
                             Label(style.title, systemImage: style.systemImage)
                                 .tag(style)
                         }
@@ -72,14 +82,14 @@ struct MapScreen: View {
                 }
 
                 Section("Overlays") {
-                    ForEach(OverlayStyle.allCases) { overlay in
+                    ForEach(SharedMapCatalog.rasterOverlays) { overlay in
                         Button {
                             toggleOverlay(overlay)
                         } label: {
                             if activeOverlays.contains(overlay) {
-                                Label(overlay.title, systemImage: "checkmark")
+                                Label(overlay.label, systemImage: "checkmark")
                             } else {
-                                Text(overlay.title)
+                                Text(overlay.label)
                             }
                         }
                     }
@@ -119,23 +129,17 @@ struct MapScreen: View {
     }
 
     private var attribution: String? {
-        var providers: [String] = []
+        var providers = activeOverlays.compactMap(\.attribution)
 
-        if let provider = baseStyle.attribution {
-            providers.append(provider)
-        }
-        if activeOverlays.contains(where: { $0.provider == .swisstopo }) {
-            providers.append("© swisstopo")
-        }
-        if activeOverlays.contains(where: { $0.provider == .nve }) {
-            providers.append("© NVE")
+        if let baseAttribution = baseStyle.attribution {
+            providers.append(baseAttribution)
         }
 
         let uniqueProviders = Array(Set(providers)).sorted()
         return uniqueProviders.isEmpty ? nil : uniqueProviders.joined(separator: "  •  ")
     }
 
-    private func toggleOverlay(_ overlay: OverlayStyle) {
+    private func toggleOverlay(_ overlay: SharedRasterOverlayDefinition) {
         if activeOverlays.contains(overlay) {
             activeOverlays.remove(overlay)
         } else {
@@ -143,10 +147,10 @@ struct MapScreen: View {
         }
     }
 
-    private func rasterSource(id: String, url: String) -> RasterSource {
+    private func rasterSource(id: String, url: String, tileSize: Double) -> RasterSource {
         var source = RasterSource(id: id)
             .tiles([url])
-        source.tileSize = 256
+        source.tileSize = tileSize
         return source
     }
 
@@ -162,168 +166,78 @@ struct MapScreen: View {
     }
 }
 
-private enum BaseStyle: String, CaseIterable, Identifiable {
-    case standard
-    case mapboxStreets
-    case mapboxStreets3D
-    case mapboxOutdoors
-    case mapboxLight
-    case mapboxTopoLight
-    case mapboxDark
-    case mapboxSatellite
-    case swisstopoVector
-    case swisstopoLight
-    case swisstopoWinter
-    case swisstopoSatellite
-    case swisstopoPixelMap
-    case swisstopoWinterRaster
-    case norgesKart
+private struct RasterConfiguration {
+    let url: String
+    let tileSize: Double
+}
 
-    var id: String { rawValue }
+private enum BaseStyle: Hashable, Identifiable {
+    case standard
+    case shared(SharedBaseMapDefinition)
+
+    static let all: [BaseStyle] = [.standard]
+        + SharedMapCatalog.baseMaps.map(BaseStyle.shared)
+
+    var id: String {
+        switch self {
+        case .standard:
+            "native.standard"
+        case let .shared(definition):
+            definition.id
+        }
+    }
 
     var title: String {
         switch self {
-        case .standard: "Standard"
-        case .mapboxStreets: "Mapbox Streets"
-        case .mapboxStreets3D: "Mapbox Streets 3D"
-        case .mapboxOutdoors: "Mapbox Outdoors"
-        case .mapboxLight: "Mapbox Light"
-        case .mapboxTopoLight: "Mapbox Topolight"
-        case .mapboxDark: "Mapbox Dark"
-        case .mapboxSatellite: "Mapbox Satellite"
-        case .swisstopoVector: "swisstopo Vector"
-        case .swisstopoLight: "swisstopo Light"
-        case .swisstopoWinter: "swisstopo Winter"
-        case .swisstopoSatellite: "swisstopo Satellite"
-        case .swisstopoPixelMap: "swisstopo Pixel Map"
-        case .swisstopoWinterRaster: "swisstopo Winter Raster"
-        case .norgesKart: "NorgesKart"
+        case .standard:
+            "Standard"
+        case let .shared(definition):
+            definition.label
         }
     }
 
     var systemImage: String {
-        switch self {
-        case .standard: "map"
-        case .mapboxSatellite, .swisstopoSatellite: "globe.americas"
-        case .mapboxOutdoors, .swisstopoWinter, .swisstopoWinterRaster: "mountain.2"
-        case .mapboxDark: "moon"
-        case .mapboxLight, .mapboxTopoLight, .swisstopoLight: "sun.max"
-        default: "map"
+        switch id {
+        case "mapboxSatellite", "swisstopoSatellite":
+            "globe.americas"
+        case "mapboxOutdoors", "swisstopoVectorWinter", "swisstopoWinter":
+            "mountain.2"
+        case "mapboxDark":
+            "moon"
+        case "mapboxLight", "mapboxTopolight", "swisstopoVectorLight":
+            "sun.max"
+        default:
+            "map"
         }
     }
 
     var styleURL: String? {
-        switch self {
-        case .standard, .swisstopoPixelMap, .swisstopoWinterRaster, .norgesKart:
-            nil
-        case .mapboxStreets:
-            "mapbox://styles/mapbox/streets-v12"
-        case .mapboxStreets3D:
-            "mapbox://styles/wirhabenzeit/clk6y6c1q00lk01pe8fqs0urn"
-        case .mapboxOutdoors:
-            "mapbox://styles/mapbox/outdoors-v12"
-        case .mapboxLight:
-            "mapbox://styles/mapbox/light-v11"
-        case .mapboxTopoLight:
-            "mapbox://styles/wirhabenzeit/clk0tpduc00ab01qyguzi09gv"
-        case .mapboxDark:
-            "mapbox://styles/mapbox/dark-v11"
-        case .mapboxSatellite:
-            "mapbox://styles/mapbox/satellite-v9"
-        case .swisstopoVector:
-            "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json"
-        case .swisstopoLight:
-            "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json"
-        case .swisstopoWinter:
-            "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap-winter.vt/style.json"
-        case .swisstopoSatellite:
-            "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.leichte-basiskarte-imagery.vt/style.json"
+        guard case let .shared(definition) = self,
+              case let .style(url) = definition.source else {
+            return nil
         }
+        return url
     }
 
     var rasterSource: RasterConfiguration? {
-        switch self {
-        case .swisstopoPixelMap:
-            RasterConfiguration(url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg")
-        case .swisstopoWinterRaster:
-            RasterConfiguration(url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe-winter/default/current/3857/{z}/{x}/{y}.jpeg")
-        case .norgesKart:
-            RasterConfiguration(url: "https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png")
-        default:
-            nil
+        guard case let .shared(definition) = self,
+              case let .raster(url, tileSize) = definition.source else {
+            return nil
         }
+        return RasterConfiguration(url: url, tileSize: tileSize)
     }
 
     var attribution: String? {
         switch self {
-        case .swisstopoVector, .swisstopoLight, .swisstopoWinter, .swisstopoSatellite,
-             .swisstopoPixelMap, .swisstopoWinterRaster:
-            "© swisstopo"
-        case .norgesKart:
-            "© Kartverket"
-        default:
+        case .standard:
             nil
+        case let .shared(definition):
+            definition.attribution
         }
     }
 }
 
-private struct RasterConfiguration {
-    let url: String
-}
-
-private enum OverlayProvider {
-    case swisstopo
-    case nve
-}
-
-private enum OverlayStyle: String, CaseIterable, Identifiable {
-    case swisstopoSki
-    case nveAvalanche
-    case swisstopoSlope
-    case veloland
-    case wanderland
-
-    var id: String { rawValue }
-    var sourceID: String { "\(rawValue)-source" }
-    var layerID: String { "\(rawValue)-layer" }
-
-    var title: String {
-        switch self {
-        case .swisstopoSki: "swisstopo Ski"
-        case .nveAvalanche: "NVE Avalanche"
-        case .swisstopoSlope: "swisstopo Slope"
-        case .veloland: "Veloland"
-        case .wanderland: "Wanderland"
-        }
-    }
-
-    var url: String {
-        switch self {
-        case .swisstopoSki:
-            "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/{z}/{x}/{y}.png"
-        case .nveAvalanche:
-            "https://gis3.nve.no/arcgis/rest/services/wmts/Bratthet_med_utlop_2024/MapServer/tile/{z}/{y}/{x}"
-        case .swisstopoSlope:
-            "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/{z}/{x}/{y}.png"
-        case .veloland:
-            "https://wmts.geo.admin.ch/1.0.0/ch.astra.veloland/default/current/3857/{z}/{x}/{y}.png"
-        case .wanderland:
-            "https://wmts.geo.admin.ch/1.0.0/ch.astra.wanderland/default/current/3857/{z}/{x}/{y}.png"
-        }
-    }
-
-    var opacity: Double {
-        switch self {
-        case .swisstopoSki: 0.8
-        case .nveAvalanche: 0.2
-        case .swisstopoSlope, .veloland, .wanderland: 0.4
-        }
-    }
-
-    var provider: OverlayProvider {
-        switch self {
-        case .nveAvalanche: .nve
-        default: .swisstopo
-        }
-    }
+private extension SharedRasterOverlayDefinition {
+    var sourceID: String { "\(id)-source" }
+    var layerID: String { "\(id)-layer" }
 }

@@ -359,8 +359,9 @@ export default function InteractiveMap() {
                 key={mapName + 'source'}
                 id={mapName}
                 type="raster"
-                tiles={mapSetting.url ? [mapSetting.url] : []}
-                tileSize={256}
+                tiles={[mapSetting.url]}
+                tileSize={mapSetting.tileSize}
+                attribution={mapSetting.attribution}
               >
                 <Layer
                   key={mapName + 'layer'}
@@ -468,8 +469,9 @@ export default function InteractiveMap() {
         {mapSettingBase?.type === 'raster' && (
           <Source
             type="raster"
-            tiles={mapSettingBase.url ? [mapSettingBase.url] : []}
-            tileSize={128}
+            tiles={[mapSettingBase.url]}
+            tileSize={mapSettingBase.tileSize}
+            attribution={mapSettingBase.attribution}
           >
             <Layer id="baseMap" type="raster" paint={{ 'raster-opacity': 1 }} />
           </Source>
