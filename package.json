@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm db:migrate:preview && next build",
-    "dev": "next dev --turbo",
+    "dev": "pnpm db:migrate && next dev --turbo",
     "lint": "eslint .",
     "start": "next start",
     "db:generate": "drizzle-kit generate",
@@ -13,6 +13,7 @@
     "db:migrate": "tsx scripts/database/migrate.ts apply",
     "db:migrate:status": "tsx scripts/database/migrate.ts status",
     "db:migrate:check": "tsx scripts/database/migrate.ts check",
+    "db:migrate:test-geometry-state": "tsx scripts/database/test-geometry-state-migration.ts",
     "db:migrate:test-webhook": "tsx scripts/database/test-webhook-inbox-migration.ts",
     "db:test-erasure": "tsx --conditions=react-server scripts/database/test-erasure-executor.ts",
     "db:test-summary-reconciliation": "tsx --conditions=react-server scripts/database/test-summary-reconciliation.ts",

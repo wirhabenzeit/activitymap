@@ -160,20 +160,25 @@ async function seed(): Promise<void> {
       total_elevation_gain: 100,
       sport_type: 'Run',
       start_date: new Date('2026-01-01T08:00:00Z'),
-      start_date_local: new Date('2026-01-01T09:00:00Z'),
+      // Production-shaped legacy value: the old transformer reparsed the
+      // activity wall clock in the host timezone, so this differs from the
+      // corrected Strava `start_date_local` value used by the incoming page.
+      start_date_local: new Date('2026-01-01T08:00:00Z'),
       timezone: '(GMT+01:00) Europe/Zurich',
-      start_latlng: [47, 8],
-      end_latlng: [47.1, 8.1],
+      start_latlng: [46.999, 7.999],
+      end_latlng: [47.101, 8.101],
       photo_count: 1,
       total_photo_count: 1,
       map_id: `map-${ACTIVITY_IDS[0]}`,
       map_polyline: 'stored-detailed-polyline',
       map_summary_polyline: '_ibE_seK_seK_seK',
       map_bbox: [2, 1, 4, 3],
+      // This is the deterministic result of the NOT NULL migration's
+      // `is_complete` backfill before the first summary reconciliation.
       geometryState: 'detailed',
       photosState: 'current',
-      lastSummarySeenAt: new Date('2026-09-01T00:00:00Z'),
-      lastDetailedFetchedAt: new Date('2026-09-01T00:00:00Z'),
+      lastSummarySeenAt: null,
+      lastDetailedFetchedAt: null,
       is_complete: true,
     },
     ...ACTIVITY_IDS.slice(1, 3).map((id) => ({

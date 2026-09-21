@@ -66,6 +66,8 @@ jobs:
         run: pnpm db:migrations:check
       - name: Exercise webhook backfill with legacy duplicates
         run: pnpm db:migrate:test-webhook
+      - name: Exercise geometry-state backfill with legacy rows
+        run: pnpm db:migrate:test-geometry-state
       - name: Apply all migrations to empty Postgres
         run: pnpm db:migrate
       - name: Verify current migration state

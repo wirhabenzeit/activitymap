@@ -97,18 +97,13 @@ function valuesEqual(left: unknown, right: unknown): boolean {
   return left === right;
 }
 
-const GEOMETRY_FIELDS = [
-  'distance',
-  'moving_time',
-  'elapsed_time',
-  'start_date',
-  'start_date_local',
-  'timezone',
-  'start_latlng',
-  'end_latlng',
+// Only fields that identify the route may invalidate a stored detailed
+// polyline. Summary-authoritative metadata (times, distance, elevation and
+// endpoint coordinates) is updated in place: it can be reformatted, corrected
+// or privacy-filtered without making the detailed route stale.
+const ROUTE_FINGERPRINT_FIELDS = [
   'map_id',
   'map_summary_polyline',
-  'map_bbox',
 ] as const satisfies readonly (keyof Activity)[];
 
 const PHOTO_FIELDS = [
@@ -122,10 +117,6 @@ function changed(
   fields: readonly (keyof Activity)[],
 ): boolean {
   return fields.some((field) => !valuesEqual(existing[field], incoming[field]));
-}
-
-function effectiveGeometryState(activity: Activity) {
-  return activity.geometryState ?? (activity.is_complete ? 'detailed' : 'summary');
 }
 
 /**
@@ -146,9 +137,9 @@ export function mergeSummaryActivity(
 
   if (!existing) return incoming;
 
-  const geometryChanged = changed(existing, incoming, GEOMETRY_FIELDS);
+  const geometryChanged = changed(existing, incoming, ROUTE_FINGERPRINT_FIELDS);
   const photosChanged = changed(existing, incoming, PHOTO_FIELDS);
-  const priorGeometryState = effectiveGeometryState(existing);
+  const priorGeometryState = existing.geometryState;
 
   return {
     ...existing,

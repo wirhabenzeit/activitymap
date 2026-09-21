@@ -200,8 +200,8 @@ export const activities = pgTable(
     last_updated: timestamp('last_updated', { mode: 'date' }).defaultNow(),
     // Component freshness contract for the v1 sync API. Production coverage
     // was completed and audited before #126 retired the DTO fallback. The
-    // columns remain nullable only until the follow-up contract migration.
-    geometryState: geometryStateEnum('geometry_state'),
+    // A migration backfills legacy rows before enforcing this invariant.
+    geometryState: geometryStateEnum('geometry_state').notNull(),
     photosState: photosStateEnum('photos_state'),
     lastSummarySeenAt: timestamp('last_summary_seen_at', { mode: 'date' }),
     lastDetailedFetchedAt: timestamp('last_detailed_fetched_at', {
