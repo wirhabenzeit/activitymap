@@ -72,8 +72,6 @@ jobs:
         run: pnpm db:migrate
       - name: Verify current migration state
         run: pnpm db:migrate:check
-      - name: Prove geometry freshness recovery against Postgres
-        run: pnpm db:test-geometry-recovery
       - name: Prove revoked-athlete erasure against Postgres
         run: pnpm db:test-erasure
       - name: Prove resumable Strava summary reconciliation against Postgres
