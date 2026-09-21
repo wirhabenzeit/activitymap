@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { requestIdFor } from '~/server/http/request-id';
+
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
 import {
@@ -27,12 +29,6 @@ export interface ListSessionsHandlerDependencies {
   resolveSessions: (
     headers: Headers,
   ) => Promise<{ currentToken: string; sessions: SessionListEntry[] } | null>;
-}
-
-function requestIdFor(request: Request, createRequestId: () => string): string {
-  const suppliedRequestId = request.headers.get('x-request-id')?.trim();
-  if (suppliedRequestId) return suppliedRequestId;
-  return createRequestId();
 }
 
 function toSessionDTO(

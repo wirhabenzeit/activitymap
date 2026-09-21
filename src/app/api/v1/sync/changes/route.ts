@@ -4,15 +4,19 @@ import { changesRepository } from '~/server/repositories/changes';
 import { photosRepository } from '~/server/repositories/photos';
 import { logger } from '~/server/logging/logger';
 import { summaryReconciliationRepository } from '~/server/repositories/summary-reconciliation';
+import { withApiV1Observability } from '~/server/api/observability';
 import { createSyncChangesHandler } from './handler';
 
-export const GET = createSyncChangesHandler({
-  resolveActor: (request) => resolveActor(request.headers),
-  activitiesRepo: activitiesRepository,
-  photosRepo: photosRepository,
-  changesRepo: changesRepository,
-  freshnessRepo: summaryReconciliationRepository,
-  onError: (error, requestId) => {
-    logger.error('GET /api/v1/sync/changes failed', { error, requestId });
-  },
-});
+export const GET = withApiV1Observability(
+  createSyncChangesHandler({
+    resolveActor: (request) => resolveActor(request.headers),
+    activitiesRepo: activitiesRepository,
+    photosRepo: photosRepository,
+    changesRepo: changesRepository,
+    freshnessRepo: summaryReconciliationRepository,
+    onError: (error, requestId) => {
+      logger.error('GET /api/v1/sync/changes failed', { error, requestId });
+    },
+  }),
+  { route: 'GET /api/v1/sync/changes' },
+);

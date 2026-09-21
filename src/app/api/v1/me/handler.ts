@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { requestIdFor } from '~/server/http/request-id';
+
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
 import {
@@ -12,12 +14,6 @@ export interface CurrentUserHandlerDependencies {
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
   resolveCurrentUser: (request: Request) => Promise<CurrentUserDTOv1 | null>;
-}
-
-function requestIdFor(request: Request, createRequestId: () => string): string {
-  const suppliedRequestId = request.headers.get('x-request-id')?.trim();
-  if (suppliedRequestId) return suppliedRequestId;
-  return createRequestId();
 }
 
 /**

@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { requestIdFor } from '~/server/http/request-id';
+
 import type { Actor } from '~/server/auth/actor';
 import { toActivityDTO } from '~/contracts/v1/activity';
 import { toPhotoDTO } from '~/contracts/v1/photo';
@@ -32,12 +34,6 @@ export interface SyncBootstrapHandlerDependencies {
   freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
   retentionDays?: number;
-}
-
-function requestIdFor(request: Request, createRequestId: () => string): string {
-  const suppliedRequestId = request.headers.get('x-request-id')?.trim();
-  if (suppliedRequestId) return suppliedRequestId;
-  return createRequestId();
 }
 
 /**

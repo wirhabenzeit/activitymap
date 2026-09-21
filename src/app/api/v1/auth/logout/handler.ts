@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { requestIdFor } from '~/server/http/request-id';
+
 import { makeEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
 
@@ -20,12 +22,6 @@ export interface LogoutHandlerDependencies {
    * via `auth.api.revokeSession`.
    */
   revokeSessionByToken: (token: string, headers: Headers) => Promise<void>;
-}
-
-function requestIdFor(request: Request, createRequestId: () => string): string {
-  const suppliedRequestId = request.headers.get('x-request-id')?.trim();
-  if (suppliedRequestId) return suppliedRequestId;
-  return createRequestId();
 }
 
 /**
