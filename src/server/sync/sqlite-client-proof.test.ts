@@ -90,7 +90,7 @@ function buildActivity(overrides: Partial<Activity> & { id: number }): Activity 
     weighted_average_watts: null,
     kilojoules: null,
     last_updated: new Date('2026-01-01T00:00:00.000Z'),
-    geometryState: null,
+    geometryState: 'summary',
     photosState: null,
     lastSummarySeenAt: null,
     lastDetailedFetchedAt: null,

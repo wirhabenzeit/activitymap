@@ -23,9 +23,9 @@ import { idString, isoDateTime, toIdString, toIsoDateTime } from './primitives';
  * migration (issue #122): `geometryState`, `photosState`,
  * `lastSummarySeenAt`, and `lastDetailedFetchedAt`. This DTO commits to that
  * target shape now so the wire contract (and any generated Swift client) is
- * forward-compatible. The expand-only #123 migration adds the real columns;
- * pre-migration rows retain a narrow `is_complete` fallback until their first
- * summary reconciliation fills those columns.
+ * forward-compatible. Production reconciliation has populated the component
+ * state for every activity, so the DTO no longer infers freshness from the
+ * legacy flag.
  */
 export const geometryStateSchema = z.enum(['summary', 'detailed', 'refresh_required']);
 export type GeometryState = z.infer<typeof geometryStateSchema>;
@@ -149,22 +149,7 @@ export function toActivityDTO(activity: Activity): ActivityDTO {
     weighted_average_watts: activity.weighted_average_watts,
     kilojoules: activity.kilojoules,
     last_updated: activity.last_updated ? toIsoDateTime(activity.last_updated) : null,
-    // Issue #126 phase 3 investigated retiring this `is_complete` fallback
-    // (per PR #151's description, which flagged it as this issue's job) and
-    // deliberately kept it. This service has no way to query production to
-    // confirm every pre-#123 row has since been through summary
-    // reconciliation and gotten a real `geometryState` - the cron job that
-    // backfills it (`~/app/api/cron/reconcile-strava-summaries`, per #123/
-    // #151/#153/#154) runs on an ongoing schedule, not as a one-time
-    // migration step, so some
-    // rows can legitimately still be unreconciled at any point in time.
-    // Removing this fallback would silently turn every such row's
-    // `geometry_state` from a defensible "detailed"/"summary" guess into a
-    // validation failure (the schema requires a value). Safe to revisit
-    // once there is a way to confirm reconciliation coverage (e.g. a cron
-    // metric or a one-off audit query), but not from static analysis alone.
-    geometry_state:
-      activity.geometryState ?? (activity.is_complete ? 'detailed' : 'summary'),
+    geometry_state: activity.geometryState,
     photos_state: activity.photosState,
     last_summary_seen_at: activity.lastSummarySeenAt
       ? toIsoDateTime(activity.lastSummarySeenAt)

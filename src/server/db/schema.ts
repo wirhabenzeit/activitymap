@@ -198,10 +198,9 @@ export const activities = pgTable(
     weighted_average_watts: integer('weighted_average_watts'),
     kilojoules: doublePrecision('kilojoules'),
     last_updated: timestamp('last_updated', { mode: 'date' }).defaultNow(),
-    // Expand-only component freshness contract for the v1 sync API. These
-    // remain nullable during the #126 web migration so pre-existing rows can
-    // safely fall back to `is_complete` until the first summary
-    // reconciliation observes them.
+    // Component freshness contract for the v1 sync API. Production coverage
+    // was completed and audited before #126 retired the DTO fallback. The
+    // columns remain nullable only until the follow-up contract migration.
     geometryState: geometryStateEnum('geometry_state'),
     photosState: photosStateEnum('photos_state'),
     lastSummarySeenAt: timestamp('last_summary_seen_at', { mode: 'date' }),

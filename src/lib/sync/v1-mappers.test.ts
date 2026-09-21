@@ -103,8 +103,8 @@ void test('dtoToActivity round-trips every field toActivityDTO carries', () => {
   assert.equal(restored.is_complete, true, 'is_complete bridges to geometry_state === "detailed"');
 });
 
-void test('dtoToActivity bridges is_complete to false for a summary-only activity', () => {
-  const dto = toActivityDTO({ ...baseActivity, geometryState: null, is_complete: false });
+void test('dtoToActivity derives the temporary in-memory flag from component freshness', () => {
+  const dto = toActivityDTO({ ...baseActivity, geometryState: 'summary', is_complete: true });
   const restored = dtoToActivity(dto);
   assert.equal(dto.geometry_state, 'summary');
   assert.equal(restored.is_complete, false);

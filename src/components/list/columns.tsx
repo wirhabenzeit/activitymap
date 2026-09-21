@@ -153,17 +153,15 @@ export const columns: ColumnDef<Features, Activity>[] = [
     },
   },
   {
-    id: 'is_complete',
-    accessorKey: 'is_complete',
-    meta: { title: 'Complete', width: 'minmax(80px, 1fr)' },
+    id: 'geometry_state',
+    accessorKey: 'geometryState',
+    meta: { title: 'Geometry', width: 'minmax(100px, 1fr)' },
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Complete" />
+      <DataTableColumnHeader column={column} title="Geometry" />
     ),
     cell: ({ getValue }) => {
-      const isComplete = getValue() as boolean;
-      return (
-        <div className="text-right w-full">{isComplete ? 'Yes' : 'No'}</div>
-      );
+      const geometryState = getValue() as Activity['geometryState'];
+      return <div className="text-right w-full">{geometryState ?? 'Unknown'}</div>;
     },
   },
   {
