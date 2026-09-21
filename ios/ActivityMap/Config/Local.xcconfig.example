@@ -1,0 +1,2 @@
+// Copy this file to Local.xcconfig and use a URL-restricted public token.
+MAPBOX_ACCESS_TOKEN = pk.your-public-mapbox-token

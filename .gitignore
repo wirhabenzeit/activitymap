@@ -35,6 +35,13 @@ next-env.d.ts
 .DS_Store
 *.pem
 
+# Xcode / Swift
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.build/
+/ios/ActivityMap/Config/Local.xcconfig
+
 # debug
 npm-debug.log*
 yarn-debug.log*
