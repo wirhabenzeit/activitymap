@@ -1,0 +1,3 @@
+// The token is public at runtime but must be supplied outside version control.
+MAPBOX_ACCESS_TOKEN =
+#include? "Local.xcconfig"
