@@ -327,3 +327,82 @@ void test('GET /api/v1/sync/bootstrap includes retention and completed-summary f
     reconciledAt.toISOString(),
   );
 });
+
+void test('GET /api/v1/sync/bootstrap pagination boundary: a page exactly filling the limit still returns a non-null nextCursor, and the following page is empty with nextCursor null', async () => {
+  // Off-by-one risk: if the handler mistook "returned exactly `limit` rows"
+  // for "there might be more" only when it happened to be followed by a
+  // partial page, a dataset whose size is an exact multiple of the page
+  // size could terminate one page too early and silently drop the last
+  // page's worth of rows.
+  const limit = 5;
+  const activities = Array.from({ length: limit }, (_, i) => buildActivity({ id: i + 1 }));
+  const GET = createSyncBootstrapHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo(activities),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo(0),
+  });
+
+  const first = await GET(
+    new Request(`https://example.test/api/v1/sync/bootstrap?limit=${limit}`),
+  );
+  const firstBody = (await first.json()) as {
+    data: { items: { id: string }[]; nextCursor: string | null };
+  };
+  assert.equal(firstBody.data.items.length, limit);
+  assert.ok(
+    firstBody.data.nextCursor,
+    'a full page must still signal "there might be more" via a non-null nextCursor',
+  );
+
+  const second = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/bootstrap?limit=${limit}&cursor=${encodeURIComponent(firstBody.data.nextCursor)}`,
+    ),
+  );
+  const secondBody = (await second.json()) as {
+    data: { items: unknown[]; nextCursor: string | null };
+  };
+  assert.deepEqual(secondBody.data.items, []);
+  assert.equal(secondBody.data.nextCursor, null);
+});
+
+void test('GET /api/v1/sync/bootstrap holds up for a large account: thousands of activities paginate completely, in order, with no duplicates or gaps', async () => {
+  const TOTAL = 4237; // Deliberately not a round number or a multiple of the page size.
+  const limit = 200;
+  const activities = Array.from({ length: TOTAL }, (_, i) => buildActivity({ id: i + 1 }));
+  const GET = createSyncBootstrapHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo(activities),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo(0),
+  });
+
+  const seenIds: number[] = [];
+  let cursor: string | undefined;
+  let pages = 0;
+  const MAX_PAGES = Math.ceil(TOTAL / limit) + 1;
+  do {
+    const url = new URL('https://example.test/api/v1/sync/bootstrap');
+    url.searchParams.set('limit', String(limit));
+    if (cursor) url.searchParams.set('cursor', cursor);
+    const response = await GET(new Request(url));
+    const body = (await response.json()) as {
+      data: { items: { id: string }[]; nextCursor: string | null };
+    };
+    for (const item of body.data.items) seenIds.push(Number(item.id));
+    cursor = body.data.nextCursor ?? undefined;
+    pages += 1;
+    assert.ok(pages <= MAX_PAGES, 'pagination must terminate within the expected number of pages');
+  } while (cursor);
+
+  assert.equal(seenIds.length, TOTAL, 'every activity must be returned exactly once');
+  assert.equal(new Set(seenIds).size, TOTAL, 'no activity id may repeat across pages');
+  assert.deepEqual(
+    seenIds,
+    activities.map((a) => a.id),
+    'activities must retain repository order across page boundaries',
+  );
+});

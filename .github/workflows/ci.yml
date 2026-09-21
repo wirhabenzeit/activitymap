@@ -74,6 +74,8 @@ jobs:
         run: pnpm db:migrate:check
       - name: Prove revoked-athlete erasure against Postgres
         run: pnpm db:test-erasure
+      - name: Prove revoked accounts are excluded from legacy activity sync
+        run: pnpm db:test-legacy-sync-selection
       - name: Prove resumable Strava summary reconciliation against Postgres
         run: pnpm db:test-summary-reconciliation
       - name: Prove a second migration run is a no-op

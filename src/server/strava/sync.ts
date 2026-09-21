@@ -1,4 +1,4 @@
-import { eq, isNotNull, desc, and, asc } from 'drizzle-orm';
+import { eq, desc, and, asc } from 'drizzle-orm';
 import { db } from '~/server/db';
 import { activities, activitySync, users } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
@@ -8,6 +8,7 @@ import {
   activitiesRepository,
   type ActivitiesRepository,
 } from '~/server/repositories/activities';
+import { legacyActivitySyncRepository } from '~/server/repositories/legacy-activity-sync';
 
 export type SyncActivityOptions = {
   maxActivities?: number; // Total max activities to process (default: 50)
@@ -43,11 +44,24 @@ export async function syncActivities(
   const reachedOldest: string[] = [];
   const errors: Record<string, string> = {};
 
-  // Step 1: Get all users with Strava accounts to process
-  const usersToProcess = await db
-    .select()
-    .from(users)
-    .where(isNotNull(users.athlete_id));
+  // Step 1: Get all users with Strava accounts to process.
+  //
+  // Excludes an athlete whose Strava account has been deauthorized
+  // (`accounts.revokedAt` set - see `~/server/strava/webhook.ts`'s
+  // `handleAthleteDeauthorization`, issue #125): per
+  // docs/strava-data-policy.md §3, once revoked this application must
+  // "stop using the stored token - do not attempt another refresh or API
+  // call with it". Filtering here, before `getAccountInternal` is ever
+  // called for this user, is what actually enforces that - by the time a
+  // token-refresh attempt inside `getAccountInternal` could fail, the
+  // no-refresh rule has already been violated. This mirrors the same
+  // `isNull(accounts.revokedAt)` guard
+  // `~/server/repositories/summary-reconciliation.ts`'s `listDue`/`claim`
+  // already apply to the periodic summary-reconciliation cron.
+  //
+  // The repository owns the exact production query and is exercised by a
+  // guarded PostgreSQL proof in CI.
+  const usersToProcess = await legacyActivitySyncRepository.listEligibleUsers();
 
 
 

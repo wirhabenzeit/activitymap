@@ -2,6 +2,7 @@ import 'server-only';
 
 import { auth } from '~/lib/auth';
 import { getUserInternal, UserNotFoundError } from '~/server/db/internal';
+import type { User } from '~/server/db/schema';
 
 /**
  * The authenticated caller of an application service.
@@ -25,6 +26,24 @@ export class UnauthenticatedError extends Error {
   }
 }
 
+type BetterAuthSession = { user?: { id?: string | null } | null } | null | undefined;
+
+/**
+ * Injectable dependencies for `resolveActor`/`requireActor` (issue #127).
+ * Both default to the real Better Auth session lookup and the real user
+ * repository, so every existing call site (`resolveActor(request.headers)`)
+ * is unaffected; tests can override either to exercise "no actor" cases
+ * (an expired or revoked session, no local user row, no linked athlete)
+ * without a live database or a real Better Auth session store. An expired
+ * or revoked Better Auth session is exactly what `getSession` itself
+ * resolves to `null`/`undefined` for - this module's job at that boundary
+ * is just to treat that as "no actor", which is what these tests prove.
+ */
+export type ActorDependencies = {
+  getSession?: (headers: Headers) => Promise<BetterAuthSession>;
+  getUser?: (userId: string) => Promise<Pick<User, 'athlete_id'> | null>;
+};
+
 /**
  * Resolve the authenticated Actor for a request from its headers only - the
  * same "no credential in the URL" rule as `resolveRequestSession` (see
@@ -39,15 +58,24 @@ export class UnauthenticatedError extends Error {
  * in the first place - see `~/server/auth/mobile.ts` for that extension
  * point. Resolution here does not need a separate "not implemented" branch.
  */
-export async function resolveActor(headers: Headers): Promise<Actor | null> {
-  const session = await auth.api.getSession({ headers });
+export async function resolveActor(
+  headers: Headers,
+  deps: ActorDependencies = {},
+): Promise<Actor | null> {
+  const getSession = deps.getSession ?? ((h) => auth.api.getSession({ headers: h }));
+  const getUser = deps.getUser ?? getUserInternal;
+
+  const session = await getSession(headers);
   if (!session?.user?.id) {
+    // Also what Better Auth itself resolves an expired or revoked session
+    // to - `getSession` returns null/undefined rather than a stale object,
+    // so this branch is what actually rejects those, not a separate check.
     return null;
   }
 
   let athleteId: number | null = null;
   try {
-    const user = await getUserInternal(session.user.id);
+    const user = await getUser(session.user.id);
     athleteId = user?.athlete_id ?? null;
   } catch (error) {
     if (error instanceof UserNotFoundError) {
@@ -79,8 +107,11 @@ export async function resolveActor(headers: Headers): Promise<Actor | null> {
  * there isn't one. Transport code (Route Handlers, Server Actions) calls
  * this and then passes the resulting `Actor` into an application service.
  */
-export async function requireActor(headers: Headers): Promise<Actor> {
-  const actor = await resolveActor(headers);
+export async function requireActor(
+  headers: Headers,
+  deps: ActorDependencies = {},
+): Promise<Actor> {
+  const actor = await resolveActor(headers, deps);
   if (!actor) {
     throw new UnauthenticatedError();
   }
