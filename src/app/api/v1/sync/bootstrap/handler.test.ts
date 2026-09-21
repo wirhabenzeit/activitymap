@@ -401,7 +401,8 @@ void test('GET /api/v1/sync/bootstrap holds up for a large account: thousands of
   assert.equal(seenIds.length, TOTAL, 'every activity must be returned exactly once');
   assert.equal(new Set(seenIds).size, TOTAL, 'no activity id may repeat across pages');
   assert.deepEqual(
-    [...seenIds].sort((a, b) => a - b),
+    seenIds,
     activities.map((a) => a.id),
+    'activities must retain repository order across page boundaries',
   );
 });

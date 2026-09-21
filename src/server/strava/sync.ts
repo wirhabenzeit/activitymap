@@ -1,6 +1,6 @@
-import { eq, isNotNull, desc, and, asc, notExists, sql } from 'drizzle-orm';
+import { eq, desc, and, asc } from 'drizzle-orm';
 import { db } from '~/server/db';
-import { accounts, activities, activitySync, users } from '~/server/db/schema';
+import { activities, activitySync, users } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
 import { logger } from '~/server/logging/logger';
 import { fetchStravaActivities } from './service';
@@ -8,6 +8,7 @@ import {
   activitiesRepository,
   type ActivitiesRepository,
 } from '~/server/repositories/activities';
+import { legacyActivitySyncRepository } from '~/server/repositories/legacy-activity-sync';
 
 export type SyncActivityOptions = {
   maxActivities?: number; // Total max activities to process (default: 50)
@@ -58,29 +59,9 @@ export async function syncActivities(
   // `~/server/repositories/summary-reconciliation.ts`'s `listDue`/`claim`
   // already apply to the periodic summary-reconciliation cron.
   //
-  // A `NOT EXISTS` subquery, not a join, so this query's result shape stays
-  // exactly the flat `users` row the rest of this function already expects
-  // (a join would nest the result under per-table keys).
-  const usersToProcess = await db
-    .select()
-    .from(users)
-    .where(
-      and(
-        isNotNull(users.athlete_id),
-        notExists(
-          db
-            .select({ one: sql`1` })
-            .from(accounts)
-            .where(
-              and(
-                eq(accounts.userId, users.id),
-                eq(accounts.providerId, 'strava'),
-                isNotNull(accounts.revokedAt),
-              ),
-            ),
-        ),
-      ),
-    );
+  // The repository owns the exact production query and is exercised by a
+  // guarded PostgreSQL proof in CI.
+  const usersToProcess = await legacyActivitySyncRepository.listEligibleUsers();
 
 
 
