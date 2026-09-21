@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { requestIdFor } from '~/server/http/request-id';
+
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
 import {
@@ -27,12 +29,6 @@ export interface MobileExchangeHandlerDependencies {
    * header - the same path a mobile client's later requests take.
    */
   resolveBearerSessionExpiry: (bearerToken: string) => Promise<Date | null>;
-}
-
-function requestIdFor(request: Request, createRequestId: () => string): string {
-  const suppliedRequestId = request.headers.get('x-request-id')?.trim();
-  if (suppliedRequestId) return suppliedRequestId;
-  return createRequestId();
 }
 
 /** All `MobileAuthError` codes are authentication failures: 401. */

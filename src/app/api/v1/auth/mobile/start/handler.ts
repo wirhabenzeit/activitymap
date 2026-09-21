@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { requestIdFor } from '~/server/http/request-id';
+
 import { errorEnvelope } from '~/contracts/v1/error';
 import {
   isAllowedMobileRedirectUri,
@@ -22,12 +24,6 @@ export interface MobileAuthStartHandlerDependencies {
     callbackURL: string;
     headers: Headers;
   }) => Promise<{ url: string } | null>;
-}
-
-function requestIdFor(request: Request, createRequestId: () => string): string {
-  const suppliedRequestId = request.headers.get('x-request-id')?.trim();
-  if (suppliedRequestId) return suppliedRequestId;
-  return createRequestId();
 }
 
 /**
