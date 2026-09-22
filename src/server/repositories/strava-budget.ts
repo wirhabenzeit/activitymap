@@ -45,6 +45,7 @@ const startOf = (now: Date, duration: number) =>
 export function createStravaRequestBudget(
   database: typeof db = db,
   clock = () => new Date(),
+  reserves?: { fifteenMinutes: number; daily: number },
 ): StravaRequestBudget {
   return {
     async reserve(read) {
@@ -74,7 +75,17 @@ export function createStravaRequestBudget(
           const reset = windowStart.getTime() + window.duration;
           if (
             (blockedUntil && blockedUntil > startedAt) ||
-            used >= Math.max(0, ceiling - window.reserve)
+            used >=
+              Math.max(
+                0,
+                ceiling -
+                  Math.max(
+                    window.reserve,
+                    (window.duration === 900_000
+                      ? reserves?.fifteenMinutes
+                      : reserves?.daily) ?? 0,
+                  ),
+              )
           ) {
             throw new StravaBudgetExceededError(
               Math.max(

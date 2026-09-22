@@ -99,6 +99,20 @@
       "when": 1790086905855,
       "tag": "0013_stream-availability-metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790097990224,
+      "tag": "0014_stream-backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790108735984,
+      "tag": "0015_stream-backfill-account-block",
+      "breakpoints": true
     }
   ]
 }

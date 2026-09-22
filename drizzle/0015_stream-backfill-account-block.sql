@@ -1,0 +1,1 @@
+ALTER TABLE "stream_backfill_account" ADD COLUMN "blocked_credentials" text;

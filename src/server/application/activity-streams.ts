@@ -4,12 +4,14 @@ import {
   type StravaRequestBudget,
 } from '~/server/strava/request-budget';
 import { STREAM_REQUEST_TIMEOUT_MS } from '~/server/strava/stream-policy';
+import { StreamBackfillStopped } from '~/server/strava/stream-backfill-policy';
 
 import { ZodError } from 'zod';
 import type { Actor } from '~/server/auth/actor';
 import {
   createActivityStreamsRepository,
   type ActivityStreamsRepository,
+  type StreamFetchClaim,
 } from '~/server/repositories/activity-streams';
 import {
   StravaApiError,
@@ -84,12 +86,16 @@ export const createStreamSource: StreamSourceFactory = ({
   throw new StravaApiError('No usable Strava credentials', 401);
 };
 
-/** Shared bounded ingestion for the v1 endpoint and the future #184 worker. */
+/** Shared bounded ingestion for the v1 endpoint and the historical backfill worker. */
 export async function fetchActivityStreams(
   actor: Actor,
   activityId: string,
   options: {
     force?: boolean;
+    requestBudget?: StravaRequestBudget;
+    signal?: AbortSignal;
+    assertActive?: () => Promise<void>;
+    onClaim?: (claim: StreamFetchClaim) => Promise<void>;
     repository?: ActivityStreamsRepository;
     createSource?: StreamSourceFactory;
     now?: () => Date;
@@ -99,6 +105,8 @@ export async function fetchActivityStreams(
   streamActivityIdSchema.parse(activityId);
   const repository = options.repository ?? createActivityStreamsRepository();
   const now = options.now ?? (() => new Date());
+  await options.assertActive?.();
+  options.signal?.throwIfAborted();
   const attempt = await repository.begin(
     actor,
     activityId,
@@ -110,13 +118,22 @@ export async function fetchActivityStreams(
   let claim = attempt.claim;
   let payload;
   try {
+    await options.onClaim?.(claim);
     const source = (options.createSource ?? createStreamSource)({
       tokens: attempt.tokens,
+      requestBudget: options.requestBudget,
       beforeRequest: async () => {
         if (!(await repository.isCurrent(claim)))
           throw new SupersededStreamFetchError();
+        await options.assertActive?.();
+        options.signal?.throwIfAborted();
       },
-      signal: AbortSignal.timeout(STREAM_REQUEST_TIMEOUT_MS),
+      signal: options.signal
+        ? AbortSignal.any([
+            options.signal,
+            AbortSignal.timeout(STREAM_REQUEST_TIMEOUT_MS),
+          ])
+        : AbortSignal.timeout(STREAM_REQUEST_TIMEOUT_MS),
       now: now(),
       onRateLimit: options.onRateLimit,
       onRefresh: async (tokens) => {
@@ -128,9 +145,15 @@ export async function fetchActivityStreams(
     payload = rawActivityStreamsSchema.parse(
       await source.getActivityStreams(activityId),
     );
+    await options.assertActive?.();
+    options.signal?.throwIfAborted();
   } catch (error) {
     if (error instanceof SupersededStreamFetchError)
       return { status: 'superseded' as const };
+    // The caller's own stop (deadline, lease or request cap) says nothing
+    // about Strava: leave the claim to expire rather than record a failure.
+    if (error instanceof StreamBackfillStopped || options.signal?.aborted)
+      throw error;
     const recorded = await repository.fail(
       claim,
       classifyStreamFetchFailure(error),
