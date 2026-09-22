@@ -18,6 +18,10 @@ nonisolated enum APIClient {
         case decoding(String)
         case server(code: String, message: String, status: Int, requestID: String?, retryable: Bool)
         case unexpectedStatus(Int)
+        /// The response parsed fine, but its `schemaVersion` does not match
+        /// this build's `ActivityMapAPI.schemaVersion`. This exists to be
+        /// checked, not just carried: see `decodeResult`.
+        case schemaVersionMismatch(expected: String, actual: String)
 
         var description: String {
             switch self {
@@ -32,6 +36,8 @@ nonisolated enum APIClient {
                     + (requestID.map { ", request \($0)" } ?? "") + ")"
             case .unexpectedStatus(let status):
                 "Unexpected HTTP status \(status)"
+            case .schemaVersionMismatch(let expected, let actual):
+                "Server schema version \(actual) does not match the version this build expects (\(expected))"
             }
         }
     }
@@ -126,10 +132,22 @@ nonisolated enum APIClient {
             throw RequestError.unexpectedStatus(httpResponse.statusCode)
         }
 
+        let envelope: ActivityMapAPI.Envelope<Payload>
         do {
-            return try decoder.decode(ActivityMapAPI.Envelope<Payload>.self, from: data).data
+            envelope = try decoder.decode(ActivityMapAPI.Envelope<Payload>.self, from: data)
         } catch {
             throw RequestError.decoding(String(describing: error))
         }
+
+        // The version marker exists specifically to detect contract
+        // divergence (see ActivityMapAPI.schemaVersion's doc comment); a
+        // mismatch here means the payload above was decoded against a
+        // contract shape this build cannot actually trust.
+        guard envelope.schemaVersion == ActivityMapAPI.schemaVersion else {
+            throw RequestError.schemaVersionMismatch(
+                expected: ActivityMapAPI.schemaVersion, actual: envelope.schemaVersion)
+        }
+
+        return envelope.data
     }
 }

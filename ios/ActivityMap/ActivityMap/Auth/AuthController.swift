@@ -25,12 +25,27 @@ final class AuthController: NSObject {
         case signedOut
         case signingIn
         case signedIn(ActivityMapAPI.CurrentUser)
+        /// `restoreSession()` found a Keychain token but could not confirm it
+        /// — a transport failure, timeout, `5xx`/`429`, or a decode error,
+        /// anything short of the server explicitly rejecting the token. The
+        /// token is left in the Keychain; retry with `restoreSession()`
+        /// rather than starting a fresh sign-in, since the stored token may
+        /// still be perfectly valid.
+        case sessionRestoreFailed(String)
+        /// `signOut()` could not confirm the server revoked the session — a
+        /// transport failure, timeout, or `5xx`. The Keychain token is left
+        /// in place: deleting the only copy here would leave a still-valid
+        /// server session with nothing left to retry revocation with. Retry
+        /// with `signOut()`.
+        case signOutFailed(String)
         case failed(String)
     }
 
     enum AuthError: Error, CustomStringConvertible {
         case missingCodeOrState
         case stateMismatch
+        case sessionFailedToStart
+        case secureRandomUnavailable(OSStatus)
 
         var description: String {
             switch self {
@@ -38,6 +53,10 @@ final class AuthController: NSObject {
                 "The sign-in callback was missing its code or state."
             case .stateMismatch:
                 "The sign-in callback did not match the request that started it."
+            case .sessionFailedToStart:
+                "The sign-in sheet could not be presented."
+            case .secureRandomUnavailable(let status):
+                "Could not generate a secure random value (status \(status))."
             }
         }
     }
@@ -49,10 +68,11 @@ final class AuthController: NSObject {
     private var authSession: ASWebAuthenticationSession?
 
     /// Attempts to resume a session already stored in the Keychain. Call once
-    /// at launch. A missing or rejected token leaves `status` at
-    /// `.signedOut` rather than `.failed`: there is nothing actionable for
-    /// someone who has simply never signed in, and a stale token looks the
-    /// same to them as never having signed in at all.
+    /// at launch. Only an explicit server rejection (`401`/`not_authenticated`)
+    /// clears the token and moves to `.signedOut` — anything else (no
+    /// connectivity, a timeout, a `5xx`) leaves the token in place and moves
+    /// to `.sessionRestoreFailed`, since merely launching the app during a
+    /// transient outage must not permanently sign anyone out.
     func restoreSession() async {
         guard let token = SessionStore.load() else { return }
         do {
@@ -60,8 +80,12 @@ final class AuthController: NSObject {
                 "/api/v1/me", bearerToken: token, as: ActivityMapAPI.CurrentUser.self)
             status = .signedIn(user)
         } catch {
-            SessionStore.clear()
-            status = .signedOut
+            if Self.isExplicitlyUnauthenticated(error) {
+                SessionStore.clear()
+                status = .signedOut
+            } else {
+                status = .sessionRestoreFailed(String(describing: error))
+            }
         }
     }
 
@@ -73,8 +97,8 @@ final class AuthController: NSObject {
     func signIn() async {
         status = .signingIn
         do {
-            let state = Self.randomURLSafeString()
-            let verifier = Self.randomURLSafeString()
+            let state = try Self.randomURLSafeString()
+            let verifier = try Self.randomURLSafeString()
             let challenge = Self.s256Challenge(forVerifier: verifier)
 
             guard
@@ -120,7 +144,11 @@ final class AuthController: NSObject {
                 as: ActivityMapAPI.CurrentUser.self)
             status = .signedIn(user)
         } catch is CancellationError {
-            // The person dismissed the sign-in sheet; not a failure to report.
+            // Swift-level task cancellation; not a failure to report.
+            status = .signedOut
+        } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            // The person dismissed the sign-in sheet themselves. This is the
+            // ordinary "changed their mind" path, not an error.
             status = .signedOut
         } catch {
             status = .failed(String(describing: error))
@@ -129,14 +157,44 @@ final class AuthController: NSObject {
 
     /// Revokes the session server-side first — so a leaked token can never be
     /// replayed even if the local clear below is somehow never reached — then
-    /// clears the Keychain regardless of whether the network call succeeded.
+    /// clears the Keychain only once that revocation is confirmed (or the
+    /// server reports the token already invalid). A transport failure or
+    /// `5xx` instead leaves the token in place and reports
+    /// `.signOutFailed`: clearing it anyway would abandon a still-valid
+    /// server session with no copy of the token left to retry revoking it.
     func signOut() async {
-        if let token = SessionStore.load() {
-            _ = try? await APIClient.post(
-                "/api/v1/auth/logout", bearerToken: token, as: JSONValue.self)
+        guard let token = SessionStore.load() else {
+            status = .signedOut
+            return
         }
-        SessionStore.clear()
-        status = .signedOut
+        do {
+            _ = try await APIClient.post(
+                "/api/v1/auth/logout", bearerToken: token, as: JSONValue.self)
+            SessionStore.clear()
+            status = .signedOut
+        } catch {
+            if Self.isExplicitlyUnauthenticated(error) {
+                // Nothing left to revoke server-side either way.
+                SessionStore.clear()
+                status = .signedOut
+            } else {
+                status = .signOutFailed(String(describing: error))
+            }
+        }
+    }
+
+    /// True only for a server response that explicitly rejected the
+    /// credential (`401`, `not_authenticated`) — never for a transport
+    /// failure, timeout, decode error, or any other status, which must not
+    /// be treated as equivalent to "this token is invalid". Left internal
+    /// rather than private, like `APIClient.decodeResult`, so it can be
+    /// exercised directly against crafted errors without a live server.
+    static func isExplicitlyUnauthenticated(_ error: Error) -> Bool {
+        guard case .server(let code, _, let status, _, _) = error as? APIClient.RequestError
+        else {
+            return false
+        }
+        return status == 401 || code == "not_authenticated"
     }
 
     // MARK: - ASWebAuthenticationSession
@@ -158,15 +216,31 @@ final class AuthController: NSObject {
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             self.authSession = session
-            session.start()
+
+            // `start()` returns false (without ever calling the completion
+            // handler above) when the session cannot begin at all - e.g. no
+            // presentation context. Without this guard the continuation
+            // would never resume and signIn() would hang on "Signing in…"
+            // forever.
+            guard session.start() else {
+                self.authSession = nil
+                continuation.resume(throwing: AuthError.sessionFailedToStart)
+                return
+            }
         }
     }
 
     // MARK: - PKCE
 
-    private static func randomURLSafeString(byteCount: Int = 32) -> String {
+    private static func randomURLSafeString(byteCount: Int = 32) throws -> String {
         var bytes = [UInt8](repeating: 0, count: byteCount)
-        _ = SecRandomCopyBytes(kSecRandomDefault, byteCount, &bytes)
+        let status = SecRandomCopyBytes(kSecRandomDefault, byteCount, &bytes)
+        // A failure here leaves `bytes` all-zero; encoding that anyway would
+        // make `state`/the PKCE verifier predictable instead of random, so
+        // this must fail closed rather than continue with the buffer.
+        guard status == errSecSuccess else {
+            throw AuthError.secureRandomUnavailable(status)
+        }
         return Data(bytes).base64URLEncodedString()
     }
 

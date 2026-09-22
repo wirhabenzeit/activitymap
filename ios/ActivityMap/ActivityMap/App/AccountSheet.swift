@@ -41,6 +41,10 @@ struct AccountSheet: View {
             signingInContent
         case .signedIn(let user):
             signedInContent(user)
+        case .sessionRestoreFailed(let message):
+            sessionRestoreFailedContent(message)
+        case .signOutFailed(let message):
+            signOutFailedContent(message)
         case .failed(let message):
             signInFailedContent(message)
         }
@@ -135,6 +139,52 @@ struct AccountSheet: View {
             Section {
                 Button("Try Again") {
                     Task { await auth.signIn() }
+                }
+            }
+        }
+    }
+
+    /// A stored session exists but could not be confirmed this time (no
+    /// connectivity, a timeout, a server error) — retries `restoreSession()`
+    /// rather than starting a fresh sign-in, since the existing token has not
+    /// been rejected, only left unverified.
+    private func sessionRestoreFailedContent(_ message: String) -> some View {
+        Group {
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Couldn't Verify Your Session")
+                        .font(.headline)
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                Button("Retry") {
+                    Task { await auth.restoreSession() }
+                }
+            }
+        }
+    }
+
+    /// The server-side session may still be active — retries `signOut()`
+    /// rather than treating the person as already signed out.
+    private func signOutFailedContent(_ message: String) -> some View {
+        Group {
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Sign-Out Failed")
+                        .font(.headline)
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                Button("Try Again") {
+                    Task { await auth.signOut() }
                 }
             }
         }
