@@ -1,6 +1,6 @@
 # ActivityMap iOS mockup
 
-This is the SwiftUI prototype for a future native ActivityMap client. It currently uses sample data and is not connected to the v1 API or sync engine.
+The SwiftUI client supports mobile sign-in and has a SwiftData persistence foundation. Network synchronization is the next step; the running app currently starts with an empty activity list. Sample activities are used only by Xcode previews.
 
 ## Run it
 
@@ -48,7 +48,23 @@ The bundle identifier is `page.dominik.activitymap` and is deliberately stable, 
 
 Production universal links can replace the custom scheme once there is a final bundle identifier, an Apple team, an Associated Domains entitlement, and a hosted AASA file. Until then the custom scheme is the supported path.
 
-Configuration alone does not put a sign-in button in the app: `ios/ActivityMapMobileAuthTestClient/` is not part of the app target yet, and has never been compiled. Integrating it is the next iOS authentication change.
+Use Profile to sign in. `AuthController` stores the ActivityMap session in the Keychain, confirms it through `/api/v1/me`, and supports restoration and revocation.
+
+## Local persistence and tests
+
+`LocalStore` owns all SwiftData reads and writes. Records are scoped by deployment URL and authenticated user ID. Activities and photos retain the complete generated DTO as encoded data, with unique scoped keys; UI mappers consume detached values. Each page and its optional sync checkpoint commit in one explicit save, with autosave disabled and rollback on failure. CloudKit is disabled.
+
+`ActivityMapApp` creates the disk store and exposes it through the SwiftUI environment. `ActivityStore.load(from:scope:)` is ready for the sync coordinator; the network loop and login/foreground triggers are still pending. A store-open error is displayed without deleting data or falling back silently to memory.
+
+Run the `ActivityMap` scheme's tests in Xcode, or select an installed iOS 27 simulator:
+
+```sh
+xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
+  -scheme ActivityMap -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+  -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
+```
+
+CI runs the same Swift Testing target. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and Mapbox initialization. No credentials or local server are required.
 
 ## Shared configuration direction
 

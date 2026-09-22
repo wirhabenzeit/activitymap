@@ -58,14 +58,36 @@ jobs:
         run: |
           xcodebuild -version
           xcodebuild -showsdks | grep -i iphonesimulator
-      - name: Build the app target for the simulator
+      - name: Select an available iOS 27 simulator
         run: |
-          xcodebuild build \
+          simulator_id=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime, entries in devices.items():
+              if ".iOS-27-" in runtime:
+                  for device in entries:
+                      if device["name"].startswith("iPhone"):
+                          print(device["udid"])
+                          sys.exit(0)
+          sys.exit("No available iOS 27 iPhone simulator")
+          ')
+          echo "IOS_TEST_SIMULATOR=$simulator_id" >> "$GITHUB_ENV"
+      - name: Build app and run Swift Testing persistence tests
+        run: |
+          xcodebuild test \
             -project ios/ActivityMap/ActivityMap.xcodeproj \
             -scheme ActivityMap \
             -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "platform=iOS Simulator,id=$IOS_TEST_SIMULATOR" \
+            -parallel-testing-enabled NO \
+            -resultBundlePath ios-test-results.xcresult \
             CODE_SIGNING_ALLOWED=NO
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ios-test-results
+          path: ios-test-results.xcresult
+          if-no-files-found: ignore
 
   migrations:
     runs-on: ubuntu-24.04

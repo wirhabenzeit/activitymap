@@ -49,17 +49,10 @@ All four have unit tests. The Swift sync engine should be a deliberate,
 close port of `v1-sync.ts` rather than a fresh design, so that one protocol has
 one set of semantics across both clients and the tests can be mirrored.
 
-**There is already a Swift auth reference implementation.** `ios/ActivityMapMobileAuthTestClient/ActivityMapMobileAuthTestClient.swift`
-sketches the PKCE/`ASWebAuthenticationSession`/exchange/Keychain flow against
-the real endpoints, and is a useful starting point for `Auth/` rather than
-something to rewrite.
-
-It is not verified in any sense: its own header records that it has never been
-compiled, and it is not a member of the app target, so nothing in the build or
-in CI exercises it. Treat it as unproven until it has been integrated, compiled
-in the app target, and put through an actual sign-in against a configured
-server. That is Phase B, and discovering that parts of it need reworking would
-be an ordinary outcome.
+**Authentication is integrated.** `Auth/AuthController.swift` handles PKCE,
+`ASWebAuthenticationSession`, exchange, Keychain storage, restoration and
+revocation through the shared `APIClient`. The account sheet displays the real
+`/api/v1/me` response, and sign-in has been exercised against the local server.
 
 ## The iOS client does not talk to the database
 
@@ -102,13 +95,10 @@ The question in the original ask was Core Data "or something like that". The
 recommendation is **SwiftData**, for reasons specific to this protocol rather
 than general preference.
 
-- `@Attribute(.unique)` on the activity id gives insert-as-upsert semantics:
-  inserting a model whose unique value already exists updates the existing row.
-  That is exactly what the change feed's `upsert` operation means, so
-  `applyChangesPage` needs no read-modify-write pass.
-- `@ModelActor` provides an isolated background context, so sync writes never
-  touch the main actor's context and the whole engine is plain `async`/`await`
-  with no Combine — which matches this project's stated architecture rules.
+- Unique keys include deployment, user and entity ID. `LocalStore` explicitly
+  updates existing rows, including repeat operations within the same page.
+- `LocalStore` is an actor that creates a fresh context per operation, so model
+  objects never cross an actor boundary and reads see committed data.
 - `ModelContext.save()` is the transactional unit the protocol requires (see
   "The cursor rule" below). Core Data offers the same guarantee, but SwiftData
   expresses it with far less ceremony.
@@ -150,10 +140,12 @@ Auth/
   AuthController.swift       // PKCE + ASWebAuthenticationSession (from the test client)
   SessionStore.swift         // Keychain read/write/clear
 Persistence/
-  StoredActivity.swift       // @Model, @Attribute(.unique) var id: String
-  StoredPhoto.swift          // @Model, @Attribute(.unique) var uniqueID: String
-  SyncState.swift            // @Model: scope, bootstrapCursor, changesCursor, lastSyncAt
-  LocalStore.swift           // @ModelActor: the only writer
+  StoreScope.swift           // deployment + authenticated user identity
+  StoreCodec.swift           // internal Codable format preserving Date precision
+  StoredActivity.swift       // @Model: unique scoped key, ID, DTO payload
+  StoredPhoto.swift          // @Model: unique scoped key, parent activity ID, DTO payload
+  SyncState.swift            // @Model: scope + encoded SyncCheckpoint
+  LocalStore.swift           // actor: the only reader/writer of SwiftData models
 Sync/
   SyncEngine.swift           // port of src/lib/sync/v1-sync.ts
   SyncStatus.swift           // @Observable surface for the UI
@@ -219,34 +211,13 @@ The two alternatives were considered and are weaker here:
 This is the one correctness property that must not be compromised, and it drives
 the shape of `LocalStore`.
 
-`SyncState` is a `@Model` in the *same* store as `StoredActivity` and
-`StoredPhoto`. Applying a page of changes and advancing the cursor past that
-page therefore happen in one `ModelContext.save()`:
-
-```swift
-@ModelActor
-actor LocalStore {
-    func applyChangesPage(_ page: SyncChangesPage, scope: String) throws {
-        for item in page.items {
-            switch (item.entityType, item.operation) {
-            case (.activity, .upsert):
-                guard let dto = item.activity else { continue }
-                modelContext.insert(StoredActivity(dto, scope: scope))
-            case (.photo, .upsert):
-                guard let dto = item.photo else { continue }
-                modelContext.insert(StoredPhoto(dto, scope: scope))
-            case (.activity, .delete):
-                try deleteActivity(id: item.id, scope: scope)
-                try deletePhotos(activityID: item.id, scope: scope)
-            case (.photo, .delete):
-                try deletePhoto(uniqueID: item.id, scope: scope)
-            }
-        }
-        try advanceCursor(to: page.nextCursor, scope: scope)
-        try modelContext.save()
-    }
-}
-```
+`SyncState`, `StoredActivity` and `StoredPhoto` share one store.
+`LocalStore.apply(_:checkpoint:scope:)` applies ordered mutations and the
+checkpoint in one explicit `ModelContext.save()`. Autosave is disabled; any
+error rolls back the context. A nil checkpoint leaves sync state unchanged
+while incomplete bootstrap pages are accumulated. Network code must reject
+malformed changes before constructing mutations, never skip them and advance
+the cursor.
 
 If the process dies mid-page, nothing commits and the next run replays the same
 cursor. The protocol is explicitly designed for that replay to be harmless.
@@ -260,8 +231,8 @@ photo. Omitting it leaves orphaned photo rows.
 
 A direct port of `runV1Sync`. The state machine, in full:
 
-1. Read `SyncState` for the current scope (`auth:<userId>`, matching the web
-   client's scope-key convention).
+1. Read `SyncState` for the current scope (deployment URL and authenticated
+   user ID; session rotation does not change the scope).
 2. No completed bootstrap, or no cursor? **Fresh bootstrap**: clear the scope
    first (a failed earlier bootstrap can leave rows without a state record, and
    rows deleted between attempts would otherwise survive as ghosts), drain
@@ -303,16 +274,15 @@ Revisit only if an account's dataset outgrows memory.
 ## Geometry
 
 The DTO carries `map_polyline` and `map_summary_polyline` as Google
-encoded-polyline strings; `Activity` holds `[CLLocationCoordinate2D]`. Nothing
-in the existing dependency set decodes that format — Turf ships polyline
-*measurement* helpers, not the codec — so `Support/Polyline.swift` needs a
-decoder. It is roughly forty lines at precision 5.
+encoded-polyline strings; `Activity` holds `[CLLocationCoordinate2D]`.
+`Support/Polyline.swift` decodes precision-5 coordinates and rejects malformed
+or out-of-range input.
 
-Store the encoded string in SwiftData and decode lazily into an in-memory cache
-keyed by activity id. Decoding every polyline on insert makes bootstrap slower
-and larger for geometry most users never pan to; decoding on every map render is
-worse. Prefer `map_polyline` when `geometry_state == .detailed`, and fall back
-to `map_summary_polyline` otherwise.
+The store retains encoded geometry. `StoredModelMapper` decodes it when loading
+the in-memory UI snapshot, so map renders reuse coordinates. It prefers
+`map_polyline` when `geometry_state == .detailed` and the string is nonempty,
+and falls back to `map_summary_polyline` otherwise. A lazy per-route cache can
+follow if profiling shows whole-snapshot decoding is too expensive.
 
 ## Open gaps
 
@@ -321,12 +291,7 @@ to `map_summary_polyline` otherwise.
    implemented. The first native client is therefore read-only, which matches
    the plan's own rollout ordering — native mutations come after read sync is
    stable — but it does mean the detail view cannot edit.
-2. **Sign-in is not reachable from the app.**
-   `ios/ActivityMapMobileAuthTestClient/` is not a member of the app target, so
-   configuring the callback scheme does not by itself put a sign-in button in
-   the mockup. Integrating it is Phase B, and configuration work should not be
-   mistaken for having done it.
-3. **Production universal links are still unresolved.** The custom scheme covers
+2. **Production universal links are still unresolved.** The custom scheme covers
    local development. Replacing it needs a final bundle identifier, an Apple
    team, an Associated Domains entitlement, and a hosted AASA file. None of
    those should be committed speculatively; in particular a signing team is
@@ -358,24 +323,20 @@ Each phase is independently useful and leaves the app running.
 URL scheme, the localhost ATS exception, the stable bundle identifier,
 `APIConfiguration`, and Swift 6 language mode are in place, with
 `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback` set in the local
-`.env`. The Zod-derived Swift DTOs and their CI drift check are in place too. No
-behaviour change: `SampleData` still drives the UI, and nothing calls the
-network yet.
+`.env`. The Zod-derived Swift DTOs and their CI drift check are in place too.
 
-**Phase B — Authentication.** Promote the auth test client into `Auth/`, backed
-by `SessionStore` and driven from `AccountSheet`. Prove it by rendering the real
-`/api/v1/me` response in the account sheet. This is the phase most likely to
-stall on configuration, so it should not be bundled with anything else.
+**Phase B — Authentication.** *Done.* `AuthController`, `SessionStore` and
+`AccountSheet` use the shared API client and render the real `/api/v1/me` response.
 
-**Phase C — Local store.** Add the three `@Model` types, `LocalStore`, and the
-model container wiring in `ActivityMapApp`. Switch `ActivityStore` to read from
-`LocalStore`, seeding it with `SampleData` on an empty store so the UI keeps
-working and previews keep rendering.
+**Phase C — Local store.** *Done.* Three `@Model` types, scoped `LocalStore`,
+container wiring, DTO/UI mappers, and simulator Swift Testing coverage are in
+place. Sample data is preview-only. `ActivityStore.load(from:scope:)` reads the
+store; runtime loading will be connected to the sync coordinator in Phase D.
 
-**Phase D — Sync engine.** Add `APIClient`, `SyncAPI`, and `SyncEngine`, port
-the `v1-sync.ts` tests, and trigger a pass after login and on foreground. Add
-`Support/Polyline.swift` and the geometry cache. Drop the `SampleData` seed
-behind a preview-only path.
+**Phase D — Sync engine.** Add `SyncAPI` and `SyncEngine` around the existing
+`APIClient`, port the `v1-sync.ts` tests, and trigger a pass after login and on
+foreground. Connect committed data to `ActivityStore`, including account-switch
+and logout isolation.
 
 **Phase E — Polish.** Sync status in `HeaderBar`, offline and error states that
 distinguish "no network" from "session expired", scope clearing on logout and
