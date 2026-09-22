@@ -73,6 +73,7 @@ final class SyncController {
         if !sameCredential { retryAt = nil }
         needsCleanup = true
         work = Task {
+            defer { if current == generation { work = nil } }
             await previous?.value
             guard current == generation, !Task.isCancelled else { return }
             do {
@@ -90,18 +91,28 @@ final class SyncController {
             } catch {
                 if current == generation { status = .failed(String(describing: error)) }
             }
-            if current == generation { work = nil }
         }
     }
 
     func refresh() async {
-        if let work { await work.value; return }
-        guard let session, let storage else { return }
+        guard !Task.isCancelled else { return }
+        if let pending = work {
+            await pending.value
+            if pending.isCancelled { await refresh() }
+            return
+        }
+        guard let storage else { return }
+        if needsCleanup {
+            setSession(session, storage: storage)
+            await work?.value
+            return
+        }
+        guard let session else { return }
         if let retryAt, retryAt > now() { status = .rateLimited(retryAt); return }
         let current = generation
         work = Task {
+            defer { if current == generation { work = nil } }
             await perform(session, storage: storage, generation: current)
-            if current == generation { work = nil }
         }
         await work?.value
     }

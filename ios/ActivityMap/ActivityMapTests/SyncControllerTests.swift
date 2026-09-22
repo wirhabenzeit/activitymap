@@ -26,6 +26,20 @@ actor GatedSyncSource: SyncPageSource {
 
 @MainActor
 struct SyncControllerTests {
+    @Test func refreshRestartsWorkCancelledBeforeItBegins() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        // Cleanup must still run even if the queued account transition never started.
+        try await storage.apply([.upsertActivity(try Fixtures.activity())], scope: Fixtures.scope)
+        let source = SyncFixtures.complete([try Fixtures.activity(["id": "2"])])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(id: "bob"), storage: storage)
+        controller.pause()
+        await controller.refresh()
+        #expect(controller.status == .ready && controller.activities.activities.map(\.id) == [2])
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities.isEmpty)
+        #expect(await source.calls == 3)
+    }
+
     @Test func accountSwitchCancelsLateResponsesBeforePurgingPreviousAccount() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let oldSource = GatedSyncSource()
