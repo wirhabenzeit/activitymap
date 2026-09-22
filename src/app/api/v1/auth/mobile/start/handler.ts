@@ -19,11 +19,22 @@ export interface MobileAuthStartHandlerDependencies {
    * web sign-in uses - see `~/lib/auth.ts`'s `genericOAuth` config) with a
    * callback URL that lands back on `/api/v1/auth/mobile/callback`. Wired
    * in `route.ts` to `auth.api.signInSocial`.
+   *
+   * `headers` carries whatever `Set-Cookie` Better Auth attaches to that
+   * call - most importantly its own internal OAuth state-verification
+   * cookie (`~/server/auth/mobile.ts`'s `state`/PKCE fields are a separate,
+   * unrelated concept from this cookie). Better Auth's `parseGenericState`
+   * checks that cookie again once Strava redirects back to
+   * `/api/auth/callback/strava`, so if this handler ever forwards `url`
+   * without also forwarding `headers` onto the actual redirect response,
+   * every sign-in fails at that point with "State not persisted correctly"
+   * - a real regression this project shipped once already; see the fixing
+   * commit for how it was caught.
    */
   startSocialSignIn: (input: {
     callbackURL: string;
     headers: Headers;
-  }) => Promise<{ url: string } | null>;
+  }) => Promise<{ url: string; headers?: Headers } | null>;
 }
 
 /**
@@ -105,7 +116,16 @@ export function createMobileAuthStartHandler({
       if (!result?.url) {
         throw new Error('Strava sign-in did not return an authorization URL');
       }
-      return Response.redirect(result.url, 302);
+
+      // Not `Response.redirect(result.url, 302)`: the Fetch spec gives that
+      // helper's response an immutable header list, so there would be no
+      // way to also attach the `Set-Cookie` header(s) below onto the same
+      // response.
+      const responseHeaders = new Headers({ location: result.url });
+      for (const cookie of result.headers?.getSetCookie() ?? []) {
+        responseHeaders.append('set-cookie', cookie);
+      }
+      return new Response(null, { status: 302, headers: responseHeaders });
     } catch (error) {
       onError(error, requestId);
       return Response.json(

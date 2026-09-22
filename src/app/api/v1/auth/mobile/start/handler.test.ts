@@ -49,6 +49,62 @@ void test('GET /api/v1/auth/mobile/start redirects to the Strava authorization U
   assert.ok(capturedCallbackURL?.includes('state=s1'));
 });
 
+void test('GET /api/v1/auth/mobile/start forwards every Set-Cookie header onto the redirect', async () => {
+  // Regression test: this handler previously called Response.redirect(url,
+  // 302), whose header list the Fetch spec makes immutable, so there was no
+  // way to attach a Set-Cookie header even if one had been available - and
+  // route.ts additionally called `auth.api.signInSocial` without
+  // `asResponse: true`, so it never had one to attach in the first place.
+  // Better Auth's own OAuth state-verification cookie was silently dropped
+  // as a result, and every real sign-in failed once Strava redirected back
+  // with "State not persisted correctly". Neither half of that was visible
+  // to a test whose fake `startSocialSignIn` never returned `headers`, which
+  // is exactly why this must assert Set-Cookie forwarding specifically,
+  // not just the redirect Location.
+  const GET = createMobileAuthStartHandler({
+    loadRedirectAllowlist: () => ALLOWLIST,
+    startSocialSignIn: async () => ({
+      url: 'https://www.strava.com/oauth/authorize?client_id=1',
+      headers: new Headers([
+        ['set-cookie', 'better-auth.state=abc123; Path=/; HttpOnly'],
+        ['set-cookie', 'better-auth.oauth_state=def456; Path=/; HttpOnly'],
+      ]),
+    }),
+  });
+
+  const response = await GET(
+    new Request(
+      'https://app.example.test/api/v1/auth/mobile/start?state=s1&code_challenge=c1&redirect_uri=activitymap%3A%2F%2Fauth%2Fcallback',
+      { redirect: 'manual' },
+    ),
+  );
+
+  assert.equal(response.status, 302);
+  assert.deepEqual(response.headers.getSetCookie(), [
+    'better-auth.state=abc123; Path=/; HttpOnly',
+    'better-auth.oauth_state=def456; Path=/; HttpOnly',
+  ]);
+});
+
+void test('GET /api/v1/auth/mobile/start still redirects when startSocialSignIn returns no headers', async () => {
+  const GET = createMobileAuthStartHandler({
+    loadRedirectAllowlist: () => ALLOWLIST,
+    startSocialSignIn: async () => ({
+      url: 'https://www.strava.com/oauth/authorize?client_id=1',
+    }),
+  });
+
+  const response = await GET(
+    new Request(
+      'https://app.example.test/api/v1/auth/mobile/start?state=s1&code_challenge=c1&redirect_uri=activitymap%3A%2F%2Fauth%2Fcallback',
+      { redirect: 'manual' },
+    ),
+  );
+
+  assert.equal(response.status, 302);
+  assert.deepEqual(response.headers.getSetCookie(), []);
+});
+
 void test('GET /api/v1/auth/mobile/start rejects a missing parameter', async () => {
   const GET = createMobileAuthStartHandler({
     loadRedirectAllowlist: () => ALLOWLIST,
