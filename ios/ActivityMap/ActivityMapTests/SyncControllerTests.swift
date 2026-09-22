@@ -115,6 +115,23 @@ struct SyncControllerTests {
         #expect(try await storage.snapshot(scope: Fixtures.scope).activities.isEmpty)
     }
 
+    @Test func recentPollCannotValidateDataWithoutCompletedReconciliation() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        var checkpoint = Fixtures.checkpoint
+        checkpoint.lastSyncAt = Date()
+        checkpoint.freshness = .init(lastSummaryReconciledAt: nil)
+        try await storage.apply([.upsertActivity(try Fixtures.activity())], checkpoint: checkpoint, scope: Fixtures.scope)
+        let source = ScriptedSyncSource([])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(verified: false), storage: storage)
+        await controller.refresh()
+
+        #expect(controller.status == .expired && controller.activities.activities.isEmpty)
+        let snapshot = try await storage.snapshot(scope: Fixtures.scope)
+        #expect(snapshot.activities.isEmpty && snapshot.checkpoint == nil)
+        #expect(await source.calls == 0)
+    }
+
     @Test func unauthorizedSyncClearsCacheAndInvalidatesOnlyItsToken() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         var checkpoint = Fixtures.checkpoint

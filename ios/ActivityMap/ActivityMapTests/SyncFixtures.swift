@@ -42,7 +42,7 @@ enum SyncFixtures {
         .photos(.init(items: items, nextCursor: next, snapshotCursor: nil, retention: retention, freshness: freshness))
     }
 
-    static func changes(_ items: [ActivityMapAPI.SyncChangeItem] = [], next: String = "caught-up") -> ActivityMapAPI.SyncChangesPage {
+    static func changes(_ items: [ActivityMapAPI.SyncChangeItem] = [], next: String) -> ActivityMapAPI.SyncChangesPage {
         .init(items: items, nextCursor: next, retention: retention, freshness: freshness)
     }
 
@@ -60,7 +60,7 @@ enum SyncFixtures {
         ScriptedSyncSource([
             .bootstrap(.activities, nil, .success(activities(items))),
             .bootstrap(.photos, nil, .success(photos())),
-            .changes("snapshot", .success(changes())),
+            .changes("snapshot", .success(changes(next: "snapshot"))),
         ])
     }
 }

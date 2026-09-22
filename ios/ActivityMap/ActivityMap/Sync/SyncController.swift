@@ -184,8 +184,10 @@ final class SyncController {
         }
         // Feed retention (usually 30 days) is not permission to retain a stale
         // offline cache. Use the stricter seven-day data freshness boundary.
-        let validated = min(synced, checkpoint.freshness?.lastSummaryReconciledAt ?? synced)
-        guard now().timeIntervalSince(validated) < 7 * 24 * 60 * 60 else {
+        // A successful delta poll only checks the local change cursor. It
+        // cannot stand in for a completed Strava summary reconciliation.
+        guard let reconciled = checkpoint.freshness?.lastSummaryReconciledAt,
+              now().timeIntervalSince(min(synced, reconciled)) < 7 * 24 * 60 * 60 else {
             clearVisible()
             status = .expired
             try await storage.clear(scope: session.scope)

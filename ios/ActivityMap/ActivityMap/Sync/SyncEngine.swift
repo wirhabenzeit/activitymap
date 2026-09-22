@@ -82,7 +82,11 @@ nonisolated struct SyncEngine: Sendable {
             let page = try await source.changes(cursor: cursor)
             try Task.checkCancellation()
             guard !page.nextCursor.isEmpty else { throw ProtocolError.invalidPage }
-            if !page.items.isEmpty {
+            // The server may omit superseded upserts from a page while still
+            // advancing its cursor. Only an empty page at the same cursor is
+            // caught up; an empty advancing page still has successors to read.
+            let caughtUp = page.items.isEmpty && page.nextCursor == cursor
+            if !caughtUp {
                 guard page.nextCursor != cursor, seen.insert(page.nextCursor).inserted else {
                     throw ProtocolError.stalledCursor
                 }
@@ -92,9 +96,9 @@ nonisolated struct SyncEngine: Sendable {
             checkpoint.changesCursor = page.nextCursor
             checkpoint.retention = page.retention
             checkpoint.freshness = page.freshness
-            if page.items.isEmpty { checkpoint.lastSyncAt = now() }
+            if caughtUp { checkpoint.lastSyncAt = now() }
             try await store.apply(mutations, checkpoint: checkpoint, scope: scope)
-            if page.items.isEmpty { return checkpoint }
+            if caughtUp { return checkpoint }
         }
     }
 

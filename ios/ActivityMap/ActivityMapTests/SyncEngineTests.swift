@@ -16,13 +16,13 @@ struct SyncEngineTests {
             .bootstrap(.photos, nil, .success(SyncFixtures.photos([photo], next: "p2"))),
             .bootstrap(.photos, "p2", .success(SyncFixtures.photos())),
             .changes("snapshot", .success(SyncFixtures.changes([SyncFixtures.upsert(changed)], next: "delta"))),
-            .changes("delta", .success(SyncFixtures.changes())),
+            .changes("delta", .success(SyncFixtures.changes(next: "delta"))),
         ])
         let checkpoint = try await SyncEngine(source: source, store: store, scope: Fixtures.scope).run()
         let result = try await store.snapshot(scope: Fixtures.scope)
         #expect(Set(result.activities) == Set([changed, second]))
         #expect(result.photos == [photo])
-        #expect(checkpoint.bootstrapCursor == "snapshot" && checkpoint.changesCursor == "caught-up")
+        #expect(checkpoint.bootstrapCursor == "snapshot" && checkpoint.changesCursor == "delta")
         #expect(checkpoint.bootstrapComplete && checkpoint.lastSyncAt != nil)
         #expect(await source.steps.isEmpty)
     }
@@ -42,7 +42,7 @@ struct SyncEngineTests {
         #expect(partial.activities == [dto] && partial.checkpoint?.changesCursor == "committed")
         let resumed = ScriptedSyncSource([
             .changes("committed", .success(SyncFixtures.changes([SyncFixtures.upsert(dto)], next: "replayed"))),
-            .changes("replayed", .success(SyncFixtures.changes())),
+            .changes("replayed", .success(SyncFixtures.changes(next: "replayed"))),
         ])
         _ = try await SyncEngine(source: resumed, store: store, scope: Fixtures.scope).run()
         #expect(try await store.snapshot(scope: Fixtures.scope).activities == [dto])
@@ -69,13 +69,13 @@ struct SyncEngineTests {
             .changes("cursor-1", .failure(SyncFixtures.rebootstrap)),
             .bootstrap(.activities, nil, .success(SyncFixtures.activities())),
             .bootstrap(.photos, nil, .success(SyncFixtures.photos())),
-            .changes("snapshot", .success(SyncFixtures.changes())),
+            .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot"))),
         ])
         _ = try await SyncEngine(source: source, store: store, scope: Fixtures.scope).run()
         #expect(try await store.snapshot(scope: Fixtures.scope).activities.isEmpty)
         #expect(await source.calls == 4)
         let twice = ScriptedSyncSource([
-            .changes("caught-up", .failure(SyncFixtures.rebootstrap)),
+            .changes("snapshot", .failure(SyncFixtures.rebootstrap)),
             .bootstrap(.activities, nil, .failure(SyncFixtures.rebootstrap)),
         ])
         await #expect(throws: APIClient.RequestError.self) {
@@ -102,7 +102,7 @@ struct SyncEngineTests {
         try await store.apply([], checkpoint: Fixtures.checkpoint, scope: Fixtures.scope)
         let invalid = ActivityMapAPI.SyncChangeItem(sequence: "2", entityType: .activity, operation: .upsert, id: "2", activity: nil, photo: nil)
         let source = ScriptedSyncSource([
-            .changes("cursor-1", .success(SyncFixtures.changes([SyncFixtures.upsert(try Fixtures.activity()), invalid])))
+            .changes("cursor-1", .success(SyncFixtures.changes([SyncFixtures.upsert(try Fixtures.activity()), invalid], next: "uncommitted")))
         ])
         await #expect(throws: SyncEngine.ProtocolError.self) {
             try await SyncEngine(source: source, store: store, scope: Fixtures.scope).run()
@@ -136,11 +136,31 @@ struct SyncEngineTests {
         let deletion = ActivityMapAPI.SyncChangeItem(sequence: "1", entityType: .activity, operation: .delete, id: activity.id, activity: nil, photo: nil)
         let source = ScriptedSyncSource([
             .changes("cursor-1", .success(SyncFixtures.changes([deletion], next: "deleted"))),
-            .changes("deleted", .success(SyncFixtures.changes())),
+            .changes("deleted", .success(SyncFixtures.changes(next: "deleted"))),
         ])
         _ = try await SyncEngine(source: source, store: store, scope: Fixtures.scope).run()
         let result = try await store.snapshot(scope: Fixtures.scope)
         #expect(result.activities.isEmpty && result.photos.isEmpty)
-        #expect(result.checkpoint?.changesCursor == "caught-up")
+        #expect(result.checkpoint?.changesCursor == "deleted")
+    }
+
+    @Test func emptyAdvancingPageDoesNotHideLaterTombstones() async throws {
+        let store = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let activity = try Fixtures.activity()
+        try await store.apply([.upsertActivity(activity)], checkpoint: Fixtures.checkpoint, scope: Fixtures.scope)
+        let deletion = ActivityMapAPI.SyncChangeItem(
+            sequence: "101", entityType: .activity, operation: .delete,
+            id: activity.id, activity: nil, photo: nil)
+        let source = ScriptedSyncSource([
+            // Superseded upserts can be omitted while the server advances past them.
+            .changes("cursor-1", .success(SyncFixtures.changes(next: "filtered-upserts"))),
+            .changes("filtered-upserts", .success(SyncFixtures.changes([deletion], next: "deleted"))),
+            .changes("deleted", .success(SyncFixtures.changes(next: "deleted"))),
+        ])
+
+        let checkpoint = try await SyncEngine(source: source, store: store, scope: Fixtures.scope).run()
+        #expect(try await store.snapshot(scope: Fixtures.scope).activities.isEmpty)
+        #expect(checkpoint.changesCursor == "deleted" && checkpoint.lastSyncAt != nil)
+        #expect(await source.steps.isEmpty)
     }
 }
