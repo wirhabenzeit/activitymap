@@ -1,3 +1,5 @@
+import { getTableColumns } from 'drizzle-orm';
+import { activityStreamMetadataProjection } from './stream-metadata';
 import 'server-only';
 
 import { and, asc, desc, eq, gt, inArray, sql } from 'drizzle-orm';
@@ -51,7 +53,7 @@ export function createActivitiesRepository(
   return {
     async findManyByAthlete(athleteId, { limit = 10000, offset = 0 } = {}) {
       return database
-        .select()
+        .select({ ...getTableColumns(activities), streamsMetadata: activityStreamMetadataProjection })
         .from(activities)
         .where(eq(activities.athlete, athleteId))
         .orderBy(desc(activities.start_date))
@@ -62,7 +64,7 @@ export function createActivitiesRepository(
     async findManyByIds(ids) {
       if (ids.length === 0) return [];
       return database
-        .select()
+        .select({ ...getTableColumns(activities), streamsMetadata: activityStreamMetadataProjection })
         .from(activities)
         .where(inArray(activities.id, ids))
         .orderBy(desc(activities.start_date));
@@ -70,7 +72,7 @@ export function createActivitiesRepository(
 
     async findPageByAthlete(athleteId, { afterId = 0, limit }) {
       return database
-        .select()
+        .select({ ...getTableColumns(activities), streamsMetadata: activityStreamMetadataProjection })
         .from(activities)
         .where(
           and(eq(activities.athlete, athleteId), gt(activities.id, afterId)),

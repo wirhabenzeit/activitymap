@@ -19,6 +19,8 @@
     "db:test-legacy-sync-selection": "tsx --conditions=react-server scripts/database/test-legacy-activity-sync-selection.ts",
     "db:test-summary-reconciliation": "tsx --conditions=react-server scripts/database/test-summary-reconciliation.ts",
     "db:test-activity-streams": "tsx --conditions=react-server scripts/database/test-activity-streams.ts",
+    "db:migrate:test-stream-lifecycle": "tsx scripts/database/test-stream-lifecycle-migration.ts",
+    "db:test-stream-lifecycle": "tsx --conditions=react-server scripts/database/test-stream-lifecycle.ts",
     "db:audit-sync-migration": "tsx scripts/database/audit-sync-migration.ts",
     "db:migrate:preview": "tsx scripts/database/migrate-preview.ts",
     "db:schema:fingerprint": "tsx scripts/database/migrate.ts fingerprint",

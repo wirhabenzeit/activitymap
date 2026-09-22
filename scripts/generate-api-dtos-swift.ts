@@ -34,6 +34,10 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 import { authenticationDTOSchema } from '../src/contracts/v1/auth';
+import { streamTypeSchema, streamFreshnessSchema, streamFetchStatusSchema, streamFailureCodeSchema,
+  streamMetadataSchema, timeStreamSchema, distanceStreamSchema, latlngStreamSchema, altitudeStreamSchema,
+  wattsStreamSchema, heartrateStreamSchema, rawStreamsDTOSchema, activityStreamsDTOSchema,
+} from '../src/contracts/v1/activity-streams';
 import {
   activityDTOSchema,
   geometryStateSchema,
@@ -75,6 +79,15 @@ const INDENT = '    ';
  * order in the output file.
  */
 const registeredSchemas: [string, z.ZodType][] = [
+  ['StreamType', streamTypeSchema],
+  ['StreamFreshness', streamFreshnessSchema],
+  ['StreamFetchStatus', streamFetchStatusSchema],
+  ['StreamFailureCode', streamFailureCodeSchema],
+  ['StreamMetadata', streamMetadataSchema],
+  ['TimeStream', timeStreamSchema], ['DistanceStream', distanceStreamSchema],
+  ['LatlngStream', latlngStreamSchema], ['AltitudeStream', altitudeStreamSchema],
+  ['WattsStream', wattsStreamSchema], ['HeartrateStream', heartrateStreamSchema],
+  ['RawStreams', rawStreamsDTOSchema], ['ActivityStreams', activityStreamsDTOSchema],
   ['GeometryState', geometryStateSchema],
   ['PhotosState', photosStateSchema],
   ['SyncResource', syncResourceSchema],
@@ -109,6 +122,8 @@ const inlineEnumNames = new Map<string, string>([
   [enumKey(['upsert', 'delete']), 'ChangeOperation'],
   [enumKey(['cookie', 'bearer']), 'AuthenticationMethod'],
   [enumKey(sportTypes), 'SportType'],
+  [enumKey(['low', 'medium', 'high']), 'StreamResolution'],
+  [enumKey(['time', 'distance']), 'StreamSeriesType'],
 ]);
 
 /**
@@ -317,6 +332,8 @@ function swiftType(schema: JSONSchema, path: string): string {
       return `[${swiftType(schema.items as JSONSchema, `${path}[]`)}]`;
     }
     case 'object': {
+      // Named fields remain typed even if unknown future metadata is allowed.
+      if (schema.properties) return registerNestedObject(schema, path);
       const additional = schema.additionalProperties;
       if (additional && typeof additional === 'object') {
         return `[String: ${swiftType(additional as JSONSchema, `${path}[key]`)}]`;

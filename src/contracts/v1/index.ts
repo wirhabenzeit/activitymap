@@ -8,3 +8,5 @@ export * from './activity';
 export * from './photo';
 export * from './sync';
 export * from './mobile-auth';
+
+export * from './activity-streams';

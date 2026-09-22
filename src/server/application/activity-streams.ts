@@ -1,4 +1,9 @@
 import 'server-only';
+import {
+  StravaBudgetExceededError,
+  type StravaRequestBudget,
+} from '~/server/strava/request-budget';
+import { STREAM_REQUEST_TIMEOUT_MS } from '~/server/strava/stream-policy';
 
 import { ZodError } from 'zod';
 import type { Actor } from '~/server/auth/actor';
@@ -18,6 +23,8 @@ import {
 } from '~/server/strava/streams';
 
 export function classifyStreamFetchFailure(error: unknown): StreamFetchFailure {
+  if (error instanceof StravaBudgetExceededError)
+    return { code: 'rate_limited', retryable: true };
   if (error instanceof ZodError || error instanceof SyntaxError)
     return { code: 'invalid_response', retryable: false };
   if (error instanceof StravaApiError) {
@@ -39,6 +46,9 @@ export type StreamSourceFactory = (options: {
     { kind: 'fetch' }
   >['tokens'];
   now: Date;
+  requestBudget?: StravaRequestBudget;
+  signal?: AbortSignal;
+  beforeRequest?: () => Promise<void>;
   onRefresh: Parameters<typeof StravaClient.withRefreshToken>[1];
   onRateLimit?: (usage: StravaRateLimitUsage) => void;
 }) => StreamSource;
@@ -48,22 +58,33 @@ export const createStreamSource: StreamSourceFactory = ({
   now,
   onRefresh,
   onRateLimit,
+  requestBudget,
+  signal,
+  beforeRequest,
 }) => {
   if (
     tokens.accessToken &&
     tokens.expiresAtDate &&
     tokens.expiresAtDate > now
   ) {
-    return StravaClient.withAccessToken(tokens.accessToken, { onRateLimit });
+    return StravaClient.withAccessToken(tokens.accessToken, {
+      onRateLimit,
+      requestBudget,
+      signal,
+      beforeRequest,
+    });
   }
   if (tokens.refreshToken)
     return StravaClient.withRefreshToken(tokens.refreshToken, onRefresh, {
       onRateLimit,
+      requestBudget,
+      signal,
+      beforeRequest,
     });
   throw new StravaApiError('No usable Strava credentials', 401);
 };
 
-/** Internal ingestion only; transport, invalidation and scheduling follow in #183/#184. */
+/** Shared bounded ingestion for the v1 endpoint and the future #184 worker. */
 export async function fetchActivityStreams(
   actor: Actor,
   activityId: string,
@@ -84,13 +105,18 @@ export async function fetchActivityStreams(
     now(),
     options.force,
   );
-  if (attempt.kind === 'cached')
-    return { status: 'cached' as const, snapshot: attempt.snapshot };
+  if (attempt.kind !== 'fetch')
+    return { status: attempt.kind, snapshot: attempt.snapshot };
   let claim = attempt.claim;
   let payload;
   try {
     const source = (options.createSource ?? createStreamSource)({
       tokens: attempt.tokens,
+      beforeRequest: async () => {
+        if (!(await repository.isCurrent(claim)))
+          throw new SupersededStreamFetchError();
+      },
+      signal: AbortSignal.timeout(STREAM_REQUEST_TIMEOUT_MS),
       now: now(),
       onRateLimit: options.onRateLimit,
       onRefresh: async (tokens) => {
@@ -108,6 +134,7 @@ export async function fetchActivityStreams(
     const recorded = await repository.fail(
       claim,
       classifyStreamFetchFailure(error),
+      now(),
     );
     if (!recorded) return { status: 'superseded' as const };
     throw error;

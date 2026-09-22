@@ -97,6 +97,7 @@ void test('source refreshes expired credentials through StravaClient before fetc
       expiresAtDate: new Date(1000),
     },
     now,
+    requestBudget: testBudget,
     onRefresh: async (tokens: StravaTokens) => {
       assert.deepEqual(tokens, refreshed);
       order.push('persist');
@@ -156,3 +157,12 @@ void test('source refreshes expired credentials through StravaClient before fetc
     StravaApiError,
   );
 });
+
+const testBudget = {
+  async reserve(read: boolean) {
+    return { startedAt: new Date(), read };
+  },
+  async observe() {
+    return undefined;
+  },
+};

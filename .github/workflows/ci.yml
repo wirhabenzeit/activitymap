@@ -58,6 +58,10 @@ jobs:
         run: |
           xcodebuild -version
           xcodebuild -showsdks | grep -i iphonesimulator
+      - name: Verify old and new Swift clients decode stream metadata
+        run: |
+          git fetch origin +refs/heads/main:refs/remotes/origin/main --depth=1
+          bash scripts/verify-stream-dtos.sh origin/main
       - name: Select an available iOS 27 simulator
         run: |
           simulator_id=$(xcrun simctl list devices available --json | python3 -c '
@@ -124,6 +128,8 @@ jobs:
         run: pnpm db:migrate:test-webhook
       - name: Exercise geometry-state backfill with legacy rows
         run: pnpm db:migrate:test-geometry-state
+      - name: Exercise stream lifecycle upgrade with existing raw payloads
+        run: pnpm db:migrate:test-stream-lifecycle
       - name: Apply all migrations to empty Postgres
         run: pnpm db:migrate
       - name: Verify current migration state
@@ -136,6 +142,8 @@ jobs:
         run: pnpm db:test-summary-reconciliation
       - name: Prove raw activity streams and stale-write guards against Postgres
         run: pnpm db:test-activity-streams
+      - name: Prove stream API, invalidation and shared request budgeting
+        run: pnpm db:test-stream-lifecycle
       - name: Prove a second migration run is a no-op
         run: pnpm db:migrate
       - name: Verify schema fingerprint

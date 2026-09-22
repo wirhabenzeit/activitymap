@@ -1,3 +1,4 @@
+import { activityStreamsDTOSchema } from './activity-streams';
 import { z } from 'zod';
 import { SCHEMA_VERSION } from './primitives';
 import { authenticationDTOSchema } from './auth';
@@ -28,6 +29,7 @@ export function buildOpenApiDocument() {
   registry.add(authenticationDTOSchema, { id: 'Authentication' });
   registry.add(currentUserDTOSchema, { id: 'CurrentUser' });
   registry.add(activityDTOSchema, { id: 'Activity' });
+  registry.add(responseEnvelope(activityStreamsDTOSchema), { id: 'ActivityStreamsResponse' });
   registry.add(photoDTOSchema, { id: 'Photo' });
   registry.add(responseEnvelope(syncBootstrapPageDTOSchema), {
     id: 'SyncBootstrapPageResponse',
@@ -220,6 +222,27 @@ export function buildOpenApiDocument() {
               'The cursor is malformed, unsupported, or older than the retained change history (`sync_rebootstrap_required`); call `/api/v1/sync/bootstrap` again',
             ),
             '429': errorResponse('Too many requests; see `Retry-After`'),
+          },
+        },
+      },
+      '/api/v1/activities/{id}/streams': {
+        get: {
+          operationId: 'getActivityStreams', summary: 'Get raw streams for an owned activity', security,
+          description: 'By default, a cache miss or stale generation fetches synchronously with a 20-second upstream deadline. A concurrent fetch returns 202; poll after Retry-After. fetch=none only inspects local state. Missing/inaccessible activities and disconnected accounts return 404 without availability information. Successful empty or partial streams return 200; absent keys denote unavailable sensors only when metadata.state is current. Expired/invalidated samples are withheld. Activity tombstones invalidate the entire local stream cache. Seven-day expires_at also applies to successful empty responses.',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string', pattern: '^[1-9][0-9]*$' }, description: 'Decimal activity ID, never a floating-point number' },
+            { name: 'fetch', in: 'query', schema: { type: 'string', enum: ['auto', 'none'], default: 'auto' } },
+            { name: 'refresh', in: 'query', schema: { type: 'string', enum: ['true', 'false'], default: 'false' }, description: 'Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none.' },
+          ],
+          responses: {
+            '200': { description: 'Stored streams and explicit availability/freshness; fetch=none may return not_fetched or failed state', content: { 'application/json': { schema: ref('ActivityStreamsResponse') } } },
+            '202': { description: 'Fetch already in progress or invalidated during this request; see Retry-After', content: { 'application/json': { schema: ref('ActivityStreamsResponse') } } },
+            '400': errorResponse('Invalid activity ID or query parameters'),
+            '401': errorResponse('Authentication is required'),
+            '404': errorResponse('Activity or connected account unavailable'),
+            '429': errorResponse('Per-user/API or shared Strava budget exhausted; see Retry-After'),
+            '500': errorResponse('Unexpected database or internal failure'),
+            '503': errorResponse('Stream fetch failed; retryability is explicit. No empty success is synthesized from errors.'),
           },
         },
       },
