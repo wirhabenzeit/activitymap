@@ -91,9 +91,16 @@ final class AuthController: NSObject {
 
     /// Runs the full flow end to end: generate `state` and a PKCE
     /// verifier/challenge, open the hosted sign-in sheet, exchange the
-    /// resulting one-time code, store the bearer token, then fetch
-    /// `/api/v1/me` to prove the new session actually works before reporting
-    /// success.
+    /// resulting one-time code, store the bearer token, then hand off to
+    /// `restoreSession()` to confirm it and report `status`.
+    ///
+    /// That handoff matters once the token is actually saved: at that point
+    /// authentication has already succeeded and persisted, so a timeout or
+    /// `5xx` on the confirming `/api/v1/me` call must not be treated as a
+    /// sign-in failure whose retry starts a whole new OAuth round trip —
+    /// `restoreSession()` already draws that 401-versus-transient
+    /// distinction and gives a transient failure the right retry (itself,
+    /// not a fresh `signIn()`).
     func signIn() async {
         status = .signingIn
         do {
@@ -139,10 +146,10 @@ final class AuthController: NSObject {
 
             try SessionStore.save(exchange.sessionToken)
 
-            let user = try await APIClient.get(
-                "/api/v1/me", bearerToken: exchange.sessionToken,
-                as: ActivityMapAPI.CurrentUser.self)
-            status = .signedIn(user)
+            // The token is saved; from here on, any failure to confirm it is
+            // restoreSession()'s classification to make, not a fresh
+            // sign-in failure. restoreSession() never throws.
+            await restoreSession()
         } catch is CancellationError {
             // Swift-level task cancellation; not a failure to report.
             status = .signedOut
