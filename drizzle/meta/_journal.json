@@ -71,6 +71,13 @@
       "when": 1789979258102,
       "tag": "0009_add-api-rate-limit-bucket",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790076613756,
+      "tag": "0010_activity-streams",
+      "breakpoints": true
     }
   ]
 }

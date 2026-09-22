@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   doublePrecision,
@@ -18,6 +19,9 @@ import { sportTypes } from '~/server/strava/types';
 import type { SportType } from '~/server/strava/types';
 import type { WebhookRequest } from '~/types/strava';
 import type { ShareLinkFieldOptions } from '~/lib/sharing/fields';
+import type {
+  ActivityStreamType, RawActivityStreams, StreamFetchFailure,
+} from '~/server/strava/streams';
 
 export const sportTypeEnum = pgEnum('sport_type', sportTypes);
 
@@ -215,6 +219,25 @@ export const activities = pgTable(
     index('activities_public_id_idx').on(table.public_id),
   ],
 );
+
+// Kept separate so activity lists, maps and sync DTOs never load samples.
+// JSONB retains each independently sampled stream and its upstream metadata.
+export const activityStreams = pgTable('activity_streams', {
+  activityId: bigint('activity_id', { mode: 'bigint' }).primaryKey()
+    .references(() => activities.id, { onDelete: 'cascade' }),
+  generation: text('generation').notNull(),
+  attemptId: text('attempt_id'),
+  requestedTypes: text('requested_types').array().$type<ActivityStreamType[]>().notNull(),
+  payload: jsonb('payload').$type<RawActivityStreams>(),
+  revision: bigint('revision', { mode: 'bigint' }).notNull().default(sql`0`),
+  sourceVersion: text('source_version'),
+  fetchedAt: timestamp('fetched_at', { mode: 'date' }),
+  lastAttemptAt: timestamp('last_attempt_at', { mode: 'date' }).notNull(),
+  lastAttemptStatus: text('last_attempt_status', {
+    enum: ['pending', 'succeeded', 'failed'],
+  }).notNull(),
+  lastError: jsonb('last_error').$type<StreamFetchFailure>(),
+});
 
 export const photos = pgTable(
   'photos',

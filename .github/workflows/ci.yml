@@ -134,6 +134,8 @@ jobs:
         run: pnpm db:test-legacy-sync-selection
       - name: Prove resumable Strava summary reconciliation against Postgres
         run: pnpm db:test-summary-reconciliation
+      - name: Prove raw activity streams and stale-write guards against Postgres
+        run: pnpm db:test-activity-streams
       - name: Prove a second migration run is a no-op
         run: pnpm db:migrate
       - name: Verify schema fingerprint
