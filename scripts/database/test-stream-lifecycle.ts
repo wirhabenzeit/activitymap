@@ -302,6 +302,18 @@ async function run() {
   const failed = await repository.read(actor, ID);
   assert.deepEqual(failed?.payload, {});
   assert.equal(failed?.lastError?.code, 'rate_limited');
+  const lastGood = await failing(request());
+  assert.equal(
+    lastGood.status,
+    200,
+    'a failed refresh cooldown still serves the current payload',
+  );
+  const lastGoodBody = activityStreamsDTOSchema.parse(
+    ((await lastGood.json()) as { data: unknown }).data,
+  );
+  assert.equal(lastGoodBody.metadata.state, 'current');
+  assert.equal(lastGoodBody.metadata.fetch_status, 'failed');
+  assert.deepEqual(lastGoodBody.streams, {});
 
   clock = new Date(clock.getTime() + 120_000);
   claim = await repository.begin(actor, ID, now(), true);

@@ -181,6 +181,17 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           .from(activityStreams)
           .where(eq(activityStreams.activityId, BigInt(activityId)))
           .for('update');
+        const current =
+          existing?.payload != null &&
+          !existing.invalidatedAt &&
+          existing.fetchedAt &&
+          existing.fetchedAt.getTime() + STREAM_MAX_AGE_MS > now.getTime() &&
+          existing.sourceVersion === source.sourceVersion;
+        // A current payload stays readable while another refresh is in flight
+        // or cooling down after a failure; only fetches wait for either.
+        if (current && !force) {
+          return { kind: 'cached' as const, snapshot: snapshot(existing) };
+        }
         if (
           existing?.attemptId &&
           existing.leaseExpiresAt &&
@@ -192,13 +203,8 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           return { kind: 'cooldown' as const, snapshot: snapshot(existing) };
         }
         if (
-          existing?.payload != null &&
-          !existing.invalidatedAt &&
-          existing.fetchedAt &&
-          existing.fetchedAt.getTime() + STREAM_MAX_AGE_MS > now.getTime() &&
-          existing.sourceVersion === source.sourceVersion &&
-          (!force ||
-            existing.fetchedAt.getTime() + STREAM_RETRY_MS > now.getTime())
+          current &&
+          existing.fetchedAt!.getTime() + STREAM_RETRY_MS > now.getTime()
         ) {
           return { kind: 'cached' as const, snapshot: snapshot(existing) };
         }
