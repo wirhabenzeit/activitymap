@@ -1,6 +1,6 @@
 # Raw activity streams
 
-Issue #182 added the ingestion service; #183 adds the API and lifecycle described below. The service requests `time`, `distance`,
+Issue #182 added ingestion, #183 added the API/lifecycle, and #184 adds hourly historical backfill. The service requests `time`, `distance`,
 `latlng`, `altitude`, `watts`, and `heartrate` together from
 `GET /activities/{id}/streams?keys=…&key_by_type=true` using `StravaClient`.
 Strava's current [endpoint definition](https://developers.strava.com/docs/reference/#api-Streams-getActivityStreams)
@@ -81,8 +81,6 @@ the same guard so an in-flight refresh cannot restore a revoked account.
 
 ## Follow-up boundary
 
-- #184 adds resumable hourly backfill, request budgets and retry scheduling.
-  Partial/empty successes must not be treated as an endless missing-data queue.
 - #185 adds iOS loading/cache. Charts and any downsampling remain deferred.
 
 Follow [the migration deployment sequence](database-migrations.md) before
@@ -182,8 +180,8 @@ The budget keeps the existing reconciliation reserves of 25 requests per
 15-minute window and 100 per day. All currently supported operations are
 non-upload calls; OAuth refresh is conservatively charged against both limits.
 The budget stores only four rows and rolls them forward at UTC boundaries.
-#184 must use this same client and additionally enforce its conservative
-backfill batch limits.
+The historical backfill uses this same accounting with the additional reserves
+and batch limits below.
 
 ### Deployment and validation
 
@@ -201,3 +199,112 @@ empty success, throttling, deauthorization, deletion and shared budget races.
 `bash scripts/verify-stream-dtos.sh <base-ref>` compiles both the new DTOs and
 the actual previous generated Swift file, then decodes new/old activity payloads
 and raw stream arrays. CI runs the PostgreSQL proof and Swift decoding check.
+
+## Historical backfill (#184)
+
+`POST /api/cron/backfill-activity-streams` is a separate invocation after summary
+reconciliation, so each worker retains its own 45-second work budget within a
+60-second route. The new endpoint requires the existing `x-cron-secret`,
+`VERCEL_ENV=production`, `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`, and
+`ACTIVITYMAP_STREAM_BACKFILL=enabled`. It is disabled by default. The workflow
+also requires the GitHub repository variable `ACTIVITYMAP_STREAM_BACKFILL=enabled`.
+A failed reconciliation step skips backfill for that hour.
+
+Defaults are **5 activities and 10 outbound request reservations globally per
+UTC hour**, sequentially. JSON parameters `activityLimit` (1–10) and
+`requestLimit` (1–20) can lower or modestly raise the caps; the first invocation
+sets the hour's allowance, and replays can only lower it. OAuth refresh counts
+as a request, as does any retry. There are no in-run automatic retries.
+Reservations are charged before outbound work and are not refunded on crashes,
+so reported `requests` can exceed the actual requests sent. The shared Strava
+budget additionally preserves **50 requests per 15 minutes and 200 per day** in
+both overall and read windows; ordinary callers retain their 25/100 reserves.
+The larger background reserve does not mark otherwise usable foreground
+capacity blocked. Low quota or any 429 stops the run and pauses same-hour
+replays. Upstream headers and shared accounting may keep later hours paused too.
+
+The run's 90-second lease serializes overlapping workers. Hourly selected/request
+counters are durable even if the process terminates. Per-activity scheduling
+leases and the existing stream-fetch lease recover after 90 seconds. Every
+upstream request rechecks the run lease and deadline, as well as stream ownership
+and generation. HTTP cancellation uses the smaller of the remaining run deadline
+and the ingestion service's 20-second timeout. Late responses cannot publish
+past the work deadline or revive deleted/revoked/invalidated streams. Database
+checkpoint/cleanup work has the remaining route time; the 45-second bound is a
+work deadline, not a guarantee of a response during a database outage.
+
+Three additive tables in migration 0014 hold the hourly allowance, account
+rotation, and per-activity attempt metadata. Scheduling writes do not publish
+activity change-feed entries. Accounts rotate in order of last selection; each
+account starts with its newest activity, then alternates oldest/newest. Thus
+continuously arriving recent activities cannot permanently starve older history.
+Only activities belonging to a connected, non-revoked account are eligible.
+Current stream leases and cooldowns are respected, including foreground work.
+
+A successful set, including `{}` or absent HR/power/GPS keys, completes historical
+backfill for that storage generation. The worker does **not** periodically
+refresh completed history merely because the API's seven-day cache expires;
+on-demand loading still revalidates expired data. Known stream invalidation
+makes an activity eligible again. This keeps completed recent activities from
+consuming all capacity intended for unfetched history.
+
+Attempts persist their count, generation, retry time and safe error code. Retryable
+failures use exponential backoff starting at one hour and capped at 24 hours.
+They remain retryable, including repeated quota deferrals. Unauthorized/not-found,
+invalid payloads and other non-retryable errors are terminal for that generation.
+They stay visible in `stream_backfill_attempt` and are excluded from the automatic
+queue. A new generation resets scheduling, while foreground fetches remain
+independent of backfill retry policy. An operator can explicitly retry a corrected
+terminal case by clearing `terminal` and `next_attempt_at` for that activity;
+this does not reset shared request counters or bypass ownership checks.
+
+The response and redacted cycle-complete log report `selected`, `fetched`,
+`unavailable` (successful empty sets or activity/claim unavailable), `retried`,
+`failed`, `requests`, `remainingBacklog`, `stopReason`, and `elapsedMs` for that
+invocation. Backlog includes temporarily leased/cooling-down work but excludes
+terminal failures and completed generations. A `complete` stop means no work is
+currently eligible, so backlog can remain nonzero. `busy`, `activity_limit`,
+`request_limit`, `deadline`, `rate_limit` and `lease_lost` explain other stops.
+Failures of individual activities are recorded in a successful run response;
+uncaught worker/storage errors fail the invocation. Inspect terminal failures alongside
+the backlog when measuring coverage:
+
+```sql
+SELECT terminal, last_error->>'code' AS error_code, count(*)
+FROM stream_backfill_attempt
+GROUP BY terminal, last_error->>'code';
+```
+
+### Rollout, manual invocation, and pause
+
+1. Deploy #182/#183 lifecycle handling and migrations 0010–0013 first. Verify
+   invalidation, deletion and deauthorization before scheduled stream ingestion.
+2. Apply additive migration 0014 and deploy this worker with both enable switches
+   unset. Existing raw data needs no transformation or backfill migration.
+3. Set the production server enable switch, then invoke a **one-activity** canary
+   with the existing cron secret. Check counters, stored raw samples, and the
+   owned API/change-feed metadata. A canary fixes that hour's smaller allowance.
+4. Set the GitHub repository variable to enable the hourly step at the next hour.
+   Observe actual fetched counts, backlog, terminal errors, quota stops, and
+   ordinary Strava traffic. At five/hour, 120/day is only a theoretical ceiling.
+5. Unset the GitHub variable to pause scheduling. Unset the server environment
+   switch and redeploy to disable manual invocations too. Already-running work
+   remains bounded by its deadline; do not delete progress rows to pause.
+
+```sh
+curl --fail-with-body --silent --show-error --max-time 60 \
+  --request POST \
+  --header "x-cron-secret: ${CRON_SECRET}" \
+  --header 'content-type: application/json' \
+  --data '{"activityLimit":1,"requestLimit":2}' \
+  https://activitymap.dominik.page/api/cron/backfill-activity-streams
+```
+
+`pnpm db:test-stream-backfill` uses a guarded local test database and mocked
+upstream HTTP with the real client and repositories. It proves multi-account
+caps and fairness, OAuth accounting, overlapping and interrupted runs, replay
+fencing, empty completion, all four quota windows and foreground headroom,
+429/checkpoint preservation, retry/terminal handling, generation invalidation,
+deauthorization/deletion, and both simulated and real abort deadlines. CI runs
+it after migrations and the existing lifecycle proof. No live Strava calls are
+made by the fixture.

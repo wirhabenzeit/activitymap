@@ -144,6 +144,8 @@ jobs:
         run: pnpm db:test-activity-streams
       - name: Prove stream API, invalidation and shared request budgeting
         run: pnpm db:test-stream-lifecycle
+      - name: Prove conservative hourly stream backfill
+        run: pnpm db:test-stream-backfill
       - name: Prove a second migration run is a no-op
         run: pnpm db:migrate
       - name: Verify schema fingerprint

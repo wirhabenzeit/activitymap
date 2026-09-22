@@ -715,3 +715,39 @@ export const stravaRequestBudgets = pgTable('strava_request_budget', {
   ceiling: integer('ceiling').notNull(),
   blockedUntil: timestamp('blocked_until', { mode: 'date' }),
 });
+
+// A single global hourly allowance survives scheduler replays and process loss.
+// Tokens fence late workers; no lock is held during upstream requests.
+export const streamBackfillRuns = pgTable('stream_backfill_run', {
+  key: text('key').primaryKey(),
+  windowStart: timestamp('window_start', { mode: 'date' }).notNull(),
+  activityLimit: integer('activity_limit').notNull(),
+  requestLimit: integer('request_limit').notNull(),
+  selected: integer('selected').notNull().default(0),
+  requests: integer('requests').notNull().default(0),
+  leaseToken: text('lease_token'),
+  leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }),
+  paused: boolean('paused').notNull().default(false),
+});
+
+// Round-robin accounts, alternating newest/oldest work within each account.
+export const streamBackfillAccounts = pgTable('stream_backfill_account', {
+  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  lastSelectedAt: timestamp('last_selected_at', { mode: 'date' }).notNull(),
+  selectOldest: boolean('select_oldest').notNull().default(true),
+});
+
+// Scheduling metadata is separate from stream data: retries/checkpoints must
+// not publish activity change-feed entries or load large JSON payloads.
+export const streamBackfillAttempts = pgTable('stream_backfill_attempt', {
+  activityId: bigint('activity_id', { mode: 'bigint' }).primaryKey()
+    .references(() => activities.id, { onDelete: 'cascade' }),
+  generation: text('generation'),
+  attemptCount: integer('attempt_count').notNull(),
+  lastAttemptAt: timestamp('last_attempt_at', { mode: 'date' }).notNull(),
+  nextAttemptAt: timestamp('next_attempt_at', { mode: 'date' }),
+  terminal: boolean('terminal').notNull().default(false),
+  lastError: jsonb('last_error').$type<StreamFetchFailure>(),
+  leaseToken: text('lease_token'),
+  leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }),
+});
