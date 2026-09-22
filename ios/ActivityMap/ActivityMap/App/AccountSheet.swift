@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AccountSheet: View {
     let destination: AccountDestination
+    let auth: AuthController
 
     @Environment(\.dismiss) private var dismiss
     @State private var distanceUnit = DistanceUnit.kilometers
@@ -33,27 +34,109 @@ struct AccountSheet: View {
 
     @ViewBuilder
     private var profileContent: some View {
-        Section {
-            VStack(spacing: 12) {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(.secondary)
+        switch auth.status {
+        case .signedOut:
+            signedOutContent
+        case .signingIn:
+            signingInContent
+        case .signedIn(let user):
+            signedInContent(user)
+        case .failed(let message):
+            signInFailedContent(message)
+        }
+    }
 
-                VStack(spacing: 3) {
-                    Text("Dominik")
-                        .font(.headline)
-                    Text("ActivityMap account")
-                        .font(.subheadline)
+    private var signedOutContent: some View {
+        Group {
+            Section {
+                VStack(spacing: 12) {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 64))
                         .foregroundStyle(.secondary)
+                    Text("Not Signed In")
+                        .font(.headline)
                 }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
+                Button {
+                    Task { await auth.signIn() }
+                } label: {
+                    Label("Sign in with Strava", systemImage: "figure.outdoor.cycle")
+                }
+            }
+        }
+    }
+
+    private var signingInContent: some View {
+        Section {
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("Signing in…")
+                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             .listRowBackground(Color.clear)
         }
+    }
 
-        Section("Connected Services") {
-            LabeledContent("Strava", value: "Connected")
-            LabeledContent("Last Sync", value: "Just now")
+    private func signedInContent(_ user: ActivityMapAPI.CurrentUser) -> some View {
+        Group {
+            Section {
+                VStack(spacing: 12) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(.secondary)
+
+                    VStack(spacing: 3) {
+                        Text(user.name ?? "ActivityMap Account")
+                            .font(.headline)
+                        if let email = user.email {
+                            Text(email)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            }
+
+            Section("Connected Services") {
+                LabeledContent("Strava", value: user.stravaConnected ? "Connected" : "Not Connected")
+                if let athleteID = user.athleteID {
+                    LabeledContent("Athlete ID", value: athleteID)
+                }
+                LabeledContent("Session", value: user.authentication.method.rawValue.capitalized)
+            }
+
+            Section {
+                Button("Sign Out", role: .destructive) {
+                    Task { await auth.signOut() }
+                }
+            }
+        }
+    }
+
+    private func signInFailedContent(_ message: String) -> some View {
+        Group {
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Sign-In Failed")
+                        .font(.headline)
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                Button("Try Again") {
+                    Task { await auth.signIn() }
+                }
+            }
         }
     }
 
