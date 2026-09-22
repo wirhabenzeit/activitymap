@@ -24,6 +24,8 @@ jobs:
       - run: pnpm lint
       - name: Validate shared map catalogue and generated Swift
         run: pnpm map-catalog:check
+      - name: Check the generated Swift API DTOs match the Zod contracts
+        run: pnpm api-dtos:check
       - name: Fetch main for the OpenAPI breaking-change comparison
         run: git fetch origin +refs/heads/main:refs/remotes/origin/main --depth=1
       - name: Check for breaking OpenAPI changes vs main
@@ -38,6 +40,32 @@ jobs:
           node-version: 22
       - name: Generate and compile the Swift client
         run: bash scripts/verify-swift-client.sh
+
+  # Compiles the generated wire types inside the real app target. The
+  # api-dtos:check step in `quality` only compares generated text, and
+  # `swift-client` above compiles a separate OpenAPI-generated package, so
+  # without this job invalid generated Swift could pass CI.
+  #
+  # This needs the iOS 27 SDK, which as of September 2026 exists only on the
+  # `xcode-27` runner label (public preview). macos-26 tops out at iOS 26.5. If
+  # that label is withdrawn before it goes GA, pin an image with an iOS 27 SDK
+  # rather than lowering IPHONEOS_DEPLOYMENT_TARGET.
+  ios-app:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+      - name: Record the toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphonesimulator
+      - name: Build the app target for the simulator
+        run: |
+          xcodebuild build \
+            -project ios/ActivityMap/ActivityMap.xcodeproj \
+            -scheme ActivityMap \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
 
   migrations:
     runs-on: ubuntu-24.04

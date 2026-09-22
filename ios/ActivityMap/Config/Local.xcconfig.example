@@ -1,2 +1,13 @@
 // Copy this file to Local.xcconfig and use a URL-restricted public token.
 MAPBOX_ACCESS_TOKEN = pk.your-public-mapbox-token
+
+// Optional overrides. Base.xcconfig already defaults to a local Next.js dev
+// server, so uncomment these only to point the app somewhere else. Remember
+// that "//" starts a comment in xcconfig, so build URLs from $(SLASH) rather
+// than typing the separator literally.
+//
+// ACTIVITYMAP_API_BASE_URL = https:$(SLASH)$(SLASH)your-preview.vercel.app
+//
+// Changing the callback scheme also requires updating the server's
+// MOBILE_AUTH_REDIRECT_ALLOWLIST to match, or sign-in is rejected.
+// ACTIVITYMAP_AUTH_CALLBACK_SCHEME = activitymap

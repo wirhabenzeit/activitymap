@@ -29,6 +29,8 @@
     "openapi:check-breaking": "tsx scripts/check-openapi-breaking-changes.ts",
     "map-catalog:generate": "tsx scripts/generate-map-catalog-swift.ts",
     "map-catalog:check": "tsx scripts/generate-map-catalog-swift.ts --check",
+    "api-dtos:generate": "tsx scripts/generate-api-dtos-swift.ts",
+    "api-dtos:check": "tsx scripts/generate-api-dtos-swift.ts --check",
     "friflyt:enrich": "node scripts/enrich-friflyt-geojson.mjs",
     "friflyt:enrich:translate": "node scripts/enrich-friflyt-geojson.mjs --translate"
   },

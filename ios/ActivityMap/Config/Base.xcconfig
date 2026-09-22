@@ -1,3 +1,21 @@
 // The token is public at runtime but must be supplied outside version control.
 MAPBOX_ACCESS_TOKEN =
+
+// xcconfig treats "//" as the start of a comment, so URL separators have to be
+// composed from $(SLASH) instead of written literally.
+SLASH = /
+
+// Which ActivityMap deployment this build talks to. The app never holds a
+// database credential or a Strava token: picking an environment here picks a
+// deployment, and that deployment owns its own database. Override in the
+// ignored Local.xcconfig to point at a preview or production URL.
+ACTIVITYMAP_API_BASE_URL = http:$(SLASH)$(SLASH)localhost:3000
+
+// Mobile sign-in callback. The scheme is registered under CFBundleURLTypes in
+// Info.plist and is what ASWebAuthenticationSession watches for. The full URI
+// must also be listed in the server's MOBILE_AUTH_REDIRECT_ALLOWLIST, which
+// matches protocol, host, and path prefix exactly.
+ACTIVITYMAP_AUTH_CALLBACK_SCHEME = activitymap
+ACTIVITYMAP_AUTH_REDIRECT_URI = $(ACTIVITYMAP_AUTH_CALLBACK_SCHEME):$(SLASH)$(SLASH)auth/callback
+
 #include? "Local.xcconfig"
