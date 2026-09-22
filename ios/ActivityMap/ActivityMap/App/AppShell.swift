@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AppShell: View {
     @State private var store = ActivityStore()
+    @State private var auth = AuthController()
     @State private var showsFilters = false
     @State private var accountDestination: AccountDestination?
 
@@ -13,6 +14,7 @@ struct AppShell: View {
                 .navigationTitle("ActivityMap")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+                .task { await auth.restoreSession() }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Menu {
@@ -71,7 +73,7 @@ struct AppShell: View {
                     .presentationDetents([.medium, .large])
                 }
                 .sheet(item: $accountDestination) { destination in
-                    AccountSheet(destination: destination)
+                    AccountSheet(destination: destination, auth: auth)
                 }
             }
     }
