@@ -66,8 +66,8 @@ function authorizationVersion(account: Account): string {
     .digest('hex');
 }
 
-/** Lock order matches account erasure: user -> account -> activity -> streams. */
-async function lockSource(tx: Transaction, actor: Actor, activityId: string) {
+/** Locks the actor's user and connected, non-revoked Strava account. */
+async function lockEligibleAccount(tx: Transaction, actor: Actor) {
   const [user] = await tx
     .select({ id: users.id })
     .from(users)
@@ -92,6 +92,13 @@ async function lockSource(tx: Transaction, actor: Actor, activityId: string) {
   if (!account || account.revokedAt || account.scheduledErasureAt) return null;
   const tokens = resolveAccountTokens(account);
   if (!tokens.accessToken && !tokens.refreshToken) return null;
+  return account;
+}
+
+/** Lock order matches account erasure: user -> account -> activity -> streams. */
+async function lockSource(tx: Transaction, actor: Actor, activityId: string) {
+  const account = await lockEligibleAccount(tx, actor);
+  if (!account) return null;
   const [activity] = await tx
     .select({
       // A conservative version of the whole source row catches existing writers
@@ -250,14 +257,26 @@ export function createActivityStreamsRepository(database: typeof db = db) {
       });
     },
 
-    /** Refresh callbacks must not restore credentials after revoke/reconnect. */
+    /**
+     * Refresh callbacks must not restore credentials after revoke/reconnect.
+     * Returns the updated claim, or null when the claim is no longer current.
+     */
     async replaceCredentials(
       claim: StreamFetchClaim,
       tokens: StravaTokens,
     ): Promise<StreamFetchClaim | null> {
       return database.transaction(async (tx) => {
-        const source = await lockClaim(tx, claim);
-        if (!source) return null;
+        // Only replace the exact credentials this attempt refreshed; a
+        // concurrent refresh or reconnect already stored newer, valid tokens.
+        const eligible = await lockEligibleAccount(tx, claim.actor);
+        if (
+          !eligible ||
+          authorizationVersion(eligible) !== claim.authorizationVersion
+        )
+          return null;
+        // Strava has already rotated the refresh token, so persist it even
+        // when the stream attempt itself was superseded during the request.
+        const current = await lockClaim(tx, claim);
         const [account] = await tx
           .update(accounts)
           .set(
@@ -268,9 +287,9 @@ export function createActivityStreamsRepository(database: typeof db = db) {
               expiresAtDate: new Date(tokens.expires_at * 1000),
             }),
           )
-          .where(eq(accounts.id, source.account.id))
+          .where(eq(accounts.id, eligible.id))
           .returning();
-        return account
+        return current && account
           ? { ...claim, authorizationVersion: authorizationVersion(account) }
           : null;
       });

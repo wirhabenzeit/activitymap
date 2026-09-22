@@ -321,6 +321,43 @@ async function run() {
     'old credential generation rejected',
   );
   assert.ok(await repository.commit(current, RAW_STREAMS_FIXTURE, NOW));
+
+  // Strava rotates the refresh token on use, so a superseded attempt must
+  // still persist it; otherwise the stored refresh token is already dead.
+  refreshClaim = await claim();
+  await testDb
+    .update(activities)
+    .set({ elapsed_time: 4321 })
+    .where(activityWhere);
+  assert.equal(
+    await repository.replaceCredentials(refreshClaim, {
+      ...refreshed,
+      access_token: 'superseded-access',
+      refresh_token: 'superseded-refresh',
+    }),
+    null,
+    'superseded claim is not revived',
+  );
+  const [afterSuperseded] = await testDb
+    .select()
+    .from(accounts)
+    .where(eq(accounts.id, accountId));
+  assert.equal(afterSuperseded?.refreshToken, 'superseded-refresh');
+  assert.equal(afterSuperseded?.refresh_token, 'superseded-refresh');
+  // A claim from before another writer's refresh never overwrites newer tokens.
+  assert.equal(
+    await repository.replaceCredentials(refreshClaim, {
+      ...refreshed,
+      refresh_token: 'stale-refresh',
+    }),
+    null,
+  );
+  assert.equal(
+    (await testDb.select().from(accounts).where(eq(accounts.id, accountId)))[0]
+      ?.refreshToken,
+    'superseded-refresh',
+  );
+
   refreshClaim = await claim();
   await testDb
     .update(accounts)
