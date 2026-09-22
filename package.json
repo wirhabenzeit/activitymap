@@ -18,6 +18,7 @@
     "db:test-erasure": "tsx --conditions=react-server scripts/database/test-erasure-executor.ts",
     "db:test-legacy-sync-selection": "tsx --conditions=react-server scripts/database/test-legacy-activity-sync-selection.ts",
     "db:test-summary-reconciliation": "tsx --conditions=react-server scripts/database/test-summary-reconciliation.ts",
+    "db:test-activity-streams": "tsx --conditions=react-server scripts/database/test-activity-streams.ts",
     "db:audit-sync-migration": "tsx scripts/database/audit-sync-migration.ts",
     "db:migrate:preview": "tsx scripts/database/migrate-preview.ts",
     "db:schema:fingerprint": "tsx scripts/database/migrate.ts fingerprint",

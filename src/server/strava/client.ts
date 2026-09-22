@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type {
   StravaActivity,
   StravaPhoto,
@@ -8,9 +9,22 @@ import type {
 import { mergeAndProcessStravaPhotos } from './transforms';
 import { logger } from '~/server/logging/logger';
 import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
+import {
+  ACTIVITY_STREAM_TYPES,
+  rawActivityStreamsSchema,
+  streamActivityIdSchema,
+  type RawActivityStreams,
+} from './streams';
 
 const STRAVA_API_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token';
+
+const stravaTokensSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(1),
+  expires_at: z.number().int().positive(),
+  expires_in: z.number().int().nonnegative(),
+});
 
 export interface StravaTokens {
   access_token: string;
@@ -147,8 +161,9 @@ export class StravaClient {
   static withRefreshToken(
     refreshToken: string,
     tokenRefreshCallback: (tokens: StravaTokens) => Promise<void>,
+    { onRateLimit }: { onRateLimit?: (usage: StravaRateLimitUsage) => void } = {},
   ): StravaClient {
-    return new StravaClient({ refreshToken, tokenRefreshCallback });
+    return new StravaClient({ refreshToken, tokenRefreshCallback, rateLimitCallback: onRateLimit });
   }
 
   /**
@@ -196,27 +211,22 @@ export class StravaClient {
         }),
       });
 
-      const tokens = (await response.json()) as StravaTokens;
-
+      const usage = parseStravaRateLimitUsage(response.headers);
+      if (usage) this.rateLimitCallback?.(usage);
       if (!response.ok) {
-        throw new Error(`Failed to refresh access token: ${response.status}`);
+        throw new StravaApiError('Failed to refresh access token', response.status);
       }
+      const tokens = stravaTokensSchema.parse(await response.json());
 
-      // Update internal tokens
+      // Persist/authorize first. A rejected callback must not leave this client
+      // holding credentials that could be reused after account revocation.
+      await this.tokenRefreshCallback?.(tokens);
       this.accessToken = tokens.access_token;
-      if (tokens.refresh_token) {
-        this.refreshToken = tokens.refresh_token;
-      }
-
-      // Call the callback if provided
-      if (this.tokenRefreshCallback) {
-        await this.tokenRefreshCallback(tokens);
-      }
-
+      this.refreshToken = tokens.refresh_token;
       return tokens;
     } catch (error) {
       logger.error('Error refreshing access token:', error);
-      throw new Error('Failed to refresh access token');
+      throw error;
     }
   }
 
@@ -357,6 +367,16 @@ export class StravaClient {
 
   async getActivity(id: number): Promise<StravaActivity> {
     return this.request<StravaActivity>(`/activities/${id}`);
+  }
+
+  async getActivityStreams(id: string): Promise<RawActivityStreams> {
+    const activityId = streamActivityIdSchema.parse(id);
+    const query = new URLSearchParams({
+      keys: ACTIVITY_STREAM_TYPES.join(','), key_by_type: 'true',
+    });
+    return rawActivityStreamsSchema.parse(
+      await this.request<unknown>(`/activities/${activityId}/streams?${query}`),
+    );
   }
 
   async getActivities(
