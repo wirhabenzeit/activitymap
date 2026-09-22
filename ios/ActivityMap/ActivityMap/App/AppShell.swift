@@ -6,6 +6,10 @@ struct AppShell: View {
     @State private var showsFilters = false
     @State private var accountDestination: AccountDestination?
 
+    init(activities: [Activity] = []) {
+        _store = State(initialValue: ActivityStore(activities: activities))
+    }
+
     var body: some View {
         NavigationStack {
             content
@@ -129,5 +133,5 @@ enum AccountDestination: String, Identifiable {
 }
 
 #Preview {
-    AppShell()
+    AppShell(activities: SampleData.activities)
 }

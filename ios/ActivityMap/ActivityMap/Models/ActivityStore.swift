@@ -24,7 +24,17 @@ struct NumericFilter: Equatable {
 
 @Observable
 final class ActivityStore {
-    var activities: [Activity] = SampleData.activities
+    var activities: [Activity]
+
+    init(activities: [Activity] = []) {
+        self.activities = activities
+    }
+
+    /// The sync coordinator will call this after a committed sync pass.
+    func load(from store: LocalStore, scope: StoreScope) async throws {
+        let snapshot = try await store.snapshot(scope: scope)
+        activities = try snapshot.activities.map(StoredModelMapper.activity)
+    }
 
     var activeCategories: Set<ActivityCategory> = Set(ActivityCategory.allCases)
     var activeSportTypes: Set<SportType> = Set(SportType.allCases)

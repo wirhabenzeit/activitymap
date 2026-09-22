@@ -26,8 +26,19 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES">
+      shouldUseLaunchSchemeArgsEnv = "NO">
+      <CommandLineArguments>
+         <CommandLineArgument argument = "--unit-testing" isEnabled = "YES"/>
+      </CommandLineArguments>
       <Testables>
+         <TestableReference skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C0DE00000000000000000004"
+               BuildableName = "ActivityMapTests.xctest"
+               BlueprintName = "ActivityMapTests"
+               ReferencedContainer = "container:ActivityMap.xcodeproj"/>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

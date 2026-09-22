@@ -7,5 +7,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    AppShell(activities: SampleData.activities)
 }
