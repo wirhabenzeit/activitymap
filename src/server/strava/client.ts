@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { StravaRequestBudget } from './request-budget';
 import type {
   StravaActivity,
   StravaPhoto,
@@ -101,8 +102,18 @@ export class StravaApiError extends Error {
   }
 }
 
+type StravaClientOptions = {
+  onRateLimit?: (usage: StravaRateLimitUsage) => void;
+  requestBudget?: StravaRequestBudget;
+  signal?: AbortSignal;
+  beforeRequest?: () => Promise<void>;
+};
+
 export class StravaClient {
   private accessToken?: string;
+  private requestBudget?: StravaRequestBudget;
+  private signal?: AbortSignal;
+  private beforeRequest?: () => Promise<void>;
   private refreshToken?: string;
   private clientId: string;
   private clientSecret: string;
@@ -114,14 +125,23 @@ export class StravaClient {
     refreshToken,
     tokenRefreshCallback,
     rateLimitCallback,
+    requestBudget,
+    signal,
+    beforeRequest,
   }: {
     accessToken?: string;
     refreshToken?: string;
     tokenRefreshCallback?: (tokens: StravaTokens) => Promise<void>;
     rateLimitCallback?: (usage: StravaRateLimitUsage) => void;
+    requestBudget?: StravaRequestBudget;
+    signal?: AbortSignal;
+    beforeRequest?: () => Promise<void>;
   }) {
     requireExternalEffectsEnabled();
 
+    this.requestBudget = requestBudget;
+    this.signal = signal;
+    this.beforeRequest = beforeRequest;
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
     this.tokenRefreshCallback = tokenRefreshCallback;
@@ -149,10 +169,10 @@ export class StravaClient {
   static withAccessToken(
     accessToken: string,
     {
-      onRateLimit,
-    }: { onRateLimit?: (usage: StravaRateLimitUsage) => void } = {},
+      onRateLimit, requestBudget, signal, beforeRequest,
+    }: StravaClientOptions = {},
   ): StravaClient {
-    return new StravaClient({ accessToken, rateLimitCallback: onRateLimit });
+    return new StravaClient({ accessToken, rateLimitCallback: onRateLimit, requestBudget, signal, beforeRequest });
   }
 
   /**
@@ -161,9 +181,9 @@ export class StravaClient {
   static withRefreshToken(
     refreshToken: string,
     tokenRefreshCallback: (tokens: StravaTokens) => Promise<void>,
-    { onRateLimit }: { onRateLimit?: (usage: StravaRateLimitUsage) => void } = {},
+    { onRateLimit, requestBudget, signal, beforeRequest }: StravaClientOptions = {},
   ): StravaClient {
-    return new StravaClient({ refreshToken, tokenRefreshCallback, rateLimitCallback: onRateLimit });
+    return new StravaClient({ refreshToken, tokenRefreshCallback, rateLimitCallback: onRateLimit, requestBudget, signal, beforeRequest });
   }
 
   /**
@@ -189,6 +209,25 @@ export class StravaClient {
     return new StravaClient({});
   }
 
+  private async budgetedFetch(url: string, init: RequestInit): Promise<Response> {
+    const budget = this.requestBudget ??
+      (await import('~/server/repositories/strava-budget')).stravaRequestBudget;
+    // All currently supported operations are non-upload endpoints, including
+    // activity edits. Conservatively charge OAuth against both limits too.
+    const ticket = await budget.reserve(true);
+    let response: Response;
+    try {
+      await this.beforeRequest?.();
+      response = await fetch(url, { ...init, signal: this.signal ?? init.signal });
+    } catch (error) {
+      // Keep the reservation charged, but no longer count it as in flight.
+      await budget.observe(ticket, null, 0);
+      throw error;
+    }
+    await budget.observe(ticket, parseStravaRateLimitUsage(response.headers), response.status);
+    return response;
+  }
+
   /**
    * Refresh the access token using the refresh token
    */
@@ -198,7 +237,7 @@ export class StravaClient {
     }
 
     try {
-      const response = await fetch(STRAVA_TOKEN_URL, {
+      const response = await this.budgetedFetch(STRAVA_TOKEN_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -284,7 +323,7 @@ export class StravaClient {
       headers.Authorization = authHeader;
     }
 
-    const response = await fetch(`${STRAVA_API_BASE_URL}${endpoint}`, {
+    const response = await this.budgetedFetch(`${STRAVA_API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
     });

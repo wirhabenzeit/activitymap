@@ -1,3 +1,4 @@
+import { streamMetadataSchema, type StreamMetadata } from './activity-streams';
 import { z } from 'zod';
 import type { Activity } from '~/server/db/schema';
 import { sportTypes } from '~/server/db/schema';
@@ -34,6 +35,7 @@ export const photosStateSchema = z.enum(['current', 'refresh_required']);
 export type PhotosState = z.infer<typeof photosStateSchema>;
 
 export const activityDTOSchema = z.object({
+  streams: streamMetadataSchema.optional(),
   id: idString,
   athlete: idString,
   name: z.string(),
@@ -96,8 +98,9 @@ export type ActivityDTO = z.infer<typeof activityDTOSchema>;
 /** Maps a Drizzle `Activity` row to the v1 wire contract. Validates its own
  * output, so a future schema.ts change that breaks the contract fails loud
  * here instead of silently changing the wire shape. */
-export function toActivityDTO(activity: Activity): ActivityDTO {
+export function toActivityDTO(activity: Activity & { streamsMetadata?: StreamMetadata }): ActivityDTO {
   return activityDTOSchema.parse({
+    ...(activity.streamsMetadata ? { streams: activity.streamsMetadata } : {}),
     id: toIdString(activity.id),
     athlete: toIdString(activity.athlete),
     name: activity.name,

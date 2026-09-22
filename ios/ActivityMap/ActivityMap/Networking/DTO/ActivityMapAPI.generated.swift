@@ -21,6 +21,155 @@ nonisolated enum ActivityMapAPI {
 }
 
 nonisolated extension ActivityMapAPI {
+    struct StreamMetadata: Codable, Hashable, Sendable {
+        let generation: String?
+        let revision: String
+        let state: StreamFreshness
+        let fetchStatus: StreamFetchStatus
+        let availableTypes: [StreamType]
+        let fetchedAt: Date?
+        let expiresAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case generation
+            case revision
+            case state
+            case fetchStatus = "fetch_status"
+            case availableTypes = "available_types"
+            case fetchedAt = "fetched_at"
+            case expiresAt = "expires_at"
+        }
+    }
+
+    struct TimeStream: Codable, Hashable, Sendable {
+        let type: String?
+        let data: [Int]
+        let originalSize: Int
+        let resolution: StreamResolution
+        let seriesType: StreamSeriesType
+
+        enum CodingKeys: String, CodingKey {
+            case type
+            case data
+            case originalSize = "original_size"
+            case resolution
+            case seriesType = "series_type"
+        }
+    }
+
+    struct DistanceStream: Codable, Hashable, Sendable {
+        let type: String?
+        let data: [Double]
+        let originalSize: Int
+        let resolution: StreamResolution
+        let seriesType: StreamSeriesType
+
+        enum CodingKeys: String, CodingKey {
+            case type
+            case data
+            case originalSize = "original_size"
+            case resolution
+            case seriesType = "series_type"
+        }
+    }
+
+    struct LatlngStream: Codable, Hashable, Sendable {
+        let type: String?
+        let data: [[Double]]
+        let originalSize: Int
+        let resolution: StreamResolution
+        let seriesType: StreamSeriesType
+
+        enum CodingKeys: String, CodingKey {
+            case type
+            case data
+            case originalSize = "original_size"
+            case resolution
+            case seriesType = "series_type"
+        }
+    }
+
+    struct AltitudeStream: Codable, Hashable, Sendable {
+        let type: String?
+        let data: [Double]
+        let originalSize: Int
+        let resolution: StreamResolution
+        let seriesType: StreamSeriesType
+
+        enum CodingKeys: String, CodingKey {
+            case type
+            case data
+            case originalSize = "original_size"
+            case resolution
+            case seriesType = "series_type"
+        }
+    }
+
+    struct WattsStream: Codable, Hashable, Sendable {
+        let type: String?
+        let data: [Int]
+        let originalSize: Int
+        let resolution: StreamResolution
+        let seriesType: StreamSeriesType
+
+        enum CodingKeys: String, CodingKey {
+            case type
+            case data
+            case originalSize = "original_size"
+            case resolution
+            case seriesType = "series_type"
+        }
+    }
+
+    struct HeartrateStream: Codable, Hashable, Sendable {
+        let type: String?
+        let data: [Int]
+        let originalSize: Int
+        let resolution: StreamResolution
+        let seriesType: StreamSeriesType
+
+        enum CodingKeys: String, CodingKey {
+            case type
+            case data
+            case originalSize = "original_size"
+            case resolution
+            case seriesType = "series_type"
+        }
+    }
+
+    struct RawStreams: Codable, Hashable, Sendable {
+        let time: TimeStream?
+        let distance: DistanceStream?
+        let latlng: LatlngStream?
+        let altitude: AltitudeStream?
+        let watts: WattsStream?
+        let heartrate: HeartrateStream?
+    }
+
+    /// The shape of `ActivityStreams.last_error`.
+    struct ActivityStreamsLastError: Codable, Hashable, Sendable {
+        let code: StreamFailureCode
+        let retryable: Bool
+    }
+
+    struct ActivityStreams: Codable, Hashable, Sendable {
+        let activityID: String
+        let metadata: StreamMetadata
+        let requestedTypes: [StreamType]
+        let streams: RawStreams?
+        let lastError: ActivityStreamsLastError?
+        let nextRetryAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case activityID = "activity_id"
+            case metadata
+            case requestedTypes = "requested_types"
+            case streams
+            case lastError = "last_error"
+            case nextRetryAt = "next_retry_at"
+        }
+    }
+
     struct Authentication: Codable, Hashable, Sendable {
         let method: AuthenticationMethod
         let sessionExpiresAt: Date
@@ -47,6 +196,7 @@ nonisolated extension ActivityMapAPI {
     }
 
     struct Activity: Codable, Hashable, Sendable {
+        let streams: StreamMetadata?
         let id: String
         let athlete: String
         let name: String
@@ -104,6 +254,7 @@ nonisolated extension ActivityMapAPI {
         let lastDetailedFetchedAt: Date?
 
         enum CodingKeys: String, CodingKey {
+            case streams
             case id
             case athlete
             case name
@@ -399,6 +550,48 @@ nonisolated extension ActivityMapAPI {
         case windsurf = "Windsurf"
         case workout = "Workout"
         case yoga = "Yoga"
+    }
+
+    enum StreamFailureCode: String, Codable, Hashable, Sendable {
+        case rateLimited = "rate_limited"
+        case unauthorized = "unauthorized"
+        case notFound = "not_found"
+        case invalidResponse = "invalid_response"
+        case upstreamError = "upstream_error"
+    }
+
+    enum StreamFetchStatus: String, Codable, Hashable, Sendable {
+        case notFetched = "not_fetched"
+        case pending = "pending"
+        case succeeded = "succeeded"
+        case failed = "failed"
+        case invalidated = "invalidated"
+    }
+
+    enum StreamFreshness: String, Codable, Hashable, Sendable {
+        case notFetched = "not_fetched"
+        case current = "current"
+        case stale = "stale"
+    }
+
+    enum StreamResolution: String, Codable, Hashable, Sendable {
+        case low = "low"
+        case medium = "medium"
+        case high = "high"
+    }
+
+    enum StreamSeriesType: String, Codable, Hashable, Sendable {
+        case time = "time"
+        case distance = "distance"
+    }
+
+    enum StreamType: String, Codable, Hashable, Sendable {
+        case time = "time"
+        case distance = "distance"
+        case latlng = "latlng"
+        case altitude = "altitude"
+        case watts = "watts"
+        case heartrate = "heartrate"
     }
 
     enum SyncResource: String, Codable, Hashable, Sendable {

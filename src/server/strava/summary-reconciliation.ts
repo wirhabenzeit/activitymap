@@ -1,4 +1,6 @@
 import 'server-only';
+import { StravaBudgetExceededError, STRAVA_RATE_LIMIT_15_MINUTE_RESERVE, STRAVA_RATE_LIMIT_DAILY_RESERVE } from './request-budget';
+export { STRAVA_RATE_LIMIT_15_MINUTE_RESERVE, STRAVA_RATE_LIMIT_DAILY_RESERVE } from './request-budget';
 
 import { getAccountInternal } from '~/server/db/internal';
 import { logger } from '~/server/logging/logger';
@@ -23,8 +25,6 @@ export const DEFAULT_PAGES_PER_ATHLETE = 3;
 export const MAX_PAGES_PER_ATHLETE = 5;
 export const DEFAULT_CONFIRMATIONS_PER_ATHLETE = 20;
 export const SUMMARY_RECONCILIATION_TIME_BUDGET_MS = 45_000;
-export const STRAVA_RATE_LIMIT_15_MINUTE_RESERVE = 25;
-export const STRAVA_RATE_LIMIT_DAILY_RESERVE = 100;
 
 export interface SummaryReconciliationSource {
   listPage(input: {
@@ -73,7 +73,7 @@ function isNotFound(error: unknown): boolean {
 }
 
 function isRateLimited(error: unknown): boolean {
-  return error instanceof StravaApiError && error.status === 429;
+  return error instanceof StravaBudgetExceededError || (error instanceof StravaApiError && error.status === 429);
 }
 
 export function hasInsufficientStravaRateLimitHeadroom(

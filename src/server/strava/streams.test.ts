@@ -115,6 +115,7 @@ void test('client requests all six keys once, authenticates, validates and repor
   );
   const client = StravaClient.withAccessToken('fixture-access', {
     onRateLimit: (usage) => usages.push(usage),
+    requestBudget: testBudget,
   });
   assert.deepEqual(
     await client.getActivityStreams('9007199254740993'),
@@ -136,3 +137,12 @@ void test('client requests all six keys once, authenticates, validates and repor
   mockFetch.mock.mockImplementation(async () => Response.json({}));
   assert.deepEqual(await client.getActivityStreams('1'), {});
 });
+
+const testBudget = {
+  async reserve(read: boolean) {
+    return { startedAt: new Date(), read };
+  },
+  async observe() {
+    return undefined;
+  },
+};

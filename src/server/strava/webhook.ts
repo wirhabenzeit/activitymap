@@ -355,6 +355,10 @@ export async function processWebhookEvent(
         set: activityToSave,
       });
 
+    if (data.aspect_type === 'update') {
+      await tx.execute(sql`select invalidate_activity_streams(${String(object_id)}::bigint)`);
+    }
+
     // 2. Handle photos: Delete existing, then insert new ones
     const existingPhotos = await tx
       .select({

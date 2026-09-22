@@ -229,14 +229,18 @@ export const activityStreams = pgTable('activity_streams', {
   attemptId: text('attempt_id'),
   requestedTypes: text('requested_types').array().$type<ActivityStreamType[]>().notNull(),
   payload: jsonb('payload').$type<RawActivityStreams>(),
+  availableTypes: text('available_types').array().$type<ActivityStreamType[]>().notNull().default(sql`'{}'::text[]`),
   revision: bigint('revision', { mode: 'bigint' }).notNull().default(sql`0`),
   sourceVersion: text('source_version'),
   fetchedAt: timestamp('fetched_at', { mode: 'date' }),
   lastAttemptAt: timestamp('last_attempt_at', { mode: 'date' }).notNull(),
   lastAttemptStatus: text('last_attempt_status', {
-    enum: ['pending', 'succeeded', 'failed'],
+    enum: ['pending', 'succeeded', 'failed', 'invalidated'],
   }).notNull(),
   lastError: jsonb('last_error').$type<StreamFetchFailure>(),
+  invalidatedAt: timestamp('invalidated_at', { mode: 'date' }),
+  leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }),
+  nextRetryAt: timestamp('next_retry_at', { mode: 'date' }),
 });
 
 export const photos = pgTable(
@@ -700,3 +704,14 @@ export const apiRateLimitBuckets = pgTable(
 export type ApiRateLimitBucket = typeof apiRateLimitBuckets.$inferSelect;
 
 export { sportTypes, type SportType };
+
+// Application-wide reservations plus observed upstream limits, shared by every
+// StravaClient caller (foreground, webhooks and scheduled work).
+export const stravaRequestBudgets = pgTable('strava_request_budget', {
+  key: text('key').primaryKey(),
+  windowStart: timestamp('window_start', { mode: 'date' }).notNull(),
+  used: integer('used').notNull(),
+  inFlight: integer('in_flight').notNull().default(0),
+  ceiling: integer('ceiling').notNull(),
+  blockedUntil: timestamp('blocked_until', { mode: 'date' }),
+});

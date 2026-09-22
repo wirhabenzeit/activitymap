@@ -1,4 +1,9 @@
 import 'server-only';
+import {
+  STREAM_MAX_AGE_MS,
+  STREAM_FETCH_LEASE_MS,
+  STREAM_RETRY_MS,
+} from '~/server/strava/stream-policy';
 
 import { createHash, randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
@@ -74,7 +79,9 @@ async function lockEligibleAccount(tx: Transaction, actor: Actor) {
     .where(
       and(eq(users.id, actor.userId), eq(users.athlete_id, actor.athleteId)),
     )
-    .for('update');
+    // Prevent erasure while remaining compatible with activity writers'
+    // user foreign-key checks when their metadata triggers publish changes.
+    .for('key share');
   if (!user) return null;
   const [account] = await tx
     .select()
@@ -101,9 +108,8 @@ async function lockSource(tx: Transaction, actor: Actor, activityId: string) {
   if (!account) return null;
   const [activity] = await tx
     .select({
-      // A conservative version of the whole source row catches existing writers
-      // without adding stream state to activity DTOs. #183 can refine invalidation.
-      version: sql<string>`md5(to_jsonb(${activities})::text)`,
+      // Same source projection as the activity invalidation trigger.
+      version: sql<string>`md5(activity_stream_source(${activities})::text)`,
     })
     .from(activities)
     .where(
@@ -130,7 +136,10 @@ async function lockClaim(tx: Transaction, claim: StreamFetchClaim) {
   )
     return null;
   const [row] = await tx
-    .select()
+    .select({
+      generation: activityStreams.generation,
+      attemptId: activityStreams.attemptId,
+    })
     .from(activityStreams)
     .where(eq(activityStreams.activityId, BigInt(claim.activityId)))
     .for('update');
@@ -141,6 +150,11 @@ async function lockClaim(tx: Transaction, claim: StreamFetchClaim) {
 
 export function createActivityStreamsRepository(database: typeof db = db) {
   return {
+    async isCurrent(claim: StreamFetchClaim): Promise<boolean> {
+      return database.transaction(async (tx) =>
+        Boolean(await lockClaim(tx, claim)),
+      );
+    },
     async read(
       actor: Actor,
       activityId: string,
@@ -168,10 +182,23 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           .where(eq(activityStreams.activityId, BigInt(activityId)))
           .for('update');
         if (
-          !force &&
-          existing?.payload !== null &&
-          existing?.payload !== undefined &&
-          existing.sourceVersion === source.sourceVersion
+          existing?.attemptId &&
+          existing.leaseExpiresAt &&
+          existing.leaseExpiresAt > now
+        ) {
+          return { kind: 'pending' as const, snapshot: snapshot(existing) };
+        }
+        if (existing?.nextRetryAt && existing.nextRetryAt > now) {
+          return { kind: 'cooldown' as const, snapshot: snapshot(existing) };
+        }
+        if (
+          existing?.payload != null &&
+          !existing.invalidatedAt &&
+          existing.fetchedAt &&
+          existing.fetchedAt.getTime() + STREAM_MAX_AGE_MS > now.getTime() &&
+          existing.sourceVersion === source.sourceVersion &&
+          (!force ||
+            existing.fetchedAt.getTime() + STREAM_RETRY_MS > now.getTime())
         ) {
           return { kind: 'cached' as const, snapshot: snapshot(existing) };
         }
@@ -186,6 +213,8 @@ export function createActivityStreamsRepository(database: typeof db = db) {
             requestedTypes: [...ACTIVITY_STREAM_TYPES],
             lastAttemptAt: now,
             lastAttemptStatus: 'pending',
+            leaseExpiresAt: new Date(now.getTime() + STREAM_FETCH_LEASE_MS),
+            nextRetryAt: null,
           })
           .onConflictDoUpdate({
             target: activityStreams.activityId,
@@ -193,6 +222,8 @@ export function createActivityStreamsRepository(database: typeof db = db) {
               attemptId,
               lastAttemptAt: now,
               lastAttemptStatus: 'pending',
+              leaseExpiresAt: new Date(now.getTime() + STREAM_FETCH_LEASE_MS),
+              nextRetryAt: null,
               lastError: null,
               requestedTypes: [...ACTIVITY_STREAM_TYPES],
             },
@@ -226,11 +257,17 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           .update(activityStreams)
           .set({
             payload,
+            availableTypes: ACTIVITY_STREAM_TYPES.filter(
+              (type) => payload[type] !== undefined,
+            ),
             sourceVersion: claim.sourceVersion,
             fetchedAt: now,
             revision: sql`${activityStreams.revision} + 1`,
             attemptId: null,
             lastAttemptStatus: 'succeeded',
+            invalidatedAt: null,
+            leaseExpiresAt: null,
+            nextRetryAt: null,
             lastError: null,
           })
           .where(eq(activityStreams.activityId, BigInt(claim.activityId)))
@@ -242,6 +279,7 @@ export function createActivityStreamsRepository(database: typeof db = db) {
     async fail(
       claim: StreamFetchClaim,
       error: StreamFetchFailure,
+      now = new Date(),
     ): Promise<boolean> {
       return database.transaction(async (tx) => {
         if (!(await lockClaim(tx, claim))) return false;
@@ -250,6 +288,8 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           .set({
             attemptId: null,
             lastAttemptStatus: 'failed',
+            leaseExpiresAt: null,
+            nextRetryAt: new Date(now.getTime() + STREAM_RETRY_MS),
             lastError: error,
           })
           .where(eq(activityStreams.activityId, BigInt(claim.activityId)));

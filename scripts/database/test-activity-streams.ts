@@ -81,7 +81,16 @@ async function seedActivity() {
   });
 }
 async function claim() {
-  const result = await repository.begin(actor, ID, NOW, true);
+  // Simulate a previous worker's lease/cooldown expiring before retry.
+  await testDb
+    .update(activityStreams)
+    .set({ leaseExpiresAt: new Date(0), nextRetryAt: null })
+    .where(eq(activityStreams.activityId, BigInt(ID)));
+  const stored = await repository.read(actor, ID);
+  const beginAt = new Date(
+    Math.max(NOW.getTime(), stored?.fetchedAt?.getTime() ?? 0) + 120_000,
+  );
+  const result = await repository.begin(actor, ID, beginAt, true);
   assert.equal(result.kind, 'fetch');
   if (result.kind !== 'fetch') throw new Error('Expected fetch');
   return result.claim;
@@ -103,15 +112,13 @@ async function run() {
     await testDb
       .insert(users)
       .values({ id: owner.userId, athlete_id: owner.athleteId });
-    await testDb
-      .insert(accounts)
-      .values({
-        id: `${owner.userId}-account`,
-        userId: owner.userId,
-        accountId: String(owner.athleteId),
-        providerId: 'strava',
-        ...credentials,
-      });
+    await testDb.insert(accounts).values({
+      id: `${owner.userId}-account`,
+      userId: owner.userId,
+      accountId: String(owner.athleteId),
+      providerId: 'strava',
+      ...credentials,
+    });
   }
   await seedActivity();
   assert.equal(
@@ -167,6 +174,7 @@ async function run() {
     fetchActivityStreams(actor, ID, {
       ...options,
       force: true,
+      now: () => new Date(NOW.getTime() + 120_000),
       createSource: () => ({
         async getActivityStreams() {
           throw new StravaApiError('rate limited', 429);
@@ -242,7 +250,7 @@ async function run() {
   );
 
   // A newer claim wins even if the older request returns later.
-  const overlapping = await Promise.all([claim(), claim()]);
+  const overlapping = [await claim(), await claim()];
   const currentAttempt = (await repository.read(actor, ID))?.attemptId;
   const newer = overlapping.find((item) => item.attemptId === currentAttempt)!;
   const older = overlapping.find((item) => item !== newer)!;
@@ -260,11 +268,12 @@ async function run() {
       await fetchActivityStreams(actor, ID, {
         ...options,
         force: true,
+        now: () => new Date(NOW.getTime() + 120_000),
         createSource: () => ({
           async getActivityStreams() {
             await testDb
               .update(activities)
-              .set({ name: 'Changed during fetch' })
+              .set({ elapsed_time: 5000 })
               .where(activityWhere);
             return {};
           },
@@ -289,6 +298,7 @@ async function run() {
       await fetchActivityStreams(actor, ID, {
         ...options,
         force: true,
+        now: () => new Date(NOW.getTime() + 120_000),
         createSource: ({ onRefresh }) => ({
           async getActivityStreams() {
             await onRefresh(refreshed);

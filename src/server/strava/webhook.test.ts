@@ -28,6 +28,7 @@ function buildFakeDb(opts: {
 
   function makeHandle(via: FakeCall['via']) {
     return {
+      execute: async () => undefined,
       select(_columns?: unknown) {
         return {
           from(table: unknown) {
@@ -250,6 +251,7 @@ function buildFakeAccountsDb(initialAccount: FakeAccountRow | null) {
 
   function makeHandle(via: 'outer' | 'tx') {
     return {
+      execute: async () => undefined,
       select(_columns?: unknown) {
         return {
           from(table: unknown) {
