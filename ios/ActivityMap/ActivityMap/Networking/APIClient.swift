@@ -18,6 +18,7 @@ nonisolated enum APIClient {
         case decoding(String)
         case server(code: String, message: String, status: Int, requestID: String?, retryable: Bool)
         case unexpectedStatus(Int)
+        case rateLimited(retryAfter: TimeInterval, requestID: String?)
         /// The response parsed fine, but its `schemaVersion` does not match
         /// this build's `ActivityMapAPI.schemaVersion`. This exists to be
         /// checked, not just carried: see `decodeResult`.
@@ -36,6 +37,8 @@ nonisolated enum APIClient {
                     + (requestID.map { ", request \($0)" } ?? "") + ")"
             case .unexpectedStatus(let status):
                 "Unexpected HTTP status \(status)"
+            case .rateLimited:
+                "Too many requests. Please wait before trying again."
             case .schemaVersionMismatch(let expected, let actual):
                 "Server schema version \(actual) does not match the version this build expects (\(expected))"
             }
@@ -44,13 +47,18 @@ nonisolated enum APIClient {
 
     static func get<Payload: Decodable & Sendable>(
         _ path: String,
+        query: [URLQueryItem] = [],
         bearerToken: String? = nil,
+        baseURL: URL = APIConfiguration.baseURL,
+        session: URLSession = .shared,
         as payloadType: Payload.Type
     ) async throws -> Payload {
-        var request = URLRequest(url: APIConfiguration.endpoint(path))
+        var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
+        components.queryItems = query.isEmpty ? nil : query
+        var request = URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
         request.httpMethod = "GET"
         applyCommonHeaders(&request, bearerToken: bearerToken)
-        return try await perform(request, as: payloadType)
+        return try await perform(request, session: session, as: payloadType)
     }
 
     static func post<Body: Encodable, Payload: Decodable & Sendable>(
@@ -86,19 +94,23 @@ nonisolated enum APIClient {
     private static func applyCommonHeaders(_ request: inout URLRequest, bearerToken: String?) {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let bearerToken {
+            request.httpShouldHandleCookies = false
             request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
         }
     }
 
     private static func perform<Payload: Decodable & Sendable>(
         _ request: URLRequest,
+        session: URLSession = .shared,
         as payloadType: Payload.Type
     ) async throws -> Payload {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            try Task.checkCancellation()
+            (data, response) = try await session.data(for: request)
         } catch {
+            if Task.isCancelled || error is CancellationError { throw CancellationError() }
             throw RequestError.transport(String(describing: error))
         }
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -118,6 +130,19 @@ nonisolated enum APIClient {
         as payloadType: Payload.Type
     ) throws -> Payload {
         let decoder = ActivityMapAPI.makeDecoder()
+
+        if httpResponse.statusCode == 429 {
+            let raw = httpResponse.value(forHTTPHeaderField: "Retry-After")
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+            let delay = raw.flatMap(Double.init)
+                ?? raw.flatMap { formatter.date(from: $0)?.timeIntervalSinceNow } ?? 60
+            throw RequestError.rateLimited(
+                retryAfter: delay.isFinite ? max(1, delay) : 60,
+                requestID: httpResponse.value(forHTTPHeaderField: "X-Request-Id"))
+        }
 
         guard (200..<300).contains(httpResponse.statusCode) else {
             if let failure = try? decoder.decode(ActivityMapAPI.ErrorEnvelope.self, from: data) {

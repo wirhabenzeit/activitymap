@@ -65,6 +65,7 @@ actor LocalStore {
     func apply(
         _ mutations: [StoreMutation], checkpoint: SyncCheckpoint? = nil, scope: StoreScope
     ) throws {
+        try Task.checkCancellation()
         let context = makeContext()
         let scopeKey = scope.key
         do {
@@ -113,6 +114,7 @@ actor LocalStore {
                     context.insert(try SyncState(scope: scopeKey, checkpoint: checkpoint))
                 }
             }
+            try Task.checkCancellation()
             try save(context)
         } catch {
             context.rollback()
@@ -131,6 +133,22 @@ actor LocalStore {
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<SyncState>(
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
+            try save(context)
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    /// Removes data belonging to prior accounts/deployments, including partial
+    /// bootstraps with no checkpoint. Called after the previous sync has stopped.
+    func clearExcept(scope: StoreScope?) throws {
+        let context = makeContext()
+        let keep = scope?.key
+        do {
+            for row in try context.fetch(FetchDescriptor<StoredActivity>()) where row.scope != keep { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredPhoto>()) where row.scope != keep { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<SyncState>()) where row.scope != keep { context.delete(row) }
             try save(context)
         } catch {
             context.rollback()

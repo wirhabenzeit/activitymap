@@ -333,16 +333,16 @@ container wiring, DTO/UI mappers, and simulator Swift Testing coverage are in
 place. Sample data is preview-only. `ActivityStore.load(from:scope:)` reads the
 store; runtime loading will be connected to the sync coordinator in Phase D.
 
-**Phase D — Sync engine.** Add `SyncAPI` and `SyncEngine` around the existing
-`APIClient`, port the `v1-sync.ts` tests, and trigger a pass after login and on
-foreground. Connect committed data to `ActivityStore`, including account-switch
-and logout isolation.
+**Phase D — Sync engine.** *Implemented on the branch stacked above Phase C.*
+`SyncAPI` and `SyncEngine` use the shared HTTP client and atomic store page saves.
+`SyncController` connects login, foreground and manual refresh to the map/list,
+with cancellation and generation checks across account changes. The test target
+mirrors the web protocol scenarios; `scripts/verify-ios-sync-local.mjs` also drives
+the real local API through the Swift engine into a temporary disk store.
 
-**Phase E — Polish.** Sync status in `HeaderBar`, offline and error states that
-distinguish "no network" from "session expired", scope clearing on logout and
-account switch, and the retention/freshness metadata (`retentionDays`,
-`cursorValidUntil`, `lastSummaryReconciledAt`) surfaced somewhere honest in the
-account sheet.
+**Phase E — Polish.** Basic sync status, offline/error states, rate-limit handling,
+scope clearing and account-sheet freshness dates are included in Phase D.
+Background refresh and richer photo presentation can follow the read-only map/list.
 
 ## Test strategy
 

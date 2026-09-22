@@ -3,11 +3,12 @@ import SwiftUI
 struct AccountSheet: View {
     let destination: AccountDestination
     let auth: AuthController
+    var sync: SyncController? = nil
+    var refresh: (() async -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var distanceUnit = DistanceUnit.kilometers
     @State private var appearance = Appearance.system
-    @State private var automaticallySyncs = true
 
     var body: some View {
         NavigationStack {
@@ -15,6 +16,7 @@ struct AccountSheet: View {
                 switch destination {
                 case .profile:
                     profileContent
+                    syncContent
                 case .settings:
                     settingsContent
                 case .about:
@@ -192,13 +194,7 @@ struct AccountSheet: View {
 
     private var settingsContent: some View {
         Group {
-            Section("Activity Data") {
-                Toggle("Sync Automatically", isOn: $automaticallySyncs)
-                NavigationLink("Connected Services") {
-                    Text("Connected services will appear here.")
-                        .navigationTitle("Connected Services")
-                }
-            }
+            syncContent
 
             Section("Display") {
                 Picker("Distance", selection: $distanceUnit) {
@@ -211,6 +207,31 @@ struct AccountSheet: View {
                     ForEach(Appearance.allCases) { appearance in
                         Text(appearance.title).tag(appearance)
                     }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var syncContent: some View {
+        if let sync {
+            Section("Activity Data") {
+                Text(sync.status.title)
+                if let lastSync = sync.checkpoint?.lastSyncAt {
+                    LabeledContent("Last synced") { Text(lastSync, style: .relative) }
+                }
+                if let reconciled = sync.checkpoint?.freshness?.lastSummaryReconciledAt {
+                    LabeledContent("Strava last checked") { Text(reconciled, style: .relative) }
+                }
+                if case .failed(let message) = sync.status {
+                    Text(message).font(.footnote).foregroundStyle(.secondary)
+                }
+                if case .rateLimited(let date) = sync.status {
+                    LabeledContent("Retry after") { Text(date, style: .time) }
+                }
+                if let refresh, sync.session != nil {
+                    Button("Sync Now") { Task { await refresh() } }
+                        .disabled(sync.status == .syncing)
                 }
             }
         }

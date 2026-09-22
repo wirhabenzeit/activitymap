@@ -3,6 +3,9 @@ import SwiftUI
 struct AppShell: View {
     @State private var store = ActivityStore()
     @State private var auth = AuthController()
+    @State private var sync: SyncController?
+    @Environment(\.localStore) private var localStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showsFilters = false
     @State private var accountDestination: AccountDestination?
 
@@ -18,11 +21,34 @@ struct AppShell: View {
                 .navigationTitle("ActivityMap")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-                .task { await auth.restoreSession() }
+                .task {
+                    guard let localStore else { return } // Xcode previews stay offline.
+                    if sync == nil {
+                        sync = SyncController(activities: store, invalidate: { auth.invalidateSession(token: $0) })
+                    }
+                    sync?.setSession(auth.syncSession, storage: localStore)
+                    await refresh()
+                }
+                .onChange(of: auth.syncSession) { _, session in
+                    if let localStore { sync?.setSession(session, storage: localStore) }
+                }
+                .task(id: scenePhase) {
+                    guard scenePhase == .active else { sync?.pause(); return }
+                    if sync != nil { await refresh() }
+                    while !Task.isCancelled {
+                        do { try await Task.sleep(for: .seconds(60)) } catch { return }
+                        await refresh()
+                    }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if let sync {
+                        SyncStatusView(sync: sync, refresh: refresh)
+                    }
+                }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Menu {
-                            Section("Dominik") {
+                            Section(auth.currentUser?.name ?? "Account") {
                                 Button {
                                     accountDestination = .profile
                                 } label: {
@@ -77,7 +103,7 @@ struct AppShell: View {
                     .presentationDetents([.medium, .large])
                 }
                 .sheet(item: $accountDestination) { destination in
-                    AccountSheet(destination: destination, auth: auth)
+                    AccountSheet(destination: destination, auth: auth, sync: sync, refresh: refresh)
                 }
             }
     }
@@ -86,8 +112,15 @@ struct AppShell: View {
     private var content: some View {
         switch store.selectedTab {
         case .map: MapScreen(store: store)
-        case .list: ListScreen(store: store)
+        case .list: ListScreen(store: store).refreshable { await refresh() }
         }
+    }
+
+    private func refresh() async {
+        guard let localStore else { return }
+        await auth.restoreSession()
+        sync?.setSession(auth.syncSession, storage: localStore)
+        await sync?.refresh()
     }
 
     private var filterButtonLabel: String {

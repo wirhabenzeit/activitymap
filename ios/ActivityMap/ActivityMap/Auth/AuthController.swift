@@ -62,6 +62,33 @@ final class AuthController: NSObject {
     }
 
     private(set) var status: Status = .signedOut
+    private(set) var currentUser: ActivityMapAPI.CurrentUser?
+    private var revision = 0
+    private var restoringToken: String?
+    private var signingOut = false
+
+    override init() {
+        super.init()
+        if let token = SessionStore.load() {
+            currentUser = SessionIdentityStore.load(token: token, deployment: APIConfiguration.baseURL)
+        }
+    }
+
+    var syncSession: SyncSession? {
+        guard let currentUser, let token = SessionStore.load() else { return nil }
+        let verified: Bool
+        if case .signedIn = status { verified = true } else { verified = false }
+        return SyncSession(user: currentUser, token: token, deployment: APIConfiguration.baseURL, verified: verified)
+    }
+
+    func invalidateSession(token: String) {
+        guard SessionStore.load() == token else { return }
+        revision += 1
+        SessionStore.clear()
+        SessionIdentityStore.clear()
+        currentUser = nil
+        status = .signedOut
+    }
 
     /// Retained only for the duration of one sign-in attempt; `start()` needs
     /// its session kept alive, and there is nothing to keep once it finishes.
@@ -74,15 +101,23 @@ final class AuthController: NSObject {
     /// to `.sessionRestoreFailed`, since merely launching the app during a
     /// transient outage must not permanently sign anyone out.
     func restoreSession() async {
+        guard !signingOut else { return }
         guard let token = SessionStore.load() else { return }
+        guard restoringToken != token else { return }
+        restoringToken = token
+        defer { if restoringToken == token { restoringToken = nil } }
+        let requestRevision = revision
         do {
             let user = try await APIClient.get(
                 "/api/v1/me", bearerToken: token, as: ActivityMapAPI.CurrentUser.self)
+            guard requestRevision == revision, SessionStore.load() == token else { return }
+            try SessionIdentityStore.save(user, token: token, deployment: APIConfiguration.baseURL)
+            currentUser = user
             status = .signedIn(user)
         } catch {
+            guard requestRevision == revision, SessionStore.load() == token else { return }
             if Self.isExplicitlyUnauthenticated(error) {
-                SessionStore.clear()
-                status = .signedOut
+                invalidateSession(token: token)
             } else {
                 status = .sessionRestoreFailed(String(describing: error))
             }
@@ -102,6 +137,8 @@ final class AuthController: NSObject {
     /// distinction and gives a transient failure the right retry (itself,
     /// not a fresh `signIn()`).
     func signIn() async {
+        revision += 1
+        currentUser = nil
         status = .signingIn
         do {
             let state = try Self.randomURLSafeString()
@@ -170,7 +207,13 @@ final class AuthController: NSObject {
     /// `.signOutFailed`: clearing it anyway would abandon a still-valid
     /// server session with no copy of the token left to retry revoking it.
     func signOut() async {
+        guard !signingOut else { return }
+        signingOut = true
+        defer { signingOut = false }
+        revision += 1
+        currentUser = nil // Hide data and stop sync as soon as sign-out starts.
         guard let token = SessionStore.load() else {
+            SessionIdentityStore.clear()
             status = .signedOut
             return
         }
@@ -178,11 +221,13 @@ final class AuthController: NSObject {
             _ = try await APIClient.post(
                 "/api/v1/auth/logout", bearerToken: token, as: JSONValue.self)
             SessionStore.clear()
+            SessionIdentityStore.clear()
             status = .signedOut
         } catch {
             if Self.isExplicitlyUnauthenticated(error) {
                 // Nothing left to revoke server-side either way.
                 SessionStore.clear()
+                SessionIdentityStore.clear()
                 status = .signedOut
             } else {
                 status = .signOutFailed(String(describing: error))
@@ -197,6 +242,7 @@ final class AuthController: NSObject {
     /// rather than private, like `APIClient.decodeResult`, so it can be
     /// exercised directly against crafted errors without a live server.
     static func isExplicitlyUnauthenticated(_ error: Error) -> Bool {
+        if case .unexpectedStatus(401) = error as? APIClient.RequestError { return true }
         guard case .server(let code, _, let status, _, _) = error as? APIClient.RequestError
         else {
             return false
