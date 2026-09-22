@@ -15,6 +15,11 @@ Status: **Accepted**
 - Cached Strava data must be revalidated within seven days.
 - Webhooks provide the prompt update path; periodic reconciliation is the
   safety net.
+- The server owns Strava reconciliation. The native client applies server
+  upserts and tombstones from its saved change cursor and bounds its offline
+  copy to seven days after its last successful backend sync. A missing server
+  reconciliation timestamp or a temporary backend outage does not by itself
+  delete a still-valid native copy.
 
 ## 3. Deletion and deauthorization
 

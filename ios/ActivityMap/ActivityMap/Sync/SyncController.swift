@@ -14,7 +14,7 @@ nonisolated struct SyncSession: Equatable, Sendable {
 @Observable
 final class SyncController {
     enum Status: Equatable {
-        case signedOut, syncing, ready, serverCheckPending, offline, expired, disconnected
+        case signedOut, syncing, ready, offline, expired, disconnected
         case failed(String)
         case rateLimited(Date)
 
@@ -23,7 +23,6 @@ final class SyncController {
             case .signedOut: "Sign in to load activities"
             case .syncing: "Syncing activities…"
             case .ready: "Activities up to date"
-            case .serverCheckPending: "Activities loaded · Strava check pending"
             case .offline: "Offline · reconnect to sync"
             case .expired: "Saved activities expired · reconnect to refresh"
             case .disconnected: "Strava is not connected"
@@ -43,7 +42,6 @@ final class SyncController {
     private var generation = 0
     private var retryAt: Date?
     private var needsCleanup = false
-    private var showingUnreconciledOnline = false
     private let now: () -> Date
     private let source: (SyncSession) -> any SyncPageSource
     private let invalidate: (String) -> Void
@@ -72,7 +70,6 @@ final class SyncController {
         let previous = work
         previous?.cancel()
         clearVisible()
-        showingUnreconciledOnline = false
         if !sameCredential { retryAt = nil }
         needsCleanup = true
         work = Task {
@@ -120,14 +117,7 @@ final class SyncController {
         await work?.value
     }
 
-    func pause() {
-        work?.cancel()
-        if showingUnreconciledOnline {
-            showingUnreconciledOnline = false
-            clearVisible()
-            status = .expired
-        }
-    }
+    func pause() { work?.cancel() }
 
     private func perform(_ session: SyncSession, storage: LocalStore, generation current: Int) async {
         do {
@@ -137,13 +127,9 @@ final class SyncController {
                 if current == generation { status = session.user.stravaConnected ? .expired : .disconnected }
                 return
             }
-            // Keep a successful online result visible during a later delta poll.
-            // A new session must still pass the stricter offline-cache check.
-            if !showingUnreconciledOnline {
-                _ = try await loadCache(
-                    session, storage: storage, generation: current,
-                    clearExpired: !session.verified)
-            }
+            try await loadCache(
+                session, storage: storage, generation: current,
+                clearExpired: !session.verified)
             guard current == generation, !Task.isCancelled else { return }
             guard session.verified else {
                 if status != .expired { status = .offline }
@@ -154,14 +140,8 @@ final class SyncController {
             let engine = SyncEngine(source: source(session), store: storage, scope: session.scope)
             _ = try await engine.run()
             guard current == generation, !Task.isCancelled else { return }
-            // The just-completed network pass may be shown while authenticated,
-            // even if the server has not completed its Strava reconciliation.
-            let freshForOffline = try await loadCache(
-                session, storage: storage, generation: current, afterOnlineSync: true)
-            if current == generation {
-                showingUnreconciledOnline = !freshForOffline
-                status = freshForOffline ? .ready : .serverCheckPending
-            }
+            try await loadCache(session, storage: storage, generation: current)
+            if current == generation, status != .expired { status = .ready }
         } catch {
             guard current == generation, !Task.isCancelled else { return }
             if AuthController.isExplicitlyUnauthenticated(error) {
@@ -180,8 +160,7 @@ final class SyncController {
             }
             // Reload committed pages even on failure: already-applied tombstones
             // must not remain visible just because a subsequent request failed.
-            showingUnreconciledOnline = false
-            do { _ = try await loadCache(session, storage: storage, generation: current) }
+            do { try await loadCache(session, storage: storage, generation: current) }
             catch { if current == generation { clearVisible() } }
             guard current == generation else { return }
             if case .rateLimited(let delay, _) = error as? APIClient.RequestError {
@@ -196,34 +175,26 @@ final class SyncController {
         }
     }
 
-    /// Returns whether the saved data is safe to show offline. A completed
-    /// online pass may be presented without granting it offline-cache status.
     private func loadCache(
         _ session: SyncSession, storage: LocalStore, generation current: Int,
-        afterOnlineSync: Bool = false, clearExpired: Bool = true
-    ) async throws -> Bool {
+        clearExpired: Bool = true
+    ) async throws {
         let snapshot = try await storage.snapshot(scope: session.scope)
         guard current == generation, !Task.isCancelled else { throw CancellationError() }
         checkpoint = snapshot.checkpoint
         guard let checkpoint, checkpoint.bootstrapComplete, let synced = checkpoint.lastSyncAt else {
             activities.activities = []
             photos = []
-            return false
+            return
         }
-        // Feed retention (usually 30 days) is not permission to retain a stale
-        // offline cache. Use the stricter seven-day data freshness boundary.
-        // A successful delta poll only checks the local change cursor. It
-        // cannot stand in for a completed Strava summary reconciliation.
-        let freshForOffline = checkpoint.freshness?.lastSummaryReconciledAt.map {
-            now().timeIntervalSince(min(synced, $0)) < 7 * 24 * 60 * 60
-        } ?? false
-        guard freshForOffline || afterOnlineSync else {
+        // The server owns Strava reconciliation. A device cache is seven-day
+        // bounded from its last successful backend sync, even during outages.
+        guard now().timeIntervalSince(synced) < 7 * 24 * 60 * 60 else {
             clearVisible()
             status = .expired
-            // Preserve the checkpoint just long enough for a verified session
-            // to catch up from it. An offline/error path removes expired data.
+            // A verified session can still resume from the saved cursor.
             if clearExpired { try await storage.clear(scope: session.scope) }
-            return false
+            return
         }
         let mapped = try snapshot.activities.map(StoredModelMapper.activity)
         activities.activities = mapped
@@ -231,7 +202,6 @@ final class SyncController {
         let ids = Set(mapped.map(\.id))
         activities.selectedActivityIDs.formIntersection(ids)
         if let id = activities.highlightedActivityID, !ids.contains(id) { activities.highlightedActivityID = nil }
-        return freshForOffline
     }
 
     private func clearVisible() {
