@@ -49,11 +49,17 @@ All four have unit tests. The Swift sync engine should be a deliberate,
 close port of `v1-sync.ts` rather than a fresh design, so that one protocol has
 one set of semantics across both clients and the tests can be mirrored.
 
-**There is already a verified Swift auth client.** `ios/ActivityMapMobileAuthTestClient/ActivityMapMobileAuthTestClient.swift`
-implements the PKCE/`ASWebAuthenticationSession`/exchange/Keychain flow against
-the real endpoints. It is labelled as never having been compiled, but it is
-structurally correct and is the starting point for `Auth/`, not something to
-rewrite.
+**There is already a Swift auth reference implementation.** `ios/ActivityMapMobileAuthTestClient/ActivityMapMobileAuthTestClient.swift`
+sketches the PKCE/`ASWebAuthenticationSession`/exchange/Keychain flow against
+the real endpoints, and is a useful starting point for `Auth/` rather than
+something to rewrite.
+
+It is not verified in any sense: its own header records that it has never been
+compiled, and it is not a member of the app target, so nothing in the build or
+in CI exercises it. Treat it as unproven until it has been integrated, compiled
+in the app target, and put through an actual sign-in against a configured
+server. That is Phase B, and discovering that parts of it need reworking would
+be an ordinary outcome.
 
 ## The iOS client does not talk to the database
 
@@ -66,11 +72,26 @@ on the plan doc's anti-pattern list.
 and the database follows from that deployment's own configuration per the
 [environment matrix](environment-and-database-rollout.md#target-environment-matrix):
 
-| iOS build configuration | API base URL | Resulting database |
-| --- | --- | --- |
-| Debug (local) | `http://localhost:3000` | Docker Postgres via local `DATABASE_URL` |
-| Debug (preview) | The Vercel preview URL | That preview's dedicated Neon branch |
-| Release | The production URL | Neon production branch |
+| iOS build configuration | API base URL | Resulting database | Native sign-in |
+| --- | --- | --- | --- |
+| Debug (local) | `http://localhost:3000` | Docker Postgres via local `DATABASE_URL` | Yes, once external effects and Strava credentials are configured |
+| Debug (preview) | The Vercel preview URL | That preview's dedicated Neon branch | **No** — build and read-only inspection only |
+| Release | The production URL | Neon production branch | Yes |
+
+Preview cannot authenticate, and this is deliberate rather than a gap to close.
+Preview deployments run with `ACTIVITYMAP_EXTERNAL_EFFECTS` disabled, and
+`src/lib/auth.ts` only registers the Strava `genericOAuth` provider when
+external effects are enabled. A Preview therefore has no Strava provider at all,
+so the mobile flow has nothing to redirect to. Treat Preview as unauthenticated
+and build-only; use an explicitly configured local server for end-to-end
+authentication, or stand up the optional staging deployment from the
+environment matrix if a hosted authenticated target is ever needed.
+
+Local sign-in needs more than the redirect allow-list. It also needs
+`ACTIVITYMAP_EXTERNAL_EFFECTS=enabled` plus `AUTH_STRAVA_ID`,
+`AUTH_STRAVA_SECRET`, and the Better Auth values, and enabling external effects
+means the local server makes real Strava API calls — see the iOS README for the
+full list and that caveat.
 
 The only credential on the device is an ActivityMap bearer session token in the
 Keychain.

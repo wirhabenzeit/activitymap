@@ -31,17 +31,24 @@ Note that `//` starts a comment in xcconfig, so URL separators are composed from
 
 ## Local sign-in setup
 
-The server rejects any redirect target missing from `MOBILE_AUTH_REDIRECT_ALLOWLIST`, matching protocol, host, and path prefix exactly. Set it in the repository's `.env` or `.env.local` — `.env.example` is documentation only, so uncommenting a line there configures nothing:
+Native sign-in works against an explicitly configured local server. It does **not** work against a Vercel Preview: Preview runs with `ACTIVITYMAP_EXTERNAL_EFFECTS` disabled, and `src/lib/auth.ts` only registers the Strava OAuth provider when external effects are enabled, so a Preview has no provider for the mobile flow to redirect to. Treat Preview as build-only.
 
-```
-MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback
-```
+Set these in the repository's `.env` or `.env.local`. `.env.example` is documentation only, so uncommenting a line there configures nothing:
+
+| Variable | Why |
+| --- | --- |
+| `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback` | Must match the app's `ACTIVITYMAP_AUTH_REDIRECT_URI`; matched on exact protocol, host, and path prefix |
+| `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled` | Without this the Strava OAuth provider is never registered and sign-in cannot start |
+| `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET` | The Strava OAuth application credentials |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Session signing, and the trusted-origin fallback |
+
+Be aware of what the second one turns on: with external effects enabled, the local server makes real Strava API calls and real Strava writes, and any webhook or cron route you invoke acts against live data. That is why the default everywhere except production is `disabled`. Enable it deliberately, for a sign-in session you are actually testing.
 
 The bundle identifier is `page.dominik.activitymap` and is deliberately stable, because a registered URL scheme and any future universal link both depend on it.
 
 Production universal links can replace the custom scheme once there is a final bundle identifier, an Apple team, an Associated Domains entitlement, and a hosted AASA file. Until then the custom scheme is the supported path.
 
-Configuration alone does not put a sign-in button in the app: `ios/ActivityMapMobileAuthTestClient/` is not part of the app target yet. Integrating it is the next iOS authentication change.
+Configuration alone does not put a sign-in button in the app: `ios/ActivityMapMobileAuthTestClient/` is not part of the app target yet, and has never been compiled. Integrating it is the next iOS authentication change.
 
 ## Shared configuration direction
 
