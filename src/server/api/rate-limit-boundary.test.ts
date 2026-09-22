@@ -138,6 +138,42 @@ void test('withApiV1RateLimit falls back to per-IP limiting when no session cred
   assert.equal(third.status, 429);
 });
 
+void test('mobile OAuth shares a strict IP bucket that sync traffic cannot exhaust', async () => {
+  const repo = fakeRepo();
+  const now = () => new Date('2026-01-01T00:00:00.000Z');
+  const handler = async () => Response.json({ ok: true });
+  const sync = withApiV1RateLimit(handler, {
+    route: 'GET /api/v1/sync/bootstrap',
+    repo,
+    now,
+  });
+  const oauthOptions = {
+    repo,
+    now,
+    ipGroup: { name: 'mobile-oauth', rule: TIGHT_RULE },
+  };
+  const start = withApiV1RateLimit(handler, {
+    ...oauthOptions,
+    route: 'GET /api/v1/auth/mobile/start',
+  });
+  const exchange = withApiV1RateLimit(handler, {
+    ...oauthOptions,
+    route: 'POST /api/v1/auth/mobile/exchange',
+  });
+  const request = () =>
+    new Request('https://example.com', {
+      headers: { 'x-forwarded-for': '203.0.113.5' },
+    });
+
+  for (let i = 0; i < 25; i++) {
+    assert.equal((await sync(request())).status, 200);
+  }
+  assert.equal((await start(request())).status, 200);
+  assert.equal((await exchange(request())).status, 200);
+  assert.equal((await start(request())).status, 429);
+  assert.equal((await sync(request())).status, 200);
+});
+
 void test('withApiV1RateLimit aggregates distinct sessions into one per-user bucket', async () => {
   const handler = async () => Response.json({ ok: true });
   const repo = fakeRepo();

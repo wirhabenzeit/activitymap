@@ -34,15 +34,15 @@ enum SyncFixtures {
     static let freshness = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: Date())
     static let rebootstrap = APIClient.RequestError.server(code: "sync_rebootstrap_required", message: "Expired", status: 409, requestID: "request", retryable: false)
 
-    static func activities(_ items: [ActivityMapAPI.Activity] = [], next: String? = nil, snapshot: String? = "snapshot") -> ActivityMapAPI.SyncBootstrapPage {
+    static func activities(_ items: [ActivityMapAPI.Activity] = [], next: String? = nil, snapshot: String? = "snapshot", freshness: ActivityMapAPI.SyncFreshnessMeta = SyncFixtures.freshness) -> ActivityMapAPI.SyncBootstrapPage {
         .activities(.init(items: items, nextCursor: next, snapshotCursor: snapshot, retention: retention, freshness: freshness))
     }
 
-    static func photos(_ items: [ActivityMapAPI.Photo] = [], next: String? = nil) -> ActivityMapAPI.SyncBootstrapPage {
+    static func photos(_ items: [ActivityMapAPI.Photo] = [], next: String? = nil, freshness: ActivityMapAPI.SyncFreshnessMeta = SyncFixtures.freshness) -> ActivityMapAPI.SyncBootstrapPage {
         .photos(.init(items: items, nextCursor: next, snapshotCursor: nil, retention: retention, freshness: freshness))
     }
 
-    static func changes(_ items: [ActivityMapAPI.SyncChangeItem] = [], next: String) -> ActivityMapAPI.SyncChangesPage {
+    static func changes(_ items: [ActivityMapAPI.SyncChangeItem] = [], next: String, freshness: ActivityMapAPI.SyncFreshnessMeta = SyncFixtures.freshness) -> ActivityMapAPI.SyncChangesPage {
         .init(items: items, nextCursor: next, retention: retention, freshness: freshness)
     }
 

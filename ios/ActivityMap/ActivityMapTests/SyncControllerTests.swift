@@ -132,6 +132,36 @@ struct SyncControllerTests {
         #expect(await source.calls == 0)
     }
 
+    @Test func onlineSyncDisplaysUnreconciledDataWithoutRebootstrappingEveryMinute() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let dto = try Fixtures.activity()
+        let pending = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: nil)
+        let source = ScriptedSyncSource([
+            .bootstrap(.activities, nil, .success(SyncFixtures.activities([dto], freshness: pending))),
+            .bootstrap(.photos, nil, .success(SyncFixtures.photos(freshness: pending))),
+            .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot", freshness: pending))),
+            .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot", freshness: pending))),
+        ])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        #expect(controller.status == .serverCheckPending)
+        #expect(controller.activities.activities.map(\.name) == [dto.name])
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities == [dto])
+
+        await controller.refresh()
+        #expect(controller.status == .serverCheckPending)
+        #expect(controller.activities.activities.count == 1)
+        #expect(await source.calls == 4) // One later delta poll, no second bootstrap.
+
+        controller.pause()
+        #expect(controller.status == .expired && controller.activities.activities.isEmpty)
+        controller.setSession(SyncFixtures.session(verified: false), storage: storage)
+        await controller.refresh()
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities.isEmpty)
+        #expect(await source.calls == 4)
+    }
+
     @Test func unauthorizedSyncClearsCacheAndInvalidatesOnlyItsToken() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         var checkpoint = Fixtures.checkpoint
