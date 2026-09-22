@@ -1,6 +1,6 @@
 # ActivityMap iOS mockup
 
-The SwiftUI client supports mobile sign-in and has a SwiftData persistence foundation. Network synchronization is the next step; the running app currently starts with an empty activity list. Sample activities are used only by Xcode previews.
+The SwiftUI client supports mobile sign-in and local-first activity synchronization. Sign in to bootstrap activities and photo metadata into SwiftData; the map and list then read that cache. Sample activities are used only by Xcode previews.
 
 ## Run it
 
@@ -54,7 +54,11 @@ Use Profile to sign in. `AuthController` stores the ActivityMap session in the K
 
 `LocalStore` owns all SwiftData reads and writes. Records are scoped by deployment URL and authenticated user ID. Activities and photos retain the complete generated DTO as encoded data, with unique scoped keys; UI mappers consume detached values. Each page and its optional sync checkpoint commit in one explicit save, with autosave disabled and rollback on failure. CloudKit is disabled.
 
-`ActivityMapApp` creates the disk store and exposes it through the SwiftUI environment. `ActivityStore.load(from:scope:)` is ready for the sync coordinator; the network loop and login/foreground triggers are still pending. A store-open error is displayed without deleting data or falling back silently to memory.
+`ActivityMapApp` creates the disk store. `SyncController` loads committed snapshots into the UI after sign-in, on foreground entry, every minute while foregrounded, and on manual refresh (map status bar, list pull-to-refresh, or Profile → Sync Now). The network engine pages activities and photos, then catches up from the first snapshot cursor. Later passes use the last committed change cursor. A `409 sync_rebootstrap_required` triggers one fresh bootstrap.
+
+The account sheet shows sync errors, rate-limit retry time, last successful sync and Strava reconciliation time. Offline launch uses the last verified user identity, bound to the Keychain token and deployment. A seven-day freshness limit and session expiry bound offline use; the change feed's longer retention window does not extend that limit. Logout, account changes and deauthorization clear scoped data. Transient network/server errors keep the session and usable cache.
+
+A store-open error is displayed without deleting data or falling back silently to memory. Native writes and background refresh tasks are still pending; this client reads activity data.
 
 Run the `ActivityMap` scheme's tests in Xcode, or select an installed iOS 27 simulator:
 
@@ -65,6 +69,14 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
 ```
 
 CI runs the same Swift Testing target. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and Mapbox initialization. No credentials or local server are required.
+
+To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
+
+```sh
+node --env-file=.env scripts/verify-ios-sync-local.mjs <simulator-udid>
+```
+
+This opt-in test uses an existing connected account in the local database. It creates and removes a temporary 30-minute local session, verifies bootstrap, delta catch-up, disk reload and offline UI loading, and prints only counts. It rejects non-local database targets. Normal CI skips this test and uses deterministic HTTP/page fixtures.
 
 ## Shared configuration direction
 
