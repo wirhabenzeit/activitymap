@@ -234,7 +234,8 @@ checkpoint/cleanup work has the remaining route time; the 45-second bound is a
 work deadline, not a guarantee of a response during a database outage.
 
 Three additive tables in migration 0014 hold the hourly allowance, account
-rotation, and per-activity attempt metadata. Scheduling writes do not publish
+rotation, and per-activity attempt metadata; migration 0015 adds the account
+credential block described below. Scheduling writes do not publish
 activity change-feed entries. Accounts rotate in order of last selection; each
 account starts with its newest activity, then alternates oldest/newest. Thus
 continuously arriving recent activities cannot permanently starve older history.
@@ -250,8 +251,18 @@ consuming all capacity intended for unfetched history.
 
 Attempts persist their count, generation, retry time and safe error code. Retryable
 failures use exponential backoff starting at one hour and capped at 24 hours.
-They remain retryable, including repeated quota deferrals. Unauthorized/not-found,
-invalid payloads and other non-retryable errors are terminal for that generation.
+They remain retryable, including repeated quota deferrals. Not-found, invalid
+payloads and other non-retryable errors are terminal for that generation.
+Stopping at the run's own request cap, deadline or lease is not a failure: the
+interrupted activity is released without an error or backoff and the stream
+record is left untouched until its fetch lease expires.
+
+Unauthorized responses describe the credentials, not the activity. They pause
+the whole account by recording a non-secret fingerprint of its stored grant
+(expiry and update timestamps) in `stream_backfill_account.blocked_credentials`;
+no further requests are spent on that account until a token refresh or
+reconnect changes the fingerprint. The activity keeps `unauthorized` as its
+last error but is neither terminal nor backed off.
 They stay visible in `stream_backfill_attempt` and are excluded from the automatic
 queue. A new generation resets scheduling, while foreground fetches remain
 independent of backfill retry policy. An operator can explicitly retry a corrected
@@ -279,7 +290,7 @@ GROUP BY terminal, last_error->>'code';
 
 1. Deploy #182/#183 lifecycle handling and migrations 0010–0013 first. Verify
    invalidation, deletion and deauthorization before scheduled stream ingestion.
-2. Apply additive migration 0014 and deploy this worker with both enable switches
+2. Apply additive migrations 0014–0015 and deploy this worker with both enable switches
    unset. Existing raw data needs no transformation or backfill migration.
 3. Set the production server enable switch, then invoke a **one-activity** canary
    with the existing cron secret. Check counters, stored raw samples, and the

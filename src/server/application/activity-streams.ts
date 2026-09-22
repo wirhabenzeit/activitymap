@@ -4,6 +4,7 @@ import {
   type StravaRequestBudget,
 } from '~/server/strava/request-budget';
 import { STREAM_REQUEST_TIMEOUT_MS } from '~/server/strava/stream-policy';
+import { StreamBackfillStopped } from '~/server/strava/stream-backfill-policy';
 
 import { ZodError } from 'zod';
 import type { Actor } from '~/server/auth/actor';
@@ -149,6 +150,10 @@ export async function fetchActivityStreams(
   } catch (error) {
     if (error instanceof SupersededStreamFetchError)
       return { status: 'superseded' as const };
+    // The caller's own stop (deadline, lease or request cap) says nothing
+    // about Strava: leave the claim to expire rather than record a failure.
+    if (error instanceof StreamBackfillStopped || options.signal?.aborted)
+      throw error;
     const recorded = await repository.fail(
       claim,
       classifyStreamFetchFailure(error),

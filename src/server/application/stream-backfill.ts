@@ -138,12 +138,26 @@ export async function backfillActivityStreams({
             await repository.finishAttempt(run, candidate, null);
             continue;
           }
+          // Self-imposed stops release the activity without an error or
+          // backoff; it stays eligible for the next run.
+          if (error instanceof StreamBackfillStopped) {
+            await repository.finishAttempt(run, candidate, null);
+            throw error;
+          }
+          if (signal.aborted || clock() >= deadline) {
+            await repository.finishAttempt(run, candidate, null);
+            throw new StreamBackfillStopped('deadline');
+          }
           const failure = classifyStreamFetchFailure(error);
           // Durable safe classification only; never persist upstream bodies/tokens.
           await repository.finishAttempt(run, candidate, failure);
-          if (error instanceof StreamBackfillStopped) throw error;
-          if (signal.aborted || clock() >= deadline)
-            throw new StreamBackfillStopped('deadline');
+          if (failure.code === 'unauthorized') {
+            // Credentials, not this activity, are the problem: skip the
+            // account until they change instead of failing each activity.
+            await repository.blockAccount(run, candidate);
+            result.failed++;
+            continue;
+          }
           if (
             error instanceof StravaBudgetExceededError ||
             failure.code === 'rate_limited'

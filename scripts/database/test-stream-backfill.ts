@@ -260,6 +260,26 @@ async function runProof() {
   assert.equal(capped.fetched, 1);
   assert.equal(capped.stopReason, 'request_limit');
   assert.equal(requests.filter((p) => p.endsWith('/oauth/token')).length, 2);
+  // Stopping at our own cap is not an upstream failure: nothing is marked
+  // failed or backed off, and the interrupted activity stays eligible.
+  assert.equal(
+    (
+      await testDb
+        .select()
+        .from(activityStreams)
+        .where(eq(activityStreams.lastAttemptStatus, 'failed'))
+    ).length,
+    0,
+  );
+  assert.equal(
+    (
+      await testDb
+        .select()
+        .from(streamBackfillAttempts)
+        .where(sql`${streamBackfillAttempts.lastError} is not null`)
+    ).length,
+    0,
+  );
   assert.equal((await run()).selected, 0);
 
   // A second process cannot run while the first is awaiting the network.
@@ -509,6 +529,38 @@ async function runProof() {
   [attempt] = await testDb.select().from(streamBackfillAttempts);
   assert.equal(attempt?.attemptCount, 1);
   assert.equal(attempt?.terminal, false);
+
+  // Rejected credentials pause the account, not its activities, until the
+  // grant changes (refresh or reconnect); no request budget is spent meanwhile.
+  await cleanup();
+  await seed(1, 3);
+  nextHour();
+  behavior = async () =>
+    Response.json({ message: 'Authorization Error' }, { status: 401, headers });
+  const rejected = await run();
+  assert.equal(rejected.failed, 1);
+  assert.equal(rejected.selected, 1, 'other activities of the account wait');
+  assert.equal(requests.length, 1);
+  const rejectedAttempts = await testDb.select().from(streamBackfillAttempts);
+  assert.equal(rejectedAttempts.length, 1);
+  assert.equal(rejectedAttempts[0]?.terminal, false);
+  assert.equal(rejectedAttempts[0]?.nextAttemptAt, null);
+  assert.deepEqual(rejectedAttempts[0]?.lastError, {
+    code: 'unauthorized',
+    retryable: false,
+  });
+  nextHour();
+  behavior = async (url) => successful(url);
+  assert.equal((await run()).selected, 0, 'unchanged credentials stay paused');
+  assert.equal(requests.length, 0);
+  await testDb
+    .update(accounts)
+    .set({
+      accessToken: 'reconnected',
+      accessTokenExpiresAt: new Date('2036-01-01'),
+    })
+    .where(eq(accounts.id, userIds[0]!));
+  assert.equal((await run()).fetched, 3, 'reconnect resumes every activity');
 
   // A generation invalidation, revocation or deletion during HTTP cannot commit.
   for (const change of ['invalidate', 'revoke', 'delete'] as const) {

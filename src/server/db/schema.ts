@@ -735,6 +735,8 @@ export const streamBackfillAccounts = pgTable('stream_backfill_account', {
   userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   lastSelectedAt: timestamp('last_selected_at', { mode: 'date' }).notNull(),
   selectOldest: boolean('select_oldest').notNull().default(true),
+  // Credential fingerprint Strava last rejected; skipped until it changes.
+  blockedCredentials: text('blocked_credentials'),
 });
 
 // Scheduling metadata is separate from stream data: retries/checkpoints must

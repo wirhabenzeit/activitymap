@@ -42,6 +42,11 @@ const connected = sql`${accounts.id} = (
 and (coalesce(${accounts.accessToken}, ${accounts.access_token}, '') <> ''
   or coalesce(${accounts.refreshToken}, ${accounts.refresh_token}, '') <> '')`;
 const unfinished = sql`(${attempts.terminal} is not true or not (${sameGeneration}))`;
+// Non-secret fingerprint of the stored grant. Refresh and reconnect both
+// rewrite the expiry, so a Strava rejection is only retried once it changes.
+const credentialFingerprint = (account: typeof accounts) =>
+  sql<string>`concat_ws('|', ${account.accessTokenExpiresAt}, ${account.expiresAt}, ${account.expires_at}, ${account.updatedAt})`;
+const notBlocked = sql`${fairness.blockedCredentials} is distinct from ${credentialFingerprint(accounts)}`;
 
 export function createStreamBackfillRepository(
   database: typeof db = db,
@@ -159,6 +164,7 @@ export function createStreamBackfillRepository(
           .where(
             and(
               connected,
+              notBlocked,
               needsFetch,
               unfinished,
               sql`(${activityStreams.leaseExpiresAt} is null or ${activityStreams.leaseExpiresAt} <= ${now.toISOString()})`,
@@ -266,14 +272,17 @@ export function createStreamBackfillRepository(
     ) {
       await database.transaction(async (tx) => {
         const { now } = await lockRun(tx, run);
+        // Unauthorized is gated per account (blockAccount), so it must not
+        // make the activity terminal or back it off past a reconnect.
+        const activityLevel = error && error.code !== 'unauthorized';
         await tx
           .update(attempts)
           .set({
             leaseToken: null,
             leaseExpiresAt: null,
             lastError: error,
-            terminal: Boolean(error && !error.retryable),
-            nextAttemptAt: error
+            terminal: Boolean(activityLevel && !error.retryable),
+            nextAttemptAt: activityLevel
               ? streamBackfillRetryAt(now, candidate.attemptCount)
               : null,
           })
@@ -283,6 +292,23 @@ export function createStreamBackfillRepository(
               eq(attempts.leaseToken, run.token),
             ),
           );
+      });
+    },
+
+    /** Skip an account whose current credentials Strava rejected. */
+    async blockAccount(run: BackfillRun, candidate: BackfillCandidate) {
+      await database.transaction(async (tx) => {
+        await lockRun(tx, run);
+        const [account] = await tx
+          .select({ fingerprint: credentialFingerprint(accounts) })
+          .from(accounts)
+          .innerJoin(users, eq(accounts.userId, users.id))
+          .where(and(eq(users.id, candidate.actor.userId), connected));
+        if (!account) return;
+        await tx
+          .update(fairness)
+          .set({ blockedCredentials: account.fingerprint })
+          .where(eq(fairness.userId, candidate.actor.userId));
       });
     },
 
