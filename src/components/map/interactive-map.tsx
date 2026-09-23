@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
-import { Camera, ChevronDown, ChevronUp, Globe } from 'lucide-react';
+import { Camera, ChevronDown, ChevronUp, Flame, Globe } from 'lucide-react';
 import { columns } from '~/components/list/columns';
 import {
   ActivityCard,
@@ -62,6 +62,7 @@ import { Selection } from '~/components/map/selection-control';
 import { LayerSwitcher } from '~/components/map/layer-switcher';
 import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import PhotoLayer from '~/components/map/photo';
+import { RouteHeatmapLayer } from '~/components/map/route-heatmap-layer';
 import { cn, groupBy } from '~/lib/utils';
 
 import {
@@ -225,6 +226,7 @@ export default function InteractiveMap() {
   const [panelExpanded, setPanelExpanded] = useState(false);
   // Bumped on every map pick so a new list starts scrolled to the top.
   const [pickCount, setPickCount] = useState(0);
+  const [showHeatmap, setShowHeatmap] = useState(false);
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
   const onMouseLeave = useCallback(() => setCursor('auto'), []);
 
@@ -592,6 +594,16 @@ export default function InteractiveMap() {
             />
           </MapControlIconButton>
         </Overlay>
+        <Overlay position="top-left">
+          <MapControlIconButton
+            onClick={() => setShowHeatmap((value) => !value)}
+            aria-label="Toggle heatmap"
+          >
+            <Flame
+              color={showHeatmap ? 'hsl(var(--header-background))' : 'gray'}
+            />
+          </MapControlIconButton>
+        </Overlay>
         {overlayMapComponents}
         {uploadedGeoJson && (
           <Source id="uploaded-gpx" type="geojson" data={uploadedGeoJson}>
@@ -610,7 +622,7 @@ export default function InteractiveMap() {
             />
           </Source>
         )}
-        <RouteLayer />
+        {showHeatmap ? <RouteHeatmapLayer /> : <RouteLayer />}
         {showPhotos && <PhotoLayer />}
       </ReactMapGL>
       <div
