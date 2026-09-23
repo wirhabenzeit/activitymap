@@ -14,6 +14,10 @@ struct MapScreen: View {
     @State private var activeOverlays = Set(
         SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault)
     )
+    /// Built once per activities change and handed to the source unchanged,
+    /// so re-renders compare it by storage identity instead of re-uploading.
+    @State private var routeData: GeoJSONSourceData = .featureCollection(FeatureCollection(features: []))
+
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -39,17 +43,13 @@ struct MapScreen: View {
                         .rasterOpacity(overlay.opacity)
                 }
 
-                ForEvery(store.filteredActivities) { activity in
-                    PolylineAnnotation(
-                        id: String(activity.id),
-                        lineCoordinates: activity.coordinates
-                    )
-                    .lineColor(StyleColor(UIColor(activity.category.color)))
-                    .lineWidth(activity.id == store.highlightedActivityID ? 5 : 3)
-                }
+                routeContent
             }
             .mapStyle(mapStyle)
             .ignoresSafeArea()
+            .task(id: store.activitiesRevision) {
+                routeData = RouteSource.data(for: store.activities)
+            }
 
             mapControls
                 .padding(16)
@@ -66,6 +66,36 @@ struct MapScreen: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .allowsHitTesting(false)
             }
+        }
+    }
+
+    @MapContentBuilder
+    private var routeContent: some MapContent {
+        let visibleFilter = RouteSource.filter(ids: store.filteredActivities.map(\.id))
+
+        GeoJSONSource(id: RouteSource.id)
+            .data(routeData)
+
+        LineLayer(id: "routeLayer", source: RouteSource.id)
+            .filter(visibleFilter)
+            .lineColor(RouteSource.lineColor)
+            .lineWidth(3)
+            .lineJoin(.round)
+            .lineCap(.round)
+
+        if let highlightedID = store.highlightedActivityID {
+            LineLayer(id: "routeLayerHigh", source: RouteSource.id)
+                .filter(Exp(.all) {
+                    visibleFilter
+                    Exp(.eq) {
+                        Exp(.get) { "id" }
+                        Double(highlightedID)
+                    }
+                })
+                .lineColor(RouteSource.lineColor)
+                .lineWidth(5)
+                .lineJoin(.round)
+                .lineCap(.round)
         }
     }
 

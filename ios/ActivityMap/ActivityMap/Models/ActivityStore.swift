@@ -24,7 +24,13 @@ struct NumericFilter: Equatable {
 
 @Observable
 final class ActivityStore {
-    var activities: [Activity]
+    var activities: [Activity] {
+        didSet { activitiesRevision &+= 1 }
+    }
+
+    /// Bumped on every `activities` assignment so views can rebuild derived
+    /// data (e.g. the map's route source) only when the activities change.
+    private(set) var activitiesRevision = 0
 
     init(activities: [Activity] = []) {
         self.activities = activities
