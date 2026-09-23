@@ -2,14 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>MBXAccessToken</key>
-	<string>$(MAPBOX_ACCESS_TOKEN)</string>
 	<key>ActivityMapAPIBaseURL</key>
 	<string>$(ACTIVITYMAP_API_BASE_URL)</string>
-	<key>ActivityMapAuthRedirectURI</key>
-	<string>$(ACTIVITYMAP_AUTH_REDIRECT_URI)</string>
 	<key>ActivityMapAuthCallbackScheme</key>
 	<string>$(ACTIVITYMAP_AUTH_CALLBACK_SCHEME)</string>
+	<key>ActivityMapAuthRedirectURI</key>
+	<string>$(ACTIVITYMAP_AUTH_REDIRECT_URI)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -23,6 +21,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>MBXAccessToken</key>
+	<string>$(MAPBOX_ACCESS_TOKEN)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>

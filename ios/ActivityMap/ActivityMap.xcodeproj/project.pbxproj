@@ -10,9 +10,19 @@
 		B458E4E1306084C900861B04 /* MapboxMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B458E4E0306084C900861B04 /* MapboxMaps */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C0DE00000000000000000009 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = ActivityMap;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
-		C0DE00000000000000000001 /* ActivityMapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ActivityMapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000120 /* ActivityMap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ActivityMap.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0DE00000000000000000001 /* ActivityMapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ActivityMapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DECAFE0000000000000001 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -27,7 +37,6 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		C0DE00000000000000000002 /* ActivityMapTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = ActivityMapTests; sourceTree = "<group>"; };
 		000000000000000000000010 /* ActivityMap */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -36,14 +45,23 @@
 			path = ActivityMap;
 			sourceTree = "<group>";
 		};
+		C0DE00000000000000000002 /* ActivityMapTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ActivityMapTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		C0DE00000000000000000003 /* Test Frameworks */ = {isa = PBXFrameworksBuildPhase; files = (); };
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				B458E4E1306084C900861B04 /* MapboxMaps in Frameworks */,
+			);
+		};
+		C0DE00000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -59,14 +77,6 @@
 			);
 			sourceTree = "<group>";
 		};
-		C0DECAFE0000000000000002 /* Config */ = {
-			isa = PBXGroup;
-			children = (
-				C0DECAFE0000000000000001 /* Base.xcconfig */,
-			);
-			path = Config;
-			sourceTree = "<group>";
-		};
 		000000000000000000000020 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -76,21 +86,17 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		C0DECAFE0000000000000002 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				C0DECAFE0000000000000001 /* Base.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		C0DE00000000000000000004 /* ActivityMapTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = C0DE00000000000000000005;
-			buildPhases = (C0DE00000000000000000006, C0DE00000000000000000003, C0DE00000000000000000007);
-			buildRules = ();
-			dependencies = (C0DE00000000000000000008);
-			fileSystemSynchronizedGroups = (C0DE00000000000000000002);
-			name = ActivityMapTests;
-			productName = ActivityMapTests;
-			productReference = C0DE00000000000000000001;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
 		000000000000000100000000 /* ActivityMap */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 000000000000000110000000 /* Build configuration list for PBXNativeTarget "ActivityMap" */;
@@ -111,6 +117,27 @@
 			productName = ActivityMap;
 			productReference = 000000000000000000000120 /* ActivityMap.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C0DE00000000000000000004 /* ActivityMapTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0DE00000000000000000005 /* Build configuration list for PBXNativeTarget "ActivityMapTests" */;
+			buildPhases = (
+				C0DE00000000000000000006 /* Sources */,
+				C0DE00000000000000000003 /* Frameworks */,
+				C0DE00000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C0DE00000000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C0DE00000000000000000002 /* ActivityMapTests */,
+			);
+			name = ActivityMapTests;
+			productName = ActivityMapTests;
+			productReference = C0DE00000000000000000001 /* ActivityMapTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -151,8 +178,12 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		C0DE00000000000000000007 /* Test Resources */ = {isa = PBXResourcesBuildPhase; files = (); };
 		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		C0DE00000000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -160,69 +191,27 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		C0DE00000000000000000006 /* Test Sources */ = {isa = PBXSourcesBuildPhase; files = (); };
 		000000000000000120000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		C0DE00000000000000000006 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
 			);
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXContainerItemProxy section */
-		C0DE00000000000000000009 = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 000000000000000000000000;
-			proxyType = 1;
-			remoteGlobalIDString = 000000000000000100000000;
-			remoteInfo = ActivityMap;
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXTargetDependency section */
-		C0DE00000000000000000008 = {
+		C0DE00000000000000000008 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 000000000000000100000000;
-			targetProxy = C0DE00000000000000000009;
+			target = 000000000000000100000000 /* ActivityMap */;
+			targetProxy = C0DE00000000000000000009 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		C0DE0000000000000000000A /* Test Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = page.dominik.activitymap.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ActivityMap.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ActivityMap";
-			};
-			name = Debug;
-		};
-		C0DE0000000000000000000B /* Test Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = page.dominik.activitymap.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ActivityMap.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ActivityMap";
-			};
-			name = Release;
-		};
 		000000000000000011000000 /* Debug configuration for PBXProject "ActivityMap" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -361,6 +350,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DX96FWY9AX;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -405,6 +395,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DX96FWY9AX;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -443,14 +434,53 @@
 			};
 			name = Release;
 		};
+		C0DE0000000000000000000A /* Debug configuration for PBXNativeTarget "ActivityMapTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = page.dominik.activitymap.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ActivityMap.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ActivityMap";
+			};
+			name = Debug;
+		};
+		C0DE0000000000000000000B /* Release configuration for PBXNativeTarget "ActivityMapTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = page.dominik.activitymap.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ActivityMap.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ActivityMap";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		C0DE00000000000000000005 = {
-			isa = XCConfigurationList;
-			buildConfigurations = (C0DE0000000000000000000A, C0DE0000000000000000000B);
-			defaultConfigurationName = Release;
-		};
 		000000000000000010000000 /* Build configuration list for PBXProject "ActivityMap" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -464,6 +494,14 @@
 			buildConfigurations = (
 				000000000000000111000000 /* Debug configuration for PBXNativeTarget "ActivityMap" */,
 				000000000000000112000000 /* Release configuration for PBXNativeTarget "ActivityMap" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		C0DE00000000000000000005 /* Build configuration list for PBXNativeTarget "ActivityMapTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0DE0000000000000000000A /* Debug configuration for PBXNativeTarget "ActivityMapTests" */,
+				C0DE0000000000000000000B /* Release configuration for PBXNativeTarget "ActivityMapTests" */,
 			);
 			defaultConfigurationName = Release;
 		};

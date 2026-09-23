@@ -11,7 +11,7 @@ The SwiftUI client supports mobile sign-in and local-first activity synchronizat
 
 Swift Package Manager pins the Mapbox dependency in `Package.resolved`. Local Xcode state and credentials are intentionally ignored.
 
-No signing team is committed, because Simulator development does not need one and a personal team is not a shared setting. Legal links and App Store metadata also remain unset while this is a mockup.
+The app target currently uses development team `DX96FWY9AX` for physical-device signing. Choose another team in Signing & Capabilities if that team is unavailable to you. Simulator tests do not require signing. Legal links and App Store metadata remain unset while this is a mockup.
 
 ## Deployment configuration
 
@@ -21,13 +21,27 @@ The app talks to an ActivityMap deployment over `/api/v1`. It never holds a data
 
 | xcconfig value | Default | Purpose |
 | --- | --- | --- |
-| `ACTIVITYMAP_API_BASE_URL` | `http://localhost:3000` | The deployment to call |
+| `ACTIVITYMAP_API_BASE_URL` | Simulator: `http://localhost:3000`; device: `https://activitymap.dominik.page` | The deployment to call |
 | `ACTIVITYMAP_AUTH_CALLBACK_SCHEME` | `activitymap` | Registered in `CFBundleURLTypes`; what `ASWebAuthenticationSession` watches for |
 | `ACTIVITYMAP_AUTH_REDIRECT_URI` | `activitymap://auth/callback` | Where mobile sign-in returns its one-time code |
 
 Note that `//` starts a comment in xcconfig, so URL separators are composed from `$(SLASH)` rather than written literally.
 
 `Info.plist` carries one narrow App Transport Security exception, permitting insecure HTTP loads to `localhost` only, so Debug builds can reach a local `pnpm dev` server. Running against a device on the LAN needs its own exception or an HTTPS tunnel.
+
+### Run on a physical iPhone
+
+The simulator shares the Mac's `localhost`; an iPhone's `localhost` is the phone. `Config/Base.xcconfig` now sends simulator builds to the local server and physical-device builds to the production HTTPS deployment:
+
+```xcconfig
+ACTIVITYMAP_API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)activitymap.dominik.page
+```
+
+Run the `ActivityMap` scheme on the connected iPhone in Xcode. The app target has a development team for signing; select your own in Signing & Capabilities if needed. The phone needs internet access to reach production. Its activity cache and session are scoped to this server URL, so it signs in and syncs independently of the simulator's local-server account.
+
+The production Vercel project's **Production** environment must set `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback`, have Strava sign-in enabled, and serve `/api/v1` on that HTTPS host. This Vercel setting is not stored in Git; after adding or changing it, redeploy Production for the server to read it. If sign-in fails with `redirect_not_allowed`, check this setting first. A Vercel Preview is unsuitable for sign-in because external effects are disabled there.
+
+To test the Mac's local backend from an iPhone instead, use an HTTPS tunnel with a stable hostname and override the device setting in the ignored `Config/Local.xcconfig`. Add the tunnel host to Better Auth's `allowedHosts` in `src/lib/auth.ts`, set `BETTER_AUTH_URL` consistently, and register the tunnel callback host in the Strava OAuth application. The local server also needs the variables under **Local sign-in setup** below. Direct `http://<Mac LAN IP>:3000` does not work with this client: `APIConfiguration` rejects non-local HTTP and the app's transport policy only excepts `localhost`.
 
 ## Local sign-in setup
 

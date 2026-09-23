@@ -7,9 +7,11 @@ SLASH = /
 
 // Which ActivityMap deployment this build talks to. The app never holds a
 // database credential or a Strava token: picking an environment here picks a
-// deployment, and that deployment owns its own database. Override in the
-// ignored Local.xcconfig to point at a preview or production URL.
+// deployment, and that deployment owns its own database. The simulator can
+// reach the Mac through localhost; a physical iPhone uses production over
+// HTTPS. Override either setting in the ignored Local.xcconfig as needed.
 ACTIVITYMAP_API_BASE_URL = http:$(SLASH)$(SLASH)localhost:3000
+ACTIVITYMAP_API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)activitymap.dominik.page
 
 // Mobile sign-in callback. The scheme is registered under CFBundleURLTypes in
 // Info.plist and is what ASWebAuthenticationSession watches for. The full URI
