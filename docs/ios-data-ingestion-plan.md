@@ -68,17 +68,13 @@ and the database follows from that deployment's own configuration per the
 | iOS build configuration | API base URL | Resulting database | Native sign-in |
 | --- | --- | --- | --- |
 | Debug (local) | `http://localhost:3000` | Docker Postgres via local `DATABASE_URL` | Yes, once external effects and Strava credentials are configured |
-| Debug (preview) | The Vercel preview URL | That preview's dedicated Neon branch | **No** — build and read-only inspection only |
+| Debug (preview) | The Vercel preview URL | That preview's dedicated Neon branch | Yes, after [Preview Strava setup](preview-strava-login.md) and mobile redirect allow-list configuration |
 | Release | The production URL | Neon production branch | Yes |
 
-Preview cannot authenticate, and this is deliberate rather than a gap to close.
-Preview deployments run with `ACTIVITYMAP_EXTERNAL_EFFECTS` disabled, and
-`src/lib/auth.ts` only registers the Strava `genericOAuth` provider when
-external effects are enabled. A Preview therefore has no Strava provider at all,
-so the mobile flow has nothing to redirect to. Treat Preview as unauthenticated
-and build-only; use an explicitly configured local server for end-to-end
-authentication, or stand up the optional staging deployment from the
-environment matrix if a hosted authenticated target is ever needed.
+Preview deployments support Strava sign-in and interactive API requests by
+default after [Preview Strava setup](preview-strava-login.md). Native sign-in
+also needs its redirect URI on the Preview allow-list. Webhooks and cron remain
+disabled.
 
 Local sign-in needs more than the redirect allow-list. It also needs
 `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled` plus `AUTH_STRAVA_ID`,

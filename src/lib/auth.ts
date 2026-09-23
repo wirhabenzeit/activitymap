@@ -1,14 +1,14 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
-import { bearer } from 'better-auth/plugins';
+import { bearer, oAuthProxy } from 'better-auth/plugins';
 import { createAuthMiddleware } from 'better-auth/api';
 import { db } from '~/server/db';
 import { users, accounts, sessions, verification } from '~/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '~/server/logging/logger';
-import { externalEffectsEnabled } from '~/server/config/external-effects';
+import { stravaAccessEnabled } from '~/server/config/external-effects';
 
 const stravaProfileSchema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -25,19 +25,6 @@ function getSessionUserId(value: unknown): string | null {
 
   const session = value as { user?: { id?: unknown } };
   return typeof session.user?.id === 'string' ? session.user.id : null;
-}
-
-function isStravaAccount(
-  value: unknown,
-): value is { providerId: 'strava'; accountId: string } {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-
-  const account = value as { providerId?: unknown; accountId?: unknown };
-  return (
-    account.providerId === 'strava' && typeof account.accountId === 'string'
-  );
 }
 
 export const auth = betterAuth({
@@ -61,7 +48,7 @@ export const auth = betterAuth({
     },
   }),
   plugins: [
-    ...(externalEffectsEnabled()
+    ...(stravaAccessEnabled()
       ? [
           genericOAuth({
             config: [
@@ -115,6 +102,14 @@ export const auth = betterAuth({
           }),
         ]
       : []),
+    ...(process.env.OAUTH_PROXY_PRODUCTION_URL && process.env.OAUTH_PROXY_SECRET
+      ? [
+          oAuthProxy({
+            productionURL: process.env.OAUTH_PROXY_PRODUCTION_URL,
+            secret: process.env.OAUTH_PROXY_SECRET,
+          }),
+        ]
+      : []),
     // Accepts an `Authorization: Bearer <signed-session-token>` header as
     // an alternative to the secure cookie, so non-browser clients (e.g. a
     // future mobile app) can authenticate through the same safe
@@ -132,13 +127,18 @@ export const auth = betterAuth({
   // Hook to update athlete_id after OAuth sign-in
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
-      // Check if this is a social sign-in callback
-      if (ctx.path.startsWith('/sign-in/social/callback')) {
+      // Both the direct and proxied Strava callbacks create a local session.
+      if (ctx.path.startsWith('/callback/strava')) {
         const userId = getSessionUserId(ctx.context.newSession);
-        const account = (ctx.context as Record<string, unknown>).account;
-
-        if (userId && isStravaAccount(account)) {
+        if (userId) {
           try {
+            const account = await db.query.accounts.findFirst({
+              where: and(
+                eq(accounts.userId, userId),
+                eq(accounts.providerId, 'strava'),
+              ),
+            });
+            if (!account) return;
             const athleteId = Number(account.accountId);
             if (!Number.isFinite(athleteId)) {
               return;
