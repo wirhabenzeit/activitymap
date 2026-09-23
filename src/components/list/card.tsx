@@ -51,6 +51,7 @@ import { type RefObject } from 'react';
 import { LngLatBounds } from 'mapbox-gl';
 import { useShallowStore } from '~/store';
 import { PhotoLightbox } from './photo';
+import { ElevationChart } from './elevation-chart';
 import { useRouter } from 'next/navigation';
 
 type CardProps = React.ComponentProps<typeof Card>;
@@ -88,9 +89,10 @@ import { useToast } from '~/hooks/use-toast';
 export function ActivityCardContent({ row }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { isGuest, stravaConnected } = useShallowStore((state) => ({
+  const { isGuest, stravaConnected, userId } = useShallowStore((state) => ({
     isGuest: state.isGuest,
     stravaConnected: state.user?.stravaConnected ?? false,
+    userId: state.user?.id,
   }));
   const { data: allPhotos = [] } = usePhotos();
   const queryClient = useQueryClient();
@@ -223,7 +225,7 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
 
   return (
     <>
-      <Card className="w-auto max-w-80 border-none shadow-none">
+      <Card className="w-full border-none shadow-none">
         <CardHeader>
           <CardTitle>
             <div className="flex items-center space-x-4">
@@ -261,6 +263,11 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
               </div>
             ))}
           </div>
+          {!isGuest && stravaConnected && userId && (
+            <div className="mt-4">
+              <ElevationChart activityId={String(activityId)} userId={userId} />
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex justify-between space-x-1">
           <Button onClick={() => setOpen(true)} disabled={isGuest}>
@@ -396,7 +403,7 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
               <Info className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="p-0 w-auto">
+          <PopoverContent className="w-[min(90vw,22rem)] max-h-[80vh] overflow-y-auto p-0">
             <ActivityCardContent row={row} />
           </PopoverContent>
         </Popover>
