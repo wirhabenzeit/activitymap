@@ -11,6 +11,9 @@ import {
   ChevronRight,
   Loader2,
   Download,
+  MoreHorizontal,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 import { decode } from '@mapbox/polyline';
 import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
@@ -55,6 +58,12 @@ import { useShallowStore } from '~/store';
 import { PhotoLightbox } from './photo';
 import { ElevationChart } from './elevation-chart';
 import { useRouter } from 'next/navigation';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu';
 
 type CardProps = React.ComponentProps<typeof Card>;
 
@@ -62,7 +71,8 @@ interface ActivityCardProps extends CardProps {
   row: Row<Features, Activity>;
   map?: RefObject<MapRef | null>;
   inlineDetails?: boolean;
-  horizontalDetails?: boolean;
+  mapDetails?: boolean;
+  onClearSelection?: () => void;
   onOpenDetails?: () => void;
 }
 
@@ -95,7 +105,8 @@ import { useToast } from '~/hooks/use-toast';
 
 export function ActivityCardContent({
   row,
-  horizontalDetails = false,
+  mapDetails = false,
+  onClearSelection,
 }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -121,16 +132,6 @@ export function ActivityCardContent({
   const stats = [
     {
       icon: Calendar,
-      label: 'Date',
-      value: date.toLocaleDateString(undefined, {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      }),
-      detail: date.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
       description: date.toLocaleDateString('en-US', {
         month: '2-digit',
         day: '2-digit',
@@ -141,32 +142,20 @@ export function ActivityCardContent({
     },
     {
       icon: StopwatchIcon,
-      label: 'Moving',
-      value: formattedValue('moving_time', row),
-      detail: `${formattedValue('elapsed_time', row)} elapsed`,
       description: `${formattedValue('moving_time', row)} (moving), ${formattedValue('elapsed_time', row)} (elapsed)`,
     },
     {
       icon: RulerHorizontalIcon,
-      label: 'Distance',
-      value: formattedValue('distance', row),
-      detail: undefined,
       description: formattedValue('distance', row),
     },
     {
       icon: Mountain,
-      label: 'Elevation gain',
-      value: `+${formattedValue('total_elevation_gain', row)}`,
-      detail: `${formattedValue('elev_low', row)}–${formattedValue('elev_high', row)} elevation`,
       description: `+${formattedValue('total_elevation_gain', row)} (${formattedValue('elev_high', row)} max, ${formattedValue('elev_low', row)} min)`,
     },
     ...(row.getValue('average_heartrate')
       ? [
           {
             icon: Heart,
-            label: 'Heart rate',
-            value: `${formattedValue('average_heartrate', row)} avg`,
-            detail: `${formattedValue('max_heartrate', row)} max`,
             description: `${formattedValue('average_heartrate', row)} (avg), ${formattedValue('max_heartrate', row)} (max)`,
           },
         ]
@@ -175,13 +164,46 @@ export function ActivityCardContent({
       ? [
           {
             icon: Zap,
-            label: 'Power',
-            value: `${formattedValue('weighted_average_watts', row)} norm`,
-            detail: `${formattedValue('average_watts', row)} avg · ${formattedValue('max_watts', row)} max`,
             description: `${formattedValue('weighted_average_watts', row)} (norm), ${formattedValue('average_watts', row)} (avg), ${formattedValue('max_watts', row)} (max)`,
           },
         ]
       : []),
+  ];
+
+  const power = formattedValue('weighted_average_watts', row);
+  const gain = formattedValue('total_elevation_gain', row);
+  const elevationLow = formattedValue('elev_low', row);
+  const elevationHigh = formattedValue('elev_high', row);
+  const averagePower = formattedValue('average_watts', row);
+  const maximumPower = formattedValue('max_watts', row);
+  const elapsedTime = formattedValue('elapsed_time', row);
+  const mapStats = [
+    {
+      label: 'Distance',
+      value: formattedValue('distance', row) ?? '—',
+      detail: undefined,
+    },
+    {
+      label: 'Moving time',
+      value: formattedValue('moving_time', row) ?? '—',
+      detail: elapsedTime ? `${elapsedTime} elapsed` : undefined,
+    },
+    {
+      label: 'Elevation gain',
+      value: gain ? `+${gain}` : '—',
+      detail:
+        elevationLow && elevationHigh
+          ? `${elevationLow}–${elevationHigh} elevation`
+          : undefined,
+    },
+    {
+      label: 'Power',
+      value: power ? `${power} normalized` : '—',
+      detail:
+        power && averagePower && maximumPower
+          ? `${averagePower} avg · ${maximumPower} max`
+          : undefined,
+    },
   ];
 
   const handleRefresh = async () => {
@@ -261,173 +283,216 @@ export function ActivityCardContent({
       <ElevationChart
         activityId={String(activityId)}
         userId={userId}
-        compact={horizontalDetails}
+        compact={mapDetails}
       />
     ) : null;
 
   return (
     <>
-      <Card className="w-full border-none shadow-none">
-        <div
-          className={cn(
-            horizontalDetails &&
-              'lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]',
-          )}
-        >
-          <div className="min-w-0">
-            {!horizontalDetails ? (
-              <CardHeader>
-                <CardTitle>
-                  <div className="flex items-center space-x-4">
-                    {Icon && sport_group && (
-                      <Icon
-                        color={categorySettings[sport_group].color}
-                        className="w-6 h-6"
-                        height="3em"
-                      />
-                    )}
-                    <div>{row.getValue('name')}</div>
-                  </div>
+      {mapDetails ? (
+        <Card className="w-full border-none shadow-none">
+          <CardHeader className="space-y-1 px-4 pb-3 pt-3">
+            <div className="flex items-start gap-2">
+              {Icon && sport_group && (
+                <Icon
+                  color={categorySettings[sport_group].color}
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-base leading-5">
+                  {row.getValue('name')}
                 </CardTitle>
-                <CardDescription>
-                  {row.getValue('description') ?? ''}
-                  {photos && photos.length > 0 ? (
-                    <div className="pt-4">
-                      <PhotoLightbox
-                        photos={photos}
-                        title={row.getValue('name')}
-                        className="h-[3rem]"
-                      />
-                    </div>
-                  ) : null}
-                </CardDescription>
-              </CardHeader>
-            ) : (
-              (Boolean(row.original.description) || photos.length > 0) && (
-                <div className="px-3 pt-3 text-xs text-muted-foreground">
-                  {row.original.description && (
-                    <p className="line-clamp-2">{row.original.description}</p>
-                  )}
-                  {photos.length > 0 && (
-                    <PhotoLightbox
-                      photos={photos}
-                      title={row.getValue('name')}
-                      className="mt-2 h-[2.5rem]"
-                    />
-                  )}
-                </div>
-              )
-            )}
-            <CardContent className={horizontalDetails ? 'p-3 pb-2' : undefined}>
-              {horizontalDetails ? (
-                <div className="grid grid-cols-2 gap-1.5">
-                  {stats.map((stat) => (
-                    <div
-                      className="min-w-0 rounded-md border bg-muted/20 px-2.5 py-1.5"
-                      key={stat.label}
-                    >
-                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <stat.icon className="h-3 w-3 shrink-0" />
-                        <span>{stat.label}</span>
-                      </div>
-                      <div
-                        className="truncate text-sm font-semibold leading-5"
-                        title={stat.value ?? undefined}
-                      >
-                        {stat.value}
-                      </div>
-                      {stat.detail && (
-                        <div
-                          className="truncate text-[11px] text-muted-foreground"
-                          title={stat.detail}
-                        >
-                          {stat.detail}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {stats.map((stat, index) => (
-                    <div className="flex items-center pt-2" key={index}>
-                      <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
-                      <div className="text-xs text-muted-foreground">
-                        {stat.description}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {!horizontalDetails && elevationProfile && (
-                <div className="mt-4">{elevationProfile}</div>
-              )}
-            </CardContent>
-            <CardFooter
-              className={
-                horizontalDetails
-                  ? 'flex flex-wrap items-center gap-1.5 px-3 pb-3 pt-0'
-                  : 'flex justify-between space-x-1'
-              }
-            >
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {date.toLocaleDateString(undefined, {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}{' '}
+                  ·{' '}
+                  {date.toLocaleTimeString(undefined, {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
               <Button
-                size={horizontalDetails ? 'sm' : 'default'}
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
                 onClick={() => setOpen(true)}
                 disabled={isGuest}
               >
                 Edit
               </Button>
-              <Button
-                size={horizontalDetails ? 'sm' : 'default'}
-                variant={horizontalDetails ? 'outline' : 'default'}
-                className={horizontalDetails ? 'h-8 w-8 p-0' : undefined}
-                onClick={handleRefresh}
-                disabled={loading || isGuest}
-                aria-label="Refresh activity from Strava"
-                title="Refresh activity from Strava"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ReloadIcon />
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size={horizontalDetails ? 'sm' : 'default'}
-                className={horizontalDetails ? 'h-8 w-8 p-0' : undefined}
-                onClick={handleDownloadGpx}
-                aria-label="Download GPX"
-                title="Download GPX"
-                disabled={
-                  !row.original.map_polyline &&
-                  !row.original.map_summary_polyline
-                }
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size={horizontalDetails ? 'sm' : 'default'}
-                asChild
-              >
-                <Link
-                  href={`https://strava.com/activities/${id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    aria-label="More route actions"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onSelect={() => void handleRefresh()}
+                    disabled={loading || isGuest || !stravaConnected}
+                  >
+                    <ReloadIcon /> Refresh from Strava
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={handleDownloadGpx}
+                    disabled={
+                      !row.original.map_polyline &&
+                      !row.original.map_summary_polyline
+                    }
+                  >
+                    <Download /> Download GPX
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href={`https://strava.com/activities/${id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink /> Open in Strava
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {onClearSelection && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={onClearSelection}
+                  aria-label="Clear selection"
+                  title="Clear selection"
                 >
-                  Strava
-                </Link>
-              </Button>
-            </CardFooter>
-          </div>
-          {horizontalDetails && elevationProfile && (
-            <div className="min-w-0 px-3 pb-3 lg:border-l lg:py-3">
-              {elevationProfile}
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-          )}
-        </div>
-      </Card>
+            {row.original.description && (
+              <CardDescription className="whitespace-pre-wrap text-sm">
+                {row.original.description}
+              </CardDescription>
+            )}
+            {photos.length > 0 && (
+              <PhotoLightbox
+                photos={photos}
+                title={row.getValue('name')}
+                className="h-[2.5rem]"
+              />
+            )}
+          </CardHeader>
+          <CardContent className="px-4 pb-4 pt-0 lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-4">
+            <dl className="grid self-start grid-cols-2 gap-x-5 gap-y-2.5">
+              {mapStats.map((stat) => (
+                <div className="min-w-0" key={stat.label}>
+                  <dt className="text-xs text-muted-foreground">
+                    {stat.label}
+                  </dt>
+                  <dd
+                    className="truncate text-base font-semibold"
+                    title={stat.value}
+                  >
+                    {stat.value}
+                  </dd>
+                  {stat.detail && (
+                    <dd
+                      className="truncate text-[11px] text-muted-foreground"
+                      title={stat.detail}
+                    >
+                      {stat.detail}
+                    </dd>
+                  )}
+                </div>
+              ))}
+            </dl>
+            {elevationProfile && (
+              <div className="mt-3 min-w-0 lg:mt-0 lg:border-l lg:pl-4">
+                {elevationProfile}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="w-full border-none shadow-none">
+          <CardHeader>
+            <CardTitle>
+              <div className="flex items-center space-x-4">
+                {Icon && sport_group && (
+                  <Icon
+                    color={categorySettings[sport_group].color}
+                    className="w-6 h-6"
+                    height="3em"
+                  />
+                )}
+                <div>{row.getValue('name')}</div>
+              </div>
+            </CardTitle>
+            <CardDescription>
+              {row.getValue('description') ?? ''}
+              {photos && photos.length > 0 ? (
+                <div className="pt-4">
+                  <PhotoLightbox
+                    photos={photos}
+                    title={row.getValue('name')}
+                    className="h-[3rem]"
+                  />
+                </div>
+              ) : null}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              {stats.map((stat, index) => (
+                <div className="flex items-center pt-2" key={index}>
+                  <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
+                  <div className="text-xs text-muted-foreground">
+                    {stat.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {elevationProfile && <div className="mt-4">{elevationProfile}</div>}
+          </CardContent>
+          <CardFooter className="flex justify-between space-x-1">
+            <Button onClick={() => setOpen(true)} disabled={isGuest}>
+              Edit
+            </Button>
+            <Button onClick={handleRefresh} disabled={loading || isGuest}>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ReloadIcon />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDownloadGpx}
+              disabled={
+                !row.original.map_polyline && !row.original.map_summary_polyline
+              }
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" asChild>
+              <Link
+                href={`https://strava.com/activities/${id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Strava
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
     </>
   );

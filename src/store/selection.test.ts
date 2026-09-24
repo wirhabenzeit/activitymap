@@ -24,7 +24,7 @@ void test('the active route is always part of the selected routes', () => {
   assert.equal(store.getState().highlighted, 11);
 
   setSelected([12]);
-  assert.equal(store.getState().highlighted, 0);
+  assert.equal(store.getState().highlighted, 12);
 
   setHighlighted(11);
   assert.equal(store.getState().highlighted, 0);
@@ -33,4 +33,11 @@ void test('the active route is always part of the selected routes', () => {
   setSelected([]);
   assert.deepEqual(store.getState().selected, []);
   assert.equal(store.getState().highlighted, 0);
+
+  setSelected([11]);
+  assert.equal(store.getState().highlighted, 11);
+
+  setSelected([11, 12]);
+  setSelected([12]);
+  assert.equal(store.getState().highlighted, 12);
 });

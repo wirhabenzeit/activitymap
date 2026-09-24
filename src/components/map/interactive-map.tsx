@@ -473,6 +473,10 @@ export default function InteractiveMap() {
     [],
   );
   const panelExpanded = panelExpandedOverride ?? highlighted !== 0;
+  const clearSelection = () => {
+    setSelected([]);
+    setPanelExpandedOverride(null);
+  };
 
   // Part of #132: a visitor who arrived via a legacy `/map?user=`/
   // `/map?activities=` share link gets an explicit "no longer works"
@@ -602,49 +606,52 @@ export default function InteractiveMap() {
       <div
         className={cn(
           'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
-          panelExpanded && highlighted !== 0
+          highlighted !== 0
             ? 'lg:w-[min(70vw,48rem)]'
-            : 'lg:w-[min(70vw,38rem)]',
+            : 'lg:w-[min(70vw,40rem)]',
           { hidden: rows.length == 0 },
         )}
       >
-        <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
-          <span className="font-semibold">Routes</span>
-          <span className="text-muted-foreground">
-            {selected.length} selected
-          </span>
-          <div className="flex-1" />
-          {selected.length > 0 && (
+        {selected.length > 1 && (
+          <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
+            <span className="font-semibold">Routes</span>
+            <span className="text-muted-foreground">
+              {selected.length} selected
+            </span>
+            <div className="flex-1" />
             <Button
               size="sm"
               variant="ghost"
               className="h-7 px-2"
-              onClick={() => {
-                setSelected([]);
-                setPanelExpandedOverride(null);
-              }}
+              onClick={clearSelection}
             >
               Clear selection
             </Button>
-          )}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            aria-label={
-              panelExpanded ? 'Collapse route panel' : 'Expand route panel'
-            }
-            onClick={() => setPanelExpandedOverride(!panelExpanded)}
-          >
-            {panelExpanded ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronUp className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              aria-label={
+                panelExpanded ? 'Collapse route panel' : 'Expand route panel'
+              }
+              onClick={() => setPanelExpandedOverride(!panelExpanded)}
+            >
+              {panelExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        )}
         <DataTable
-          className={panelExpanded ? 'max-h-[65vh]' : 'max-h-36'}
+          className={
+            selected.length === 1
+              ? 'max-h-[70vh]'
+              : panelExpanded
+                ? 'max-h-[65vh]'
+                : 'max-h-36'
+          }
           columns={mapColumns}
           data={rows}
           selected={selected}
@@ -652,10 +659,16 @@ export default function InteractiveMap() {
           map={mapRefLoc}
           columnFilters={columnFilters}
           paginationControl={false}
-          hideHeader={rows.length === 1}
           activeId={highlighted}
           renderInlineDetails={(row) => (
-            <ActivityCardContent row={row} horizontalDetails />
+            <ActivityCardContent row={row} mapDetails />
+          )}
+          renderSingleDetails={(row) => (
+            <ActivityCardContent
+              row={row}
+              mapDetails
+              onClearSelection={clearSelection}
+            />
           )}
           {...compactList}
           columnVisibility={mapColumnVisibility}

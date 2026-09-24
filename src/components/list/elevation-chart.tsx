@@ -232,7 +232,7 @@ export function ElevationChart({
           Loading elevation samples…
         </div>
       ) : profile ? (
-        <ElevationPlot profile={profile} height={compact ? 185 : 118} />
+        <ElevationPlot profile={profile} height={compact ? 135 : 118} />
       ) : (
         <p className="text-xs text-muted-foreground">
           Elevation by distance is unavailable for this activity.

@@ -79,6 +79,7 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   activeId?: number;
   hideHeader?: boolean;
   renderInlineDetails?: (row: Row<Features, TData>) => React.ReactNode;
+  renderSingleDetails?: (row: Row<Features, TData>) => React.ReactNode;
 }
 
 interface RowWithId {
@@ -103,6 +104,7 @@ export const DataTable = React.memo(function DataTable<
   activeId,
   hideHeader = false,
   renderInlineDetails,
+  renderSingleDetails,
   setSorting,
   setColumnVisibility,
   setSelected,
@@ -148,6 +150,15 @@ export const DataTable = React.memo(function DataTable<
       expanded: activeId ? { [activeId]: true } : {},
     },
   });
+
+  const singleRow = table.getRowModel().rows[0];
+  if (data.length === 1 && singleRow && renderSingleDetails) {
+    return (
+      <div className={cn('overflow-y-auto', className)}>
+        {renderSingleDetails(singleRow)}
+      </div>
+    );
+  }
 
   return (
     <div className={cn('flex flex-col', className)}>
