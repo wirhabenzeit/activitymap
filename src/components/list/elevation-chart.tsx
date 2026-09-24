@@ -83,8 +83,10 @@ async function fetchStreams(
 
 function ElevationPlot({
   profile,
+  height = 118,
 }: {
   profile: NonNullable<StreamResult['profile']>;
+  height?: number;
 }) {
   const plot = useMemo(() => {
     const { altitude, distance } = profile;
@@ -170,7 +172,7 @@ function ElevationPlot({
   return (
     <Chart
       definition={plot.definition}
-      height={118}
+      height={height}
       initialWidth={304}
       className="w-full text-muted-foreground"
       ariaLabel={`Elevation profile from ${metres.format(plot.min)} to ${metres.format(plot.max)} metres over ${(plot.total / 1000).toFixed(1)} kilometres`}
@@ -230,7 +232,7 @@ export function ElevationChart({
           Loading elevation samples…
         </div>
       ) : profile ? (
-        <ElevationPlot profile={profile} />
+        <ElevationPlot profile={profile} height={compact ? 185 : 118} />
       ) : (
         <p className="text-xs text-muted-foreground">
           Elevation by distance is unavailable for this activity.
