@@ -11,6 +11,7 @@ import {
   type Updater,
   type RowSelectionState,
   type RowData,
+  type Row,
   type TableFeatures,
   useTable,
   flexRender,
@@ -45,7 +46,11 @@ interface ListState {
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
-  interface ColumnMeta<TFeatures extends TableFeatures, TData extends RowData, TValue> {
+  interface ColumnMeta<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+    TValue,
+  > {
     width: string;
     title: string;
   }
@@ -71,6 +76,9 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   setSelected: (updater: Updater<number[]>) => void;
   columnFilters: ColumnFiltersState;
   map?: RefObject<MapRef | null>;
+  activeId?: number;
+  hideHeader?: boolean;
+  renderInlineDetails?: (row: Row<Features, TData>) => React.ReactNode;
 }
 
 interface RowWithId {
@@ -92,6 +100,9 @@ export const DataTable = React.memo(function DataTable<
   summaryRow,
   paginationControl = true,
   map,
+  activeId,
+  hideHeader = false,
+  renderInlineDetails,
   setSorting,
   setColumnVisibility,
   setSelected,
@@ -148,7 +159,12 @@ export const DataTable = React.memo(function DataTable<
             .join(' '),
         }}
       >
-        <TableHeader className="sticky [&_tr]:border-b-0 grid grid-cols-subgrid col-span-full">
+        <TableHeader
+          className={cn(
+            'sticky [&_tr]:border-b-0 grid grid-cols-subgrid col-span-full',
+            hideHeader && 'hidden',
+          )}
+        >
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow
               key={headerGroup.id}
@@ -210,31 +226,46 @@ export const DataTable = React.memo(function DataTable<
         <TableBody className="grid grid-cols-subgrid col-span-full">
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() && 'selected'}
-                className="group grid grid-cols-subgrid col-span-full"
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    className={cn(
-                      'bg-background group-data-[state=selected]:bg-muted flex items-center',
-                      cell.column.getIsPinned() == 'start' &&
-                        'sticky left-0 border-border border-r',
-                      cell.column.getIsPinned() == 'end' &&
-                        'sticky right-0 border-border border-l',
-                      density == 'sm'
-                        ? 'py-1 px-1'
-                        : density == 'md'
-                          ? 'p-2'
-                          : 'py-3 px-2 text-sm',
-                    )}
-                    key={cell.id}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
+              <React.Fragment key={row.id}>
+                <TableRow
+                  data-state={row.getIsSelected() && 'selected'}
+                  data-active={activeId === Number(row.id) || undefined}
+                  className="group grid grid-cols-subgrid col-span-full data-[active=true]:ring-1 data-[active=true]:ring-inset data-[active=true]:ring-orange-500"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      className={cn(
+                        'bg-background group-data-[state=selected]:bg-muted flex items-center',
+                        cell.column.getIsPinned() == 'start' &&
+                          'sticky left-0 border-border border-r',
+                        cell.column.getIsPinned() == 'end' &&
+                          'sticky right-0 border-border border-l',
+                        density == 'sm'
+                          ? 'py-1 px-1'
+                          : density == 'md'
+                            ? 'p-2'
+                            : 'py-3 px-2 text-sm',
+                      )}
+                      key={cell.id}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+                {activeId === Number(row.id) && renderInlineDetails && (
+                  <TableRow className="grid grid-cols-subgrid col-span-full">
+                    <TableCell
+                      colSpan={row.getVisibleCells().length}
+                      className="col-span-full p-0 bg-background"
+                    >
+                      {renderInlineDetails(row)}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </React.Fragment>
             ))
           ) : (
             <TableRow>

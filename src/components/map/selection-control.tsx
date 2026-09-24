@@ -17,18 +17,20 @@ const styles = `
 `;
 
 export function Selection() {
-  const [setSelected] = useShallowStore((state) => [
-    state.setSelected,
-  ]);
+  const { setSelected, setNearby } = useShallowStore((state) => ({
+    setSelected: state.setSelected,
+    setNearby: state.setNearby,
+  }));
 
   useControl(
     () =>
       new SelectionControl({
         layers: ['routeLayerBG', 'routeLayerBGsel'],
         source: 'routeSource',
-        selectionHandler: (sel: number[]) => {
+        selectionHandler: (sel: number[], box: boolean) => {
           const ids = Array.from(new Set(sel));
-          setSelected(ids);
+          setNearby(ids);
+          if (box) setSelected(ids);
         },
       }),
   );
@@ -38,7 +40,7 @@ export function Selection() {
 export class SelectionControl implements IControl {
   layers: string[];
   source: string;
-  selectionHandler: (ids: number[]) => void;
+  selectionHandler: (ids: number[], box: boolean) => void;
   canvas?: HTMLElement;
   map?: mapboxgl.Map;
   start?: Point;
@@ -55,7 +57,7 @@ export class SelectionControl implements IControl {
   }: {
     layers: string[];
     source: string;
-    selectionHandler: (ids: number[]) => void;
+    selectionHandler: (ids: number[], box: boolean) => void;
   }) {
     const styleSheet = document.createElement('style');
     styleSheet.innerText = styles;
@@ -96,6 +98,7 @@ export class SelectionControl implements IControl {
     });
     this.selectionHandler(
       selectedFeatures.map((feature) => feature.id as number),
+      false,
     );
   };
 
@@ -175,6 +178,7 @@ export class SelectionControl implements IControl {
       if (selectedFeatures)
         this.selectionHandler(
           selectedFeatures.map((feature) => feature.id as number),
+          true,
         );
     }
     this.map?.dragPan.enable();

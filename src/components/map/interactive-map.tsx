@@ -8,8 +8,11 @@ import React, {
   useRef,
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
-import { Camera, Globe } from 'lucide-react';
+import { Camera, ChevronDown, ChevronUp, Globe, X } from 'lucide-react';
 import { columns } from '~/components/list/columns';
+import { ActivityCard, ActivityCardContent } from '~/components/list/card';
+import { Button } from '~/components/ui/button';
+import { activityFields } from '~/settings/activity';
 
 import ReactMapGL, {
   NavigationControl,
@@ -79,19 +82,16 @@ const isDefaultViewState = (viewState: ViewState): boolean => {
   );
 };
 
-const getOverlayMapSetting = (
-  overlayId: OverlayMapId,
-): OverlaySetting => {
+const getOverlayMapSetting = (overlayId: OverlayMapId): OverlaySetting => {
   return overlayMaps[overlayId];
 };
 
 const RouteLayer = React.memo(function RouteLayer() {
-  const { selected, highlighted } = useShallowStore(
-    (state) => ({
-      selected: state.selected,
-      highlighted: state.highlighted,
-    }),
-  );
+  const { selected, nearby, highlighted } = useShallowStore((state) => ({
+    selected: state.selected,
+    nearby: state.nearby,
+    highlighted: state.highlighted,
+  }));
 
   const { data: activities = [] } = useActivities();
   const { filterIDs } = useFilteredActivities(activities);
@@ -127,6 +127,11 @@ const RouteLayer = React.memo(function RouteLayer() {
     selectedFilter,
   ];
   const filterHigh: mapboxgl.FilterSpecification = ['==', 'id', highlighted];
+  const nearbyFilter: mapboxgl.FilterSpecification = [
+    'all',
+    filter,
+    ['in', 'id', ...nearby],
+  ];
 
   return (
     <Source data={geoJson} id="routeSource" type="geojson">
@@ -151,6 +156,14 @@ const RouteLayer = React.memo(function RouteLayer() {
           'line-cap': 'round',
         }}
         filter={filterAll}
+      />
+      <Layer
+        source="routeSource"
+        id="routeLayerNearby"
+        type="line"
+        paint={{ 'line-color': color, 'line-width': 4, 'line-opacity': 0.65 }}
+        layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+        filter={nearbyFilter}
       />
       <Layer
         source="routeSource"
@@ -191,13 +204,20 @@ const RouteLayer = React.memo(function RouteLayer() {
         type="line"
         paint={{
           'line-color': 'black',
-          'line-pattern': 'pattern-dot',
-          'line-width': 6,
+          'line-width': 9,
         }}
         layout={{
           'line-join': 'round',
           'line-cap': 'round',
         }}
+        filter={filterHigh}
+      />
+      <Layer
+        source="routeSource"
+        id="routeLayerHighFG"
+        type="line"
+        paint={{ 'line-color': '#f97316', 'line-width': 5 }}
+        layout={{ 'line-join': 'round', 'line-cap': 'round' }}
         filter={filterHigh}
       />
     </Source>
@@ -211,6 +231,9 @@ export default function InteractiveMap() {
     [searchParams],
   );
   const [cursor, setCursor] = useState('auto');
+  const [panelExpandedOverride, setPanelExpandedOverride] = useState<
+    boolean | null
+  >(null);
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
   const onMouseLeave = useCallback(() => setCursor('auto'), []);
 
@@ -220,16 +243,25 @@ export default function InteractiveMap() {
   const { filterIDs } = useFilteredActivities(activities);
 
   // Memoize activity dictionary for efficient lookup
-  const activityDict = useMemo(() =>
-    activities.reduce((acc, act) => {
-      acc[act.id] = act;
-      return acc;
-    }, {} as Record<number, Activity>),
-    [activities]);
+  const activityDict = useMemo(
+    () =>
+      activities.reduce(
+        (acc, act) => {
+          acc[act.id] = act;
+          return acc;
+        },
+        {} as Record<number, Activity>,
+      ),
+    [activities],
+  );
 
   const {
     selected,
+    nearby,
+    highlighted,
     setSelected,
+    setNearby,
+    setHighlighted,
     baseMap,
     overlays,
     mapPosition,
@@ -245,8 +277,11 @@ export default function InteractiveMap() {
     guestModeType,
   } = useShallowStore((state) => ({
     selected: state.selected,
+    nearby: state.nearby,
+    highlighted: state.highlighted,
     setHighlighted: state.setHighlighted,
     setSelected: state.setSelected,
+    setNearby: state.setNearby,
     baseMap: state.baseMap,
     overlays: state.overlayMaps,
     mapPosition: state.position,
@@ -337,7 +372,10 @@ export default function InteractiveMap() {
     overlays.forEach((mapName) => {
       const mapSetting = getOverlayMapSetting(mapName);
       const interactiveLayerIds = mapSetting.interactiveLayerIds;
-      if (Array.isArray(interactiveLayerIds) && interactiveLayerIds.length > 0) {
+      if (
+        Array.isArray(interactiveLayerIds) &&
+        interactiveLayerIds.length > 0
+      ) {
         ids.push(...interactiveLayerIds);
       }
     });
@@ -395,20 +433,64 @@ export default function InteractiveMap() {
 
   const mapSettingBase = baseMaps[baseMap];
 
-  const photoDict = useMemo(() => groupBy(photos, (photo) => photo.activity_id), [photos]);
-  const rows = useMemo(() =>
-    selected
-      .map((key) => {
-        const activity = activityDict[key];
-        if (!activity) return undefined;
-        return {
-          ...activity,
-          ...(key in photoDict && { photos: photoDict[key] }),
-        };
-      })
-      .filter((x) => x != undefined),
-    [selected, activityDict, photoDict]
+  const photoDict = useMemo(
+    () => groupBy(photos, (photo) => photo.activity_id),
+    [photos],
   );
+  const rows = useMemo(
+    () =>
+      Array.from(new Set([...nearby, ...selected]))
+        .map((key) => {
+          const activity = activityDict[key];
+          if (!activity) return undefined;
+          return {
+            ...activity,
+            ...(key in photoDict && { photos: photoDict[key] }),
+          };
+        })
+        .filter((x) => x != undefined),
+    [nearby, selected, activityDict, photoDict],
+  );
+  const mapColumns = useMemo(
+    () =>
+      columns.map((column) =>
+        column.id === 'name'
+          ? {
+              ...column,
+              cell: ({
+                row,
+              }: {
+                row: Parameters<typeof ActivityCard>[0]['row'];
+              }) => (
+                <ActivityCard
+                  row={row}
+                  map={mapRefLoc}
+                  inlineDetails
+                  onOpenDetails={() => setPanelExpandedOverride(true)}
+                />
+              ),
+            }
+          : column,
+      ),
+    [],
+  );
+  const mapColumnVisibility = useMemo(
+    () => ({
+      ...Object.fromEntries(
+        Object.keys(activityFields).map((id) => [id, false]),
+      ),
+      id: false,
+      description: false,
+      photos: false,
+      geometry_state: false,
+      edit: false,
+      name: true,
+      distance: true,
+      total_elevation_gain: true,
+    }),
+    [],
+  );
+  const panelExpanded = panelExpandedOverride ?? highlighted !== 0;
 
   // Part of #132: a visitor who arrived via a legacy `/map?user=`/
   // `/map?activities=` share link gets an explicit "no longer works"
@@ -438,18 +520,6 @@ export default function InteractiveMap() {
           }
         }}
         onLoad={() => {
-          const map = mapRefLoc.current?.getMap();
-          if (map) {
-            map.loadImage(
-              'https://docs.mapbox.com/mapbox-gl-js/assets/pattern-dot.png',
-              (error, image) => {
-                if (error) throw error;
-                if (image && !map.hasImage('pattern-dot')) {
-                  map.addImage('pattern-dot', image);
-                }
-              },
-            );
-          }
           tryAutoCenterOnLatestActivity();
         }}
         projection={'globe'}
@@ -529,7 +599,7 @@ export default function InteractiveMap() {
               paint={{
                 'line-color': '#000',
                 'line-width': 2,
-                'line-opacity': 1.,
+                'line-opacity': 1,
               }}
               layout={{
                 'line-join': 'round',
@@ -543,19 +613,70 @@ export default function InteractiveMap() {
       </ReactMapGL>
       <div
         className={cn(
-          'z-10 absolute w-[80%] left-[10%] right-[10%] bottom-0 bg-background mb-10 rounded-lg shadow-lg overflow-hidden',
+          'z-10 absolute left-2 right-2 bottom-2 sm:left-[10%] sm:right-[10%] sm:bottom-6 bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
           { hidden: rows.length == 0 },
         )}
       >
+        <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
+          <span className="font-semibold">Routes</span>
+          <span className="text-muted-foreground">
+            {nearby.length} nearby · {selected.length} selected
+          </span>
+          <div className="flex-1" />
+          {selected.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2"
+              onClick={() => setSelected([])}
+            >
+              Clear selection
+            </Button>
+          )}
+          {nearby.length > 0 && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              aria-label="Clear nearby routes"
+              onClick={() => {
+                setNearby([]);
+                setHighlighted(0);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            aria-label={
+              panelExpanded ? 'Collapse route panel' : 'Expand route panel'
+            }
+            onClick={() => setPanelExpandedOverride(!panelExpanded)}
+          >
+            {panelExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronUp className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
         <DataTable
-          className="max-h-64"
-          columns={columns}
+          className={panelExpanded ? 'max-h-[65vh]' : 'max-h-36'}
+          columns={mapColumns}
           data={rows}
           selected={selected}
           setSelected={setSelected}
           map={mapRefLoc}
           columnFilters={columnFilters}
+          paginationControl={false}
+          hideHeader={rows.length === 1}
+          activeId={highlighted}
+          renderInlineDetails={(row) => <ActivityCardContent row={row} />}
           {...compactList}
+          columnVisibility={mapColumnVisibility}
         />
       </div>
     </div>

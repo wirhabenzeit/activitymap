@@ -59,10 +59,14 @@ type CardProps = React.ComponentProps<typeof Card>;
 interface ActivityCardProps extends CardProps {
   row: Row<Features, Activity>;
   map?: RefObject<MapRef | null>;
+  inlineDetails?: boolean;
+  onOpenDetails?: () => void;
 }
 
-const formattedValue = (key: keyof typeof activityFields, row: Row<Features, Activity>) =>
-  activityFields[key].formatter(row.getValue(key));
+const formattedValue = (
+  key: keyof typeof activityFields,
+  row: Row<Features, Activity>,
+) => activityFields[key].formatter(row.getValue(key));
 
 export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
   const [open, setOpen] = useState(false);
@@ -103,9 +107,7 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
   const activityId = row.original.id;
 
-  const photos = allPhotos.filter(
-    (p) => p.activity_id === activityId,
-  );
+  const photos = allPhotos.filter((p) => p.activity_id === activityId);
 
   const id: number = row.getValue('id');
 
@@ -135,19 +137,19 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
     },
     ...(row.getValue('average_heartrate')
       ? [
-        {
-          icon: Heart,
-          description: `${formattedValue('average_heartrate', row)} (avg), ${formattedValue('max_heartrate', row)} (max)`,
-        },
-      ]
+          {
+            icon: Heart,
+            description: `${formattedValue('average_heartrate', row)} (avg), ${formattedValue('max_heartrate', row)} (max)`,
+          },
+        ]
       : []),
     ...(row.getValue('weighted_average_watts')
       ? [
-        {
-          icon: Zap,
-          description: `${formattedValue('weighted_average_watts', row)} (norm), ${formattedValue('average_watts', row)} (avg), ${formattedValue('max_watts', row)} (max)`,
-        },
-      ]
+          {
+            icon: Zap,
+            description: `${formattedValue('weighted_average_watts', row)} (norm), ${formattedValue('average_watts', row)} (avg), ${formattedValue('max_watts', row)} (max)`,
+          },
+        ]
       : []),
   ];
 
@@ -200,13 +202,13 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
 
     // Convert to GPX with metadata
     const options: { metadata: { name: string; time: string; desc?: string } } =
-    {
-      metadata: {
-        name: String(row.getValue('name')),
-        time: row.original.start_date.toISOString(),
-        desc: row.original.description ?? undefined,
-      },
-    };
+      {
+        metadata: {
+          name: String(row.getValue('name')),
+          time: row.original.start_date.toISOString(),
+          desc: row.original.description ?? undefined,
+        },
+      };
 
     const gpx = GeoJsonToGpx(geojson, options);
     const gpxString = new XMLSerializer().serializeToString(gpx);
@@ -301,16 +303,22 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
   );
 }
 
-export function ActivityCard({ row, map }: ActivityCardProps) {
+export function ActivityCard({
+  row,
+  map,
+  inlineDetails = false,
+  onOpenDetails,
+}: ActivityCardProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { highlighted, setHighlighted, isGuest, setPosition, setSelected } = useShallowStore((state) => ({
-    highlighted: state.highlighted,
-    setHighlighted: state.setHighlighted,
-    isGuest: state.isGuest,
-    setPosition: state.setPosition,
-    setSelected: state.setSelected,
-  }));
+  const { highlighted, setHighlighted, isGuest, setPosition, setSelected } =
+    useShallowStore((state) => ({
+      highlighted: state.highlighted,
+      setHighlighted: state.setHighlighted,
+      isGuest: state.isGuest,
+      setPosition: state.setPosition,
+      setSelected: state.setSelected,
+    }));
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
@@ -328,6 +336,7 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
       );
       map.current.fitBounds(bounds, { padding: 50 });
       setHighlighted(row.original.id);
+      onOpenDetails?.();
     } else {
       // If map is not available, navigate to the map page
       // Create a bounds object with the bbox coordinates
@@ -344,16 +353,29 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
         zoom: 12, // Default zoom level
         bearing: 0,
         pitch: 0,
-        padding: { top: 0, bottom: 0, left: 0, right: 0 }
+        padding: { top: 0, bottom: 0, left: 0, right: 0 },
       };
 
       // Set the position in the store
       setPosition(viewState, bounds);
-      setSelected((selected) => selected.includes(row.original.id) ? selected : [...selected, row.original.id]);
+      setSelected((selected) =>
+        selected.includes(row.original.id)
+          ? selected
+          : [...selected, row.original.id],
+      );
       setHighlighted(row.original.id);
 
       // Navigate to the map page
       router.push('/map');
+    }
+  };
+
+  const toggleInlineDetails = () => {
+    if (highlighted === row.original.id) {
+      setHighlighted(0);
+    } else {
+      setHighlighted(row.original.id);
+      onOpenDetails?.();
     }
   };
 
@@ -378,35 +400,57 @@ export function ActivityCard({ row, map }: ActivityCardProps) {
             />
           )}
         </Button>
-        <div
+        <button
+          type="button"
+          onClick={() => inlineDetails && toggleInlineDetails()}
           className={cn(
             'text-left truncate justify-start max-w-full',
+            inlineDetails && 'hover:underline',
             highlighted === Number(row.id)
               ? 'text-header-background'
               : 'text-primary',
           )}
         >
           {row.getValue('name')}
-        </div>
+        </button>
         <div className="flex-1" />
         <Button
           variant="ghost"
           className="px-0 h-4"
           size="sm"
           onClick={handleMapClick}
+          aria-label={`Show ${String(row.getValue('name'))} on map`}
         >
           <Map className="h-4 w-4" />
         </Button>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" className="px-0 h-4" size="sm">
-              <Info className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[min(90vw,22rem)] max-h-[80vh] overflow-y-auto p-0">
-            <ActivityCardContent row={row} />
-          </PopoverContent>
-        </Popover>
+        {inlineDetails ? (
+          <Button
+            variant="ghost"
+            className="px-0 h-4"
+            size="sm"
+            onClick={toggleInlineDetails}
+            aria-label={`Toggle details for ${String(row.getValue('name'))}`}
+            aria-expanded={highlighted === row.original.id}
+          >
+            <Info className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                className="px-0 h-4"
+                size="sm"
+                aria-label={`Show details for ${String(row.getValue('name'))}`}
+              >
+                <Info className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[min(90vw,22rem)] max-h-[80vh] overflow-y-auto p-0">
+              <ActivityCardContent row={row} />
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
     </>
