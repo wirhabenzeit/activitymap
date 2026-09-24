@@ -549,7 +549,7 @@ export default function InteractiveMap() {
         <Overlay position="top-right">
           <UploadControl />
         </Overlay>
-        <Selection />
+        <Selection onNearbyChange={() => setPanelExpandedOverride(null)} />
         <Overlay position="top-left">
           <LayerSwitcher />
         </Overlay>

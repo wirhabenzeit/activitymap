@@ -16,7 +16,7 @@ const styles = `
 }
 `;
 
-export function Selection() {
+export function Selection({ onNearbyChange }: { onNearbyChange?: () => void }) {
   const { setSelected, setNearby } = useShallowStore((state) => ({
     setSelected: state.setSelected,
     setNearby: state.setNearby,
@@ -30,6 +30,7 @@ export function Selection() {
         selectionHandler: (sel: number[], box: boolean) => {
           const ids = Array.from(new Set(sel));
           setNearby(ids);
+          onNearbyChange?.();
           if (box) setSelected(ids);
         },
       }),
