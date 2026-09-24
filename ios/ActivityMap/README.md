@@ -39,13 +39,13 @@ ACTIVITYMAP_API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)activitymap.domi
 
 Run the `ActivityMap` scheme on the connected iPhone in Xcode. The app target has a development team for signing; select your own in Signing & Capabilities if needed. The phone needs internet access to reach production. Its activity cache and session are scoped to this server URL, so it signs in and syncs independently of the simulator's local-server account.
 
-The production Vercel project's **Production** environment must set `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback`, have Strava sign-in enabled, and serve `/api/v1` on that HTTPS host. This Vercel setting is not stored in Git; after adding or changing it, redeploy Production for the server to read it. If sign-in fails with `redirect_not_allowed`, check this setting first. A Vercel Preview is unsuitable for sign-in because external effects are disabled there.
+The production Vercel project's **Production** environment must set `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback`, have Strava sign-in enabled, and serve `/api/v1` on that HTTPS host. This Vercel setting is not stored in Git; after adding or changing it, redeploy Production for the server to read it. If sign-in fails with `redirect_not_allowed`, check this setting first. Vercel Preview also supports Strava after the [Preview Strava setup](../../docs/preview-strava-login.md).
 
 To test the Mac's local backend from an iPhone instead, use an HTTPS tunnel with a stable hostname and override the device setting in the ignored `Config/Local.xcconfig`. Add the tunnel host to Better Auth's `allowedHosts` in `src/lib/auth.ts`, set `BETTER_AUTH_URL` consistently, and register the tunnel callback host in the Strava OAuth application. The local server also needs the variables under **Local sign-in setup** below. Direct `http://<Mac LAN IP>:3000` does not work with this client: `APIConfiguration` rejects non-local HTTP and the app's transport policy only excepts `localhost`.
 
 ## Local sign-in setup
 
-Native sign-in works against an explicitly configured local server. It does **not** work against a Vercel Preview: Preview runs with `ACTIVITYMAP_EXTERNAL_EFFECTS` disabled, and `src/lib/auth.ts` only registers the Strava OAuth provider when external effects are enabled, so a Preview has no provider for the mobile flow to redirect to. Treat Preview as build-only.
+Native sign-in works against an explicitly configured local server. Preview sign-in requires the [Preview Strava setup](../../docs/preview-strava-login.md). Native Preview sign-in additionally needs `MOBILE_AUTH_REDIRECT_ALLOWLIST` in the Preview environment.
 
 Set these in the repository's `.env` or `.env.local`. `.env.example` is documentation only, so uncommenting a line there configures nothing:
 

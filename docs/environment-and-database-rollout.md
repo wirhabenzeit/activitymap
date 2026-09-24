@@ -387,3 +387,12 @@ Record only presence and scope, never values.
 
 The GitHub `Production` environment is configured and verified. Automatic
 workflow creation does not remove its approval requirement.
+
+## Preview Strava access
+
+The inventory and PR #138 rollout above describe the earlier Preview policy.
+Preview now supports interactive Strava authentication and API requests by
+default without enabling webhooks or cron. This requires Preview-scoped
+credentials and Better Auth's OAuth proxy on both Preview and Production. See
+[Preview Strava sign-in](preview-strava-login.md) for the current setup and
+security boundaries.

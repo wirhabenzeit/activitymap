@@ -12,14 +12,18 @@ export const env = createEnv({
     NEON_DATABASE_URL: z.string().url().optional(),
     DATABASE_URL: z.string().url().optional(),
     AUTH_SECRET: z.string(),
+    BETTER_AUTH_SECRET: z.string().optional(),
     AUTH_STRAVA_ID: z.string().optional(),
     AUTH_STRAVA_SECRET: z.string().optional(),
+    OAUTH_PROXY_SECRET: z.string().optional(),
+    OAUTH_PROXY_PRODUCTION_URL: z.string().url().optional(),
     STRAVA_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
     PUBLIC_URL: z.string().url().optional(),
     NODE_ENV: z
       .enum(['development', 'test', 'production'])
       .default('development'),
     VERCEL: z.string().optional(),
+    VERCEL_ENV: z.string().optional(),
   },
 
   /**
@@ -44,9 +48,13 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     VERCEL: process.env.VERCEL,
+    VERCEL_ENV: process.env.VERCEL_ENV,
     AUTH_SECRET: process.env.AUTH_SECRET,
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     AUTH_STRAVA_ID: process.env.AUTH_STRAVA_ID,
     AUTH_STRAVA_SECRET: process.env.AUTH_STRAVA_SECRET,
+    OAUTH_PROXY_SECRET: process.env.OAUTH_PROXY_SECRET,
+    OAUTH_PROXY_PRODUCTION_URL: process.env.OAUTH_PROXY_PRODUCTION_URL,
     PUBLIC_URL: process.env.PUBLIC_URL,
     NEXT_PUBLIC_MAPBOX_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
     NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV,
@@ -81,6 +89,49 @@ export const env = createEnv({
             });
           }
         }
+      }
+
+      if (values.VERCEL_ENV === 'preview') {
+        const previewAuthVariables = {
+          BETTER_AUTH_SECRET: values.BETTER_AUTH_SECRET,
+          AUTH_STRAVA_ID: values.AUTH_STRAVA_ID,
+          AUTH_STRAVA_SECRET: values.AUTH_STRAVA_SECRET,
+          OAUTH_PROXY_SECRET: values.OAUTH_PROXY_SECRET,
+          OAUTH_PROXY_PRODUCTION_URL: values.OAUTH_PROXY_PRODUCTION_URL,
+        };
+
+        for (const [variable, value] of Object.entries(previewAuthVariables)) {
+          if (!value) {
+            context.addIssue({
+              code: 'custom',
+              path: [variable],
+              message: `${variable} is required for Preview Strava access`,
+            });
+          }
+        }
+      }
+
+      if (values.VERCEL_ENV === 'production') {
+        for (const [variable, value] of Object.entries({
+          OAUTH_PROXY_SECRET: values.OAUTH_PROXY_SECRET,
+          OAUTH_PROXY_PRODUCTION_URL: values.OAUTH_PROXY_PRODUCTION_URL,
+        })) {
+          if (!value) {
+            context.addIssue({
+              code: 'custom',
+              path: [variable],
+              message: `${variable} is required for Preview OAuth callbacks`,
+            });
+          }
+        }
+      }
+
+      if (Boolean(values.OAUTH_PROXY_SECRET) !== Boolean(values.OAUTH_PROXY_PRODUCTION_URL)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['OAUTH_PROXY_SECRET'],
+          message: 'OAUTH_PROXY_SECRET and OAUTH_PROXY_PRODUCTION_URL must be configured together',
+        });
       }
     }),
   /**
