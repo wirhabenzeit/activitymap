@@ -10,6 +10,7 @@ import {
   type ColumnFiltersState,
   type Updater,
   type RowSelectionState,
+  type ExpandedState,
   type RowData,
   type Row,
   type TableFeatures,
@@ -77,6 +78,7 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   columnFilters: ColumnFiltersState;
   map?: RefObject<MapRef | null>;
   activeId?: number;
+  onActiveChange?: (id: number) => void;
   hideHeader?: boolean;
   renderInlineDetails?: (row: Row<Features, TData>) => React.ReactNode;
 }
@@ -101,6 +103,7 @@ export const DataTable = React.memo(function DataTable<
   paginationControl = true,
   map,
   activeId,
+  onActiveChange,
   hideHeader = false,
   renderInlineDetails,
   setSorting,
@@ -124,6 +127,17 @@ export const DataTable = React.memo(function DataTable<
           : updater;
       setSelected(Object.keys(selection).map(Number));
     },
+    getRowCanExpand: () => Boolean(renderInlineDetails),
+    onExpandedChange: (updater: Updater<ExpandedState>) => {
+      const current: ExpandedState = activeId ? { [activeId]: true } : {};
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      if (next === true) return;
+      const newlyExpanded = Object.keys(next).find(
+        (id) => next[id] && !current[id],
+      );
+      const remainingExpanded = Object.keys(next).find((id) => next[id]);
+      onActiveChange?.(Number(newlyExpanded ?? remainingExpanded ?? 0));
+    },
     onDensityChange: setDensity,
     onSummaryRowChange: setSummaryRow,
     onColumnPinningChange: setColumnPinning,
@@ -143,6 +157,7 @@ export const DataTable = React.memo(function DataTable<
       summaryRow,
       map,
       rowSelection: Object.fromEntries(selected.map((id) => [id, true])),
+      expanded: activeId ? { [activeId]: true } : {},
     },
   });
 
@@ -229,7 +244,7 @@ export const DataTable = React.memo(function DataTable<
               <React.Fragment key={row.id}>
                 <TableRow
                   data-state={row.getIsSelected() && 'selected'}
-                  data-active={activeId === Number(row.id) || undefined}
+                  data-active={row.getIsExpanded() || undefined}
                   className="group grid grid-cols-subgrid col-span-full data-[active=true]:ring-1 data-[active=true]:ring-inset data-[active=true]:ring-orange-500"
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -255,7 +270,7 @@ export const DataTable = React.memo(function DataTable<
                     </TableCell>
                   ))}
                 </TableRow>
-                {activeId === Number(row.id) && renderInlineDetails && (
+                {row.getIsExpanded() && renderInlineDetails && (
                   <TableRow className="grid grid-cols-subgrid col-span-full">
                     <TableCell
                       colSpan={row.getVisibleCells().length}

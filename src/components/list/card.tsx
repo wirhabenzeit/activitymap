@@ -7,6 +7,8 @@ import {
   Zap,
   Map,
   Info,
+  ChevronDown,
+  ChevronRight,
   Loader2,
   Download,
 } from 'lucide-react';
@@ -60,6 +62,7 @@ interface ActivityCardProps extends CardProps {
   row: Row<Features, Activity>;
   map?: RefObject<MapRef | null>;
   inlineDetails?: boolean;
+  horizontalDetails?: boolean;
   onOpenDetails?: () => void;
 }
 
@@ -90,7 +93,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { refreshActivity } from '~/server/strava/actions';
 import { useToast } from '~/hooks/use-toast';
 
-export function ActivityCardContent({ row }: ActivityCardProps) {
+export function ActivityCardContent({
+  row,
+  horizontalDetails = false,
+}: ActivityCardProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { isGuest, stravaConnected, userId } = useShallowStore((state) => ({
@@ -225,78 +231,99 @@ export function ActivityCardContent({ row }: ActivityCardProps) {
     URL.revokeObjectURL(url);
   };
 
+  const elevationProfile =
+    !isGuest && stravaConnected && userId ? (
+      <ElevationChart activityId={String(activityId)} userId={userId} />
+    ) : null;
+
   return (
     <>
       <Card className="w-full border-none shadow-none">
-        <CardHeader>
-          <CardTitle>
-            <div className="flex items-center space-x-4">
-              {Icon && sport_group && (
-                <Icon
-                  color={categorySettings[sport_group].color}
-                  className="w-6 h-6"
-                  height="3em"
-                />
-              )}
-              <div>{row.getValue('name')}</div>
-            </div>
-          </CardTitle>
-          <CardDescription>
-            {row.getValue('description') ?? ''}
-            {photos && photos.length > 0 ? (
-              <div className="pt-4">
-                <PhotoLightbox
-                  photos={photos}
-                  title={row.getValue('name')}
-                  className="h-[3rem]"
-                />
-              </div>
-            ) : null}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-1">
-            {stats.map((stat, index) => (
-              <div className="flex items-center pt-2" key={index}>
-                <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
-                <div className="text-xs text-muted-foreground">
-                  {stat.description}
+        <div
+          className={cn(
+            horizontalDetails &&
+              'xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]',
+          )}
+        >
+          <div className="min-w-0">
+            <CardHeader>
+              <CardTitle>
+                <div className="flex items-center space-x-4">
+                  {Icon && sport_group && (
+                    <Icon
+                      color={categorySettings[sport_group].color}
+                      className="w-6 h-6"
+                      height="3em"
+                    />
+                  )}
+                  <div>{row.getValue('name')}</div>
                 </div>
+              </CardTitle>
+              <CardDescription>
+                {row.getValue('description') ?? ''}
+                {photos && photos.length > 0 ? (
+                  <div className="pt-4">
+                    <PhotoLightbox
+                      photos={photos}
+                      title={row.getValue('name')}
+                      className="h-[3rem]"
+                    />
+                  </div>
+                ) : null}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {stats.map((stat, index) => (
+                  <div className="flex items-center pt-2" key={index}>
+                    <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
+                    <div className="text-xs text-muted-foreground">
+                      {stat.description}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+              {!horizontalDetails && elevationProfile && (
+                <div className="mt-4">{elevationProfile}</div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between space-x-1">
+              <Button onClick={() => setOpen(true)} disabled={isGuest}>
+                Edit
+              </Button>
+              <Button onClick={handleRefresh} disabled={loading || isGuest}>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ReloadIcon />
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDownloadGpx}
+                disabled={
+                  !row.original.map_polyline &&
+                  !row.original.map_summary_polyline
+                }
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button variant="outline">
+                <Link
+                  href={`https://strava.com/activities/${id}`}
+                  target="_blank"
+                >
+                  Strava
+                </Link>
+              </Button>
+            </CardFooter>
           </div>
-          {!isGuest && stravaConnected && userId && (
-            <div className="mt-4">
-              <ElevationChart activityId={String(activityId)} userId={userId} />
+          {horizontalDetails && elevationProfile && (
+            <div className="min-w-0 border-t p-6 xl:border-l xl:border-t-0">
+              {elevationProfile}
             </div>
           )}
-        </CardContent>
-        <CardFooter className="flex justify-between space-x-1">
-          <Button onClick={() => setOpen(true)} disabled={isGuest}>
-            Edit
-          </Button>
-          <Button onClick={handleRefresh} disabled={loading || isGuest}>
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ReloadIcon />
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleDownloadGpx}
-            disabled={
-              !row.original.map_polyline && !row.original.map_summary_polyline
-            }
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-          <Button variant="outline">
-            <Link href={`https://strava.com/activities/${id}`} target="_blank">
-              Strava
-            </Link>
-          </Button>
-        </CardFooter>
+        </div>
       </Card>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
     </>
@@ -371,12 +398,8 @@ export function ActivityCard({
   };
 
   const toggleInlineDetails = () => {
-    if (highlighted === row.original.id) {
-      setHighlighted(0);
-    } else {
-      setHighlighted(row.original.id);
-      onOpenDetails?.();
-    }
+    if (!row.getIsExpanded()) onOpenDetails?.();
+    row.toggleExpanded();
   };
 
   const nameClassName = cn(
@@ -418,25 +441,32 @@ export function ActivityCard({
           <div className={nameClassName}>{row.getValue('name')}</div>
         )}
         <div className="flex-1" />
-        <Button
-          variant="ghost"
-          className="px-0 h-4"
-          size="sm"
-          onClick={handleMapClick}
-          aria-label={`Show ${String(row.getValue('name'))} on map`}
-        >
-          <Map className="h-4 w-4" />
-        </Button>
-        {inlineDetails ? (
+        {!inlineDetails && (
           <Button
             variant="ghost"
             className="px-0 h-4"
             size="sm"
-            onClick={toggleInlineDetails}
-            aria-label={`Toggle details for ${String(row.getValue('name'))}`}
-            aria-expanded={highlighted === row.original.id}
+            onClick={handleMapClick}
+            aria-label={`Show ${String(row.getValue('name'))} on map`}
           >
-            <Info className="h-4 w-4" />
+            <Map className="h-4 w-4" />
+          </Button>
+        )}
+        {inlineDetails ? (
+          <Button
+            variant="ghost"
+            className="h-6 gap-1 px-1 text-xs"
+            size="sm"
+            onClick={toggleInlineDetails}
+            aria-label={`${row.getIsExpanded() ? 'Collapse' : 'Expand'} details for ${String(row.getValue('name'))}`}
+            aria-expanded={row.getIsExpanded()}
+          >
+            {row.getIsExpanded() ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            <span>Details</span>
           </Button>
         ) : (
           <Popover>

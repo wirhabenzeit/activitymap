@@ -217,6 +217,7 @@ export default function InteractiveMap() {
     [searchParams],
   );
   const [cursor, setCursor] = useState('auto');
+  const [nearby, setNearby] = useState<number[]>([]);
   const [panelExpandedOverride, setPanelExpandedOverride] = useState<
     boolean | null
   >(null);
@@ -243,10 +244,8 @@ export default function InteractiveMap() {
 
   const {
     selected,
-    nearby,
     highlighted,
     setSelected,
-    setNearby,
     setHighlighted,
     baseMap,
     overlays,
@@ -263,11 +262,9 @@ export default function InteractiveMap() {
     guestModeType,
   } = useShallowStore((state) => ({
     selected: state.selected,
-    nearby: state.nearby,
     highlighted: state.highlighted,
     setHighlighted: state.setHighlighted,
     setSelected: state.setSelected,
-    setNearby: state.setNearby,
     baseMap: state.baseMap,
     overlays: state.overlayMaps,
     mapPosition: state.position,
@@ -425,7 +422,13 @@ export default function InteractiveMap() {
   );
   const rows = useMemo(
     () =>
-      Array.from(new Set([...nearby, ...selected]))
+      Array.from(
+        new Set([
+          ...nearby,
+          ...selected,
+          ...(highlighted ? [highlighted] : []),
+        ]),
+      )
         .map((key) => {
           const activity = activityDict[key];
           if (!activity) return undefined;
@@ -435,7 +438,7 @@ export default function InteractiveMap() {
           };
         })
         .filter((x) => x != undefined),
-    [nearby, selected, activityDict, photoDict],
+    [nearby, selected, highlighted, activityDict, photoDict],
   );
   const mapColumns = useMemo(
     () =>
@@ -549,7 +552,14 @@ export default function InteractiveMap() {
         <Overlay position="top-right">
           <UploadControl />
         </Overlay>
-        <Selection onNearbyChange={() => setPanelExpandedOverride(null)} />
+        <Selection
+          onSelection={(ids, box) => {
+            setNearby(ids);
+            setHighlighted(ids.length === 1 ? ids[0]! : 0);
+            if (box) setSelected(ids);
+            setPanelExpandedOverride(null);
+          }}
+        />
         <Overlay position="top-left">
           <LayerSwitcher />
         </Overlay>
@@ -600,6 +610,7 @@ export default function InteractiveMap() {
       <div
         className={cn(
           'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,38rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
+          panelExpanded && highlighted !== 0 && 'xl:w-[min(75vw,56rem)]',
           { hidden: rows.length == 0 },
         )}
       >
@@ -627,7 +638,6 @@ export default function InteractiveMap() {
               aria-label="Clear nearby routes"
               onClick={() => {
                 setNearby([]);
-                setHighlighted(0);
               }}
             >
               <X className="h-4 w-4" />
@@ -660,7 +670,10 @@ export default function InteractiveMap() {
           paginationControl={false}
           hideHeader={rows.length === 1}
           activeId={highlighted}
-          renderInlineDetails={(row) => <ActivityCardContent row={row} />}
+          onActiveChange={setHighlighted}
+          renderInlineDetails={(row) => (
+            <ActivityCardContent row={row} horizontalDetails />
+          )}
           {...compactList}
           columnVisibility={mapColumnVisibility}
         />

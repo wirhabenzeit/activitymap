@@ -2,7 +2,6 @@
 
 import { type MapMouseEvent, Point, type PointLike } from 'mapbox-gl';
 import { useControl, type IControl } from 'react-map-gl/mapbox';
-import { useShallowStore } from '~/store';
 
 const styles = `
 .boxdraw {
@@ -16,12 +15,11 @@ const styles = `
 }
 `;
 
-export function Selection({ onNearbyChange }: { onNearbyChange?: () => void }) {
-  const { setSelected, setNearby } = useShallowStore((state) => ({
-    setSelected: state.setSelected,
-    setNearby: state.setNearby,
-  }));
-
+export function Selection({
+  onSelection,
+}: {
+  onSelection: (ids: number[], box: boolean) => void;
+}) {
   useControl(
     () =>
       new SelectionControl({
@@ -29,9 +27,7 @@ export function Selection({ onNearbyChange }: { onNearbyChange?: () => void }) {
         source: 'routeSource',
         selectionHandler: (sel: number[], box: boolean) => {
           const ids = Array.from(new Set(sel));
-          setNearby(ids);
-          onNearbyChange?.();
-          if (box) setSelected(ids);
+          onSelection(ids, box);
         },
       }),
   );
