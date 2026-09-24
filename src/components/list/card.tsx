@@ -398,8 +398,12 @@ export function ActivityCard({
   };
 
   const toggleInlineDetails = () => {
-    if (!row.getIsExpanded()) onOpenDetails?.();
-    row.table.setExpanded(row.getIsExpanded() ? {} : { [row.id]: true });
+    if (row.getIsExpanded()) {
+      setHighlighted(0);
+    } else {
+      setHighlighted(row.original.id);
+      onOpenDetails?.();
+    }
   };
 
   const nameClassName = cn(

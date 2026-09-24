@@ -10,7 +10,6 @@ import {
   type ColumnFiltersState,
   type Updater,
   type RowSelectionState,
-  type ExpandedState,
   type RowData,
   type Row,
   type TableFeatures,
@@ -78,7 +77,6 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   columnFilters: ColumnFiltersState;
   map?: RefObject<MapRef | null>;
   activeId?: number;
-  onActiveChange?: (id: number) => void;
   hideHeader?: boolean;
   renderInlineDetails?: (row: Row<Features, TData>) => React.ReactNode;
 }
@@ -103,7 +101,6 @@ export const DataTable = React.memo(function DataTable<
   paginationControl = true,
   map,
   activeId,
-  onActiveChange,
   hideHeader = false,
   renderInlineDetails,
   setSorting,
@@ -129,16 +126,6 @@ export const DataTable = React.memo(function DataTable<
     },
     getRowCanExpand: () => Boolean(renderInlineDetails),
     getIsRowExpanded: (row) => Number(row.id) === activeId,
-    onExpandedChange: (updater: Updater<ExpandedState>) => {
-      const current: ExpandedState = activeId ? { [activeId]: true } : {};
-      const next = typeof updater === 'function' ? updater(current) : updater;
-      if (next === true) return;
-      const newlyExpanded = Object.keys(next).find(
-        (id) => next[id] && !current[id],
-      );
-      const remainingExpanded = Object.keys(next).find((id) => next[id]);
-      onActiveChange?.(Number(newlyExpanded ?? remainingExpanded ?? 0));
-    },
     onDensityChange: setDensity,
     onSummaryRowChange: setSummaryRow,
     onColumnPinningChange: setColumnPinning,

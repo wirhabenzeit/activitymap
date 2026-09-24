@@ -670,7 +670,6 @@ export default function InteractiveMap() {
           paginationControl={false}
           hideHeader={rows.length === 1}
           activeId={highlighted}
-          onActiveChange={setHighlighted}
           renderInlineDetails={(row) => (
             <ActivityCardContent row={row} horizontalDetails />
           )}
