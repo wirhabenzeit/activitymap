@@ -14,6 +14,30 @@ void test('prefers the Vercel-managed Neon connection', () => {
   });
 });
 
+void test('Preview uses the direct Neon connection verified by migrations', () => {
+  const result = resolveDatabaseConnection({
+    VERCEL_ENV: 'preview',
+    NEON_DATABASE_URL: 'postgres://pooled.example/app',
+    NEON_DATABASE_URL_UNPOOLED: 'postgres://direct.example/app',
+  });
+
+  assert.deepEqual(result, {
+    connectionString: 'postgres://direct.example/app',
+    source: 'NEON_DATABASE_URL_UNPOOLED',
+  });
+});
+
+void test('Preview refuses to fall back to a stale pooled connection', () => {
+  assert.throws(
+    () =>
+      resolveDatabaseConnection({
+        VERCEL_ENV: 'preview',
+        NEON_DATABASE_URL: 'postgres://pooled.example/app',
+      }),
+    /NEON_DATABASE_URL_UNPOOLED is required/,
+  );
+});
+
 void test('keeps DATABASE_URL as a temporary compatibility fallback', () => {
   const result = resolveDatabaseConnection({
     DATABASE_URL: 'postgres://legacy.example/app',

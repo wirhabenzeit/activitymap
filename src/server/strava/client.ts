@@ -9,7 +9,7 @@ import type {
 } from './types';
 import { mergeAndProcessStravaPhotos } from './transforms';
 import { logger } from '~/server/logging/logger';
-import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
+import { requireStravaAccessEnabled } from '~/server/config/external-effects';
 import {
   ACTIVITY_STREAM_TYPES,
   rawActivityStreamsSchema,
@@ -137,7 +137,7 @@ export class StravaClient {
     signal?: AbortSignal;
     beforeRequest?: () => Promise<void>;
   }) {
-    requireExternalEffectsEnabled();
+    requireStravaAccessEnabled();
 
     this.requestBudget = requestBudget;
     this.signal = signal;

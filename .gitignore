@@ -34,7 +34,8 @@ next-env.d.ts
 # misc
 .DS_Store
 *.pem
-/.claude/
+/.claude/*
+!/.claude/launch.json
 
 # Xcode / Swift
 DerivedData/

@@ -47,6 +47,31 @@ export function UserSettings() {
   const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
   const { toast } = useToast();
 
+  const handleSignIn = async () => {
+    try {
+      const result = await signIn.social({
+        provider: 'strava',
+        callbackURL: '/map',
+      });
+      if (result.error) {
+        toast({
+          title: 'Strava sign-in unavailable',
+          description:
+            result.error.status === 404
+              ? 'Strava sign-in is not enabled for this deployment.'
+              : result.error.message ?? 'Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Strava sign-in failed',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleCreateWebhook = async () => {
     try {
       const result = await createWebhookSubscription();
@@ -146,7 +171,7 @@ export function UserSettings() {
             onClick={
               !isInitialized || user
                 ? undefined
-                : () => signIn.social({ provider: 'strava' })
+                : handleSignIn
             }
           >
             {user || !isInitialized ? (
