@@ -29,10 +29,16 @@ export const createSelectionSlice: StateCreator<
     set((state) => {
       state.selected =
         typeof value === 'function' ? value(state.selected) : value;
+      if (!state.selected.includes(state.highlighted)) {
+        state.highlighted = 0;
+      }
     }),
 
   setHighlighted: (highlighted) =>
     set((state) => {
-      state.highlighted = highlighted;
+      state.highlighted =
+        highlighted !== 0 && state.selected.includes(highlighted)
+          ? highlighted
+          : 0;
     }),
 });

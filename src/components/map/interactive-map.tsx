@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
-import { Camera, ChevronDown, ChevronUp, Globe, X } from 'lucide-react';
+import { Camera, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { columns } from '~/components/list/columns';
 import { ActivityCard, ActivityCardContent } from '~/components/list/card';
 import { Button } from '~/components/ui/button';
@@ -217,7 +217,6 @@ export default function InteractiveMap() {
     [searchParams],
   );
   const [cursor, setCursor] = useState('auto');
-  const [nearby, setNearby] = useState<number[]>([]);
   const [panelExpandedOverride, setPanelExpandedOverride] = useState<
     boolean | null
   >(null);
@@ -422,13 +421,7 @@ export default function InteractiveMap() {
   );
   const rows = useMemo(
     () =>
-      Array.from(
-        new Set([
-          ...nearby,
-          ...selected,
-          ...(highlighted ? [highlighted] : []),
-        ]),
-      )
+      selected
         .map((key) => {
           const activity = activityDict[key];
           if (!activity) return undefined;
@@ -438,7 +431,7 @@ export default function InteractiveMap() {
           };
         })
         .filter((x) => x != undefined),
-    [nearby, selected, highlighted, activityDict, photoDict],
+    [selected, activityDict, photoDict],
   );
   const mapColumns = useMemo(
     () =>
@@ -553,10 +546,9 @@ export default function InteractiveMap() {
           <UploadControl />
         </Overlay>
         <Selection
-          onSelection={(ids, box) => {
-            setNearby(ids);
+          onSelection={(ids) => {
+            setSelected(ids);
             setHighlighted(ids.length === 1 ? ids[0]! : 0);
-            if (box) setSelected(ids);
             setPanelExpandedOverride(null);
           }}
         />
@@ -617,7 +609,7 @@ export default function InteractiveMap() {
         <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
           <span className="font-semibold">Routes</span>
           <span className="text-muted-foreground">
-            {nearby.length} nearby · {selected.length} selected
+            {selected.length} selected
           </span>
           <div className="flex-1" />
           {selected.length > 0 && (
@@ -625,22 +617,12 @@ export default function InteractiveMap() {
               size="sm"
               variant="ghost"
               className="h-7 px-2"
-              onClick={() => setSelected([])}
-            >
-              Clear selection
-            </Button>
-          )}
-          {nearby.length > 0 && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              aria-label="Clear nearby routes"
               onClick={() => {
-                setNearby([]);
+                setSelected([]);
+                setPanelExpandedOverride(null);
               }}
             >
-              <X className="h-4 w-4" />
+              Clear selection
             </Button>
           )}
           <Button

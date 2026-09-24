@@ -18,16 +18,16 @@ const styles = `
 export function Selection({
   onSelection,
 }: {
-  onSelection: (ids: number[], box: boolean) => void;
+  onSelection: (ids: number[]) => void;
 }) {
   useControl(
     () =>
       new SelectionControl({
         layers: ['routeLayerBG', 'routeLayerBGsel'],
         source: 'routeSource',
-        selectionHandler: (sel: number[], box: boolean) => {
+        selectionHandler: (sel: number[]) => {
           const ids = Array.from(new Set(sel));
-          onSelection(ids, box);
+          onSelection(ids);
         },
       }),
   );
@@ -37,7 +37,7 @@ export function Selection({
 export class SelectionControl implements IControl {
   layers: string[];
   source: string;
-  selectionHandler: (ids: number[], box: boolean) => void;
+  selectionHandler: (ids: number[]) => void;
   canvas?: HTMLElement;
   map?: mapboxgl.Map;
   start?: Point;
@@ -54,7 +54,7 @@ export class SelectionControl implements IControl {
   }: {
     layers: string[];
     source: string;
-    selectionHandler: (ids: number[], box: boolean) => void;
+    selectionHandler: (ids: number[]) => void;
   }) {
     const styleSheet = document.createElement('style');
     styleSheet.innerText = styles;
@@ -95,7 +95,6 @@ export class SelectionControl implements IControl {
     });
     this.selectionHandler(
       selectedFeatures.map((feature) => feature.id as number),
-      false,
     );
   };
 
@@ -175,7 +174,6 @@ export class SelectionControl implements IControl {
       if (selectedFeatures)
         this.selectionHandler(
           selectedFeatures.map((feature) => feature.id as number),
-          true,
         );
     }
     this.map?.dragPan.enable();
