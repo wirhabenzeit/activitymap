@@ -87,9 +87,8 @@ const getOverlayMapSetting = (overlayId: OverlayMapId): OverlaySetting => {
 };
 
 const RouteLayer = React.memo(function RouteLayer() {
-  const { selected, nearby, highlighted } = useShallowStore((state) => ({
+  const { selected, highlighted } = useShallowStore((state) => ({
     selected: state.selected,
-    nearby: state.nearby,
     highlighted: state.highlighted,
   }));
 
@@ -127,11 +126,6 @@ const RouteLayer = React.memo(function RouteLayer() {
     selectedFilter,
   ];
   const filterHigh: mapboxgl.FilterSpecification = ['==', 'id', highlighted];
-  const nearbyFilter: mapboxgl.FilterSpecification = [
-    'all',
-    filter,
-    ['in', 'id', ...nearby],
-  ];
 
   return (
     <Source data={geoJson} id="routeSource" type="geojson">
@@ -156,14 +150,6 @@ const RouteLayer = React.memo(function RouteLayer() {
           'line-cap': 'round',
         }}
         filter={filterAll}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerNearby"
-        type="line"
-        paint={{ 'line-color': color, 'line-width': 4, 'line-opacity': 0.65 }}
-        layout={{ 'line-join': 'round', 'line-cap': 'round' }}
-        filter={nearbyFilter}
       />
       <Layer
         source="routeSource"
