@@ -65,6 +65,9 @@ branch-specific `NEON_DATABASE_URL_UNPOOLED` supplied by the managed Neon
 integration, applies pending migrations under the normal advisory lock, and
 then lets the application build continue.
 
+Preview runtime uses that same direct connection. Production runtime continues
+to use the managed pooled `NEON_DATABASE_URL`.
+
 Configure `MIGRATION_FORBIDDEN_BRANCH_ID` in the Vercel Preview environment to
 the Neon Production branch ID. The Preview runner fails closed unless all of
 the following are true:

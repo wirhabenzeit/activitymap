@@ -6,6 +6,11 @@ instead of deploying a login button that returns 404. Preview has its own Neon
 branch. Use a distinct `BETTER_AUTH_SECRET` for Preview, and never point it at
 Production's database.
 
+Preview runtime and migrations use the integration's
+`NEON_DATABASE_URL_UNPOOLED`. This avoids a pooled Preview connection that can
+be out of sync with the branch credential. Production continues using
+`NEON_DATABASE_URL`.
+
 Preview sign-in and user-initiated Strava API actions make real Strava requests,
 including token refresh and writes made through the app. Webhook processing,
 subscription management, and cron jobs still require

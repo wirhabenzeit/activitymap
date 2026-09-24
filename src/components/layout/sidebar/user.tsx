@@ -49,7 +49,10 @@ export function UserSettings() {
 
   const handleSignIn = async () => {
     try {
-      const result = await signIn.social({ provider: 'strava' });
+      const result = await signIn.social({
+        provider: 'strava',
+        callbackURL: '/map',
+      });
       if (result.error) {
         toast({
           title: 'Strava sign-in unavailable',
