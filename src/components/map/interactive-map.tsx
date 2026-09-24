@@ -613,7 +613,7 @@ export default function InteractiveMap() {
       </ReactMapGL>
       <div
         className={cn(
-          'z-10 absolute left-2 right-2 bottom-2 sm:left-[10%] sm:right-[10%] sm:bottom-6 bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
+          'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,38rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
           { hidden: rows.length == 0 },
         )}
       >

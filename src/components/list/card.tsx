@@ -379,6 +379,12 @@ export function ActivityCard({
     }
   };
 
+  const nameClassName = cn(
+    'text-left truncate justify-start max-w-full',
+    inlineDetails && 'hover:underline',
+    highlighted === Number(row.id) ? 'text-header-background' : 'text-primary',
+  );
+
   return (
     <>
       <div
@@ -400,19 +406,17 @@ export function ActivityCard({
             />
           )}
         </Button>
-        <button
-          type="button"
-          onClick={() => inlineDetails && toggleInlineDetails()}
-          className={cn(
-            'text-left truncate justify-start max-w-full',
-            inlineDetails && 'hover:underline',
-            highlighted === Number(row.id)
-              ? 'text-header-background'
-              : 'text-primary',
-          )}
-        >
-          {row.getValue('name')}
-        </button>
+        {inlineDetails ? (
+          <button
+            type="button"
+            onClick={toggleInlineDetails}
+            className={nameClassName}
+          >
+            {row.getValue('name')}
+          </button>
+        ) : (
+          <div className={nameClassName}>{row.getValue('name')}</div>
+        )}
         <div className="flex-1" />
         <Button
           variant="ghost"
