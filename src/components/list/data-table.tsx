@@ -128,6 +128,7 @@ export const DataTable = React.memo(function DataTable<
       setSelected(Object.keys(selection).map(Number));
     },
     getRowCanExpand: () => Boolean(renderInlineDetails),
+    getIsRowExpanded: (row) => Number(row.id) === activeId,
     onExpandedChange: (updater: Updater<ExpandedState>) => {
       const current: ExpandedState = activeId ? { [activeId]: true } : {};
       const next = typeof updater === 'function' ? updater(current) : updater;

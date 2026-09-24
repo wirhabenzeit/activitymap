@@ -399,7 +399,7 @@ export function ActivityCard({
 
   const toggleInlineDetails = () => {
     if (!row.getIsExpanded()) onOpenDetails?.();
-    row.toggleExpanded();
+    row.table.setExpanded(row.getIsExpanded() ? {} : { [row.id]: true });
   };
 
   const nameClassName = cn(
