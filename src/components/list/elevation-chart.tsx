@@ -181,9 +181,11 @@ function ElevationPlot({
 export function ElevationChart({
   activityId,
   userId,
+  compact = false,
 }: {
   activityId: string;
   userId: string;
+  compact?: boolean;
 }) {
   const query = useQuery({
     queryKey: ['activity-elevation', userId, activityId],
@@ -201,7 +203,12 @@ export function ElevationChart({
   const profile = query.data?.profile;
 
   return (
-    <section className="border-t pt-3" aria-label="Elevation profile">
+    <section
+      className={
+        compact ? 'border-t pt-3 lg:border-t-0 lg:pt-0' : 'border-t pt-3'
+      }
+      aria-label="Elevation profile"
+    >
       <h3 className="mb-2 text-sm font-semibold">Elevation profile</h3>
       {query.isError ? (
         <div className="space-y-2">

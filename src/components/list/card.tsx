@@ -121,6 +121,16 @@ export function ActivityCardContent({
   const stats = [
     {
       icon: Calendar,
+      label: 'Date',
+      value: date.toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }),
+      detail: date.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
       description: date.toLocaleDateString('en-US', {
         month: '2-digit',
         day: '2-digit',
@@ -131,20 +141,32 @@ export function ActivityCardContent({
     },
     {
       icon: StopwatchIcon,
+      label: 'Moving',
+      value: formattedValue('moving_time', row),
+      detail: `${formattedValue('elapsed_time', row)} elapsed`,
       description: `${formattedValue('moving_time', row)} (moving), ${formattedValue('elapsed_time', row)} (elapsed)`,
     },
     {
       icon: RulerHorizontalIcon,
+      label: 'Distance',
+      value: formattedValue('distance', row),
+      detail: undefined,
       description: formattedValue('distance', row),
     },
     {
       icon: Mountain,
+      label: 'Elevation gain',
+      value: `+${formattedValue('total_elevation_gain', row)}`,
+      detail: `${formattedValue('elev_low', row)}–${formattedValue('elev_high', row)} elevation`,
       description: `+${formattedValue('total_elevation_gain', row)} (${formattedValue('elev_high', row)} max, ${formattedValue('elev_low', row)} min)`,
     },
     ...(row.getValue('average_heartrate')
       ? [
           {
             icon: Heart,
+            label: 'Heart rate',
+            value: `${formattedValue('average_heartrate', row)} avg`,
+            detail: `${formattedValue('max_heartrate', row)} max`,
             description: `${formattedValue('average_heartrate', row)} (avg), ${formattedValue('max_heartrate', row)} (max)`,
           },
         ]
@@ -153,6 +175,9 @@ export function ActivityCardContent({
       ? [
           {
             icon: Zap,
+            label: 'Power',
+            value: `${formattedValue('weighted_average_watts', row)} norm`,
+            detail: `${formattedValue('average_watts', row)} avg · ${formattedValue('max_watts', row)} max`,
             description: `${formattedValue('weighted_average_watts', row)} (norm), ${formattedValue('average_watts', row)} (avg), ${formattedValue('max_watts', row)} (max)`,
           },
         ]
@@ -233,7 +258,11 @@ export function ActivityCardContent({
 
   const elevationProfile =
     !isGuest && stravaConnected && userId ? (
-      <ElevationChart activityId={String(activityId)} userId={userId} />
+      <ElevationChart
+        activityId={String(activityId)}
+        userId={userId}
+        compact={horizontalDetails}
+      />
     ) : null;
 
   return (
@@ -242,56 +271,121 @@ export function ActivityCardContent({
         <div
           className={cn(
             horizontalDetails &&
-              'xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]',
+              'lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]',
           )}
         >
           <div className="min-w-0">
-            <CardHeader>
-              <CardTitle>
-                <div className="flex items-center space-x-4">
-                  {Icon && sport_group && (
-                    <Icon
-                      color={categorySettings[sport_group].color}
-                      className="w-6 h-6"
-                      height="3em"
-                    />
+            {!horizontalDetails ? (
+              <CardHeader>
+                <CardTitle>
+                  <div className="flex items-center space-x-4">
+                    {Icon && sport_group && (
+                      <Icon
+                        color={categorySettings[sport_group].color}
+                        className="w-6 h-6"
+                        height="3em"
+                      />
+                    )}
+                    <div>{row.getValue('name')}</div>
+                  </div>
+                </CardTitle>
+                <CardDescription>
+                  {row.getValue('description') ?? ''}
+                  {photos && photos.length > 0 ? (
+                    <div className="pt-4">
+                      <PhotoLightbox
+                        photos={photos}
+                        title={row.getValue('name')}
+                        className="h-[3rem]"
+                      />
+                    </div>
+                  ) : null}
+                </CardDescription>
+              </CardHeader>
+            ) : (
+              (Boolean(row.original.description) || photos.length > 0) && (
+                <div className="px-3 pt-3 text-xs text-muted-foreground">
+                  {row.original.description && (
+                    <p className="line-clamp-2">{row.original.description}</p>
                   )}
-                  <div>{row.getValue('name')}</div>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                {row.getValue('description') ?? ''}
-                {photos && photos.length > 0 ? (
-                  <div className="pt-4">
+                  {photos.length > 0 && (
                     <PhotoLightbox
                       photos={photos}
                       title={row.getValue('name')}
-                      className="h-[3rem]"
+                      className="mt-2 h-[2.5rem]"
                     />
-                  </div>
-                ) : null}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                {stats.map((stat, index) => (
-                  <div className="flex items-center pt-2" key={index}>
-                    <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
-                    <div className="text-xs text-muted-foreground">
-                      {stat.description}
+                  )}
+                </div>
+              )
+            )}
+            <CardContent className={horizontalDetails ? 'p-3 pb-2' : undefined}>
+              {horizontalDetails ? (
+                <div className="grid grid-cols-2 gap-1.5">
+                  {stats.map((stat) => (
+                    <div
+                      className="min-w-0 rounded-md border bg-muted/20 px-2.5 py-1.5"
+                      key={stat.label}
+                    >
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <stat.icon className="h-3 w-3 shrink-0" />
+                        <span>{stat.label}</span>
+                      </div>
+                      <div
+                        className="truncate text-sm font-semibold leading-5"
+                        title={stat.value ?? undefined}
+                      >
+                        {stat.value}
+                      </div>
+                      {stat.detail && (
+                        <div
+                          className="truncate text-[11px] text-muted-foreground"
+                          title={stat.detail}
+                        >
+                          {stat.detail}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {stats.map((stat, index) => (
+                    <div className="flex items-center pt-2" key={index}>
+                      <stat.icon className="mr-2 h-4 w-4 opacity-70" />{' '}
+                      <div className="text-xs text-muted-foreground">
+                        {stat.description}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {!horizontalDetails && elevationProfile && (
                 <div className="mt-4">{elevationProfile}</div>
               )}
             </CardContent>
-            <CardFooter className="flex justify-between space-x-1">
-              <Button onClick={() => setOpen(true)} disabled={isGuest}>
+            <CardFooter
+              className={
+                horizontalDetails
+                  ? 'flex flex-wrap items-center gap-1.5 px-3 pb-3 pt-0'
+                  : 'flex justify-between space-x-1'
+              }
+            >
+              <Button
+                size={horizontalDetails ? 'sm' : 'default'}
+                onClick={() => setOpen(true)}
+                disabled={isGuest}
+              >
                 Edit
               </Button>
-              <Button onClick={handleRefresh} disabled={loading || isGuest}>
+              <Button
+                size={horizontalDetails ? 'sm' : 'default'}
+                variant={horizontalDetails ? 'outline' : 'default'}
+                className={horizontalDetails ? 'h-8 w-8 p-0' : undefined}
+                onClick={handleRefresh}
+                disabled={loading || isGuest}
+                aria-label="Refresh activity from Strava"
+                title="Refresh activity from Strava"
+              >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -300,7 +394,11 @@ export function ActivityCardContent({
               </Button>
               <Button
                 variant="outline"
+                size={horizontalDetails ? 'sm' : 'default'}
+                className={horizontalDetails ? 'h-8 w-8 p-0' : undefined}
                 onClick={handleDownloadGpx}
+                aria-label="Download GPX"
+                title="Download GPX"
                 disabled={
                   !row.original.map_polyline &&
                   !row.original.map_summary_polyline
@@ -308,10 +406,15 @@ export function ActivityCardContent({
               >
                 <Download className="h-4 w-4" />
               </Button>
-              <Button variant="outline">
+              <Button
+                variant="outline"
+                size={horizontalDetails ? 'sm' : 'default'}
+                asChild
+              >
                 <Link
                   href={`https://strava.com/activities/${id}`}
                   target="_blank"
+                  rel="noopener noreferrer"
                 >
                   Strava
                 </Link>
@@ -319,7 +422,7 @@ export function ActivityCardContent({
             </CardFooter>
           </div>
           {horizontalDetails && elevationProfile && (
-            <div className="min-w-0 border-t p-6 xl:border-l xl:border-t-0">
+            <div className="min-w-0 px-3 pb-3 lg:border-l lg:py-3">
               {elevationProfile}
             </div>
           )}

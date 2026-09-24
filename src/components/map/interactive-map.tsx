@@ -601,8 +601,10 @@ export default function InteractiveMap() {
       </ReactMapGL>
       <div
         className={cn(
-          'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,38rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
-          panelExpanded && highlighted !== 0 && 'xl:w-[min(75vw,56rem)]',
+          'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
+          panelExpanded && highlighted !== 0
+            ? 'lg:w-[min(70vw,48rem)]'
+            : 'lg:w-[min(70vw,38rem)]',
           { hidden: rows.length == 0 },
         )}
       >
