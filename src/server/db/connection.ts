@@ -2,7 +2,10 @@ const LOCAL_DATABASE_URL =
   'postgres://postgres:postgres@db.localtest.me:5432/main';
 
 export type DatabaseConnectionSource =
-  'NEON_DATABASE_URL' | 'DATABASE_URL' | 'local-default';
+  | 'NEON_DATABASE_URL_UNPOOLED'
+  | 'NEON_DATABASE_URL'
+  | 'DATABASE_URL'
+  | 'local-default';
 
 type DatabaseEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -16,6 +19,18 @@ export function resolveDatabaseConnection(environment: DatabaseEnvironment): {
   connectionString: string;
   source: DatabaseConnectionSource;
 } {
+  if (environment.VERCEL_ENV === 'preview') {
+    const directNeonUrl = nonEmpty(environment.NEON_DATABASE_URL_UNPOOLED);
+    if (!directNeonUrl) {
+      throw new Error('NEON_DATABASE_URL_UNPOOLED is required in Vercel Preview');
+    }
+
+    return {
+      connectionString: directNeonUrl,
+      source: 'NEON_DATABASE_URL_UNPOOLED',
+    };
+  }
+
   const managedNeonUrl = nonEmpty(environment.NEON_DATABASE_URL);
   if (managedNeonUrl) {
     return {
