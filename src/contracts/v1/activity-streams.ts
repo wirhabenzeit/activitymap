@@ -3,8 +3,12 @@ import {
   ACTIVITY_STREAM_TYPES,
   rawActivityStreamsSchema,
 } from '~/server/strava/streams';
-import { STREAM_MAX_AGE_MS } from '~/server/strava/stream-policy';
-import type { StreamSnapshot } from '~/server/repositories/activity-streams';
+import { streamSummarySchema } from '~/server/strava/stream-summary';
+import type {
+  StreamSnapshot,
+  StreamSummaryRead,
+  StreamSummarySnapshot,
+} from '~/server/repositories/activity-streams';
 import { idString, isoDateTime } from './primitives';
 
 export const streamTypeSchema = z.enum(ACTIVITY_STREAM_TYPES);
@@ -78,39 +82,64 @@ export const activityStreamsDTOSchema = z.object({
 });
 export type ActivityStreamsDTO = z.infer<typeof activityStreamsDTOSchema>;
 
+export const activityStreamSummaryDTOSchema = z.object({
+  activity_id: idString,
+  metadata: streamMetadataSchema,
+  summary: streamSummarySchema.nullable(),
+  last_error: activityStreamsDTOSchema.shape.last_error,
+  next_retry_at: isoDateTime.nullable(),
+});
+export type ActivityStreamSummaryDTO = z.infer<
+  typeof activityStreamSummaryDTOSchema
+>;
+export const activityStreamSummariesDTOSchema = z.object({
+  summaries: z.array(activityStreamSummaryDTOSchema),
+});
+
 export function toStreamMetadata(
-  row: StreamSnapshot | null,
-  now: Date,
+  row: StreamSummarySnapshot | null,
 ): StreamMetadata {
-  const expires = row?.fetchedAt
-    ? new Date(row.fetchedAt.getTime() + STREAM_MAX_AGE_MS)
-    : null;
   return {
     generation: row?.generation ?? null,
     revision: row?.revision ?? '0',
+    // No age limit: only invalidation (source edits, webhooks, deletion)
+    // makes a stored set stale. `expires_at` is kept for compatibility.
     state: !row?.fetchedAt
       ? 'not_fetched'
-      : row.invalidatedAt || !expires || expires <= now
+      : row.invalidatedAt
         ? 'stale'
         : 'current',
     fetch_status: row?.lastAttemptStatus ?? 'not_fetched',
     available_types: row?.availableTypes ?? [],
     fetched_at: row?.fetchedAt?.toISOString() ?? null,
-    expires_at: expires?.toISOString() ?? null,
+    expires_at: null,
   };
 }
 export function toActivityStreamsDTO(
   activityId: string,
   row: StreamSnapshot | null,
-  now: Date,
 ): ActivityStreamsDTO {
-  const metadata = toStreamMetadata(row, now);
+  const metadata = toStreamMetadata(row);
   return activityStreamsDTOSchema.parse({
     activity_id: activityId,
     metadata,
     requested_types: [...ACTIVITY_STREAM_TYPES],
     // Preserve last-good storage, but never serve expired/invalidated samples.
     streams: metadata.state === 'current' ? (row?.payload ?? null) : null,
+    last_error: row?.lastError ?? null,
+    next_retry_at: row?.nextRetryAt?.toISOString() ?? null,
+  });
+}
+export function toActivityStreamSummaryDTO({
+  activityId,
+  row,
+}: StreamSummaryRead): ActivityStreamSummaryDTO {
+  const metadata = toStreamMetadata(row);
+  return activityStreamSummaryDTOSchema.parse({
+    activity_id: activityId,
+    metadata,
+    // Same rule as raw samples: never serve an invalidated set.
+    summary: metadata.state === 'current' ? (row?.summary ?? null) : null,
     last_error: row?.lastError ?? null,
     next_retry_at: row?.nextRetryAt?.toISOString() ?? null,
   });

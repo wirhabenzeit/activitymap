@@ -1,0 +1,1 @@
+ALTER TABLE "activity_streams" ADD COLUMN "summary" jsonb;

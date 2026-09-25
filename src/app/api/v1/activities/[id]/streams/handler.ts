@@ -4,7 +4,9 @@ import type { Actor } from '~/server/auth/actor';
 import { errorEnvelope } from '~/contracts/v1/error';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import {
+  activityStreamSummaryDTOSchema,
   activityStreamsDTOSchema,
+  toActivityStreamSummaryDTO,
   toActivityStreamsDTO,
 } from '~/contracts/v1/activity-streams';
 import { streamActivityIdSchema } from '~/server/strava/streams';
@@ -25,7 +27,13 @@ export function createActivityStreamsHandler(deps: {
   fetch?: typeof fetchActivityStreams;
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
+  /** `summary` serves the downsampled streams instead of the raw samples. */
+  view?: 'raw' | 'summary';
 }) {
+  const path =
+    deps.view === 'summary'
+      ? /^\/api\/v1\/activities\/([^/]+)\/streams\/summary\/?$/
+      : /^\/api\/v1\/activities\/([^/]+)\/streams\/?$/;
   return async (request: Request): Promise<Response> => {
     const requestId = requestIdFor(request);
     const headers = {
@@ -51,9 +59,7 @@ export function createActivityStreamsHandler(deps: {
       if (!actor)
         return fail(401, 'not_authenticated', 'Authentication is required.');
       const url = new URL(request.url);
-      const match = /^\/api\/v1\/activities\/([^/]+)\/streams\/?$/.exec(
-        url.pathname,
-      );
+      const match = path.exec(url.pathname);
       const parsedId = streamActivityIdSchema.safeParse(match?.[1]);
       const fetchMode = url.searchParams.get('fetch') ?? 'auto';
       const refresh = url.searchParams.get('refresh') ?? 'false';
@@ -102,17 +108,28 @@ export function createActivityStreamsHandler(deps: {
       }
       // Recheck access after the network request, including a revoke/delete
       // racing with the save. Never send a snapshot captured before that check.
+      const responseHeaders = {
+        ...headers,
+        ...(status === 202 ? { 'Retry-After': '3' } : {}),
+      };
+      if (deps.view === 'summary') {
+        const [read] = await deps.repository.readSummaries(actor, [id]);
+        if (!read) throw new ActivityStreamsUnavailableError();
+        return Response.json(
+          responseEnvelope(activityStreamSummaryDTOSchema).parse(
+            makeEnvelope(toActivityStreamSummaryDTO(read), now()),
+          ),
+          { status, headers: responseHeaders },
+        );
+      }
       const row = await deps.repository.read(actor, id);
       return Response.json(
         responseEnvelope(activityStreamsDTOSchema).parse(
-          makeEnvelope(toActivityStreamsDTO(id, row, now()), now()),
+          makeEnvelope(toActivityStreamsDTO(id, row), now()),
         ),
         {
           status,
-          headers: {
-            ...headers,
-            ...(status === 202 ? { 'Retry-After': '3' } : {}),
-          },
+          headers: responseHeaders,
         },
       );
     } catch (error) {

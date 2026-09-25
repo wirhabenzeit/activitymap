@@ -1,5 +1,7 @@
-/** Stream samples cannot be revalidated from activity summaries. */
-export const STREAM_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+// Stored streams have no age limit. The summary reconciliation cron
+// revalidates the athlete's dataset, and any change to the source fields
+// below invalidates the streams through the database trigger
+// (docs/strava-data-policy.md).
 export const STREAM_FETCH_LEASE_MS = 90_000;
 export const STREAM_REQUEST_TIMEOUT_MS = 20_000;
 export const STREAM_RETRY_MS = 60_000;

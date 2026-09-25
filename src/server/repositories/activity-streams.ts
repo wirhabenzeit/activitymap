@@ -1,12 +1,11 @@
 import 'server-only';
 import {
-  STREAM_MAX_AGE_MS,
   STREAM_FETCH_LEASE_MS,
   STREAM_RETRY_MS,
 } from '~/server/strava/stream-policy';
 
 import { createHash, randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, sql } from 'drizzle-orm';
 import type { Actor } from '~/server/auth/actor';
 import { db } from '~/server/db';
 import {
@@ -27,6 +26,11 @@ import {
   streamActivityIdSchema,
   type StreamFetchFailure,
 } from '~/server/strava/streams';
+import {
+  STREAM_SUMMARY_VERSION,
+  summarizeStreams,
+  type StreamSummary,
+} from '~/server/strava/stream-summary';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type StoredStreams = typeof activityStreams.$inferSelect;
@@ -42,6 +46,14 @@ export type StreamFetchClaim = {
   sourceVersion: string;
   authorizationVersion: string;
 };
+/** Everything but the raw samples: enough for metadata and the summary. */
+export type StreamSummarySnapshot = Omit<StreamSnapshot, 'payload'>;
+export type StreamSummaryRead = {
+  activityId: string;
+  /** Null when no stream fetch has been recorded for the activity. */
+  row: StreamSummarySnapshot | null;
+};
+
 export class ActivityStreamsUnavailableError extends Error {
   constructor() {
     super('Activity or eligible Strava account unavailable');
@@ -171,6 +183,87 @@ export function createActivityStreamsRepository(database: typeof db = db) {
       });
     },
 
+    /**
+     * Summaries for the actor's own activities among `activityIds`; other IDs
+     * are left out. Never contacts Strava. Current sets stored before
+     * summaries existed (or with an older algorithm) are summarized once here.
+     */
+    async readSummaries(
+      actor: Actor,
+      activityIds: string[],
+    ): Promise<StreamSummaryRead[]> {
+      activityIds.forEach((id) => streamActivityIdSchema.parse(id));
+      if (activityIds.length === 0) return [];
+      return database.transaction(async (tx) => {
+        if (!(await lockEligibleAccount(tx, actor)))
+          throw new ActivityStreamsUnavailableError();
+        // Select everything except the raw samples.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { payload, ...columns } = getTableColumns(activityStreams);
+        const rows = await tx
+          .select({
+            ownedId: sql<string>`${activities.id}::text`,
+            stream: columns,
+          })
+          .from(activities)
+          .leftJoin(
+            activityStreams,
+            eq(activityStreams.activityId, sql`${activities.id}`),
+          )
+          .where(
+            and(
+              eq(activities.athlete, actor.athleteId),
+              // Compare as bigint, never through JavaScript Number.
+              sql`${activities.id} = any(array[${sql.join(
+                activityIds.map((id) => sql`${id}::bigint`),
+                sql`, `,
+              )}])`,
+            ),
+          );
+        const reads: StreamSummaryRead[] = [];
+        for (const { ownedId, stream } of rows) {
+          if (!stream?.generation) {
+            reads.push({ activityId: ownedId, row: null });
+            continue;
+          }
+          let summary: StreamSummary | null = stream.summary;
+          if (
+            stream.fetchedAt &&
+            !stream.invalidatedAt &&
+            summary?.version !== STREAM_SUMMARY_VERSION
+          ) {
+            const [stored] = await tx
+              .select({ payload: activityStreams.payload })
+              .from(activityStreams)
+              .where(eq(activityStreams.activityId, stream.activityId));
+            if (stored?.payload) {
+              summary = summarizeStreams(stored.payload);
+              // Guard on revision so a concurrent commit's summary wins.
+              await tx
+                .update(activityStreams)
+                .set({ summary })
+                .where(
+                  and(
+                    eq(activityStreams.activityId, stream.activityId),
+                    eq(activityStreams.revision, stream.revision),
+                  ),
+                );
+            }
+          }
+          reads.push({
+            activityId: ownedId,
+            row: {
+              ...stream,
+              summary,
+              activityId: ownedId,
+              revision: String(stream.revision),
+            },
+          });
+        }
+        return reads;
+      });
+    },
+
     async begin(actor: Actor, activityId: string, now: Date, force = false) {
       streamActivityIdSchema.parse(activityId);
       return database.transaction(async (tx) => {
@@ -185,7 +278,6 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           existing?.payload != null &&
           !existing.invalidatedAt &&
           existing.fetchedAt &&
-          existing.fetchedAt.getTime() + STREAM_MAX_AGE_MS > now.getTime() &&
           existing.sourceVersion === source.sourceVersion;
         // A current payload stays readable while another refresh is in flight
         // or cooling down after a failure; only fetches wait for either.
@@ -263,6 +355,7 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           .update(activityStreams)
           .set({
             payload,
+            summary: summarizeStreams(payload),
             availableTypes: ACTIVITY_STREAM_TYPES.filter(
               (type) => payload[type] !== undefined,
             ),
