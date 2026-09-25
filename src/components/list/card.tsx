@@ -7,11 +7,11 @@ import {
   Zap,
   Map,
   Info,
-  ChevronDown,
-  ChevronRight,
+  ChevronUp,
   Loader2,
   Download,
   MoreHorizontal,
+  Pencil,
   ExternalLink,
   X,
 } from 'lucide-react';
@@ -72,6 +72,7 @@ interface ActivityCardProps extends CardProps {
   map?: RefObject<MapRef | null>;
   inlineDetails?: boolean;
   mapDetails?: boolean;
+  onCollapse?: () => void;
   onClearSelection?: () => void;
   onOpenDetails?: () => void;
 }
@@ -106,6 +107,7 @@ import { useToast } from '~/hooks/use-toast';
 export function ActivityCardContent({
   row,
   mapDetails = false,
+  onCollapse,
   onClearSelection,
 }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
@@ -196,14 +198,18 @@ export function ActivityCardContent({
           ? `${elevationLow}–${elevationHigh} elevation`
           : undefined,
     },
-    {
-      label: 'Power',
-      value: power ? `${power} normalized` : '—',
-      detail:
-        power && averagePower && maximumPower
-          ? `${averagePower} avg · ${maximumPower} max`
-          : undefined,
-    },
+    ...(power
+      ? [
+          {
+            label: 'Normalized power',
+            value: power,
+            detail:
+              averagePower && maximumPower
+                ? `${averagePower} avg · ${maximumPower} max`
+                : undefined,
+          },
+        ]
+      : []),
   ];
 
   const handleRefresh = async () => {
@@ -292,18 +298,30 @@ export function ActivityCardContent({
       {mapDetails ? (
         <Card className="w-full border-none shadow-none">
           <CardHeader className="space-y-1 px-4 pb-3 pt-3">
-            <div className="flex items-start gap-2">
-              {Icon && sport_group && (
-                <Icon
-                  color={categorySettings[sport_group].color}
-                  className="mt-0.5 h-4 w-4 shrink-0"
-                />
-              )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 shrink-0 border p-0"
+                onClick={() => {
+                  onCollapse?.();
+                  row.toggleSelected();
+                }}
+                aria-label="Deselect route"
+                title="Deselect route"
+              >
+                {Icon && sport_group && (
+                  <Icon
+                    color={categorySettings[sport_group].color}
+                    className="h-5 w-5"
+                  />
+                )}
+              </Button>
               <div className="min-w-0 flex-1">
                 <CardTitle className="text-base leading-5">
                   {row.getValue('name')}
                 </CardTitle>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
                   {date.toLocaleDateString(undefined, {
                     day: 'numeric',
                     month: 'short',
@@ -319,7 +337,7 @@ export function ActivityCardContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs"
+                className="h-7 px-2 text-xs max-lg:hidden"
                 onClick={() => setOpen(true)}
                 disabled={isGuest}
               >
@@ -337,6 +355,13 @@ export function ActivityCardContent({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="lg:hidden"
+                    onSelect={() => setOpen(true)}
+                    disabled={isGuest}
+                  >
+                    <Pencil /> Edit
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => void handleRefresh()}
                     disabled={loading || isGuest || !stravaConnected}
@@ -363,6 +388,18 @@ export function ActivityCardContent({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              {onCollapse && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={onCollapse}
+                  aria-label="Collapse route details"
+                  title="Collapse"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+              )}
               {onClearSelection && (
                 <Button
                   variant="ghost"
@@ -380,13 +417,6 @@ export function ActivityCardContent({
               <CardDescription className="whitespace-pre-wrap text-sm">
                 {row.original.description}
               </CardDescription>
-            )}
-            {photos.length > 0 && (
-              <PhotoLightbox
-                photos={photos}
-                title={row.getValue('name')}
-                className="h-[2.5rem]"
-              />
             )}
           </CardHeader>
           <CardContent className="px-4 pb-4 pt-0 lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-4">
@@ -412,6 +442,20 @@ export function ActivityCardContent({
                   )}
                 </div>
               ))}
+              {photos.length > 0 && (
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">
+                    {photos.length === 1 ? 'Photo' : `${photos.length} photos`}
+                  </dt>
+                  <dd className="mt-0.5">
+                    <PhotoLightbox
+                      photos={photos}
+                      title={row.getValue('name')}
+                      className="h-10"
+                    />
+                  </dd>
+                </div>
+              )}
             </dl>
             {elevationProfile && (
               <div className="mt-3 min-w-0 lg:mt-0 lg:border-l lg:pl-4">
@@ -565,15 +609,6 @@ export function ActivityCard({
     }
   };
 
-  const toggleInlineDetails = () => {
-    if (row.getIsExpanded()) {
-      setHighlighted(0);
-    } else {
-      setHighlighted(row.original.id);
-      onOpenDetails?.();
-    }
-  };
-
   const nameClassName = cn(
     'text-left truncate justify-start max-w-full',
     inlineDetails && 'hover:underline',
@@ -590,7 +625,11 @@ export function ActivityCard({
           variant={row.getIsSelected() ? 'outline' : 'ghost'}
           size="sm"
           className="h-6 w-6 border"
-          onClick={() => row.toggleSelected()}
+          onClick={(event) => {
+            // Rows with inline details expand on click; don't also toggle that.
+            event.stopPropagation();
+            row.toggleSelected();
+          }}
           aria-label="Select row"
         >
           {Icon && sport_group && (
@@ -601,17 +640,7 @@ export function ActivityCard({
             />
           )}
         </Button>
-        {inlineDetails ? (
-          <button
-            type="button"
-            onClick={toggleInlineDetails}
-            className={nameClassName}
-          >
-            {row.getValue('name')}
-          </button>
-        ) : (
-          <div className={nameClassName}>{row.getValue('name')}</div>
-        )}
+        <div className={nameClassName}>{row.getValue('name')}</div>
         <div className="flex-1" />
         {!inlineDetails && (
           <Button
@@ -624,23 +653,7 @@ export function ActivityCard({
             <Map className="h-4 w-4" />
           </Button>
         )}
-        {inlineDetails ? (
-          <Button
-            variant="ghost"
-            className="h-6 gap-1 px-1 text-xs"
-            size="sm"
-            onClick={toggleInlineDetails}
-            aria-label={`${row.getIsExpanded() ? 'Collapse' : 'Expand'} details for ${String(row.getValue('name'))}`}
-            aria-expanded={row.getIsExpanded()}
-          >
-            {row.getIsExpanded() ? (
-              <ChevronDown className="h-3 w-3" />
-            ) : (
-              <ChevronRight className="h-3 w-3" />
-            )}
-            <span>Details</span>
-          </Button>
-        ) : (
+        {!inlineDetails && (
           <Popover>
             <PopoverTrigger asChild>
               <Button

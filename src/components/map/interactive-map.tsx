@@ -435,25 +435,25 @@ export default function InteractiveMap() {
   );
   const mapColumns = useMemo(
     () =>
-      columns.map((column) =>
-        column.id === 'name'
+      columns.map((column) => {
+        // Size columns to the panel instead of the list page's fixed minimums,
+        // so the table never scrolls sideways on narrow screens.
+        const meta = column.meta && {
+          ...column.meta,
+          width: column.id === 'name' ? 'minmax(0, 1fr)' : 'max-content',
+        };
+        return column.id === 'name'
           ? {
               ...column,
+              meta,
               cell: ({
                 row,
               }: {
                 row: Parameters<typeof ActivityCard>[0]['row'];
-              }) => (
-                <ActivityCard
-                  row={row}
-                  map={mapRefLoc}
-                  inlineDetails
-                  onOpenDetails={() => setPanelExpandedOverride(true)}
-                />
-              ),
+              }) => <ActivityCard row={row} map={mapRefLoc} inlineDetails />,
             }
-          : column,
-      ),
+          : { ...column, meta };
+      }),
     [],
   );
   const mapColumnVisibility = useMemo(
@@ -660,8 +660,18 @@ export default function InteractiveMap() {
           columnFilters={columnFilters}
           paginationControl={false}
           activeId={highlighted}
+          headerClassName="max-lg:hidden"
+          cellClassName="max-lg:px-2 max-lg:border-r-0"
+          onRowClick={(row) => {
+            setHighlighted(row.original.id);
+            setPanelExpandedOverride(true);
+          }}
           renderInlineDetails={(row) => (
-            <ActivityCardContent row={row} mapDetails />
+            <ActivityCardContent
+              row={row}
+              mapDetails
+              onCollapse={() => setHighlighted(0)}
+            />
           )}
           renderSingleDetails={(row) => (
             <ActivityCardContent

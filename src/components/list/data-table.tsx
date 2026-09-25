@@ -77,7 +77,9 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   columnFilters: ColumnFiltersState;
   map?: RefObject<MapRef | null>;
   activeId?: number;
-  hideHeader?: boolean;
+  headerClassName?: string;
+  cellClassName?: string;
+  onRowClick?: (row: Row<Features, TData>) => void;
   renderInlineDetails?: (row: Row<Features, TData>) => React.ReactNode;
   renderSingleDetails?: (row: Row<Features, TData>) => React.ReactNode;
 }
@@ -102,7 +104,9 @@ export const DataTable = React.memo(function DataTable<
   paginationControl = true,
   map,
   activeId,
-  hideHeader = false,
+  headerClassName,
+  cellClassName,
+  onRowClick,
   renderInlineDetails,
   renderSingleDetails,
   setSorting,
@@ -176,7 +180,7 @@ export const DataTable = React.memo(function DataTable<
         <TableHeader
           className={cn(
             'sticky [&_tr]:border-b-0 grid grid-cols-subgrid col-span-full',
-            hideHeader && 'hidden',
+            headerClassName,
           )}
         >
           {table.getHeaderGroups().map((headerGroup) => (
@@ -241,42 +245,63 @@ export const DataTable = React.memo(function DataTable<
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
               <React.Fragment key={row.id}>
-                <TableRow
-                  data-state={row.getIsSelected() && 'selected'}
-                  data-active={row.getIsExpanded() || undefined}
-                  className="group grid grid-cols-subgrid col-span-full data-[active=true]:ring-1 data-[active=true]:ring-inset data-[active=true]:ring-orange-500"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      className={cn(
-                        'bg-background group-data-[state=selected]:bg-muted flex items-center',
-                        cell.column.getIsPinned() == 'start' &&
-                          'sticky left-0 border-border border-r',
-                        cell.column.getIsPinned() == 'end' &&
-                          'sticky right-0 border-border border-l',
-                        density == 'sm'
-                          ? 'py-1 px-1'
-                          : density == 'md'
-                            ? 'p-2'
-                            : 'py-3 px-2 text-sm',
-                      )}
-                      key={cell.id}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-                {row.getIsExpanded() && renderInlineDetails && (
-                  <TableRow className="grid grid-cols-subgrid col-span-full">
+                {row.getIsExpanded() && renderInlineDetails ? (
+                  // The expanded card replaces its row rather than repeating it.
+                  <TableRow className="grid grid-cols-subgrid col-span-full ring-1 ring-inset ring-orange-500">
                     <TableCell
                       colSpan={row.getVisibleCells().length}
                       className="col-span-full p-0 bg-background"
                     >
                       {renderInlineDetails(row)}
                     </TableCell>
+                  </TableRow>
+                ) : (
+                  <TableRow
+                    data-state={row.getIsSelected() && 'selected'}
+                    className={cn(
+                      'group grid grid-cols-subgrid col-span-full',
+                      onRowClick && 'cursor-pointer',
+                    )}
+                    {...(onRowClick && {
+                      tabIndex: 0,
+                      onClick: (event: React.MouseEvent) => {
+                        // Ignore clicks bubbling up from portals (e.g. the edit dialog).
+                        if (!event.currentTarget.contains(event.target as Node))
+                          return;
+                        onRowClick(row);
+                      },
+                      onKeyDown: (event: React.KeyboardEvent) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onRowClick(row);
+                        }
+                      },
+                    })}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        className={cn(
+                          'bg-background group-data-[state=selected]:bg-muted flex items-center',
+                          cell.column.getIsPinned() == 'start' &&
+                            'sticky left-0 border-border border-r',
+                          cell.column.getIsPinned() == 'end' &&
+                            'sticky right-0 border-border border-l',
+                          density == 'sm'
+                            ? 'py-1 px-1'
+                            : density == 'md'
+                              ? 'p-2'
+                              : 'py-3 px-2 text-sm',
+                          cellClassName,
+                        )}
+                        key={cell.id}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 )}
               </React.Fragment>
