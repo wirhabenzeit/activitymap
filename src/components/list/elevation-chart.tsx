@@ -203,6 +203,7 @@ export function ElevationChart({
   });
 
   const profile = query.data?.profile;
+  const height = compact ? 135 : 118;
 
   return (
     <section
@@ -212,32 +213,38 @@ export function ElevationChart({
       aria-label="Elevation profile"
     >
       <h3 className="mb-2 text-sm font-semibold">Elevation profile</h3>
-      {query.isError ? (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">{query.error.message}</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void query.refetch()}
+      {/* Every state takes the chart's height so the card never resizes. */}
+      <div style={{ height }}>
+        {profile ? (
+          // Keep showing the last profile while it revalidates in the background.
+          <ElevationPlot profile={profile} height={height} />
+        ) : query.isError ? (
+          <div className="flex h-full flex-col items-start justify-center gap-2 rounded-md bg-muted/40 px-3">
+            <p className="text-xs text-muted-foreground">
+              {query.error.message}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void query.refetch()}
+            >
+              Try again
+            </Button>
+          </div>
+        ) : query.isPending || query.data?.pending ? (
+          <div
+            className="flex h-full animate-pulse items-center justify-center gap-2 rounded-md bg-muted/60 text-xs text-muted-foreground"
+            role="status"
           >
-            Try again
-          </Button>
-        </div>
-      ) : query.isPending || query.isFetching || query.data?.pending ? (
-        <div
-          className="flex items-center gap-2 text-xs text-muted-foreground"
-          role="status"
-        >
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading elevation samples…
-        </div>
-      ) : profile ? (
-        <ElevationPlot profile={profile} height={compact ? 135 : 118} />
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          Elevation by distance is unavailable for this activity.
-        </p>
-      )}
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading elevation samples…
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center rounded-md bg-muted/40 px-3 text-center text-xs text-muted-foreground">
+            Elevation by distance is unavailable for this activity.
+          </div>
+        )}
+      </div>
     </section>
   );
 }
