@@ -3,7 +3,12 @@ import {
   ACTIVITY_STREAM_TYPES,
   rawActivityStreamsSchema,
 } from '~/server/strava/streams';
-import type { StreamSnapshot } from '~/server/repositories/activity-streams';
+import { streamSummarySchema } from '~/server/strava/stream-summary';
+import type {
+  StreamSnapshot,
+  StreamSummaryRead,
+  StreamSummarySnapshot,
+} from '~/server/repositories/activity-streams';
 import { idString, isoDateTime } from './primitives';
 
 export const streamTypeSchema = z.enum(ACTIVITY_STREAM_TYPES);
@@ -77,7 +82,23 @@ export const activityStreamsDTOSchema = z.object({
 });
 export type ActivityStreamsDTO = z.infer<typeof activityStreamsDTOSchema>;
 
-export function toStreamMetadata(row: StreamSnapshot | null): StreamMetadata {
+export const activityStreamSummaryDTOSchema = z.object({
+  activity_id: idString,
+  metadata: streamMetadataSchema,
+  summary: streamSummarySchema.nullable(),
+  last_error: activityStreamsDTOSchema.shape.last_error,
+  next_retry_at: isoDateTime.nullable(),
+});
+export type ActivityStreamSummaryDTO = z.infer<
+  typeof activityStreamSummaryDTOSchema
+>;
+export const activityStreamSummariesDTOSchema = z.object({
+  summaries: z.array(activityStreamSummaryDTOSchema),
+});
+
+export function toStreamMetadata(
+  row: StreamSummarySnapshot | null,
+): StreamMetadata {
   return {
     generation: row?.generation ?? null,
     revision: row?.revision ?? '0',
@@ -105,6 +126,20 @@ export function toActivityStreamsDTO(
     requested_types: [...ACTIVITY_STREAM_TYPES],
     // Preserve last-good storage, but never serve expired/invalidated samples.
     streams: metadata.state === 'current' ? (row?.payload ?? null) : null,
+    last_error: row?.lastError ?? null,
+    next_retry_at: row?.nextRetryAt?.toISOString() ?? null,
+  });
+}
+export function toActivityStreamSummaryDTO({
+  activityId,
+  row,
+}: StreamSummaryRead): ActivityStreamSummaryDTO {
+  const metadata = toStreamMetadata(row);
+  return activityStreamSummaryDTOSchema.parse({
+    activity_id: activityId,
+    metadata,
+    // Same rule as raw samples: never serve an invalidated set.
+    summary: metadata.state === 'current' ? (row?.summary ?? null) : null,
     last_error: row?.lastError ?? null,
     next_retry_at: row?.nextRetryAt?.toISOString() ?? null,
   });

@@ -11,6 +11,7 @@ import { useSidebar } from '~/components/ui/sidebar';
 import { Camera, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { columns } from '~/components/list/columns';
 import { ActivityCard, ActivityCardContent } from '~/components/list/card';
+import { usePrefetchStreamSummaries } from '~/components/list/elevation-chart';
 import { Button } from '~/components/ui/button';
 import { activityFields } from '~/settings/activity';
 
@@ -259,6 +260,7 @@ export default function InteractiveMap() {
     uploadedGeoJson,
     isGuest,
     guestModeType,
+    summaryUserId,
   } = useShallowStore((state) => ({
     selected: state.selected,
     highlighted: state.highlighted,
@@ -277,7 +279,11 @@ export default function InteractiveMap() {
     uploadedGeoJson: state.uploadedGeoJson,
     isGuest: state.isGuest,
     guestModeType: state.guestMode.type,
+    // Same conditions under which a route card shows its elevation profile.
+    summaryUserId:
+      !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
   }));
+  usePrefetchStreamSummaries(selected, summaryUserId);
   const { open } = useSidebar();
   const mapRefLoc = useRef<MapRef>(null);
   const columnFilters = [{ id: 'id', value: filterIDs }];

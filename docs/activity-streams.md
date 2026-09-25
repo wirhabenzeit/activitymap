@@ -79,6 +79,26 @@ existing claimed row; it never upserts. A replay cannot increment revision,
 and older requests cannot overwrite a newer attempt. Credential refresh uses
 the same guard so an in-flight refresh cannot restore a revoked account.
 
+## Downsampled summaries
+
+Each successful commit also stores `summary`, a downsampled copy of the payload
+built by `summarizeStreams`: about 300 points evenly spaced along distance (or
+time when there is no usable distance stream), with the bucket average of
+`time`, `distance`, `altitude`, `watts` and `heartrate` and the middle
+`latlng` sample. Only streams sampled like the axis stream are included, and
+all included series are index-aligned. A typical ride shrinks from hundreds of
+kilobytes to about 15 KB. `summary.version` names the algorithm; rows stored
+without a summary, or with an older version, are summarized the first time
+they are read, guarded by `revision` so a concurrent commit wins. Summaries
+follow the payload's lifecycle: they are served only while the set is
+`current`.
+
+- `GET /api/v1/activities/{id}/streams/summary` has the same fetch, freshness
+  and error semantics as `/streams`, but returns the summary.
+- `GET /api/v1/stream-summaries?ids=…` returns stored summaries for up to 100
+  owned activities without contacting Strava. The web map uses it to prefetch
+  the selected routes.
+
 ## Follow-up boundary
 
 - #185 adds iOS loading/cache. Charts and any downsampling remain deferred.

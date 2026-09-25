@@ -22,6 +22,7 @@ export const streamSnapshotFixture: StreamSnapshot = {
     'watts',
     'heartrate',
   ],
+  summary: null,
   payload: RAW_STREAMS_FIXTURE,
   sourceVersion: 'source-1',
   requestedTypes: [

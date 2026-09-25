@@ -1,4 +1,8 @@
-import { activityStreamsDTOSchema } from './activity-streams';
+import {
+  activityStreamSummariesDTOSchema,
+  activityStreamSummaryDTOSchema,
+  activityStreamsDTOSchema,
+} from './activity-streams';
 import { z } from 'zod';
 import { SCHEMA_VERSION } from './primitives';
 import { authenticationDTOSchema } from './auth';
@@ -30,6 +34,12 @@ export function buildOpenApiDocument() {
   registry.add(currentUserDTOSchema, { id: 'CurrentUser' });
   registry.add(activityDTOSchema, { id: 'Activity' });
   registry.add(responseEnvelope(activityStreamsDTOSchema), { id: 'ActivityStreamsResponse' });
+  registry.add(responseEnvelope(activityStreamSummaryDTOSchema), {
+    id: 'ActivityStreamSummaryResponse',
+  });
+  registry.add(responseEnvelope(activityStreamSummariesDTOSchema), {
+    id: 'ActivityStreamSummariesResponse',
+  });
   registry.add(photoDTOSchema, { id: 'Photo' });
   registry.add(responseEnvelope(syncBootstrapPageDTOSchema), {
     id: 'SyncBootstrapPageResponse',
@@ -243,6 +253,44 @@ export function buildOpenApiDocument() {
             '429': errorResponse('Per-user/API or shared Strava budget exhausted; see Retry-After'),
             '500': errorResponse('Unexpected database or internal failure'),
             '503': errorResponse('Stream fetch failed; retryability is explicit. No empty success is synthesized from errors.'),
+          },
+        },
+      },
+      '/api/v1/activities/{id}/streams/summary': {
+        get: {
+          operationId: 'getActivityStreamSummary', summary: 'Get downsampled streams for an owned activity', security,
+          description: 'Same fetch, freshness and error semantics as /api/v1/activities/{id}/streams, but returns about 300 evenly spaced points instead of the raw samples. Points are spaced along distance (or time without a distance stream); each present series has one value per point. Streams sampled differently from that axis are omitted. summary is null unless metadata.state is current.',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string', pattern: '^[1-9][0-9]*$' }, description: 'Decimal activity ID, never a floating-point number' },
+            { name: 'fetch', in: 'query', schema: { type: 'string', enum: ['auto', 'none'], default: 'auto' } },
+            { name: 'refresh', in: 'query', schema: { type: 'string', enum: ['true', 'false'], default: 'false' }, description: 'Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none.' },
+          ],
+          responses: {
+            '200': { description: 'Stored summary and explicit availability/freshness', content: { 'application/json': { schema: ref('ActivityStreamSummaryResponse') } } },
+            '202': { description: 'Fetch already in progress or invalidated during this request; see Retry-After', content: { 'application/json': { schema: ref('ActivityStreamSummaryResponse') } } },
+            '400': errorResponse('Invalid activity ID or query parameters'),
+            '401': errorResponse('Authentication is required'),
+            '404': errorResponse('Activity or connected account unavailable'),
+            '429': errorResponse('Per-user/API or shared Strava budget exhausted; see Retry-After'),
+            '500': errorResponse('Unexpected database or internal failure'),
+            '503': errorResponse('Stream fetch failed; retryability is explicit.'),
+          },
+        },
+      },
+      '/api/v1/stream-summaries': {
+        get: {
+          operationId: 'getStreamSummaries', summary: 'Get stored downsampled streams for several owned activities', security,
+          description: 'Never contacts Strava. Returns one entry per owned activity among ids, in no particular order; IDs of other athletes are omitted. Activities without a current stored set have summary null; load them through /api/v1/activities/{id}/streams/summary.',
+          parameters: [
+            { name: 'ids', in: 'query', required: true, schema: { type: 'string', pattern: '^[1-9][0-9]*(,[1-9][0-9]*)*$' }, description: 'Up to 100 comma-separated decimal activity IDs' },
+          ],
+          responses: {
+            '200': { description: 'Summaries for the owned activities among ids', content: { 'application/json': { schema: ref('ActivityStreamSummariesResponse') } } },
+            '400': errorResponse('Missing, malformed or too many IDs'),
+            '401': errorResponse('Authentication is required'),
+            '404': errorResponse('Connected account unavailable'),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
+            '500': errorResponse('Unexpected database or internal failure'),
           },
         },
       },
