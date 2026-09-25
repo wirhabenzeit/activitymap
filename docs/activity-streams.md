@@ -155,11 +155,13 @@ existing activity tombstone is the instruction to delete the entire client
 stream cache. Deauthorization denies access immediately; erasure cascades the
 stored payloads. No independent stream tombstones or bulk feed samples exist.
 
-A successful fetch, including an empty success, expires after seven days.
-Summary reconciliation never extends that deadline: summaries cannot prove
-unchanged sensor samples. Known edits publish invalidation immediately;
-otherwise clients must honor `expires_at` locally and request revalidation when
-they next need streams. The expiry itself needs no scheduled feed mutation.
+A successful fetch, including an empty success, has no age limit. Like the
+rest of the athlete's dataset, stored streams are revalidated by the periodic
+summary reconciliation ([Strava data policy](strava-data-policy.md)): any change
+to an activity's source fields invalidates its streams through the source
+trigger, and webhooks and deletions invalidate them promptly. A set stays
+`current` until then. `expires_at` remains in the contract for compatibility
+and is always `null`.
 Generation plus revision identify a client cache entry; a generation change
 invalidates old data even when the successful revision has not changed.
 
@@ -193,8 +195,8 @@ the client now requires the budget table. Preview follows the existing migration
 runner; Production follows the approval/order documented in the migration guide.
 
 `pnpm db:test-stream-lifecycle` proves endpoint ownership for both auth modes,
-deduplication, exact samples, array-free list/feed metadata, replay, seven-day
-expiry, known and explicit invalidation, late saves, publication rollback,
+deduplication, exact samples, array-free list/feed metadata, replay, no age
+limit, known and explicit invalidation, late saves, publication rollback,
 empty success, throttling, deauthorization, deletion and shared budget races.
 `bash scripts/verify-stream-dtos.sh <base-ref>` compiles both the new DTOs and
 the actual previous generated Swift file, then decodes new/old activity payloads
@@ -244,8 +246,7 @@ Current stream leases and cooldowns are respected, including foreground work.
 
 A successful set, including `{}` or absent HR/power/GPS keys, completes historical
 backfill for that storage generation. The worker does **not** periodically
-refresh completed history merely because the API's seven-day cache expires;
-on-demand loading still revalidates expired data. Known stream invalidation
+refresh completed history; stored sets stay current until invalidated. Known stream invalidation
 makes an activity eligible again. This keeps completed recent activities from
 consuming all capacity intended for unfetched history.
 

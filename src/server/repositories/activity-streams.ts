@@ -1,6 +1,5 @@
 import 'server-only';
 import {
-  STREAM_MAX_AGE_MS,
   STREAM_FETCH_LEASE_MS,
   STREAM_RETRY_MS,
 } from '~/server/strava/stream-policy';
@@ -185,7 +184,6 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           existing?.payload != null &&
           !existing.invalidatedAt &&
           existing.fetchedAt &&
-          existing.fetchedAt.getTime() + STREAM_MAX_AGE_MS > now.getTime() &&
           existing.sourceVersion === source.sourceVersion;
         // A current payload stays readable while another refresh is in flight
         // or cooling down after a failure; only fetches wait for either.

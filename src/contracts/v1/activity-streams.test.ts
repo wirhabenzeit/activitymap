@@ -7,10 +7,7 @@ import {
 } from './activity-streams';
 import { RAW_STREAMS_FIXTURE } from '~/server/strava/streams.fixture';
 import type { StreamSnapshot } from '~/server/repositories/activity-streams';
-import {
-  STREAM_SOURCE_FIELDS,
-  STREAM_MAX_AGE_MS,
-} from '~/server/strava/stream-policy';
+import { STREAM_SOURCE_FIELDS } from '~/server/strava/stream-policy';
 
 const now = new Date('2026-09-22T12:00:00Z');
 export const streamSnapshotFixture: StreamSnapshot = {
@@ -48,36 +45,41 @@ void test('stream wire payload preserves samples and metadata and separates abse
   const full = toActivityStreamsDTO(
     streamSnapshotFixture.activityId,
     streamSnapshotFixture,
-    now,
   );
   assert.deepEqual(full.streams, RAW_STREAMS_FIXTURE);
   assert.equal(full.activity_id, '9007199254740993');
   assert.equal(full.metadata.state, 'current');
-  const empty = toActivityStreamsDTO(
-    '1',
-    { ...streamSnapshotFixture, payload: {}, availableTypes: [] },
-    now,
-  );
+  const empty = toActivityStreamsDTO('1', {
+    ...streamSnapshotFixture,
+    payload: {},
+    availableTypes: [],
+  });
   assert.deepEqual(empty.streams, {});
   assert.deepEqual(empty.metadata.available_types, []);
   assert.equal(empty.metadata.state, 'current');
-  const missing = toActivityStreamsDTO('1', null, now);
+  const missing = toActivityStreamsDTO('1', null);
   assert.equal(missing.streams, null);
   assert.equal(missing.metadata.state, 'not_fetched');
   assert.equal(missing.metadata.fetch_status, 'not_fetched');
   assert.ok(activityStreamsDTOSchema.safeParse(full).success);
 });
-void test('expired and invalidated raw samples are withheld without destroying last-good storage', () => {
-  for (const [row, clock] of [
-    [streamSnapshotFixture, new Date(now.getTime() + STREAM_MAX_AGE_MS)],
-    [{ ...streamSnapshotFixture, invalidatedAt: now }, now],
-  ] as const) {
-    const dto = toActivityStreamsDTO('1', row, clock);
-    assert.equal(dto.metadata.state, 'stale');
-    assert.equal(dto.streams, null);
-    assert.equal(dto.metadata.revision, '1');
-    assert.deepEqual(row.payload, RAW_STREAMS_FIXTURE);
-  }
+void test('invalidated raw samples are withheld without destroying last-good storage', () => {
+  const row = { ...streamSnapshotFixture, invalidatedAt: now };
+  const dto = toActivityStreamsDTO('1', row);
+  assert.equal(dto.metadata.state, 'stale');
+  assert.equal(dto.streams, null);
+  assert.equal(dto.metadata.revision, '1');
+  assert.deepEqual(row.payload, RAW_STREAMS_FIXTURE);
+});
+void test('stored samples have no age limit until invalidated', () => {
+  // A year-old fetch is still current; only invalidation makes it stale.
+  const dto = toActivityStreamsDTO('1', {
+    ...streamSnapshotFixture,
+    fetchedAt: new Date('2025-01-01T00:00:00Z'),
+  });
+  assert.equal(dto.metadata.state, 'current');
+  assert.equal(dto.metadata.expires_at, null);
+  assert.deepEqual(dto.streams, RAW_STREAMS_FIXTURE);
 });
 void test('SQL invalidation projection tracks the documented source fields', () => {
   const migration = readFileSync(

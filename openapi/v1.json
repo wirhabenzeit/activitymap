@@ -2218,7 +2218,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "By default, a cache miss or stale generation fetches synchronously with a 20-second upstream deadline. A concurrent fetch returns 202; poll after Retry-After. fetch=none only inspects local state. Missing/inaccessible activities and disconnected accounts return 404 without availability information. Successful empty or partial streams return 200; absent keys denote unavailable sensors only when metadata.state is current. Expired/invalidated samples are withheld. Activity tombstones invalidate the entire local stream cache. Seven-day expires_at also applies to successful empty responses.",
+        "description": "By default, a cache miss or stale generation fetches synchronously with a 20-second upstream deadline. A concurrent fetch returns 202; poll after Retry-After. fetch=none only inspects local state. Missing/inaccessible activities and disconnected accounts return 404 without availability information. Successful empty or partial streams return 200; absent keys denote unavailable sensors only when metadata.state is current. Invalidated samples are withheld. Activity tombstones invalidate the entire local stream cache. Stored sets have no age limit; expires_at is always null and kept for compatibility.",
         "parameters": [
           {
             "name": "id",

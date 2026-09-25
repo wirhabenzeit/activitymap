@@ -12,7 +12,9 @@ Status: **Accepted**
 
 ## 2. Retention and freshness
 
-- Cached Strava data must be revalidated within seven days.
+- Cached Strava data must be revalidated within seven days. The periodic
+  summary reconciliation revalidates the athlete's dataset, including stored
+  activity streams: a changed summary invalidates the affected streams.
 - Webhooks provide the prompt update path; periodic reconciliation is the
   safety net.
 

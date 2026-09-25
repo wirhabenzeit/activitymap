@@ -105,7 +105,7 @@ export function createActivityStreamsHandler(deps: {
       const row = await deps.repository.read(actor, id);
       return Response.json(
         responseEnvelope(activityStreamsDTOSchema).parse(
-          makeEnvelope(toActivityStreamsDTO(id, row, now()), now()),
+          makeEnvelope(toActivityStreamsDTO(id, row), now()),
         ),
         {
           status,

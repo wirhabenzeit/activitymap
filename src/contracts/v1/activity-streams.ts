@@ -3,7 +3,6 @@ import {
   ACTIVITY_STREAM_TYPES,
   rawActivityStreamsSchema,
 } from '~/server/strava/streams';
-import { STREAM_MAX_AGE_MS } from '~/server/strava/stream-policy';
 import type { StreamSnapshot } from '~/server/repositories/activity-streams';
 import { idString, isoDateTime } from './primitives';
 
@@ -78,33 +77,28 @@ export const activityStreamsDTOSchema = z.object({
 });
 export type ActivityStreamsDTO = z.infer<typeof activityStreamsDTOSchema>;
 
-export function toStreamMetadata(
-  row: StreamSnapshot | null,
-  now: Date,
-): StreamMetadata {
-  const expires = row?.fetchedAt
-    ? new Date(row.fetchedAt.getTime() + STREAM_MAX_AGE_MS)
-    : null;
+export function toStreamMetadata(row: StreamSnapshot | null): StreamMetadata {
   return {
     generation: row?.generation ?? null,
     revision: row?.revision ?? '0',
+    // No age limit: only invalidation (source edits, webhooks, deletion)
+    // makes a stored set stale. `expires_at` is kept for compatibility.
     state: !row?.fetchedAt
       ? 'not_fetched'
-      : row.invalidatedAt || !expires || expires <= now
+      : row.invalidatedAt
         ? 'stale'
         : 'current',
     fetch_status: row?.lastAttemptStatus ?? 'not_fetched',
     available_types: row?.availableTypes ?? [],
     fetched_at: row?.fetchedAt?.toISOString() ?? null,
-    expires_at: expires?.toISOString() ?? null,
+    expires_at: null,
   };
 }
 export function toActivityStreamsDTO(
   activityId: string,
   row: StreamSnapshot | null,
-  now: Date,
 ): ActivityStreamsDTO {
-  const metadata = toStreamMetadata(row, now);
+  const metadata = toStreamMetadata(row);
   return activityStreamsDTOSchema.parse({
     activity_id: activityId,
     metadata,
