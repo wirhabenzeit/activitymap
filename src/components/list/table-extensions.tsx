@@ -15,10 +15,12 @@ import {
   columnVisibilityFeature,
   columnPinningFeature,
   rowSelectionFeature,
+  rowExpandingFeature,
   rowPaginationFeature,
   createSortedRowModel,
   createFilteredRowModel,
   createPaginatedRowModel,
+  createExpandedRowModel,
 } from '@tanstack/react-table';
 import type { MapRef } from 'react-map-gl/mapbox';
 import { type RefObject } from 'react';
@@ -224,6 +226,7 @@ export const features = tableFeatures({
   columnVisibilityFeature,
   columnPinningFeature,
   rowSelectionFeature,
+  rowExpandingFeature,
   rowPaginationFeature,
   densityFeature,
   mapFeature,
@@ -231,6 +234,7 @@ export const features = tableFeatures({
   sortedRowModel: createSortedRowModel(),
   filteredRowModel: createFilteredRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
+  expandedRowModel: createExpandedRowModel(),
 });
 
 export type Features = typeof features;

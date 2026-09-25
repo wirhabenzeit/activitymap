@@ -18,11 +18,14 @@ import { fetchActivityStreams } from '../../src/server/application/activity-stre
 import { createActivityStreamsHandler } from '../../src/app/api/v1/activities/[id]/streams/handler';
 import { toActivityDTO } from '../../src/contracts/v1/activity';
 import {
+  activityStreamSummariesDTOSchema,
+  activityStreamSummaryDTOSchema,
   activityStreamsDTOSchema,
   toActivityStreamsDTO,
 } from '../../src/contracts/v1/activity-streams';
 import { RAW_STREAMS_FIXTURE } from '../../src/server/strava/streams.fixture';
-import { STREAM_MAX_AGE_MS } from '../../src/server/strava/stream-policy';
+import { summarizeStreams } from '../../src/server/strava/stream-summary';
+import { createStreamSummariesHandler } from '../../src/app/api/v1/stream-summaries/handler';
 import { StravaApiError } from '../../src/server/strava/client';
 import { StravaBudgetExceededError } from '../../src/server/strava/request-budget';
 import type { Actor } from '../../src/server/auth/actor';
@@ -100,6 +103,19 @@ async function fetch(force = false) {
 }
 const request = (query = '') =>
   new Request(`https://app.test/api/v1/activities/${ID}/streams?${query}`);
+const makeHandlerView = (
+  caller: Actor,
+  view: 'raw' | 'summary',
+  createSource = source,
+) =>
+  createActivityStreamsHandler({
+    view,
+    repository,
+    resolveActor: async () => caller,
+    now,
+    fetch: (owner, id, options) =>
+      fetchActivityStreams(owner, id, { ...options, createSource }),
+  });
 const makeHandler = (caller: Actor, createSource = source) =>
   createActivityStreamsHandler({
     repository,
@@ -180,7 +196,7 @@ async function run() {
   assert.equal(listed.streams?.revision, '1');
   assert.deepEqual(
     listed.streams,
-    toActivityStreamsDTO(ID, stored, now()).metadata,
+    toActivityStreamsDTO(ID, stored).metadata,
   );
   assert.doesNotMatch(
     JSON.stringify(listed),
@@ -212,16 +228,71 @@ async function run() {
     'cached',
     'engagement and summary observations do not revalidate or invalidate sensor samples',
   );
-  clock = new Date(clock.getTime() + STREAM_MAX_AGE_MS);
+  clock = new Date(clock.getTime() + 365 * 24 * 60 * 60 * 1000);
   assert.equal(
-    toActivityStreamsDTO(ID, await repository.read(actor, ID), now()).metadata
-      .state,
-    'stale',
+    toActivityStreamsDTO(ID, await repository.read(actor, ID)).metadata.state,
+    'current',
   );
   assert.equal(
     (await fetch()).status,
-    'fetched',
-    'invisible stream changes still require seven-day revalidation',
+    'cached',
+    'stored samples stay current until invalidated, whatever their age',
+  );
+  assert.equal(
+    toActivityDTO((await activityRepository.findManyByIds([Number(ID)]))[0]!)
+      .streams?.state,
+    'current',
+  );
+
+  // Summaries: written with the payload, filled lazily for older rows, and
+  // only ever returned for the actor's own activities.
+  const expectedSummary = summarizeStreams(RAW_STREAMS_FIXTURE);
+  const [storedSummary] = await testDb
+    .select({ summary: activityStreams.summary })
+    .from(activityStreams)
+    .where(eq(activityStreams.activityId, BigInt(ID)));
+  assert.deepEqual(storedSummary?.summary, expectedSummary);
+  await testDb
+    .update(activityStreams)
+    .set({ summary: null })
+    .where(eq(activityStreams.activityId, BigInt(ID)));
+  const [lazy] = await repository.readSummaries(actor, [ID, '9183999']);
+  assert.equal(lazy?.activityId, ID);
+  assert.deepEqual(lazy?.row?.summary, expectedSummary);
+  const [refilled] = await testDb
+    .select({ summary: activityStreams.summary })
+    .from(activityStreams)
+    .where(eq(activityStreams.activityId, BigInt(ID)));
+  assert.deepEqual(
+    refilled?.summary,
+    expectedSummary,
+    'a lazily computed summary is stored',
+  );
+  assert.deepEqual(
+    await repository.readSummaries(other, [ID]),
+    [],
+    "another athlete's activity is omitted",
+  );
+  const summaryResponse = await makeHandlerView(actor, 'summary')(
+    new Request(`https://app.test/api/v1/activities/${ID}/streams/summary`),
+  );
+  assert.equal(summaryResponse.status, 200);
+  const summaryBody = activityStreamSummaryDTOSchema.parse(
+    ((await summaryResponse.json()) as { data: unknown }).data,
+  );
+  assert.deepEqual(summaryBody.summary, expectedSummary);
+  assert.doesNotMatch(JSON.stringify(summaryBody), /original_size/);
+  const batchResponse = await createStreamSummariesHandler({
+    repository,
+    resolveActor: async () => actor,
+  })(new Request(`https://app.test/api/v1/stream-summaries?ids=${ID},1`));
+  assert.equal(batchResponse.status, 200);
+  const batch = activityStreamSummariesDTOSchema.parse(
+    ((await batchResponse.json()) as { data: unknown }).data,
+  );
+  assert.deepEqual(
+    batch.summaries.map((entry) => [entry.activity_id, entry.summary]),
+    [[ID, expectedSummary]],
   );
 
   const generation = (await repository.read(actor, ID))!.generation;
@@ -232,7 +303,7 @@ async function run() {
     .where(eq(activities.id, Number(ID)));
   const invalid = await repository.read(actor, ID);
   assert.notEqual(invalid?.generation, generation);
-  assert.equal(toActivityStreamsDTO(ID, invalid, now()).streams, null);
+  assert.equal(toActivityStreamsDTO(ID, invalid).streams, null);
   assert.equal(
     (await changes.findAfter(actor.athleteId, beforeInvalidation)).length,
     1,
@@ -241,7 +312,7 @@ async function run() {
   await fetch();
   await testDb.execute(sql`select invalidate_activity_streams(${ID}::bigint)`);
   assert.equal(
-    toActivityStreamsDTO(ID, await repository.read(actor, ID), now()).metadata
+    toActivityStreamsDTO(ID, await repository.read(actor, ID)).metadata
       .state,
     'stale',
   );

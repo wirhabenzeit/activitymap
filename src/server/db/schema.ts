@@ -22,6 +22,7 @@ import type { ShareLinkFieldOptions } from '~/lib/sharing/fields';
 import type {
   ActivityStreamType, RawActivityStreams, StreamFetchFailure,
 } from '~/server/strava/streams';
+import type { StreamSummary } from '~/server/strava/stream-summary';
 
 export const sportTypeEnum = pgEnum('sport_type', sportTypes);
 
@@ -229,6 +230,9 @@ export const activityStreams = pgTable('activity_streams', {
   attemptId: text('attempt_id'),
   requestedTypes: text('requested_types').array().$type<ActivityStreamType[]>().notNull(),
   payload: jsonb('payload').$type<RawActivityStreams>(),
+  // Downsampled copy of `payload`, written with it. Serve it instead of the
+  // raw samples wherever a chart or preview is enough.
+  summary: jsonb('summary').$type<StreamSummary>(),
   availableTypes: text('available_types').array().$type<ActivityStreamType[]>().notNull().default(sql`'{}'::text[]`),
   revision: bigint('revision', { mode: 'bigint' }).notNull().default(sql`0`),
   sourceVersion: text('source_version'),

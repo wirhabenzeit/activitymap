@@ -79,6 +79,26 @@ existing claimed row; it never upserts. A replay cannot increment revision,
 and older requests cannot overwrite a newer attempt. Credential refresh uses
 the same guard so an in-flight refresh cannot restore a revoked account.
 
+## Downsampled summaries
+
+Each successful commit also stores `summary`, a downsampled copy of the payload
+built by `summarizeStreams`: about 300 points evenly spaced along distance (or
+time when there is no usable distance stream), with the bucket average of
+`time`, `distance`, `altitude`, `watts` and `heartrate` and the middle
+`latlng` sample. Only streams sampled like the axis stream are included, and
+all included series are index-aligned. A typical ride shrinks from hundreds of
+kilobytes to about 15 KB. `summary.version` names the algorithm; rows stored
+without a summary, or with an older version, are summarized the first time
+they are read, guarded by `revision` so a concurrent commit wins. Summaries
+follow the payload's lifecycle: they are served only while the set is
+`current`.
+
+- `GET /api/v1/activities/{id}/streams/summary` has the same fetch, freshness
+  and error semantics as `/streams`, but returns the summary.
+- `GET /api/v1/stream-summaries?ids=…` returns stored summaries for up to 100
+  owned activities without contacting Strava. The web map uses it to prefetch
+  the selected routes.
+
 ## Follow-up boundary
 
 - #185 adds iOS loading/cache. Charts and any downsampling remain deferred.
@@ -155,11 +175,13 @@ existing activity tombstone is the instruction to delete the entire client
 stream cache. Deauthorization denies access immediately; erasure cascades the
 stored payloads. No independent stream tombstones or bulk feed samples exist.
 
-A successful fetch, including an empty success, expires after seven days.
-Summary reconciliation never extends that deadline: summaries cannot prove
-unchanged sensor samples. Known edits publish invalidation immediately;
-otherwise clients must honor `expires_at` locally and request revalidation when
-they next need streams. The expiry itself needs no scheduled feed mutation.
+A successful fetch, including an empty success, has no age limit. Like the
+rest of the athlete's dataset, stored streams are revalidated by the periodic
+summary reconciliation ([Strava data policy](strava-data-policy.md)): any change
+to an activity's source fields invalidates its streams through the source
+trigger, and webhooks and deletions invalidate them promptly. A set stays
+`current` until then. `expires_at` remains in the contract for compatibility
+and is always `null`.
 Generation plus revision identify a client cache entry; a generation change
 invalidates old data even when the successful revision has not changed.
 
@@ -193,8 +215,8 @@ the client now requires the budget table. Preview follows the existing migration
 runner; Production follows the approval/order documented in the migration guide.
 
 `pnpm db:test-stream-lifecycle` proves endpoint ownership for both auth modes,
-deduplication, exact samples, array-free list/feed metadata, replay, seven-day
-expiry, known and explicit invalidation, late saves, publication rollback,
+deduplication, exact samples, array-free list/feed metadata, replay, no age
+limit, known and explicit invalidation, late saves, publication rollback,
 empty success, throttling, deauthorization, deletion and shared budget races.
 `bash scripts/verify-stream-dtos.sh <base-ref>` compiles both the new DTOs and
 the actual previous generated Swift file, then decodes new/old activity payloads
@@ -244,8 +266,7 @@ Current stream leases and cooldowns are respected, including foreground work.
 
 A successful set, including `{}` or absent HR/power/GPS keys, completes historical
 backfill for that storage generation. The worker does **not** periodically
-refresh completed history merely because the API's seven-day cache expires;
-on-demand loading still revalidates expired data. Known stream invalidation
+refresh completed history; stored sets stay current until invalidated. Known stream invalidation
 makes an activity eligible again. This keeps completed recent activities from
 consuming all capacity intended for unfetched history.
 
