@@ -217,9 +217,9 @@ export default function InteractiveMap() {
     [searchParams],
   );
   const [cursor, setCursor] = useState('auto');
-  const [panelExpandedOverride, setPanelExpandedOverride] = useState<
-    boolean | null
-  >(null);
+  const [panelExpanded, setPanelExpanded] = useState(false);
+  // Bumped on every map pick so a new list starts scrolled to the top.
+  const [pickCount, setPickCount] = useState(0);
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
   const onMouseLeave = useCallback(() => setCursor('auto'), []);
 
@@ -472,10 +472,9 @@ export default function InteractiveMap() {
     }),
     [],
   );
-  const panelExpanded = panelExpandedOverride ?? highlighted !== 0;
   const clearSelection = () => {
     setSelected([]);
-    setPanelExpandedOverride(null);
+    setPanelExpanded(false);
   };
 
   // Part of #132: a visitor who arrived via a legacy `/map?user=`/
@@ -553,7 +552,8 @@ export default function InteractiveMap() {
           onSelection={(ids) => {
             setSelected(ids);
             setHighlighted(ids.length === 1 ? ids[0]! : 0);
-            setPanelExpandedOverride(null);
+            setPanelExpanded(false);
+            setPickCount((count) => count + 1);
           }}
         />
         <Overlay position="top-left">
@@ -605,10 +605,7 @@ export default function InteractiveMap() {
       </ReactMapGL>
       <div
         className={cn(
-          'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
-          highlighted !== 0
-            ? 'lg:w-[min(70vw,48rem)]'
-            : 'lg:w-[min(70vw,40rem)]',
+          'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,48rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
           { hidden: rows.length == 0 },
         )}
       >
@@ -634,7 +631,7 @@ export default function InteractiveMap() {
               aria-label={
                 panelExpanded ? 'Collapse route panel' : 'Expand route panel'
               }
-              onClick={() => setPanelExpandedOverride(!panelExpanded)}
+              onClick={() => setPanelExpanded(!panelExpanded)}
             >
               {panelExpanded ? (
                 <ChevronDown className="h-4 w-4" />
@@ -645,13 +642,19 @@ export default function InteractiveMap() {
           </div>
         )}
         <DataTable
+          key={pickCount}
           className={
+            // Only the chevron grows the list; opening a route's card keeps
+            // the panel compact (card plus a few rows) instead.
             selected.length === 1
               ? 'max-h-[70vh]'
               : panelExpanded
                 ? 'max-h-[65vh]'
-                : 'max-h-36'
+                : highlighted !== 0
+                  ? 'max-h-[min(60vh,24rem)]'
+                  : 'max-h-[12.5rem]'
           }
+          scrollHint
           columns={mapColumns}
           data={rows}
           selected={selected}
@@ -662,10 +665,7 @@ export default function InteractiveMap() {
           activeId={highlighted}
           headerClassName="max-lg:hidden"
           cellClassName="max-lg:px-2 max-lg:border-r-0"
-          onRowClick={(row) => {
-            setHighlighted(row.original.id);
-            setPanelExpandedOverride(true);
-          }}
+          onRowClick={(row) => setHighlighted(row.original.id)}
           renderInlineDetails={(row) => (
             <ActivityCardContent
               row={row}
