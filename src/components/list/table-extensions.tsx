@@ -22,8 +22,6 @@ import {
   createPaginatedRowModel,
   createExpandedRowModel,
 } from '@tanstack/react-table';
-import type { MapRef } from 'react-map-gl/mapbox';
-import { type RefObject } from 'react';
 
 // Density Feature
 export type DensityState = 'sm' | 'md' | 'lg';
@@ -91,65 +89,6 @@ export const densityFeature: TableFeature = {
             if (value) return value;
             return old === 'lg' ? 'md' : old === 'md' ? 'sm' : 'lg'; //cycle through the 3 options
           });
-        },
-      },
-    });
-  },
-};
-
-// Map Feature
-export interface MapTableState {
-  map?: RefObject<MapRef | null>;
-}
-
-export interface MapOptions {
-  onMapChange?: OnChangeFn<RefObject<MapRef | null> | undefined>;
-}
-
-export interface MapInstance {
-  setMap: (updater: Updater<RefObject<MapRef | null> | undefined>) => void;
-}
-
-/* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
-declare module '@tanstack/react-table' {
-  interface Plugins {
-    mapFeature: TableFeature;
-  }
-  interface TableState_FeatureMap {
-    mapFeature: MapTableState;
-  }
-  interface TableOptions_FeatureMap<
-    TFeatures extends TableFeatures,
-    TData extends RowData,
-  > {
-    mapFeature: MapOptions;
-  }
-  interface Table_FeatureMap<
-    TFeatures extends TableFeatures,
-    TData extends RowData,
-  > {
-    mapFeature: MapInstance;
-  }
-}
-/* eslint-enable @typescript-eslint/no-unused-vars */
-
-export const mapFeature: TableFeature = {
-  getInitialState: (state) => {
-    return {
-      map: undefined,
-      ...state,
-    };
-  },
-  getDefaultTableOptions: (table) => {
-    return {
-      onMapChange: makeStateUpdater('map', table),
-    };
-  },
-  constructTableAPIs: (table) => {
-    assignTableAPIs('mapFeature', table, {
-      table_setMap: {
-        fn: (updater: Updater<RefObject<MapRef | null> | undefined>) => {
-          setStateSlice(table, 'map', updater);
         },
       },
     });
@@ -229,7 +168,6 @@ export const features = tableFeatures({
   rowExpandingFeature,
   rowPaginationFeature,
   densityFeature,
-  mapFeature,
   summaryRowFeature,
   sortedRowModel: createSortedRowModel(),
   filteredRowModel: createFilteredRowModel(),

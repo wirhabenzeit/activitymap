@@ -112,15 +112,7 @@ export const columns: ColumnDef<Features, Activity>[] = [
         </div>
       </DataTableColumnHeader>
     ),
-    cell: ({ row, table }) => {
-      const mapRef = table.store.state.map;
-      return (
-        <ActivityCard
-          row={row}
-          map={mapRef}
-        />
-      );
-    },
+    cell: ({ row }) => <ActivityCard row={row} />,
     enableHiding: false,
   },
   ...Object.entries(activityFields).map(([id, spec]) =>

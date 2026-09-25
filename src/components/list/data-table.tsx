@@ -16,8 +16,6 @@ import {
   useTable,
   flexRender,
 } from '@tanstack/react-table';
-import { type MapRef } from 'react-map-gl/mapbox';
-import { type RefObject } from 'react';
 
 import {
   Table,
@@ -75,7 +73,6 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   selected: number[];
   setSelected: (updater: Updater<number[]>) => void;
   columnFilters: ColumnFiltersState;
-  map?: RefObject<MapRef | null>;
   activeId?: number;
   headerClassName?: string;
   cellClassName?: string;
@@ -104,7 +101,6 @@ export const DataTable = React.memo(function DataTable<
   columnPinning,
   summaryRow,
   paginationControl = true,
-  map,
   activeId,
   headerClassName,
   cellClassName,
@@ -156,7 +152,6 @@ export const DataTable = React.memo(function DataTable<
       columnPinning,
       density,
       summaryRow,
-      map,
       rowSelection: Object.fromEntries(selected.map((id) => [id, true])),
       expanded: activeId ? { [activeId]: true } : {},
     },
@@ -173,19 +168,20 @@ export const DataTable = React.memo(function DataTable<
     );
   }, []);
 
-  // Bring a newly opened card into view below the sticky header.
+  // Bring a newly opened card into view below the sticky header, but only
+  // when part of it is hidden, so opening a visible row doesn't jump.
   React.useEffect(() => {
     const container = containerRef.current;
     const scroller = container?.querySelector('#table-main')?.parentElement;
     const active = container?.querySelector('[data-active-row]');
     if (!scroller || !active) return;
     const header = container?.querySelector('thead');
-    const offset =
-      active.getBoundingClientRect().top -
-      scroller.getBoundingClientRect().top -
-      (header?.getBoundingClientRect().height ?? 0);
-    scroller.scrollTo({ top: scroller.scrollTop + offset });
-  }, [activeId]);
+    const view = scroller.getBoundingClientRect();
+    const top = view.top + (header?.getBoundingClientRect().height ?? 0);
+    const card = active.getBoundingClientRect();
+    if (card.top >= top && card.bottom <= view.bottom) return;
+    scroller.scrollTo({ top: scroller.scrollTop + card.top - top });
+  }, [activeId, sorting]);
 
   React.useEffect(() => {
     if (!scrollHint) return;
@@ -217,7 +213,9 @@ export const DataTable = React.memo(function DataTable<
       <Table
         id="table-main"
         className="text-xs grid"
-        wrapperClassName="overflow-scroll min-h-0 w-full flex-1"
+        // An inline-size container lets expanded cards match the visible
+        // width (100cqw) instead of the full, horizontally scrolling table.
+        wrapperClassName="overflow-scroll min-h-0 w-full flex-1 [container-type:inline-size]"
         style={{
           gridTemplateColumns: table
             .getVisibleFlatColumns()
@@ -303,7 +301,9 @@ export const DataTable = React.memo(function DataTable<
                       colSpan={row.getVisibleCells().length}
                       className="col-span-full p-0 bg-background"
                     >
-                      {renderInlineDetails(row)}
+                      <div className="sticky left-0 w-[100cqw]">
+                        {renderInlineDetails(row)}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -316,8 +316,15 @@ export const DataTable = React.memo(function DataTable<
                     {...(onRowClick && {
                       tabIndex: 0,
                       onClick: (event: React.MouseEvent) => {
-                        // Ignore clicks bubbling up from portals (e.g. the edit dialog).
-                        if (!event.currentTarget.contains(event.target as Node))
+                        const target = event.target as Element;
+                        // Ignore clicks bubbling up from portals (e.g. the edit
+                        // dialog) and from controls inside the row.
+                        if (
+                          !event.currentTarget.contains(target) ||
+                          target.closest(
+                            'button, a, input, select, textarea, [role="menuitem"]',
+                          )
+                        )
                           return;
                         onRowClick(row);
                       },

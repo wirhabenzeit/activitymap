@@ -3,6 +3,7 @@
 import React from 'react';
 import { columns } from '~/components/list/columns';
 import { DataTable } from '~/components/list/data-table';
+import { inlineRouteDetails } from '~/components/list/card';
 import { groupBy } from '~/lib/utils';
 import { useShallowStore } from '~/store';
 
@@ -18,6 +19,9 @@ export default function ListPage() {
       tableState: state.fullList,
     }));
 
+  // The open card is local to the list: browsing details must not select an
+  // activity or change the route highlighted on the map.
+  const [openId, setOpenId] = React.useState(0);
   const { data: activities = [] } = useActivities();
   const { data: photos = [] } = usePhotos();
   const { filterIDs } = useFilteredActivities(activities);
@@ -49,6 +53,7 @@ export default function ListPage() {
         selected={selected}
         setSelected={setSelected}
         columnFilters={columnFilters}
+        {...inlineRouteDetails(openId, setOpenId)}
         {...tableState}
       />
     </div>
