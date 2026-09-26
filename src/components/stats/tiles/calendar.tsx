@@ -120,7 +120,7 @@ export function CalendarHeatmap({
       height={top + cell * 7}
       role="img"
       aria-label="Activity calendar"
-      className="text-[10px]"
+      className="mx-auto block text-[10px]"
     >
       {labels &&
         ['Mon', 'Wed', 'Fri'].map((label, index) => (

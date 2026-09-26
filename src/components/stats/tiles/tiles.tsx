@@ -619,7 +619,7 @@ const sportMixView: TileView = {
   face: ({ activities, today }) => {
     const shares = sportMix(activities, today, 'currentYear');
     return (
-      <div className="mt-auto">
+      <div className="mt-auto pt-2">
         <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-sm">
           {shares.map(({ sport, share }) => (
             <i
