@@ -2,19 +2,12 @@
 
 // The tile-based stats view: the bento grid from shared/stats-tiles.json.
 // Every tile reads the activities the sidebar filters already narrowed down.
-// Opening a tile expands it in place to the full grid width with its one
-// switch; the other tiles reflow underneath.
+// Opening a tile shows its detail in a dialog over the grid, with the tile's
+// one switch and arrows to step through the other tiles.
 
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useTheme } from 'next-themes';
-import { X } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import {
@@ -26,6 +19,12 @@ import {
 import { placeBento } from '~/lib/stats/bento';
 import { localToday, toStatsActivity } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '~/components/ui/dialog';
 
 import { Measure } from './charts';
 import { tilePalette } from './format';
@@ -68,61 +67,67 @@ export default function StatsTiles() {
     {},
   );
 
-  useEffect(() => {
-    if (!openID) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpenID(null);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [openID]);
+  const openIndex = shownTiles.findIndex(({ tile }) => tile.id === openID);
+  const open = shownTiles[openIndex];
+  const step = (by: number) =>
+    setOpenID(
+      shownTiles[(openIndex + by + shownTiles.length) % shownTiles.length]!.tile
+        .id,
+    );
 
   return (
-    <Measure className="h-full w-full overflow-y-auto">
-      {({ width }) => (
-        <BentoGrid
-          width={width}
-          context={context}
-          openID={openID}
-          setOpenID={setOpenID}
-          options={options}
-          setOption={(id, option) =>
-            setOptions((previous) => ({ ...previous, [id]: option }))
-          }
-        />
-      )}
-    </Measure>
+    <>
+      <Measure className="h-full w-full overflow-y-auto">
+        {({ width }) => (
+          <BentoGrid width={width} context={context} onOpen={setOpenID} />
+        )}
+      </Measure>
+      <Dialog
+        open={open !== undefined}
+        onOpenChange={(isOpen) => !isOpen && setOpenID(null)}
+      >
+        <DialogContent
+          className="max-h-[90dvh] max-w-3xl gap-0 overflow-y-auto p-0"
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft') step(-1);
+            if (event.key === 'ArrowRight') step(1);
+          }}
+        >
+          {open && (
+            <TileDetail
+              tile={open.tile}
+              view={open.view}
+              context={context}
+              option={options[open.tile.id] ?? toggleOf(open.tile)?.options[0]}
+              setOption={(option) =>
+                setOptions((previous) => ({
+                  ...previous,
+                  [open.tile.id]: option,
+                }))
+              }
+              onStep={step}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
 function BentoGrid({
   width,
   context,
-  openID,
-  setOpenID,
-  options,
-  setOption,
+  onOpen,
 }: {
   width: number;
   context: TileContext;
-  openID: StatsTileID | null;
-  setOpenID: (id: StatsTileID | null) => void;
-  options: Partial<Record<StatsTileID, string>>;
-  setOption: (id: StatsTileID, option: string) => void;
+  onOpen: (id: StatsTileID) => void;
 }) {
   const padding = width < 520 ? 12 : 16;
   const regular = width - 2 * padding >= statsTileLayout.regular.minWidth;
   const grid = regular ? statsTileLayout.regular : statsTileLayout.compact;
-  const gap = statsTileLayout.gap;
-
-  // The open tile spans the full width and as many rows as its content needs.
-  const [openRows, setOpenRows] = useState(3);
   const placements = placeBento(
-    shownTiles.map(({ tile }) =>
-      tile.id === openID
-        ? { columns: grid.columns, rows: openRows }
-        : tile.span,
-    ),
+    shownTiles.map(({ tile }) => tile.span),
     grid.columns,
   );
 
@@ -131,42 +136,25 @@ function BentoGrid({
       className="mx-auto grid max-w-[1120px]"
       style={{
         padding,
-        gap,
+        gap: statsTileLayout.gap,
         gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
         gridAutoRows: grid.rowHeight,
       }}
     >
       {shownTiles.map(({ tile, view }, index) => {
         const placement = placements[index]!;
-        const style: CSSProperties = {
-          gridColumn: `${placement.column} / span ${placement.columns}`,
-          gridRow: `${placement.row} / span ${placement.rows}`,
-        };
-        return tile.id === openID ? (
-          <TileDetail
-            key={tile.id}
-            tile={tile}
-            view={view}
-            context={context}
-            option={options[tile.id] ?? toggleOf(tile)?.options[0]}
-            setOption={(option) => setOption(tile.id, option)}
-            onClose={() => setOpenID(null)}
-            onHeight={(height) =>
-              setOpenRows(
-                Math.max(2, Math.ceil((height + gap) / (grid.rowHeight + gap))),
-              )
-            }
-            style={style}
-          />
-        ) : (
+        return (
           <TileFace
             key={tile.id}
             tile={tile}
             view={view}
             context={context}
             large={placement.rows > 1}
-            onOpen={() => setOpenID(tile.id)}
-            style={style}
+            onOpen={() => onOpen(tile.id)}
+            style={{
+              gridColumn: `${placement.column} / span ${placement.columns}`,
+              gridRow: `${placement.row} / span ${placement.rows}`,
+            }}
           />
         );
       })}
@@ -249,87 +237,70 @@ function TileDetail({
   context,
   option,
   setOption,
-  onClose,
-  onHeight,
-  style,
+  onStep,
 }: {
   tile: StatsTile;
   view: TileView;
   context: TileContext;
   option: string | undefined;
   setOption: (option: string) => void;
-  onClose: () => void;
-  onHeight: (height: number) => void;
-  style: CSSProperties;
+  onStep: (by: number) => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
   const toggle = toggleOf(tile);
-
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) onHeight(entry.target.getBoundingClientRect().height);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
-    <section
-      aria-label={tile.title}
-      className="min-w-0 rounded-lg border bg-card text-card-foreground shadow-xs"
-      style={style}
-    >
-      <div ref={ref} className="flex flex-col gap-3.5 px-4 pb-5 pt-4">
-        <div className="flex items-center gap-2.5">
-          <h2 className="flex-1 truncate text-base font-semibold">
-            {tile.title}
-          </h2>
-          <span className="whitespace-nowrap text-xs text-muted-foreground">
-            {view.period(context)}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="grid h-7 w-7 place-items-center rounded-md border text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2.5">
-          <div className="min-w-0">
-            <Headline summary={view.summary(context, option)} size="detail" />
-          </div>
-          {toggle && (
-            <div
-              role="group"
-              aria-label={toggle.label}
-              className="inline-flex flex-wrap gap-0.5 rounded-lg border bg-muted p-0.5"
-            >
-              {toggle.options.map((value: string) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={value === option}
-                  onClick={() => setOption(value)}
-                  className={cn(
-                    'whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground',
-                    value === option &&
-                      'bg-background text-foreground shadow-xs',
-                  )}
-                >
-                  {optionLabels[value] ?? value}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        {view.detail(context, option)}
+    <div className="flex min-w-0 flex-col gap-4 p-5 sm:p-6">
+      <div className="flex items-center gap-2 pr-8">
+        <button
+          type="button"
+          onClick={() => onStep(-1)}
+          aria-label="Previous stat"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-md border text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onStep(1)}
+          aria-label="Next stat"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-md border text-muted-foreground hover:text-foreground"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <DialogTitle className="ml-1 min-w-0 flex-1 truncate text-lg font-semibold">
+          {tile.title}
+        </DialogTitle>
+        <DialogDescription className="whitespace-nowrap text-xs text-muted-foreground">
+          {view.period(context)}
+        </DialogDescription>
       </div>
-    </section>
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0">
+          <Headline summary={view.summary(context, option)} size="detail" />
+        </div>
+        {toggle && (
+          <div
+            role="group"
+            aria-label={toggle.label}
+            className="inline-flex flex-wrap gap-0.5 rounded-lg border bg-muted p-0.5"
+          >
+            {toggle.options.map((value: string) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={value === option}
+                onClick={() => setOption(value)}
+                className={cn(
+                  'whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground',
+                  value === option && 'bg-background text-foreground shadow-xs',
+                )}
+              >
+                {optionLabels[value] ?? value}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {view.detail(context, option)}
+    </div>
   );
 }
