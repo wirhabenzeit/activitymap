@@ -7,14 +7,15 @@ import UIKit
 /// changing filters never re-uploads geometry.
 enum RouteSource {
     static let id = "routeSource"
+    static let ordinaryLayerID = "routeLayer"
 
     static func data(for activities: [Activity]) -> GeoJSONSourceData {
         let features = activities.compactMap { activity -> Feature? in
             guard activity.coordinates.count > 1 else { return nil }
             var feature = Feature(geometry: .lineString(LineString(activity.coordinates)))
-            feature.identifier = .number(Double(activity.id))
+            feature.identifier = .string(String(activity.id))
             feature.properties = [
-                "id": .number(Double(activity.id)),
+                "id": .string(String(activity.id)),
                 "sport_type": .string(activity.sportType.rawValue),
             ]
             return feature
@@ -41,7 +42,7 @@ enum RouteSource {
         guard !ids.isEmpty else { return Exp(.literal) { false } }
         return Exp(.match) {
             Exp(.get) { "id" }
-            ids.map(Double.init)
+            ids.map(String.init)
             true
             false
         }

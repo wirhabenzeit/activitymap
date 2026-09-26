@@ -14,41 +14,12 @@ struct MapScreen: View {
     @State private var activeOverlays = Set(
         SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault)
     )
-    /// Built once per activities change and handed to the source unchanged,
-    /// so re-renders compare it by storage identity instead of re-uploading.
-    @State private var routeData: GeoJSONSourceData = .featureCollection(FeatureCollection(features: []))
-
+    @State private var picker = RoutePicker()
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Map(viewport: $viewport) {
-                if let raster = baseStyle.rasterSource {
-                    rasterSource(
-                        id: "selected-raster-base",
-                        url: raster.url,
-                        tileSize: raster.tileSize
-                    )
-
-                    RasterLayer(id: "selected-raster-base-layer", source: "selected-raster-base")
-                }
-
-                ForEvery(SharedMapCatalog.rasterOverlays.filter(activeOverlays.contains)) { overlay in
-                    rasterSource(
-                        id: overlay.sourceID,
-                        url: overlay.url,
-                        tileSize: overlay.tileSize
-                    )
-
-                    RasterLayer(id: overlay.layerID, source: overlay.sourceID)
-                        .rasterOpacity(overlay.opacity)
-                }
-
-                routeContent
-            }
-            .mapStyle(mapStyle)
-            .ignoresSafeArea()
-            .task(id: store.activitiesRevision) {
-                routeData = RouteSource.data(for: store.activities)
+            MapReader { proxy in
+                mapView(proxy: proxy)
             }
 
             mapControls
@@ -69,35 +40,135 @@ struct MapScreen: View {
                     .allowsHitTesting(false)
             }
         }
+        .overlay(alignment: .bottomLeading) {
+            selectionControls
+                .padding(.leading, 16)
+                .padding(.trailing, 80)
+                .padding(.bottom, 100)
+        }
+        .sheet(isPresented: $picker.isPresented) {
+            RoutePickerSheet(picker: picker, store: store)
+        }
+        .alert("Route selection", isPresented: Binding(
+            get: { picker.errorMessage != nil },
+            set: { if !$0 { picker.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { picker.errorMessage = nil }
+        } message: {
+            Text(picker.errorMessage ?? "")
+        }
+        .onChange(of: store.selection.visibleIDs) { _, _ in picker.reconcile(with: store) }
+        .onChange(of: store.activeActivityID) { _, _ in picker.reconcile(with: store) }
+        .onChange(of: picker.isAdding) { _, _ in picker.invalidateQuery() }
+        .onChange(of: baseStyle) { _, _ in picker.invalidateQuery() }
+        .onChange(of: activeOverlays) { _, _ in picker.invalidateQuery() }
+        .onDisappear { picker.invalidateQuery() }
+    }
+
+    private func mapView(proxy: MapProxy) -> some View {
+        Map(viewport: $viewport) {
+            baseContent
+            RouteLayers(data: store.routeGeometry.data, visibleIDs: store.selection.visibleIDs,
+                        selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
+
+            routeInteraction(proxy: proxy)
+            TapInteraction { context in
+                if let map = proxy.map { picker.pick(at: context.point, map: map, store: store) }
+                return true
+            }
+        }
+        .mapStyle(mapStyle)
+        .gestureHandlers(MapGestureHandlers(onBegin: { gesture in
+            if gesture != .singleTap { picker.invalidateQuery() }
+        }))
+        .onCameraChanged { _ in picker.invalidateQuery() }
+        .ignoresSafeArea()
+        .onChange(of: store.activitiesRevision, initial: true) { _, revision in
+            picker.reconcile(with: store)
+            store.routeGeometry.update(activities: store.activities, revision: revision)
+        }
+    }
+
+    private func routeInteraction(proxy: MapProxy) -> TapInteraction {
+        // Route hits take priority over external feature overlays. Photo
+        // annotations consume their own taps before this layer interaction.
+        TapInteraction(.layer(RouteSource.ordinaryLayerID), radius: RouteHitTesting.radius) { _, context in
+            if let map = proxy.map { picker.pick(at: context.point, map: map, store: store) }
+            return true
+        }
     }
 
     @MapContentBuilder
-    private var routeContent: some MapContent {
-        let visibleFilter = RouteSource.filter(ids: store.filteredActivities.map(\.id))
+    private var baseContent: some MapContent {
+        if let raster = baseStyle.rasterSource {
+            rasterSource(
+                id: "selected-raster-base",
+                url: raster.url,
+                tileSize: raster.tileSize
+            )
 
-        GeoJSONSource(id: RouteSource.id)
-            .data(routeData)
+            RasterLayer(id: "selected-raster-base-layer", source: "selected-raster-base")
+        }
 
-        LineLayer(id: "routeLayer", source: RouteSource.id)
-            .filter(visibleFilter)
-            .lineColor(RouteSource.lineColor)
-            .lineWidth(3)
-            .lineJoin(.round)
-            .lineCap(.round)
+        ForEvery(SharedMapCatalog.rasterOverlays.filter(activeOverlays.contains)) { overlay in
+            rasterSource(
+                id: overlay.sourceID,
+                url: overlay.url,
+                tileSize: overlay.tileSize
+            )
 
-        if let activeID = store.activeActivityID {
-            LineLayer(id: "routeLayerHigh", source: RouteSource.id)
-                .filter(Exp(.all) {
-                    visibleFilter
-                    Exp(.eq) {
-                        Exp(.get) { "id" }
-                        Double(activeID)
+            RasterLayer(id: overlay.layerID, source: overlay.sourceID)
+                .rasterOpacity(overlay.opacity)
+        }
+
+    }
+
+    private var selectionControls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { selectionModeMenu; selectionSummary }
+            VStack(alignment: .leading, spacing: 8) { selectionModeMenu; selectionSummary }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.primary)
+    }
+
+    private var selectionModeMenu: some View {
+        Menu {
+            Toggle("Add routes to selection", isOn: $picker.isAdding)
+            if !store.selectedActivityIDs.isEmpty {
+                Button("Clear selection", role: .destructive) { store.clearSelection() }
+            }
+        } label: {
+            Label(picker.isAdding ? "Add" : "Select",
+                  systemImage: picker.isAdding ? "plus.circle" : "cursorarrow.click")
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+        }
+        .accessibilityLabel("Map selection mode")
+        .accessibilityValue(picker.isAdding ? "Add routes" : "Replace selection")
+        .modifier(MapChromeSurface())
+    }
+
+    @ViewBuilder
+    private var selectionSummary: some View {
+        if !store.selectedActivityIDs.isEmpty {
+            Button {
+                picker.reviewSelection(store: store)
+            } label: {
+                VStack(spacing: 2) {
+                    Text("\(store.selectedActivityIDs.count) selected")
+                        .font(.subheadline.weight(.semibold))
+                    if store.hiddenSelectedCount > 0 {
+                        Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption2)
                     }
-                })
-                .lineColor(RouteSource.lineColor)
-                .lineWidth(5)
-                .lineJoin(.round)
-                .lineCap(.round)
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+            }
+            .disabled(store.selection.visibleSelectedIDs.isEmpty)
+            .accessibilityHint("Review visible selected routes; \(store.hiddenSelectedCount) hidden by filters")
+            .modifier(MapChromeSurface())
         }
     }
 
