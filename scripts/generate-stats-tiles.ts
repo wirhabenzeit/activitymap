@@ -22,6 +22,7 @@ const swiftOutputPath = resolve(
 const identifierSchema = z.string().regex(/^[a-z][A-Za-z0-9]*$/);
 const metricIDs = ['count', 'distance', 'elevation', 'time'] as const;
 const windowIDs = [
+  'currentWeek',
   'yearToDate',
   'currentYear',
   'monthToDate',
@@ -64,6 +65,11 @@ const manifestSchema = z
         >,
       )
       .strict(),
+    groups: z
+      .array(
+        z.object({ id: identifierSchema, title: z.string().min(1) }).strict(),
+      )
+      .min(1),
     tiles: z
       .array(
         z
@@ -71,12 +77,15 @@ const manifestSchema = z
             id: identifierSchema,
             title: z.string().min(1),
             window: z.enum(windowIDs),
+            group: identifierSchema,
             span: z
               .object({
                 columns: z.number().int().positive(),
                 rows: z.number().int().positive(),
               })
               .strict(),
+            // Primary tiles get the large headline numerals.
+            primary: z.boolean().optional(),
             optional: z.boolean().optional(),
             toggle: z
               .object({
@@ -129,7 +138,11 @@ if (duplicateTile) {
   throw new Error(`Stats tile ID ${duplicateTile} is used more than once.`);
 }
 
+const groupIDs = manifest.groups.map((group) => group.id);
 for (const tile of manifest.tiles) {
+  if (!groupIDs.includes(tile.group)) {
+    throw new Error(`Stats tile ${tile.id} is in unknown group ${tile.group}.`);
+  }
   if (tile.span.columns > layout.regular.columns) {
     throw new Error(
       `Stats tile ${tile.id} is wider than the regular grid (${layout.regular.columns} columns).`,
@@ -173,11 +186,14 @@ export const statsTileLayout = ${JSON.stringify(layout, null, 2)} as const;
 
 export const statsMetrics = ${JSON.stringify(manifest.metrics, null, 2)} as const;
 
+export const statsTileGroups = ${JSON.stringify(manifest.groups, null, 2)} as const;
+
 export const statsTiles = ${JSON.stringify(manifest.tiles, null, 2)} as const;
 
 export type StatsMetric = keyof typeof statsMetrics;
 export type StatsTile = (typeof statsTiles)[number];
 export type StatsTileID = StatsTile['id'];
+export type StatsTileGroupID = (typeof statsTileGroups)[number]['id'];
 `;
 
 // Format like the rest of src/ so pnpm prettier leaves the file alone.
@@ -196,6 +212,12 @@ const metricRows = metricIDs
   )
   .join('\n');
 
+const groupTitleRows = manifest.groups
+  .map(
+    (group) => `        case .${group.id}: return ${swiftString(group.title)}`,
+  )
+  .join('\n');
+
 const optionIDs = [...toggleOptionSchema.options];
 
 const tileRows = manifest.tiles
@@ -207,6 +229,8 @@ const tileRows = manifest.tiles
             id: .${tile.id},
             title: ${swiftString(tile.title)},
             window: .${tile.window},
+            group: .${tile.group},
+            isPrimary: ${tile.primary ?? false},
             span: .init(columns: ${tile.span.columns}, rows: ${tile.span.rows}),
             isOptional: ${tile.optional ?? false},
             toggle: ${toggle}
@@ -235,6 +259,16 @@ ${metricRows}
     }
 }
 
+enum StatsTileGroup: String, CaseIterable, Hashable, Sendable {
+${manifest.groups.map((group) => swiftCase(group.id)).join('\n')}
+
+    var title: String {
+        switch self {
+${groupTitleRows}
+        }
+    }
+}
+
 enum StatsWindow: String, CaseIterable, Hashable, Sendable {
 ${windowIDs.map(swiftCase).join('\n')}
 }
@@ -257,6 +291,8 @@ struct StatsTileDefinition: Identifiable, Hashable, Sendable {
     let id: StatsTileID
     let title: String
     let window: StatsWindow
+    let group: StatsTileGroup
+    let isPrimary: Bool
     let span: StatsTileSpan
     let isOptional: Bool
     let toggle: StatsTileToggle?

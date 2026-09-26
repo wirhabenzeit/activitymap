@@ -5,6 +5,7 @@ import { type Activity } from '~/server/db/schema';
 import { defaultStatsSettings, type StatsSetting } from '~/components/stats';
 
 export enum StatsPlots {
+  tiles = '/stats/tiles',
   calendar = '/stats/calendar',
   progress = '/stats/progress',
   timeline = '/stats/timeline',

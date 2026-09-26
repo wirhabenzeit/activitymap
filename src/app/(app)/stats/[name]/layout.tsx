@@ -20,15 +20,17 @@ import { TabsTrigger, TabsList, Tabs } from '~/components/ui/tabs';
 import { StatsPlots } from '~/store/stats';
 
 type StatsPlotsKeys = keyof typeof statsPlots;
-type TabKeys = `/stats/${StatsPlotsKeys}`;
+type TabKeys = `/stats/${StatsPlotsKeys | 'tiles'}`;
 type TabValue = { label: string; index: number };
 
+// The tile-based view is a proof of concept that sits next to the four
+// configurable charts until it replaces them.
 const tabs = (Object.keys(statsPlots) as (keyof typeof statsPlots)[]).reduce(
   (acc, name, index) => ({
     ...acc,
-    [`/stats/${name}`]: { label: name, index },
+    [`/stats/${name}`]: { label: name, index: index + 1 },
   }),
-  {} as Record<TabKeys, TabValue>,
+  { '/stats/tiles': { label: 'tiles', index: 0 } } as Record<TabKeys, TabValue>,
 );
 
 const TabsLinkTrigger: React.FC<{
@@ -56,6 +58,8 @@ export default function Stats({ children }: { children: React.ReactNode }) {
   }
 
   const { settingsRef, elementRef } = useContext(StatsContext);
+  // Tiles have no settings strip: each detail view carries its one switch.
+  const showSettings = pathname !== (StatsPlots.tiles as string);
 
   return (
     <div
@@ -77,7 +81,12 @@ export default function Stats({ children }: { children: React.ReactNode }) {
               ))}
             </TabsList>
           </Tabs>
-          <div className="m-l-auto right-0 inline-flex">
+          <div
+            className={cn(
+              'm-l-auto right-0 inline-flex',
+              !showSettings && 'hidden',
+            )}
+          >
             <Separator orientation="vertical" />
             <Button
               variant="link"
@@ -96,7 +105,7 @@ export default function Stats({ children }: { children: React.ReactNode }) {
         <div
           className={cn(
             'w-full overflow-y-hidden overflow-x-scroll border-t-2 border-muted',
-            settingsOpen ? 'block' : 'hidden',
+            settingsOpen && showSettings ? 'block' : 'hidden',
           )}
         >
           <div

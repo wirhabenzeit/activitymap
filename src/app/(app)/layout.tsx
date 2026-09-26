@@ -47,8 +47,9 @@ export default async function AppShellLayout({
   return (
     <div style={{ width: '100dvw', height: '100dvh', overflow: 'hidden' }}>
       <ServiceWorkerProvider />
-      <OfflineSyncProvider />
       <QueryProvider>
+        {/* Reads the React Query client, so it must sit inside QueryProvider. */}
+        <OfflineSyncProvider />
         <AuthProvider initialAuth={initialAuth}>
           <SidebarProvider
             className="flex h-dvh flex-col"
