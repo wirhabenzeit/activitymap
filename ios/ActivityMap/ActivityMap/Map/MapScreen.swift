@@ -18,8 +18,10 @@ struct MapScreen: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            MapReader { proxy in
-                mapView(proxy: proxy)
+            GeometryReader { geometry in
+                MapReader { proxy in
+                    mapView(proxy: proxy, geometry: geometry)
+                }
             }
 
             mapControls
@@ -70,7 +72,7 @@ struct MapScreen: View {
         .onDisappear { picker.invalidateQuery() }
     }
 
-    private func mapView(proxy: MapProxy) -> some View {
+    private func mapView(proxy: MapProxy, geometry: GeometryProxy) -> some View {
         Map(viewport: $viewport) {
             baseContent
             RouteLayers(data: store.routeGeometry.data, visibleIDs: store.selection.visibleIDs,
@@ -83,12 +85,7 @@ struct MapScreen: View {
             }
         }
         .mapStyle(mapStyle)
-        .ornamentOptions(OrnamentOptions(attributionButton: AttributionButtonOptions(
-            position: .bottomTrailing,
-            // Keep the full 44pt attribution target beside, rather than
-            // underneath, the lowered map-control pill.
-            margins: CGPoint(x: 80, y: 8)
-        )))
+        .ornamentOptions(bottomAttributionOptions(in: geometry))
         .gestureHandlers(MapGestureHandlers(onBegin: { gesture in
             if gesture != .singleTap { picker.invalidateQuery() }
         }))
@@ -98,6 +95,28 @@ struct MapScreen: View {
             picker.reconcile(with: store)
             store.routeGeometry.update(activities: store.activities, revision: revision)
         }
+    }
+
+    private func bottomAttributionOptions(in geometry: GeometryProxy) -> OrnamentOptions {
+        // Native ornament sizes in the pinned Mapbox SDK: 85×21 wordmark,
+        // 44×44 info target. Position their combined row, not each corner.
+        let logoWidth: CGFloat = 85
+        let infoSize: CGFloat = 44
+        let gap: CGFloat = 8
+        let leading = max(8, (geometry.size.width - logoWidth - gap - infoSize) / 2)
+        // Use the lower safe-area space, leaving at least 18pt below the full
+        // info target for the home indicator. On screens without an inset,
+        // retain an 18pt bottom margin instead.
+        let bottom = 18 - geometry.safeAreaInsets.bottom
+        return OrnamentOptions(
+            logo: LogoViewOptions(position: .bottomLeft, margins: CGPoint(
+                // The info glyph is bottom-aligned inside its 44pt target.
+                x: leading, y: bottom
+            )),
+            attributionButton: AttributionButtonOptions(position: .bottomLeft, margins: CGPoint(
+                x: leading + logoWidth + gap, y: bottom
+            ))
+        )
     }
 
     private func routeInteraction(proxy: MapProxy) -> TapInteraction {
