@@ -13,6 +13,7 @@ import {
 } from '~/settings/stats-tiles.generated';
 import {
   activityCalendar,
+  mondayOf,
   consistency,
   distanceVsElevation,
   monthVsLastMonth,
@@ -43,13 +44,14 @@ import {
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
-import { CalendarHeatmap, type CalendarColour } from './calendar';
+import { CalendarHeatmap, MonthRows, type CalendarColour } from './calendar';
 import {
   CumulativeLines,
   DistanceElevationDots,
   Measure,
   PlainBars,
   SportBars,
+  VolumeArea,
   type LineSeries,
 } from './charts';
 import {
@@ -81,7 +83,8 @@ export type TileView = {
   // The face's own small switch (first option is the default), if any.
   faceOptions?: readonly string[];
   face: (context: TileContext, option: string | undefined) => ReactNode;
-  detail: (context: TileContext, option: string | undefined) => ReactNode;
+  // The drill-down panel's content, for tiles that have one.
+  detail?: (context: TileContext, option: string | undefined) => ReactNode;
 };
 
 const metricFaceOptions = ['distance', 'time', 'elevation'] as const;
@@ -430,33 +433,32 @@ const weeklyVolumeView: TileView = {
   faceOptions: metricFaceOptions,
   face: (context, option) => {
     const metric = asMetric(option, 'distance');
+    const { weekStarts, values } = weeklyVolume(
+      context.activities,
+      context.today,
+      metric,
+    );
     return (
       <>
         <FillChart>
           {({ width, height }) => (
-            <SportBars
-              rows={weekRows(context, metric)}
+            <VolumeArea
+              weeks={weekStarts.map((weekStart, index) => ({
+                x: dateOfDay(weekStart),
+                value: values[index]!,
+              }))}
+              trend={rollingFourWeeks(context, metric).map((point) => ({
+                x: dateOfDay(Number(point.x)),
+                value: point.value,
+              }))}
+              trendLabel="4-wk avg"
               width={width}
               height={height}
-              detail={false}
-              partialLast
-              trend={rollingFourWeeks(context, metric)}
               palette={context.palette}
               valueFormat={(value) => formatWithUnit(value, metric)}
-              xTickFormat={weekOf}
             />
           )}
         </FillChart>
-        <div className="mt-1 hidden shrink-0 justify-end gap-3 text-[11px] text-muted-foreground sm:flex">
-          <span className="flex items-center gap-1">
-            <i className="inline-block h-0.5 w-3 bg-foreground/70" />
-            4-week average
-          </span>
-          <span className="flex items-center gap-1">
-            <i className="inline-block h-2 w-2 rounded-[2px] bg-muted-foreground/30" />
-            this week so far
-          </span>
-        </div>
       </>
     );
   },
@@ -535,27 +537,13 @@ const activityCalendarView: TileView = {
       .sort((x, y) => y[1] - x[1])
       .map(([sport]) => sport);
     return (
-      <>
-        <FillChart>
-          {({ width, height }) => (
-            <CalendarHeatmap
-              today={context.today}
-              weeks={Math.max(
-                8,
-                Math.min(53, Math.floor(width / (height / 7))),
-              )}
-              width={width}
-              height={height}
-              dominantSport={dominantSport}
-              totals={days}
-              colour="sport"
-              palette={context.palette}
-              labels={false}
-            />
-          )}
-        </FillChart>
-        <SportLegend sports={sports} />
-      </>
+      <MonthRows
+        today={context.today}
+        dominantSport={dominantSport}
+        totals={days}
+        palette={context.palette}
+        footer={<SportLegend sports={sports} />}
+      />
     );
   },
   detail: (context, option) => {
@@ -865,27 +853,50 @@ const consistencyView: TileView = {
       sub: `5+ active days in ${solid} of ${fullWeeks.length} weeks`,
     };
   },
-  face: (context) => (
-    <FillChart>
-      {({ width, height }) => (
-        <PlainBars
-          rows={activeDaysPerWeek(context.activities, context.today, 12).map(
-            (week, index, weeks) => ({
-              x: String(week.weekStart),
-              value: week.activeDays,
-              highlight: index === weeks.length - 1,
-            }),
-          )}
-          width={width}
-          height={height}
-          detail={false}
-          palette={context.palette}
-          xTickFormat={weekOf}
-          valueFormat={(value) => `${value} active days`}
-        />
-      )}
-    </FillChart>
-  ),
+  // One column per week (Monday on top), one dot per day: filled when
+  // active, hollow when not.
+  face: (context) => {
+    const first = mondayOf(context.today) - 11 * 7;
+    const flags = activeDayFlags(
+      context.activities,
+      context.today,
+      context.today - first + 1,
+    );
+    return (
+      <div
+        className="mt-auto grid grid-flow-col gap-[3px]"
+        style={{
+          gridTemplateRows: 'repeat(7, minmax(0, 1fr))',
+          gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+        }}
+        role="img"
+        aria-label="Active days, last 12 weeks"
+      >
+        {Array.from({ length: 12 * 7 }, (_, index) => {
+          const day = first + index;
+          const active = flags[index];
+          return (
+            <i
+              key={index}
+              className={cn(
+                'mx-auto block h-1.5 w-1.5 rounded-full',
+                day > context.today
+                  ? 'bg-transparent'
+                  : active
+                    ? 'bg-foreground'
+                    : 'border border-muted-foreground/40',
+              )}
+              title={
+                day > context.today
+                  ? undefined
+                  : `${shortDate(dateOfDay(day))}: ${active ? 'active' : 'rest day'}`
+              }
+            />
+          );
+        })}
+      </div>
+    );
+  },
   detail: (context, option) => {
     const weeks = weeksOf(option);
     const { activeDaysPerWeek: average } = consistency(
@@ -1084,7 +1095,6 @@ const thisWeekView: TileView = {
       </>
     );
   },
-  detail: () => null,
 };
 
 // Typical week ---------------------------------------------------------------
@@ -1119,7 +1129,6 @@ const typicalWeekView: TileView = {
       </div>
     );
   },
-  detail: () => null,
 };
 
 // Pace -----------------------------------------------------------------------
@@ -1154,7 +1163,7 @@ const yearPaceView: TileView = {
     const scale = Math.max(pace.projected, pace.lastYear, 1);
     const at = (value: number) => `${(value / scale) * 100}%`;
     return (
-      <div className="mt-auto">
+      <div className="mt-auto pt-2">
         <div className="relative h-2.5 rounded-sm bg-muted">
           <div
             className="absolute inset-y-0 left-0 rounded-sm bg-foreground/25"
@@ -1199,7 +1208,6 @@ const yearPaceView: TileView = {
       </div>
     );
   },
-  detail: () => null,
 };
 
 // Records --------------------------------------------------------------------
@@ -1266,7 +1274,6 @@ const recordsView: TileView = {
       </div>
     );
   },
-  detail: () => null,
 };
 
 // Best 30 days ---------------------------------------------------------------
@@ -1321,7 +1328,6 @@ const best30DaysView: TileView = {
       </div>
     );
   },
-  detail: () => null,
 };
 
 // Rest days ------------------------------------------------------------------
@@ -1369,7 +1375,6 @@ const restDaysView: TileView = {
       </div>
     );
   },
-  detail: () => null,
 };
 
 // Speed trend is optional in the manifest and has no rules or fixtures yet,

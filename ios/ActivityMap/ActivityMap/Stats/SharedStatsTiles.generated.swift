@@ -6,7 +6,6 @@ enum StatsTileID: String, CaseIterable, Hashable, Sendable {
     case monthVsLastMonth
     case yearToDate
     case yearPace
-    case best30Days
     case records
     case totals
     case activityCalendar
@@ -14,6 +13,7 @@ enum StatsTileID: String, CaseIterable, Hashable, Sendable {
     case sportMix
     case distanceVsElevation
     case typicalWeek
+    case best30Days
     case restDays
     case speedTrend
 }
@@ -43,12 +43,14 @@ enum StatsTileGroup: String, CaseIterable, Hashable, Sendable {
     case now
     case thisYear
     case patterns
+    case more
 
     var title: String {
         switch self {
         case .now: return "Now"
         case .thisYear: return "This year"
         case .patterns: return "Patterns"
+        case .more: return "More"
         }
     }
 }
@@ -166,16 +168,6 @@ enum SharedStatsTiles {
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation])
         ),
         .init(
-            id: .best30Days,
-            title: "Best 30 days",
-            window: .currentYear,
-            group: .thisYear,
-            isPrimary: false,
-            span: .init(columns: 1, rows: 1),
-            isOptional: false,
-            toggle: .init(label: "Metric", options: [.distance, .time, .elevation])
-        ),
-        .init(
             id: .records,
             title: "Records",
             window: .currentYear,
@@ -201,7 +193,7 @@ enum SharedStatsTiles {
             window: .last12Months,
             group: .patterns,
             isPrimary: false,
-            span: .init(columns: 2, rows: 1),
+            span: .init(columns: 2, rows: 2),
             isOptional: false,
             toggle: .init(label: "Colour by", options: [.sport, .distance, .elevation, .time])
         ),
@@ -239,17 +231,27 @@ enum SharedStatsTiles {
             id: .typicalWeek,
             title: "Typical week",
             window: .last12Weeks,
-            group: .patterns,
+            group: .more,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
             isOptional: false,
             toggle: nil
         ),
         .init(
+            id: .best30Days,
+            title: "Best 30 days",
+            window: .currentYear,
+            group: .more,
+            isPrimary: false,
+            span: .init(columns: 1, rows: 1),
+            isOptional: false,
+            toggle: .init(label: "Metric", options: [.distance, .time, .elevation])
+        ),
+        .init(
             id: .restDays,
             title: "Rest days",
             window: .last90Days,
-            group: .patterns,
+            group: .more,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
             isOptional: false,

@@ -45,6 +45,11 @@ export const statsTileGroups = [
     id: 'patterns',
     title: 'Patterns',
   },
+  {
+    id: 'more',
+    title: 'More',
+    collapsed: true,
+  },
 ] as const;
 
 export const statsTiles = [
@@ -121,20 +126,6 @@ export const statsTiles = [
     },
   },
   {
-    id: 'best30Days',
-    title: 'Best 30 days',
-    window: 'currentYear',
-    group: 'thisYear',
-    span: {
-      columns: 1,
-      rows: 1,
-    },
-    toggle: {
-      label: 'Metric',
-      options: ['distance', 'time', 'elevation'],
-    },
-  },
-  {
     id: 'records',
     title: 'Records',
     window: 'currentYear',
@@ -166,7 +157,7 @@ export const statsTiles = [
     group: 'patterns',
     span: {
       columns: 2,
-      rows: 1,
+      rows: 2,
     },
     toggle: {
       label: 'Colour by',
@@ -215,17 +206,31 @@ export const statsTiles = [
     id: 'typicalWeek',
     title: 'Typical week',
     window: 'last12Weeks',
-    group: 'patterns',
+    group: 'more',
     span: {
       columns: 1,
       rows: 1,
     },
   },
   {
+    id: 'best30Days',
+    title: 'Best 30 days',
+    window: 'currentYear',
+    group: 'more',
+    span: {
+      columns: 1,
+      rows: 1,
+    },
+    toggle: {
+      label: 'Metric',
+      options: ['distance', 'time', 'elevation'],
+    },
+  },
+  {
     id: 'restDays',
     title: 'Rest days',
     window: 'last90Days',
-    group: 'patterns',
+    group: 'more',
     span: {
       columns: 1,
       rows: 1,

@@ -68,7 +68,14 @@ const manifestSchema = z
       .strict(),
     groups: z
       .array(
-        z.object({ id: identifierSchema, title: z.string().min(1) }).strict(),
+        z
+          .object({
+            id: identifierSchema,
+            title: z.string().min(1),
+            // Collapsed groups start folded away behind their title.
+            collapsed: z.boolean().optional(),
+          })
+          .strict(),
       )
       .min(1),
     tiles: z

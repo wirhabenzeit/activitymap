@@ -12,6 +12,7 @@ import {
 } from 'react';
 import * as d3 from 'd3';
 import {
+  areaY,
   barY,
   defineChart,
   dot,
@@ -230,6 +231,125 @@ export function CumulativeLines({
 
 function currentKey(series: LineSeries[]) {
   return series.find((s) => s.current)?.key;
+}
+
+// Weekly totals as a filled area, with a dashed tail into the current,
+// partial week and an optional rolling-average line.
+export type WeekPoint = { x: Date; value: number };
+
+export function VolumeArea({
+  weeks,
+  trend = [],
+  trendLabel = '',
+  width,
+  height,
+  palette,
+  valueFormat,
+}: {
+  weeks: WeekPoint[];
+  trend?: WeekPoint[];
+  // Named at the trend line's start, away from the partial week.
+  trendLabel?: string;
+  width: number;
+  height: number;
+  palette: TilePalette;
+  valueFormat: (value: number) => string;
+}) {
+  const full = weeks.slice(0, -1);
+  const tail = weeks.slice(-2);
+  // A trend line, not bars: the scale hugs the data so week-to-week change
+  // is visible in a short tile, and the area fills down to the scale's floor.
+  const values = [...full, ...trend].map((week) => week.value);
+  const low = Math.min(...values, Infinity);
+  const high = Math.max(...values, 0);
+  const floor = Number.isFinite(low)
+    ? Math.max(0, low - (high - low) * 0.25)
+    : 0;
+  const definition = defineChart({
+    marks: [
+      areaY(full, {
+        x: 'x',
+        y: 'value',
+        y1: floor,
+        fill: palette.foreground,
+        fillOpacity: 0.08,
+      }),
+      lineY(full, {
+        x: 'x',
+        y: 'value',
+        stroke: palette.foreground,
+        strokeWidth: 2,
+      }),
+      lineY(tail, {
+        x: 'x',
+        y: 'value',
+        stroke: palette.muted,
+        strokeWidth: 1.5,
+        strokeDasharray: '3 3',
+      }),
+      lineY(trend, {
+        x: 'x',
+        y: 'value',
+        stroke: palette.heat,
+        strokeWidth: 1.5,
+      }),
+      text(trend.slice(0, 1), {
+        x: 'x',
+        y: 'value',
+        text: () => trendLabel,
+        fill: palette.heat,
+        anchor: 'start',
+        dy: -6,
+        fontSize: 10,
+        fontWeight: 500,
+      }),
+      dot(weeks.slice(-1), {
+        x: 'x',
+        y: 'value',
+        fill: palette.muted,
+        r: 3,
+      }),
+      crosshair({ marker: true }),
+    ],
+    guides: false,
+    margin: { top: 16, right: 6, bottom: 2, left: 2 },
+    scales: {
+      x: {
+        scale: d3
+          .scaleUtc()
+          .domain([weeks[0]?.x ?? new Date(0), weeks.at(-1)?.x ?? new Date(0)]),
+        axis: false,
+      },
+      y: {
+        scale: d3.scaleLinear().domain([floor, Math.max(high, floor + 1)]),
+        axis: false,
+      },
+    },
+    tooltip: {
+      use: tooltip,
+      portal,
+      items: [
+        {
+          id: 'x',
+          label: 'Week of',
+          text: (point) => d3.utcFormat('%b %-d')(point.datum.x),
+        },
+        {
+          id: 'value',
+          label: 'Total',
+          text: (point) => valueFormat(point.datum.value),
+        },
+      ],
+    },
+  });
+  return (
+    <Chart
+      definition={definition}
+      width={width}
+      height={height}
+      ariaLabel="Weekly totals"
+    />
+  );
 }
 
 export type SportBar = { x: string; sport: Sport; value: number };
