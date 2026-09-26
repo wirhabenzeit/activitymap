@@ -15,8 +15,11 @@ import {
   initializeSportType,
   initializeValues,
   normalizeDateRange,
+  parseValueFilterInput,
   sanitizePersistedBinary,
   sanitizePersistedDateRange,
+  toPersistedValues,
+  toggleSportGroupState,
   type BinaryColumn,
   type BinaryFilterMode,
   type FilterableActivity,
@@ -159,6 +162,52 @@ void test('legacy persisted dates and binary defaults migrate safely', () => {
   });
 });
 
+void test('numeric input accepts only finite plain decimals', () => {
+  assert.deepEqual(
+    parseValueFilterInput('   ', '>=', (value) => value),
+    {
+      status: 'empty',
+    },
+  );
+  assert.deepEqual(
+    parseValueFilterInput('0x10', '>=', (value) => value),
+    {
+      status: 'invalid',
+    },
+  );
+  assert.deepEqual(
+    parseValueFilterInput('1e3', '<=', (value) => value),
+    {
+      status: 'invalid',
+    },
+  );
+  assert.deepEqual(
+    parseValueFilterInput(' .5 ', '<=', (value) => value * 1_000),
+    {
+      status: 'valid',
+      filter: { value: 500, operator: '<=', displayValue: '.5' },
+    },
+  );
+  assert.deepEqual(
+    parseValueFilterInput('1.', '>=', () => Number.POSITIVE_INFINITY),
+    { status: 'invalid' },
+  );
+});
+
+void test('persisted numeric filters omit their editing draft', () => {
+  assert.deepEqual(
+    toPersistedValues({
+      ...initializeValues(),
+      distance: { value: 1_000, operator: '>=', displayValue: '1.' },
+    }),
+    {
+      distance: { value: 1_000, operator: '>=' },
+      elapsed_time: undefined,
+      total_elevation_gain: undefined,
+    },
+  );
+});
+
 void test('group and individual sport changes stay synchronized', () => {
   const filterStore = createStore<FilterSlice>()(
     immer(
@@ -188,6 +237,38 @@ void test('group and individual sport changes stay synchronized', () => {
     false,
     'changing Ride must preserve the individual Run selection',
   );
+
+  filterStore.getState().setSportGroup((groups) => ({
+    ...groups,
+    run: toggleSportGroupState(groups.run),
+  }));
+  assert.equal(filterStore.getState().sportGroup.run, true);
+  assert.equal(filterStore.getState().sportType.Run, true);
+  assert.equal(filterStore.getState().sportType.VirtualRun, true);
+
+  filterStore.getState().setSportGroup((groups) => ({
+    ...groups,
+    run: toggleSportGroupState(groups.run),
+  }));
+  assert.equal(filterStore.getState().sportGroup.run, false);
+  assert.equal(filterStore.getState().sportType.Run, false);
+  assert.equal(filterStore.getState().sportType.VirtualRun, false);
+
+  filterStore.getState().setValueOperator('distance', '<=');
+  assert.equal(
+    filterStore.getState().values.distance,
+    undefined,
+    'changing an empty operator must not activate a numeric filter',
+  );
+  filterStore.getState().setValues((values) => ({
+    ...values,
+    distance: { value: 0, operator: '>=' },
+  }));
+  filterStore.getState().setValueOperator('distance', '<=');
+  assert.deepEqual(filterStore.getState().values.distance, {
+    value: 0,
+    operator: '<=',
+  });
 
   filterStore.getState().resetFilters();
   assert.ok(Object.values(filterStore.getState().sportType).every(Boolean));

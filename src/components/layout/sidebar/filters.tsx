@@ -53,6 +53,8 @@ import {
   calendarDateFromLocalDate,
   calendarDateToLocalDate,
   normalizeDateRange,
+  parseValueFilterInput,
+  toggleSportGroupState,
   type BinaryFilterMode,
 } from '~/store/filter';
 
@@ -71,7 +73,11 @@ export function CategoryFilter() {
 
   useEffect(() => {
     const doSingleClickThing = () => {
-      if (key) setSportGroup((group) => ({ ...group, [key]: !group[key] }));
+      if (key)
+        setSportGroup((group) => ({
+          ...group,
+          [key]: toggleSportGroupState(group[key]),
+        }));
     };
 
     const doDoubleClickThing = () => {
@@ -216,11 +222,13 @@ export function InequalityFilter({
 }: {
   name: keyof typeof inequalityFilters;
 }) {
-  const [filter, setValues] = useShallowStore((state) => [
+  const [filter, setValues, setValueOperator] = useShallowStore((state) => [
     state.values[name],
     state.setValues,
+    state.setValueOperator,
   ]);
-  const operator = filter?.operator ?? '>=';
+  const [pendingOperator, setPendingOperator] = useState<'>=' | '<='>('>=');
+  const operator = filter?.operator ?? pendingOperator;
   const input =
     filter?.displayValue ??
     (filter
@@ -228,20 +236,20 @@ export function InequalityFilter({
       : '');
 
   const validateInput = (nextInput: string) => {
-    if (nextInput === '') {
+    const parsed = parseValueFilterInput(
+      nextInput,
+      operator,
+      inequalityFilters[name].transform,
+    );
+    if (parsed.status === 'empty') {
+      setPendingOperator(operator);
       setValues((previous) => ({ ...previous, [name]: undefined }));
       return;
     }
-
-    const number = Number(nextInput);
-    if (!Number.isFinite(number)) return;
+    if (parsed.status === 'invalid') return;
     setValues((previous) => ({
       ...previous,
-      [name]: {
-        value: inequalityFilters[name].transform(number),
-        operator,
-        displayValue: nextInput,
-      },
+      [name]: parsed.filter,
     }));
   };
 
@@ -249,13 +257,8 @@ export function InequalityFilter({
 
   const toggleOperator = () => {
     const next = operator === '>=' ? '<=' : '>=';
-    setValues((previous) => ({
-      ...previous,
-      [name]: {
-        value: filter?.value ?? 0,
-        operator: next,
-      },
-    }));
+    setPendingOperator(next);
+    setValueOperator(name, next);
   };
 
   return (

@@ -27,7 +27,7 @@ export type DateRange = {
 export type ValueFilter = {
   value: number;
   operator: '>=' | '<=';
-  /** Raw UI text retained while editing decimals; omitted from persistence. */
+  /** Raw UI text retained while editing decimals. */
   displayValue?: string;
 };
 
@@ -48,6 +48,10 @@ export type FilterActions = {
   setDateRange: (update: SetStateAction<DateRange | undefined>) => void;
   setValues: (
     update: SetStateAction<Record<ValueColumn, ValueFilter | undefined>>,
+  ) => void;
+  setValueOperator: (
+    name: ValueColumn,
+    operator: ValueFilter['operator'],
   ) => void;
   setSearch: (update: SetStateAction<string>) => void;
   setBinary: (
@@ -126,6 +130,35 @@ export const normalizeDateRange = (
     return undefined;
   }
   return { start, end };
+};
+
+/** Mixed and unselected groups become fully selected; selected becomes none. */
+export const toggleSportGroupState = (current: CategoryGroupState): boolean =>
+  current !== true;
+
+export type ParsedValueFilter =
+  | { status: 'empty' }
+  | { status: 'invalid' }
+  | { status: 'valid'; filter: ValueFilter };
+
+const plainDecimalPattern = /^(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+export const parseValueFilterInput = (
+  input: string,
+  operator: ValueFilter['operator'],
+  toCanonical: (value: number) => number,
+): ParsedValueFilter => {
+  const displayValue = input.trim();
+  if (displayValue === '') return { status: 'empty' };
+  if (!plainDecimalPattern.test(displayValue)) return { status: 'invalid' };
+
+  const value = toCanonical(Number(displayValue));
+  if (!Number.isFinite(value)) return { status: 'invalid' };
+
+  return {
+    status: 'valid',
+    filter: { value, operator, displayValue },
+  };
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -212,6 +245,16 @@ export const initializeValues = (): Record<
   elapsed_time: undefined,
   total_elevation_gain: undefined,
 });
+
+export const toPersistedValues = (
+  values: FilterState['values'],
+): FilterState['values'] =>
+  Object.fromEntries(
+    Object.entries(values).map(([key, filter]) => [
+      key,
+      filter ? { value: filter.value, operator: filter.operator } : undefined,
+    ]),
+  ) as FilterState['values'];
 
 export const initializeBinary = (): Record<BinaryColumn, BinaryFilterMode> => ({
   commute: 'any',
@@ -347,6 +390,13 @@ export const createFilterSlice: StateCreator<
       set((state) => {
         state.values =
           typeof update === 'function' ? update(state.values) : update;
+      });
+    },
+
+    setValueOperator: (name, operator) => {
+      set((state) => {
+        const filter = state.values[name];
+        if (filter) filter.operator = operator;
       });
     },
 
