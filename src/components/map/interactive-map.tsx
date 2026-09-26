@@ -10,7 +10,11 @@ import React, {
 import { useSidebar } from '~/components/ui/sidebar';
 import { Camera, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { columns } from '~/components/list/columns';
-import { ActivityCard, ActivityCardContent } from '~/components/list/card';
+import {
+  ActivityCard,
+  ActivityCardContent,
+  inlineRouteDetails,
+} from '~/components/list/card';
 import { usePrefetchStreamSummaries } from '~/components/list/elevation-chart';
 import { Button } from '~/components/ui/button';
 import { activityFields } from '~/settings/activity';
@@ -456,7 +460,7 @@ export default function InteractiveMap() {
                 row,
               }: {
                 row: Parameters<typeof ActivityCard>[0]['row'];
-              }) => <ActivityCard row={row} map={mapRefLoc} inlineDetails />,
+              }) => <ActivityCard row={row} showMapButton={false} />,
             }
           : { ...column, meta };
       }),
@@ -665,26 +669,13 @@ export default function InteractiveMap() {
           data={rows}
           selected={selected}
           setSelected={setSelected}
-          map={mapRefLoc}
           columnFilters={columnFilters}
           paginationControl={false}
-          activeId={highlighted}
           headerClassName="max-lg:hidden"
           cellClassName="max-lg:px-2 max-lg:border-r-0"
-          onRowClick={(row) => setHighlighted(row.original.id)}
-          renderInlineDetails={(row) => (
-            <ActivityCardContent
-              row={row}
-              mapDetails
-              onCollapse={() => setHighlighted(0)}
-            />
-          )}
+          {...inlineRouteDetails(highlighted, setHighlighted)}
           renderSingleDetails={(row) => (
-            <ActivityCardContent
-              row={row}
-              mapDetails
-              onClearSelection={clearSelection}
-            />
+            <ActivityCardContent row={row} onClearSelection={clearSelection} />
           )}
           {...compactList}
           columnVisibility={mapColumnVisibility}

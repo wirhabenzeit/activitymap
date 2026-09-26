@@ -1,7 +1,6 @@
 'use client';
 
 import { type ColumnDef, type Table } from '@tanstack/react-table';
-import { Pin } from 'lucide-react';
 import { Checkbox } from '~/components/ui/checkbox';
 
 import { type Activity, type Photo } from '~/server/db/schema';
@@ -18,6 +17,7 @@ import { ActivityCard, DescriptionCard } from './card';
 import { EditActivity } from './edit';
 import { PhotoLightbox } from './photo';
 import { type Features } from './table-extensions';
+import { getWidthMode, setWidthMode, widthModes } from './width-mode';
 
 function columnFromField<K extends ActivityValueType>(
   id: keyof typeof activityFields,
@@ -64,6 +64,24 @@ function columnFromField<K extends ActivityValueType>(
   };
 }
 
+/** Header button that cycles through the width modes. */
+function WidthModeToggle({ table }: { table: Table<Features, Activity> }) {
+  const mode = getWidthMode(table);
+  const { icon: Icon, label, next } = widthModes[mode];
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="p-1 border"
+      onClick={() => setWidthMode(table, next)}
+      aria-label={`${label}. Switch to: ${widthModes[next].label.toLowerCase()}`}
+      title={`${label} (click to change)`}
+    >
+      <Icon />
+    </Button>
+  );
+}
+
 export const columns: ColumnDef<Features, Activity>[] = [
   {
     id: 'id',
@@ -98,29 +116,12 @@ export const columns: ColumnDef<Features, Activity>[] = [
           />
           <span>Name</span>
           <div className="flex-1 text-right">
-            <Button
-              variant={column.getIsPinned() ? 'outline' : 'ghost'}
-              size="sm"
-              className="p-1 border"
-              onClick={() =>
-                column.pin(column.getIsPinned() ? false : 'start')
-              }
-            >
-              <Pin />
-            </Button>
+            <WidthModeToggle table={table} />
           </div>
         </div>
       </DataTableColumnHeader>
     ),
-    cell: ({ row, table }) => {
-      const mapRef = table.store.state.map;
-      return (
-        <ActivityCard
-          row={row}
-          map={mapRef}
-        />
-      );
-    },
+    cell: ({ row }) => <ActivityCard row={row} />,
     enableHiding: false,
   },
   ...Object.entries(activityFields).map(([id, spec]) =>

@@ -22,8 +22,6 @@ import {
   createPaginatedRowModel,
   createExpandedRowModel,
 } from '@tanstack/react-table';
-import type { MapRef } from 'react-map-gl/mapbox';
-import { type RefObject } from 'react';
 
 // Density Feature
 export type DensityState = 'sm' | 'md' | 'lg';
@@ -97,59 +95,52 @@ export const densityFeature: TableFeature = {
   },
 };
 
-// Map Feature
-export interface MapTableState {
-  map?: RefObject<MapRef | null>;
+// Fit Width Feature: hide columns that don't fit instead of scrolling.
+export interface FitWidthTableState {
+  fitWidth: boolean;
 }
 
-export interface MapOptions {
-  onMapChange?: OnChangeFn<RefObject<MapRef | null> | undefined>;
+export interface FitWidthOptions {
+  onFitWidthChange?: OnChangeFn<boolean>;
 }
 
-export interface MapInstance {
-  setMap: (updater: Updater<RefObject<MapRef | null> | undefined>) => void;
+export interface FitWidthInstance {
+  setFitWidth: (updater: Updater<boolean>) => void;
 }
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
 declare module '@tanstack/react-table' {
   interface Plugins {
-    mapFeature: TableFeature;
+    fitWidthFeature: TableFeature;
   }
   interface TableState_FeatureMap {
-    mapFeature: MapTableState;
+    fitWidthFeature: FitWidthTableState;
   }
   interface TableOptions_FeatureMap<
     TFeatures extends TableFeatures,
     TData extends RowData,
   > {
-    mapFeature: MapOptions;
+    fitWidthFeature: FitWidthOptions;
   }
   interface Table_FeatureMap<
     TFeatures extends TableFeatures,
     TData extends RowData,
   > {
-    mapFeature: MapInstance;
+    fitWidthFeature: FitWidthInstance;
   }
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
-export const mapFeature: TableFeature = {
-  getInitialState: (state) => {
-    return {
-      map: undefined,
-      ...state,
-    };
-  },
-  getDefaultTableOptions: (table) => {
-    return {
-      onMapChange: makeStateUpdater('map', table),
-    };
-  },
+export const fitWidthFeature: TableFeature = {
+  getInitialState: (state) => ({ fitWidth: false, ...state }),
+  getDefaultTableOptions: (table) => ({
+    onFitWidthChange: makeStateUpdater('fitWidth', table),
+  }),
   constructTableAPIs: (table) => {
-    assignTableAPIs('mapFeature', table, {
-      table_setMap: {
-        fn: (updater: Updater<RefObject<MapRef | null> | undefined>) => {
-          setStateSlice(table, 'map', updater);
+    assignTableAPIs('fitWidthFeature', table, {
+      table_setFitWidth: {
+        fn: (updater: Updater<boolean>) => {
+          setStateSlice(table, 'fitWidth', updater);
         },
       },
     });
@@ -229,7 +220,7 @@ export const features = tableFeatures({
   rowExpandingFeature,
   rowPaginationFeature,
   densityFeature,
-  mapFeature,
+  fitWidthFeature,
   summaryRowFeature,
   sortedRowModel: createSortedRowModel(),
   filteredRowModel: createFilteredRowModel(),

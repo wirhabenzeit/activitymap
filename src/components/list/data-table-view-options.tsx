@@ -18,15 +18,24 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import { Button } from '~/components/ui/button';
-import { Columns, FileSpreadsheet, FileStack, LineChart } from 'lucide-react';
+import {
+  Columns,
+  FileSpreadsheet,
+  FileStack,
+  LineChart,
+  MoveHorizontal,
+} from 'lucide-react';
+import { getWidthMode, setWidthMode, widthModes } from './width-mode';
 import { MixerHorizontalIcon } from '@radix-ui/react-icons';
 
 interface DataTableViewOptionsProps<TData extends RowData> {
   table: TableType<Features, TData>;
+  hiddenByFit?: Set<string>;
 }
 
 export function DataTableViewOptions<TData extends RowData>({
   table,
+  hiddenByFit,
 }: DataTableViewOptionsProps<TData>) {
   return (
     <div className="flex items-center space-x-2">
@@ -64,9 +73,33 @@ export function DataTableViewOptions<TData extends RowData>({
                         }}
                       >
                         {column.columnDef.meta?.title ?? column.id}
+                        {hiddenByFit?.has(column.id) && (
+                          <span className="ml-auto pl-2 text-xs normal-case text-muted-foreground">
+                            no room
+                          </span>
+                        )}
                       </DropdownMenuCheckboxItem>
                     );
                   })}
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="gap-2">
+              <MoveHorizontal className="size-4" />
+              <span>Scrolling</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent>
+                {(['fit', 'pinned', 'free'] as const).map((mode) => (
+                  <DropdownMenuCheckboxItem
+                    key={mode}
+                    checked={getWidthMode(table) === mode}
+                    onClick={() => setWidthMode(table, mode)}
+                  >
+                    {widthModes[mode].label}
+                  </DropdownMenuCheckboxItem>
+                ))}
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
           </DropdownMenuSub>
@@ -91,7 +124,7 @@ export function DataTableViewOptions<TData extends RowData>({
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="gap-2">
               <LineChart className="size-4" />
-              <span>Column summary</span>
+              <span>Summary row</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent>
@@ -104,11 +137,11 @@ export function DataTableViewOptions<TData extends RowData>({
                     checked={table.store.state.summaryRow === value}
                   >
                     {value === null
-                      ? 'None'
+                      ? 'Off'
                       : value === 'page'
-                        ? 'Page'
+                        ? 'This page'
                         : value === 'all'
-                          ? 'All'
+                          ? 'All activities'
                           : 'Selected'}
                   </DropdownMenuCheckboxItem>
                 ))}
