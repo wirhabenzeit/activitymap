@@ -70,7 +70,7 @@ Use Profile to sign in. `AuthController` stores the ActivityMap session in the K
 
 `ActivityMapApp` creates the disk store. `SyncController` loads committed snapshots into the UI after sign-in, on foreground entry, every minute while foregrounded, and on manual refresh (map status bar, list pull-to-refresh, or Profile → Sync Now). The network engine pages activities and photos, then catches up from the first snapshot cursor. Later passes use the last committed change cursor. A `409 sync_rebootstrap_required` triggers one fresh bootstrap.
 
-The account sheet shows sync errors, rate-limit retry time, last successful sync and Strava reconciliation time. Offline launch uses the last verified user identity, bound to the Keychain token and deployment. A seven-day freshness limit and session expiry bound offline use; the change feed's longer retention window does not extend that limit. Logout, account changes and deauthorization clear scoped data. Transient network/server errors keep the session and usable cache.
+The account sheet shows sync errors, rate-limit retry time, last successful sync and Strava reconciliation time. Offline launch uses the last verified user identity, bound to the Keychain token and deployment. The app keeps its saved activities until it next syncs: the server revalidates Strava data within seven days, and each sync applies its changes and deletions (see `docs/strava-data-policy.md`). Session expiry, logout, account changes and deauthorization clear scoped data. Transient network/server errors keep the session and usable cache.
 
 A store-open error is displayed without deleting data or falling back silently to memory. Native writes and background refresh tasks are still pending; this client reads activity data.
 

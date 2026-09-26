@@ -19,6 +19,7 @@ const SUCCESS = {
   failed: 0,
   stoppedForTimeBudget: 0,
   stoppedForRateLimit: 0,
+  overdue: 0,
   elapsedMs: 1,
 };
 

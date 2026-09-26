@@ -12,16 +12,19 @@ Status: **Accepted**
 
 ## 2. Retention and freshness
 
-- Cached Strava data must be revalidated within seven days. The periodic
-  summary reconciliation revalidates the athlete's dataset, including stored
-  activity streams: a changed summary invalidates the affected streams.
+- Cached Strava data must be revalidated within seven days. The server
+  enforces this: the hourly summary reconciliation re-reads each connected
+  athlete's activity summaries at least once every seven days (a new scan
+  starts after six days, so a multi-run scan finishes inside the limit). A
+  changed summary invalidates the affected detail geometry and streams, which
+  are then fetched again.
 - Webhooks provide the prompt update path; periodic reconciliation is the
   safety net.
-- The server owns Strava reconciliation. The native client applies server
-  upserts and tombstones from its saved change cursor and bounds its offline
-  copy to seven days after its last successful backend sync. A missing server
-  reconciliation timestamp or a temporary backend outage does not by itself
-  delete a still-valid native copy.
+- Clients do not enforce their own expiry. The web cache and the native app
+  mirror the server: whenever they are connected they apply its upserts and
+  tombstones from their saved change cursor. A device that stays offline keeps
+  its last copy and receives changes, deletions and deauthorization when it
+  next connects. Sign-out, sign-in expiry and Strava disconnection clear it.
 
 ## 3. Deletion and deauthorization
 

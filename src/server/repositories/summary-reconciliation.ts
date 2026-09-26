@@ -57,6 +57,11 @@ export interface SummaryReconciliationRepository {
     dueBefore: Date,
     now: Date,
   ): Promise<SummaryReconciliationCandidate[]>;
+  /**
+   * Eligible athletes whose last complete scan (or sign-up, before the first
+   * scan) is at or before `freshBefore`.
+   */
+  countOverdue(freshBefore: Date): Promise<number>;
   claim(
     candidate: SummaryReconciliationCandidate,
     dueBefore: Date,
@@ -365,6 +370,34 @@ export function createSummaryReconciliationRepository(
         if (candidates.length === limit) break;
       }
       return candidates;
+    },
+
+    async countOverdue(freshBefore) {
+      const [row] = await database
+        .select({
+          overdue: sql<number>`count(distinct ${users.athlete_id})::int`,
+        })
+        .from(users)
+        .innerJoin(
+          accounts,
+          and(eq(accounts.userId, users.id), eq(accounts.providerId, 'strava')),
+        )
+        .where(
+          and(
+            // Same eligibility as listDue.
+            isNotNull(users.athlete_id),
+            isNull(accounts.revokedAt),
+            or(
+              isNotNull(accounts.accessToken),
+              isNotNull(accounts.access_token),
+              isNotNull(accounts.refreshToken),
+              isNotNull(accounts.refresh_token),
+            ),
+            // Timestamps are stored as UTC wall time without a zone.
+            sql`coalesce(${users.lastSummaryReconciledAt}, ${users.createdAt}, 'epoch') <= ${freshBefore.toISOString()}::timestamp`,
+          ),
+        );
+      return row?.overdue ?? 0;
     },
 
     async claim(candidate, dueBefore, now, leaseMs) {

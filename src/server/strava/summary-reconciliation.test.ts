@@ -241,6 +241,9 @@ function fakeRepository(): SummaryReconciliationRepository & {
     async listDue() {
       return completed ? [] : [candidate];
     },
+    async countOverdue() {
+      return 0;
+    },
     async claim() {
       return makeClaim();
     },
