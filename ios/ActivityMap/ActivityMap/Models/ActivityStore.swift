@@ -36,6 +36,7 @@ final class ActivityStore {
     private(set) var activitiesRevision = 0
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
+    let mapContext = MapContext()
 
     init(activities: [Activity] = []) {
         self.activities = activities
@@ -212,9 +213,24 @@ final class ActivityStore {
         guard let activity = activities.first(where: { $0.id == activityID }) else {
             return .notFound
         }
-        let outcome = selection.showOnMap(activityID, hasGeometry: !activity.coordinates.isEmpty)
-        if outcome == .shown { selectedTab = .map }
+        let hasGeometry = RouteExtent(coordinates: activity.coordinates) != nil
+        let outcome = selection.showOnMap(activityID, hasGeometry: hasGeometry)
+        if outcome == .shown {
+            mapContext.hiddenTargetID = nil
+            mapContext.request(.activity(activityID))
+            selectedTab = .map
+        } else if outcome == .hiddenByFilters {
+            mapContext.hiddenTargetID = activityID
+        }
         return outcome
+    }
+
+    func clearFiltersAndShowOnMap(_ activityID: Int) {
+        mapContext.hiddenTargetID = nil
+        guard let activity = activities.first(where: { $0.id == activityID }),
+              RouteExtent(coordinates: activity.coordinates) != nil else { return }
+        resetFilters()
+        showOnMap(activityID)
     }
 
     /// Logout, account or deployment transition.
@@ -222,6 +238,7 @@ final class ActivityStore {
         activities = []
         routeGeometry.update(activities: [], revision: activitiesRevision)
         selection.clearScope()
+        mapContext.clearScope()
     }
 
     private var activityIndex: Set<Int> { Set(activities.map(\.id)) }

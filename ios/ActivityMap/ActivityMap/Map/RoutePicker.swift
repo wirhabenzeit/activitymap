@@ -10,6 +10,7 @@ final class RoutePicker {
 
     var isAdding = false
     var isPresented = false
+    var sheetHeight: CGFloat = 0
     var detailID: Int?
     var errorMessage: String?
     private(set) var candidateIDs: [Int] = []

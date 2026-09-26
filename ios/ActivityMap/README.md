@@ -102,7 +102,17 @@ The floating **N selected** menu provides **Show selected routes**, **Add routes
 
 Selected routes have a wider white casing; the active route adds a dark outer casing. All layers share one cached GeoJSON snapshot per activity revision, retained across tab changes and cleared on scope reset. Selection/filter updates change layer filters only. Canonical string feature IDs avoid precision loss through Double. Picking queries only the ordinary activity route layer; raster/POI layers cannot enter the hit set. Native annotation controls consume their own taps before route handling; photo-marker integration remains #219.
 
-`RoutePickingTests` covers hit ordering, tolerance, duplicate tile fragments, partial geometry, filtered/hidden selection, stale responses and geometry reuse with 2,000 activities. `RenderedRoutePickingTests` exercises the production layers and query adapter in the real Mapbox renderer. Physical-device gesture/VoiceOver checks and dense-library performance measurements remain acceptance work; the cache build counter is not a frame-time benchmark. Camera retention/fitting (#205), the reusable detail design (#208) and persistent results panel (#209) remain separate follow-ups.
+`RoutePickingTests` covers hit ordering, tolerance, duplicate tile fragments, partial geometry, filtered/hidden selection, stale responses and geometry reuse with 2,000 activities. `RenderedRoutePickingTests` exercises the production layers and query adapter in the real Mapbox renderer. Physical-device gesture/VoiceOver checks and dense-library performance measurements remain acceptance work; the cache build counter is not a frame-time benchmark. The reusable detail design (#208) and persistent results panel (#209) remain separate follow-ups.
+
+## Map context and navigation
+
+Map/list switches preserve the actual camera (center, zoom, bearing and pitch), basemap and overlays. The map renderer can be recreated; the shared `MapContext` restores it once its style loads. The list stays mounted to preserve its exact scroll offset. Account/scope resets clear camera, list and pending navigation, while retaining display preferences.
+
+**Show on map** adds/activates the activity through the shared selection store and frames its latest geometry. Hidden targets require an explicit **Clear filters and show on map** confirmation; GPS-less activities remain inspectable with framing disabled. The camera menu offers **Fit selection**, **Fit filtered routes**, **Reset bearing** and **Reset map view** separately. Switching 2D/3D retains location and zoom.
+
+Fits reserve space for navigation, safe areas, floating controls and the current results sheet. A sheet covering the map’s center defers the request until it shrinks or closes, as the native fit requires a visible projection center. Requests are consumed once after style readiness; later redraws, filter/selection changes and sheet resizing do not repeatedly fit. Point routes use a small extent and zoom cap of 16; date-line routes use the shortest longitude interval. Framing uses Mercator for consistent native camera fitting across styles.
+
+The native renderer tests cover phone/tablet frame sizes, sheet padding, point/date-line routes, deferred requests, pitch/reset behavior, and a real SwiftUI map/list round trip with camera and exact list-offset restoration. Physical-device layout and gesture validation remains part of review.
 
 ## Shared configuration direction
 

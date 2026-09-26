@@ -17,7 +17,6 @@ struct AppShell: View {
         NavigationStack {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea(edges: store.selectedTab == .map ? .top : [])
                 .navigationTitle("ActivityMap")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
@@ -107,12 +106,8 @@ struct AppShell: View {
             }
     }
 
-    @ViewBuilder
     private var content: some View {
-        switch store.selectedTab {
-        case .map: MapScreen(store: store)
-        case .list: ListScreen(store: store).refreshable { await refresh() }
-        }
+        BrowseContent(store: store, refresh: refresh)
     }
 
     private func refresh() async {
