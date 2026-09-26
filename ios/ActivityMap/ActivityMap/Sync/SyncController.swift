@@ -69,7 +69,13 @@ final class SyncController {
         let current = generation
         let previous = work
         previous?.cancel()
-        clearVisible()
+        // Verification and profile metadata may change during normal refresh.
+        // Keep browsing state for the same usable credential; actual scope,
+        // expiry and connection transitions still clear it immediately.
+        let retainsVisibleState = sameCredential && next.map {
+            $0.user.stravaConnected && $0.user.authentication.sessionExpiresAt > now()
+        } == true
+        if !retainsVisibleState { clearVisible() }
         if !sameCredential { retryAt = nil }
         needsCleanup = true
         work = Task {

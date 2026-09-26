@@ -208,6 +208,37 @@ struct ActivityStoreSelectionTests {
         #expect(store.inspectedActivityID == nil)
     }
 
+    @Test func deletionUsesTheNewSnapshotsVisibilityToActivateASurvivor() {
+        let store = ActivityStore(activities: [Self.activity(1), Self.activity(2), Self.activity(3)])
+        store.activeSportTypes = [.run]
+        store.replaceSelection(with: [1, 2, 3])
+        store.activate(1)
+        store.activities = [Self.activity(2, sport: .ride), Self.activity(3)]
+        #expect(store.selectedActivityIDs == [2, 3])
+        #expect(store.activeActivityID == 3)
+    }
+
+    @Test func deletionDoesNotActivateAnOldSoleVisibleSurvivor() {
+        let store = ActivityStore(activities: [Self.activity(1), Self.activity(2), Self.activity(3, sport: .ride)])
+        store.activeSportTypes = [.run]
+        store.replaceSelection(with: [1, 2, 3])
+        store.activate(1)
+        store.activities = [Self.activity(2), Self.activity(3)]
+        #expect(store.selectedActivityIDs == [2, 3])
+        #expect(store.activeActivityID == nil, "both surviving selections now pass the filter")
+    }
+
+    @Test func updatedActivitiesWithoutDeletionNeverAutoActivate() {
+        let store = ActivityStore(activities: [Self.activity(1), Self.activity(2)])
+        store.activeSportTypes = [.run]
+        store.replaceSelection(with: [1, 2])
+        store.activate(1)
+        store.inspect(1)
+        store.activities = [Self.activity(1, sport: .ride), Self.activity(2)]
+        #expect(store.selectedActivityIDs == [1, 2])
+        #expect(store.activeActivityID == nil && store.inspectedActivityID == nil)
+    }
+
     @Test func tabChangesKeepSelectionFocusAndInspection() {
         let store = ActivityStore(activities: [Self.activity(1), Self.activity(2)])
         store.replaceSelection(with: [1])

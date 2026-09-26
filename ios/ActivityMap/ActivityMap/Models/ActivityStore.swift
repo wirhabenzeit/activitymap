@@ -226,13 +226,11 @@ final class ActivityStore {
         selection.setVisible(Set(filteredActivities.map(\.id)))
     }
 
-    /// Committed deletions and rebootstrap removals drop absent IDs using
-    /// the removal rule, then visibility follows the new activity set.
+    /// Reconcile removals and filter eligibility as one committed snapshot.
     private func reconcileSelectionWithActivities() {
-        let known = activityIndex
-        let referenced = selection.selectedIDs
-            .union([selection.activeID, selection.inspectedID].compactMap { $0 })
-        selection.removeActivities(referenced.subtracting(known))
-        reconcileSelectionVisibility()
+        selection.reconcileActivities(
+            existingIDs: activityIndex,
+            visibleIDs: Set(filteredActivities.map(\.id))
+        )
     }
 }

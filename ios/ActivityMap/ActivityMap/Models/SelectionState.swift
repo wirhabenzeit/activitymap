@@ -151,6 +151,17 @@ nonisolated struct SelectionState: Equatable, Sendable {
         applyRemovalRule(selectionChanged: selectedIDs != previous)
     }
 
+    /// A committed snapshot can remove IDs and change filter eligibility in
+    /// the same pass. Apply the removal rule against its final visibility,
+    /// without transiently activating a survivor from the previous snapshot.
+    mutating func reconcileActivities(existingIDs: Set<Int>, visibleIDs: Set<Int>) {
+        let previous = selectedIDs
+        selectedIDs.formIntersection(existingIDs)
+        self.visibleIDs = visibleIDs.intersection(existingIDs)
+        if let inspectedID, !self.visibleIDs.contains(inspectedID) { self.inspectedID = nil }
+        applyRemovalRule(selectionChanged: selectedIDs != previous)
+    }
+
     /// Logout, account or deployment transition.
     mutating func clearScope() {
         self = SelectionState()
