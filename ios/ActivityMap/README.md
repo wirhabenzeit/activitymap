@@ -84,7 +84,7 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
   -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
 ```
 
-CI runs the same Swift Testing target. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and Mapbox initialization. No credentials or local server are required.
+CI runs the same Swift Testing target. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered route-picking test explicitly creates a Mapbox view with a local style and synthetic geometry; it does not fetch a basemap. No credentials or local server are required.
 
 To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
 
@@ -93,6 +93,16 @@ node --env-file=.env scripts/verify-ios-sync-local.mjs <simulator-udid>
 ```
 
 This opt-in test uses an existing connected account in the local database. It creates and removes a temporary 30-minute local session, verifies bootstrap, delta catch-up, disk reload and offline UI loading, and prints only counts. It rejects non-local database targets. Normal CI skips this test and uses deterministic HTTP/page fixtures.
+
+## Map route selection
+
+Tap within 22 points of a visible route to select it. A normal tap replaces selection with all nearby routes; a single hit opens detail, while overlapping hits open a chooser ordered by screen distance, then numeric activity ID descending. The chooser has separate selection and detail controls. Its medium-height presentation leaves the map interactive. List inspection stays independent.
+
+The floating **N selected** menu provides **Show selected routes**, **Add routes to selection**, and **Clear selection**. It appears after the first selection; clearing selection also exits Add mode. Add unions the hit set without changing the active route; choose a result explicitly to activate it. An empty-map tap clears selection in either mode. The selected-count menu discloses how many selections are hidden by filters; clearing and changing Add mode remain available even when all selected routes are hidden. Hidden routes are neither rendered nor picked. Pans/zooms use Mapbox's native gesture recognition and cancel any pending hit query; loading/query errors preserve selection.
+
+Selected routes have a wider white casing; the active route adds a dark outer casing. All layers share one cached GeoJSON snapshot per activity revision, retained across tab changes and cleared on scope reset. Selection/filter updates change layer filters only. Canonical string feature IDs avoid precision loss through Double. Picking queries only the ordinary activity route layer; raster/POI layers cannot enter the hit set. Native annotation controls consume their own taps before route handling; photo-marker integration remains #219.
+
+`RoutePickingTests` covers hit ordering, tolerance, duplicate tile fragments, partial geometry, filtered/hidden selection, stale responses and geometry reuse with 2,000 activities. `RenderedRoutePickingTests` exercises the production layers and query adapter in the real Mapbox renderer. Physical-device gesture/VoiceOver checks and dense-library performance measurements remain acceptance work; the cache build counter is not a frame-time benchmark. Camera retention/fitting (#205), the reusable detail design (#208) and persistent results panel (#209) remain separate follow-ups.
 
 ## Shared configuration direction
 

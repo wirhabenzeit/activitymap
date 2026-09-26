@@ -35,6 +35,8 @@ final class ActivityStore {
     /// data (e.g. the map's route source) only when the activities change.
     private(set) var activitiesRevision = 0
 
+    @ObservationIgnored let routeGeometry = RouteGeometryCache()
+
     init(activities: [Activity] = []) {
         self.activities = activities
         selection.setVisible(Set(filteredActivities.map(\.id)))
@@ -218,6 +220,7 @@ final class ActivityStore {
     /// Logout, account or deployment transition.
     func clearScope() {
         activities = []
+        routeGeometry.update(activities: [], revision: activitiesRevision)
         selection.clearScope()
     }
 
