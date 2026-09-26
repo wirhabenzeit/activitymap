@@ -15,12 +15,26 @@ struct MapScreen: View {
         SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault)
     )
     @State private var picker = RoutePicker()
+    @ScaledMetric(relativeTo: .caption2) private var attributionFontSize: CGFloat = 11
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             GeometryReader { geometry in
                 MapReader { proxy in
                     mapView(proxy: proxy, geometry: geometry)
+                }
+                if let attribution {
+                    let layout = attributionLayout(in: geometry)
+                    Text(attribution)
+                        .font(.system(size: attributionFontSize))
+                        .foregroundStyle(Color.primary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .frame(width: layout.creditSize.width, height: layout.creditSize.height)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
+                        .position(layout.creditCenter)
+                        .allowsHitTesting(false)
                 }
             }
 
@@ -31,21 +45,10 @@ struct MapScreen: View {
 
         }
         .overlay(alignment: .bottomLeading) {
-            VStack(alignment: .leading, spacing: 8) {
-                if let attribution {
-                    Text(attribution)
-                        .font(.caption2)
-                        .foregroundStyle(Color.primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .modifier(MapChromeSurface())
-                        .allowsHitTesting(false)
-                }
-                selectionMenu
-            }
-            .padding(.leading, 16)
-            .padding(.trailing, 132)
-            .padding(.bottom, 32)
+            selectionMenu
+                .padding(.leading, 16)
+                .padding(.trailing, 132)
+                .padding(.bottom, 32)
         }
         .sheet(isPresented: $picker.isPresented) {
             RoutePickerSheet(picker: picker, store: store)
@@ -85,7 +88,7 @@ struct MapScreen: View {
             }
         }
         .mapStyle(mapStyle)
-        .ornamentOptions(bottomAttributionOptions(in: geometry))
+        .ornamentOptions(attributionLayout(in: geometry).ornamentOptions)
         .gestureHandlers(MapGestureHandlers(onBegin: { gesture in
             if gesture != .singleTap { picker.invalidateQuery() }
         }))
@@ -97,26 +100,9 @@ struct MapScreen: View {
         }
     }
 
-    private func bottomAttributionOptions(in geometry: GeometryProxy) -> OrnamentOptions {
-        // Native ornament sizes in the pinned Mapbox SDK: 85×21 wordmark,
-        // 44×44 info target. Position their combined row, not each corner.
-        let logoWidth: CGFloat = 85
-        let infoSize: CGFloat = 44
-        let gap: CGFloat = 8
-        let leading = max(8, (geometry.size.width - logoWidth - gap - infoSize) / 2)
-        // Use the lower safe-area space, leaving at least 18pt below the full
-        // info target for the home indicator. On screens without an inset,
-        // retain an 18pt bottom margin instead.
-        let bottom = 18 - geometry.safeAreaInsets.bottom
-        return OrnamentOptions(
-            logo: LogoViewOptions(position: .bottomLeft, margins: CGPoint(
-                // The info glyph is bottom-aligned inside its 44pt target.
-                x: leading, y: bottom
-            )),
-            attributionButton: AttributionButtonOptions(position: .bottomLeft, margins: CGPoint(
-                x: leading + logoWidth + gap, y: bottom
-            ))
-        )
+    private func attributionLayout(in geometry: GeometryProxy) -> MapAttributionLayout {
+        MapAttributionLayout(size: geometry.size, bottomInset: geometry.safeAreaInsets.bottom,
+                             credit: attribution, fontSize: attributionFontSize)
     }
 
     private func routeInteraction(proxy: MapProxy) -> TapInteraction {
@@ -134,7 +120,8 @@ struct MapScreen: View {
             rasterSource(
                 id: "selected-raster-base",
                 url: raster.url,
-                tileSize: raster.tileSize
+                tileSize: raster.tileSize,
+                attribution: baseStyle.attribution
             )
 
             RasterLayer(id: "selected-raster-base-layer", source: "selected-raster-base")
@@ -144,7 +131,8 @@ struct MapScreen: View {
             rasterSource(
                 id: overlay.sourceID,
                 url: overlay.url,
-                tileSize: overlay.tileSize
+                tileSize: overlay.tileSize,
+                attribution: overlay.attribution
             )
 
             RasterLayer(id: overlay.layerID, source: overlay.sourceID)
@@ -280,10 +268,11 @@ struct MapScreen: View {
         }
     }
 
-    private func rasterSource(id: String, url: String, tileSize: Double) -> RasterSource {
+    private func rasterSource(id: String, url: String, tileSize: Double, attribution: String?) -> RasterSource {
         var source = RasterSource(id: id)
             .tiles([url])
         source.tileSize = tileSize
+        source.attribution = attribution
         return source
     }
 
