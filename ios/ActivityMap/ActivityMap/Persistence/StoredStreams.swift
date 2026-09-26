@@ -10,8 +10,8 @@ nonisolated final class StoredRawStreams {
     var activityID: String
     var generation: String?
     var revision: String
-    /// Set when sync reports a different generation or a newer/invalidated
-    /// revision. Kept for offline display, but never presented as current.
+    /// Set when sync reports a newer revision or an invalidation of this one.
+    /// Kept for offline display, but never presented as current.
     var invalidated: Bool
     var storedAt: Date
     /// `StreamMetadata`, encoded with `StoreCodec`.
@@ -219,16 +219,22 @@ nonisolated enum StreamRevision {
         return left == right ? .orderedSame : (left < right ? .orderedAscending : .orderedDescending)
     }
 
-    /// Whether `metadata` (from sync) describes a different or newer set than
-    /// the cached `generation`/`revision`. A generation change always wins,
-    /// because generations are not ordered; an older revision never does.
+    /// Whether `metadata` (from sync) describes a newer set than the cached
+    /// current `generation`/`revision`.
+    ///
+    /// Relies on a server invariant (docs/activity-streams.md): for as long as
+    /// an activity exists, a successful fetch increments `revision` and keeps
+    /// the generation, while invalidation rotates the generation and keeps the
+    /// revision. Revision therefore orders sets across generations; at equal
+    /// revision, a different generation or `stale` state is a later
+    /// invalidation. A reset (deletion and recreation) reaches the client as a
+    /// tombstone or a re-bootstrap, both of which clear the cache first.
     static func supersedes(_ metadata: ActivityMapAPI.StreamMetadata, generation: String?, revision: String) -> Bool {
-        guard metadata.generation == generation else { return true }
         switch compare(metadata.revision, revision) {
-        case .orderedDescending: return true
-        // Invalidation keeps the revision; only a new successful fetch bumps it.
-        case .orderedSame: return metadata.state == .stale
-        case .orderedAscending: return false
+        case .orderedDescending: true
+        case .orderedSame: metadata.generation != generation || metadata.state == .stale
+        // Delayed sync; never regress a newer cache entry.
+        case .orderedAscending: false
         }
     }
 }

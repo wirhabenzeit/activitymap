@@ -295,7 +295,7 @@ async function run() {
     [[ID, expectedSummary]],
   );
 
-  const generation = (await repository.read(actor, ID))!.generation;
+  const { generation, revision } = (await repository.read(actor, ID))!;
   const beforeInvalidation = await changes.latestSequence(actor.athleteId);
   await testDb
     .update(activities)
@@ -303,6 +303,9 @@ async function run() {
     .where(eq(activities.id, Number(ID)));
   const invalid = await repository.read(actor, ID);
   assert.notEqual(invalid?.generation, generation);
+  // Clients order cached sets by revision alone: invalidation rotates the
+  // generation but must never change the revision (see activity-streams.md).
+  assert.equal(invalid?.revision, revision);
   assert.equal(toActivityStreamsDTO(ID, invalid).streams, null);
   assert.equal(
     (await changes.findAfter(actor.athleteId, beforeInvalidation)).length,
@@ -310,12 +313,13 @@ async function run() {
   );
   // Explicit webhook invalidation also catches edits whose source fields are unchanged.
   await fetch();
+  const refetched = (await repository.read(actor, ID))!;
+  assert.ok(BigInt(refetched.revision) > BigInt(revision));
   await testDb.execute(sql`select invalidate_activity_streams(${ID}::bigint)`);
-  assert.equal(
-    toActivityStreamsDTO(ID, await repository.read(actor, ID)).metadata
-      .state,
-    'stale',
-  );
+  const reinvalidated = await repository.read(actor, ID);
+  assert.equal(toActivityStreamsDTO(ID, reinvalidated).metadata.state, 'stale');
+  assert.notEqual(reinvalidated?.generation, refetched.generation);
+  assert.equal(reinvalidated?.revision, refetched.revision);
 
   let claim = await repository.begin(actor, ID, now());
   assert.equal(claim.kind, 'fetch');

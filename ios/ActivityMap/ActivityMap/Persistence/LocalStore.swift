@@ -214,8 +214,8 @@ private nonisolated struct StreamRowIndex {
         summaries[activityID] = nil
     }
 
-    /// Marks both representations stale when sync describes a different or
-    /// newer set. Returns whether anything changed. Only data actually
+    /// Marks both representations stale when sync describes a newer set or
+    /// an invalidation of the cached one. Returns whether anything changed. Only data actually
     /// requested later is refetched; nothing here triggers a download.
     func invalidate(activityID: String, against metadata: ActivityMapAPI.StreamMetadata) -> Bool {
         var changed = false

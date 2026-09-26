@@ -145,11 +145,15 @@ struct StreamCacheTests {
         #expect(try await current(id) == (false, false))
         #expect(try await current("2") == (true, true))
 
-        // Invalidation of the cached revision, and a generation change.
-        try await store.apply([.upsertActivity(try StreamFixtures.activity(id: "2", revision: "5", state: "stale"))], scope: scope)
+        // Invalidation of the cached revision rotates the generation.
+        try await store.apply([.upsertActivity(try StreamFixtures.activity(id: "2", generation: "g2", revision: "5", state: "stale"))], scope: scope)
         #expect(try await current("2") == (false, false))
+
+        // Revision orders across generations: an older one is delayed sync.
         #expect(try await saveRaw(store, id: "3", generation: "g1", revision: "9") == .stored)
-        try await store.apply([.upsertActivity(try StreamFixtures.activity(id: "3", generation: "g2", revision: "1"))], scope: scope)
+        try await store.apply([.upsertActivity(try StreamFixtures.activity(id: "3", generation: "g0", revision: "8", state: "stale"))], scope: scope)
+        #expect(try await current("3") == (true, nil))
+        try await store.apply([.upsertActivity(try StreamFixtures.activity(id: "3", generation: "g2", revision: "9", state: "stale"))], scope: scope)
         #expect(try await current("3") == (false, nil))
 
         // Stale entries remain readable offline, flagged as not current.
@@ -159,17 +163,31 @@ struct StreamCacheTests {
         #expect(try await store.snapshot(scope: scope).activities.count == 3)
     }
 
-    @Test func directResponseOlderThanCommittedSyncIsStoredAsStale() async throws {
+    @Test func directResponsesAreReconciledWithCommittedSync() async throws {
         let store = try memoryStore()
+        func isCurrent() async throws -> Bool? {
+            try await store.cachedStreamSummary(activityID: id, scope: scope)?.isCurrent
+        }
         try await store.apply([.upsertActivity(try StreamFixtures.activity(revision: "3"))], scope: scope)
+        // Sync already knows a newer set.
         #expect(try await saveSummary(store, revision: "2") == .stored)
-        #expect(try await store.cachedStreamSummary(activityID: id, scope: scope)?.isCurrent == false)
-        // A response of another generation may be newer than lagging sync.
-        #expect(try await saveSummary(store, generation: "g2", revision: "1") == .stored)
-        #expect(try await store.cachedStreamSummary(activityID: id, scope: scope)?.isCurrent == true)
-        // Once sync reports that generation, nothing changes.
-        try await store.apply([.upsertActivity(try StreamFixtures.activity(generation: "g2", revision: "1"))], scope: scope)
-        #expect(try await store.cachedStreamSummary(activityID: id, scope: scope)?.isCurrent == true)
+        #expect(try await isCurrent() == false)
+        // Sync lags behind a refetch after an invalidation: the response is newer.
+        #expect(try await saveSummary(store, generation: "g2", revision: "4") == .stored)
+        #expect(try await isCurrent() == true)
+        // Delayed sync items for older revisions, of any generation, change nothing.
+        try await store.apply([.upsertActivity(try StreamFixtures.activity(generation: "g2", revision: "3", state: "stale"))], scope: scope)
+        try await store.apply([.upsertActivity(try StreamFixtures.activity(generation: "g1", revision: "3"))], scope: scope)
+        #expect(try await isCurrent() == true)
+        try await store.apply([.upsertActivity(try StreamFixtures.activity(generation: "g2", revision: "4"))], scope: scope)
+        #expect(try await isCurrent() == true)
+        // A later invalidation of the cached revision wins.
+        try await store.apply([.upsertActivity(try StreamFixtures.activity(generation: "g3", revision: "4", state: "stale"))], scope: scope)
+        #expect(try await isCurrent() == false)
+        // So does sync that is exactly as new as an invalidated response's revision.
+        try await store.apply([.upsertActivity(try StreamFixtures.activity(id: "2", generation: "g5", revision: "7", state: "stale"))], scope: scope)
+        #expect(try await saveSummary(store, id: "2", generation: "g4", revision: "7") == .stored)
+        #expect(try await store.cachedStreamSummary(activityID: "2", scope: scope)?.isCurrent == false)
     }
 
     // MARK: - Ordering and fencing
@@ -182,9 +200,14 @@ struct StreamCacheTests {
         #expect(try await saveRaw(store, revision: "1", fence: earlier) == .superseded)
         #expect(try await saveSummary(store, revision: "2", fence: later) == .stored)
         #expect(try await saveSummary(store, revision: "1", fence: earlier) == .superseded)
-        // Across generations, the later request wins.
-        #expect(try await saveSummary(store, generation: "g0", revision: "7", fence: earlier) == .superseded)
-        #expect(try await store.cachedStreamSummary(activityID: id, scope: scope)?.metadata.revision == "2")
+        // Revision orders across generations, whichever request started first.
+        #expect(try await saveSummary(store, generation: "g0", revision: "1", fence: later) == .superseded)
+        #expect(try await saveSummary(store, generation: "g3", revision: "3", fence: earlier) == .stored)
+        #expect(try await store.cachedStreamSummary(activityID: id, scope: scope)?.metadata.generation == "g3")
+        // At equal revision, the later request wins.
+        let newest = await store.streamFence()
+        #expect(try await saveSummary(store, generation: "g5", revision: "3", fence: newest) == .stored)
+        #expect(try await saveSummary(store, generation: "g4", revision: "3", fence: earlier) == .superseded)
         // Numeric, not lexicographic, revision order.
         #expect(try await saveRaw(store, revision: "10") == .stored)
         #expect(try await saveRaw(store, revision: "9") == .superseded)

@@ -116,14 +116,16 @@ bytes, which keeps sample values, missing keys and unknown per-stream metadata.
 Only `current` sets are cached; a current set without a usable summary is a
 valid cached state. There is no age-based expiry.
 
-Sync never reads stream payloads. When a committed activity upsert carries
-stream metadata with another generation, a newer revision, or the cached
-revision marked `stale`, both cached representations are marked not current
-and are refetched only when requested again. Activity tombstones delete them.
-Writes are fenced by a token captured before each request: a tombstone, a
-scope clear, an account/deployment transition or a sync invalidation after the
-capture discards the response. Within one generation an older revision never
-replaces a newer one; across generations the later request wins.
+Sync never reads stream payloads. Using the ordering invariant above, a
+committed activity upsert whose stream metadata has a newer revision, or the
+cached revision with another generation or `stale` state, marks both cached
+representations not current; they are refetched only when requested again.
+Older metadata (sync lagging a direct response) is ignored, whatever its
+generation. Activity tombstones and re-bootstraps delete the cache. Writes are
+fenced by a token captured before each request: a tombstone, a scope clear, an
+account/deployment transition or a sync invalidation after the capture
+discards the response. An older revision never replaces a newer one; at equal
+revision the later request wins.
 
 Follow [the migration deployment sequence](database-migrations.md) before
 enabling a production consumer.
@@ -206,6 +208,17 @@ trigger, and webhooks and deletions invalidate them promptly. A set stays
 and is always `null`.
 Generation plus revision identify a client cache entry; a generation change
 invalidates old data even when the successful revision has not changed.
+
+**Ordering invariant.** For as long as an activity exists, `revision` never
+decreases: a successful commit increments it and keeps the generation, while
+invalidation rotates the generation and keeps the revision. Revision therefore
+orders stream sets across generations, and at equal revision a different
+generation (or `stale` state) is a later invalidation. Only deleting the
+activity (or erasing the athlete) resets it, and clients learn about that
+through a tombstone or a re-bootstrap. The iOS cache relies on this to ignore
+delayed sync metadata; `pnpm db:test-stream-lifecycle` asserts it. Do not bump
+`revision` on invalidation or reset it while the activity exists without
+revisiting the client cache rules.
 
 ### Shared Strava request budget
 

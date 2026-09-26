@@ -161,8 +161,8 @@ extension LocalStore {
 
     /// Nil to proceed with a write, otherwise why it is rejected.
     ///
-    /// Within one generation, revisions order sets, so an older revision never
-    /// replaces a newer one. Generations are unordered, so across them the
+    /// Revisions order sets across generations (see `StreamRevision.supersedes`),
+    /// so an older revision never replaces a newer one. At equal revision the
     /// response to the later request wins.
     private func admission(
         _ incoming: ActivityMapAPI.StreamMetadata,
@@ -171,27 +171,22 @@ extension LocalStore {
     ) -> StreamCacheWrite? {
         guard streamFences.admits(fence, keys: [scopeKey, activityKey]) else { return .fenced }
         guard let existing else { return nil }
-        if existing.generation == incoming.generation {
-            switch StreamRevision.compare(incoming.revision, existing.revision) {
-            case .orderedAscending: return .superseded
-            case .orderedDescending: return nil
-            case .orderedSame: break
-            }
+        switch StreamRevision.compare(incoming.revision, existing.revision) {
+        case .orderedAscending: return .superseded
+        case .orderedDescending: return nil
+        case .orderedSame: return streamFences.wroteLater(than: fence, key: writeKey) ? .superseded : nil
         }
-        return streamFences.wroteLater(than: fence, key: writeKey) ? .superseded : nil
     }
 
     /// Whether committed sync metadata for the activity already describes a
-    /// newer or invalidated set of the same generation. A different generation
-    /// is not evidence either way (sync may lag a direct response), so the
-    /// fresh response is kept as current; a later sync change still wins.
+    /// newer set, or an invalidation of this one. Older sync metadata (sync
+    /// lagging a direct response) leaves the response current.
     private func syncSupersedes(
         _ incoming: ActivityMapAPI.StreamMetadata, activityKey: String, context: ModelContext
     ) -> Bool {
         guard let row = try? context.fetch(FetchDescriptor<StoredActivity>(
                   predicate: #Predicate { $0.key == activityKey })).first,
-              let synced = try? row.decoded().streams,
-              synced.generation == incoming.generation else { return false }
+              let synced = try? row.decoded().streams else { return false }
         return StreamRevision.supersedes(synced, generation: incoming.generation, revision: incoming.revision)
     }
 }
