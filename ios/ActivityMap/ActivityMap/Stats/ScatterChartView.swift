@@ -10,12 +10,14 @@ struct ScatterChartView: View {
                 .font(.headline)
 
             Chart(activities) { activity in
-                PointMark(
-                    x: .value("Distance", activity.distance / 1000),
-                    y: .value("Elevation", activity.totalElevationGain)
-                )
-                .foregroundStyle(activity.category.color)
-                .symbolSize(40)
+                if let distance = activity.distance, let elevation = activity.totalElevationGain {
+                    PointMark(
+                        x: .value("Distance", distance / 1000),
+                        y: .value("Elevation", elevation)
+                    )
+                    .foregroundStyle(activity.category.color)
+                    .symbolSize(40)
+                }
             }
             .chartXAxisLabel("Distance (km)")
             .chartYAxisLabel("Elevation gain (m)")

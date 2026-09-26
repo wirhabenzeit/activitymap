@@ -11,13 +11,14 @@ struct TimelineChartView: View {
     }
 
     private var weeklyTotals: [WeekTotal] {
-        let calendar = Calendar.current
+        let calendar = Formatters.activityCalendar
         var totals: [Date: Double] = [:]
         for activity in activities {
+            guard let distance = activity.distance else { continue }
             guard let weekStart = calendar.date(
-                from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: activity.startDate)
+                from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: activity.startDateLocal)
             ) else { continue }
-            totals[weekStart, default: 0] += activity.distance / 1000
+            totals[weekStart, default: 0] += distance / 1000
         }
         return totals
             .map { WeekTotal(weekStart: $0.key, distanceKm: $0.value) }

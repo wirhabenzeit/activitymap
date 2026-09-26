@@ -91,15 +91,20 @@ final class ActivityStore {
     }
 
     var filteredActivities: [Activity] {
-        activities.filter { activity in
+        // DatePicker values carry the user's chosen calendar components;
+        // activity-local timestamps carry theirs in UTC-shaped encoding.
+        let lowerDay = dateRange.map { Formatters.dayKey($0.lowerBound, timeZone: .current) }
+        let upperDay = dateRange.map { Formatters.dayKey($0.upperBound, timeZone: .current) }
+        return activities.filter { activity in
             guard activeCategories.contains(activity.category) else { return false }
             guard activeSportTypes.contains(activity.sportType) else { return false }
 
-            if let dateRange, !dateRange.contains(activity.startDate) { return false }
+            if let lowerDay, let upperDay,
+               !(lowerDay...upperDay).contains(activity.localDayKey) { return false }
 
             if let distanceFilter, !matches(distanceFilter, activity.distance) { return false }
             if let elevationFilter, !matches(elevationFilter, activity.totalElevationGain) { return false }
-            if let durationFilter, !matches(durationFilter, Double(activity.elapsedTime)) { return false }
+            if let durationFilter, !matches(durationFilter, activity.elapsedTime.map(Double.init)) { return false }
 
             if let commuteOnly, activity.commute != commuteOnly { return false }
 
@@ -118,7 +123,8 @@ final class ActivityStore {
         return count
     }
 
-    private func matches(_ filter: NumericFilter, _ value: Double) -> Bool {
+    private func matches(_ filter: NumericFilter, _ value: Double?) -> Bool {
+        guard let value, value.isFinite else { return false }
         switch filter.operatorType {
         case .gte: return value >= filter.value
         case .lte: return value <= filter.value
