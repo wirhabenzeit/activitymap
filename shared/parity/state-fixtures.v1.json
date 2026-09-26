@@ -414,6 +414,351 @@
           }
         }
       ]
+    },
+    {
+      "name": "addition removal and visibility use distinct activation rules",
+      "initial": {
+        "selected_ids": [],
+        "active_id": null,
+        "inspected_id": null,
+        "visible_ids": [
+          "101",
+          "102",
+          "103"
+        ]
+      },
+      "steps": [
+        {
+          "name": "adding to empty selection does not open detail",
+          "event": {
+            "type": "add_selection",
+            "ids": [
+              "101"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "duplicate addition stays a no-op",
+          "event": {
+            "type": "add_selection",
+            "ids": [
+              "101",
+              "101"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "explicit Show on map adds and activates",
+          "event": {
+            "type": "show_on_map",
+            "id": "101",
+            "geometry_available": true
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "adding multiple results preserves focus",
+          "event": {
+            "type": "add_selection",
+            "ids": [
+              "102",
+              "103"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "102",
+              "103"
+            ],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "explicit activation changes focus",
+          "event": {
+            "type": "activate",
+            "id": "102"
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "102",
+              "103"
+            ],
+            "active_id": "102",
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "removing active with multiple survivors clears focus",
+          "event": {
+            "type": "remove_selection",
+            "ids": [
+              "102"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "103"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "removing to one visible survivor activates it",
+          "event": {
+            "type": "remove_selection",
+            "ids": [
+              "103"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "hiding the active selection clears focus",
+          "event": {
+            "type": "set_visible",
+            "ids": [
+              "102",
+              "103"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "restoring sole selection visibility does not open detail",
+          "event": {
+            "type": "set_visible",
+            "ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "removing an unselected ID does not reopen sole selection",
+          "event": {
+            "type": "remove_selection",
+            "ids": [
+              "102"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "explicit replacement does reopen sole selection",
+          "event": {
+            "type": "replace_selection",
+            "ids": [
+              "101"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "deleting the active selection removes visibility and focus",
+          "event": {
+            "type": "remove_activities",
+            "ids": [
+              "101"
+            ]
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "102",
+              "103"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "bulk addition and toggle do not imply replacement",
+      "initial": {
+        "selected_ids": [],
+        "active_id": null,
+        "inspected_id": null,
+        "visible_ids": [
+          "101"
+        ]
+      },
+      "steps": [
+        {
+          "name": "select all with one visible result does not open detail",
+          "event": {
+            "type": "select_all_filtered"
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101"
+            ]
+          }
+        },
+        {
+          "name": "deselect all clears the selected scope",
+          "event": {
+            "type": "deselect_all_filtered"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101"
+            ]
+          }
+        },
+        {
+          "name": "toggle adds without opening detail",
+          "event": {
+            "type": "toggle_selection",
+            "id": "101"
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101"
+            ]
+          }
+        },
+        {
+          "name": "toggle removes without opening another result",
+          "event": {
+            "type": "toggle_selection",
+            "id": "101"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101"
+            ]
+          }
+        }
+      ]
     }
   ],
   "summaryScopeCase": {
@@ -594,6 +939,56 @@
       },
       "expected": {
         "available": false
+      }
+    },
+    {
+      "name": "sub-kilometre relative span uses metres",
+      "summary": {
+        "version": 1,
+        "basis": "distance",
+        "distance": [
+          100,
+          1099.9
+        ],
+        "altitude": [
+          1,
+          2
+        ]
+      },
+      "expected": {
+        "available": true,
+        "relative_distance": [
+          0,
+          999.9
+        ],
+        "distance_unit": "m",
+        "altitude_min": 1,
+        "altitude_max": 2
+      }
+    },
+    {
+      "name": "kilometre threshold uses relative span not absolute distance",
+      "summary": {
+        "version": 1,
+        "basis": "distance",
+        "distance": [
+          100,
+          1100
+        ],
+        "altitude": [
+          1,
+          2
+        ]
+      },
+      "expected": {
+        "available": true,
+        "relative_distance": [
+          0,
+          1000
+        ],
+        "distance_unit": "km",
+        "altitude_min": 1,
+        "altitude_max": 2
       }
     }
   ]

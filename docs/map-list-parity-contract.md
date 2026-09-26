@@ -18,16 +18,20 @@ Visibility means passing the shared activity filter, not being inside the curren
 
 | Event | Selection | Active map activity | List inspection |
 | --- | --- | --- | --- |
-| Select one / replace selection | Replace with supplied existing IDs | If exactly one supplied ID is visible, activate it; otherwise retain the existing active ID only if still selected and visible | Unchanged |
-| Toggle/add/remove | Apply to the set; IDs stay unique | Reconcile as above; never retain a removed/hidden active ID | Unchanged |
+| Select one / replace selection | Replace with supplied existing IDs | If exactly one resulting selected ID is visible, activate it; otherwise retain the existing active ID only if still selected and visible, or clear | Unchanged |
+| Add selection | Union supplied existing IDs with selection | Preserve the existing active ID if still selected and visible, otherwise none. Adding alone never activates a result, including an addition to empty selection | Unchanged |
+| Remove selection | Subtract supplied IDs | If selection changed and exactly one remaining selected ID is visible, activate that ID; otherwise retain the existing active ID only if still selected and visible, or clear | Unchanged |
+| Toggle one ID | Add if unselected; remove if selected | Use the corresponding add or remove rule above | Unchanged |
 | Activate a result | Unchanged | Set if selected and visible; an invalid activation clears active without selecting anything | Unchanged |
 | Open/close list detail | Unchanged | Unchanged | Open/clear inspected ID |
-| Filter changes | Preserve existing selected IDs | Preserve only if still visible; otherwise clear. Merely restoring a filter does not reopen a formerly active detail | Close if the inspected row is no longer visible |
-| Select all in named scope | Union the indicated IDs with existing selection | Reconcile selection as above | Unchanged |
-| Deselect all in named scope | Subtract only the indicated IDs | Reconcile selection as above | Unchanged |
+| Filter changes | Preserve existing selected IDs | Preserve only if still visible; otherwise clear. Never activate another result, even if exactly one visible selection remains. Restoring a filter does not reopen a formerly active detail | Close if the inspected row is no longer visible |
+| Select all in named scope | Union the indicated IDs with existing selection | Use the add rule; do not activate a new result | Unchanged |
+| Deselect all in named scope | Subtract only the indicated IDs | Use the remove rule | Unchanged |
 | Clear selection | Empty | None | Unchanged |
-| Committed deletion/rebootstrap removal | Remove absent IDs | Reconcile remaining selection | Close if absent |
+| Committed deletion/rebootstrap removal | Remove absent IDs from selection and visibility | Use the remove rule, based on whether selected IDs were removed | Close if absent |
 | Logout/account/deployment transition | Empty | None | None |
+
+All active-ID rules use the **resulting selected set intersected with filter-visible IDs**, not just the IDs supplied by the event. Adding an already selected ID or removing an unselected ID is a no-op and does not reopen a detail. A multi-ID toggle, if exposed, computes the final set once: use the remove rule if any previously selected ID was removed, otherwise the add rule. Show on map is an explicit exception to passive addition: it adds the target **and activates it**, as specified below.
 
 Web pagination's header checkbox is explicitly **Select this page**; offer **Select all filtered activities** separately. Native continuous-list selection uses **All filtered activities**, not only instantiated SwiftUI rows. Both expose deselect-all and mixed selection feedback. A global Clear selection includes hidden IDs.
 
@@ -53,7 +57,7 @@ All restrictions combine with AND. There is one filter state for list, map route
 | --- | --- |
 | Name search | Normalize name/query to Unicode NFC, use locale-independent lowercase, trim the query's outer whitespace, then perform substring matching. Internal whitespace and accents remain significant. Empty/whitespace-only search imposes no restriction. |
 | Sport types | A set of canonical sport types; no selected sports means no results. A missing fixture field means all, not an empty set. |
-| Sport groups | Group controls modify only their member types and derive all/none/mixed from those types. There is no second hidden category predicate that can contradict checked types. Existing category memberships/colors are the reference. |
+| Sport groups | A single group toggle modifies only its member types: all → none; none or mixed → all. Derive all/none/mixed from those types. An explicit solo-group action may deselect other groups. There is no second hidden category predicate that can contradict checked types. Existing category memberships/colors are the reference. |
 | Commute/private/flagged | Each has Any/Yes/No. Any includes true, false and unknown/null; Yes matches only true; No matches only false. Unknown is not false. All three restrictions must be visible and resettable. |
 | Numeric values | Inclusive `>=` or `<=` on distance, elapsed duration and elevation gain. An active comparison excludes absent/non-finite values. A measured zero participates normally. UI input converts exactly once to canonical metres/seconds. No restriction means missing values are included. |
 | Dates | Inclusive activity-local calendar-day range, represented semantically as `YYYY-MM-DD` endpoints. No restriction means all dates. Reject invalid/inverted UI ranges with actionable feedback rather than silently applying a different range. |
@@ -113,11 +117,23 @@ Reference surfaces must be captured from the same fixtures: no activities, no fi
 
 Compact elevation charts use server summaries; full raw samples are independent. Require aligned altitude and usable forward distance for the current elevation-by-distance baseline. A time-basis or absent series is an explicit unavailable profile, not a zero chart. Do not index samples into an independently simplified route polyline. HR/power charts and map-linked scrubbing remain outside this parity baseline.
 
+In `profileCases`, `relative_distance` is always in **metres**, computed by subtracting the first distance sample; `distance_unit` specifies axis display formatting only. Use metres when the relative span is less than 1,000 m and kilometres at or above 1,000 m, dividing relative metres by 1,000 only for display. Altitude values/extrema remain metres. Thus `[0, 1000]` with `distance_unit: "km"` displays from 0 to 1 km, not 0 to 1,000 km.
+
 Respect server retry timing for pending/429/retryable 503 and bound/cancel requests. No raw download or decode on ordinary map/list launch, compact detail open or sync. #230 may change the encoded summary format and delivery after measurement; it has not yet selected a codec or shipped activity-embedded samples.
 
 Photo metadata is already synced. Galleries preserve activity association and distinguish cached bytes from merely known URLs. Valid zero latitude/longitude are valid map locations; null/out-of-range coordinates omit only the map marker. Image failure is neither an empty library nor an expired session.
 
 #231 resolves freshness ownership: there is no seven-day client data TTL. An unexpired scoped session may read a 30-day-old cache, including when server reconciliation metadata is missing. An old timestamp is informational; known server generation/revision/state invalidation is authoritative. True session expiry, 401, logout, account/deployment transition and observed disconnection/deauthorization still clear/fence data. Reconnect applies changes/tombstones, or one bounded `409 sync_rebootstrap_required` recovery; authoritative snapshot replacement also removes orphan photo/stream caches. Image/cache capacity eviction is a separate policy from source freshness.
+
+`cachePresentationCases.expected` names observable outcomes, not literal UI strings or mutually exclusive internal states:
+
+| Fixture outcome | Required presentation and lifecycle behavior |
+| --- | --- |
+| `show_cached_offline` | Read the authorized, completed cache, including current cached profiles; lack of connectivity or old sync age alone does not clear it or expire sign-in. |
+| `show_cached_with_retry` | Keep that cache visible after a retryable transport failure and expose retry/progress feedback while respecting server retry timing. Do not treat the failure as sign-out. |
+| `clear_scoped_data_sign_in_expired` | A confirmed invalid session clears/fences scoped activity, photo and stream caches and presents expired sign-in/reconnection UI. |
+| `profile_not_current` | Known source invalidation suppresses the invalidated profile's current presentation; keep unrelated authorized activity data. Retained last-good storage is not permission to display that profile as current. |
+| `rebootstrap_once_reconcile_orphan_data` | Recover from `sync_rebootstrap_required` with one bounded snapshot replacement/catch-up attempt. Reconcile orphaned scoped activity/photo/stream data against the authoritative snapshot; a repeat failure surfaces an error instead of looping. |
 
 Owners: #200, #213–#219, #227 and #230. Stream contracts remain in #185; this document is not an alternate transport schema.
 
