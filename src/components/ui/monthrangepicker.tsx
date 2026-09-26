@@ -71,39 +71,41 @@ type QuickSelector = {
   onClick?: (selector: QuickSelector) => void;
 };
 
-const QUICK_SELECTORS: QuickSelector[] = [
-  {
-    label: 'This year',
-    startMonth: new Date(new Date().getFullYear(), 0),
-    endMonth: getEndOfMonth(new Date().getFullYear(), 11),
-  },
-  {
-    label: 'Last year',
-    startMonth: new Date(new Date().getFullYear() - 1, 0),
-    endMonth: getEndOfMonth(new Date().getFullYear() - 1, 11),
-  },
-  {
-    label: 'This month',
-    startMonth: new Date(new Date().getFullYear(), new Date().getMonth()),
-    endMonth: getEndOfMonth(new Date().getFullYear(), new Date().getMonth()),
-  },
-  {
-    label: 'Last month',
-    startMonth: new Date(
-      addMonths(new Date(new Date().getFullYear(), new Date().getMonth()), -1),
-    ),
-    endMonth: getEndOfMonth(
-      addMonths(new Date(new Date().getFullYear(), new Date().getMonth()), -1).getFullYear(),
-      addMonths(new Date(new Date().getFullYear(), new Date().getMonth()), -1).getMonth(),
-    ),
-  },
-  {
-    label: 'Reset',
-    startMonth: new Date(), // Placeholder dates
-    endMonth: new Date(), // Placeholder dates
-    variant: 'destructive',
-  },
-];
+const defaultQuickSelectors = (): QuickSelector[] => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const lastMonth = addMonths(new Date(year, month), -1);
+
+  return [
+    {
+      label: 'This year',
+      startMonth: new Date(year, 0),
+      endMonth: getEndOfMonth(year, 11),
+    },
+    {
+      label: 'Last year',
+      startMonth: new Date(year - 1, 0),
+      endMonth: getEndOfMonth(year - 1, 11),
+    },
+    {
+      label: 'This month',
+      startMonth: new Date(year, month),
+      endMonth: getEndOfMonth(year, month),
+    },
+    {
+      label: 'Last month',
+      startMonth: lastMonth,
+      endMonth: getEndOfMonth(lastMonth.getFullYear(), lastMonth.getMonth()),
+    },
+    {
+      label: 'Reset',
+      startMonth: now,
+      endMonth: now,
+      variant: 'destructive',
+    },
+  ];
+};
 
 type MonthRangeCalProps = {
   selectedMonthRange?: { start: Date; end: Date };
@@ -184,7 +186,7 @@ function MonthRangeCal({
   variant,
   minDate,
   maxDate,
-  quickSelectors = QUICK_SELECTORS,
+  quickSelectors,
   showQuickSelectors = true,
   onYearBackward,
   onYearForward,
@@ -203,9 +205,12 @@ function MonthRangeCal({
   const [endYear, setEndYear] = React.useState<number>(initialEndYear);
   const [endMonth, setEndMonth] = React.useState<number>(initialEndMonth);
   const [rangePending, setRangePending] = React.useState<boolean>(false);
-  const [endLocked, setEndLocked] = React.useState<boolean>(true);
+  const [endLocked, setEndLocked] = React.useState<boolean>(
+    Boolean(selectedMonthRange),
+  );
   const [menuYear, setMenuYear] = React.useState<number>(startYear);
   const setDateRange = useStore((state) => state.setDateRange);
+  const selectors = quickSelectors ?? defaultQuickSelectors();
 
   const effectiveMinDate =
     minDate && maxDate && minDate > maxDate ? maxDate : minDate;
@@ -219,6 +224,8 @@ function MonthRangeCal({
           </div>
           <div className="flex items-center space-x-1">
             <button
+              type="button"
+              aria-label="Previous two years"
               onClick={() => {
                 setMenuYear(menuYear - 1);
                 if (onYearBackward) onYearBackward();
@@ -231,6 +238,8 @@ function MonthRangeCal({
               <ChevronLeft className="h-4 w-4 opacity-50" />
             </button>
             <button
+              type="button"
+              aria-label="Next two years"
               onClick={() => {
                 setMenuYear(menuYear + 1);
                 if (onYearForward) onYearForward();
@@ -269,19 +278,22 @@ function MonthRangeCal({
                                   (menuYear + m.yearOffset < endYear ||
                                     (menuYear + m.yearOffset == endYear &&
                                       m.number < endMonth)) &&
-                                  (rangePending || endLocked)
+                                  (rangePending ||
+                                    (endLocked && selectedMonthRange))
                                   ? 'bg-accent text-accent-foreground'
                                   : '',
                               ),
                               menuYear + m.yearOffset == startYear &&
                                 m.number == startMonth &&
-                                (rangePending || endLocked)
+                                (rangePending ||
+                                  (endLocked && selectedMonthRange))
                                 ? 'rounded-l-md bg-accent text-accent-foreground'
                                 : '',
                             ),
                             menuYear + m.yearOffset == endYear &&
                               m.number == endMonth &&
-                              (rangePending || endLocked) &&
+                              (rangePending ||
+                                (endLocked && selectedMonthRange)) &&
                               menuYear + m.yearOffset >= startYear &&
                               m.number >= startMonth
                               ? 'rounded-r-md bg-accent text-accent-foreground'
@@ -297,6 +309,7 @@ function MonthRangeCal({
                         }}
                       >
                         <button
+                          type="button"
                           onClick={() => {
                             if (rangePending) {
                               if (
@@ -364,7 +377,8 @@ function MonthRangeCal({
                                   menuYear + m.yearOffset == startYear) ||
                                 (endMonth == m.number &&
                                   menuYear + m.yearOffset == endYear &&
-                                  !rangePending)
+                                  !rangePending &&
+                                  selectedMonthRange)
                                   ? (variant?.calendar?.selected ?? 'default')
                                   : (variant?.calendar?.main ?? 'ghost'),
                             }),
@@ -387,13 +401,16 @@ function MonthRangeCal({
 
       {showQuickSelectors ? (
         <div className="flex flex-col justify-center gap-1">
-          {quickSelectors.map((s) => {
+          {selectors.map((s) => {
             return (
               <Button
                 onClick={() => {
-                  if (s.label == 'Reset') setDateRange(undefined);
-                  else {
-                    setStartYear(s.startMonth.getMonth());
+                  if (s.label == 'Reset') {
+                    setRangePending(false);
+                    setEndLocked(false);
+                    setDateRange(undefined);
+                  } else {
+                    setStartYear(s.startMonth.getFullYear());
                     setStartMonth(s.startMonth.getMonth());
                     setEndYear(s.endMonth.getFullYear());
                     setEndMonth(s.endMonth.getMonth());
