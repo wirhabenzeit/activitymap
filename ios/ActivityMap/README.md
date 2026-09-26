@@ -106,13 +106,13 @@ Selected routes have a wider white casing; the active route adds a dark outer ca
 
 ## Map context and navigation
 
-Map/list switches preserve the actual camera (center, zoom, bearing and pitch), basemap and overlays. The map renderer can be recreated; the shared `MapContext` restores it once its style loads. The list stays mounted to preserve its exact scroll offset. Account/scope resets clear camera, list and pending navigation, while retaining display preferences.
+Map/list switches preserve the actual camera (center, zoom, bearing and pitch), basemap and overlays. Both map and list stay mounted across tab switches: this preserves the loaded route renderer without a delayed source reload, as well as the exact list scroll offset. Inactive views ignore touches and are hidden from accessibility; leaving the map dismisses transient route-picking UI. The shared `MapContext` can also restore the camera after renderer recreation. Account/scope resets recreate both views and clear camera and pending navigation, while retaining display preferences.
 
 **Show on map** adds/activates the activity through the shared selection store and frames its latest geometry. Hidden targets require an explicit **Clear filters and show on map** confirmation; GPS-less activities remain inspectable with framing disabled. The camera menu offers **Fit selection**, **Fit filtered routes**, **Reset bearing** and **Reset map view** separately. Switching 2D/3D retains location and zoom.
 
 Fits reserve space for navigation, safe areas, floating controls and the current results sheet. A sheet covering the map’s center defers the request until it shrinks or closes, as the native fit requires a visible projection center. Requests are consumed once after style readiness; later redraws, filter/selection changes and sheet resizing do not repeatedly fit. Point routes use a small extent and zoom cap of 16; date-line routes use the shortest longitude interval. Framing uses Mercator for consistent native camera fitting across styles.
 
-The native renderer tests cover phone/tablet frame sizes, sheet padding, point/date-line routes, deferred requests, pitch/reset behavior, and a real SwiftUI map/list round trip with camera and exact list-offset restoration. Physical-device layout and gesture validation remains part of review.
+The native renderer tests cover phone/tablet frame sizes, sheet padding, point/date-line routes, deferred requests, pitch/reset behavior, and a real SwiftUI map/list round trip with camera and exact list-offset restoration, immediate reuse of all 200 rendered routes without a reload, and renderer disposal on scope reset. Physical-device layout and gesture validation remains part of review.
 
 ## Shared configuration direction
 

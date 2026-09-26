@@ -15,10 +15,14 @@ struct BrowseContent: View {
                     .opacity(store.selectedTab == .list ? 1 : 0)
                     .allowsHitTesting(store.selectedTab == .list)
                     .accessibilityHidden(store.selectedTab != .list)
-                if store.selectedTab == .map {
-                    MapScreen(store: store, topOcclusion: geometry.safeAreaInsets.top)
-                        .ignoresSafeArea(edges: .top)
-                }
+                // Keep the loaded style, GeoJSON source and rendered route tiles
+                // alive too; saving only the camera causes routes to pop in later.
+                MapScreen(store: store, topOcclusion: geometry.safeAreaInsets.top)
+                    .id(store.mapContext.scopeRevision)
+                    .ignoresSafeArea(edges: .top)
+                    .opacity(store.selectedTab == .map ? 1 : 0)
+                    .allowsHitTesting(store.selectedTab == .map)
+                    .accessibilityHidden(store.selectedTab != .map)
             }
         }
         .confirmationDialog("This activity is hidden by filters", isPresented: Binding(

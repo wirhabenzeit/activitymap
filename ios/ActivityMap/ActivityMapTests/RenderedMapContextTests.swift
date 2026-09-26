@@ -98,6 +98,50 @@ extension RenderedRoutePickingTests {
         #expect(resolve() == nil && store.mapContext.pendingRequest == nil)
     }
 
+    @Test func tabReturnKeepsLoadedRouteRenderer() async throws {
+        let oldToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = oldToken }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let oldWindow = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        let store = ActivityStore(activities: (1...200).map { ActivityStoreSelectionTests.activity($0) })
+        let host = UIHostingController(rootView: NavigationStack { BrowseContent(store: store) })
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
+        try await cameraWait { !descendants(host.view, of: MapView.self).isEmpty }
+        let firstMap = try #require(descendants(host.view, of: MapView.self).first)
+        var idle = false
+        let idleEvent = firstMap.mapboxMap.onMapIdle.observe { _ in idle = true }
+        defer { idleEvent.cancel() }
+        firstMap.mapboxMap.loadStyle(CameraHarness.style)
+        try await cameraWait { idle && firstMap.mapboxMap.layerExists(withId: RouteSource.ordinaryLayerID) }
+        firstMap.mapboxMap.setCamera(to: CameraOptions(center: CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005), zoom: 13))
+        try await Task.sleep(for: .milliseconds(150))
+        let picker = RoutePicker()
+        let point = firstMap.mapboxMap.point(for: CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005))
+        picker.pick(at: point, map: firstMap.mapboxMap, store: store)
+        try await cameraWait { picker.isPresented || picker.errorMessage != nil }
+        try #require(picker.candidateIDs.count == 200)
+        store.selectedTab = .list
+        try await Task.sleep(for: .milliseconds(100))
+        store.selectedTab = .map
+        try await cameraWait { !descendants(host.view, of: MapView.self).isEmpty }
+        let returnedMap = try #require(descendants(host.view, of: MapView.self).first)
+        #expect(returnedMap === firstMap, "A tab switch must not recreate the route renderer")
+        try #require(returnedMap.mapboxMap.layerExists(withId: RouteSource.ordinaryLayerID), "Routes must already be loaded on return, without waiting for style/source reload")
+        picker.isPresented = false
+        picker.pick(at: point, map: returnedMap.mapboxMap, store: store)
+        try await cameraWait { picker.isPresented || picker.errorMessage != nil }
+        #expect(picker.errorMessage == nil && picker.candidateIDs.count == 200)
+        #expect(store.routeGeometry.buildCount == 1)
+        store.clearScope()
+        try await cameraWait {
+            descendants(host.view, of: MapView.self).first.map { $0 !== returnedMap } ?? false
+        }
+    }
+
     @Test func nativeTabRoundTripRestoresCameraAndListOffset() async throws {
         let oldToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
@@ -125,20 +169,21 @@ extension RenderedRoutePickingTests {
                                                       zoom: 10, bearing: 25, pitch: 40))
         try await cameraWait { abs(store.mapContext.camera.zoom - 10) < 0.01 }
         store.selectedTab = .list
-        try await cameraWait { descendants(host.view, of: MapView.self).isEmpty }
+        try await Task.sleep(for: .milliseconds(100))
         #expect(abs(list.contentOffset.y - offset) < 1)
         #expect(descendants(host.view, of: UIScrollView.self).contains { $0 === list })
         store.selectedTab = .map
         try await cameraWait { !descendants(host.view, of: MapView.self).isEmpty }
         let secondMap = try #require(descendants(host.view, of: MapView.self).first)
-        #expect(firstMap !== secondMap, "Retention must work even though the renderer is recreated")
-        secondMap.mapboxMap.loadStyle(CameraHarness.style)
-        try await cameraWait { secondMap.mapboxMap.isStyleLoaded }
+        #expect(firstMap === secondMap, "Tab switches must preserve the loaded renderer")
+        #expect(secondMap.mapboxMap.isStyleLoaded)
         try await Task.sleep(for: .milliseconds(150))
         let restored = secondMap.mapboxMap.cameraState
         #expect(abs(restored.center.latitude - 47.1) < 0.001 && abs(restored.center.longitude - 8.7) < 0.001)
         #expect(abs(restored.zoom - 10) < 0.01 && abs(restored.bearing - 25) < 0.01 && abs(restored.pitch - 40) < 0.01)
-        // Exercise the actual SwiftUI intent/viewport adapter, not only the fitter.
+        // Exercise the actual SwiftUI intent/viewport adapter from the hidden map.
+        store.selectedTab = .list
+        try await Task.sleep(for: .milliseconds(100))
         store.showOnMap(150)
         try await cameraWait { store.mapContext.pendingRequest == nil }
         try await Task.sleep(for: .milliseconds(650))
@@ -146,7 +191,7 @@ extension RenderedRoutePickingTests {
         let framed = secondMap.mapboxMap.points(for: try #require(store.activities.first { $0.id == 150 }).coordinates)
         #expect(framed.allSatisfy { $0.y >= secondMap.safeAreaInsets.top + 16 && $0.y <= secondMap.bounds.height - secondMap.safeAreaInsets.bottom - 80 })
         store.selectedTab = .list
-        try await cameraWait { descendants(host.view, of: MapView.self).isEmpty }
+        try await Task.sleep(for: .milliseconds(100))
         #expect(abs(list.contentOffset.y - offset) < 1)
     }
 }

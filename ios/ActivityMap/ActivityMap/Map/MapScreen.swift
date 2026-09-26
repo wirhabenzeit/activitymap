@@ -73,6 +73,14 @@ struct MapScreen: View {
                 picker.isPresented = false
             }
         }
+        .onChange(of: store.selectedTab) { _, tab in
+            if tab != .map {
+                picker.isPresented = false
+                picker.sheetHeight = 0
+                picker.isAdding = false
+                picker.invalidateQuery()
+            }
+        }
         .onChange(of: picker.isAdding) { _, _ in picker.invalidateQuery() }
         .onChange(of: context.baseStyle) { oldStyle, newStyle in
             if oldStyle.styleURL != newStyle.styleURL { acceptsCameraEvents = false }
@@ -119,6 +127,9 @@ struct MapScreen: View {
         }
         .onMapIdle { _ in applyNavigation(proxy: proxy, geometry: geometry) }
         .ignoresSafeArea()
+        .onChange(of: store.selectedTab) { _, tab in
+            if tab == .map { applyNavigation(proxy: proxy, geometry: geometry) }
+        }
         .onChange(of: context.pendingRequest?.id) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
         .onChange(of: picker.sheetHeight) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
         .onChange(of: geometry.size) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
