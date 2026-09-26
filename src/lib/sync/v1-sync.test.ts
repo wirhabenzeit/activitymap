@@ -21,11 +21,17 @@ import type { V1SyncState } from './v1-store.ts';
  * rebootstrap-on-409 — without needing a browser.
  */
 
-const ACTOR: Actor = { userId: 'user-1', athleteId: 42, authentication: 'cookie' };
+const ACTOR: Actor = {
+  userId: 'user-1',
+  athleteId: 42,
+  authentication: 'cookie',
+};
 const NOW = new Date('2026-09-20T12:00:00.000Z');
 const SCOPE = 'auth:user-1';
 
-function buildActivity(overrides: Partial<Activity> & { id: number }): Activity {
+function buildActivity(
+  overrides: Partial<Activity> & { id: number },
+): Activity {
   return {
     athlete: ACTOR.athleteId,
     public_id: overrides.id * 7,
@@ -93,24 +99,42 @@ class FakeServer {
   changes: SyncChange[] = [];
   private nextSequence = 1;
 
-  private recordChange(entry: Omit<SyncChange, 'sequence' | 'athleteId' | 'changedAt'>) {
-    this.changes.push({ sequence: this.nextSequence++, athleteId: ACTOR.athleteId, changedAt: NOW, ...entry });
+  private recordChange(
+    entry: Omit<SyncChange, 'sequence' | 'athleteId' | 'changedAt'>,
+  ) {
+    this.changes.push({
+      sequence: this.nextSequence++,
+      athleteId: ACTOR.athleteId,
+      changedAt: NOW,
+      ...entry,
+    });
   }
 
   upsertActivity(activity: Activity) {
     this.activities.set(activity.id, activity);
-    this.recordChange({ entityType: 'activity', entityId: String(activity.id), operation: 'upsert' });
+    this.recordChange({
+      entityType: 'activity',
+      entityId: String(activity.id),
+      operation: 'upsert',
+    });
   }
 
   deleteActivity(id: number) {
     // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory fake, not a drizzle table
     this.activities.delete(id);
-    this.recordChange({ entityType: 'activity', entityId: String(id), operation: 'delete' });
+    this.recordChange({
+      entityType: 'activity',
+      entityId: String(id),
+      operation: 'delete',
+    });
   }
 
   activitiesRepo() {
     return {
-      findPageByAthlete: async (athleteId: number, { afterId = 0, limit }: { afterId?: number; limit: number }) =>
+      findPageByAthlete: async (
+        athleteId: number,
+        { afterId = 0, limit }: { afterId?: number; limit: number },
+      ) =>
         [...this.activities.values()]
           .filter((a) => a.athlete === athleteId && a.id > afterId)
           .sort((a, b) => a.id - b.id)
@@ -132,9 +156,15 @@ class FakeServer {
   changesRepo() {
     return {
       latestSequence: async () => this.changes.at(-1)?.sequence ?? 0,
-      findAfter: async (athleteId: number, afterSequence: number, { limit = 500 }: { limit?: number } = {}) =>
+      findAfter: async (
+        athleteId: number,
+        afterSequence: number,
+        { limit = 500 }: { limit?: number } = {},
+      ) =>
         this.changes
-          .filter((c) => c.athleteId === athleteId && c.sequence > afterSequence)
+          .filter(
+            (c) => c.athleteId === athleteId && c.sequence > afterSequence,
+          )
           .sort((a, b) => a.sequence - b.sequence)
           .slice(0, limit),
     };
@@ -325,12 +355,20 @@ void test('runV1Sync catches up via /sync/changes once a scope has already boots
   server.upsertActivity(buildActivity({ id: 1 }));
   const { deps, activities } = createFakeStore();
 
-  await runV1Sync({ scope: SCOPE, store: deps, fetchImpl: buildFetchImpl(server) });
+  await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+  });
 
   server.upsertActivity(buildActivity({ id: 2 }));
   server.deleteActivity(1);
 
-  const result = await runV1Sync({ scope: SCOPE, store: deps, fetchImpl: buildFetchImpl(server) });
+  const result = await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+  });
 
   assert.equal(result.mode, 'changes');
   assert.equal(result.activityUpserts, 1);
@@ -350,7 +388,11 @@ void test('runV1Sync clears local state and re-bootstraps on 409 sync_rebootstra
     scope: SCOPE,
     bootstrapCursor: 'stale',
     bootstrapComplete: true,
-    changesCursor: encodeSyncCursor({ sequence: 999, athleteId: ACTOR.athleteId, issuedAt: NOW }),
+    changesCursor: encodeSyncCursor({
+      sequence: 999,
+      athleteId: ACTOR.athleteId,
+      issuedAt: NOW,
+    }),
     lastSyncAt: NOW.toISOString(),
     updatedAt: NOW.toISOString(),
   });
@@ -358,13 +400,88 @@ void test('runV1Sync clears local state and re-bootstraps on 409 sync_rebootstra
     { id: '999' } as ActivityDTO, // stale row a real bootstrap for this fixture would never produce
   ]);
 
-  const result = await runV1Sync({ scope: SCOPE, store: deps, fetchImpl: buildFetchImpl(server) });
+  const result = await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+  });
 
-  assert.equal(result.mode, 'bootstrap', 'a rejected cursor must fall back to a fresh bootstrap');
+  assert.equal(
+    result.mode,
+    'bootstrap',
+    'a rejected cursor must fall back to a fresh bootstrap',
+  );
   assert.deepEqual(
     [...activities.get(SCOPE)!.keys()].sort(),
     ['1'],
     'the stale pre-rebootstrap row must not survive - clearV1Scope ran before the fresh bootstrap',
   );
   assert.equal(states.get(SCOPE)?.bootstrapComplete, true);
+});
+
+void test('runV1Sync publishes ordered activity tombstones to client cache fences', async () => {
+  const server = new FakeServer();
+  server.upsertActivity(buildActivity({ id: 1 }));
+  const { deps } = createFakeStore();
+  const observed: string[] = [];
+  const onActivityChanges = (
+    changes: Array<{ activityId: string; operation: 'upsert' | 'delete' }>,
+  ) => {
+    observed.push(
+      ...changes.map((change) => `${change.operation}:${change.activityId}`),
+    );
+  };
+
+  await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+    onActivityChanges,
+  });
+  observed.length = 0;
+  server.deleteActivity(1);
+
+  await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+    onActivityChanges,
+  });
+  assert.deepEqual(observed, ['delete:1']);
+});
+
+void test('runV1Sync fences the whole scope before a cursor-expiry rebootstrap publishes rows', async () => {
+  const server = new FakeServer();
+  server.upsertActivity(buildActivity({ id: 1 }));
+  const { deps } = createFakeStore();
+  await deps.setV1SyncState({
+    scope: SCOPE,
+    bootstrapCursor: 'stale',
+    bootstrapComplete: true,
+    changesCursor: encodeSyncCursor({
+      sequence: 999,
+      athleteId: ACTOR.athleteId,
+      issuedAt: NOW,
+    }),
+    lastSyncAt: NOW.toISOString(),
+    updatedAt: NOW.toISOString(),
+  });
+  const observed: string[] = [];
+
+  await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+    onScopeReset: () => {
+      observed.push('reset');
+    },
+    onActivityChanges: (changes) => {
+      observed.push(
+        ...changes.map((change) => `${change.operation}:${change.activityId}`),
+      );
+    },
+  });
+
+  assert.equal(observed[0], 'reset');
+  assert.ok(observed.includes('upsert:1'));
 });

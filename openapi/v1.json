@@ -718,6 +718,183 @@
         ],
         "additionalProperties": false
       },
+      "UpdateActivityRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "sport_type": {
+            "type": "string",
+            "enum": [
+              "AlpineSki",
+              "BackcountrySki",
+              "Badminton",
+              "Canoeing",
+              "Crossfit",
+              "EBikeRide",
+              "EMountainBikeRide",
+              "Elliptical",
+              "Golf",
+              "GravelRide",
+              "Handcycle",
+              "HighIntensityIntervalTraining",
+              "Hike",
+              "IceSkate",
+              "InlineSkate",
+              "Kayaking",
+              "Kitesurf",
+              "MountainBikeRide",
+              "NordicSki",
+              "Pickleball",
+              "Pilates",
+              "Racquetball",
+              "Ride",
+              "RockClimbing",
+              "RollerSki",
+              "Rowing",
+              "Run",
+              "Sail",
+              "Skateboard",
+              "Snowboard",
+              "Snowshoe",
+              "Soccer",
+              "Squash",
+              "StairStepper",
+              "StandUpPaddling",
+              "Surfing",
+              "Swim",
+              "TableTennis",
+              "Tennis",
+              "TrailRun",
+              "Velomobile",
+              "VirtualRide",
+              "VirtualRow",
+              "VirtualRun",
+              "Walk",
+              "WeightTraining",
+              "Wheelchair",
+              "Windsurf",
+              "Workout",
+              "Yoga"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ActivityResponse": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "1"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Activity"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "serverTime",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "RefreshActivityResponse": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "1"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "activity": {
+                "$ref": "#/components/schemas/Activity"
+              },
+              "photos": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Photo"
+                }
+              },
+              "photos_status": {
+                "type": "string",
+                "enum": [
+                  "complete",
+                  "partial"
+                ]
+              },
+              "photos_error": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "retry_after_seconds": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "retryable",
+                      "retry_after_seconds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "activity",
+              "photos",
+              "photos_status",
+              "photos_error"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "serverTime",
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "ActivityStreamsResponse": {
         "type": "object",
         "properties": {
@@ -3138,6 +3315,254 @@
           },
           "500": {
             "description": "The request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/activities/{id}": {
+      "patch": {
+        "operationId": "updateActivity",
+        "summary": "Edit an owned activity in Strava and locally",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Updates an existing activity owned by the caller. Omitted fields remain unchanged; an empty description clears it. The response is reread after commit and includes current stream generation/revision/state metadata. A local_persistence_failed response means Strava accepted the edit but the local commit failed. A local_state_conflict response means Strava accepted the edit but a newer local write won the optimistic fence; clients must refresh before deciding whether to retry.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "description": "Canonical decimal activity ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateActivityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The authoritative locally committed activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid activity ID or request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Activity missing or not owned by the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The connected Strava account is unavailable, or Strava accepted the edit but newer local state requires reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-user/API or shared Strava budget exhausted; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected the requested edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Strava is unavailable, external effects are disabled, or Strava succeeded but local persistence failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/activities/{id}/refresh": {
+      "post": {
+        "operationId": "refreshActivity",
+        "summary": "Refresh one owned activity and its photos from Strava",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Synchronously refreshes only the selected existing activity. The returned activity is reread after commit and includes current stream metadata. photos_status=complete means photos is the authoritative replacement set; partial means the photo request failed, the old local photo set was preserved, photos is intentionally empty/non-authoritative, and photos_error carries retry classification/guidance. All committed changes also appear through ordinary delta sync. No raw streams or sync cursor are returned.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "description": "Canonical decimal activity ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed activity refresh with explicit photo completeness",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshActivityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid activity ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Activity missing, deleted upstream, or not owned by the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The connected Strava account is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-user/API or shared Strava budget exhausted; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Strava rejected the refresh",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Strava is unavailable, external effects are disabled, or Strava succeeded but local persistence failed",
             "content": {
               "application/json": {
                 "schema": {

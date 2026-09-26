@@ -7,6 +7,10 @@ import { z } from 'zod';
 import { SCHEMA_VERSION } from './primitives';
 import { authenticationDTOSchema } from './auth';
 import { activityDTOSchema } from './activity';
+import {
+  activityRefreshResultSchema,
+  updateActivityRequestSchema,
+} from './activity-mutations';
 import { photoDTOSchema } from './photo';
 import { currentUserDTOSchema } from './user';
 import { syncBootstrapPageDTOSchema, syncChangesPageDTOSchema } from './sync';
@@ -33,6 +37,11 @@ export function buildOpenApiDocument() {
   registry.add(authenticationDTOSchema, { id: 'Authentication' });
   registry.add(currentUserDTOSchema, { id: 'CurrentUser' });
   registry.add(activityDTOSchema, { id: 'Activity' });
+  registry.add(updateActivityRequestSchema, { id: 'UpdateActivityRequest' });
+  registry.add(responseEnvelope(activityDTOSchema), { id: 'ActivityResponse' });
+  registry.add(responseEnvelope(activityRefreshResultSchema), {
+    id: 'RefreshActivityResponse',
+  });
   registry.add(responseEnvelope(activityStreamsDTOSchema), { id: 'ActivityStreamsResponse' });
   registry.add(responseEnvelope(activityStreamSummaryDTOSchema), {
     id: 'ActivityStreamSummaryResponse',
@@ -334,6 +343,93 @@ export function buildOpenApiDocument() {
             ),
             '429': errorResponse('Too many requests; see `Retry-After`'),
             '500': errorResponse('The request could not be completed'),
+          },
+        },
+      },
+      '/api/v1/activities/{id}': {
+        patch: {
+          operationId: 'updateActivity',
+          summary: 'Edit an owned activity in Strava and locally',
+          security,
+          description:
+            'Updates an existing activity owned by the caller. Omitted fields remain unchanged; an empty description clears it. The response is reread after commit and includes current stream generation/revision/state metadata. A local_persistence_failed response means Strava accepted the edit but the local commit failed. A local_state_conflict response means Strava accepted the edit but a newer local write won the optimistic fence; clients must refresh before deciding whether to retry.',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', pattern: '^[1-9][0-9]*$' },
+              description: 'Canonical decimal activity ID',
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('UpdateActivityRequest') },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'The authoritative locally committed activity',
+              content: {
+                'application/json': { schema: ref('ActivityResponse') },
+              },
+            },
+            '400': errorResponse('Invalid activity ID or request body'),
+            '401': errorResponse('Authentication is required'),
+            '404': errorResponse('Activity missing or not owned by the caller'),
+            '409': errorResponse(
+              'The connected Strava account is unavailable, or Strava accepted the edit but newer local state requires reconciliation',
+            ),
+            '429': errorResponse(
+              'Per-user/API or shared Strava budget exhausted; see Retry-After',
+            ),
+            '500': errorResponse('Unexpected internal failure'),
+            '502': errorResponse('Strava rejected the requested edit'),
+            '503': errorResponse(
+              'Strava is unavailable, external effects are disabled, or Strava succeeded but local persistence failed',
+            ),
+          },
+        },
+      },
+      '/api/v1/activities/{id}/refresh': {
+        post: {
+          operationId: 'refreshActivity',
+          summary: 'Refresh one owned activity and its photos from Strava',
+          security,
+          description:
+            'Synchronously refreshes only the selected existing activity. The returned activity is reread after commit and includes current stream metadata. photos_status=complete means photos is the authoritative replacement set; partial means the photo request failed, the old local photo set was preserved, photos is intentionally empty/non-authoritative, and photos_error carries retry classification/guidance. All committed changes also appear through ordinary delta sync. No raw streams or sync cursor are returned.',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', pattern: '^[1-9][0-9]*$' },
+              description: 'Canonical decimal activity ID',
+            },
+          ],
+          responses: {
+            '200': {
+              description:
+                'Completed activity refresh with explicit photo completeness',
+              content: {
+                'application/json': { schema: ref('RefreshActivityResponse') },
+              },
+            },
+            '400': errorResponse('Invalid activity ID'),
+            '401': errorResponse('Authentication is required'),
+            '404': errorResponse(
+              'Activity missing, deleted upstream, or not owned by the caller',
+            ),
+            '409': errorResponse('The connected Strava account is unavailable'),
+            '429': errorResponse(
+              'Per-user/API or shared Strava budget exhausted; see Retry-After',
+            ),
+            '500': errorResponse('Unexpected internal failure'),
+            '502': errorResponse('Strava rejected the refresh'),
+            '503': errorResponse(
+              'Strava is unavailable, external effects are disabled, or Strava succeeded but local persistence failed',
+            ),
           },
         },
       },

@@ -48,6 +48,18 @@ function daysInMonth(year: number, monthIndex: number): number {
   return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 }
 
+// The same calendar date one year earlier, with 29 February clamped to 28.
+function sameDateLastYear(day: Day): Day {
+  const date = new Date(day * millisecondsPerDay);
+  const year = date.getUTCFullYear() - 1;
+  const month = date.getUTCMonth();
+  return dayFromParts(
+    year,
+    month,
+    Math.min(date.getUTCDate(), daysInMonth(year, month)),
+  );
+}
+
 function mondayOf(day: Day): Day {
   // 1970-01-01 was a Thursday.
   return day - ((day + 3) % 7);
@@ -92,12 +104,7 @@ export function yearToDate(
 ): Comparison {
   const date = new Date(today * millisecondsPerDay);
   const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const previousEnd = dayFromParts(
-    year - 1,
-    month,
-    Math.min(date.getUTCDate(), daysInMonth(year - 1, month)),
-  );
+  const previousEnd = sameDateLastYear(today);
   return {
     current: sumBetween(activities, metric, dayFromParts(year, 0, 1), today),
     previous: sumBetween(
@@ -156,7 +163,7 @@ export function activityCalendar(
   activities: readonly StatsActivity[],
   today: Day,
 ): ActivityCalendar {
-  const first = today - 364;
+  const first = sameDateLastYear(today);
   const timeByDay = new Map<Day, Map<Sport, number>>();
   for (const activity of activities) {
     const day = dayOf(activity.start_date_local);
@@ -290,7 +297,7 @@ export function distanceVsElevation(
   activities: readonly StatsActivity[],
   today: Day,
 ): DistanceVsElevation {
-  const first = today - 364;
+  const first = sameDateLastYear(today);
   const points: DistanceVsElevation['points'] = [];
   for (const activity of activities) {
     const day = dayOf(activity.start_date_local);

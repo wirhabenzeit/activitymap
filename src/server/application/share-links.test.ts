@@ -131,6 +131,14 @@ function fakeActivitiesRepo(activities: Activity[]): ActivitiesRepository {
       else activities.push(activity);
       return activity;
     },
+    async replaceExistingForAthlete(athleteId, activity) {
+      const index = activities.findIndex(
+        (row) => row.id === activity.id && row.athlete === athleteId,
+      );
+      if (index < 0) return null;
+      activities[index] = activity;
+      return activity;
+    },
   };
 }
 

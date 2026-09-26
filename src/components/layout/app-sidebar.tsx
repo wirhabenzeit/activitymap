@@ -18,6 +18,9 @@ import {
   InequalityFilter,
   MonthPicker,
   CategoryFilter,
+  BinaryFilter,
+  ResetFilters,
+  SearchFilter,
 } from './sidebar/filters';
 
 import { UserSettings } from './sidebar/user';
@@ -43,11 +46,15 @@ export function AppSidebar() {
           <SidebarGroupLabel>Filters</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SearchFilter />
               <MonthPicker />
               <InequalityFilter name="distance" />
               <InequalityFilter name="total_elevation_gain" />
               <InequalityFilter name="elapsed_time" />
-              {/* <BinaryFilter name="commute" /> */}
+              <BinaryFilter name="commute" />
+              <BinaryFilter name="private" />
+              <BinaryFilter name="flagged" />
+              <ResetFilters />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

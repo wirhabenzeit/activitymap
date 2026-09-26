@@ -5,6 +5,7 @@ export * from './pagination';
 export * from './envelope';
 export * from './user';
 export * from './activity';
+export * from './activity-mutations';
 export * from './photo';
 export * from './sync';
 export * from './mobile-auth';

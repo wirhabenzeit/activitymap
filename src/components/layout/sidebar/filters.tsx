@@ -1,8 +1,8 @@
 'use client';
 
-import { type Dispatch, type SetStateAction, useEffect } from 'react';
+import { useEffect } from 'react';
 
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Search, RotateCcw } from 'lucide-react';
 
 import { useShallowStore } from '~/store';
 
@@ -41,8 +41,22 @@ import { useState } from 'react';
 import { cn } from '~/lib/utils';
 
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
-import { Checkbox } from '~/components/ui/checkbox';
 import { type SportType } from '~/server/db/schema';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select';
+import {
+  calendarDateFromLocalDate,
+  calendarDateToLocalDate,
+  normalizeDateRange,
+  parseValueFilterInput,
+  toggleSportGroupState,
+  type BinaryFilterMode,
+} from '~/store/filter';
 
 export function CategoryFilter() {
   const { sportType, sportGroup, setSportGroup, setSportType } =
@@ -59,7 +73,11 @@ export function CategoryFilter() {
 
   useEffect(() => {
     const doSingleClickThing = () => {
-      if (key) setSportGroup((group) => ({ ...group, [key]: !group[key] }));
+      if (key)
+        setSportGroup((group) => ({
+          ...group,
+          [key]: toggleSportGroupState(group[key]),
+        }));
     };
 
     const doDoubleClickThing = () => {
@@ -96,6 +114,11 @@ export function CategoryFilter() {
         ([id, { name, color, icon: Icon, alias }]) => (
           <SidebarMenuItem key={id}>
             <SidebarMenuButton
+              aria-pressed={
+                sportGroup[id as keyof typeof sportGroup] === 'mixed'
+                  ? 'mixed'
+                  : sportGroup[id as keyof typeof sportGroup]
+              }
               onClick={(e) => {
                 e.preventDefault();
                 setClicks(clicks + 1);
@@ -116,10 +139,13 @@ export function CategoryFilter() {
               >
                 {name}
               </span>
+              {sportGroup[id as keyof typeof sportGroup] === 'mixed' ? (
+                <span className="sr-only">Some activity types selected</span>
+              ) : null}
             </SidebarMenuButton>
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuAction>
+                <SidebarMenuAction aria-label={`Choose ${name} activity types`}>
                   <MoreHorizontal />
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
@@ -155,14 +181,16 @@ export function CategoryFilter() {
 
 function InequalityFilterContent({
   operator,
-  setOperator,
+  toggleOperator,
   unit,
+  label,
   input,
   validateInput,
 }: {
   operator: '>=' | '<=';
-  setOperator: Dispatch<SetStateAction<'>=' | '<='>>;
+  toggleOperator: () => void;
   unit: string;
+  label: string;
   input: string;
   validateInput: (value: string) => void;
 }) {
@@ -171,13 +199,16 @@ function InequalityFilterContent({
       <Button
         className="absolute left-1 h-6 w-6 px-1 py-1 text-foreground/60"
         variant="secondary"
-        onClick={() => setOperator((op) => (op === '>=' ? '<=' : '>='))}
+        onClick={toggleOperator}
+        aria-label={`Change comparison from ${operator}`}
       >
         {operator}
       </Button>
       <Input
         value={input}
         placeholder="0"
+        aria-label={`${label} filter value in ${unit}`}
+        inputMode="decimal"
         onChange={(event) => validateInput(event.target.value)}
         className="h-8 w-full pl-8 pr-8 text-right focus-visible:bg-background focus-visible:ring-0"
       />
@@ -191,28 +222,44 @@ export function InequalityFilter({
 }: {
   name: keyof typeof inequalityFilters;
 }) {
-  const [operator, setOperator] = useState<'>=' | '<='>('>=' as const);
-  const [input, setInput] = useState('');
-  const [value, setValue] = useState(0.0);
+  const [filter, setValues, setValueOperator] = useShallowStore((state) => [
+    state.values[name],
+    state.setValues,
+    state.setValueOperator,
+  ]);
+  const [pendingOperator, setPendingOperator] = useState<'>=' | '<='>('>=');
+  const operator = filter?.operator ?? pendingOperator;
+  const input =
+    filter?.displayValue ??
+    (filter
+      ? inequalityFilters[name].fromCanonical(filter.value).toString()
+      : '');
 
-  const validateInput = (value: string) => {
-    const number = parseFloat(value);
-    if (!isNaN(number)) {
-      setInput(value);
-      setValue(number);
+  const validateInput = (nextInput: string) => {
+    const parsed = parseValueFilterInput(
+      nextInput,
+      operator,
+      inequalityFilters[name].transform,
+    );
+    if (parsed.status === 'empty') {
+      setPendingOperator(operator);
+      setValues((previous) => ({ ...previous, [name]: undefined }));
+      return;
     }
+    if (parsed.status === 'invalid') return;
+    setValues((previous) => ({
+      ...previous,
+      [name]: parsed.filter,
+    }));
   };
 
-  const setValues = useShallowStore((state) => state.setValues);
   const { open } = useSidebar();
 
-  React.useEffect(() => {
-    const transformed = inequalityFilters[name].transform(value);
-    setValues((prev) => ({
-      ...prev,
-      [name]: input === '' ? undefined : { value: transformed, operator },
-    }));
-  }, [operator, value, input, name, setValues]);
+  const toggleOperator = () => {
+    const next = operator === '>=' ? '<=' : '>=';
+    setPendingOperator(next);
+    setValueOperator(name, next);
+  };
 
   return (
     <SidebarMenuItem className="peer/menu-button flex w-full items-center gap-0 overflow-hidden rounded-md text-left outline-hidden transition-[width,height,padding] group-data-[collapsible=icon]:size-8! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 h-8 text-sm">
@@ -225,8 +272,9 @@ export function InequalityFilter({
         <PopoverContent className="w-auto p-2">
           <InequalityFilterContent
             operator={operator}
-            setOperator={setOperator}
+            toggleOperator={toggleOperator}
             unit={inequalityFilters[name].unit}
+            label={inequalityFilters[name].label}
             input={input}
             validateInput={validateInput}
           />
@@ -234,8 +282,9 @@ export function InequalityFilter({
       </Popover>
       <InequalityFilterContent
         operator={operator}
-        setOperator={setOperator}
+        toggleOperator={toggleOperator}
         unit={inequalityFilters[name].unit}
+        label={inequalityFilters[name].label}
         input={input}
         validateInput={validateInput}
       />
@@ -248,9 +297,20 @@ export function MonthPicker() {
     state.dateRange,
     state.setDateRange,
   ]);
+  const [dateError, setDateError] = useState<string>();
 
-  const dateStr = [dates?.start, dates?.end].map((date) =>
-    date ? format(date, 'MMM yyyy') : undefined,
+  const selectedDates = dates
+    ? {
+        start: calendarDateToLocalDate(dates.start),
+        end: calendarDateToLocalDate(dates.end),
+      }
+    : undefined;
+  const validSelectedDates =
+    selectedDates?.start && selectedDates.end
+      ? { start: selectedDates.start, end: selectedDates.end }
+      : undefined;
+  const dateStr = [validSelectedDates?.start, validSelectedDates?.end].map(
+    (date) => (date ? format(date, 'MMM yyyy') : undefined),
   );
 
   return (
@@ -273,11 +333,25 @@ export function MonthPicker() {
         <PopoverContent className="w-auto p-0">
           <MonthRangePicker
             onMonthRangeSelect={(range) => {
-
-              setDates(range);
+              const start = calendarDateFromLocalDate(range.start);
+              const end = calendarDateFromLocalDate(range.end);
+              const normalized = normalizeDateRange(start, end);
+              if (!normalized) {
+                setDateError(
+                  'Choose a valid range whose end is on or after its start.',
+                );
+                return;
+              }
+              setDateError(undefined);
+              setDates(normalized);
             }}
-            selectedMonthRange={dates}
+            selectedMonthRange={validSelectedDates}
           />
+          {dateError ? (
+            <p className="px-3 pb-3 text-sm text-destructive" role="alert">
+              {dateError}
+            </p>
+          ) : null}
         </PopoverContent>
       </Popover>
     </SidebarMenuItem>
@@ -290,26 +364,72 @@ export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
     state.setBinary,
   ]);
 
-  const handleChange = () => {
+  const handleChange = (mode: BinaryFilterMode) => {
     setBinary((prev) => ({
       ...prev,
-      [name]: binary === undefined ? true : !binary,
+      [name]: mode,
     }));
   };
 
+  const id = React.useId();
+
   return (
-    <SidebarMenuItem className="flex items-center gap-4 h-8 mx-2">
+    <SidebarMenuItem className="mx-2 flex h-9 items-center gap-3">
       {binaryFilters[name].icon}
-      <label
-        htmlFor="terms"
-        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-      >
+      <label htmlFor={id} className="min-w-16 text-sm font-medium leading-none">
         {binaryFilters[name].label}
       </label>
-      <Checkbox
-        checked={binary ?? 'indeterminate'}
-        onCheckedChange={handleChange}
+      <Select
+        value={binary}
+        onValueChange={(value) => handleChange(value as BinaryFilterMode)}
+      >
+        <SelectTrigger
+          id={id}
+          className="ml-auto h-8 w-24"
+          aria-label={`${binaryFilters[name].label} filter`}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="any">Any</SelectItem>
+          <SelectItem value="yes">Yes</SelectItem>
+          <SelectItem value="no">No</SelectItem>
+        </SelectContent>
+      </Select>
+    </SidebarMenuItem>
+  );
+}
+
+export function SearchFilter() {
+  const [search, setSearch] = useShallowStore((state) => [
+    state.search,
+    state.setSearch,
+  ]);
+
+  return (
+    <SidebarMenuItem className="relative mx-2">
+      <Search className="pointer-events-none absolute left-2 top-2 size-4 text-muted-foreground" />
+      <Input
+        aria-label="Search activity names"
+        className="h-8 pl-8"
+        placeholder="Search activities"
+        type="search"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
       />
+    </SidebarMenuItem>
+  );
+}
+
+export function ResetFilters() {
+  const resetFilters = useShallowStore((state) => state.resetFilters);
+
+  return (
+    <SidebarMenuItem className="mx-2 mt-2">
+      <Button className="h-8 w-full" variant="outline" onClick={resetFilters}>
+        <RotateCcw />
+        Reset filters
+      </Button>
     </SidebarMenuItem>
   );
 }

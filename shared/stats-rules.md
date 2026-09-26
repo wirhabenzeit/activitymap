@@ -12,7 +12,7 @@ Web and iOS draw the stats tiles with their own code. This page pins every rule 
   - `currentYear`: the same as `yearToDate` for the current year.
   - `monthToDate`: the 1st of this month through today. The comparison runs from the 1st of last month through the same day number, capped at that month's last day.
   - `last12Weeks` / `last52Weeks`: the current, partial week and the 11 (or 51) full weeks before it.
-  - `last12Months`: the 365 days ending today.
+  - `last12Months`: the same calendar date one year earlier (28 February for 29 February) through today, matching the filter preset in `docs/map-list-parity-contract.md`.
   - `allTime`: every activity.
 
 ## Metrics
@@ -21,7 +21,7 @@ Web and iOS draw the stats tiles with their own code. This page pins every rule 
 - `distance`: kilometres (API metres ÷ 1000).
 - `elevation`: metres of `total_elevation_gain`.
 - `time`: hours of `moving_time` (API seconds ÷ 3600).
-- A missing value counts as 0. The activity still counts toward `count` and active days.
+- Sums add the known values, and a missing value adds nothing. The activity still counts toward `count` and active days. Unlike the list summary in `docs/map-list-parity-contract.md`, a tile whose activities all lack a metric shows 0 instead of unknown.
 
 ## Sports
 

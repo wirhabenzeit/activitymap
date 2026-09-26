@@ -1,5 +1,5 @@
 {
-  "description": "Sixteen activities around Saturday 26 September 2026, chosen to hit the edges in shared/stats-rules.md: two activities on one day, a late-evening and a just-after-midnight start, an activity without distance, the same date last year, the first day of the 12-month window, and a last-month activity after today's day of the month.",
+  "description": "Sixteen activities around Saturday 26 September 2026, chosen to hit the edges in shared/stats-rules.md: two activities on one day, a late-evening and a just-after-midnight start, an activity without distance, the same date last year (also the first day of the 12-month window), the day after it, and a last-month activity after today's day of the month.",
   "today": "2026-09-26",
   "activities": [
     {
@@ -162,8 +162,9 @@
       "distance": [12, 0, 0, 0, 0, 0, 50, 10, 8, 0, 0, 127]
     },
     "activityCalendar": {
-      "activeDays": 12,
+      "activeDays": 13,
       "dominantSport": {
+        "2025-09-26": "ride",
         "2025-09-27": "run",
         "2026-01-01": "misc",
         "2026-02-14": "bcXcSki",
@@ -192,6 +193,6 @@
       ]
     },
     "consistency": { "activeDaysPerWeek": 0.363636, "currentStreak": 3 },
-    "distanceVsElevation": { "activities": 12, "metersPerKm": 20.120482 }
+    "distanceVsElevation": { "activities": 13, "metersPerKm": 19.390681 }
   }
 }

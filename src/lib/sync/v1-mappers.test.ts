@@ -4,7 +4,11 @@ import test from 'node:test';
 import type { Activity, Photo } from '~/server/db/schema.ts';
 import { toActivityDTO } from '~/contracts/v1/activity.ts';
 import { toPhotoDTO } from '~/contracts/v1/photo.ts';
-import { dtoToActivity, dtoToPhoto } from './v1-mappers.ts';
+import {
+  activityStreamMetadata,
+  dtoToActivity,
+  dtoToPhoto,
+} from './v1-mappers.ts';
 
 const baseActivity: Activity = {
   id: 7,
@@ -108,6 +112,25 @@ void test('dtoToActivity derives the temporary in-memory flag from component fre
   const restored = dtoToActivity(dto);
   assert.equal(dto.geometry_state, 'summary');
   assert.equal(restored.is_complete, false);
+});
+
+void test('dtoToActivity keeps stream generation metadata for summary invalidation', () => {
+  const streams = {
+    generation: 'generation-1',
+    revision: '4',
+    state: 'current' as const,
+    fetch_status: 'succeeded' as const,
+    available_types: ['distance', 'altitude'] as Array<
+      'distance' | 'altitude'
+    >,
+    fetched_at: '2026-09-26T12:00:00.000Z',
+    expires_at: null,
+  };
+  const dto = { ...toActivityDTO(baseActivity), streams };
+  const restored = dtoToActivity(dto);
+
+  assert.deepEqual(activityStreamMetadata(restored), streams);
+  assert.deepEqual(toActivityDTO(restored).streams, streams);
 });
 
 void test('dtoToPhoto round-trips every field exactly (PhotoDTO has no bridged fields)', () => {

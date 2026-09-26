@@ -13,17 +13,22 @@ import { type ListSlice, createListSlice } from './list';
 import { type SelectionSlice, createSelectionSlice } from './selection';
 import { type MapSlice, createMapSlice } from './map';
 import { type ActivitySlice, createActivitySlice } from './activity';
-import { type FilterSlice, createFilterSlice } from './filter';
+import {
+  deriveSportGroups,
+  initializeValues,
+  sanitizePersistedBinary,
+  sanitizePersistedDateRange,
+  toPersistedValues,
+  type FilterSlice,
+  type ValueColumn,
+  createFilterSlice,
+} from './filter';
 import { type AuthSlice, createAuthSlice } from './auth';
 import {
   type NotificationSlice,
   createNotificationSlice,
 } from './notifications';
-import {
-  baseMaps,
-  overlayMaps,
-  defaultMapPosition,
-} from '~/settings/map';
+import { baseMaps, overlayMaps, defaultMapPosition } from '~/settings/map';
 
 // Combine all slice types into the root state type
 export type RootState = StatsSlice &
@@ -64,22 +69,29 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
-const sanitizeDateRange = (value: unknown): RootState['dateRange'] => {
-  if (!isRecord(value)) {
-    return undefined;
+export const sanitizeValues = (value: unknown): RootState['values'] => {
+  const values = initializeValues();
+  if (!isRecord(value)) return values;
+
+  for (const key of Object.keys(values) as ValueColumn[]) {
+    const candidate = value[key];
+    if (
+      isRecord(candidate) &&
+      isFiniteNumber(candidate.value) &&
+      (candidate.operator === '>=' || candidate.operator === '<=')
+    ) {
+      values[key] = {
+        value: candidate.value,
+        operator: candidate.operator,
+      };
+    }
   }
-
-  const start = new Date(value.start as string | number | Date);
-  const end = new Date(value.end as string | number | Date);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return undefined;
-  }
-
-  return { start, end };
+  return values;
 };
 
-const sanitizePosition = (value: unknown): RootState['position'] | undefined => {
+const sanitizePosition = (
+  value: unknown,
+): RootState['position'] | undefined => {
   if (!isRecord(value)) {
     return undefined;
   }
@@ -110,11 +122,11 @@ const sanitizePosition = (value: unknown): RootState['position'] | undefined => 
     isFiniteNumber(paddingValue.bottom) &&
     isFiniteNumber(paddingValue.left)
       ? {
-        top: paddingValue.top,
-        right: paddingValue.right,
-        bottom: paddingValue.bottom,
-        left: paddingValue.left,
-      }
+          top: paddingValue.top,
+          right: paddingValue.right,
+          bottom: paddingValue.bottom,
+          left: paddingValue.left,
+        }
       : defaultMapPosition.padding;
 
   return {
@@ -156,7 +168,7 @@ export const store = create<RootState>()(
           sportType: state.sportType,
           sportGroup: state.sportGroup,
           dateRange: state.dateRange,
-          values: state.values,
+          values: toPersistedValues(state.values),
           search: state.search,
           binary: state.binary,
         }),
@@ -164,22 +176,35 @@ export const store = create<RootState>()(
           const persisted = (persistedState ?? {}) as Partial<PersistedUiState>;
 
           const baseMap =
-            typeof persisted.baseMap === 'string' && persisted.baseMap in baseMaps
+            typeof persisted.baseMap === 'string' &&
+            persisted.baseMap in baseMaps
               ? persisted.baseMap
               : currentState.baseMap;
 
           const overlayMapsState = Array.isArray(persisted.overlayMaps)
             ? persisted.overlayMaps.filter(
-              (overlay): overlay is keyof typeof overlayMaps =>
-                typeof overlay === 'string' && overlay in overlayMaps,
-            )
+                (overlay): overlay is keyof typeof overlayMaps =>
+                  typeof overlay === 'string' && overlay in overlayMaps,
+              )
             : currentState.overlayMaps;
+
+          const sportType = { ...currentState.sportType };
+          if (isRecord(persisted.sportType)) {
+            for (const key of Object.keys(
+              sportType,
+            ) as (keyof typeof sportType)[]) {
+              if (typeof persisted.sportType[key] === 'boolean') {
+                sportType[key] = persisted.sportType[key];
+              }
+            }
+          }
 
           return {
             ...currentState,
             baseMap,
             overlayMaps: overlayMapsState,
-            position: sanitizePosition(persisted.position) ?? currentState.position,
+            position:
+              sanitizePosition(persisted.position) ?? currentState.position,
             threeDim:
               typeof persisted.threeDim === 'boolean'
                 ? persisted.threeDim
@@ -188,31 +213,18 @@ export const store = create<RootState>()(
               typeof persisted.showPhotos === 'boolean'
                 ? persisted.showPhotos
                 : currentState.showPhotos,
-            sportType: {
-              ...currentState.sportType,
-              ...(isRecord(persisted.sportType)
-                ? persisted.sportType
-                : {}),
-            },
-            sportGroup: {
-              ...currentState.sportGroup,
-              ...(isRecord(persisted.sportGroup)
-                ? persisted.sportGroup
-                : {}),
-            },
-            dateRange: sanitizeDateRange(persisted.dateRange),
-            values: {
-              ...currentState.values,
-              ...(isRecord(persisted.values) ? persisted.values : {}),
-            },
+            sportType,
+            sportGroup: deriveSportGroups(sportType),
+            dateRange: sanitizePersistedDateRange(persisted.dateRange),
+            values: sanitizeValues(persisted.values),
             search:
               typeof persisted.search === 'string'
                 ? persisted.search
                 : currentState.search,
-            binary: {
-              ...currentState.binary,
-              ...(isRecord(persisted.binary) ? persisted.binary : {}),
-            },
+            // Boolean values from version 1 were invisible false defaults,
+            // not user choices, so only the explicit Any/Yes/No modes carry
+            // forward.
+            binary: sanitizePersistedBinary(persisted.binary),
           };
         },
       },
@@ -226,8 +238,10 @@ export const useStore = store;
 export const useShallowStore = Object.assign(
   <T>(selector: (state: RootState) => T) => useStore(useShallow(selector)),
   {
-    subscribe: (...args: Parameters<typeof store.subscribe>) => store.subscribe(...args),
+    subscribe: (...args: Parameters<typeof store.subscribe>) =>
+      store.subscribe(...args),
     getState: () => store.getState(),
-    setState: (...args: Parameters<typeof store.setState>) => store.setState(...args),
+    setState: (...args: Parameters<typeof store.setState>) =>
+      store.setState(...args),
   },
 );

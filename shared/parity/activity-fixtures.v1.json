@@ -1,0 +1,967 @@
+{
+  "version": 1,
+  "description": "Synthetic cross-platform behavior vectors for issue #196. These are projection records, not complete Activity DTOs. Filter results preserve input order; sorting is tested separately.",
+  "activities": [
+    {
+      "id": "101",
+      "name": "Morning Run",
+      "sport_type": "Run",
+      "start_date_local": "2026-03-29T00:15:00.000Z",
+      "start_date": "2026-03-28T23:15:00.000Z",
+      "timezone": "(GMT+01:00) Europe/Zurich",
+      "distance": 1000,
+      "elapsed_time": 600,
+      "total_elevation_gain": 10,
+      "commute": false,
+      "private": false,
+      "flagged": false,
+      "moving_time": 540,
+      "average_speed": 2,
+      "average_heartrate": 120,
+      "max_heartrate": null,
+      "average_watts": null,
+      "elev_high": 510,
+      "elev_low": null
+    },
+    {
+      "id": "102",
+      "name": "Café Ride",
+      "sport_type": "Ride",
+      "start_date_local": "2026-03-29T23:59:59.999Z",
+      "start_date": "2026-03-29T21:59:59.999Z",
+      "timezone": "(GMT+02:00) Europe/Zurich",
+      "distance": 5000,
+      "elapsed_time": 1800,
+      "total_elevation_gain": 50,
+      "commute": true,
+      "private": true,
+      "flagged": false,
+      "moving_time": 1500,
+      "average_speed": 3,
+      "average_heartrate": 150,
+      "max_heartrate": 170,
+      "average_watts": 120,
+      "elev_high": 600,
+      "elev_low": 450
+    },
+    {
+      "id": "103",
+      "name": "No GPS Workout",
+      "sport_type": "Workout",
+      "start_date_local": "2026-03-28T23:30:00.000Z",
+      "start_date": "2026-03-29T03:30:00.000Z",
+      "timezone": "(GMT-04:00) America/New_York",
+      "distance": null,
+      "elapsed_time": null,
+      "total_elevation_gain": null,
+      "commute": null,
+      "private": null,
+      "flagged": null,
+      "moving_time": null,
+      "average_speed": null,
+      "average_heartrate": null,
+      "max_heartrate": null,
+      "average_watts": null,
+      "elev_high": null,
+      "elev_low": null
+    },
+    {
+      "id": "104",
+      "name": "Measured Zero",
+      "sport_type": "Run",
+      "start_date_local": "2026-03-30T00:00:00.000Z",
+      "start_date": "2026-03-29T22:00:00.000Z",
+      "timezone": "(GMT+02:00) Europe/Zurich",
+      "distance": 0,
+      "elapsed_time": 0,
+      "total_elevation_gain": 0,
+      "commute": false,
+      "private": false,
+      "flagged": false,
+      "moving_time": 0,
+      "average_speed": 0,
+      "average_heartrate": null,
+      "max_heartrate": null,
+      "average_watts": 0,
+      "elev_high": 0,
+      "elev_low": 0
+    },
+    {
+      "id": "105",
+      "name": "Autumn Hike",
+      "sport_type": "Hike",
+      "start_date_local": "2026-10-25T02:30:00.000Z",
+      "start_date": "2026-10-25T00:30:00.000Z",
+      "timezone": "(GMT+02:00) Europe/Zurich",
+      "distance": 2000,
+      "elapsed_time": 1200,
+      "total_elevation_gain": 20,
+      "commute": false,
+      "private": true,
+      "flagged": null
+    },
+    {
+      "id": "106",
+      "name": "Autumn Hike",
+      "sport_type": "Hike",
+      "start_date_local": "2026-10-25T02:30:00.000Z",
+      "start_date": "2026-10-25T01:30:00.000Z",
+      "timezone": "(GMT+01:00) Europe/Zurich",
+      "distance": 2000,
+      "elapsed_time": 1500,
+      "total_elevation_gain": 30,
+      "commute": true,
+      "private": false,
+      "flagged": false
+    },
+    {
+      "id": "107",
+      "name": "Café Ridge",
+      "sport_type": "TrailRun",
+      "start_date_local": "2026-03-29T00:30:00.000Z",
+      "start_date": "2026-03-29T07:30:00.000Z",
+      "timezone": "(GMT-07:00) America/Los_Angeles",
+      "distance": 5000,
+      "elapsed_time": 3600,
+      "total_elevation_gain": 100,
+      "commute": false,
+      "private": false,
+      "flagged": true
+    },
+    {
+      "id": "108",
+      "name": "Island Ride",
+      "sport_type": "Ride",
+      "start_date_local": "2026-03-30T00:15:00.000Z",
+      "start_date": "2026-03-29T10:15:00.000Z",
+      "timezone": "(GMT+14:00) Pacific/Kiritimati",
+      "distance": 10000,
+      "elapsed_time": 7200,
+      "total_elevation_gain": 300,
+      "commute": null,
+      "private": false,
+      "flagged": false
+    },
+    {
+      "id": "109",
+      "name": "CAFÉ Swim",
+      "sport_type": "Swim",
+      "start_date_local": "2026-03-29T12:00:00.000Z",
+      "start_date": "2026-03-29T03:00:00.000Z",
+      "timezone": "(GMT+09:00) Asia/Tokyo",
+      "distance": 250,
+      "elapsed_time": 300,
+      "total_elevation_gain": null,
+      "commute": false,
+      "private": false,
+      "flagged": false
+    },
+    {
+      "id": "110",
+      "name": "Long description with partial power and elevation",
+      "sport_type": "NordicSki",
+      "start_date_local": "2026-01-01T00:00:00.000Z",
+      "start_date": "2025-12-31T23:00:00.000Z",
+      "timezone": "(GMT+01:00) Europe/Zurich",
+      "distance": null,
+      "elapsed_time": 3600,
+      "total_elevation_gain": 400,
+      "commute": false,
+      "private": null,
+      "flagged": false,
+      "description": "A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. A long description. ",
+      "average_watts": 250,
+      "max_watts": null,
+      "weighted_average_watts": null,
+      "average_heartrate": null,
+      "max_heartrate": 160,
+      "elev_high": null,
+      "elev_low": null
+    },
+    {
+      "id": "111",
+      "name": "Equator Walk",
+      "sport_type": "Walk",
+      "start_date_local": "2026-03-29T14:00:00.000Z",
+      "start_date": "2026-03-29T14:00:00.000Z",
+      "timezone": "(GMT+00:00) Etc/UTC",
+      "distance": 750,
+      "elapsed_time": 450,
+      "total_elevation_gain": 5,
+      "commute": false,
+      "private": false,
+      "flagged": false
+    },
+    {
+      "id": "112",
+      "name": "Evening Run",
+      "sport_type": "Run",
+      "start_date_local": "2026-03-29T18:00:00.000Z",
+      "start_date": "2026-03-29T16:00:00.000Z",
+      "timezone": "(GMT+02:00) Europe/Zurich",
+      "distance": 1000,
+      "elapsed_time": 600,
+      "total_elevation_gain": 15,
+      "commute": false,
+      "private": false,
+      "flagged": false
+    }
+  ],
+  "filterCases": [
+    {
+      "name": "defaults include true false and unknown binary flags",
+      "filter": {},
+      "expected_ids": [
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "private yes excludes unknown",
+      "filter": {
+        "binary": {
+          "private": "yes"
+        }
+      },
+      "expected_ids": [
+        "102",
+        "105"
+      ]
+    },
+    {
+      "name": "private no excludes unknown",
+      "filter": {
+        "binary": {
+          "private": "no"
+        }
+      },
+      "expected_ids": [
+        "101",
+        "104",
+        "106",
+        "107",
+        "108",
+        "109",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "private any explicitly includes unknown",
+      "filter": {
+        "binary": {
+          "private": "any"
+        }
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "commute yes",
+      "filter": {
+        "binary": {
+          "commute": "yes"
+        }
+      },
+      "expected_ids": [
+        "102",
+        "106"
+      ]
+    },
+    {
+      "name": "commute no excludes unknown",
+      "filter": {
+        "binary": {
+          "commute": "no"
+        }
+      },
+      "expected_ids": [
+        "101",
+        "104",
+        "105",
+        "107",
+        "109",
+        "110",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "flagged yes",
+      "filter": {
+        "binary": {
+          "flagged": "yes"
+        }
+      },
+      "expected_ids": [
+        "107"
+      ]
+    },
+    {
+      "name": "flagged no excludes unknown",
+      "filter": {
+        "binary": {
+          "flagged": "no"
+        }
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "104",
+        "106",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "binary predicates combine with AND",
+      "filter": {
+        "binary": {
+          "commute": "no",
+          "private": "no",
+          "flagged": "no"
+        }
+      },
+      "expected_ids": [
+        "101",
+        "104",
+        "109",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "numeric zero is not unknown",
+      "filter": {
+        "values": {
+          "distance": {
+            "operator": "<=",
+            "value": 0
+          }
+        }
+      },
+      "expected_ids": [
+        "104"
+      ]
+    },
+    {
+      "name": "active gte zero rejects missing metrics",
+      "filter": {
+        "values": {
+          "distance": {
+            "operator": ">=",
+            "value": 0
+          }
+        }
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "distance threshold inclusive in metres",
+      "filter": {
+        "values": {
+          "distance": {
+            "operator": ">=",
+            "value": 1000
+          }
+        }
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "105",
+        "106",
+        "107",
+        "108",
+        "112"
+      ]
+    },
+    {
+      "name": "distance maximum inclusive in metres",
+      "filter": {
+        "values": {
+          "distance": {
+            "operator": "<=",
+            "value": 1000
+          }
+        }
+      },
+      "expected_ids": [
+        "101",
+        "104",
+        "109",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "elapsed duration uses seconds",
+      "filter": {
+        "values": {
+          "elapsed_time": {
+            "operator": "<=",
+            "value": 600
+          }
+        }
+      },
+      "expected_ids": [
+        "101",
+        "104",
+        "109",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "elevation exact inclusive threshold",
+      "filter": {
+        "values": {
+          "total_elevation_gain": {
+            "operator": ">=",
+            "value": 50
+          }
+        }
+      },
+      "expected_ids": [
+        "102",
+        "107",
+        "108",
+        "110"
+      ]
+    },
+    {
+      "name": "multiple numeric predicates combine",
+      "filter": {
+        "values": {
+          "distance": {
+            "operator": ">=",
+            "value": 1000
+          },
+          "elapsed_time": {
+            "operator": "<=",
+            "value": 1800
+          }
+        }
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "105",
+        "106",
+        "112"
+      ]
+    },
+    {
+      "name": "single activity-local day inclusive with DST and travel",
+      "filter": {
+        "date_range": {
+          "start": "2026-03-29",
+          "end": "2026-03-29"
+        }
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "107",
+        "109",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "activity-local day differs from UTC date",
+      "filter": {
+        "date_range": {
+          "start": "2026-03-28",
+          "end": "2026-03-28"
+        }
+      },
+      "expected_ids": [
+        "103"
+      ]
+    },
+    {
+      "name": "positive offset next day and midnight included",
+      "filter": {
+        "date_range": {
+          "start": "2026-03-30",
+          "end": "2026-03-30"
+        }
+      },
+      "expected_ids": [
+        "104",
+        "108"
+      ]
+    },
+    {
+      "name": "fall-back repeated wall time both included",
+      "filter": {
+        "date_range": {
+          "start": "2026-10-25",
+          "end": "2026-10-25"
+        }
+      },
+      "expected_ids": [
+        "105",
+        "106"
+      ]
+    },
+    {
+      "name": "custom day range includes both ends",
+      "filter": {
+        "date_range": {
+          "start": "2026-03-28",
+          "end": "2026-03-30"
+        }
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "103",
+        "104",
+        "107",
+        "108",
+        "109",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "single sport",
+      "filter": {
+        "sport_types": [
+          "Run"
+        ]
+      },
+      "expected_ids": [
+        "101",
+        "104",
+        "112"
+      ]
+    },
+    {
+      "name": "sport aliases explicit",
+      "filter": {
+        "sport_types": [
+          "Hike",
+          "TrailRun",
+          "RockClimbing",
+          "Snowshoe"
+        ]
+      },
+      "expected_ids": [
+        "105",
+        "106",
+        "107"
+      ]
+    },
+    {
+      "name": "empty sport selection is no results",
+      "filter": {
+        "sport_types": []
+      },
+      "expected_ids": []
+    },
+    {
+      "name": "trim case and Unicode NFC search",
+      "filter": {
+        "search": "  café  "
+      },
+      "expected_ids": [
+        "102",
+        "107",
+        "109"
+      ]
+    },
+    {
+      "name": "decomposed search matches composed data",
+      "filter": {
+        "search": "Café"
+      },
+      "expected_ids": [
+        "102",
+        "107",
+        "109"
+      ]
+    },
+    {
+      "name": "search preserves accents",
+      "filter": {
+        "search": "cafe"
+      },
+      "expected_ids": []
+    },
+    {
+      "name": "whitespace-only search is empty",
+      "filter": {
+        "search": "   "
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112"
+      ]
+    },
+    {
+      "name": "search internal whitespace is literal",
+      "filter": {
+        "search": "Morning  Run"
+      },
+      "expected_ids": []
+    },
+    {
+      "name": "combined day sport distance and private",
+      "filter": {
+        "date_range": {
+          "start": "2026-03-29",
+          "end": "2026-03-29"
+        },
+        "sport_types": [
+          "Run",
+          "Ride"
+        ],
+        "values": {
+          "distance": {
+            "operator": ">=",
+            "value": 1000
+          }
+        },
+        "binary": {
+          "private": "no"
+        }
+      },
+      "expected_ids": [
+        "101",
+        "112"
+      ]
+    },
+    {
+      "name": "reset example equals defaults",
+      "filter": {
+        "search": "",
+        "binary": {
+          "commute": "any",
+          "private": "any",
+          "flagged": "any"
+        }
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112"
+      ]
+    }
+  ],
+  "sortCases": [
+    {
+      "name": "default canonical numeric ID descending",
+      "ids": [
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106"
+      ],
+      "sort": {
+        "field": "id",
+        "direction": "desc"
+      },
+      "expected_ids": [
+        "106",
+        "105",
+        "104",
+        "103",
+        "102",
+        "101"
+      ]
+    },
+    {
+      "name": "distance ascending nulls last then ID descending",
+      "ids": [
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106"
+      ],
+      "sort": {
+        "field": "distance",
+        "direction": "asc"
+      },
+      "expected_ids": [
+        "104",
+        "101",
+        "106",
+        "105",
+        "102",
+        "103"
+      ]
+    },
+    {
+      "name": "distance descending nulls still last",
+      "ids": [
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106"
+      ],
+      "sort": {
+        "field": "distance",
+        "direction": "desc"
+      },
+      "expected_ids": [
+        "102",
+        "106",
+        "105",
+        "101",
+        "104",
+        "103"
+      ]
+    },
+    {
+      "name": "local datetime ties break by ID descending",
+      "ids": [
+        "105",
+        "106"
+      ],
+      "sort": {
+        "field": "start_date_local",
+        "direction": "asc"
+      },
+      "expected_ids": [
+        "106",
+        "105"
+      ]
+    },
+    {
+      "name": "name normalized case-insensitive ties by ID descending",
+      "ids": [
+        "105",
+        "106",
+        "112",
+        "101"
+      ],
+      "sort": {
+        "field": "name",
+        "direction": "asc"
+      },
+      "expected_ids": [
+        "106",
+        "105",
+        "112",
+        "101"
+      ]
+    }
+  ],
+  "summaryCases": [
+    {
+      "name": "partial values use known count and include zero",
+      "ids": [
+        "101",
+        "102",
+        "103",
+        "104"
+      ],
+      "expected": {
+        "activity_count": 4,
+        "distance": {
+          "sum": 6000,
+          "known_count": 3
+        },
+        "elapsed_time": {
+          "sum": 2400,
+          "known_count": 3
+        },
+        "moving_time": {
+          "sum": 2040,
+          "known_count": 3
+        },
+        "total_elevation_gain": {
+          "sum": 60,
+          "known_count": 3
+        },
+        "average_speed": {
+          "mean": 1.6666666666666667,
+          "known_count": 3
+        },
+        "average_heartrate": {
+          "mean": 135,
+          "known_count": 2
+        },
+        "elev_high": {
+          "max": 600,
+          "known_count": 3
+        },
+        "elev_low": {
+          "min": 0,
+          "known_count": 2
+        },
+        "local_day_count": 3
+      }
+    },
+    {
+      "name": "nonempty all-unknown metric is unknown",
+      "ids": [
+        "103"
+      ],
+      "expected": {
+        "activity_count": 1,
+        "distance": {
+          "sum": null,
+          "known_count": 0
+        },
+        "elapsed_time": {
+          "sum": null,
+          "known_count": 0
+        },
+        "average_speed": {
+          "mean": null,
+          "known_count": 0
+        }
+      }
+    },
+    {
+      "name": "empty scope totals are zero and means absent",
+      "ids": [],
+      "expected": {
+        "activity_count": 0,
+        "distance": {
+          "sum": 0,
+          "known_count": 0
+        },
+        "elapsed_time": {
+          "sum": 0,
+          "known_count": 0
+        },
+        "average_speed": {
+          "mean": null,
+          "known_count": 0
+        },
+        "elev_high": {
+          "max": null,
+          "known_count": 0
+        },
+        "local_day_count": 0
+      }
+    },
+    {
+      "name": "measured zero survives aggregation",
+      "ids": [
+        "104"
+      ],
+      "expected": {
+        "activity_count": 1,
+        "distance": {
+          "sum": 0,
+          "known_count": 1
+        },
+        "average_watts": {
+          "mean": 0,
+          "known_count": 1
+        }
+      }
+    }
+  ],
+  "photoCases": [
+    {
+      "id": "equator",
+      "activity_id": "111",
+      "location": [
+        0,
+        8
+      ],
+      "expected_marker": true
+    },
+    {
+      "id": "meridian",
+      "activity_id": "111",
+      "location": [
+        47,
+        0
+      ],
+      "expected_marker": true
+    },
+    {
+      "id": "origin",
+      "activity_id": "111",
+      "location": [
+        0,
+        0
+      ],
+      "expected_marker": true
+    },
+    {
+      "id": "no-location",
+      "activity_id": "103",
+      "location": null,
+      "expected_marker": false
+    },
+    {
+      "id": "invalid-latitude",
+      "activity_id": "103",
+      "location": [
+        91,
+        8
+      ],
+      "expected_marker": false
+    }
+  ]
+}

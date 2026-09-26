@@ -29,12 +29,24 @@
 import type { Activity, Photo } from '~/server/db/schema';
 import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { PhotoDTO } from '~/contracts/v1/photo';
+import type { StreamMetadata } from '~/contracts/v1/activity-streams';
+
+export type ActivityWithStreams = Activity & {
+  streamsMetadata?: StreamMetadata;
+};
+
+export const activityStreamMetadata = (
+  activity: Activity,
+): StreamMetadata | undefined =>
+  (activity as ActivityWithStreams).streamsMetadata;
 
 const toDate = (iso: string): Date => new Date(iso);
-const toNullableDate = (iso: string | null): Date | null => (iso === null ? null : new Date(iso));
+const toNullableDate = (iso: string | null): Date | null =>
+  iso === null ? null : new Date(iso);
 
-export function dtoToActivity(dto: ActivityDTO): Activity {
+export function dtoToActivity(dto: ActivityDTO): ActivityWithStreams {
   return {
+    ...(dto.streams ? { streamsMetadata: dto.streams } : {}),
     id: Number(dto.id),
     public_id: Number(dto.id),
     athlete: Number(dto.athlete),
