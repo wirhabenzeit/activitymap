@@ -60,7 +60,7 @@ function sameDateLastYear(day: Day): Day {
   );
 }
 
-function mondayOf(day: Day): Day {
+export function mondayOf(day: Day): Day {
   // 1970-01-01 was a Thursday.
   return day - ((day + 3) % 7);
 }
