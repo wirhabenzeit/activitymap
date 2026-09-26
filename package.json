@@ -36,7 +36,9 @@
     "api-dtos:check": "tsx scripts/generate-api-dtos-swift.ts --check",
     "friflyt:enrich": "node scripts/enrich-friflyt-geojson.mjs",
     "friflyt:enrich:translate": "node scripts/enrich-friflyt-geojson.mjs --translate",
-    "db:test-stream-backfill": "tsx --conditions=react-server scripts/database/test-stream-backfill.ts"
+    "db:test-stream-backfill": "tsx --conditions=react-server scripts/database/test-stream-backfill.ts",
+    "stats-tiles:generate": "tsx scripts/generate-stats-tiles.ts",
+    "stats-tiles:check": "tsx scripts/generate-stats-tiles.ts --check"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
