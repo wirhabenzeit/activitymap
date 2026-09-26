@@ -26,7 +26,7 @@ extension RenderedRoutePickingTests {
                     var current = MapCamera.initial
                     current.pitch = pitch
                     current.bearing = pitch == 0 ? 0 : 25
-                    let padding = RouteCameraFitter.padding(safeArea: UIEdgeInsets(top: 62, left: 0, bottom: 34, right: 0), sheetHeight: sheet)
+                    let padding = RouteCameraFitter.padding(safeArea: UIEdgeInsets(top: 62, left: 0, bottom: 34, right: 0), sheetHeight: sheet, leadingOcclusion: tablet && sheet == 0 ? 330 : 0)
                     let options = try RouteCameraFitter.camera(extent: extent, map: harness.map.mapboxMap,
                                                                padding: padding, size: size, current: current)
                     harness.map.mapboxMap.setCamera(to: options)

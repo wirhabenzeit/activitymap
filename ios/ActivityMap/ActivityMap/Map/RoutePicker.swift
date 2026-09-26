@@ -3,14 +3,14 @@ import CoreGraphics
 import MapboxMaps
 import Observation
 
-/// Transient map UI, kept separate from independent list inspection.
+/// Map results presentation and hit-query lifetime, separate from list inspection.
 @MainActor @Observable
 final class RoutePicker {
     private static let unavailableMessage = "Routes could not be selected. Wait for the map to load and try again."
 
     var isAdding = false
     var isPresented = false
-    var sheetHeight: CGFloat = 0
+    var detent = MapResultsDetent.medium
     var detailID: Int?
     var errorMessage: String?
     private(set) var candidateIDs: [Int] = []
@@ -67,41 +67,62 @@ final class RoutePicker {
         guard request == generation else { return }
         let eligible = Set(store.filteredActivities.filter { $0.coordinates.count > 1 }.map(\.id))
         var seen = Set<Int>()
-        candidateIDs = ids.filter { eligible.contains($0) && seen.insert($0).inserted }
+        let hits = ids.filter { eligible.contains($0) && seen.insert($0).inserted }
         errorMessage = nil
         detailID = nil
-        if candidateIDs.isEmpty {
+        if hits.isEmpty {
             // Explicit contract: empty-map taps clear, including in Add mode.
             store.clearSelection()
-            isPresented = false
+            reconcile(with: store)
             return
         }
         if adding {
-            store.addToSelection(candidateIDs)
+            store.addToSelection(hits)
         } else {
-            store.replaceSelection(with: candidateIDs)
-            if candidateIDs.count == 1 { detailID = candidateIDs.first }
+            store.replaceSelection(with: hits)
+            if hits.count == 1 { detailID = hits.first }
         }
+        candidateIDs = hits
+        reconcile(with: store)
         isPresented = true
+        if detent == .compact { detent = .medium }
     }
 
     func reconcile(with store: ActivityStore) {
         invalidateQuery()
-        candidateIDs.removeAll { !store.selection.visibleIDs.contains($0) }
-        if let detailID, detailID != store.activeActivityID { self.detailID = nil }
-        if candidateIDs.isEmpty { isPresented = false }
+        let visible = store.selection.visibleSelectedIDs
+        candidateIDs = candidateIDs.filter(visible.contains)
+            + visible.subtracting(candidateIDs).sorted(by: >)
+        if let detailID, detailID != store.activeActivityID {
+            self.detailID = store.activeActivityID
+        }
+        if store.selectedActivityIDs.isEmpty {
+            isPresented = false
+            detailID = nil
+            isAdding = false
+            detent = .medium
+        }
     }
 
     func reviewSelection(store: ActivityStore) {
-        invalidateQuery()
-        candidateIDs = store.selection.visibleSelectedIDs.sorted(by: >)
-        detailID = nil
-        isPresented = !candidateIDs.isEmpty
+        reconcile(with: store)
+        if candidateIDs.count == 1, let id = candidateIDs.first { store.activate(id) }
+        detailID = store.activeActivityID
+        isPresented = !store.selectedActivityIDs.isEmpty
+    }
+
+    func step(_ offset: Int, store: ActivityStore) {
+        reconcile(with: store)
+        guard !candidateIDs.isEmpty else { return }
+        let index = detailID.flatMap { candidateIDs.firstIndex(of: $0) } ?? 0
+        let next = (index + offset + candidateIDs.count) % candidateIDs.count
+        showDetail(candidateIDs[next], store: store)
     }
 
     func showDetail(_ id: Int, store: ActivityStore) {
         guard store.selectedActivityIDs.contains(id), store.selection.visibleIDs.contains(id) else { return }
         store.activate(id)
         detailID = id
+        isPresented = true
     }
 }

@@ -49,8 +49,9 @@ struct RouteExtent {
 }
 
 enum RouteCameraFitter {
-    static func padding(safeArea: UIEdgeInsets, sheetHeight: CGFloat, topOcclusion: CGFloat = 0) -> UIEdgeInsets {
-        UIEdgeInsets(top: max(safeArea.top + 64, topOcclusion + 16), left: safeArea.left + 24,
+    static func padding(safeArea: UIEdgeInsets, sheetHeight: CGFloat, topOcclusion: CGFloat = 0,
+                        leadingOcclusion: CGFloat = 0) -> UIEdgeInsets {
+        UIEdgeInsets(top: max(safeArea.top + 64, topOcclusion + 16), left: max(safeArea.left + 24, leadingOcclusion + 16),
                      bottom: max(safeArea.bottom + 80, sheetHeight + 24), right: safeArea.right + 80)
     }
 
@@ -79,7 +80,8 @@ enum RouteCameraFitter {
 @MainActor
 enum MapNavigation {
     static func resolve(store: ActivityStore, map: MapboxMap, size: CGSize,
-                        safeArea: UIEdgeInsets, sheetHeight: CGFloat, topOcclusion: CGFloat = 0) -> CameraOptions? {
+                        safeArea: UIEdgeInsets, sheetHeight: CGFloat, topOcclusion: CGFloat = 0,
+                        leadingOcclusion: CGFloat = 0) -> CameraOptions? {
         let context = store.mapContext
         guard let request = context.pendingRequest, map.isStyleLoaded,
               size.width > 0, size.height > 0 else { return nil }
@@ -119,7 +121,8 @@ enum MapNavigation {
             context.navigationError = "These activities have no GPS route to frame."
             context.consume(request); return nil
         }
-        let padding = RouteCameraFitter.padding(safeArea: safeArea, sheetHeight: sheetHeight, topOcclusion: topOcclusion)
+        let padding = RouteCameraFitter.padding(safeArea: safeArea, sheetHeight: sheetHeight, topOcclusion: topOcclusion,
+                                                leadingOcclusion: leadingOcclusion)
         // Wait for a large sheet to shrink/dismiss instead of fitting into a
         // sliver or consuming a request before usable map space exists.
         guard size.width - padding.left - padding.right >= 80,

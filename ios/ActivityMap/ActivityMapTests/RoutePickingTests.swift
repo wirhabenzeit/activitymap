@@ -90,7 +90,7 @@ struct RoutePickerTests {
         #expect(store.activeActivityID == 2 && picker.detailID == 2)
         store.removeFromSelection([2])
         picker.reconcile(with: store)
-        #expect(store.activeActivityID == 1 && picker.detailID == nil)
+        #expect(store.activeActivityID == 1 && picker.detailID == 1)
     }
 
     @Test func addingPreservesActiveAndHiddenSelectionsAndNeverAutoActivates() {
@@ -127,12 +127,12 @@ struct RoutePickerTests {
         #expect(store.selectedActivityIDs == [2])
     }
 
-    @Test func filteringAndScopeChangesDismissIneligibleChoices() {
+    @Test func filteringDisclosesHiddenSelectionAndScopeResetDismissesResults() {
         let store = store(), picker = RoutePicker()
         picker.apply(ids: [3], adding: false, request: picker.invalidateQuery(), store: store)
         store.activeSportTypes.remove(.ride)
         picker.reconcile(with: store)
-        #expect(!picker.isPresented && picker.detailID == nil && picker.candidateIDs.isEmpty)
+        #expect(picker.isPresented && picker.detailID == nil && picker.candidateIDs.isEmpty)
         #expect(store.selectedActivityIDs == [3])
         store.resetFilters()
         picker.apply(ids: [1], adding: false, request: picker.invalidateQuery(), store: store)

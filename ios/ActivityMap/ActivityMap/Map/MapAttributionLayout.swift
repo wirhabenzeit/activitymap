@@ -8,14 +8,15 @@ struct MapAttributionLayout {
     let creditSize: CGSize
     let creditCenter: CGPoint
 
-    init(size: CGSize, bottomInset: CGFloat, credit: String?, fontSize: CGFloat) {
+    init(size: CGSize, bottomInset: CGFloat, credit: String?, fontSize: CGFloat,
+         bottomOcclusion: CGFloat = 0, leadingOcclusion: CGFloat = 0) {
         // Sizes in the pinned SDK: 85×21 wordmark and a 44×44 info target
         // whose visible glyph is bottom-aligned. Keep both native views intact.
         let logoWidth: CGFloat = 85
         let infoWidth: CGFloat = 44
         let gap: CGFloat = 8
         if let credit {
-            let available = max(1, size.width - 32 - logoWidth - infoWidth - gap * 2 - 8)
+            let available = max(1, size.width - leadingOcclusion - 32 - logoWidth - infoWidth - gap * 2 - 8)
             let textBounds = (credit as NSString).boundingRect(
                 with: CGSize(width: available, height: .greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -27,10 +28,10 @@ struct MapAttributionLayout {
         }
         let creditSpan = credit == nil ? 0 : creditSize.width + gap
         let rowWidth = logoWidth + gap + creditSpan + infoWidth
-        let leading = max(8, (size.width - rowWidth) / 2)
+        let leading = max(leadingOcclusion + 8, leadingOcclusion + (size.width - leadingOcclusion - rowWidth) / 2)
         // Retain 18pt beneath the footer for the home indicator, using the
         // bottom inset without raising the map/selection controls.
-        let bottom = 18 - bottomInset
+        let bottom = 18 - bottomInset + bottomOcclusion
         ornamentOptions = OrnamentOptions(
             logo: LogoViewOptions(position: .bottomLeft, margins: CGPoint(x: leading, y: bottom)),
             attributionButton: AttributionButtonOptions(position: .bottomLeft, margins: CGPoint(

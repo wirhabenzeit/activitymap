@@ -7,18 +7,20 @@ struct MapScreen: View {
     private let topOcclusion: CGFloat
 
     @Bindable private var context: MapContext
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
     @State private var viewport: Viewport
     @State private var acceptsCameraEvents = false
 
-    init(store: ActivityStore, topOcclusion: CGFloat = 0) {
+    init(store: ActivityStore, topOcclusion: CGFloat = 0, picker: RoutePicker? = nil) {
+        _picker = State(initialValue: picker ?? RoutePicker())
         self.topOcclusion = topOcclusion
         self.store = store
         self.context = store.mapContext
         _viewport = State(initialValue: store.mapContext.camera.viewport)
     }
 
-    @State private var picker = RoutePicker()
+    @State private var picker: RoutePicker
     @ScaledMetric(relativeTo: .caption2) private var attributionFontSize: CGFloat = 11
 
     var body: some View {
@@ -40,22 +42,27 @@ struct MapScreen: View {
                         .position(layout.creditCenter)
                         .allowsHitTesting(false)
                 }
+                let layout = resultsLayout(in: geometry)
+                let showingResults = picker.isPresented
+                let horizontalTools = showingResults && !layout.isSidePanel
+                mapControls(horizontal: horizontalTools)
+                    .position(x: geometry.size.width - (horizontalTools ? 96 : 42),
+                              y: horizontalTools ? layout.frame.minY - 96 : geometry.size.height - 112)
+                // BrowseContent hides this whole map on the list tab. Keep the
+                // results subtree mounted too, preserving its exact scroll offset.
+                if showingResults {
+                    RoutePickerSheet(picker: picker, store: store, isSidePanel: layout.isSidePanel)
+                        .frame(width: layout.frame.width, height: layout.frame.height)
+                        .position(x: layout.frame.midX, y: layout.frame.midY)
+                } else {
+                    VStack {
+                        Spacer()
+                        HStack { selectionMenu; Spacer(minLength: 132) }
+                            .padding(.horizontal, 16).padding(.bottom, 32)
+                    }
+                }
             }
 
-            mapControls
-                .padding(.trailing, 16)
-                // Align with the selection menu above the bottom safe area.
-                .padding(.bottom, 32)
-
-        }
-        .overlay(alignment: .bottomLeading) {
-            selectionMenu
-                .padding(.leading, 16)
-                .padding(.trailing, 132)
-                .padding(.bottom, 32)
-        }
-        .sheet(isPresented: $picker.isPresented, onDismiss: { picker.sheetHeight = 0 }) {
-            RoutePickerSheet(picker: picker, store: store)
         }
         .alert("Route selection", isPresented: Binding(
             get: { picker.errorMessage != nil },
@@ -68,6 +75,7 @@ struct MapScreen: View {
         .onChange(of: store.selection.visibleIDs) { _, _ in picker.reconcile(with: store) }
         .onChange(of: store.activeActivityID) { _, _ in picker.reconcile(with: store) }
         .onChange(of: store.selectedActivityIDs) { _, ids in
+            picker.reconcile(with: store)
             if ids.isEmpty {
                 picker.isAdding = false
                 picker.isPresented = false
@@ -75,9 +83,6 @@ struct MapScreen: View {
         }
         .onChange(of: store.selectedTab) { _, tab in
             if tab != .map {
-                picker.isPresented = false
-                picker.sheetHeight = 0
-                picker.isAdding = false
                 picker.invalidateQuery()
             }
         }
@@ -90,7 +95,6 @@ struct MapScreen: View {
         .onChange(of: context.scopeRevision) { _, _ in
             picker.isPresented = false
             picker.isAdding = false
-            picker.sheetHeight = 0
             viewport = context.camera.viewport
         }
         .onDisappear {
@@ -131,7 +135,8 @@ struct MapScreen: View {
             if tab == .map { applyNavigation(proxy: proxy, geometry: geometry) }
         }
         .onChange(of: context.pendingRequest?.id) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
-        .onChange(of: picker.sheetHeight) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
+        .onChange(of: picker.detent) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
+        .onChange(of: picker.isPresented) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
         .onChange(of: geometry.size) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
         .onChange(of: store.activitiesRevision, initial: true) { _, revision in
             picker.reconcile(with: store)
@@ -141,6 +146,21 @@ struct MapScreen: View {
 
     private func applyNavigation(proxy: MapProxy, geometry: GeometryProxy) {
         guard acceptsCameraEvents, store.selectedTab == .map, let map = proxy.map else { return }
+        if case let .activity(id) = context.pendingRequest?.action,
+           store.selection.visibleSelectedIDs.contains(id) {
+            // Do not activate a different remaining result if filters/deletion
+            // invalidate a queued Show on map target before the renderer is ready.
+            picker.reconcile(with: store)
+            picker.showDetail(id, store: store)
+            picker.detent = .compact
+        }
+        if let action = context.pendingRequest?.action,
+           action == .fitSelection || action == .fitFiltered {
+            // Explicit fits leave enough map space for the route and chrome.
+            picker.detent = .compact
+        }
+        let layout = resultsLayout(in: geometry)
+        let showingResults = picker.isPresented
         let safeArea = geometry.safeAreaInsets
         // The map extends under navigation; retain its original occluded height
         // from BrowseContent, plus the fitter's 16-point breathing room.
@@ -151,7 +171,9 @@ struct MapScreen: View {
             store: store, map: map, size: size,
             safeArea: UIEdgeInsets(top: safeArea.top, left: safeArea.leading,
                                   bottom: safeArea.bottom, right: safeArea.trailing),
-            sheetHeight: picker.isPresented ? picker.sheetHeight : 0, topOcclusion: topOcclusion
+            // Include the tools and attribution row above a bottom panel.
+            sheetHeight: showingResults && !layout.isSidePanel ? layout.bottomOcclusion + 104 : 0, topOcclusion: topOcclusion,
+            leadingOcclusion: showingResults && layout.isSidePanel ? layout.leadingOcclusion + safeArea.leading : 0
         ) else { return }
         withViewportAnimation(.default(maxDuration: 0.5)) {
             viewport = .camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
@@ -159,8 +181,18 @@ struct MapScreen: View {
     }
 
     private func attributionLayout(in geometry: GeometryProxy) -> MapAttributionLayout {
-        MapAttributionLayout(size: geometry.size, bottomInset: geometry.safeAreaInsets.bottom,
-                             credit: attribution, fontSize: attributionFontSize)
+        let layout = resultsLayout(in: geometry)
+        let showingResults = picker.isPresented
+        return MapAttributionLayout(size: geometry.size, bottomInset: geometry.safeAreaInsets.bottom,
+                                    credit: attribution, fontSize: attributionFontSize,
+                                    bottomOcclusion: showingResults ? layout.bottomOcclusion : 0,
+                                    leadingOcclusion: showingResults ? layout.leadingOcclusion : 0)
+    }
+
+    private func resultsLayout(in geometry: GeometryProxy) -> MapResultsLayout {
+        MapResultsLayout(size: geometry.size, topInset: max(topOcclusion, geometry.safeAreaInsets.top),
+                         bottomInset: geometry.safeAreaInsets.bottom, detent: picker.detent,
+                         largeText: typeSize.isAccessibilitySize)
     }
 
     private func routeInteraction(proxy: MapProxy) -> TapInteraction {
@@ -206,9 +238,8 @@ struct MapScreen: View {
                 Button {
                     picker.reviewSelection(store: store)
                 } label: {
-                    Label("Show selected routes", systemImage: "list.bullet")
+                    Label("Show selected activities", systemImage: "list.bullet")
                 }
-                .disabled(store.selection.visibleSelectedIDs.isEmpty)
                 Toggle("Add routes to selection", isOn: $picker.isAdding)
                 Button("Clear selection", role: .destructive) { store.clearSelection() }
             } label: {
@@ -230,13 +261,14 @@ struct MapScreen: View {
             .foregroundStyle(Color.primary)
             .accessibilityLabel("\(store.selectedActivityIDs.count) selected, \(store.hiddenSelectedCount) hidden by filters")
             .accessibilityValue(picker.isAdding ? "Add routes enabled" : "Replace selection")
-            .accessibilityHint("Show selected routes, add routes or clear selection")
+            .accessibilityHint("Show selected activities, add routes or clear selection")
             .modifier(MapChromeSurface())
         }
     }
 
-    private var mapControls: some View {
-        VStack(spacing: 0) {
+    private func mapControls(horizontal: Bool) -> some View {
+        let layout = horizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+        return layout {
             Menu {
                 Section("Base Map") {
                     Picker("Base Map", selection: $context.baseStyle) {
@@ -266,7 +298,7 @@ struct MapScreen: View {
             }
             .accessibilityLabel("Map layers")
 
-            Divider().frame(width: 24)
+            Divider().frame(width: horizontal ? 1 : 24, height: horizontal ? 24 : 1)
 
             Button {
                 context.request(.pitch(context.isPitched ? 0 : 50))
@@ -278,7 +310,7 @@ struct MapScreen: View {
             .accessibilityLabel("3D map")
             .accessibilityValue(context.isPitched ? "On" : "Off")
 
-            Divider().frame(width: 24)
+            Divider().frame(width: horizontal ? 1 : 24, height: horizontal ? 24 : 1)
 
             Menu {
                 Button("Fit selection", systemImage: "selection.pin.in.out") { context.request(.fitSelection) }
@@ -297,7 +329,7 @@ struct MapScreen: View {
             .accessibilityLabel("Map camera")
         }
         .buttonStyle(.plain)
-        .font(.body.weight(.semibold))
+        .font(.system(size: 18, weight: .semibold))
         .foregroundStyle(Color.primary)
         .padding(4)
         .modifier(MapChromeSurface())
