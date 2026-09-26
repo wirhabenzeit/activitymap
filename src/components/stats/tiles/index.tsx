@@ -6,7 +6,7 @@
 // narrower than the regular layout's) and the tiles reflow into them. Tiles
 // are not interactive for now; their detail views stay in ./tiles for later.
 
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useTheme } from 'next-themes';
 
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
@@ -22,6 +22,8 @@ import { cn } from '~/lib/utils';
 import { Measure } from './charts';
 import { tilePalette } from './format';
 import {
+  faceOptionLabels,
+  optionLabels,
   tileView,
   type TileContext,
   type TileSummary,
@@ -160,6 +162,9 @@ function TileFace({
   large: boolean;
   style: CSSProperties;
 }) {
+  const [option, setOption] = useState(
+    view.faceOptions?.[0] ?? toggleOf(tile)?.options[0],
+  );
   return (
     <section
       aria-label={tile.title}
@@ -167,16 +172,67 @@ function TileFace({
       style={style}
     >
       <div className="flex w-full items-baseline justify-between gap-2">
-        <span className="shrink-0 text-[13px] font-medium">{tile.title}</span>
-        <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-          {view.period(context)}
+        <span
+          className="min-w-0 truncate text-[13px] font-medium"
+          title={view.period(context)}
+        >
+          {tile.title}
         </span>
+        {view.faceOptions ? (
+          <FaceSwitch
+            label={`${tile.title} shows`}
+            options={view.faceOptions}
+            value={option}
+            onChange={setOption}
+          />
+        ) : (
+          <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+            {view.period(context)}
+          </span>
+        )}
       </div>
       <Headline
-        summary={view.summary(context, toggleOf(tile)?.options[0])}
+        summary={view.summary(context, option)}
         size={large ? 'large' : 'tile'}
       />
-      {view.face(context)}
+      {view.face(context, option)}
     </section>
+  );
+}
+
+function FaceSwitch({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: readonly string[];
+  value: string | undefined;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="-my-1 inline-flex shrink-0 self-center rounded-md bg-muted p-0.5"
+    >
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={option === value}
+          aria-label={optionLabels[option] ?? option}
+          title={optionLabels[option] ?? option}
+          onClick={() => onChange(option)}
+          className={cn(
+            'rounded-[5px] px-1.5 py-0.5 text-[11px] font-medium leading-none text-muted-foreground hover:text-foreground',
+            option === value && 'bg-background text-foreground shadow-xs',
+          )}
+        >
+          {faceOptionLabels[option] ?? option}
+        </button>
+      ))}
+    </div>
   );
 }

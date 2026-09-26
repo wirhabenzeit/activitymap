@@ -66,8 +66,21 @@ export type TileSummary = { value: string; unit: string; sub: ReactNode };
 export type TileView = {
   period: (context: TileContext) => string;
   summary: (context: TileContext, option: string | undefined) => TileSummary;
-  face: (context: TileContext) => ReactNode;
+  // The face's own small switch (first option is the default), if any.
+  faceOptions?: readonly string[];
+  face: (context: TileContext, option: string | undefined) => ReactNode;
   detail: (context: TileContext, option: string | undefined) => ReactNode;
+};
+
+const metricFaceOptions = ['distance', 'time', 'elevation'] as const;
+
+// Short labels for the face switches, which have little room.
+export const faceOptionLabels: Record<string, string> = {
+  distance: 'km',
+  time: 'h',
+  elevation: 'm',
+  hours: 'h',
+  days: 'days',
 };
 
 export const optionLabels: Record<string, string> = {
@@ -77,6 +90,8 @@ export const optionLabels: Record<string, string> = {
   allTime: 'All time',
   last12Weeks: '12 weeks',
   last52Weeks: '52 weeks',
+  hours: 'Hours',
+  days: 'Active days',
 };
 
 function Delta({
@@ -198,22 +213,24 @@ const yearToDateView: TileView = {
       ),
     };
   },
-  face: (context) => {
+  faceOptions: metricFaceOptions,
+  face: (context, option) => {
+    const metric = asMetric(option, 'distance');
     const year = dateOfDay(context.today).getUTCFullYear();
     return (
       <FillChart>
         {({ width, height }) => (
           <CumulativeLines
             series={[
-              yearSeries(context, year - 1, 'distance'),
-              yearSeries(context, year, 'distance'),
+              yearSeries(context, year - 1, metric),
+              yearSeries(context, year, metric),
             ]}
             xMax={365}
             width={width}
             height={height}
             palette={context.palette}
             detail={false}
-            valueFormat={(y) => formatWithUnit(y, 'distance')}
+            valueFormat={(y) => formatWithUnit(y, metric)}
             xLabel={dayOfYearLabel}
           />
         )}
@@ -354,20 +371,24 @@ const weeklyVolumeView: TileView = {
       sub: `this week · average ${formatWithUnit(average, metric)}`,
     };
   },
-  face: (context) => (
-    <FillChart>
-      {({ width, height }) => (
-        <SportBars
-          rows={weekRows(context, 'distance')}
-          width={width}
-          height={height}
-          detail={false}
-          palette={context.palette}
-          valueFormat={(value) => formatWithUnit(value, 'distance')}
-        />
-      )}
-    </FillChart>
-  ),
+  faceOptions: metricFaceOptions,
+  face: (context, option) => {
+    const metric = asMetric(option, 'distance');
+    return (
+      <FillChart>
+        {({ width, height }) => (
+          <SportBars
+            rows={weekRows(context, metric)}
+            width={width}
+            height={height}
+            detail={false}
+            palette={context.palette}
+            valueFormat={(value) => formatWithUnit(value, metric)}
+          />
+        )}
+      </FillChart>
+    );
+  },
   detail: (context, option) => {
     const metric = asMetric(option, 'distance');
     const rows = weekRows(context, metric);
@@ -554,22 +575,26 @@ const monthVsLastMonthView: TileView = {
       ),
     };
   },
-  face: (context) => (
-    <FillChart>
-      {({ width, height }) => (
-        <CumulativeLines
-          series={monthPair(context, 'elevation')}
-          xMax={31}
-          width={width}
-          height={height}
-          palette={context.palette}
-          detail={false}
-          valueFormat={(y) => formatWithUnit(y, 'elevation')}
-          xLabel={(x) => `Day ${x}`}
-        />
-      )}
-    </FillChart>
-  ),
+  faceOptions: metricFaceOptions,
+  face: (context, option) => {
+    const metric = asMetric(option, 'elevation');
+    return (
+      <FillChart>
+        {({ width, height }) => (
+          <CumulativeLines
+            series={monthPair(context, metric)}
+            xMax={31}
+            width={width}
+            height={height}
+            palette={context.palette}
+            detail={false}
+            valueFormat={(y) => formatWithUnit(y, metric)}
+            xLabel={(x) => `Day ${x}`}
+          />
+        )}
+      </FillChart>
+    );
+  },
   detail: (context, option) => {
     const metric = asMetric(option, 'elevation');
     return (
@@ -719,34 +744,75 @@ const sportMixView: TileView = {
 const weeksOf = (option: string | undefined) =>
   option === 'last52Weeks' ? 52 : 12;
 
+// Moving time per week, the last week so far; the average is over the full
+// weeks before it.
+function hoursPerWeek(context: TileContext, weeks: number) {
+  const { weekStarts, values } = weeklyVolume(
+    context.activities,
+    context.today,
+    'time',
+    weeks,
+  );
+  const fullWeeks = values.slice(0, -1);
+  return {
+    rows: weekStarts.map((weekStart, index) => ({
+      weekStart,
+      hours: values[index]!,
+    })),
+    average:
+      fullWeeks.reduce((sum, value) => sum + value, 0) / fullWeeks.length,
+  };
+}
+
 const consistencyView: TileView = {
   period: () => 'Last 12 weeks',
-  summary: ({ activities, today }, option) => {
-    const result = consistency(activities, today, weeksOf(option));
+  // The face switches between hours and active days per week; the detail's
+  // option is its range and always shows hours.
+  summary: (context, option) => {
+    const weeks = weeksOf(option);
+    const result = consistency(context.activities, context.today, weeks);
+    const streak = `Current streak ${result.currentStreak} ${
+      result.currentStreak === 1 ? 'day' : 'days'
+    }`;
+    if (option === 'days')
+      return {
+        value: result.activeDaysPerWeek.toFixed(1),
+        unit: 'days / week',
+        sub: streak,
+      };
     return {
-      value: result.activeDaysPerWeek.toFixed(1),
-      unit: 'days / week',
-      sub: `Current streak ${result.currentStreak} ${
-        result.currentStreak === 1 ? 'day' : 'days'
-      }`,
+      value: formatMetric(hoursPerWeek(context, weeks).average, 'time'),
+      unit: 'h / week',
+      sub: streak,
     };
   },
-  face: (context) => (
+  faceOptions: ['hours', 'days'],
+  face: (context, option) => (
     <FillChart>
       {({ width, height }) => (
         <PlainBars
-          rows={activeDaysPerWeek(context.activities, context.today, 12).map(
-            (week, index, weeks) => ({
-              x: String(week.weekStart),
-              value: week.activeDays,
-              highlight: index === weeks.length - 1,
-            }),
-          )}
+          rows={
+            option === 'days'
+              ? activeDaysPerWeek(context.activities, context.today, 12).map(
+                  (week, index, weeks) => ({
+                    x: String(week.weekStart),
+                    value: week.activeDays,
+                    highlight: index === weeks.length - 1,
+                  }),
+                )
+              : hoursPerWeek(context, 12).rows.map((week, index, weeks) => ({
+                  x: String(week.weekStart),
+                  value: week.hours,
+                  highlight: index === weeks.length - 1,
+                }))
+          }
           width={width}
           height={height}
           detail={false}
           palette={context.palette}
-          valueFormat={(value) => `${value} days`}
+          valueFormat={(value) =>
+            option === 'days' ? `${value} days` : formatWithUnit(value, 'time')
+          }
         />
       )}
     </FillChart>
