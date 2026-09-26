@@ -24,27 +24,26 @@ struct MapScreen: View {
 
             mapControls
                 .padding(.trailing, 16)
-                // Leave the native Mapbox attribution button unobstructed.
-                .padding(.bottom, 56)
+                // Align with the selection menu above the bottom safe area.
+                .padding(.bottom, 32)
 
-            if let attribution {
-                Text(attribution)
-                    .font(.caption2)
-                    .foregroundStyle(Color.primary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .modifier(MapChromeSurface())
-                    .padding(.leading, 8)
-                    .padding(.bottom, 42)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .allowsHitTesting(false)
-            }
         }
         .overlay(alignment: .bottomLeading) {
-            selectionControls
-                .padding(.leading, 16)
-                .padding(.trailing, 80)
-                .padding(.bottom, 100)
+            VStack(alignment: .leading, spacing: 8) {
+                if let attribution {
+                    Text(attribution)
+                        .font(.caption2)
+                        .foregroundStyle(Color.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .modifier(MapChromeSurface())
+                        .allowsHitTesting(false)
+                }
+                selectionMenu
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 132)
+            .padding(.bottom, 32)
         }
         .sheet(isPresented: $picker.isPresented) {
             RoutePickerSheet(picker: picker, store: store)
@@ -59,6 +58,12 @@ struct MapScreen: View {
         }
         .onChange(of: store.selection.visibleIDs) { _, _ in picker.reconcile(with: store) }
         .onChange(of: store.activeActivityID) { _, _ in picker.reconcile(with: store) }
+        .onChange(of: store.selectedActivityIDs) { _, ids in
+            if ids.isEmpty {
+                picker.isAdding = false
+                picker.isPresented = false
+            }
+        }
         .onChange(of: picker.isAdding) { _, _ in picker.invalidateQuery() }
         .onChange(of: baseStyle) { _, _ in picker.invalidateQuery() }
         .onChange(of: activeOverlays) { _, _ in picker.invalidateQuery() }
@@ -78,6 +83,12 @@ struct MapScreen: View {
             }
         }
         .mapStyle(mapStyle)
+        .ornamentOptions(OrnamentOptions(attributionButton: AttributionButtonOptions(
+            position: .bottomTrailing,
+            // Keep the full 44pt attribution target beside, rather than
+            // underneath, the lowered map-control pill.
+            margins: CGPoint(x: 80, y: 8)
+        )))
         .gestureHandlers(MapGestureHandlers(onBegin: { gesture in
             if gesture != .singleTap { picker.invalidateQuery() }
         }))
@@ -123,51 +134,38 @@ struct MapScreen: View {
 
     }
 
-    private var selectionControls: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) { selectionModeMenu; selectionSummary }
-            VStack(alignment: .leading, spacing: 8) { selectionModeMenu; selectionSummary }
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Color.primary)
-    }
-
-    private var selectionModeMenu: some View {
-        Menu {
-            Toggle("Add routes to selection", isOn: $picker.isAdding)
-            if !store.selectedActivityIDs.isEmpty {
-                Button("Clear selection", role: .destructive) { store.clearSelection() }
-            }
-        } label: {
-            Label(picker.isAdding ? "Add" : "Select",
-                  systemImage: picker.isAdding ? "plus.circle" : "cursorarrow.click")
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-        }
-        .accessibilityLabel("Map selection mode")
-        .accessibilityValue(picker.isAdding ? "Add routes" : "Replace selection")
-        .modifier(MapChromeSurface())
-    }
-
     @ViewBuilder
-    private var selectionSummary: some View {
+    private var selectionMenu: some View {
         if !store.selectedActivityIDs.isEmpty {
-            Button {
-                picker.reviewSelection(store: store)
+            Menu {
+                Button {
+                    picker.reviewSelection(store: store)
+                } label: {
+                    Label("Show selected routes", systemImage: "list.bullet")
+                }
+                .disabled(store.selection.visibleSelectedIDs.isEmpty)
+                Toggle("Add routes to selection", isOn: $picker.isAdding)
+                Button("Clear selection", role: .destructive) { store.clearSelection() }
             } label: {
-                VStack(spacing: 2) {
-                    Text("\(store.selectedActivityIDs.count) selected")
-                        .font(.subheadline.weight(.semibold))
-                    if store.hiddenSelectedCount > 0 {
-                        Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption2)
+                HStack(spacing: 6) {
+                    if picker.isAdding { Image(systemName: "plus.circle") }
+                    VStack(spacing: 2) {
+                        Text("\(store.selectedActivityIDs.count) selected")
+                            .font(.subheadline.weight(.semibold))
+                        if store.hiddenSelectedCount > 0 {
+                            Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption2)
+                        }
                     }
+                    Image(systemName: "chevron.down").font(.caption.weight(.semibold))
                 }
                 .padding(.horizontal, 12)
                 .frame(minHeight: 44)
             }
-            .disabled(store.selection.visibleSelectedIDs.isEmpty)
-            .accessibilityHint("Review visible selected routes; \(store.hiddenSelectedCount) hidden by filters")
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.primary)
+            .accessibilityLabel("\(store.selectedActivityIDs.count) selected, \(store.hiddenSelectedCount) hidden by filters")
+            .accessibilityValue(picker.isAdding ? "Add routes enabled" : "Replace selection")
+            .accessibilityHint("Show selected routes, add routes or clear selection")
             .modifier(MapChromeSurface())
         }
     }
