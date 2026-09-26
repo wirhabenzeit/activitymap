@@ -114,6 +114,11 @@ export interface StravaActivity {
   upload_id: number | null;
   average_speed: number;
   max_speed: number;
+  has_heartrate?: boolean | null;
+  average_heartrate?: number | null;
+  max_heartrate?: number | null;
+  heartrate_opt_out?: boolean | null;
+  display_hide_heartrate_option?: boolean | null;
   has_kudoed: boolean;
   hide_from_home: boolean;
   gear_id: string | null;

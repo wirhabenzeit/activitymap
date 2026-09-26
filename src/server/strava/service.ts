@@ -13,7 +13,7 @@ import { logger } from '~/server/logging/logger';
 import { StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type StravaPhoto } from './types';
-import { inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { StravaActivity } from './types';
 import { fetchActivitiesSchema, type FetchActivitiesInput } from './validators';
 import {
@@ -22,6 +22,36 @@ import {
 } from '~/server/repositories/changes';
 
 const changesRepo = createChangesRepository(db);
+type ActivityPersistenceTransaction = Parameters<
+  Parameters<typeof db.transaction>[0]
+>[0];
+
+/**
+ * Run a refresh persistence callback only after locking every still-owned
+ * target row. A delete committed before the lock makes the callback a no-op;
+ * a delete that starts after the lock waits and wins after this commit.
+ */
+export async function withLockedExistingActivities<T>(
+  database: Pick<typeof db, 'transaction'>,
+  athleteId: number,
+  activityIds: number[],
+  persist: (tx: ActivityPersistenceTransaction) => Promise<T>,
+): Promise<T | null> {
+  return database.transaction(async (tx) => {
+    const existing = await tx
+      .select({ id: activitySchema.id })
+      .from(activitySchema)
+      .where(
+        and(
+          eq(activitySchema.athlete, athleteId),
+          inArray(activitySchema.id, activityIds),
+        ),
+      )
+      .for('update');
+    if (existing.length !== activityIds.length) return null;
+    return persist(tx);
+  });
+}
 
 /**
  * Internal application service. This file intentionally has no 'use server'
@@ -38,10 +68,29 @@ interface StravaApiError extends Error {
   details?: { message?: string };
 }
 
+/** Strava succeeded, but its response could not be committed locally. */
+export class StravaPersistenceError extends Error {
+  constructor(
+    options: { cause: unknown },
+    public readonly upstreamSucceeded = true,
+  ) {
+    super('The Strava response could not be persisted', options);
+    this.name = 'StravaPersistenceError';
+  }
+}
+
+export type FetchStravaActivitiesResult = {
+  activities: Activity[];
+  photos: Photo[];
+  notFoundIds: number[];
+  photoRefreshFailedIds?: number[];
+  /** Internal errors retained so the application service can classify a partial refresh. */
+  photoRefreshFailures?: Array<{ activityId: number; error: unknown }>;
+};
+
 export async function fetchStravaActivities(
   input: FetchActivitiesInput,
-): Promise<{ activities: Activity[]; photos: Photo[]; notFoundIds: number[] }> {
-
+): Promise<FetchStravaActivitiesResult> {
   const {
     accessToken,
     before,
@@ -54,124 +103,132 @@ export async function fetchStravaActivities(
     shouldDeletePhotos,
     limit,
     persist,
+    requireExisting,
   } = fetchActivitiesSchema.parse(input);
-
 
   // Token refresh is now handled outside this function
   const client = StravaClient.withAccessToken(accessToken);
   const photos: Photo[] = [];
   const notFoundIds: number[] = [];
+  const photoRefreshFailed = new Set<number>();
+  const photoRefreshFailures: Array<{ activityId: number; error: unknown }> =
+    [];
 
-  try {
-    let stravaActivitiesResult: (StravaActivity | null)[];
+  let stravaActivitiesResult: (StravaActivity | null)[];
 
-    if (requestedActivityIds) {
+  if (requestedActivityIds) {
+    stravaActivitiesResult = await Promise.all(
+      requestedActivityIds.map(async (id) => {
+        try {
+          const activity = await client.getActivity(id);
 
-      stravaActivitiesResult = await Promise.all(
-        requestedActivityIds.map(async (id) => {
-          try {
-            const activity = await client.getActivity(id);
+          return activity;
+        } catch (error: unknown) {
+          const isNotFoundError =
+            typeof error === 'object' &&
+            error !== null &&
+            (error as StravaApiError).status === 404;
 
-            return activity;
-          } catch (error: unknown) {
-            let isNotFoundError = false;
-            if (typeof error === 'object' && error !== null) {
-              const apiError = error as StravaApiError;
-              isNotFoundError =
-                apiError.status === 404 &&
-                !!(apiError.message?.includes('Record Not Found') ||
-                  apiError.details?.message?.includes('Record Not Found'));
-            }
-
-            if (isNotFoundError) {
-              logger.warn(`Activity ${id} not found on Strava (404). Marked for removal.`);
-              notFoundIds.push(id);
-              return null;
-            }
-            logger.error('Failed to fetch individual activity:', {
-              id,
-              error: error instanceof Error ? error.message : String(error),
-            });
+          if (isNotFoundError) {
+            logger.warn(
+              `Activity ${id} not found on Strava (404). Marked for removal.`,
+            );
+            notFoundIds.push(id);
             return null;
           }
-        }),
-      );
-      stravaActivitiesResult = stravaActivitiesResult;
-    } else {
-      // List/Summary mode
-      const params: Parameters<StravaClient['getActivities']>[0] = {
-        per_page: per_page ?? limit,
-      };
-      if (before) params.before = before;
-      if (after) params.after = after;
-      if (page) params.page = page;
-
-      stravaActivitiesResult = await client.getActivities(params);
-    }
-
-    const validStravaActivities = stravaActivitiesResult.filter(
-      (activity): activity is StravaActivity => activity !== null,
-    );
-
-    const fetchedActivities: StravaActivity[] = validStravaActivities;
-
-    if (!fetchedActivities || fetchedActivities.length === 0) {
-
-      return { activities: [], photos: [], notFoundIds };
-    }
-
-    const photoRefreshSucceeded = new Set<number>();
-    if (includePhotos && requestedActivityIds) {
-      // ... (photo logic remains same, omitting for brevity in thought but keeping in file)
-      const photoFetchPromises = fetchedActivities.map(async (act) => {
-        if (act.map?.polyline || act.map?.summary_polyline) {
-          try {
-            const activityPhotos: StravaPhoto[] = await client.getActivityPhotos(
-              act.id,
-            );
-            photoRefreshSucceeded.add(act.id);
-
-            return activityPhotos.map((photo) =>
-              transformStravaPhoto(photo, athleteId),
-            ).filter((photo): photo is Photo => photo !== null); // Filter out nulls
-          } catch (error) {
-            logger.error(`Failed to fetch photos for activity ${act.id}:`, error);
-            return []; // Return empty array on error for this activity
-          }
-        } else {
-          return [];
+          logger.error('Failed to fetch individual activity:', {
+            id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw error;
         }
-      });
+      }),
+    );
+    stravaActivitiesResult = stravaActivitiesResult;
+  } else {
+    // List/Summary mode
+    const params: Parameters<StravaClient['getActivities']>[0] = {
+      per_page: per_page ?? limit,
+    };
+    if (before) params.before = before;
+    if (after) params.after = after;
+    if (page) params.page = page;
 
-      const photoResults = await Promise.all(photoFetchPromises);
-      photos.push(...photoResults.flat());
-    }
+    stravaActivitiesResult = await client.getActivities(params);
+  }
 
-    const activitiesToProcess = fetchedActivities.map((act) => {
-      // Only mark as complete if we explicitly requested IDs (Detail View)
-      // OR if it has a detailed polyline (strong indicator of detail view).
-      const isComplete = !!requestedActivityIds || !!act.map?.polyline;
-      return transformStravaActivity(act, isComplete, {
-        photosCurrent: photoRefreshSucceeded.has(act.id),
-      });
+  const validStravaActivities = stravaActivitiesResult.filter(
+    (activity): activity is StravaActivity => activity !== null,
+  );
+
+  const fetchedActivities: StravaActivity[] = validStravaActivities;
+
+  if (!fetchedActivities || fetchedActivities.length === 0) {
+    return {
+      activities: [],
+      photos: [],
+      notFoundIds,
+      photoRefreshFailedIds: [],
+    };
+  }
+
+  const photoRefreshSucceeded = new Set<number>();
+  if (includePhotos && requestedActivityIds) {
+    const photoFetchPromises = fetchedActivities.map(async (act) => {
+      try {
+        const activityPhotos: StravaPhoto[] = await client.getActivityPhotos(
+          act.id,
+        );
+        photoRefreshSucceeded.add(act.id);
+
+        return activityPhotos
+          .map((photo) => transformStravaPhoto(photo, athleteId))
+          .filter((photo): photo is Photo => photo !== null);
+      } catch (error) {
+        photoRefreshFailed.add(act.id);
+        photoRefreshFailures.push({ activityId: act.id, error });
+        logger.error(`Failed to fetch photos for activity ${act.id}:`, error);
+        return [];
+      }
     });
 
-    const dbActivities = activitiesToProcess.map((act) => ({
-      ...act,
-      athlete: athleteId,
-    }));
+    const photoResults = await Promise.all(photoFetchPromises);
+    photos.push(...photoResults.flat());
+  }
 
-    let savedActivities: Activity[] = dbActivities;
+  const activitiesToProcess = fetchedActivities.map((act) => {
+    // Only mark as complete if we explicitly requested IDs (Detail View)
+    // OR if it has a detailed polyline (strong indicator of detail view).
+    const isComplete = !!requestedActivityIds || !!act.map?.polyline;
+    return transformStravaActivity(act, isComplete, {
+      photosCurrent: photoRefreshSucceeded.has(act.id),
+    });
+  });
 
-    // `persist: false` (see `~/server/strava/validators.ts`) is used by the
-    // webhook processor, which performs its own transactional
-    // upsert/photo-replace and change-feed recording immediately after this
-    // call returns. Without this flag that second write would duplicate
-    // this one - non-transactionally, with no change record - and then be
-    // immediately overwritten by it, which is exactly the kind of
-    // non-atomic double write issue #122 exists to eliminate.
-    if (persist) {
-      savedActivities = await db.transaction(async (tx) => {
+  const dbActivities = activitiesToProcess.map((act) => ({
+    ...act,
+    athlete: athleteId,
+  }));
+
+  let savedActivities: Activity[] = dbActivities;
+  const photosCurrentForRow =
+    photoRefreshSucceeded.size > 0
+      ? sql`excluded.id in (${sql.join(
+          [...photoRefreshSucceeded].map((id) => sql`${id}`),
+          sql.raw(', '),
+        )})`
+      : sql`false`;
+
+  // `persist: false` (see `~/server/strava/validators.ts`) is used by the
+  // webhook processor, which performs its own transactional
+  // upsert/photo-replace and change-feed recording immediately after this
+  // call returns. Without this flag that second write would duplicate
+  // this one - non-transactionally, with no change record - and then be
+  // immediately overwritten by it, which is exactly the kind of
+  // non-atomic double write issue #122 exists to eliminate.
+  if (persist) {
+    try {
+      const persistRows = async (tx: ActivityPersistenceTransaction) => {
         const changeEntries: NewSyncChange[] = [];
 
         // Handle photos: delete existing rows for the activities just
@@ -181,7 +238,12 @@ export async function fetchStravaActivities(
         // treats an activity's photo set as replaced wholesale on refetch.
         let removedPhotoRows: { photoId: string; activityId: number }[] = [];
         if (shouldDeletePhotos) {
-          const activityIdsWithPhotos = fetchedActivities.map((act) => act.id);
+          // A failed photo request is non-authoritative. Preserve prior photo
+          // rows and freshness for that activity rather than replacing them
+          // with a synthetic empty set.
+          const activityIdsWithPhotos = fetchedActivities
+            .map((act) => act.id)
+            .filter((id) => photoRefreshSucceeded.has(id));
           if (activityIdsWithPhotos.length > 0) {
             const existingPhotoRows = await tx
               .select({
@@ -191,7 +253,9 @@ export async function fetchStravaActivities(
               .from(photosSchema)
               .where(inArray(photosSchema.activity_id, activityIdsWithPhotos));
 
-            const incomingPhotoIds = new Set(photos.map((photo) => photo.unique_id));
+            const incomingPhotoIds = new Set(
+              photos.map((photo) => photo.unique_id),
+            );
             removedPhotoRows = existingPhotoRows.filter(
               ({ photoId }) => !incomingPhotoIds.has(photoId),
             );
@@ -255,7 +319,7 @@ export async function fetchStravaActivities(
 
           // Let's rely on the conflict target.
 
-          const valuesToInsert = dbActivities.map(act => {
+          const valuesToInsert = dbActivities.map((act) => {
             // If we are definitely fetching details (requestedActivityIds is set), act.is_complete is true.
             // If we are summary fetching, act.is_complete is false.
             return act;
@@ -287,7 +351,7 @@ export async function fetchStravaActivities(
                 // CASE WHEN excluded.is_complete THEN true ELSE activity.is_complete END
                 is_complete: sql`CASE WHEN excluded.is_complete THEN true ELSE ${activitySchema.is_complete} END`,
                 geometryState: sql`CASE WHEN excluded.is_complete THEN excluded.geometry_state ELSE COALESCE(${activitySchema.geometryState}, excluded.geometry_state) END`,
-                photosState: sql`CASE WHEN ${photoRefreshSucceeded.size > 0} THEN excluded.photos_state ELSE COALESCE(${activitySchema.photosState}, excluded.photos_state) END`,
+                photosState: sql`CASE WHEN ${photosCurrentForRow} THEN excluded.photos_state ELSE COALESCE(${activitySchema.photosState}, excluded.photos_state) END`,
                 lastSummarySeenAt: sql`excluded.last_summary_seen_at`,
                 lastDetailedFetchedAt: sql`COALESCE(excluded.last_detailed_fetched_at, ${activitySchema.lastDetailedFetchedAt})`,
 
@@ -310,8 +374,33 @@ export async function fetchStravaActivities(
                 athlete_count: sql`excluded.athlete_count`,
 
                 gear_id: sql`excluded.gear_id`,
-                map_bbox: sql`excluded.map_bbox`
-              }
+                map_bbox: sql`excluded.map_bbox`,
+                ...(requestedActivityIds
+                  ? {
+                      description: sql`excluded.description`,
+                      start_latlng: sql`excluded.start_latlng`,
+                      end_latlng: sql`excluded.end_latlng`,
+                      photo_count: sql`excluded.photo_count`,
+                      map_id: sql`excluded.map_id`,
+                      map_polyline: sql`excluded.map_polyline`,
+                      trainer: sql`excluded.trainer`,
+                      commute: sql`excluded.commute`,
+                      manual: sql`excluded.manual`,
+                      private: sql`excluded.private`,
+                      flagged: sql`excluded.flagged`,
+                      workout_type: sql`excluded.workout_type`,
+                      has_heartrate: sql`excluded.has_heartrate`,
+                      max_heartrate: sql`excluded.max_heartrate`,
+                      heartrate_opt_out: sql`excluded.heartrate_opt_out`,
+                      display_hide_heartrate_option: sql`excluded.display_hide_heartrate_option`,
+                      has_kudoed: sql`excluded.has_kudoed`,
+                      hide_from_home: sql`excluded.hide_from_home`,
+                      max_watts: sql`excluded.max_watts`,
+                      weighted_average_watts: sql`excluded.weighted_average_watts`,
+                      last_updated: sql`excluded.last_updated`,
+                    }
+                  : {}),
+              },
             })
             .returning();
 
@@ -326,7 +415,9 @@ export async function fetchStravaActivities(
         }
 
         if (photos.length > 0) {
-          const photoIds: string[] = photos.map((p) => p.unique_id).filter((id): id is string => !!id);
+          const photoIds: string[] = photos
+            .map((p) => p.unique_id)
+            .filter((id): id is string => !!id);
           let existingPhotos: { uniqueId: string | null }[] = [];
           if (photoIds.length > 0) {
             existingPhotos = await tx
@@ -335,8 +426,12 @@ export async function fetchStravaActivities(
               .where(inArray(photosSchema.unique_id, photoIds));
           }
 
-          const existingPhotoIds = new Set(existingPhotos.map((p) => p.uniqueId));
-          const newPhotos = photos.filter((p) => p.unique_id && !existingPhotoIds.has(p.unique_id));
+          const existingPhotoIds = new Set(
+            existingPhotos.map((p) => p.uniqueId),
+          );
+          const newPhotos = photos.filter(
+            (p) => p.unique_id && !existingPhotoIds.has(p.unique_id),
+          );
 
           if (newPhotos.length > 0) {
             await tx
@@ -361,12 +456,25 @@ export async function fetchStravaActivities(
         await changesRepo.record(changeEntries, tx);
 
         return dbActivities.length > 0 ? savedStats : dbActivities;
-      });
+      };
+      savedActivities = requireExisting
+        ? ((await withLockedExistingActivities(
+            db,
+            athleteId,
+            requestedActivityIds ?? [],
+            persistRows,
+          )) ?? [])
+        : await db.transaction(persistRows);
+    } catch (error) {
+      throw new StravaPersistenceError({ cause: error });
     }
-
-    return { activities: savedActivities, photos, notFoundIds };
-  } catch (error) {
-    logger.error('Error in fetchStravaActivities:', error);
-    return { activities: [], photos: [], notFoundIds };
   }
+
+  return {
+    activities: savedActivities,
+    photos,
+    notFoundIds,
+    photoRefreshFailedIds: [...photoRefreshFailed],
+    photoRefreshFailures,
+  };
 }

@@ -47,7 +47,9 @@ const actorFor = (athleteId: number, userId: string): Actor => ({
 const ACTOR_A = actorFor(ATHLETE_A, 'user-a');
 const ACTOR_B = actorFor(ATHLETE_B, 'user-b');
 
-function buildActivity(overrides: Partial<Activity> & { id: number; athlete: number }): Activity {
+function buildActivity(
+  overrides: Partial<Activity> & { id: number; athlete: number },
+): Activity {
   return {
     public_id: overrides.id * 7,
     name: `Activity ${overrides.id}`,
@@ -131,10 +133,20 @@ function fakeActivitiesRepo(activities: Activity[]): ActivitiesRepository {
       else activities.push(activity);
       return activity;
     },
+    async replaceExistingForAthlete(athleteId, activity) {
+      const index = activities.findIndex(
+        (row) => row.id === activity.id && row.athlete === athleteId,
+      );
+      if (index < 0) return null;
+      activities[index] = activity;
+      return activity;
+    },
   };
 }
 
-function fakeShareLinksRepo(opts: { revokedAthletes?: Set<number> } = {}): ShareLinksRepository & {
+function fakeShareLinksRepo(
+  opts: { revokedAthletes?: Set<number> } = {},
+): ShareLinksRepository & {
   rows: ShareLinkRecord[];
 } {
   const rows: ShareLinkRecord[] = [];
@@ -167,7 +179,8 @@ function fakeShareLinksRepo(opts: { revokedAthletes?: Set<number> } = {}): Share
     },
     async revoke(athleteId, shareId, now) {
       const record = rows.find(
-        (r) => r.id === shareId && r.athleteId === athleteId && r.revokedAt === null,
+        (r) =>
+          r.id === shareId && r.athleteId === athleteId && r.revokedAt === null,
       );
       if (!record) return null;
       record.revokedAt = now;
@@ -198,7 +211,10 @@ void test('createShareLinkForActor creates a share covering exactly the requeste
 
   assert.deepEqual(result.activityIds, [1]);
   assert.ok(result.token.length > 0);
-  assert.equal(result.expiresAt.getTime(), FIXED_NOW.getTime() + MIN_SHARE_LINK_TTL_MS);
+  assert.equal(
+    result.expiresAt.getTime(),
+    FIXED_NOW.getTime() + MIN_SHARE_LINK_TTL_MS,
+  );
   assert.deepEqual(result.fields, DEFAULT_SHARE_LINK_FIELD_OPTIONS);
   // The stored record never holds the plaintext token, only its hash.
   assert.equal(shareLinksRepo.rows[0]?.tokenHash === result.token, false);
@@ -217,7 +233,11 @@ void test('createShareLinkForActor rejects an activity id belonging to a differe
     ),
     (error: unknown) => error instanceof ForbiddenError,
   );
-  assert.equal(shareLinksRepo.rows.length, 0, 'no share should have been created');
+  assert.equal(
+    shareLinksRepo.rows.length,
+    0,
+    'no share should have been created',
+  );
 });
 
 void test('createShareLinkForActor rejects an empty activity subset', async () => {
@@ -297,7 +317,7 @@ void test('createShareLinkForActor never persists the plaintext token', async ()
 // listShareLinksForActor / revokeShareLinkForActor - authorization
 // ---------------------------------------------------------------------------
 
-void test('listShareLinksForActor only returns the actor\'s own shares', async () => {
+void test("listShareLinksForActor only returns the actor's own shares", async () => {
   const activitiesRepo = fakeActivitiesRepo([
     buildActivity({ id: 1, athlete: ATHLETE_A }),
     buildActivity({ id: 2, athlete: ATHLETE_B }),
@@ -315,16 +335,24 @@ void test('listShareLinksForActor only returns the actor\'s own shares', async (
     { activitiesRepo, shareLinksRepo, now: () => FIXED_NOW },
   );
 
-  const listA = await listShareLinksForActor(ACTOR_A, { shareLinksRepo, now: () => FIXED_NOW });
-  const listB = await listShareLinksForActor(ACTOR_B, { shareLinksRepo, now: () => FIXED_NOW });
+  const listA = await listShareLinksForActor(ACTOR_A, {
+    shareLinksRepo,
+    now: () => FIXED_NOW,
+  });
+  const listB = await listShareLinksForActor(ACTOR_B, {
+    shareLinksRepo,
+    now: () => FIXED_NOW,
+  });
 
   assert.equal(listA.length, 1);
   assert.equal(listB.length, 1);
   assert.notEqual(listA[0]?.id, listB[0]?.id);
 });
 
-void test('revokeShareLinkForActor rejects revoking another athlete\'s share', async () => {
-  const activitiesRepo = fakeActivitiesRepo([buildActivity({ id: 1, athlete: ATHLETE_A })]);
+void test("revokeShareLinkForActor rejects revoking another athlete's share", async () => {
+  const activitiesRepo = fakeActivitiesRepo([
+    buildActivity({ id: 1, athlete: ATHLETE_A }),
+  ]);
   const shareLinksRepo = fakeShareLinksRepo();
 
   const created = await createShareLinkForActor(
@@ -334,7 +362,10 @@ void test('revokeShareLinkForActor rejects revoking another athlete\'s share', a
   );
 
   await assert.rejects(
-    revokeShareLinkForActor(ACTOR_B, created.id, { shareLinksRepo, now: () => FIXED_NOW }),
+    revokeShareLinkForActor(ACTOR_B, created.id, {
+      shareLinksRepo,
+      now: () => FIXED_NOW,
+    }),
     (error: unknown) => error instanceof ShareLinkNotFoundError,
   );
 
@@ -346,13 +377,18 @@ void test('revokeShareLinkForActor rejects revoking another athlete\'s share', a
 void test('revokeShareLinkForActor rejects a nonexistent share id', async () => {
   const shareLinksRepo = fakeShareLinksRepo();
   await assert.rejects(
-    revokeShareLinkForActor(ACTOR_A, 'does-not-exist', { shareLinksRepo, now: () => FIXED_NOW }),
+    revokeShareLinkForActor(ACTOR_A, 'does-not-exist', {
+      shareLinksRepo,
+      now: () => FIXED_NOW,
+    }),
     (error: unknown) => error instanceof ShareLinkNotFoundError,
   );
 });
 
 void test('the owner can revoke their own share, and it disappears from the recipient view', async () => {
-  const activitiesRepo = fakeActivitiesRepo([buildActivity({ id: 1, athlete: ATHLETE_A })]);
+  const activitiesRepo = fakeActivitiesRepo([
+    buildActivity({ id: 1, athlete: ATHLETE_A }),
+  ]);
   const shareLinksRepo = fakeShareLinksRepo();
 
   const created = await createShareLinkForActor(
@@ -361,9 +397,15 @@ void test('the owner can revoke their own share, and it disappears from the reci
     { activitiesRepo, shareLinksRepo, now: () => FIXED_NOW },
   );
 
-  await revokeShareLinkForActor(ACTOR_A, created.id, { shareLinksRepo, now: () => FIXED_NOW });
+  await revokeShareLinkForActor(ACTOR_A, created.id, {
+    shareLinksRepo,
+    now: () => FIXED_NOW,
+  });
 
-  const summaries = await listShareLinksForActor(ACTOR_A, { shareLinksRepo, now: () => FIXED_NOW });
+  const summaries = await listShareLinksForActor(ACTOR_A, {
+    shareLinksRepo,
+    now: () => FIXED_NOW,
+  });
   assert.equal(summaries[0]?.status, 'revoked');
 });
 
@@ -371,7 +413,9 @@ void test('the owner can revoke their own share, and it disappears from the reci
 // getShareView - invalidation conditions
 // ---------------------------------------------------------------------------
 
-async function setupValidShare(overrides: { fields?: typeof DEFAULT_SHARE_LINK_FIELD_OPTIONS } = {}) {
+async function setupValidShare(
+  overrides: { fields?: typeof DEFAULT_SHARE_LINK_FIELD_OPTIONS } = {},
+) {
   const activityA = buildActivity({ id: 1, athlete: ATHLETE_A });
   const activitiesRepo = fakeActivitiesRepo([activityA]);
   const shareLinksRepo = fakeShareLinksRepo();
@@ -410,17 +454,26 @@ void test('getShareView rejects an unknown token (never existed)', async () => {
   const { activitiesRepo, shareLinksRepo } = await setupValidShare();
 
   await assert.rejects(
-    getShareView('not-a-real-token', { activitiesRepo, shareLinksRepo, now: () => FIXED_NOW }),
+    getShareView('not-a-real-token', {
+      activitiesRepo,
+      shareLinksRepo,
+      now: () => FIXED_NOW,
+    }),
     (error: unknown) => error instanceof ShareLinkUnavailableError,
   );
 });
 
 void test('getShareView rejects a guessed/incremented variant of a real token', async () => {
   const { activitiesRepo, shareLinksRepo, created } = await setupValidShare();
-  const guessed = created.token.slice(0, -1) + (created.token.endsWith('A') ? 'B' : 'A');
+  const guessed =
+    created.token.slice(0, -1) + (created.token.endsWith('A') ? 'B' : 'A');
 
   await assert.rejects(
-    getShareView(guessed, { activitiesRepo, shareLinksRepo, now: () => FIXED_NOW }),
+    getShareView(guessed, {
+      activitiesRepo,
+      shareLinksRepo,
+      now: () => FIXED_NOW,
+    }),
     (error: unknown) => error instanceof ShareLinkUnavailableError,
   );
 });
@@ -430,7 +483,11 @@ void test('getShareView rejects an expired share', async () => {
   const afterExpiry = new Date(created.expiresAt.getTime() + 1000);
 
   await assert.rejects(
-    getShareView(created.token, { activitiesRepo, shareLinksRepo, now: () => afterExpiry }),
+    getShareView(created.token, {
+      activitiesRepo,
+      shareLinksRepo,
+      now: () => afterExpiry,
+    }),
     (error: unknown) => error instanceof ShareLinkUnavailableError,
   );
 });
@@ -438,10 +495,17 @@ void test('getShareView rejects an expired share', async () => {
 void test('getShareView rejects a revoked share immediately', async () => {
   const { activitiesRepo, shareLinksRepo, created } = await setupValidShare();
 
-  await revokeShareLinkForActor(ACTOR_A, created.id, { shareLinksRepo, now: () => FIXED_NOW });
+  await revokeShareLinkForActor(ACTOR_A, created.id, {
+    shareLinksRepo,
+    now: () => FIXED_NOW,
+  });
 
   await assert.rejects(
-    getShareView(created.token, { activitiesRepo, shareLinksRepo, now: () => FIXED_NOW }),
+    getShareView(created.token, {
+      activitiesRepo,
+      shareLinksRepo,
+      now: () => FIXED_NOW,
+    }),
     (error: unknown) => error instanceof ShareLinkUnavailableError,
   );
 });
@@ -449,7 +513,9 @@ void test('getShareView rejects a revoked share immediately', async () => {
 void test('getShareView rejects every share for a deauthorized athlete, even before erasure runs', async () => {
   const activityA = buildActivity({ id: 1, athlete: ATHLETE_A });
   const activitiesRepo = fakeActivitiesRepo([activityA]);
-  const shareLinksRepo = fakeShareLinksRepo({ revokedAthletes: new Set([ATHLETE_A]) });
+  const shareLinksRepo = fakeShareLinksRepo({
+    revokedAthletes: new Set([ATHLETE_A]),
+  });
 
   const created = await createShareLinkForActor(
     ACTOR_A,
@@ -461,7 +527,11 @@ void test('getShareView rejects every share for a deauthorized athlete, even bef
   // connection is - which must be enough to stop it serving data
   // immediately, well before the 30-day erasure transaction runs.
   await assert.rejects(
-    getShareView(created.token, { activitiesRepo, shareLinksRepo, now: () => FIXED_NOW }),
+    getShareView(created.token, {
+      activitiesRepo,
+      shareLinksRepo,
+      now: () => FIXED_NOW,
+    }),
     (error: unknown) => error instanceof ShareLinkUnavailableError,
   );
 });
@@ -483,7 +553,8 @@ void test('getShareView drops a deleted activity from the result without failing
 });
 
 void test('getShareView drops an activity that lost visibility (became private)', async () => {
-  const { activitiesRepo, shareLinksRepo, created, activityA } = await setupValidShare();
+  const { activitiesRepo, shareLinksRepo, created, activityA } =
+    await setupValidShare();
 
   await activitiesRepo.upsertOne({ ...activityA, private: true });
 

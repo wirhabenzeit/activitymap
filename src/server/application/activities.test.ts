@@ -5,9 +5,13 @@ import type { Account, Activity, Photo } from '~/server/db/schema';
 import type { ActivitiesRepository } from '~/server/repositories/activities';
 import type { PhotosRepository } from '~/server/repositories/photos';
 import type { Actor } from '~/server/auth/actor';
+import { StravaApiError } from '~/server/strava/client';
+import { StravaBudgetExceededError } from '~/server/strava/request-budget';
+import type { StravaActivity } from '~/server/strava/types';
+import { EXTERNAL_EFFECTS_DISABLED_MESSAGE } from '~/server/config/external-effects';
 
 import {
-  ForbiddenError,
+  ActivityMutationError,
   deleteActivitiesForActor,
   getActivitiesForActor,
   getPhotosForActor,
@@ -35,7 +39,9 @@ const actorFor = (athleteId: number, userId: string): Actor => ({
 const ACTOR_A = actorFor(ATHLETE_A, 'user-a');
 const ACTOR_B = actorFor(ATHLETE_B, 'user-b');
 
-function buildActivity(overrides: Partial<Activity> & { id: number; athlete: number }): Activity {
+function buildActivity(
+  overrides: Partial<Activity> & { id: number; athlete: number },
+): Activity {
   return {
     public_id: overrides.id * 7,
     name: `Activity ${overrides.id}`,
@@ -96,7 +102,13 @@ function buildActivity(overrides: Partial<Activity> & { id: number; athlete: num
   };
 }
 
-function buildPhoto(overrides: Partial<Photo> & { unique_id: string; activity_id: number; athlete_id: number }): Photo {
+function buildPhoto(
+  overrides: Partial<Photo> & {
+    unique_id: string;
+    activity_id: number;
+    athlete_id: number;
+  },
+): Photo {
   return {
     activity_name: null,
     caption: null,
@@ -115,7 +127,9 @@ function buildPhoto(overrides: Partial<Photo> & { unique_id: string; activity_id
   };
 }
 
-function createFakeActivitiesRepository(seed: Activity[] = []): ActivitiesRepository {
+function createFakeActivitiesRepository(
+  seed: Activity[] = [],
+): ActivitiesRepository {
   const rows = [...seed];
   return {
     async findManyByAthlete(athleteId, { limit = 10000, offset = 0 } = {}) {
@@ -149,6 +163,14 @@ function createFakeActivitiesRepository(seed: Activity[] = []): ActivitiesReposi
       }
       return activity;
     },
+    async replaceExistingForAthlete(athleteId, activity) {
+      const index = rows.findIndex(
+        (row) => row.id === activity.id && row.athlete === athleteId,
+      );
+      if (index < 0) return null;
+      rows[index] = activity;
+      return activity;
+    },
     async findPageByAthlete(athleteId, { afterId = 0, limit }) {
       return rows
         .filter((row) => row.athlete === athleteId && row.id > afterId)
@@ -167,10 +189,17 @@ function createFakePhotosRepository(seed: Photo[] = []): PhotosRepository {
       const idSet = new Set(ids);
       return seed.filter((photo) => idSet.has(photo.unique_id));
     },
+    async findManyByActivityForAthlete(athleteId, activityId) {
+      return seed.filter(
+        (photo) =>
+          photo.athlete_id === athleteId && photo.activity_id === activityId,
+      );
+    },
     async findPageByAthlete(athleteId, { afterId = '', limit }) {
       return seed
         .filter(
-          (photo) => photo.athlete_id === athleteId && photo.unique_id > afterId,
+          (photo) =>
+            photo.athlete_id === athleteId && photo.unique_id > afterId,
         )
         .sort((a, b) => (a.unique_id < b.unique_id ? -1 : 1))
         .slice(0, limit);
@@ -193,7 +222,64 @@ const stubAccount = (overrides: Partial<Account> = {}): Account =>
     ...overrides,
   }) as Account;
 
-void test('getUserActivities only returns the actor athlete\'s own activities', async () => {
+function stravaActivity(
+  overrides: Partial<StravaActivity> = {},
+): StravaActivity {
+  return {
+    id: 7,
+    resource_state: 3,
+    athlete: { id: ATHLETE_A } as StravaActivity['athlete'],
+    name: 'Updated activity',
+    description: '',
+    distance: 1000,
+    moving_time: 300,
+    elapsed_time: 320,
+    total_elevation_gain: 12,
+    elev_high: null,
+    elev_low: null,
+    sport_type: 'Run',
+    start_date: '2026-01-01T00:00:00.000Z',
+    start_date_local: '2026-01-01T01:00:00.000Z',
+    timezone: 'Europe/Zurich',
+    start_latlng: null,
+    end_latlng: null,
+    achievement_count: 0,
+    kudos_count: 0,
+    comment_count: 0,
+    athlete_count: 1,
+    photo_count: 0,
+    total_photo_count: 0,
+    map: {
+      id: 'map-7',
+      polyline: null,
+      summary_polyline: null,
+      resource_state: 3,
+    },
+    trainer: false,
+    commute: false,
+    manual: false,
+    private: false,
+    flagged: false,
+    workout_type: null,
+    upload_id: null,
+    average_speed: 3,
+    max_speed: 4,
+    has_kudoed: false,
+    hide_from_home: false,
+    gear_id: null,
+    kilojoules: null,
+    average_watts: null,
+    device_watts: null,
+    max_watts: null,
+    weighted_average_watts: null,
+    calories: null,
+    device_name: null,
+    pr_count: 0,
+    ...overrides,
+  };
+}
+
+void test("getUserActivities only returns the actor athlete's own activities", async () => {
   const activitiesRepo = createFakeActivitiesRepository([
     buildActivity({ id: 1, athlete: ATHLETE_A }),
     buildActivity({ id: 2, athlete: ATHLETE_B }),
@@ -225,7 +311,7 @@ void test('getActivitiesForActor drops ids that belong to a different athlete, e
   );
 });
 
-void test('getActivitiesForActor returns nothing when the actor supplies only another athlete\'s id', async () => {
+void test("getActivitiesForActor returns nothing when the actor supplies only another athlete's id", async () => {
   const activitiesRepo = createFakeActivitiesRepository([
     buildActivity({ id: 2, athlete: ATHLETE_B }),
   ]);
@@ -235,7 +321,7 @@ void test('getActivitiesForActor returns nothing when the actor supplies only an
   assert.deepEqual(result, []);
 });
 
-void test('getPhotosForActor only returns the actor athlete\'s own photos', async () => {
+void test("getPhotosForActor only returns the actor athlete's own photos", async () => {
   const photosRepo = createFakePhotosRepository([
     buildPhoto({ unique_id: 'p1', activity_id: 1, athlete_id: ATHLETE_A }),
     buildPhoto({ unique_id: 'p2', activity_id: 2, athlete_id: ATHLETE_B }),
@@ -261,7 +347,9 @@ void test('updateActivityForActor rejects a cross-athlete update without ever re
         { id: 42, name: 'Renamed by A' },
         { activitiesRepo, resolveAccount: neverCalledAccountResolver },
       ),
-    ForbiddenError,
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'activity_unavailable',
   );
 });
 
@@ -276,7 +364,9 @@ void test('refreshActivityForActor rejects a cross-athlete refresh without ever 
         activitiesRepo,
         resolveAccount: neverCalledAccountResolver,
       }),
-    ForbiddenError,
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'activity_unavailable',
   );
 });
 
@@ -295,8 +385,278 @@ void test('updateActivityForActor still requires an access token for an owned ac
           resolveAccount: async () => stubAccount({ access_token: null }),
         },
       ),
-    /No Strava access token found/,
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'strava_not_connected',
   );
+});
+
+void test('updateActivityForActor preserves empty descriptions and returns the reread committed row', async () => {
+  const activitiesRepo = createFakeActivitiesRepository([
+    buildActivity({ id: 7, athlete: ATHLETE_A }),
+  ]);
+  let upstreamInput: unknown;
+  const result = await updateActivityForActor(
+    ACTOR_A,
+    { id: 7, description: '' },
+    {
+      activitiesRepo,
+      resolveAccount: async () => stubAccount(),
+      createClient: () => ({
+        async updateActivity(_id, input) {
+          upstreamInput = input;
+          return stravaActivity({
+            commute: true,
+            private: true,
+            flagged: true,
+            has_heartrate: true,
+            average_heartrate: 151,
+            max_heartrate: 184,
+            max_watts: 612,
+            weighted_average_watts: 289,
+          });
+        },
+      }),
+    },
+  );
+
+  assert.equal(result.description, '');
+  assert.equal(result.name, 'Updated activity');
+  assert.equal(result.commute, true);
+  assert.equal(result.private, true);
+  assert.equal(result.flagged, true);
+  assert.equal(result.has_heartrate, true);
+  assert.equal(result.average_heartrate, 151);
+  assert.equal(result.max_heartrate, 184);
+  assert.equal(result.max_watts, 612);
+  assert.equal(result.weighted_average_watts, 289);
+  assert.deepEqual(upstreamInput, {
+    name: undefined,
+    sport_type: undefined,
+    description: '',
+    commute: undefined,
+    hide_from_home: undefined,
+    gear_id: undefined,
+  });
+});
+
+void test('updateActivityForActor does not let a late response overwrite a newer committed row', async () => {
+  const original = buildActivity({
+    id: 7,
+    athlete: ATHLETE_A,
+    name: 'Original',
+    last_updated: new Date('2026-01-01T00:00:00Z'),
+  });
+  const newer = buildActivity({
+    id: 7,
+    athlete: ATHLETE_A,
+    name: 'Newer committed edit',
+    last_updated: new Date('2026-01-01T00:00:02Z'),
+  });
+  const activitiesRepo = createFakeActivitiesRepository([original]);
+  activitiesRepo.replaceExistingForAthlete = async () => {
+    await activitiesRepo.upsertOne(newer);
+    return null;
+  };
+
+  const result = await updateActivityForActor(
+    ACTOR_A,
+    { id: 7, name: 'Late stale edit' },
+    {
+      activitiesRepo,
+      resolveAccount: async () => stubAccount(),
+      createClient: () => ({
+        async updateActivity() {
+          return stravaActivity({ name: 'Late stale edit' });
+        },
+      }),
+    },
+  );
+  assert.equal(result.name, 'Newer committed edit');
+});
+
+void test('updateActivityForActor preserves rate-limit classification and local-save recovery state', async () => {
+  const activitiesRepo = createFakeActivitiesRepository([
+    buildActivity({ id: 7, athlete: ATHLETE_A }),
+  ]);
+  await assert.rejects(
+    () =>
+      updateActivityForActor(
+        ACTOR_A,
+        { id: 7, name: 'Updated' },
+        {
+          activitiesRepo,
+          resolveAccount: async () => stubAccount(),
+          createClient: () => ({
+            async updateActivity() {
+              throw new StravaBudgetExceededError(321);
+            },
+          }),
+        },
+      ),
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'rate_limited' &&
+      error.retryable &&
+      error.retryAfterSeconds === 321,
+  );
+
+  activitiesRepo.replaceExistingForAthlete = async () => {
+    throw new Error('database unavailable');
+  };
+  await assert.rejects(
+    () =>
+      updateActivityForActor(
+        ACTOR_A,
+        { id: 7, name: 'Accepted upstream' },
+        {
+          activitiesRepo,
+          resolveAccount: async () => stubAccount(),
+          createClient: () => ({
+            async updateActivity() {
+              return stravaActivity();
+            },
+          }),
+        },
+      ),
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'local_persistence_failed' &&
+      error.details?.upstreamSucceeded === true &&
+      error.details?.recovery === 'reconcile_or_retry_explicitly',
+  );
+});
+
+void test('updateActivityForActor classifies disabled external effects and reconciles an upstream 404 locally', async () => {
+  const disabledRepo = createFakeActivitiesRepository([
+    buildActivity({ id: 7, athlete: ATHLETE_A }),
+  ]);
+  await assert.rejects(
+    () =>
+      updateActivityForActor(
+        ACTOR_A,
+        { id: 7, name: 'Updated' },
+        {
+          activitiesRepo: disabledRepo,
+          resolveAccount: async () => stubAccount(),
+          createClient: () => {
+            throw new Error(EXTERNAL_EFFECTS_DISABLED_MESSAGE);
+          },
+        },
+      ),
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'external_effects_disabled' &&
+      !error.retryable,
+  );
+
+  const deletedRepo = createFakeActivitiesRepository([
+    buildActivity({ id: 7, athlete: ATHLETE_A }),
+  ]);
+  await assert.rejects(
+    () =>
+      updateActivityForActor(
+        ACTOR_A,
+        { id: 7, name: 'Deleted upstream' },
+        {
+          activitiesRepo: deletedRepo,
+          resolveAccount: async () => stubAccount(),
+          createClient: () => ({
+            async updateActivity() {
+              throw new StravaApiError('Record Not Found', 404);
+            },
+          }),
+        },
+      ),
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'activity_unavailable',
+  );
+  assert.deepEqual(await deletedRepo.findManyByIds([7]), []);
+});
+
+void test('refreshActivityForActor requests guarded existing-row persistence and reports partial photos', async () => {
+  const existing = buildActivity({ id: 7, athlete: ATHLETE_A });
+  const activitiesRepo = createFakeActivitiesRepository([existing]);
+  let fetchInput: Record<string, unknown> | undefined;
+  const result = await refreshActivityForActor(ACTOR_A, 7, {
+    activitiesRepo,
+    photosRepo: createFakePhotosRepository([
+      buildPhoto({ unique_id: 'old', activity_id: 7, athlete_id: ATHLETE_A }),
+    ]),
+    resolveAccount: async () => stubAccount(),
+    fetchActivities: async (input) => {
+      fetchInput = input;
+      return {
+        activities: [existing],
+        photos: [],
+        notFoundIds: [],
+        photoRefreshFailedIds: [7],
+        photoRefreshFailures: [
+          { activityId: 7, error: new StravaApiError('limited', 429) },
+        ],
+      };
+    },
+  });
+
+  assert.equal(fetchInput?.requireExisting, true);
+  assert.equal(fetchInput?.shouldDeletePhotos, true);
+  assert.equal(result.photosStatus, 'partial');
+  assert.deepEqual(result.photosError, {
+    code: 'rate_limited',
+    retryable: true,
+    retryAfterSeconds: 60,
+  });
+  assert.deepEqual(result.photos, []);
+});
+
+void test('refreshActivityForActor tombstones a confirmed upstream deletion and never turns an empty race into success', async () => {
+  for (const fetchResult of [
+    { activities: [], photos: [], notFoundIds: [7] },
+    { activities: [], photos: [], notFoundIds: [] },
+  ]) {
+    const activitiesRepo = createFakeActivitiesRepository([
+      buildActivity({ id: 7, athlete: ATHLETE_A }),
+    ]);
+    await assert.rejects(
+      () =>
+        refreshActivityForActor(ACTOR_A, 7, {
+          activitiesRepo,
+          resolveAccount: async () => stubAccount(),
+          fetchActivities: async () => fetchResult,
+        }),
+      (error: unknown) =>
+        error instanceof ActivityMutationError &&
+        error.code === 'activity_unavailable',
+    );
+    if (fetchResult.notFoundIds.length > 0)
+      assert.deepEqual(await activitiesRepo.findManyByIds([7]), []);
+  }
+});
+
+void test('refreshActivityForActor maps upstream 429 and 503 without flattening retryability', async () => {
+  for (const [upstream, expectedCode] of [
+    [new StravaApiError('limited', 429), 'rate_limited'],
+    [new StravaApiError('unavailable', 503), 'upstream_unavailable'],
+  ] as const) {
+    const activitiesRepo = createFakeActivitiesRepository([
+      buildActivity({ id: 7, athlete: ATHLETE_A }),
+    ]);
+    await assert.rejects(
+      () =>
+        refreshActivityForActor(ACTOR_A, 7, {
+          activitiesRepo,
+          resolveAccount: async () => stubAccount(),
+          fetchActivities: async () => {
+            throw upstream;
+          },
+        }),
+      (error: unknown) =>
+        error instanceof ActivityMutationError &&
+        error.code === expectedCode &&
+        error.retryable,
+    );
+  }
 });
 
 void test('deleteActivitiesForActor only deletes activities owned by the actor athlete', async () => {
@@ -319,7 +679,7 @@ void test('deleteActivitiesForActor only deletes activities owned by the actor a
   assert.equal(remaining[0]?.athlete, ATHLETE_B);
 });
 
-void test('deleteActivitiesForActor deletes only the actor\'s own activities when ids from two athletes are mixed', async () => {
+void test("deleteActivitiesForActor deletes only the actor's own activities when ids from two athletes are mixed", async () => {
   const activitiesRepo = createFakeActivitiesRepository([
     buildActivity({ id: 1, athlete: ATHLETE_A }),
     buildActivity({ id: 2, athlete: ATHLETE_A }),
@@ -332,6 +692,6 @@ void test('deleteActivitiesForActor deletes only the actor\'s own activities whe
   assert.deepEqual(
     remaining.map((activity) => activity.id).sort(),
     [1, 2],
-    'athlete B deleting a mixed id list must not remove athlete A\'s activities',
+    "athlete B deleting a mixed id list must not remove athlete A's activities",
   );
 });

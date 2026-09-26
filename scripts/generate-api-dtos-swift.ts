@@ -34,15 +34,30 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 import { authenticationDTOSchema } from '../src/contracts/v1/auth';
-import { streamTypeSchema, streamFreshnessSchema, streamFetchStatusSchema, streamFailureCodeSchema,
-  streamMetadataSchema, timeStreamSchema, distanceStreamSchema, latlngStreamSchema, altitudeStreamSchema,
-  wattsStreamSchema, heartrateStreamSchema, rawStreamsDTOSchema, activityStreamsDTOSchema,
+import {
+  streamTypeSchema,
+  streamFreshnessSchema,
+  streamFetchStatusSchema,
+  streamFailureCodeSchema,
+  streamMetadataSchema,
+  timeStreamSchema,
+  distanceStreamSchema,
+  latlngStreamSchema,
+  altitudeStreamSchema,
+  wattsStreamSchema,
+  heartrateStreamSchema,
+  rawStreamsDTOSchema,
+  activityStreamsDTOSchema,
 } from '../src/contracts/v1/activity-streams';
 import {
   activityDTOSchema,
   geometryStateSchema,
   photosStateSchema,
 } from '../src/contracts/v1/activity';
+import {
+  activityRefreshResultSchema,
+  updateActivityRequestSchema,
+} from '../src/contracts/v1/activity-mutations';
 import { photoDTOSchema } from '../src/contracts/v1/photo';
 import { currentUserDTOSchema } from '../src/contracts/v1/user';
 import {
@@ -84,16 +99,22 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['StreamFetchStatus', streamFetchStatusSchema],
   ['StreamFailureCode', streamFailureCodeSchema],
   ['StreamMetadata', streamMetadataSchema],
-  ['TimeStream', timeStreamSchema], ['DistanceStream', distanceStreamSchema],
-  ['LatlngStream', latlngStreamSchema], ['AltitudeStream', altitudeStreamSchema],
-  ['WattsStream', wattsStreamSchema], ['HeartrateStream', heartrateStreamSchema],
-  ['RawStreams', rawStreamsDTOSchema], ['ActivityStreams', activityStreamsDTOSchema],
+  ['TimeStream', timeStreamSchema],
+  ['DistanceStream', distanceStreamSchema],
+  ['LatlngStream', latlngStreamSchema],
+  ['AltitudeStream', altitudeStreamSchema],
+  ['WattsStream', wattsStreamSchema],
+  ['HeartrateStream', heartrateStreamSchema],
+  ['RawStreams', rawStreamsDTOSchema],
+  ['ActivityStreams', activityStreamsDTOSchema],
   ['GeometryState', geometryStateSchema],
   ['PhotosState', photosStateSchema],
   ['SyncResource', syncResourceSchema],
   ['Authentication', authenticationDTOSchema],
   ['CurrentUser', currentUserDTOSchema],
   ['Activity', activityDTOSchema],
+  ['UpdateActivityRequest', updateActivityRequestSchema],
+  ['ActivityRefreshResult', activityRefreshResultSchema],
   ['Photo', photoDTOSchema],
   ['SyncRetentionMeta', syncRetentionMetaSchema],
   ['SyncFreshnessMeta', syncFreshnessMetaSchema],
@@ -124,6 +145,7 @@ const inlineEnumNames = new Map<string, string>([
   [enumKey(sportTypes), 'SportType'],
   [enumKey(['low', 'medium', 'high']), 'StreamResolution'],
   [enumKey(['time', 'distance']), 'StreamSeriesType'],
+  [enumKey(['complete', 'partial']), 'PhotoRefreshStatus'],
 ]);
 
 /**
@@ -150,17 +172,85 @@ const capitalize = (value: string): string =>
  * are backtick-escaped rather than assumed safe.
  */
 const swiftKeywords = new Set([
-  'Any', 'Protocol', 'Self', 'Type', 'as', 'associatedtype', 'associativity',
-  'break', 'case', 'catch', 'class', 'continue', 'convenience', 'default',
-  'defer', 'deinit', 'didSet', 'do', 'dynamic', 'else', 'enum', 'extension',
-  'fallthrough', 'false', 'fileprivate', 'final', 'for', 'func', 'get', 'guard',
-  'if', 'import', 'in', 'indirect', 'infix', 'init', 'inout', 'internal', 'is',
-  'lazy', 'left', 'let', 'mutating', 'nil', 'none', 'nonmutating', 'open',
-  'operator', 'optional', 'override', 'postfix', 'precedence', 'prefix',
-  'private', 'protocol', 'public', 'repeat', 'required', 'rethrows', 'return',
-  'right', 'self', 'set', 'static', 'struct', 'subscript', 'super', 'switch',
-  'throw', 'throws', 'true', 'try', 'typealias', 'unowned', 'var', 'weak',
-  'where', 'while', 'willSet',
+  'Any',
+  'Protocol',
+  'Self',
+  'Type',
+  'as',
+  'associatedtype',
+  'associativity',
+  'break',
+  'case',
+  'catch',
+  'class',
+  'continue',
+  'convenience',
+  'default',
+  'defer',
+  'deinit',
+  'didSet',
+  'do',
+  'dynamic',
+  'else',
+  'enum',
+  'extension',
+  'fallthrough',
+  'false',
+  'fileprivate',
+  'final',
+  'for',
+  'func',
+  'get',
+  'guard',
+  'if',
+  'import',
+  'in',
+  'indirect',
+  'infix',
+  'init',
+  'inout',
+  'internal',
+  'is',
+  'lazy',
+  'left',
+  'let',
+  'mutating',
+  'nil',
+  'none',
+  'nonmutating',
+  'open',
+  'operator',
+  'optional',
+  'override',
+  'postfix',
+  'precedence',
+  'prefix',
+  'private',
+  'protocol',
+  'public',
+  'repeat',
+  'required',
+  'rethrows',
+  'return',
+  'right',
+  'self',
+  'set',
+  'static',
+  'struct',
+  'subscript',
+  'super',
+  'switch',
+  'throw',
+  'throws',
+  'true',
+  'try',
+  'typealias',
+  'unowned',
+  'var',
+  'weak',
+  'where',
+  'while',
+  'willSet',
 ]);
 
 const escapeSwiftIdentifier = (name: string): string =>
@@ -225,7 +315,8 @@ function registerNestedObject(schema: JSONSchema, path: string): string {
   const override = nestedObjectNames.get(path);
   const [owner, property] = path.split('.');
   const name =
-    override ?? `${owner ?? ''}${capitalize(swiftPropertyName(property ?? ''))}`;
+    override ??
+    `${owner ?? ''}${capitalize(swiftPropertyName(property ?? ''))}`;
 
   const existing = pendingNestedObjects.find((entry) => entry.name === name);
   if (!existing) {
@@ -449,10 +540,7 @@ function emitUnion(typeName: string, variants: JSONSchema[]): string {
   let discriminatorKey: string | undefined;
 
   for (const variant of variants) {
-    const properties = (variant.properties ?? {}) as Record<
-      string,
-      JSONSchema
-    >;
+    const properties = (variant.properties ?? {}) as Record<string, JSONSchema>;
     const constEntries = Object.entries(properties).filter(
       ([, property]) => typeof property.const === 'string',
     );
@@ -466,7 +554,10 @@ function emitUnion(typeName: string, variants: JSONSchema[]): string {
       throw new Error(`Union ${typeName} variants disagree on discriminator.`);
     }
     discriminatorKey = key;
-    discriminators.set(property.const as string, `${typeName}${capitalize(swiftCaseName(property.const as string))}`);
+    discriminators.set(
+      property.const as string,
+      `${typeName}${capitalize(swiftCaseName(property.const as string))}`,
+    );
   }
 
   if (!discriminatorKey) {
@@ -491,11 +582,17 @@ function emitUnion(typeName: string, variants: JSONSchema[]): string {
   const lines: string[] = [];
   lines.push(`${INDENT}enum ${typeName}: Decodable, Hashable, Sendable {`);
   for (const [value, variantName] of discriminators) {
-    lines.push(`${INDENT}${INDENT}case ${swiftCaseName(value)}(${variantName})`);
+    lines.push(
+      `${INDENT}${INDENT}case ${swiftCaseName(value)}(${variantName})`,
+    );
   }
   lines.push('');
-  lines.push(`${INDENT}${INDENT}private enum DiscriminatorKeys: String, CodingKey {`);
-  lines.push(`${INDENT.repeat(3)}case ${swiftPropertyName(discriminatorKey)} = "${discriminatorKey}"`);
+  lines.push(
+    `${INDENT}${INDENT}private enum DiscriminatorKeys: String, CodingKey {`,
+  );
+  lines.push(
+    `${INDENT.repeat(3)}case ${swiftPropertyName(discriminatorKey)} = "${discriminatorKey}"`,
+  );
   lines.push(`${INDENT}${INDENT}}`);
   lines.push('');
   lines.push(`${INDENT}${INDENT}init(from decoder: any Decoder) throws {`);
@@ -530,9 +627,7 @@ function emitUnion(typeName: string, variants: JSONSchema[]): string {
 }
 
 function docComment(text: string, indent: string): string[] {
-  return text
-    .split('\n')
-    .map((line) => `${indent}/// ${line}`.trimEnd());
+  return text.split('\n').map((line) => `${indent}/// ${line}`.trimEnd());
 }
 
 /**
@@ -635,7 +730,9 @@ ${enumSections.join('\n\n')}
 `;
 
 if (process.argv.includes('--check')) {
-  const committedSwift = await readFile(swiftOutputPath, 'utf8').catch(() => '');
+  const committedSwift = await readFile(swiftOutputPath, 'utf8').catch(
+    () => '',
+  );
   if (committedSwift !== generatedSwift) {
     throw new Error(
       'Generated Swift API DTOs are stale. Run pnpm api-dtos:generate.',

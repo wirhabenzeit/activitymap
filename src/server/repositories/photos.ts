@@ -9,6 +9,10 @@ type DrizzleDb = typeof defaultDb;
 
 export interface PhotosRepository {
   findManyByAthlete(athleteId: number): Promise<Photo[]>;
+  findManyByActivityForAthlete(
+    athleteId: number,
+    activityId: number,
+  ): Promise<Photo[]>;
   /** Rows for the given `unique_id`s, in no particular order; missing ids are silently omitted. */
   findManyByIds(ids: string[]): Promise<Photo[]>;
   /**
@@ -35,9 +39,24 @@ export function createPhotosRepository(
         .where(inArray(photos.athlete_id, [athleteId]));
     },
 
+    async findManyByActivityForAthlete(athleteId, activityId) {
+      return database
+        .select()
+        .from(photos)
+        .where(
+          and(
+            eq(photos.athlete_id, athleteId),
+            eq(photos.activity_id, activityId),
+          ),
+        );
+    },
+
     async findManyByIds(ids) {
       if (ids.length === 0) return [];
-      return database.select().from(photos).where(inArray(photos.unique_id, ids));
+      return database
+        .select()
+        .from(photos)
+        .where(inArray(photos.unique_id, ids));
     },
 
     async findPageByAthlete(athleteId, { afterId = '', limit }) {
