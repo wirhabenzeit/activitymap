@@ -141,6 +141,8 @@ enum SampleData {
                         description: id % 4 == 0 ? "Great conditions, felt strong the whole way." : nil,
                         sportType: sport,
                         startDate: date,
+                        startDateLocal: date.addingTimeInterval(Double(TimeZone.current.secondsFromGMT(for: date))),
+                        timezone: TimeZone.current.identifier,
                         distance: distance,
                         movingTime: movingTime,
                         elapsedTime: elapsedTime,

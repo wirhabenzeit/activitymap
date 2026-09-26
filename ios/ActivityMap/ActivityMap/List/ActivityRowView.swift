@@ -30,7 +30,7 @@ struct ActivityRowView: View {
                     .foregroundStyle(isActive ? AppTheme.headerBackground : .primary)
                     .fontWeight(isActive ? .semibold : .regular)
                     .lineLimit(1)
-                Text(Formatters.shortDate(activity.startDate))
+                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

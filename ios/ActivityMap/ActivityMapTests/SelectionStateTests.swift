@@ -140,6 +140,7 @@ struct ActivityStoreSelectionTests {
     static func activity(_ id: Int, sport: SportType = .run, route: Bool = true) -> Activity {
         Activity(
             id: id, name: "Activity \(id)", sportType: sport, startDate: Date(timeIntervalSince1970: 1_700_000_000),
+            startDateLocal: Date(timeIntervalSince1970: 1_700_000_000), timezone: "UTC",
             distance: 1000, movingTime: 600, elapsedTime: 600, totalElevationGain: 10, averageSpeed: 2,
             commute: false,
             coordinates: route ? [CLLocationCoordinate2D(latitude: 46, longitude: 8),
