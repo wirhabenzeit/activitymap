@@ -26,6 +26,38 @@ actor GatedSyncSource: SyncPageSource {
 
 @MainActor
 struct SyncControllerTests {
+    @Test func reconnectingTheSameSessionPreservesSelectionAndInspection() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let dto = try Fixtures.activity()
+        var checkpoint = Fixtures.checkpoint
+        checkpoint.lastSyncAt = Date()
+        try await storage.apply([.upsertActivity(dto)], checkpoint: checkpoint, scope: Fixtures.scope)
+        let source = ScriptedSyncSource([
+            .changes("cursor-1", .success(SyncFixtures.changes(next: "cursor-1")))
+        ])
+        let activities = ActivityStore()
+        let controller = SyncController(activities: activities, source: { _ in source }, invalidate: { _ in })
+        let offline = SyncFixtures.session(verified: false)
+        controller.setSession(offline, storage: storage)
+        await controller.refresh()
+        let id = try #require(activities.activities.first?.id)
+        activities.replaceSelection(with: [id])
+        activities.inspect(id)
+
+        let online = SyncSession(user: offline.user, token: offline.token, deployment: offline.deployment, verified: true)
+        controller.setSession(online, storage: storage)
+        #expect(activities.selectedActivityIDs == [id] && activities.inspectedActivityID == id)
+        await controller.refresh()
+        #expect(controller.status == .ready)
+        #expect(activities.selectedActivityIDs == [id] && activities.activeActivityID == id)
+        #expect(activities.inspectedActivityID == id)
+
+        controller.setSession(SyncFixtures.session(connected: false), storage: storage)
+        #expect(activities.selectedActivityIDs.isEmpty && activities.inspectedActivityID == nil)
+        await controller.refresh()
+        #expect(controller.status == .disconnected)
+    }
+
     @Test func refreshRestartsWorkCancelledBeforeItBegins() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         // Cleanup must still run even if the queued account transition never started.
@@ -67,14 +99,18 @@ struct SyncControllerTests {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let source = GatedSyncSource()
         let activities = ActivityStore()
-        activities.selectedActivityIDs = [42]
         let controller = SyncController(activities: activities, source: { _ in source }, invalidate: { _ in })
         controller.setSession(SyncFixtures.session(), storage: storage)
         await source.waitForRequest()
+        activities.activities = [ActivityStoreSelectionTests.activity(42)]
+        activities.replaceSelection(with: [42])
+        activities.inspect(42)
+        #expect(activities.selectedActivityIDs == [42] && activities.inspectedActivityID == 42)
         controller.setSession(nil, storage: storage)
         await source.release(SyncFixtures.activities([try Fixtures.activity()]))
         await controller.refresh()
         #expect(controller.status == .signedOut && activities.activities.isEmpty && activities.selectedActivityIDs.isEmpty)
+        #expect(activities.activeActivityID == nil && activities.inspectedActivityID == nil)
         #expect(try await storage.snapshot(scope: Fixtures.scope).checkpoint == nil)
     }
 

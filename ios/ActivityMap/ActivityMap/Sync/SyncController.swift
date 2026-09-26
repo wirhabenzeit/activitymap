@@ -69,7 +69,13 @@ final class SyncController {
         let current = generation
         let previous = work
         previous?.cancel()
-        clearVisible()
+        // Verification and profile metadata may change during normal refresh.
+        // Keep browsing state for the same usable credential; actual scope,
+        // expiry and connection transitions still clear it immediately.
+        let retainsVisibleState = sameCredential && next.map {
+            $0.user.stravaConnected && $0.user.authentication.sessionExpiresAt > now()
+        } == true
+        if !retainsVisibleState { clearVisible() }
         if !sameCredential { retryAt = nil }
         needsCleanup = true
         work = Task {
@@ -187,17 +193,14 @@ final class SyncController {
             return
         }
         let mapped = try snapshot.activities.map(StoredModelMapper.activity)
+        // Assigning activities drops selection/focus/inspection of absent IDs
+        // (committed deletions and rebootstrap removals) inside ActivityStore.
         activities.activities = mapped
         photos = snapshot.photos.map(StoredModelMapper.photo)
-        let ids = Set(mapped.map(\.id))
-        activities.selectedActivityIDs.formIntersection(ids)
-        if let id = activities.highlightedActivityID, !ids.contains(id) { activities.highlightedActivityID = nil }
     }
 
     private func clearVisible() {
-        activities.activities = []
-        activities.selectedActivityIDs = []
-        activities.highlightedActivityID = nil
+        activities.clearScope()
         photos = []
         checkpoint = nil
     }
