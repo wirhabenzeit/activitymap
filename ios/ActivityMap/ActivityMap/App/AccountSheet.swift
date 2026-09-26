@@ -230,7 +230,11 @@ struct AccountSheet: View {
                     LabeledContent("Retry after") { Text(date, style: .time) }
                 }
                 if let refresh, sync.session != nil {
-                    Button("Sync Now") { Task { await refresh() } }
+                    Button {
+                        Task { await refresh() }
+                    } label: {
+                        Label("Refresh Activities", systemImage: "arrow.clockwise")
+                    }
                         .disabled(sync.status == .syncing)
                 }
             }
