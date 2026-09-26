@@ -241,27 +241,6 @@ export function typicalWeek(
   };
 }
 
-// The longest run of consecutive active days up to today.
-export function longestStreak(
-  activities: readonly StatsActivity[],
-  today: number,
-): number {
-  const days = [
-    ...new Set(
-      activities
-        .map((activity) => dayOf(activity.start_date_local))
-        .filter((day) => day <= today),
-    ),
-  ].sort((a, b) => a - b);
-  let longest = 0;
-  let current = 0;
-  days.forEach((day, index) => {
-    current = index > 0 && days[index - 1] === day - 1 ? current + 1 : 1;
-    longest = Math.max(longest, current);
-  });
-  return longest;
-}
-
 // Where this year's pace lands by 31 December, next to last year's total.
 export function yearPace(
   activities: readonly StatsActivity[],
@@ -335,4 +314,64 @@ export function records(
   for (const [weekStart, value] of weeks)
     if (value > (biggestWeek?.value ?? 0)) biggestWeek = { value, weekStart };
   return { ...best, biggestWeek };
+}
+
+// The typical total from Monday through today's weekday, averaged over the
+// same full weeks as typicalWeek, so a partial week has a fair comparison.
+export function typicalThroughWeekday(
+  activities: readonly StatsActivity[],
+  today: number,
+  metric: StatsMetric,
+  weeks = 12,
+): number {
+  const currentWeek = mondayOf(today);
+  const weekday = today - currentWeek;
+  const first = currentWeek - (weeks - 1) * 7;
+  let total = 0;
+  for (const activity of activities) {
+    const day = dayOf(activity.start_date_local);
+    if (day < first || day >= currentWeek) continue;
+    if (day - mondayOf(day) <= weekday) total += metricValue(activity, metric);
+  }
+  return total / (weeks - 1);
+}
+
+// The `days`-day window from `first` through `today` with the largest total.
+export function bestWindow(
+  activities: readonly StatsActivity[],
+  first: number,
+  today: number,
+  metric: StatsMetric,
+  days = 30,
+) {
+  const running = cumulativeByDay(activities, metric, first, today);
+  let best = { total: 0, start: first, end: Math.min(today, first + days - 1) };
+  running.forEach((value, index) => {
+    const total = value - (index >= days ? running[index - days]! : 0);
+    if (total > best.total)
+      best = {
+        total,
+        start: first + Math.max(0, index - days + 1),
+        end: first + index,
+      };
+  });
+  const last = running.at(-1) ?? 0;
+  const current = last - (running.length > days ? running.at(-1 - days)! : 0);
+  return { ...best, current };
+}
+
+// Whether each of the last `days` days (oldest first, ending today) had an
+// activity.
+export function activeDayFlags(
+  activities: readonly StatsActivity[],
+  today: number,
+  days: number,
+): boolean[] {
+  const first = today - days + 1;
+  const flags = new Array<boolean>(days).fill(false);
+  for (const activity of activities) {
+    const day = dayOf(activity.start_date_local);
+    if (day >= first && day <= today) flags[day - first] = true;
+  }
+  return flags;
 }

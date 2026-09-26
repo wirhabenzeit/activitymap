@@ -3,16 +3,18 @@
 enum StatsTileID: String, CaseIterable, Hashable, Sendable {
     case thisWeek
     case weeklyVolume
-    case typicalWeek
+    case monthVsLastMonth
     case yearToDate
     case yearPace
-    case monthVsLastMonth
+    case best30Days
     case records
     case totals
     case activityCalendar
     case consistency
     case sportMix
     case distanceVsElevation
+    case typicalWeek
+    case restDays
     case speedTrend
 }
 
@@ -58,6 +60,7 @@ enum StatsWindow: String, CaseIterable, Hashable, Sendable {
     case monthToDate
     case last12Weeks
     case last52Weeks
+    case last90Days
     case last12Months
     case allTime
 }
@@ -73,6 +76,7 @@ enum StatsToggleOption: String, CaseIterable, Hashable, Sendable {
     case monthToDate
     case last12Weeks
     case last52Weeks
+    case last90Days
     case last12Months
     case allTime
     case sport
@@ -132,14 +136,14 @@ enum SharedStatsTiles {
             toggle: .init(label: "Metric", options: [.distance, .elevation, .time, .count])
         ),
         .init(
-            id: .typicalWeek,
-            title: "Typical week",
-            window: .last12Weeks,
+            id: .monthVsLastMonth,
+            title: "This month",
+            window: .monthToDate,
             group: .now,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
             isOptional: false,
-            toggle: nil
+            toggle: .init(label: "Metric", options: [.elevation, .distance, .time, .count])
         ),
         .init(
             id: .yearToDate,
@@ -162,14 +166,14 @@ enum SharedStatsTiles {
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation])
         ),
         .init(
-            id: .monthVsLastMonth,
-            title: "This month",
-            window: .monthToDate,
+            id: .best30Days,
+            title: "Best 30 days",
+            window: .currentYear,
             group: .thisYear,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
             isOptional: false,
-            toggle: .init(label: "Metric", options: [.elevation, .distance, .time, .count])
+            toggle: .init(label: "Metric", options: [.distance, .time, .elevation])
         ),
         .init(
             id: .records,
@@ -228,6 +232,26 @@ enum SharedStatsTiles {
             group: .patterns,
             isPrimary: false,
             span: .init(columns: 2, rows: 1),
+            isOptional: false,
+            toggle: nil
+        ),
+        .init(
+            id: .typicalWeek,
+            title: "Typical week",
+            window: .last12Weeks,
+            group: .patterns,
+            isPrimary: false,
+            span: .init(columns: 1, rows: 1),
+            isOptional: false,
+            toggle: nil
+        ),
+        .init(
+            id: .restDays,
+            title: "Rest days",
+            window: .last90Days,
+            group: .patterns,
+            isPrimary: false,
+            span: .init(columns: 1, rows: 1),
             isOptional: false,
             toggle: nil
         ),

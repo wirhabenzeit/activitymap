@@ -28,6 +28,7 @@ const windowIDs = [
   'monthToDate',
   'last12Weeks',
   'last52Weeks',
+  'last90Days',
   'last12Months',
   'allTime',
 ] as const;

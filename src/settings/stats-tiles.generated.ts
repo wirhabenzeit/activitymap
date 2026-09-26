@@ -78,13 +78,17 @@ export const statsTiles = [
     },
   },
   {
-    id: 'typicalWeek',
-    title: 'Typical week',
-    window: 'last12Weeks',
+    id: 'monthVsLastMonth',
+    title: 'This month',
+    window: 'monthToDate',
     group: 'now',
     span: {
       columns: 1,
       rows: 1,
+    },
+    toggle: {
+      label: 'Metric',
+      options: ['elevation', 'distance', 'time', 'count'],
     },
   },
   {
@@ -117,9 +121,9 @@ export const statsTiles = [
     },
   },
   {
-    id: 'monthVsLastMonth',
-    title: 'This month',
-    window: 'monthToDate',
+    id: 'best30Days',
+    title: 'Best 30 days',
+    window: 'currentYear',
     group: 'thisYear',
     span: {
       columns: 1,
@@ -127,7 +131,7 @@ export const statsTiles = [
     },
     toggle: {
       label: 'Metric',
-      options: ['elevation', 'distance', 'time', 'count'],
+      options: ['distance', 'time', 'elevation'],
     },
   },
   {
@@ -204,6 +208,26 @@ export const statsTiles = [
     group: 'patterns',
     span: {
       columns: 2,
+      rows: 1,
+    },
+  },
+  {
+    id: 'typicalWeek',
+    title: 'Typical week',
+    window: 'last12Weeks',
+    group: 'patterns',
+    span: {
+      columns: 1,
+      rows: 1,
+    },
+  },
+  {
+    id: 'restDays',
+    title: 'Rest days',
+    window: 'last90Days',
+    group: 'patterns',
+    span: {
+      columns: 1,
       rows: 1,
     },
   },

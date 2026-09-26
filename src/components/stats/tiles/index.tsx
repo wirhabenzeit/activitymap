@@ -185,6 +185,7 @@ function TileFace({
   const [option, setOption] = useState(
     view.faceOptions?.[0] ?? toggleOf(tile)?.options[0],
   );
+  const summary = view.summary(context, option);
   return (
     <section
       aria-label={tile.title}
@@ -211,10 +212,9 @@ function TileFace({
           </span>
         )}
       </div>
-      <Headline
-        summary={view.summary(context, option)}
-        size={large ? 'large' : 'tile'}
-      />
+      {summary && (
+        <Headline summary={summary} size={large ? 'large' : 'tile'} />
+      )}
       {view.face(context, option)}
     </section>
   );

@@ -17,19 +17,21 @@ void test('packs each group of starter tiles on the 4-column grid', () => {
   assert.deepEqual(placeBento(groupSpans('now'), 4), [
     { column: 1, row: 1, columns: 1, rows: 1 }, // this week
     { column: 2, row: 1, columns: 2, rows: 1 }, // training volume
-    { column: 4, row: 1, columns: 1, rows: 1 }, // typical week
+    { column: 4, row: 1, columns: 1, rows: 1 }, // this month
   ]);
   assert.deepEqual(placeBento(groupSpans('thisYear'), 4), [
     { column: 1, row: 1, columns: 2, rows: 2 }, // year to date
     { column: 3, row: 1, columns: 1, rows: 1 }, // pace
-    { column: 4, row: 1, columns: 1, rows: 1 }, // this month
+    { column: 4, row: 1, columns: 1, rows: 1 }, // best 30 days
     { column: 3, row: 2, columns: 2, rows: 1 }, // records
   ]);
   assert.deepEqual(placeBento(groupSpans('patterns'), 4), [
     { column: 1, row: 1, columns: 2, rows: 1 }, // activity calendar
     { column: 3, row: 1, columns: 1, rows: 1 }, // consistency
     { column: 4, row: 1, columns: 1, rows: 1 }, // sport mix
-    { column: 1, row: 2, columns: 4, rows: 1 }, // climbing, grown into the gap
+    { column: 1, row: 2, columns: 2, rows: 1 }, // climbing
+    { column: 3, row: 2, columns: 1, rows: 1 }, // typical week
+    { column: 4, row: 2, columns: 1, rows: 1 }, // rest days
   ]);
 });
 
@@ -50,6 +52,8 @@ void test('clamps spans to the 2-column grid and fills the gaps they leave', () 
     { column: 1, row: 2, columns: 1, rows: 1 },
     { column: 2, row: 2, columns: 1, rows: 1 },
     { column: 1, row: 3, columns: 2, rows: 1 },
+    { column: 1, row: 4, columns: 1, rows: 1 },
+    { column: 2, row: 4, columns: 1, rows: 1 },
   ]);
 });
 

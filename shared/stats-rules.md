@@ -13,6 +13,7 @@ Web and iOS draw the stats tiles with their own code. This page pins every rule 
   - `currentYear`: the same as `yearToDate` for the current year.
   - `monthToDate`: the 1st of this month through today. The comparison runs from the 1st of last month through the same day number, capped at that month's last day.
   - `last12Weeks` / `last52Weeks`: the current, partial week and the 11 (or 51) full weeks before it.
+  - `last90Days`: the 89 days before today and today.
   - `last12Months`: the same calendar date one year earlier (28 February for 29 February) through today, matching the filter preset in `docs/map-list-parity-contract.md`.
   - `allTime`: every activity.
 
@@ -38,7 +39,7 @@ Sport means the category from `src/settings/category.tsx` on the web and `Activi
 - **sportMix**: each sport's share of moving time over the chosen range, largest first. Sports with no moving time are left out.
 - **consistency**: `activeDaysPerWeek` is the mean number of active days per full week, over the full weeks of the range (11 for `last12Weeks`). The current, partial week is not counted. `currentStreak` counts consecutive active days, ending today, or yesterday when today has no activity yet.
 - **distanceVsElevation**: one point per activity with a distance above 0 in `last12Months`. `metersPerKm` is the total elevation of those points divided by their total distance.
-- **thisWeek**, **typicalWeek**, **yearPace**, **records**: web proof of concept only, with no fixtures yet. Typical week averages the same full weeks as consistency. Pace is this year's total divided by the days so far, projected over the whole year. Records are this year's single activities with the most distance, time and elevation, and the week (Monday to Sunday) with the most distance.
+- **thisWeek**, **typicalWeek**, **yearPace**, **records**, **best30Days**, **restDays**: web proof of concept only, with no fixtures yet. This week compares with the typical total from Monday through the same weekday. Typical week averages the same full weeks as consistency. Best 30 days is the 30-day window this year with the largest total. Rest days are days without an activity. Pace is this year's total divided by the days so far, projected over the whole year. Records are this year's single activities with the most distance, time and elevation, and the week (Monday to Sunday) with the most distance.
 - **speedTrend**: optional and not specified yet. It gets rules and fixtures before either platform builds it.
 
 Fixture numbers are compared with a tolerance of 0.000001.
