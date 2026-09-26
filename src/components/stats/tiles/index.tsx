@@ -8,15 +8,18 @@
 // the large headline numerals.
 //
 // Two layers: a tile shows one headline, one comparison and one small
-// visual. Tiles with a detail view open it in a side panel next to the grid
-// (over it on narrow screens), so the dashboard stays in view.
+// visual. Clicking a tile with a detail view zooms it out of its place in
+// the grid into a large card over the dimmed dashboard, and closing shrinks
+// it back, so it is always clear where the detail came from.
 
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
 } from 'react';
 import { useTheme } from 'next-themes';
 import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -80,27 +83,75 @@ export function StatsTileGrid({ activities }: { activities: StatsActivity[] }) {
     [activities, today, resolvedTheme],
   );
 
-  const [openID, setOpenID] = useState<StatsTileID | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState<Zoom | null>(null);
+  const openID = zoom?.id ?? null;
   const openIndex = detailTiles.findIndex(({ tile }) => tile.id === openID);
   const open = detailTiles[openIndex];
-  const step = (by: number) =>
-    setOpenID(
-      detailTiles[(openIndex + by + detailTiles.length) % detailTiles.length]!
-        .tile.id,
+
+  // The tile's box relative to the container, where the zoom starts and
+  // ends.
+  const tileBox = (id: StatsTileID): Box | null => {
+    const container = containerRef.current;
+    const element = container?.querySelector(`[data-tile-id="${id}"]`);
+    if (!container || !element) return null;
+    const outer = container.getBoundingClientRect();
+    const inner = element.getBoundingClientRect();
+    return {
+      top: inner.top - outer.top,
+      left: inner.left - outer.left,
+      width: inner.width,
+      height: inner.height,
+    };
+  };
+  const openTile = (id: StatsTileID) => {
+    const from = tileBox(id);
+    const container = containerRef.current;
+    if (!from || !container) return;
+    setZoom({
+      id,
+      from,
+      area: { width: container.clientWidth, height: container.clientHeight },
+      phase: 'start',
+    });
+    // Let the card render at the tile's box before it grows.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        setZoom((current) => current && { ...current, phase: 'open' }),
+      ),
     );
+  };
+  const close = () => {
+    setZoom(
+      (current) =>
+        current && {
+          ...current,
+          from: tileBox(current.id) ?? current.from,
+          phase: 'closing',
+        },
+    );
+    window.setTimeout(() => setZoom(null), zoomMilliseconds);
+  };
+  const step = (by: number) => {
+    const next =
+      detailTiles[(openIndex + by + detailTiles.length) % detailTiles.length]!
+        .tile.id;
+    setZoom((current) => current && { ...current, id: next });
+  };
 
   useEffect(() => {
     if (!openID) return;
     const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setOpenID(null);
+      if (event.key === 'Escape') close();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openID]);
 
   return (
-    <div className="relative flex h-full w-full">
-      <Measure className="h-full min-w-0 flex-1 overflow-y-auto">
+    <div ref={containerRef} className="relative h-full w-full">
+      <Measure className="h-full w-full overflow-y-auto">
         {({ width }) => {
           const padding = width < 520 ? 12 : 16;
           return (
@@ -115,18 +166,18 @@ export function StatsTileGrid({ activities }: { activities: StatsActivity[] }) {
                   )}
                   width={width - 2 * padding}
                   context={context}
-                  openID={openID}
-                  onOpen={setOpenID}
+                  zoomedID={openID}
+                  onOpen={openTile}
                 />
               ))}
             </div>
           );
         }}
       </Measure>
-      {open && (
-        <aside
-          aria-label={`${open.tile.title} details`}
-          className="absolute inset-0 z-20 overflow-y-auto bg-background md:static md:w-[440px] md:shrink-0 md:border-l"
+      {zoom && open && (
+        <ZoomedTile
+          zoom={zoom}
+          onClose={close}
           onKeyDown={(event: KeyboardEvent) => {
             if (event.key === 'ArrowLeft') step(-1);
             if (event.key === 'ArrowRight') step(1);
@@ -138,11 +189,92 @@ export function StatsTileGrid({ activities }: { activities: StatsActivity[] }) {
             view={open.view}
             context={context}
             onStep={step}
-            onClose={() => setOpenID(null)}
+            onClose={close}
           />
-        </aside>
+        </ZoomedTile>
       )}
     </div>
+  );
+}
+
+type Box = { top: number; left: number; width: number; height: number };
+type Zoom = {
+  id: StatsTileID;
+  from: Box;
+  // The container's size when the tile opened; the card grows to fill it.
+  area: { width: number; height: number };
+  // start: drawn at the tile; open: grown to the large card; closing:
+  // shrinking back to the tile.
+  phase: 'start' | 'open' | 'closing';
+};
+
+const zoomMilliseconds = 260;
+
+function ZoomedTile({
+  zoom,
+  onClose,
+  onKeyDown,
+  children,
+}: {
+  zoom: Zoom;
+  onClose: () => void;
+  onKeyDown: (event: KeyboardEvent) => void;
+  children: ReactNode;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const isOpen = zoom.phase === 'open';
+  useEffect(() => {
+    if (isOpen) cardRef.current?.focus();
+  }, [isOpen]);
+
+  const { width, height } = zoom.area;
+  const margin = width < 640 ? 8 : 24;
+  const cardWidth = Math.min(width - 2 * margin, 880);
+  const cardHeight = Math.min(height - 2 * margin, 640);
+  const to: Box = {
+    top: Math.max(margin, (height - cardHeight) / 2),
+    left: (width - cardWidth) / 2,
+    width: cardWidth,
+    height: cardHeight,
+  };
+  const box = isOpen ? to : zoom.from;
+  const transition = `${zoomMilliseconds}ms cubic-bezier(0.2, 0, 0, 1)`;
+
+  return (
+    <>
+      <div
+        className="absolute inset-0 z-20 bg-background/70 backdrop-blur-[2px] motion-reduce:!transition-none"
+        style={{ opacity: isOpen ? 1 : 0, transition: `opacity ${transition}` }}
+        onClick={onClose}
+      />
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="zoomed-tile-title"
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        className="absolute z-30 overflow-hidden rounded-lg border bg-card text-card-foreground shadow-2xl outline-none motion-reduce:!transition-none"
+        style={{
+          ...box,
+          transition: ['top', 'left', 'width', 'height']
+            .map((property) => `${property} ${transition}`)
+            .join(', '),
+        }}
+      >
+        <div
+          className="h-full overflow-y-auto motion-reduce:!transition-none"
+          style={{
+            // The detail fades in once the card has grown, so it never
+            // reflows at the tile's size.
+            opacity: isOpen ? 1 : 0,
+            transition: `opacity 150ms ease ${isOpen ? zoomMilliseconds * 0.6 : 0}ms`,
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -154,7 +286,7 @@ function BentoGroup({
   tiles,
   width,
   context,
-  openID,
+  zoomedID,
   onOpen,
 }: {
   title: string;
@@ -162,7 +294,8 @@ function BentoGroup({
   tiles: ShownTile[];
   width: number;
   context: TileContext;
-  openID: StatsTileID | null;
+  // The tile lifted out into the zoomed card, hidden in the grid meanwhile.
+  zoomedID: StatsTileID | null;
   onOpen: (id: StatsTileID) => void;
 }) {
   const [folded, setFolded] = useState(collapsed);
@@ -216,11 +349,11 @@ function BentoGroup({
                 view={view}
                 context={context}
                 large={'primary' in tile && tile.primary}
-                selected={tile.id === openID}
                 onOpen={view.detail ? () => onOpen(tile.id) : undefined}
                 style={{
                   gridColumn: `${placement.column} / span ${placement.columns}`,
                   gridRow: `${placement.row} / span ${placement.rows}`,
+                  visibility: tile.id === zoomedID ? 'hidden' : undefined,
                 }}
               />
             );
@@ -267,7 +400,6 @@ function TileFace({
   view,
   context,
   large,
-  selected,
   onOpen,
   style,
 }: {
@@ -275,7 +407,6 @@ function TileFace({
   view: TileView;
   context: TileContext;
   large: boolean;
-  selected: boolean;
   // Set when the tile has a detail view to open.
   onOpen?: () => void;
   style: CSSProperties;
@@ -287,9 +418,9 @@ function TileFace({
   return (
     <section
       aria-label={tile.title}
+      data-tile-id={tile.id}
       role={onOpen ? 'button' : undefined}
       tabIndex={onOpen ? 0 : undefined}
-      aria-pressed={onOpen ? selected : undefined}
       onClick={onOpen}
       onKeyDown={(event) => {
         if (
@@ -305,7 +436,6 @@ function TileFace({
         'flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card p-3.5 text-left text-card-foreground shadow-xs',
         onOpen &&
           'cursor-pointer transition-colors hover:border-muted-foreground/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-        selected && 'border-foreground/60 ring-1 ring-foreground/60',
       )}
       style={style}
     >
@@ -416,7 +546,10 @@ function TileDetail({
         >
           <ChevronRight className="h-4 w-4" />
         </button>
-        <h2 className="ml-1 min-w-0 flex-1 truncate text-base font-semibold">
+        <h2
+          id="zoomed-tile-title"
+          className="ml-1 min-w-0 flex-1 truncate text-base font-semibold"
+        >
           {tile.title}
         </h2>
         <span className="whitespace-nowrap text-xs text-muted-foreground">
