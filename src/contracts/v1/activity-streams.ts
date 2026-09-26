@@ -41,6 +41,10 @@ export const streamMetadataSchema = z.object({
   expires_at: isoDateTime.nullable(),
 });
 export type StreamMetadata = z.infer<typeof streamMetadataSchema>;
+export const streamLastErrorSchema = z.object({
+  code: streamFailureCodeSchema,
+  retryable: z.boolean(),
+});
 
 // JSONB was already validated against the stricter raw schema on ingestion.
 // Keep extra JSON metadata on the wire without a recursive OpenAPI JSON union.
@@ -75,9 +79,7 @@ export const activityStreamsDTOSchema = z.object({
   metadata: streamMetadataSchema,
   requested_types: z.array(streamTypeSchema),
   streams: rawStreamsDTOSchema.nullable(),
-  last_error: z
-    .object({ code: streamFailureCodeSchema, retryable: z.boolean() })
-    .nullable(),
+  last_error: streamLastErrorSchema.nullable(),
   next_retry_at: isoDateTime.nullable(),
 });
 export type ActivityStreamsDTO = z.infer<typeof activityStreamsDTOSchema>;
@@ -86,7 +88,7 @@ export const activityStreamSummaryDTOSchema = z.object({
   activity_id: idString,
   metadata: streamMetadataSchema,
   summary: streamSummarySchema.nullable(),
-  last_error: activityStreamsDTOSchema.shape.last_error,
+  last_error: streamLastErrorSchema.nullable(),
   next_retry_at: isoDateTime.nullable(),
 });
 export type ActivityStreamSummaryDTO = z.infer<

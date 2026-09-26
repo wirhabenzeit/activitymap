@@ -101,7 +101,29 @@ follow the payload's lifecycle: they are served only while the set is
 
 ## Follow-up boundary
 
-- #185 adds iOS loading/cache. Charts and any downsampling remain deferred.
+- #185 adds iOS loading/cache on top of the server summaries above; the app
+  never downsamples samples itself. Native chart rendering is #195.
+
+### iOS stream cache (#185)
+
+`StreamsAPI` calls the three endpoints above; `APIClient.getResponse` keeps the
+HTTP status (200 versus 202) and `Retry-After` of successful responses, and
+retryable 503 errors carry `Retry-After` too. `LocalStore` persists raw sets
+and summaries as separate SwiftData models (`StoredRawStreams`,
+`StoredStreamSummary`), scoped by deployment, user and activity ID, so reading
+a summary never loads raw arrays. A raw set is stored as the exact response
+bytes, which keeps sample values, missing keys and unknown per-stream metadata.
+Only `current` sets are cached; a current set without a usable summary is a
+valid cached state. There is no age-based expiry.
+
+Sync never reads stream payloads. When a committed activity upsert carries
+stream metadata with another generation, a newer revision, or the cached
+revision marked `stale`, both cached representations are marked not current
+and are refetched only when requested again. Activity tombstones delete them.
+Writes are fenced by a token captured before each request: a tombstone, a
+scope clear, an account/deployment transition or a sync invalidation after the
+capture discards the response. Within one generation an older revision never
+replaces a newer one; across generations the later request wins.
 
 Follow [the migration deployment sequence](database-migrations.md) before
 enabling a production consumer.

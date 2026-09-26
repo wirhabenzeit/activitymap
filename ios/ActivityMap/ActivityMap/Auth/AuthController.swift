@@ -243,7 +243,7 @@ final class AuthController: NSObject {
     /// exercised directly against crafted errors without a live server.
     static func isExplicitlyUnauthenticated(_ error: Error) -> Bool {
         if case .unexpectedStatus(401) = error as? APIClient.RequestError { return true }
-        guard case .server(let code, _, let status, _, _) = error as? APIClient.RequestError
+        guard case .server(let code, _, let status, _, _, _) = error as? APIClient.RequestError
         else {
             return false
         }

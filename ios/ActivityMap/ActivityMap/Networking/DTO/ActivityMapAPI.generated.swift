@@ -41,6 +41,11 @@ nonisolated extension ActivityMapAPI {
         }
     }
 
+    struct StreamLastError: Codable, Hashable, Sendable {
+        let code: StreamFailureCode
+        let retryable: Bool
+    }
+
     struct TimeStream: Codable, Hashable, Sendable {
         let type: String?
         let data: [Int]
@@ -146,18 +151,12 @@ nonisolated extension ActivityMapAPI {
         let heartrate: HeartrateStream?
     }
 
-    /// The shape of `ActivityStreams.last_error`.
-    struct ActivityStreamsLastError: Codable, Hashable, Sendable {
-        let code: StreamFailureCode
-        let retryable: Bool
-    }
-
     struct ActivityStreams: Codable, Hashable, Sendable {
         let activityID: String
         let metadata: StreamMetadata
         let requestedTypes: [StreamType]
         let streams: RawStreams?
-        let lastError: ActivityStreamsLastError?
+        let lastError: StreamLastError?
         let nextRetryAt: Date?
 
         enum CodingKeys: String, CodingKey {
@@ -168,6 +167,37 @@ nonisolated extension ActivityMapAPI {
             case lastError = "last_error"
             case nextRetryAt = "next_retry_at"
         }
+    }
+
+    struct StreamSummary: Codable, Hashable, Sendable {
+        let version: Int
+        let basis: StreamSummaryBasis?
+        let time: [Double]?
+        let distance: [Double]?
+        let latlng: [[Double]]?
+        let altitude: [Double]?
+        let watts: [Double]?
+        let heartrate: [Double]?
+    }
+
+    struct ActivityStreamSummary: Codable, Hashable, Sendable {
+        let activityID: String
+        let metadata: StreamMetadata
+        let summary: StreamSummary?
+        let lastError: StreamLastError?
+        let nextRetryAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case activityID = "activity_id"
+            case metadata
+            case summary
+            case lastError = "last_error"
+            case nextRetryAt = "next_retry_at"
+        }
+    }
+
+    struct ActivityStreamSummaries: Codable, Hashable, Sendable {
+        let summaries: [ActivityStreamSummary]
     }
 
     struct Authentication: Codable, Hashable, Sendable {
@@ -583,6 +613,11 @@ nonisolated extension ActivityMapAPI {
     enum StreamSeriesType: String, Codable, Hashable, Sendable {
         case time = "time"
         case distance = "distance"
+    }
+
+    enum StreamSummaryBasis: String, Codable, Hashable, Sendable {
+        case distance = "distance"
+        case time = "time"
     }
 
     enum StreamType: String, Codable, Hashable, Sendable {

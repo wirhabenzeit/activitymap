@@ -16,7 +16,7 @@ nonisolated struct SyncEngine: Sendable {
             }
             return try await bootstrap()
         } catch let error as APIClient.RequestError {
-            guard case .server("sync_rebootstrap_required", _, 409, _, _) = error else { throw error }
+            guard case .server("sync_rebootstrap_required", _, 409, _, _, _) = error else { throw error }
             // Exactly one fresh attempt; any second 409 escapes to the caller.
             return try await bootstrap()
         }

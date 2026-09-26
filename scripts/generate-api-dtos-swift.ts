@@ -35,9 +35,14 @@ import { z } from 'zod';
 
 import { authenticationDTOSchema } from '../src/contracts/v1/auth';
 import { streamTypeSchema, streamFreshnessSchema, streamFetchStatusSchema, streamFailureCodeSchema,
-  streamMetadataSchema, timeStreamSchema, distanceStreamSchema, latlngStreamSchema, altitudeStreamSchema,
-  wattsStreamSchema, heartrateStreamSchema, rawStreamsDTOSchema, activityStreamsDTOSchema,
+  streamMetadataSchema, streamLastErrorSchema, timeStreamSchema, distanceStreamSchema, latlngStreamSchema,
+  altitudeStreamSchema, wattsStreamSchema, heartrateStreamSchema, rawStreamsDTOSchema, activityStreamsDTOSchema,
+  activityStreamSummaryDTOSchema, activityStreamSummariesDTOSchema,
 } from '../src/contracts/v1/activity-streams';
+import {
+  streamSummaryBasisSchema,
+  streamSummarySchema,
+} from '../src/server/strava/stream-summary';
 import {
   activityDTOSchema,
   geometryStateSchema,
@@ -84,10 +89,14 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['StreamFetchStatus', streamFetchStatusSchema],
   ['StreamFailureCode', streamFailureCodeSchema],
   ['StreamMetadata', streamMetadataSchema],
+  ['StreamLastError', streamLastErrorSchema],
   ['TimeStream', timeStreamSchema], ['DistanceStream', distanceStreamSchema],
   ['LatlngStream', latlngStreamSchema], ['AltitudeStream', altitudeStreamSchema],
   ['WattsStream', wattsStreamSchema], ['HeartrateStream', heartrateStreamSchema],
   ['RawStreams', rawStreamsDTOSchema], ['ActivityStreams', activityStreamsDTOSchema],
+  ['StreamSummaryBasis', streamSummaryBasisSchema], ['StreamSummary', streamSummarySchema],
+  ['ActivityStreamSummary', activityStreamSummaryDTOSchema],
+  ['ActivityStreamSummaries', activityStreamSummariesDTOSchema],
   ['GeometryState', geometryStateSchema],
   ['PhotosState', photosStateSchema],
   ['SyncResource', syncResourceSchema],

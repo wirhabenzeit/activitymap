@@ -7,6 +7,8 @@ export const STREAM_SUMMARY_VERSION = 1;
 export const STREAM_SUMMARY_POINTS = 300;
 
 const series = z.array(z.number());
+/** The axis summary points are evenly spaced along. */
+export const streamSummaryBasisSchema = z.enum(['distance', 'time']);
 /**
  * Downsampled, index-aligned streams: every present array has one entry per
  * point. `basis` is the axis the points are evenly spaced along.
@@ -14,7 +16,7 @@ const series = z.array(z.number());
 export const streamSummarySchema = z.object({
   version: z.number().int().positive(),
   // Null when no stream can serve as an axis; stored so it isn't recomputed.
-  basis: z.enum(['distance', 'time']).nullable(),
+  basis: streamSummaryBasisSchema.nullable(),
   time: series.optional(),
   distance: series.optional(),
   latlng: z.array(z.tuple([z.number(), z.number()])).optional(),

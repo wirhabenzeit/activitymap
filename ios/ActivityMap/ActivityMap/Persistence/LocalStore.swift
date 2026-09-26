@@ -19,7 +19,10 @@ nonisolated struct StoreSnapshot: Sendable {
 /// the checkpoint reach disk in one save, or are rolled back together.
 actor LocalStore {
     private let container: ModelContainer
-    private let save: @Sendable (ModelContext) throws -> Void
+    let save: @Sendable (ModelContext) throws -> Void
+    /// Rejects stream responses whose activity or scope was invalidated while
+    /// they were in flight. See `LocalStore+Streams.swift`.
+    var streamFences = StreamFences()
 
     init(
         container: ModelContainer,
@@ -32,7 +35,10 @@ actor LocalStore {
     nonisolated static func makeContainer(
         inMemory: Bool = false, url: URL? = nil
     ) throws -> ModelContainer {
-        let schema = Schema([StoredActivity.self, StoredPhoto.self, SyncState.self])
+        let schema = Schema([
+            StoredActivity.self, StoredPhoto.self, SyncState.self,
+            StoredRawStreams.self, StoredStreamSummary.self,
+        ])
         let configuration: ModelConfiguration
         if let url {
             configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
@@ -68,6 +74,9 @@ actor LocalStore {
         try Task.checkCancellation()
         let context = makeContext()
         let scopeKey = scope.key
+        // Loaded on the first activity carrying stream metadata. Holds only
+        // cache identities; raw bodies are external and are not read.
+        var streamRows: StreamRowIndex?
         do {
             // Preserve feed order, including multiple operations on one entity.
             for mutation in mutations {
@@ -79,6 +88,12 @@ actor LocalStore {
                         row.payload = try StoreCodec.encode(dto)
                     } else {
                         context.insert(try StoredActivity(scope: scopeKey, dto: dto))
+                    }
+                    if let metadata = dto.streams {
+                        if streamRows == nil { streamRows = try StreamRowIndex(context: context, scope: scopeKey) }
+                        if streamRows?.invalidate(activityID: dto.id, against: metadata) == true {
+                            streamFences.invalidate(StoreScope.key([scopeKey, dto.id]))
+                        }
                     }
                 case .upsertPhoto(let dto):
                     let key = StoreScope.key([scopeKey, dto.uniqueID])
@@ -99,6 +114,17 @@ actor LocalStore {
                         predicate: #Predicate { $0.scope == scopeKey && $0.activityID == id })) {
                         context.delete(row)
                     }
+                    // A tombstone deletes the whole stream cache for the activity.
+                    for row in try context.fetch(FetchDescriptor<StoredRawStreams>(
+                        predicate: #Predicate { $0.scope == scopeKey && $0.activityID == id })) {
+                        context.delete(row)
+                    }
+                    for row in try context.fetch(FetchDescriptor<StoredStreamSummary>(
+                        predicate: #Predicate { $0.scope == scopeKey && $0.activityID == id })) {
+                        context.delete(row)
+                    }
+                    streamRows?.remove(activityID: id)
+                    streamFences.invalidate(StoreScope.key([scopeKey, id]))
                 case .deletePhoto(let id):
                     for row in try context.fetch(FetchDescriptor<StoredPhoto>(
                         predicate: #Predicate { $0.scope == scopeKey && $0.photoID == id })) {
@@ -125,6 +151,7 @@ actor LocalStore {
     func clear(scope: StoreScope) throws {
         let context = makeContext()
         let key = scope.key
+        streamFences.invalidate(key)
         do {
             // Use tracked deletes so rows and sync state share the same save.
             for row in try context.fetch(FetchDescriptor<StoredActivity>(
@@ -132,6 +159,10 @@ actor LocalStore {
             for row in try context.fetch(FetchDescriptor<StoredPhoto>(
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<SyncState>(
+                predicate: #Predicate { $0.scope == key })) { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredRawStreams>(
+                predicate: #Predicate { $0.scope == key })) { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredStreamSummary>(
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             try save(context)
         } catch {
@@ -145,10 +176,13 @@ actor LocalStore {
     func clearExcept(scope: StoreScope?) throws {
         let context = makeContext()
         let keep = scope?.key
+        streamFences.invalidateAll()
         do {
             for row in try context.fetch(FetchDescriptor<StoredActivity>()) where row.scope != keep { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<StoredPhoto>()) where row.scope != keep { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<SyncState>()) where row.scope != keep { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredRawStreams>()) where row.scope != keep { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredStreamSummary>()) where row.scope != keep { context.delete(row) }
             try save(context)
         } catch {
             context.rollback()
@@ -156,9 +190,45 @@ actor LocalStore {
         }
     }
 
-    private func makeContext() -> ModelContext {
+    func makeContext() -> ModelContext {
         let context = ModelContext(container)
         context.autosaveEnabled = false
         return context
+    }
+}
+
+/// Cached stream identities for one scope, used to apply sync metadata.
+private nonisolated struct StreamRowIndex {
+    private var raw: [String: StoredRawStreams] = [:]
+    private var summaries: [String: StoredStreamSummary] = [:]
+
+    init(context: ModelContext, scope: String) throws {
+        for row in try context.fetch(FetchDescriptor<StoredRawStreams>(
+            predicate: #Predicate { $0.scope == scope })) { raw[row.activityID] = row }
+        for row in try context.fetch(FetchDescriptor<StoredStreamSummary>(
+            predicate: #Predicate { $0.scope == scope })) { summaries[row.activityID] = row }
+    }
+
+    mutating func remove(activityID: String) {
+        raw[activityID] = nil
+        summaries[activityID] = nil
+    }
+
+    /// Marks both representations stale when sync describes a different or
+    /// newer set. Returns whether anything changed. Only data actually
+    /// requested later is refetched; nothing here triggers a download.
+    func invalidate(activityID: String, against metadata: ActivityMapAPI.StreamMetadata) -> Bool {
+        var changed = false
+        if let row = raw[activityID], !row.invalidated,
+           StreamRevision.supersedes(metadata, generation: row.generation, revision: row.revision) {
+            row.invalidated = true
+            changed = true
+        }
+        if let row = summaries[activityID], !row.invalidated,
+           StreamRevision.supersedes(metadata, generation: row.generation, revision: row.revision) {
+            row.invalidated = true
+            changed = true
+        }
+        return changed
     }
 }
