@@ -7,3 +7,5 @@ Platform implementations compose this catalogue with native additions. For examp
 After changing the catalogue, run `pnpm map-catalog:generate`. CI runs `pnpm map-catalog:check` to validate the data and ensure the committed Swift representation is current.
 
 `parity/` holds synthetic, versioned map/list behavior fixtures shared by web and native tests. See [the fixture guide](parity/README.md) and [the behavior contract](../docs/map-list-parity-contract.md). These are portable data and expected outcomes, not shared UI code or complete API DTOs.
+
+`stats-tiles.json` lists the stats tiles, their bento spans, time windows and the one toggle each detail view offers. `stats-rules.md` pins how each tile's numbers are computed, and `stats-fixtures/` holds activities with the numbers both clients must produce from them. Rendering, charts and interaction stay native. After changing the tiles, run `pnpm stats-tiles:generate`; CI runs `pnpm stats-tiles:check`.

@@ -1,0 +1,198 @@
+{
+  "description": "Sixteen activities around Saturday 26 September 2026, chosen to hit the edges in shared/stats-rules.md: two activities on one day, a late-evening and a just-after-midnight start, an activity without distance, the same date last year (also the first day of the 12-month window), the day after it, and a last-month activity after today's day of the month.",
+  "today": "2026-09-26",
+  "activities": [
+    {
+      "id": 1,
+      "sportType": "Ride",
+      "startDateLocal": "2026-09-26T09:00:00",
+      "distance": 40000,
+      "movingTime": 5400,
+      "elevationGain": 600
+    },
+    {
+      "id": 2,
+      "sportType": "Run",
+      "startDateLocal": "2026-09-25T23:30:00",
+      "distance": 10000,
+      "movingTime": 3000,
+      "elevationGain": 100
+    },
+    {
+      "id": 3,
+      "sportType": "Hike",
+      "startDateLocal": "2026-09-24T08:00:00",
+      "distance": 12000,
+      "movingTime": 14400,
+      "elevationGain": 900
+    },
+    {
+      "id": 4,
+      "sportType": "Run",
+      "startDateLocal": "2026-09-24T18:00:00",
+      "distance": 5000,
+      "movingTime": 1500,
+      "elevationGain": 20
+    },
+    {
+      "id": 5,
+      "sportType": "Ride",
+      "startDateLocal": "2026-09-21T00:15:00",
+      "distance": 60000,
+      "movingTime": 9000,
+      "elevationGain": 1200
+    },
+    {
+      "id": 6,
+      "sportType": "Run",
+      "startDateLocal": "2026-09-02T07:00:00",
+      "distance": 8000,
+      "movingTime": 2400,
+      "elevationGain": 80
+    },
+    {
+      "id": 7,
+      "sportType": "Ride",
+      "startDateLocal": "2026-08-20T10:00:00",
+      "distance": 50000,
+      "movingTime": 7200,
+      "elevationGain": 800
+    },
+    {
+      "id": 8,
+      "sportType": "Hike",
+      "startDateLocal": "2026-08-28T09:00:00",
+      "distance": 10000,
+      "movingTime": 10800,
+      "elevationGain": 700
+    },
+    {
+      "id": 9,
+      "sportType": "Run",
+      "startDateLocal": "2026-07-06T06:30:00",
+      "distance": 12000,
+      "movingTime": 3600,
+      "elevationGain": 150
+    },
+    {
+      "id": 10,
+      "sportType": "Run",
+      "startDateLocal": "2026-06-29T06:30:00",
+      "distance": 10000,
+      "movingTime": 3000,
+      "elevationGain": 100
+    },
+    {
+      "id": 11,
+      "sportType": "NordicSki",
+      "startDateLocal": "2026-02-14T10:00:00",
+      "distance": 25000,
+      "movingTime": 9000,
+      "elevationGain": 300
+    },
+    {
+      "id": 12,
+      "sportType": "Yoga",
+      "startDateLocal": "2026-01-01T11:00:00",
+      "distance": null,
+      "movingTime": 3600,
+      "elevationGain": null
+    },
+    {
+      "id": 13,
+      "sportType": "Ride",
+      "startDateLocal": "2025-09-26T15:00:00",
+      "distance": 30000,
+      "movingTime": 4200,
+      "elevationGain": 400
+    },
+    {
+      "id": 14,
+      "sportType": "Run",
+      "startDateLocal": "2025-09-27T07:00:00",
+      "distance": 7000,
+      "movingTime": 2100,
+      "elevationGain": 60
+    },
+    {
+      "id": 15,
+      "sportType": "Hike",
+      "startDateLocal": "2025-03-10T08:00:00",
+      "distance": 15000,
+      "movingTime": 18000,
+      "elevationGain": 1000
+    },
+    {
+      "id": 16,
+      "sportType": "Run",
+      "startDateLocal": "2024-02-29T07:00:00",
+      "distance": 5000,
+      "movingTime": 1500,
+      "elevationGain": 50
+    }
+  ],
+  "expected": {
+    "yearToDate": {
+      "count": { "current": 12, "previous": 2 },
+      "distance": { "current": 242, "previous": 45 },
+      "elevation": { "current": 4950, "previous": 1400 },
+      "time": { "current": 20.25, "previous": 6.166667 }
+    },
+    "totals": {
+      "count": 12,
+      "distance": 242,
+      "elevation": 4950,
+      "time": 20.25
+    },
+    "weeklyVolume": {
+      "weekStarts": [
+        "2026-07-06",
+        "2026-07-13",
+        "2026-07-20",
+        "2026-07-27",
+        "2026-08-03",
+        "2026-08-10",
+        "2026-08-17",
+        "2026-08-24",
+        "2026-08-31",
+        "2026-09-07",
+        "2026-09-14",
+        "2026-09-21"
+      ],
+      "distance": [12, 0, 0, 0, 0, 0, 50, 10, 8, 0, 0, 127]
+    },
+    "activityCalendar": {
+      "activeDays": 13,
+      "dominantSport": {
+        "2025-09-26": "ride",
+        "2025-09-27": "run",
+        "2026-01-01": "misc",
+        "2026-02-14": "bcXcSki",
+        "2026-06-29": "run",
+        "2026-07-06": "run",
+        "2026-08-20": "ride",
+        "2026-08-28": "trailHike",
+        "2026-09-02": "run",
+        "2026-09-21": "ride",
+        "2026-09-24": "trailHike",
+        "2026-09-25": "run",
+        "2026-09-26": "ride"
+      }
+    },
+    "monthVsLastMonth": {
+      "distance": { "current": 135, "previous": 50 },
+      "elevation": { "current": 2900, "previous": 800 }
+    },
+    "sportMix": {
+      "currentYear": [
+        { "sport": "trailHike", "share": 0.345679 },
+        { "sport": "ride", "share": 0.296296 },
+        { "sport": "run", "share": 0.185185 },
+        { "sport": "bcXcSki", "share": 0.123457 },
+        { "sport": "misc", "share": 0.049383 }
+      ]
+    },
+    "consistency": { "activeDaysPerWeek": 0.363636, "currentStreak": 3 },
+    "distanceVsElevation": { "activities": 13, "metersPerKm": 19.390681 }
+  }
+}
