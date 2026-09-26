@@ -260,7 +260,7 @@ export function ElevationChart({
 
   return (
     <section
-      className="border-t pt-3 lg:border-t-0 lg:pt-0"
+      className="border-t pt-3 @2xl:border-t-0 @2xl:pt-0"
       aria-label="Elevation profile"
     >
       <h3 className="mb-2 text-sm font-semibold">Elevation profile</h3>

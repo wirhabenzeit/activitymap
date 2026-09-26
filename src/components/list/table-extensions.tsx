@@ -95,6 +95,58 @@ export const densityFeature: TableFeature = {
   },
 };
 
+// Fit Width Feature: hide columns that don't fit instead of scrolling.
+export interface FitWidthTableState {
+  fitWidth: boolean;
+}
+
+export interface FitWidthOptions {
+  onFitWidthChange?: OnChangeFn<boolean>;
+}
+
+export interface FitWidthInstance {
+  setFitWidth: (updater: Updater<boolean>) => void;
+}
+
+/* eslint-disable @typescript-eslint/no-unused-vars -- Generic params in TanStack declaration merging are required by upstream types. */
+declare module '@tanstack/react-table' {
+  interface Plugins {
+    fitWidthFeature: TableFeature;
+  }
+  interface TableState_FeatureMap {
+    fitWidthFeature: FitWidthTableState;
+  }
+  interface TableOptions_FeatureMap<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+  > {
+    fitWidthFeature: FitWidthOptions;
+  }
+  interface Table_FeatureMap<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+  > {
+    fitWidthFeature: FitWidthInstance;
+  }
+}
+/* eslint-enable @typescript-eslint/no-unused-vars */
+
+export const fitWidthFeature: TableFeature = {
+  getInitialState: (state) => ({ fitWidth: false, ...state }),
+  getDefaultTableOptions: (table) => ({
+    onFitWidthChange: makeStateUpdater('fitWidth', table),
+  }),
+  constructTableAPIs: (table) => {
+    assignTableAPIs('fitWidthFeature', table, {
+      table_setFitWidth: {
+        fn: (updater: Updater<boolean>) => {
+          setStateSlice(table, 'fitWidth', updater);
+        },
+      },
+    });
+  },
+};
+
 // Summary Row Feature
 export type SummaryRowState = null | 'page' | 'all' | 'selected';
 
@@ -168,6 +220,7 @@ export const features = tableFeatures({
   rowExpandingFeature,
   rowPaginationFeature,
   densityFeature,
+  fitWidthFeature,
   summaryRowFeature,
   sortedRowModel: createSortedRowModel(),
   filteredRowModel: createFilteredRowModel(),

@@ -226,7 +226,9 @@ export function ActivityCardContent({
 
   return (
     <>
-      <Card className="w-full border-none shadow-none">
+      {/* Lay out by the card's own width, not the screen's: a card spanning a
+          wide table goes side by side even on a phone. */}
+      <Card className="@container w-full border-none shadow-none">
         <CardHeader className="space-y-1 px-4 pb-3 pt-3">
           <div className="flex items-center gap-2">
             <Button
@@ -266,7 +268,7 @@ export function ActivityCardContent({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs max-lg:hidden"
+              className="h-7 px-2 text-xs @max-2xl:hidden"
               onClick={() => setOpen(true)}
               disabled={isGuest}
             >
@@ -284,8 +286,9 @@ export function ActivityCardContent({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {/* The menu renders in a portal, outside the card's container
+                    query, so Edit stays in it at every width. */}
                 <DropdownMenuItem
-                  className="lg:hidden"
                   onSelect={() => setOpen(true)}
                   disabled={isGuest}
                 >
@@ -348,7 +351,7 @@ export function ActivityCardContent({
             </CardDescription>
           )}
         </CardHeader>
-        <CardContent className="px-4 pb-4 pt-0 lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-4">
+        <CardContent className="px-4 pb-4 pt-0 @2xl:grid @2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] @2xl:gap-4">
           <dl className="grid self-start grid-cols-2 gap-x-5 gap-y-2.5">
             {mapStats.map((stat) => (
               <div className="min-w-0" key={stat.label}>
@@ -385,7 +388,7 @@ export function ActivityCardContent({
             )}
           </dl>
           {elevationProfile && (
-            <div className="mt-3 min-w-0 lg:mt-0 lg:border-l lg:pl-4">
+            <div className="mt-3 min-w-0 @2xl:mt-0 @2xl:border-l @2xl:pl-4">
               {elevationProfile}
             </div>
           )}

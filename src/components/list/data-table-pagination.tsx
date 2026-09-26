@@ -15,11 +15,14 @@ import { type Features } from './table-extensions';
 interface DataTablePaginationProps<TData extends RowData> {
   table: Table<Features, TData>;
   className?: string;
+  /** Visible columns that fit-to-width mode is currently leaving out. */
+  hiddenByFit?: Set<string>;
 }
 
 export function DataTablePagination<TData extends RowData>({
   table,
   className,
+  hiddenByFit,
 }: DataTablePaginationProps<TData>) {
   return (
     <div
@@ -31,7 +34,7 @@ export function DataTablePagination<TData extends RowData>({
       <span className="text-sm text-muted-foreground">
         {`${table.getFilteredSelectedRowModel().rows.length}/${table.getFilteredRowModel().rows.length}`}
       </span>
-      <DataTableViewOptions table={table} />
+      <DataTableViewOptions table={table} hiddenByFit={hiddenByFit} />
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <Button

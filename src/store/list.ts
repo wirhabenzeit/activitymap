@@ -18,6 +18,8 @@ export type ListState = {
   summaryRow: SummaryRowState;
   columnVisibility: ColumnVisibilityState;
   columnPinning: ColumnPinningState;
+  /** Hide columns that don't fit instead of scrolling sideways. */
+  fitWidth: boolean;
 };
 
 export type ListActions = {
@@ -26,6 +28,7 @@ export type ListActions = {
   setSummaryRow: Dispatch<SetStateAction<SummaryRowState>>;
   setColumnVisibility: Dispatch<Updater<ColumnVisibilityState>>;
   setColumnPinning: Dispatch<Updater<ColumnPinningState>>;
+  setFitWidth: Dispatch<Updater<boolean>>;
 };
 
 export type ListSlice = {
@@ -72,6 +75,11 @@ const createListActions = (
           ? value(state[listType].columnPinning)
           : value;
     }),
+  setFitWidth: (value) =>
+    set((state) => {
+      state[listType].fitWidth =
+        typeof value === 'function' ? value(state[listType].fitWidth) : value;
+    }),
 });
 
 export const createListSlice: StateCreator<
@@ -107,6 +115,7 @@ export const createListSlice: StateCreator<
       geometry_state: false,
     },
     summaryRow: null,
+    fitWidth: true,
     ...createListActions(set, 'compactList'),
   },
   fullList: {
@@ -132,7 +141,8 @@ export const createListSlice: StateCreator<
       photos: true,
       geometry_state: false,
     },
-    summaryRow: 'page',
+    summaryRow: null,
+    fitWidth: true,
     ...createListActions(set, 'fullList'),
   },
 });
