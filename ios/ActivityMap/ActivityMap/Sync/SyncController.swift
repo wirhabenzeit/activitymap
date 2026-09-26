@@ -127,7 +127,9 @@ final class SyncController {
                 if current == generation { status = session.user.stravaConnected ? .expired : .disconnected }
                 return
             }
-            try await loadCache(session, storage: storage, generation: current)
+            try await loadCache(
+                session, storage: storage, generation: current,
+                clearExpired: !session.verified)
             guard current == generation, !Task.isCancelled else { return }
             guard session.verified else {
                 if status != .expired { status = .offline }
@@ -173,7 +175,10 @@ final class SyncController {
         }
     }
 
-    private func loadCache(_ session: SyncSession, storage: LocalStore, generation current: Int) async throws {
+    private func loadCache(
+        _ session: SyncSession, storage: LocalStore, generation current: Int,
+        clearExpired: Bool = true
+    ) async throws {
         let snapshot = try await storage.snapshot(scope: session.scope)
         guard current == generation, !Task.isCancelled else { throw CancellationError() }
         checkpoint = snapshot.checkpoint
@@ -182,15 +187,13 @@ final class SyncController {
             photos = []
             return
         }
-        // Feed retention (usually 30 days) is not permission to retain a stale
-        // offline cache. Use the stricter seven-day data freshness boundary.
-        // A successful delta poll only checks the local change cursor. It
-        // cannot stand in for a completed Strava summary reconciliation.
-        guard let reconciled = checkpoint.freshness?.lastSummaryReconciledAt,
-              now().timeIntervalSince(min(synced, reconciled)) < 7 * 24 * 60 * 60 else {
+        // The server owns Strava reconciliation. A device cache is seven-day
+        // bounded from its last successful backend sync, even during outages.
+        guard now().timeIntervalSince(synced) < 7 * 24 * 60 * 60 else {
             clearVisible()
             status = .expired
-            try await storage.clear(scope: session.scope)
+            // A verified session can still resume from the saved cursor.
+            if clearExpired { try await storage.clear(scope: session.scope) }
             return
         }
         let mapped = try snapshot.activities.map(StoredModelMapper.activity)

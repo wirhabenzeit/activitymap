@@ -30,7 +30,7 @@ export const DEFAULT_IP_RATE_LIMIT: RateLimitRule = {
   limit: 600,
   windowMs: 5 * 60 * 1000,
 };
-/** For pre-auth, higher-risk endpoints (OAuth start/exchange) where IP is the only signal. */
+/** Shared by mobile OAuth routes, where IP is the only pre-auth signal. */
 export const STRICT_IP_RATE_LIMIT: RateLimitRule = {
   limit: 20,
   windowMs: 5 * 60 * 1000,
@@ -44,6 +44,8 @@ export interface RateLimitBoundaryOptions {
   sessionRule?: RateLimitRule;
   userRule?: RateLimitRule;
   ipRule?: RateLimitRule;
+  /** An additional IP bucket shared only by routes with the same group name. */
+  ipGroup?: { name: string; rule: RateLimitRule };
   /** Resolve an authenticated user for routes that have one; omit on pre-auth routes. */
   resolveUserId?: (request: Request) => Promise<string | null>;
   onLimited?: (info: {
@@ -69,9 +71,9 @@ export interface RateLimitBoundaryOptions {
  * - **Per-user**: keyed by a hash of the authenticated user id and shared by
  *   all of that user's sessions/devices. Routes opt into this check by
  *   providing `resolveUserId`; genuinely pre-auth routes omit it.
- * - **Per-IP**: a floor that also covers requests with no credential yet
- *   (the mobile OAuth endpoints use a stricter rule here, since IP is the
- *   only signal available pre-auth).
+ * - **Per-IP**: a floor that also covers requests with no credential yet.
+ *   Higher-risk routes can add a stricter shared IP group without letting
+ *   ordinary sync traffic consume that group's allowance.
  *
  * A rejected request never reaches the inner handler and always uses the
  * stable v1 error envelope with the documented `rate_limited` code (`429`,
@@ -101,7 +103,16 @@ export function withApiV1RateLimit(
     if (sessionKey)
       checks.push({ scope: 'session', key: sessionKey, rule: sessionRule });
     const ipKey = ipKeyFor(request);
-    if (ipKey) checks.push({ scope: 'ip', key: ipKey, rule: ipRule });
+    if (ipKey) {
+      checks.push({ scope: 'ip', key: ipKey, rule: ipRule });
+      if (options.ipGroup) {
+        checks.push({
+          scope: 'ip',
+          key: `${ipKey}:group:${options.ipGroup.name}`,
+          rule: options.ipGroup.rule,
+        });
+      }
+    }
 
     const enforce = async (
       scope: 'session' | 'user' | 'ip',

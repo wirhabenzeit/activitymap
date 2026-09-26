@@ -37,7 +37,7 @@ export const GET = withApiV1Observability(
     }),
     {
       route: ROUTE,
-      ipRule: STRICT_IP_RATE_LIMIT,
+      ipGroup: { name: 'mobile-oauth', rule: STRICT_IP_RATE_LIMIT },
       resolveUserId: resolveRateLimitUserId,
     },
   ),

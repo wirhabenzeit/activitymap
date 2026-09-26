@@ -26,18 +26,26 @@ export const GET = withApiV1Observability(
         });
         const body: unknown = await response.json().catch(() => null);
         const url =
-          body && typeof body === 'object' && 'url' in body && typeof body.url === 'string'
+          body &&
+          typeof body === 'object' &&
+          'url' in body &&
+          typeof body.url === 'string'
             ? body.url
             : null;
         return url ? { url, headers: response.headers } : null;
       },
       onError: (error, requestId) => {
-        logger.error('GET /api/v1/auth/mobile/start failed', { error, requestId });
+        logger.error('GET /api/v1/auth/mobile/start failed', {
+          error,
+          requestId,
+        });
       },
     }),
-    // Pre-auth: no session credential exists yet, so IP is the only signal.
-    // Kept tight since this kicks off a full Strava OAuth round trip.
-    { route: ROUTE, ipRule: STRICT_IP_RATE_LIMIT },
+    // Share a tighter OAuth bucket without counting ordinary sync requests.
+    {
+      route: ROUTE,
+      ipGroup: { name: 'mobile-oauth', rule: STRICT_IP_RATE_LIMIT },
+    },
   ),
   { route: ROUTE },
 );

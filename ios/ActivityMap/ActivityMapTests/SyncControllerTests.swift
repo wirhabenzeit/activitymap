@@ -115,7 +115,7 @@ struct SyncControllerTests {
         #expect(try await storage.snapshot(scope: Fixtures.scope).activities.isEmpty)
     }
 
-    @Test func recentPollCannotValidateDataWithoutCompletedReconciliation() async throws {
+    @Test func recentSavedDataRemainsAvailableWhenBackendReconciliationIsPending() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         var checkpoint = Fixtures.checkpoint
         checkpoint.lastSyncAt = Date()
@@ -126,10 +126,60 @@ struct SyncControllerTests {
         controller.setSession(SyncFixtures.session(verified: false), storage: storage)
         await controller.refresh()
 
-        #expect(controller.status == .expired && controller.activities.activities.isEmpty)
+        #expect(controller.status == .offline && controller.activities.activities.count == 1)
         let snapshot = try await storage.snapshot(scope: Fixtures.scope)
-        #expect(snapshot.activities.isEmpty && snapshot.checkpoint == nil)
+        #expect(snapshot.activities.count == 1 && snapshot.checkpoint != nil)
         #expect(await source.calls == 0)
+    }
+
+    @Test func onlineSyncDisplaysDataAndUsesChangesCursorWithoutBackendReconciliation() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let dto = try Fixtures.activity()
+        let pending = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: nil)
+        let source = ScriptedSyncSource([
+            .bootstrap(.activities, nil, .success(SyncFixtures.activities([dto], freshness: pending))),
+            .bootstrap(.photos, nil, .success(SyncFixtures.photos(freshness: pending))),
+            .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot", freshness: pending))),
+            .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot", freshness: pending))),
+        ])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        #expect(controller.status == .ready)
+        #expect(controller.activities.activities.map(\.name) == [dto.name])
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities == [dto])
+
+        await controller.refresh()
+        #expect(controller.status == .ready)
+        #expect(controller.activities.activities.count == 1)
+        #expect(await source.calls == 4) // One later delta poll, no second bootstrap.
+
+        controller.pause()
+        #expect(controller.status == .ready && controller.activities.activities.count == 1)
+        controller.setSession(SyncFixtures.session(verified: false), storage: storage)
+        await controller.refresh()
+        #expect(controller.status == .offline && controller.activities.activities.count == 1)
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities.count == 1)
+        #expect(await source.calls == 4)
+    }
+
+    @Test func networkFailureKeepsRecentSavedActivitiesVisible() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let dto = try Fixtures.activity()
+        var checkpoint = Fixtures.checkpoint
+        checkpoint.lastSyncAt = Date()
+        checkpoint.freshness = .init(lastSummaryReconciledAt: nil)
+        try await storage.apply([.upsertActivity(dto)], checkpoint: checkpoint, scope: Fixtures.scope)
+        let source = ScriptedSyncSource([
+            .changes("cursor-1", .failure(.transport("offline")))
+        ])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+
+        #expect(controller.status == .offline)
+        #expect(controller.activities.activities.map(\.name) == [dto.name])
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities == [dto])
     }
 
     @Test func unauthorizedSyncClearsCacheAndInvalidatesOnlyItsToken() async throws {

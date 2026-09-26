@@ -30,7 +30,10 @@ export const POST = withApiV1Observability(
       },
     }),
     // Pre-auth code exchange: guard against brute-forcing the one-time code.
-    { route: ROUTE, ipRule: STRICT_IP_RATE_LIMIT },
+    {
+      route: ROUTE,
+      ipGroup: { name: 'mobile-oauth', rule: STRICT_IP_RATE_LIMIT },
+    },
   ),
   { route: ROUTE },
 );
