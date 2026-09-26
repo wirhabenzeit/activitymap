@@ -191,3 +191,148 @@ export function sportBreakdown(
   }
   return [...rows.values()].filter((row) => row.count > 0);
 }
+
+// Per-day sums of `metric` for the current week, Monday first. Days after
+// today are null.
+export function thisWeekByDay(
+  activities: readonly StatsActivity[],
+  today: number,
+  metric: StatsMetric,
+): (number | null)[] {
+  const monday = mondayOf(today);
+  const days = Array.from({ length: 7 }, (_, index) =>
+    monday + index <= today ? 0 : null,
+  );
+  for (const activity of activities) {
+    const day = dayOf(activity.start_date_local);
+    if (day < monday || day > today) continue;
+    days[day - monday]! += metricValue(activity, metric);
+  }
+  return days;
+}
+
+export type TypicalWeek = Record<StatsMetric, number> & { activeDays: number };
+
+// Means per full week over the `weeks - 1` full weeks before the current,
+// partial one (the same weeks as consistency's activeDaysPerWeek).
+export function typicalWeek(
+  activities: readonly StatsActivity[],
+  today: number,
+  weeks = 12,
+): TypicalWeek {
+  const currentWeek = mondayOf(today);
+  const first = currentWeek - (weeks - 1) * 7;
+  const sums = { count: 0, distance: 0, elevation: 0, time: 0 };
+  const activeDays = new Set<number>();
+  for (const activity of activities) {
+    const day = dayOf(activity.start_date_local);
+    if (day < first || day >= currentWeek) continue;
+    activeDays.add(day);
+    for (const metric of Object.keys(sums) as StatsMetric[])
+      sums[metric] += metricValue(activity, metric);
+  }
+  const fullWeeks = weeks - 1;
+  return {
+    count: sums.count / fullWeeks,
+    distance: sums.distance / fullWeeks,
+    elevation: sums.elevation / fullWeeks,
+    time: sums.time / fullWeeks,
+    activeDays: activeDays.size / fullWeeks,
+  };
+}
+
+// The longest run of consecutive active days up to today.
+export function longestStreak(
+  activities: readonly StatsActivity[],
+  today: number,
+): number {
+  const days = [
+    ...new Set(
+      activities
+        .map((activity) => dayOf(activity.start_date_local))
+        .filter((day) => day <= today),
+    ),
+  ].sort((a, b) => a - b);
+  let longest = 0;
+  let current = 0;
+  days.forEach((day, index) => {
+    current = index > 0 && days[index - 1] === day - 1 ? current + 1 : 1;
+    longest = Math.max(longest, current);
+  });
+  return longest;
+}
+
+// Where this year's pace lands by 31 December, next to last year's total.
+export function yearPace(
+  activities: readonly StatsActivity[],
+  today: number,
+  metric: StatsMetric,
+) {
+  const year = dateOfDay(today).getUTCFullYear();
+  const first = yearStart(year);
+  const daysSoFar = today - first + 1;
+  const daysInYear = yearStart(year + 1) - first;
+  let current = 0;
+  let lastYear = 0;
+  for (const activity of activities) {
+    const day = dayOf(activity.start_date_local);
+    if (day >= first && day <= today) current += metricValue(activity, metric);
+    else if (day >= yearStart(year - 1) && day < first)
+      lastYear += metricValue(activity, metric);
+  }
+  const perDay = current / daysSoFar;
+  return { current, perDay, projected: perDay * daysInYear, lastYear };
+}
+
+export const climbingBands = [
+  { id: 'flat', label: 'Flat', below: 8 },
+  { id: 'rolling', label: 'Rolling', below: 15 },
+  { id: 'hilly', label: 'Hilly', below: 30 },
+  { id: 'mountainous', label: 'Mountainous', below: Infinity },
+] as const;
+
+// Activities of at least 1 km from `first` through `today`, counted by climb
+// rate (metres of elevation gain per km).
+export function climbingDistribution(
+  activities: readonly StatsActivity[],
+  first: number,
+  today: number,
+) {
+  const counts = climbingBands.map((band) => ({ ...band, count: 0 }));
+  for (const activity of activities) {
+    const day = dayOf(activity.start_date_local);
+    const distance = metricValue(activity, 'distance');
+    if (day < first || day > today || distance < 1) continue;
+    const rate = metricValue(activity, 'elevation') / distance;
+    counts.find((band) => rate < band.below)!.count += 1;
+  }
+  return counts;
+}
+
+export type ActivityRecord = { value: number; day: number; sport: Sport };
+
+// The single activities (and the week) with the most distance, time and
+// elevation from `first` through `today`.
+export function records(
+  activities: readonly StatsActivity[],
+  first: number,
+  today: number,
+) {
+  const best: Partial<Record<StatsMetric, ActivityRecord>> = {};
+  const weeks = new Map<number, number>();
+  for (const activity of activities) {
+    const day = dayOf(activity.start_date_local);
+    if (day < first || day > today) continue;
+    for (const metric of ['distance', 'time', 'elevation'] as const) {
+      const value = metricValue(activity, metric);
+      if (value > (best[metric]?.value ?? 0))
+        best[metric] = { value, day, sport: activity.sport };
+    }
+    const week = mondayOf(day);
+    weeks.set(week, (weeks.get(week) ?? 0) + metricValue(activity, 'distance'));
+  }
+  let biggestWeek: { value: number; weekStart: number } | undefined;
+  for (const [weekStart, value] of weeks)
+    if (value > (biggestWeek?.value ?? 0)) biggestWeek = { value, weekStart };
+  return { ...best, biggestWeek };
+}

@@ -17,20 +17,25 @@ import {
   distanceVsElevation,
   monthVsLastMonth,
   sportMix,
-  totals,
   weeklyVolume,
   yearToDate,
+  type Sport,
   type StatsActivity,
 } from '~/lib/stats/tile-data';
 import {
   activeDaysPerWeek,
+  climbingDistribution,
   cumulativeByDay,
   dailyTotals,
   dateOfDay,
+  longestStreak,
   monthStart,
+  records,
   sportBreakdown,
-  totalsByYear,
+  thisWeekByDay,
+  typicalWeek,
   weeklyVolumeBySport,
+  yearPace,
   yearStart,
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
@@ -79,8 +84,6 @@ export const faceOptionLabels: Record<string, string> = {
   distance: 'km',
   time: 'h',
   elevation: 'm',
-  hours: 'h',
-  days: 'days',
 };
 
 export const optionLabels: Record<string, string> = {
@@ -90,18 +93,23 @@ export const optionLabels: Record<string, string> = {
   allTime: 'All time',
   last12Weeks: '12 weeks',
   last52Weeks: '52 weeks',
-  hours: 'Hours',
-  days: 'Active days',
 };
 
+const signed = (value: number, format: (value: number) => string) =>
+  `${value >= 0 ? '+' : '−'}${format(Math.abs(value))}`;
+
+// "+1,260 km · +15% vs 2025 by Sep 26": the absolute difference (when a
+// metric is given) and the percentage, coloured by direction.
 function Delta({
   current,
   previous,
   text,
+  metric,
 }: {
   current: number;
   previous: number;
   text: string;
+  metric?: StatsMetric;
 }) {
   const change = percentChange(current, previous);
   if (change === null) return <>{text}</>;
@@ -114,8 +122,9 @@ function Delta({
             : 'text-orange-700 dark:text-orange-400',
         )}
       >
-        {change >= 0 ? '+' : ''}
-        {change}%
+        {metric &&
+          `${signed(current - previous, (value) => formatWithUnit(value, metric))} · `}
+        {signed(change, String)}%
       </span>{' '}
       {text}
     </>
@@ -164,6 +173,53 @@ function Legend({ sports }: { sports: string[] }) {
   );
 }
 
+// One line of sports, as many as fit, for a tile face.
+function SportLegend({ sports }: { sports: Sport[] }) {
+  return (
+    <div className="mt-1.5 flex h-4 shrink-0 flex-wrap gap-x-2.5 overflow-hidden text-[11px] leading-4 text-muted-foreground">
+      {sports.map((sport) => (
+        <span key={sport} className="flex items-center gap-1">
+          <i
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{ background: categorySettings[sport].color }}
+          />
+          {categorySettings[sport].name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// A small labelled number for the stat grids on tile faces.
+function Stat({
+  label,
+  value,
+  unit,
+  note,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  note?: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="truncate text-[11px] text-muted-foreground">{label}</div>
+      <div className="truncate font-mono text-[15px] font-medium tabular-nums">
+        {value}
+        {unit && (
+          <small className="ml-0.5 font-sans text-[11px] font-normal text-muted-foreground">
+            {unit}
+          </small>
+        )}
+      </div>
+      {note && (
+        <div className="truncate text-[11px] text-muted-foreground">{note}</div>
+      )}
+    </div>
+  );
+}
+
 const asMetric = (option: string | undefined, fallback: StatsMetric) =>
   (option ?? fallback) as StatsMetric;
 
@@ -204,7 +260,8 @@ const yearToDateView: TileView = {
         <Delta
           current={current}
           previous={previous}
-          text={`vs last year by ${shortDate(dateOfDay(today))}`}
+          metric={metric}
+          text={`vs ${dateOfDay(today).getUTCFullYear() - 1} by ${shortDate(dateOfDay(today))}`}
         />
       ),
     };
@@ -226,6 +283,7 @@ const yearToDateView: TileView = {
             height={height}
             palette={context.palette}
             detail={false}
+            endLabels
             valueFormat={(y) => formatWithUnit(y, metric)}
             xLabel={dayOfYearLabel}
           />
@@ -272,74 +330,6 @@ const yearToDateView: TileView = {
   },
 };
 
-// Totals --------------------------------------------------------------------
-
-const totalsView: TileView = {
-  period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
-  summary: ({ activities, today }, option) => {
-    const metric = asMetric(option, 'count');
-    return {
-      value: formatMetric(totals(activities, today)[metric], metric),
-      unit: metricUnit[metric],
-      sub: `${metricLabel[metric]} this year so far`,
-    };
-  },
-  face: ({ activities, today }) => {
-    const values = totals(activities, today);
-    return (
-      <div className="mt-auto grid grid-cols-3 gap-2 border-t pt-2">
-        {(['distance', 'elevation', 'time'] as const).map((metric) => (
-          <div key={metric} className="min-w-0">
-            <div className="truncate text-[11px] text-muted-foreground">
-              {metricLabel[metric]}
-            </div>
-            <div className="truncate font-mono text-[15px] font-medium tabular-nums">
-              {formatMetric(values[metric], metric)}
-              <small className="ml-0.5 text-[11px] font-normal text-muted-foreground">
-                {metricUnit[metric]}
-              </small>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  },
-  detail: (context, option) => {
-    const metric = asMetric(option, 'count');
-    const years = totalsByYear(context.activities, context.today, metric);
-    const rows = years.flatMap(({ year, bySport }) =>
-      Object.entries(bySport).map(([sport, value]) => ({
-        x: String(year),
-        sport: sport as keyof typeof bySport,
-        value,
-      })),
-    );
-    const sports = Object.keys(categorySettings).filter((sport) =>
-      rows.some((row) => row.sport === sport && row.value > 0),
-    );
-    return (
-      <>
-        <DetailChart height={260}>
-          {({ width, height }) => (
-            <SportBars
-              rows={rows}
-              width={width}
-              height={height}
-              detail
-              palette={context.palette}
-              valueFormat={(value) => formatWithUnit(value, metric)}
-            />
-          )}
-        </DetailChart>
-        <Legend sports={sports} />
-        <p className="text-xs text-muted-foreground">
-          This year runs to {shortDate(dateOfDay(context.today))}.
-        </p>
-      </>
-    );
-  },
-};
-
 // Weekly volume -------------------------------------------------------------
 
 const weekOf = (x: string) => `Week of ${shortDate(dateOfDay(Number(x)))}`;
@@ -355,18 +345,54 @@ function weekRows(context: TileContext, metric: StatsMetric) {
   );
 }
 
+// Total of `metric` over the `days` days ending on `last`.
+const sumOver = (
+  context: TileContext,
+  metric: StatsMetric,
+  last: number,
+  days: number,
+) =>
+  cumulativeByDay(context.activities, metric, last - days + 1, last).at(-1) ??
+  0;
+
+// Mean of each full week and the three full weeks before it; the current,
+// partial week gets no point.
+function rollingFourWeeks(context: TileContext, metric: StatsMetric) {
+  const { weekStarts, values } = weeklyVolume(
+    context.activities,
+    context.today,
+    metric,
+  );
+  return weekStarts.flatMap((weekStart, index) =>
+    index >= 3 && index < values.length - 1
+      ? [
+          {
+            x: String(weekStart),
+            value:
+              values.slice(index - 3, index + 1).reduce((a, b) => a + b, 0) / 4,
+          },
+        ]
+      : [],
+  );
+}
+
 const weeklyVolumeView: TileView = {
-  period: () => 'Last 12 weeks',
-  summary: ({ activities, today }, option) => {
+  period: () => 'Last 4 weeks',
+  summary: (context, option) => {
     const metric = asMetric(option, 'distance');
-    const { values } = weeklyVolume(activities, today, metric);
-    const fullWeeks = values.slice(0, -1);
-    const average =
-      fullWeeks.reduce((sum, value) => sum + value, 0) / fullWeeks.length;
+    const current = sumOver(context, metric, context.today, 28);
+    const previous = sumOver(context, metric, context.today - 28, 28);
     return {
-      value: formatMetric(values.at(-1) ?? 0, metric),
-      unit: metricUnit[metric],
-      sub: `this week · average ${formatWithUnit(average, metric)}`,
+      value: formatMetric(current, metric),
+      unit: `${metricUnit[metric]} · last 4 weeks`,
+      sub: (
+        <Delta
+          current={current}
+          previous={previous}
+          metric={metric}
+          text="vs the 4 weeks before"
+        />
+      ),
     };
   },
   faceOptions: metricFaceOptions,
@@ -380,6 +406,8 @@ const weeklyVolumeView: TileView = {
             width={width}
             height={height}
             detail={false}
+            partialLast
+            trend={rollingFourWeeks(context, metric)}
             palette={context.palette}
             valueFormat={(value) => formatWithUnit(value, metric)}
             xTickFormat={weekOf}
@@ -436,11 +464,15 @@ function lastYearStart(today: number) {
 
 const activityCalendarView: TileView = {
   period: () => 'Last 12 months',
-  summary: ({ activities, today }) => ({
-    value: String(activityCalendar(activities, today).activeDays),
-    unit: 'active days',
-    sub: 'in the last 12 months',
-  }),
+  summary: ({ activities, today }) => {
+    const { activeDays } = activityCalendar(activities, today);
+    const days = today - lastYearStart(today) + 1;
+    return {
+      value: String(activeDays),
+      unit: 'active days',
+      sub: `${Math.round((activeDays / days) * 100)}% of days in the last 12 months`,
+    };
+  },
   face: (context) => {
     const { dominantSport } = activityCalendar(
       context.activities,
@@ -451,22 +483,35 @@ const activityCalendarView: TileView = {
       lastYearStart(context.today),
       context.today,
     );
+    // Sports by how many days they coloured, for the legend.
+    const dayCounts = new Map<Sport, number>();
+    for (const sport of dominantSport.values())
+      dayCounts.set(sport, (dayCounts.get(sport) ?? 0) + 1);
+    const sports = [...dayCounts.entries()]
+      .sort((x, y) => y[1] - x[1])
+      .map(([sport]) => sport);
     return (
-      <FillChart>
-        {({ width, height }) => (
-          <CalendarHeatmap
-            today={context.today}
-            weeks={Math.max(8, Math.min(53, Math.floor(width / (height / 7))))}
-            width={width}
-            height={height}
-            dominantSport={dominantSport}
-            totals={days}
-            colour="sport"
-            palette={context.palette}
-            labels={false}
-          />
-        )}
-      </FillChart>
+      <>
+        <FillChart>
+          {({ width, height }) => (
+            <CalendarHeatmap
+              today={context.today}
+              weeks={Math.max(
+                8,
+                Math.min(53, Math.floor(width / (height / 7))),
+              )}
+              width={width}
+              height={height}
+              dominantSport={dominantSport}
+              totals={days}
+              colour="sport"
+              palette={context.palette}
+              labels={false}
+            />
+          )}
+        </FillChart>
+        <SportLegend sports={sports} />
+      </>
     );
   },
   detail: (context, option) => {
@@ -551,6 +596,18 @@ function monthPair(context: TileContext, metric: StatsMetric): LineSeries[] {
   ];
 }
 
+// "Aug 1–26": last month up to today's day number, capped at its last day.
+function samePeriodLastMonth(today: number) {
+  const date = dateOfDay(today);
+  const previous = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1),
+  );
+  const lastDay = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 0),
+  ).getUTCDate();
+  return `${monthName(previous)} 1–${Math.min(date.getUTCDate(), lastDay)}`;
+}
+
 const monthVsLastMonthView: TileView = {
   period: ({ today }) => {
     const date = dateOfDay(today);
@@ -569,7 +626,8 @@ const monthVsLastMonthView: TileView = {
         <Delta
           current={current}
           previous={previous}
-          text={`vs last month by day ${dateOfDay(today).getUTCDate()}`}
+          metric={metric}
+          text={`vs ${samePeriodLastMonth(today)}`}
         />
       ),
     };
@@ -743,76 +801,40 @@ const sportMixView: TileView = {
 const weeksOf = (option: string | undefined) =>
   option === 'last52Weeks' ? 52 : 12;
 
-// Moving time per week, the last week so far; the average is over the full
-// weeks before it.
-function hoursPerWeek(context: TileContext, weeks: number) {
-  const { weekStarts, values } = weeklyVolume(
-    context.activities,
-    context.today,
-    'time',
-    weeks,
-  );
-  const fullWeeks = values.slice(0, -1);
-  return {
-    rows: weekStarts.map((weekStart, index) => ({
-      weekStart,
-      hours: values[index]!,
-    })),
-    average:
-      fullWeeks.reduce((sum, value) => sum + value, 0) / fullWeeks.length,
-  };
-}
-
 const consistencyView: TileView = {
   period: () => 'Last 12 weeks',
-  // The face switches between hours and active days per week; the detail's
-  // option is its range and always shows hours.
   summary: (context, option) => {
-    const weeks = weeksOf(option);
-    const result = consistency(context.activities, context.today, weeks);
-    const streak = `Current streak ${result.currentStreak} ${
-      result.currentStreak === 1 ? 'day' : 'days'
-    }`;
-    if (option === 'days')
-      return {
-        value: result.activeDaysPerWeek.toFixed(1),
-        unit: 'days / week',
-        sub: streak,
-      };
+    const result = consistency(
+      context.activities,
+      context.today,
+      weeksOf(option),
+    );
+    const longest = longestStreak(context.activities, context.today);
     return {
-      value: formatMetric(hoursPerWeek(context, weeks).average, 'time'),
-      unit: 'h / week',
-      sub: streak,
+      value: result.activeDaysPerWeek.toFixed(1),
+      unit: 'days / week',
+      sub: `Streak ${result.currentStreak} ${
+        result.currentStreak === 1 ? 'day' : 'days'
+      } · longest ${longest}`,
     };
   },
-  faceOptions: ['hours', 'days'],
-  face: (context, option) => (
+  face: (context) => (
     <FillChart>
       {({ width, height }) => (
         <PlainBars
-          rows={
-            option === 'days'
-              ? activeDaysPerWeek(context.activities, context.today, 12).map(
-                  (week, index, weeks) => ({
-                    x: String(week.weekStart),
-                    value: week.activeDays,
-                    highlight: index === weeks.length - 1,
-                  }),
-                )
-              : hoursPerWeek(context, 12).rows.map((week, index, weeks) => ({
-                  x: String(week.weekStart),
-                  value: week.hours,
-                  highlight: index === weeks.length - 1,
-                }))
-          }
+          rows={activeDaysPerWeek(context.activities, context.today, 12).map(
+            (week, index, weeks) => ({
+              x: String(week.weekStart),
+              value: week.activeDays,
+              highlight: index === weeks.length - 1,
+            }),
+          )}
           width={width}
           height={height}
           detail={false}
           palette={context.palette}
           xTickFormat={weekOf}
-          valueFormat={(value) =>
-            option === 'days' ? `${value} days` : formatWithUnit(value, 'time')
-          }
+          valueFormat={(value) => `${value} active days`}
         />
       )}
     </FillChart>
@@ -864,23 +886,42 @@ const distanceVsElevationView: TileView = {
   summary: ({ activities, today }) => {
     const { points, metersPerKm } = distanceVsElevation(activities, today);
     return {
-      value: formatMetric(metersPerKm, 'elevation'),
-      unit: 'm / km',
-      sub: `${points.length} activities, average climb rate`,
+      value: formatMetric(metersPerKm * 100, 'elevation'),
+      unit: 'm per 100 km',
+      sub: `average climb over ${points.length} activities`,
     };
   },
-  face: ({ activities, today }) => (
-    <FillChart>
-      {({ width, height }) => (
-        <DistanceElevationDots
-          points={distanceVsElevation(activities, today).points}
-          width={width}
-          height={height}
-          detail={false}
-        />
-      )}
-    </FillChart>
-  ),
+  face: ({ activities, today }) => {
+    const bands = climbingDistribution(activities, lastYearStart(today), today);
+    const total = bands.reduce((sum, band) => sum + band.count, 0);
+    const largest = Math.max(1, ...bands.map((band) => band.count));
+    return (
+      <div className="mt-2 grid min-h-0 flex-1 grid-cols-4 gap-2">
+        {bands.map((band) => (
+          <div
+            key={band.id}
+            className="flex min-h-0 min-w-0 flex-col justify-end"
+            title={`${band.label}: ${band.count} activities${
+              Number.isFinite(band.below) ? `, under ${band.below} m/km` : ''
+            }`}
+          >
+            <div
+              className="rounded-sm bg-muted-foreground/30"
+              style={{ height: `${(band.count / largest) * 100}%` }}
+            />
+            <div className="mt-1 flex items-baseline justify-between gap-1 text-[11px]">
+              <span className="truncate text-muted-foreground">
+                {band.label}
+              </span>
+              <span className="font-mono tabular-nums">
+                {total ? Math.round((band.count / total) * 100) : 0}%
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  },
   detail: ({ activities, today }) => {
     const { points } = distanceVsElevation(activities, today);
     const sports = Object.keys(categorySettings).filter((sport) =>
@@ -907,14 +948,235 @@ const distanceVsElevationView: TileView = {
   },
 };
 
+// This week ------------------------------------------------------------------
+
+const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const thisWeekView: TileView = {
+  period: () => 'This week',
+  summary: (context, option) => {
+    const metric = asMetric(option, 'distance');
+    const days = thisWeekByDay(context.activities, context.today, metric);
+    const todayIndex = days.filter((day) => day !== null).length - 1;
+    const typical = typicalWeek(context.activities, context.today)[metric];
+    return {
+      value: formatMetric(
+        days.reduce<number>((sum, day) => sum + (day ?? 0), 0),
+        metric,
+      ),
+      unit: metricUnit[metric],
+      sub: `${
+        todayIndex === 0 ? 'Mon' : `Mon–${weekdayNames[todayIndex]}`
+      } so far · typical week ${formatWithUnit(typical, metric)}`,
+    };
+  },
+  faceOptions: metricFaceOptions,
+  face: (context, option) => {
+    const metric = asMetric(option, 'distance');
+    const days = thisWeekByDay(context.activities, context.today, metric);
+    const todayIndex = days.filter((day) => day !== null).length - 1;
+    return (
+      <FillChart>
+        {({ width, height }) => (
+          <PlainBars
+            rows={days.map((value, index) => ({
+              x: weekdayNames[index]!,
+              value: value ?? 0,
+              highlight: index === todayIndex,
+            }))}
+            width={width}
+            height={height}
+            detail={false}
+            palette={context.palette}
+            valueFormat={(value) => formatWithUnit(value, metric)}
+          />
+        )}
+      </FillChart>
+    );
+  },
+  detail: () => null,
+};
+
+// Typical week ---------------------------------------------------------------
+
+const decimal = (value: number) => value.toFixed(1);
+
+const typicalWeekView: TileView = {
+  period: () => 'Last 11 full weeks',
+  summary: ({ activities, today }) => {
+    const week = typicalWeek(activities, today);
+    return {
+      value: formatMetric(week.time, 'time'),
+      unit: 'h / week',
+      sub: `${decimal(week.activeDays)} active days · ${decimal(week.count)} activities`,
+    };
+  },
+  face: ({ activities, today }) => {
+    const week = typicalWeek(activities, today);
+    return (
+      <div className="mt-auto grid grid-cols-2 gap-2 border-t pt-2">
+        <Stat
+          label="Distance"
+          value={formatMetric(week.distance, 'distance')}
+          unit="km"
+        />
+        <Stat
+          label="Elevation"
+          value={formatMetric(week.elevation, 'elevation')}
+          unit="m"
+        />
+      </div>
+    );
+  },
+  detail: () => null,
+};
+
+// Pace -----------------------------------------------------------------------
+
+const paceUnit: Record<StatsMetric, string> = {
+  count: 'activities / day',
+  distance: 'km / day',
+  elevation: 'm / day',
+  time: 'h / day',
+};
+
+const yearPaceView: TileView = {
+  period: ({ today }) => `${dateOfDay(today).getUTCFullYear()} pace`,
+  summary: ({ activities, today }, option) => {
+    const metric = asMetric(option, 'distance');
+    const pace = yearPace(activities, today, metric);
+    return {
+      value:
+        metric === 'elevation'
+          ? formatMetric(pace.perDay, metric)
+          : decimal(pace.perDay),
+      unit: paceUnit[metric],
+      sub: `${formatWithUnit(pace.projected, metric)} projected by Dec 31`,
+    };
+  },
+  faceOptions: metricFaceOptions,
+  face: ({ activities, today }, option) => {
+    const metric = asMetric(option, 'distance');
+    const pace = yearPace(activities, today, metric);
+    const scale = Math.max(pace.projected, pace.lastYear, 1);
+    const year = dateOfDay(today).getUTCFullYear();
+    return (
+      <div className="mt-auto">
+        <div className="relative h-2.5 rounded-sm bg-muted">
+          <div
+            className="absolute inset-y-0 left-0 rounded-sm bg-foreground/20"
+            style={{ width: `${(pace.projected / scale) * 100}%` }}
+          />
+          <div
+            className="absolute inset-y-0 left-0 rounded-sm bg-foreground"
+            style={{ width: `${(pace.current / scale) * 100}%` }}
+          />
+          {pace.lastYear > 0 && (
+            <div
+              className="absolute -inset-y-1 w-0.5 bg-orange-600 dark:bg-orange-400"
+              style={{ left: `${(pace.lastYear / scale) * 100}%` }}
+              title={`${year - 1}: ${formatWithUnit(pace.lastYear, metric)}`}
+            />
+          )}
+        </div>
+        <div className="mt-1.5 flex justify-between gap-2 text-[11px] text-muted-foreground">
+          <span className="truncate">
+            So far {formatWithUnit(pace.current, metric)}
+          </span>
+          {pace.lastYear > 0 && (
+            <span className="truncate">
+              <i className="mr-1 inline-block h-2 w-0.5 bg-orange-600 align-middle dark:bg-orange-400" />
+              {year - 1}: {formatWithUnit(pace.lastYear, metric)}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  },
+  detail: () => null,
+};
+
+// Records --------------------------------------------------------------------
+
+const recordNote = (record: { day: number } | undefined) =>
+  record ? shortDate(dateOfDay(record.day)) : undefined;
+
+const recordsView: TileView = {
+  period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
+  summary: ({ activities, today }) => {
+    const { distance } = records(
+      activities,
+      yearStart(dateOfDay(today).getUTCFullYear()),
+      today,
+    );
+    if (!distance)
+      return { value: '–', unit: '', sub: 'No activities this year yet' };
+    return {
+      value: formatMetric(distance.value, 'distance'),
+      unit: 'km',
+      sub: `longest activity · ${categorySettings[distance.sport].name}, ${shortDate(dateOfDay(distance.day))}`,
+    };
+  },
+  face: ({ activities, today }) => {
+    const best = records(
+      activities,
+      yearStart(dateOfDay(today).getUTCFullYear()),
+      today,
+    );
+    return (
+      <div className="mt-auto grid grid-cols-3 gap-2 border-t pt-2">
+        <Stat
+          label="Longest time"
+          value={best.time ? formatMetric(best.time.value, 'time') : '–'}
+          unit={best.time ? 'h' : undefined}
+          note={recordNote(best.time)}
+        />
+        <Stat
+          label="Biggest climb"
+          value={
+            best.elevation
+              ? formatMetric(best.elevation.value, 'elevation')
+              : '–'
+          }
+          unit={best.elevation ? 'm' : undefined}
+          note={recordNote(best.elevation)}
+        />
+        <Stat
+          label="Biggest week"
+          value={
+            best.biggestWeek
+              ? formatMetric(best.biggestWeek.value, 'distance')
+              : '–'
+          }
+          unit={best.biggestWeek ? 'km' : undefined}
+          note={
+            best.biggestWeek
+              ? weekOf(String(best.biggestWeek.weekStart))
+              : undefined
+          }
+        />
+      </div>
+    );
+  },
+  detail: () => null,
+};
+
 // Speed trend is optional in the manifest and has no rules or fixtures yet,
-// so no platform draws it.
+// so no platform draws it. Totals is folded into Year to date and Pace.
 export function tileView(id: StatsTileID): TileView | null {
   switch (id) {
+    case 'thisWeek':
+      return thisWeekView;
+    case 'typicalWeek':
+      return typicalWeekView;
+    case 'yearPace':
+      return yearPaceView;
+    case 'records':
+      return recordsView;
     case 'yearToDate':
       return yearToDateView;
     case 'totals':
-      return totalsView;
+      return null;
     case 'weeklyVolume':
       return weeklyVolumeView;
     case 'activityCalendar':

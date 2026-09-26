@@ -32,63 +32,95 @@ export const statsMetrics = {
   },
 } as const;
 
-export const statsTiles = [
+export const statsTileGroups = [
   {
-    id: 'yearToDate',
-    title: 'Year to date',
-    window: 'yearToDate',
-    span: {
-      columns: 2,
-      rows: 2,
-    },
-    toggle: {
-      label: 'Metric',
-      options: ['distance', 'elevation', 'time', 'count'],
-    },
+    id: 'now',
+    title: 'Now',
   },
   {
-    id: 'totals',
-    title: 'Totals',
-    window: 'currentYear',
+    id: 'thisYear',
+    title: 'This year',
+  },
+  {
+    id: 'patterns',
+    title: 'Patterns',
+  },
+] as const;
+
+export const statsTiles = [
+  {
+    id: 'thisWeek',
+    title: 'This week',
+    window: 'currentWeek',
+    group: 'now',
     span: {
-      columns: 2,
+      columns: 1,
       rows: 1,
     },
     toggle: {
       label: 'Metric',
-      options: ['count', 'distance', 'elevation', 'time'],
+      options: ['distance', 'time', 'elevation'],
     },
   },
   {
     id: 'weeklyVolume',
-    title: 'Weekly volume',
+    title: 'Training volume',
     window: 'last12Weeks',
+    group: 'now',
     span: {
       columns: 2,
       rows: 1,
     },
+    primary: true,
     toggle: {
       label: 'Metric',
       options: ['distance', 'elevation', 'time', 'count'],
     },
   },
   {
-    id: 'activityCalendar',
-    title: 'Activity calendar',
-    window: 'last12Months',
+    id: 'typicalWeek',
+    title: 'Typical week',
+    window: 'last12Weeks',
+    group: 'now',
+    span: {
+      columns: 1,
+      rows: 1,
+    },
+  },
+  {
+    id: 'yearToDate',
+    title: 'Year to date',
+    window: 'yearToDate',
+    group: 'thisYear',
     span: {
       columns: 2,
+      rows: 2,
+    },
+    primary: true,
+    toggle: {
+      label: 'Metric',
+      options: ['distance', 'elevation', 'time', 'count'],
+    },
+  },
+  {
+    id: 'yearPace',
+    title: 'Pace',
+    window: 'yearToDate',
+    group: 'thisYear',
+    span: {
+      columns: 1,
       rows: 1,
     },
     toggle: {
-      label: 'Colour by',
-      options: ['sport', 'distance', 'elevation', 'time'],
+      label: 'Metric',
+      options: ['distance', 'time', 'elevation'],
     },
   },
   {
     id: 'monthVsLastMonth',
     title: 'This month',
     window: 'monthToDate',
+    group: 'thisYear',
     span: {
       columns: 1,
       rows: 1,
@@ -99,22 +131,49 @@ export const statsTiles = [
     },
   },
   {
-    id: 'sportMix',
-    title: 'Sport mix',
+    id: 'records',
+    title: 'Records',
     window: 'currentYear',
+    group: 'thisYear',
     span: {
-      columns: 1,
+      columns: 2,
+      rows: 1,
+    },
+  },
+  {
+    id: 'totals',
+    title: 'Totals',
+    window: 'currentYear',
+    group: 'thisYear',
+    span: {
+      columns: 2,
+      rows: 1,
+    },
+    optional: true,
+    toggle: {
+      label: 'Metric',
+      options: ['count', 'distance', 'elevation', 'time'],
+    },
+  },
+  {
+    id: 'activityCalendar',
+    title: 'Activity calendar',
+    window: 'last12Months',
+    group: 'patterns',
+    span: {
+      columns: 2,
       rows: 1,
     },
     toggle: {
-      label: 'Range',
-      options: ['currentYear', 'allTime'],
+      label: 'Colour by',
+      options: ['sport', 'distance', 'elevation', 'time'],
     },
   },
   {
     id: 'consistency',
     title: 'Consistency',
     window: 'last12Weeks',
+    group: 'patterns',
     span: {
       columns: 1,
       rows: 1,
@@ -125,9 +184,24 @@ export const statsTiles = [
     },
   },
   {
+    id: 'sportMix',
+    title: 'Sport mix',
+    window: 'currentYear',
+    group: 'patterns',
+    span: {
+      columns: 1,
+      rows: 1,
+    },
+    toggle: {
+      label: 'Range',
+      options: ['currentYear', 'allTime'],
+    },
+  },
+  {
     id: 'distanceVsElevation',
-    title: 'Distance vs elevation',
+    title: 'Climbing',
     window: 'last12Months',
+    group: 'patterns',
     span: {
       columns: 2,
       rows: 1,
@@ -137,6 +211,7 @@ export const statsTiles = [
     id: 'speedTrend',
     title: 'Speed trend',
     window: 'last12Months',
+    group: 'patterns',
     span: {
       columns: 1,
       rows: 1,
@@ -152,3 +227,4 @@ export const statsTiles = [
 export type StatsMetric = keyof typeof statsMetrics;
 export type StatsTile = (typeof statsTiles)[number];
 export type StatsTileID = StatsTile['id'];
+export type StatsTileGroupID = (typeof statsTileGroups)[number]['id'];

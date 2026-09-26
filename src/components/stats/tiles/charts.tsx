@@ -18,6 +18,7 @@ import {
   lineY,
   ruleY,
   stack,
+  text,
   crosshair,
 } from '@tanstack/charts';
 import { tooltip } from '@tanstack/charts/tooltip';
@@ -84,6 +85,7 @@ export function CumulativeLines({
   monthAxisFrom,
   valueFormat,
   xLabel,
+  endLabels = false,
 }: {
   series: LineSeries[];
   xMax: number;
@@ -95,6 +97,8 @@ export function CumulativeLines({
   monthAxisFrom?: number;
   valueFormat: (y: number) => string;
   xLabel: (x: number) => string;
+  // Name each line at its end, so no legend is needed.
+  endLabels?: boolean;
 }) {
   const toX = (x: number) =>
     monthAxisFrom === undefined ? x : dateOfDay(monthAxisFrom + x);
@@ -111,6 +115,12 @@ export function CumulativeLines({
   const current = rows.filter((row) => row.key === currentKey(series));
   const lastCurrent = current.at(-1);
   const keys = series.map((s) => s.key);
+  const ends = endLabels
+    ? series.flatMap((s) => {
+        const last = rows.filter((row) => row.key === s.key).at(-1);
+        return last ? [last] : [];
+      })
+    : [];
 
   const definition = defineChart({
     marks: [
@@ -135,10 +145,23 @@ export function CumulativeLines({
         color: 'key',
         r: 3.5,
       }),
+      text(ends, {
+        x: 'x',
+        y: 'y',
+        text: 'label',
+        color: 'key',
+        anchor: 'start',
+        dx: 6,
+        dy: 3,
+        fontSize: 10,
+        fontWeight: 500,
+      }),
       crosshair({ marker: true }),
     ],
     guides: detail,
-    margin: detail ? undefined : { top: 4, right: 4, bottom: 2, left: 2 },
+    margin: detail
+      ? undefined
+      : { top: 6, right: endLabels ? 34 : 4, bottom: 2, left: 2 },
     scales: {
       x: {
         scale:
@@ -217,6 +240,8 @@ export function SportBars({
   height,
   detail,
   average,
+  partialLast = false,
+  trend = [],
   palette,
   valueFormat,
   xTickFormat,
@@ -226,19 +251,41 @@ export function SportBars({
   height: number;
   detail: boolean;
   average?: number;
+  // Fade the last bar, a period that is not over yet.
+  partialLast?: boolean;
+  // A line over the bars, such as a rolling average.
+  trend?: { x: string; value: number }[];
   palette: TilePalette;
   valueFormat: (value: number) => string;
   xTickFormat?: (x: string) => string;
 }) {
   const xs = Array.from(new Set(rows.map((row) => row.x)));
+  const partialX = partialLast ? xs.at(-1) : undefined;
+  const bars = (source: SportBar[], fillOpacity: number) =>
+    barY(source, {
+      x: 'x',
+      y: 'value',
+      color: 'sport',
+      layout: stack({ order: [...sportOrder] }),
+      inset: 1,
+      fillOpacity,
+    });
   const definition = defineChart({
     marks: [
-      barY(rows, {
+      bars(
+        rows.filter((row) => row.x !== partialX),
+        1,
+      ),
+      bars(
+        rows.filter((row) => row.x === partialX),
+        0.4,
+      ),
+      lineY(trend, {
         x: 'x',
         y: 'value',
-        color: 'sport',
-        layout: stack({ order: [...sportOrder] }),
-        inset: 1,
+        stroke: palette.foreground,
+        strokeWidth: 1.5,
+        strokeOpacity: 0.7,
       }),
       ...(average !== undefined && detail
         ? [
@@ -273,7 +320,10 @@ export function SportBars({
         {
           channel: 'group',
           label: 'Sport',
-          text: (point) => sportName(point.datum.sport),
+          text: (point) =>
+            'sport' in point.datum
+              ? sportName(point.datum.sport)
+              : 'Rolling average',
         },
         {
           id: 'x',

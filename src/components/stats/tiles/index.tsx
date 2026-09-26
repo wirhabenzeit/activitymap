@@ -1,20 +1,23 @@
 'use client';
 
-// The tile-based stats view: the bento grid from shared/stats-tiles.json.
-// Every tile reads the activities the sidebar filters already narrowed down.
-// The grid fills the full width: on wide screens it adds columns (never
-// narrower than the regular layout's) and the tiles reflow into them. Tiles
-// are not interactive for now; their detail views stay in ./tiles for later.
+// The tile-based stats view: the bento grid from shared/stats-tiles.json,
+// one titled section per tile group (Now, This year, Patterns). Every tile
+// reads the activities the sidebar filters already narrowed down. The grid
+// fills the full width with the regular layout's columns, so tiles widen on
+// big screens. Only primary tiles get the large headline numerals. Tiles are
+// not interactive for now; their detail views stay in ./tiles for later.
 
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useTheme } from 'next-themes';
 
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import {
+  statsTileGroups,
   statsTileLayout,
   statsTiles,
   type StatsTile,
 } from '~/settings/stats-tiles.generated';
+import { type StatsActivity } from '~/lib/stats/tile-data';
 import { placeBento } from '~/lib/stats/bento';
 import { localToday, toStatsActivity } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
@@ -41,11 +44,15 @@ const toggleOf = (tile: StatsTile) => ('toggle' in tile ? tile.toggle : null);
 
 export default function StatsTiles() {
   const { filteredActivities } = useFilteredActivities();
-  const { resolvedTheme } = useTheme();
   const activities = useMemo(
     () => filteredActivities.map(toStatsActivity),
     [filteredActivities],
   );
+  return <StatsTileGrid activities={activities} />;
+}
+
+export function StatsTileGrid({ activities }: { activities: StatsActivity[] }) {
+  const { resolvedTheme } = useTheme();
   const today = useMemo(() => localToday(), []);
   const context: TileContext = useMemo(
     () => ({
@@ -58,64 +65,77 @@ export default function StatsTiles() {
 
   return (
     <Measure className="h-full w-full overflow-y-auto">
-      {({ width }) => <BentoGrid width={width} context={context} />}
+      {({ width }) => {
+        const padding = width < 520 ? 12 : 16;
+        return (
+          <div className="flex flex-col gap-5" style={{ padding }}>
+            {statsTileGroups.map((group) => (
+              <BentoGroup
+                key={group.id}
+                title={group.title}
+                tiles={shownTiles.filter(({ tile }) => tile.group === group.id)}
+                width={width - 2 * padding}
+                context={context}
+              />
+            ))}
+          </div>
+        );
+      }}
     </Measure>
   );
 }
 
-// The regular layout's column width is the narrowest a column gets when the
-// grid adds columns on wide screens.
 const { regular, compact, gap } = statsTileLayout;
-const minColumnWidth =
-  (regular.minWidth - (regular.columns - 1) * gap) / regular.columns;
 
-function gridFor(available: number) {
-  if (available < regular.minWidth) return compact;
-  const columns = Math.floor((available + gap) / (minColumnWidth + gap));
-  return { ...regular, columns: Math.max(regular.columns, columns) };
-}
-
-function BentoGrid({
+function BentoGroup({
+  title,
+  tiles,
   width,
   context,
 }: {
+  title: string;
+  tiles: ShownTile[];
   width: number;
   context: TileContext;
 }) {
-  const padding = width < 520 ? 12 : 16;
-  const grid = gridFor(width - 2 * padding);
+  const grid = width >= regular.minWidth ? regular : compact;
   const placements = placeBento(
-    shownTiles.map(({ tile }) => tile.span),
+    tiles.map(({ tile }) => tile.span),
     grid.columns,
   );
+  if (tiles.length === 0) return null;
 
   return (
-    <div
-      className="grid"
-      style={{
-        padding,
-        gap,
-        gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
-        gridAutoRows: grid.rowHeight,
-      }}
-    >
-      {shownTiles.map(({ tile, view }, index) => {
-        const placement = placements[index]!;
-        return (
-          <TileFace
-            key={tile.id}
-            tile={tile}
-            view={view}
-            context={context}
-            large={placement.rows > 1}
-            style={{
-              gridColumn: `${placement.column} / span ${placement.columns}`,
-              gridRow: `${placement.row} / span ${placement.rows}`,
-            }}
-          />
-        );
-      })}
-    </div>
+    <section aria-label={title}>
+      <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h2>
+      <div
+        className="grid"
+        style={{
+          gap,
+          gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
+          gridAutoRows: grid.rowHeight,
+        }}
+      >
+        {tiles.map(({ tile, view }, index) => {
+          const placement = placements[index]!;
+          return (
+            <TileFace
+              key={tile.id}
+              tile={tile}
+              view={view}
+              context={context}
+              large={'primary' in tile && tile.primary}
+              style={{
+                gridColumn: `${placement.column} / span ${placement.columns}`,
+                gridRow: `${placement.row} / span ${placement.rows}`,
+              }}
+            />
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -131,8 +151,8 @@ function Headline({
       <div
         className={cn(
           'shrink-0 truncate font-mono font-medium tabular-nums leading-tight tracking-tight',
-          size === 'tile' && 'mt-1 text-[26px]',
-          size === 'large' && 'mt-1 text-[36px]',
+          size === 'tile' && 'mt-1 text-[20px]',
+          size === 'large' && 'mt-1 text-[32px]',
         )}
       >
         {summary.value}
