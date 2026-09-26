@@ -102,6 +102,23 @@ export class StravaApiError extends Error {
   }
 }
 
+/**
+ * Strava also uses 404 for responses that do not prove an activity was
+ * deleted (for example, a private activity without activity:read_all).
+ * The client normalizes Strava's JSON `message` directly into `Error.message`.
+ * Only the exact recognized missing-record message is safe to turn into a
+ * local tombstone.
+ */
+export function isStravaActivityNotFoundError(
+  error: unknown,
+): boolean {
+  return (
+    error instanceof StravaApiError &&
+    error.status === 404 &&
+    error.message.trim().toLowerCase() === 'record not found'
+  );
+}
+
 type StravaClientOptions = {
   onRateLimit?: (usage: StravaRateLimitUsage) => void;
   requestBudget?: StravaRequestBudget;

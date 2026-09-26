@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { activities, photos, syncChanges } from '~/server/db/schema';
+import {
+  activities,
+  photos,
+  syncChanges,
+  type Activity,
+} from '~/server/db/schema';
 
-import { createActivitiesRepository, type ActivitiesRepository } from './activities.ts';
+import {
+  createActivitiesRepository,
+  type ActivitiesRepository,
+} from './activities.ts';
 
 type FakeCall = {
-  method: 'select' | 'delete' | 'insertTombstone' | 'insertChange' | 'insertActivity';
+  method:
+    'select' | 'delete' | 'insertTombstone' | 'insertChange' | 'insertActivity';
   via: 'outer' | 'tx';
 };
 
@@ -103,7 +112,9 @@ function buildFakeDb(opts: {
   const outerHandle = makeHandle('outer');
   const fakeDb = {
     ...outerHandle,
-    async transaction<T>(cb: (tx: ReturnType<typeof makeHandle>) => Promise<T>) {
+    async transaction<T>(
+      cb: (tx: ReturnType<typeof makeHandle>) => Promise<T>,
+    ) {
       // A real transaction only applies its writes if `cb` resolves; since
       // this fake has no persisted state to roll back, the important
       // assertion lives in `calls` (everything went through `tx`, not
@@ -115,7 +126,9 @@ function buildFakeDb(opts: {
   return { db: fakeDb, calls, recordedChanges };
 }
 
-function repoWith(db: ReturnType<typeof buildFakeDb>['db']): ActivitiesRepository {
+function repoWith(
+  db: ReturnType<typeof buildFakeDb>['db'],
+): ActivitiesRepository {
   return createActivitiesRepository(
     db as unknown as Parameters<typeof createActivitiesRepository>[0],
   );
@@ -138,7 +151,12 @@ void test('deleteManyForAthlete performs the delete, its tombstone insert, and i
     { method: 'insertChange', via: 'tx' },
   ]);
   assert.deepEqual(recordedChanges, [
-    { athleteId: 42, entityType: 'activity', entityId: '1', operation: 'delete' },
+    {
+      athleteId: 42,
+      entityType: 'activity',
+      entityId: '1',
+      operation: 'delete',
+    },
   ]);
 });
 
@@ -151,8 +169,18 @@ void test('deleteManyForAthlete records a change entry for a photo cascade-delet
   await repoWith(db).deleteManyForAthlete(42, [1]);
 
   assert.deepEqual(recordedChanges, [
-    { athleteId: 42, entityType: 'activity', entityId: '1', operation: 'delete' },
-    { athleteId: 42, entityType: 'photo', entityId: 'photo-a', operation: 'delete' },
+    {
+      athleteId: 42,
+      entityType: 'activity',
+      entityId: '1',
+      operation: 'delete',
+    },
+    {
+      athleteId: 42,
+      entityType: 'photo',
+      entityId: 'photo-a',
+      operation: 'delete',
+    },
   ]);
 });
 
@@ -233,7 +261,12 @@ void test('upsertOne performs the activity upsert and its change record inside o
     { method: 'insertChange', via: 'tx' },
   ]);
   assert.deepEqual(recordedChanges, [
-    { athleteId: 42, entityType: 'activity', entityId: '7', operation: 'upsert' },
+    {
+      athleteId: 42,
+      entityType: 'activity',
+      entityId: '7',
+      operation: 'upsert',
+    },
   ]);
 });
 
@@ -244,8 +277,139 @@ void test('a failed change-record insert rejects an upsert instead of committing
   await assert.rejects(
     () =>
       repoWith(db).upsertOne(
-        upsertedRow as unknown as Parameters<ActivitiesRepository['upsertOne']>[0],
+        upsertedRow as unknown as Parameters<
+          ActivitiesRepository['upsertOne']
+        >[0],
       ),
     /simulated change insert failure/,
   );
+});
+
+void test('replaceExistingForAthlete locks the owned row and updates it with its change record in one transaction', async () => {
+  const calls: string[] = [];
+  const saved = { id: 7, athlete: 42, name: 'Updated' };
+  const tx = {
+    select() {
+      return {
+        from() {
+          return {
+            where() {
+              return {
+                async for(mode: string) {
+                  calls.push(`select:${mode}`);
+                  return [{ id: 7, lastUpdated: new Date('2026-01-01T00:00:00Z') }];
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+    update() {
+      calls.push('update');
+      return {
+        set() {
+          return {
+            where() {
+              return { returning: async () => [saved] };
+            },
+          };
+        },
+      };
+    },
+    insert(table: unknown) {
+      assert.equal(table, syncChanges);
+      return {
+        values() {
+          calls.push('change');
+          return { returning: async () => [{ sequence: 1n }] };
+        },
+      };
+    },
+  };
+  const db = {
+    async transaction<T>(callback: (handle: typeof tx) => Promise<T>) {
+      calls.push('transaction');
+      return callback(tx);
+    },
+  };
+  const repo = repoWith(db as unknown as ReturnType<typeof buildFakeDb>['db']);
+  const result = await repo.replaceExistingForAthlete(
+    42,
+    saved as unknown as Activity,
+    new Date('2026-01-01T00:00:00Z'),
+  );
+  assert.deepEqual(result, saved);
+  assert.deepEqual(calls, ['transaction', 'select:update', 'update', 'change']);
+});
+
+void test('replaceExistingForAthlete cannot resurrect a row deleted before its transaction lock', async () => {
+  let updated = false;
+  const tx = {
+    select() {
+      return {
+        from() {
+          return {
+            where() {
+              return { for: async () => [] };
+            },
+          };
+        },
+      };
+    },
+    update() {
+      updated = true;
+      throw new Error('must not update a missing row');
+    },
+  };
+  const db = {
+    async transaction<T>(callback: (handle: typeof tx) => Promise<T>) {
+      return callback(tx);
+    },
+  };
+  const repo = repoWith(db as unknown as ReturnType<typeof buildFakeDb>['db']);
+  const result = await repo.replaceExistingForAthlete(42, {
+    id: 7,
+    athlete: 42,
+  } as Activity, null);
+  assert.equal(result, null);
+  assert.equal(updated, false);
+});
+
+void test('replaceExistingForAthlete rejects a late response after the optimistic timestamp changed', async () => {
+  let updated = false;
+  const tx = {
+    select() {
+      return {
+        from() {
+          return {
+            where() {
+              return {
+                for: async () => [
+                  { id: 7, lastUpdated: new Date('2026-01-01T00:00:02Z') },
+                ],
+              };
+            },
+          };
+        },
+      };
+    },
+    update() {
+      updated = true;
+      throw new Error('must not overwrite the newer commit');
+    },
+  };
+  const db = {
+    async transaction<T>(callback: (handle: typeof tx) => Promise<T>) {
+      return callback(tx);
+    },
+  };
+  const repo = repoWith(db as unknown as ReturnType<typeof buildFakeDb>['db']);
+  const result = await repo.replaceExistingForAthlete(
+    42,
+    { id: 7, athlete: 42 } as Activity,
+    new Date('2026-01-01T00:00:00Z'),
+  );
+  assert.equal(result, null);
+  assert.equal(updated, false);
 });

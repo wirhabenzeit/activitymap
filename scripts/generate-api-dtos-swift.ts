@@ -43,6 +43,10 @@ import {
   geometryStateSchema,
   photosStateSchema,
 } from '../src/contracts/v1/activity';
+import {
+  activityRefreshResultSchema,
+  updateActivityRequestSchema,
+} from '../src/contracts/v1/activity-mutations';
 import { photoDTOSchema } from '../src/contracts/v1/photo';
 import { currentUserDTOSchema } from '../src/contracts/v1/user';
 import {
@@ -94,6 +98,8 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['Authentication', authenticationDTOSchema],
   ['CurrentUser', currentUserDTOSchema],
   ['Activity', activityDTOSchema],
+  ['UpdateActivityRequest', updateActivityRequestSchema],
+  ['ActivityRefreshResult', activityRefreshResultSchema],
   ['Photo', photoDTOSchema],
   ['SyncRetentionMeta', syncRetentionMetaSchema],
   ['SyncFreshnessMeta', syncFreshnessMetaSchema],
@@ -124,6 +130,7 @@ const inlineEnumNames = new Map<string, string>([
   [enumKey(sportTypes), 'SportType'],
   [enumKey(['low', 'medium', 'high']), 'StreamResolution'],
   [enumKey(['time', 'distance']), 'StreamSeriesType'],
+  [enumKey(['complete', 'partial']), 'PhotoRefreshStatus'],
 ]);
 
 /**

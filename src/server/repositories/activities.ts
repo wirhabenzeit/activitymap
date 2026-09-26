@@ -43,6 +43,16 @@ export interface ActivitiesRepository {
   /** Deletes only the rows that belong to `athleteId`; returns the deleted ids. */
   deleteManyForAthlete(athleteId: number, ids: number[]): Promise<number[]>;
   upsertOne(activity: Activity): Promise<Activity>;
+  /**
+   * Replace an existing activity only while it still belongs to `athleteId`.
+   * The ownership check and update share a row lock and transaction, so a
+   * concurrent delete wins rather than being resurrected by a late response.
+   */
+  replaceExistingForAthlete(
+    athleteId: number,
+    activity: Activity,
+    expectedLastUpdated: Date | null,
+  ): Promise<Activity | null>;
 }
 
 export function createActivitiesRepository(
@@ -53,7 +63,10 @@ export function createActivitiesRepository(
   return {
     async findManyByAthlete(athleteId, { limit = 10000, offset = 0 } = {}) {
       return database
-        .select({ ...getTableColumns(activities), streamsMetadata: activityStreamMetadataProjection })
+        .select({
+          ...getTableColumns(activities),
+          streamsMetadata: activityStreamMetadataProjection,
+        })
         .from(activities)
         .where(eq(activities.athlete, athleteId))
         .orderBy(desc(activities.start_date))
@@ -64,7 +77,10 @@ export function createActivitiesRepository(
     async findManyByIds(ids) {
       if (ids.length === 0) return [];
       return database
-        .select({ ...getTableColumns(activities), streamsMetadata: activityStreamMetadataProjection })
+        .select({
+          ...getTableColumns(activities),
+          streamsMetadata: activityStreamMetadataProjection,
+        })
         .from(activities)
         .where(inArray(activities.id, ids))
         .orderBy(desc(activities.start_date));
@@ -72,7 +88,10 @@ export function createActivitiesRepository(
 
     async findPageByAthlete(athleteId, { afterId = 0, limit }) {
       return database
-        .select({ ...getTableColumns(activities), streamsMetadata: activityStreamMetadataProjection })
+        .select({
+          ...getTableColumns(activities),
+          streamsMetadata: activityStreamMetadataProjection,
+        })
         .from(activities)
         .where(
           and(eq(activities.athlete, athleteId), gt(activities.id, afterId)),
@@ -121,7 +140,10 @@ export function createActivitiesRepository(
               })),
             )
             .onConflictDoUpdate({
-              target: [activityDeletions.athlete_id, activityDeletions.activity_id],
+              target: [
+                activityDeletions.athlete_id,
+                activityDeletions.activity_id,
+              ],
               set: { deleted_at: sql`excluded.deleted_at` },
             });
 
@@ -176,6 +198,51 @@ export function createActivitiesRepository(
           tx,
         );
 
+        return saved;
+      });
+    },
+
+    async replaceExistingForAthlete(athleteId, activity, expectedLastUpdated) {
+      return database.transaction(async (tx) => {
+        const [existing] = await tx
+          .select({ id: activities.id, lastUpdated: activities.last_updated })
+          .from(activities)
+          .where(
+            and(
+              eq(activities.id, activity.id),
+              eq(activities.athlete, athleteId),
+            ),
+          )
+          .for('update');
+        if (!existing) return null;
+        if (
+          existing.lastUpdated?.getTime() !== expectedLastUpdated?.getTime()
+        )
+          return null;
+
+        const [saved] = await tx
+          .update(activities)
+          .set(activity)
+          .where(
+            and(
+              eq(activities.id, activity.id),
+              eq(activities.athlete, athleteId),
+            ),
+          )
+          .returning();
+        if (!saved) return null;
+
+        await changesRepo.record(
+          [
+            {
+              athleteId,
+              entityType: 'activity',
+              entityId: saved.id,
+              operation: 'upsert',
+            },
+          ],
+          tx,
+        );
         return saved;
       });
     },

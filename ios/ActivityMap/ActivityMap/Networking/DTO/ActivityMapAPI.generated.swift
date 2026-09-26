@@ -313,6 +313,45 @@ nonisolated extension ActivityMapAPI {
         }
     }
 
+    struct UpdateActivityRequest: Codable, Hashable, Sendable {
+        let name: String?
+        let description: String?
+        let sportType: SportType?
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case description
+            case sportType = "sport_type"
+        }
+    }
+
+    /// The shape of `ActivityRefreshResult.photos_error`.
+    struct ActivityRefreshResultPhotosError: Codable, Hashable, Sendable {
+        let code: String
+        let retryable: Bool
+        let retryAfterSeconds: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case code
+            case retryable
+            case retryAfterSeconds = "retry_after_seconds"
+        }
+    }
+
+    struct ActivityRefreshResult: Codable, Hashable, Sendable {
+        let activity: Activity
+        let photos: [Photo]
+        let photosStatus: PhotoRefreshStatus
+        let photosError: ActivityRefreshResultPhotosError?
+
+        enum CodingKeys: String, CodingKey {
+            case activity
+            case photos
+            case photosStatus = "photos_status"
+            case photosError = "photos_error"
+        }
+    }
+
     struct Photo: Codable, Hashable, Sendable {
         let uniqueID: String
         let activityID: String
@@ -492,6 +531,11 @@ nonisolated extension ActivityMapAPI {
         case summary = "summary"
         case detailed = "detailed"
         case refreshRequired = "refresh_required"
+    }
+
+    enum PhotoRefreshStatus: String, Codable, Hashable, Sendable {
+        case complete = "complete"
+        case partial = "partial"
     }
 
     enum PhotosState: String, Codable, Hashable, Sendable {

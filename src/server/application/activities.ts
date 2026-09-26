@@ -3,8 +3,18 @@ import 'server-only';
 import { getAccountInternal } from '~/server/db/internal';
 import type { Activity, Photo } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
-import { StravaClient } from '~/server/strava/client';
-import { fetchStravaActivities } from '~/server/strava/service';
+import {
+  isStravaActivityNotFoundError,
+  StravaApiError,
+  StravaClient,
+} from '~/server/strava/client';
+import {
+  fetchStravaActivities,
+  StravaPersistenceError,
+  type FetchStravaActivitiesResult,
+} from '~/server/strava/service';
+import { StravaBudgetExceededError } from '~/server/strava/request-budget';
+import { EXTERNAL_EFFECTS_DISABLED_MESSAGE } from '~/server/config/external-effects';
 import { transformStravaActivity } from '~/server/strava/transforms';
 import { type UpdatableActivity } from '~/server/strava/types';
 import {
@@ -18,7 +28,10 @@ import {
   activitiesRepository,
   type ActivitiesRepository,
 } from '~/server/repositories/activities';
-import { photosRepository, type PhotosRepository } from '~/server/repositories/photos';
+import {
+  photosRepository,
+  type PhotosRepository,
+} from '~/server/repositories/photos';
 
 /**
  * Application service for activity/photo reads, updates, and Strava
@@ -30,10 +43,29 @@ import { photosRepository, type PhotosRepository } from '~/server/repositories/p
  * (`~/server/auth/actor.ts`).
  */
 
-export class ForbiddenError extends Error {
-  constructor(message = 'Not authorized to access this resource') {
-    super(message);
-    this.name = 'ForbiddenError';
+export type ActivityMutationErrorCode =
+  | 'activity_unavailable'
+  | 'strava_not_connected'
+  | 'external_effects_disabled'
+  | 'rate_limited'
+  | 'local_state_conflict'
+  | 'upstream_rejected'
+  | 'upstream_unavailable'
+  | 'local_persistence_failed';
+
+/** Stable service-level failure shared by the web and v1 boundaries. */
+export class ActivityMutationError extends Error {
+  constructor(
+    public readonly code: ActivityMutationErrorCode,
+    message: string,
+    public readonly status: number,
+    public readonly retryable = false,
+    public readonly retryAfterSeconds?: number,
+    public readonly details?: Record<string, unknown>,
+    options?: { cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = 'ActivityMutationError';
   }
 }
 
@@ -43,6 +75,10 @@ export type ActivitiesServiceDeps = {
   activitiesRepo?: ActivitiesRepository;
   photosRepo?: PhotosRepository;
   resolveAccount?: AccountResolver;
+  createClient?: (accessToken: string) => Pick<StravaClient, 'updateActivity'>;
+  fetchActivities?: (
+    input: Parameters<typeof fetchStravaActivities>[0],
+  ) => Promise<FetchStravaActivitiesResult>;
 };
 
 const defaultDeps = {
@@ -55,6 +91,12 @@ const defaultDeps = {
   get resolveAccount() {
     return getAccountInternal;
   },
+  get createClient() {
+    return (accessToken: string) => StravaClient.withAccessToken(accessToken);
+  },
+  get fetchActivities() {
+    return fetchStravaActivities;
+  },
 };
 
 function resolveDeps(deps: ActivitiesServiceDeps) {
@@ -62,6 +104,8 @@ function resolveDeps(deps: ActivitiesServiceDeps) {
     activitiesRepo: deps.activitiesRepo ?? defaultDeps.activitiesRepo,
     photosRepo: deps.photosRepo ?? defaultDeps.photosRepo,
     resolveAccount: deps.resolveAccount ?? defaultDeps.resolveAccount,
+    createClient: deps.createClient ?? defaultDeps.createClient,
+    fetchActivities: deps.fetchActivities ?? defaultDeps.fetchActivities,
   };
 }
 
@@ -104,18 +148,121 @@ export async function getPhotosForActor(
   return photosRepo.findManyByAthlete(actor.athleteId);
 }
 
-async function assertOwnsActivityIfKnown(
+async function requireOwnedActivity(
   activitiesRepo: ActivitiesRepository,
   actor: Actor,
   activityId: number,
-): Promise<void> {
+): Promise<Activity> {
   const [existing] = await activitiesRepo.findManyByIds([activityId]);
-  // An activity we don't have locally yet can't have its ownership checked
-  // here; Strava's own per-athlete access token scoping is the backstop for
-  // that case. An activity we *do* have must belong to this actor.
-  if (existing && existing.athlete !== actor.athleteId) {
-    throw new ForbiddenError('Activity does not belong to the authenticated athlete');
+  if (existing?.athlete !== actor.athleteId)
+    throw new ActivityMutationError(
+      'activity_unavailable',
+      'The activity is unavailable.',
+      404,
+    );
+  return existing;
+}
+
+function mutationFailure(error: unknown): ActivityMutationError {
+  if (error instanceof ActivityMutationError) return error;
+  if (error instanceof StravaPersistenceError)
+    return new ActivityMutationError(
+      'local_persistence_failed',
+      error.upstreamSucceeded
+        ? 'Strava completed the request, but the result was not saved locally.'
+        : 'The upstream result could not be reconciled locally.',
+      503,
+      true,
+      undefined,
+      {
+        upstreamSucceeded: error.upstreamSucceeded,
+        recovery: 'reconcile_or_retry_explicitly',
+      },
+      { cause: error },
+    );
+  if (error instanceof StravaBudgetExceededError)
+    return new ActivityMutationError(
+      'rate_limited',
+      'The shared Strava request budget is exhausted.',
+      429,
+      true,
+      error.retryAfterSeconds,
+      undefined,
+      { cause: error },
+    );
+  if (error instanceof StravaApiError) {
+    if (isStravaActivityNotFoundError(error))
+      return new ActivityMutationError(
+        'activity_unavailable',
+        'The activity is unavailable.',
+        404,
+        false,
+        undefined,
+        undefined,
+        { cause: error },
+      );
+    if (error.status === 429)
+      return new ActivityMutationError(
+        'rate_limited',
+        'Strava rate-limited the request.',
+        429,
+        true,
+        60,
+        undefined,
+        { cause: error },
+      );
+    if (error.status === 401 || error.status === 403)
+      return new ActivityMutationError(
+        'strava_not_connected',
+        'The connected Strava account is unavailable.',
+        409,
+        false,
+        undefined,
+        undefined,
+        { cause: error },
+      );
+    if (error.status >= 500)
+      return new ActivityMutationError(
+        'upstream_unavailable',
+        'Strava could not complete the request.',
+        503,
+        true,
+        60,
+        undefined,
+        { cause: error },
+      );
+    return new ActivityMutationError(
+      'upstream_rejected',
+      'Strava rejected the request.',
+      502,
+      false,
+      undefined,
+      undefined,
+      { cause: error },
+    );
   }
+  if (
+    error instanceof Error &&
+    error.message === EXTERNAL_EFFECTS_DISABLED_MESSAGE
+  )
+    return new ActivityMutationError(
+      'external_effects_disabled',
+      'Strava access is disabled in this environment.',
+      503,
+      false,
+      undefined,
+      undefined,
+      { cause: error },
+    );
+  return new ActivityMutationError(
+    'upstream_unavailable',
+    'Strava could not complete the request.',
+    503,
+    true,
+    60,
+    undefined,
+    { cause: error },
+  );
 }
 
 /**
@@ -130,19 +277,23 @@ export async function updateActivityForActor(
   input: UpdateActivityInput,
   deps: ActivitiesServiceDeps = {},
 ): Promise<Activity> {
-  const { activitiesRepo, resolveAccount } = resolveDeps(deps);
+  const { activitiesRepo, resolveAccount, createClient } = resolveDeps(deps);
   const act = updateActivityInputSchema.parse(input);
 
-  await assertOwnsActivityIfKnown(activitiesRepo, actor, act.id);
+  const existing = await requireOwnedActivity(activitiesRepo, actor, act.id);
 
   const account = await resolveAccount({ userId: actor.userId });
   if (!account?.access_token) {
-    throw new Error('No Strava access token found');
+    throw new ActivityMutationError(
+      'strava_not_connected',
+      'The connected Strava account is unavailable.',
+      409,
+    );
   }
 
-  const client = StravaClient.withAccessToken(account.access_token);
-
+  let stravaActivity;
   try {
+    const client = createClient(account.access_token);
     const updateData: Omit<UpdatableActivity, 'id' | 'athlete'> = {
       name: act.name,
       sport_type: act.sport_type,
@@ -152,17 +303,54 @@ export async function updateActivityForActor(
       gear_id: act.gear_id,
     };
 
-    const stravaActivity = await client.updateActivity(act.id, updateData);
-
-    const transformedActivity = {
-      ...transformStravaActivity(stravaActivity, true),
-      athlete: actor.athleteId,
-    } satisfies Activity;
-
-    return await activitiesRepo.upsertOne(transformedActivity);
+    stravaActivity = await client.updateActivity(act.id, updateData);
   } catch (error) {
     logger.error('Failed to update activity:', error);
-    throw new Error('Failed to update activity');
+    if (isStravaActivityNotFoundError(error)) {
+      try {
+        await activitiesRepo.deleteManyForAthlete(actor.athleteId, [act.id]);
+      } catch (persistenceError) {
+        throw mutationFailure(
+          new StravaPersistenceError({ cause: persistenceError }, false),
+        );
+      }
+    }
+    throw mutationFailure(error);
+  }
+
+  const transformedActivity = {
+    ...transformStravaActivity(stravaActivity, true),
+    athlete: actor.athleteId,
+  } satisfies Activity;
+
+  try {
+    const saved = await activitiesRepo.replaceExistingForAthlete(
+      actor.athleteId,
+      transformedActivity,
+      existing.last_updated,
+    );
+    // Strava accepted the edit, but a local delete or newer commit won the
+    // row lock. Never retry this write automatically: doing so could
+    // overwrite the newer state. Missing remains a 404; a present row is an
+    // explicit reconciliation conflict.
+    if (!saved) {
+      await requireOwnedActivity(activitiesRepo, actor, act.id);
+      throw new ActivityMutationError(
+        'local_state_conflict',
+        'Strava accepted the edit, but local activity state changed before it could be saved.',
+        409,
+        false,
+        undefined,
+        {
+          upstreamSucceeded: true,
+          recovery: 'refresh_before_retry',
+        },
+      );
+    }
+    return await requireOwnedActivity(activitiesRepo, actor, act.id);
+  } catch (error) {
+    if (error instanceof ActivityMutationError) throw error;
+    throw mutationFailure(new StravaPersistenceError({ cause: error }));
   }
 }
 
@@ -175,22 +363,118 @@ export async function refreshActivityForActor(
   actor: Actor,
   activityId: number,
   deps: ActivitiesServiceDeps = {},
-) {
-  const { activitiesRepo, resolveAccount } = resolveDeps(deps);
+): Promise<{
+  activity: Activity;
+  photos: Photo[];
+  photosStatus: 'complete' | 'partial';
+  photosError: {
+    code: ActivityMutationErrorCode;
+    retryable: boolean;
+    retryAfterSeconds?: number;
+  } | null;
+}> {
+  const { activitiesRepo, photosRepo, resolveAccount, fetchActivities } =
+    resolveDeps(deps);
 
-  await assertOwnsActivityIfKnown(activitiesRepo, actor, activityId);
+  await requireOwnedActivity(activitiesRepo, actor, activityId);
 
   const account = await resolveAccount({ userId: actor.userId });
   if (!account?.access_token) {
-    throw new Error('No Strava access token found');
+    throw new ActivityMutationError(
+      'strava_not_connected',
+      'The connected Strava account is unavailable.',
+      409,
+    );
   }
 
-  return fetchStravaActivities({
-    accessToken: account.access_token,
-    athleteId: actor.athleteId,
-    activityIds: [activityId],
-    includePhotos: true,
-  });
+  let result: FetchStravaActivitiesResult;
+  try {
+    result = await fetchActivities({
+      accessToken: account.access_token,
+      athleteId: actor.athleteId,
+      activityIds: [activityId],
+      includePhotos: true,
+      shouldDeletePhotos: true,
+      requireExisting: true,
+    });
+  } catch (error) {
+    logger.error('Failed to refresh activity:', error);
+    throw mutationFailure(error);
+  }
+
+  if (result.notFoundIds.includes(activityId)) {
+    try {
+      await activitiesRepo.deleteManyForAthlete(actor.athleteId, [activityId]);
+    } catch (error) {
+      throw mutationFailure(new StravaPersistenceError({ cause: error }));
+    }
+    throw new ActivityMutationError(
+      'activity_unavailable',
+      'The activity is unavailable.',
+      404,
+    );
+  }
+
+  const activityFailure = result.failures?.find(
+    (failure) => failure.activityId === activityId,
+  );
+  if (result.failedIds?.includes(activityId)) {
+    throw mutationFailure(
+      activityFailure?.error ??
+        new ActivityMutationError(
+          'upstream_unavailable',
+          'Strava could not complete the request.',
+          503,
+          true,
+          60,
+        ),
+    );
+  }
+
+  if (!result.activities.some((activity) => activity.id === activityId))
+    throw new ActivityMutationError(
+      'activity_unavailable',
+      'The activity is unavailable.',
+      404,
+    );
+
+  const activity = await requireOwnedActivity(
+    activitiesRepo,
+    actor,
+    activityId,
+  );
+  const photosStatus = result.photoRefreshFailedIds?.includes(activityId)
+    ? 'partial'
+    : 'complete';
+  const rawPhotoFailure = result.photoRefreshFailures?.find(
+    (failure) => failure.activityId === activityId,
+  );
+  const classifiedPhotoFailure = rawPhotoFailure
+    ? mutationFailure(rawPhotoFailure.error)
+    : null;
+  const photos =
+    photosStatus === 'complete'
+      ? await photosRepo.findManyByActivityForAthlete(
+          actor.athleteId,
+          activityId,
+        )
+      : [];
+  return {
+    activity,
+    photos,
+    photosStatus,
+    photosError: classifiedPhotoFailure
+      ? {
+          code: classifiedPhotoFailure.code,
+          retryable: classifiedPhotoFailure.retryable,
+          ...(classifiedPhotoFailure.retryAfterSeconds
+            ? { retryAfterSeconds: classifiedPhotoFailure.retryAfterSeconds }
+            : {}),
+        }
+      : photosStatus === 'partial'
+        ? { code: 'upstream_unavailable', retryable: true }
+        : null,
+  };
 }
 
 /** Delete activities owned by the actor's athlete; ids owned by anyone else are silently ignored. */

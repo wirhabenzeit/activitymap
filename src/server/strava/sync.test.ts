@@ -30,6 +30,7 @@ function fakeActivitiesRepo(
       return ids;
     },
     upsertOne: async (activity) => activity,
+    replaceExistingForAthlete: async (_athleteId, activity) => activity,
     ...overrides,
   };
   return { repo, deleteCalls };

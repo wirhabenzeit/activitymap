@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import { sportTypes } from './types';
+import {
+  ACTIVITY_DESCRIPTION_MAX_LENGTH,
+  ACTIVITY_NAME_MAX_LENGTH,
+} from '~/contracts/v1/activity-mutations';
 
 export const fetchActivitiesSchema = z.object({
     accessToken: z.string(),
@@ -19,14 +23,21 @@ export const fetchActivitiesSchema = z.object({
     // transaction, so the same mutation is not written - and change-recorded
     // - twice.
     persist: z.boolean().default(true),
+    // Per-activity user refreshes may update an existing owned row but must
+    // never recreate one deleted while the upstream request was in flight.
+    requireExisting: z.boolean().default(false),
 });
 
 export type FetchActivitiesInput = z.input<typeof fetchActivitiesSchema>;
 
 export const updateActivityInputSchema = z.object({
     id: z.number(),
-    name: z.string().optional(),
-    description: z.string().optional(),
+    name: z.string()
+      .min(1)
+      .max(ACTIVITY_NAME_MAX_LENGTH)
+      .refine((name) => name.trim().length > 0)
+      .optional(),
+    description: z.string().max(ACTIVITY_DESCRIPTION_MAX_LENGTH).optional(),
     sport_type: z.enum(sportTypes).optional(),
     commute: z.boolean().optional(),
     hide_from_home: z.boolean().optional(),

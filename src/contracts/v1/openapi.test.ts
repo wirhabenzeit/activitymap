@@ -126,6 +126,8 @@ void test('every implemented rate-limited v1 operation documents 429', () => {
     ['get', '/api/v1/sync/bootstrap'],
     ['get', '/api/v1/sync/changes'],
     ['get', '/api/v1/activities'],
+    ['patch', '/api/v1/activities/{id}'],
+    ['post', '/api/v1/activities/{id}/refresh'],
     ['get', '/api/v1/photos'],
     ['get', '/api/v1/auth/mobile/start'],
     ['get', '/api/v1/auth/mobile/callback'],
