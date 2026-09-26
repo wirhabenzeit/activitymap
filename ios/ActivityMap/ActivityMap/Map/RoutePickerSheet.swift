@@ -71,6 +71,7 @@ struct RoutePickerSheet: View {
                 }
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { picker.sheetHeight = $0 }
         .presentationDetents([.medium, .large])
         .presentationBackgroundInteraction(.enabled(upThrough: .medium))
     }
