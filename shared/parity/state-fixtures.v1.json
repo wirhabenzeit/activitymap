@@ -1,0 +1,600 @@
+{
+  "version": 1,
+  "selectionScenarios": [
+    {
+      "name": "selection active and inspection are separate",
+      "initial": {
+        "selected_ids": [],
+        "active_id": null,
+        "inspected_id": null,
+        "visible_ids": [
+          "101",
+          "102",
+          "103"
+        ]
+      },
+      "steps": [
+        {
+          "name": "list inspection does not select",
+          "event": {
+            "type": "inspect",
+            "id": "103"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": "103",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "single selection activates",
+          "event": {
+            "type": "replace_selection",
+            "ids": [
+              "101"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": "101",
+            "inspected_id": "103",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "adding preserves the existing active route",
+          "event": {
+            "type": "add_selection",
+            "ids": [
+              "102"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "102"
+            ],
+            "active_id": "101",
+            "inspected_id": "103",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "activate a selected result",
+          "event": {
+            "type": "activate",
+            "id": "102"
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "102"
+            ],
+            "active_id": "102",
+            "inspected_id": "103",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "filters preserve selection but clear hidden active route",
+          "event": {
+            "type": "set_visible",
+            "ids": [
+              "101",
+              "103"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "102"
+            ],
+            "active_id": null,
+            "inspected_id": "103",
+            "visible_ids": [
+              "101",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "list detail still independent",
+          "event": {
+            "type": "inspect",
+            "id": "101"
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "102"
+            ],
+            "active_id": null,
+            "inspected_id": "101",
+            "visible_ids": [
+              "101",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "restoring filter does not reopen map detail",
+          "event": {
+            "type": "set_visible",
+            "ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "102"
+            ],
+            "active_id": null,
+            "inspected_id": "101",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "activate restored selection explicitly",
+          "event": {
+            "type": "activate",
+            "id": "102"
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "102"
+            ],
+            "active_id": "102",
+            "inspected_id": "101",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "remove active leaves single remaining active",
+          "event": {
+            "type": "remove_selection",
+            "ids": [
+              "102"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": "101",
+            "inspected_id": "101",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "clear selection does not close inspected list detail",
+          "event": {
+            "type": "clear_selection"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": "101",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "GPS-less selection still supports detail",
+          "event": {
+            "type": "replace_selection",
+            "ids": [
+              "103"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "103"
+            ],
+            "active_id": "103",
+            "inspected_id": "101",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "GPS-less Show on map unavailable without state mutation",
+          "event": {
+            "type": "show_on_map",
+            "id": "103",
+            "geometry_available": false
+          },
+          "expected": {
+            "selected_ids": [
+              "103"
+            ],
+            "active_id": "103",
+            "inspected_id": "101",
+            "visible_ids": [
+              "101",
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "committed deletion closes the deleted inspected detail",
+          "event": {
+            "type": "remove_activities",
+            "ids": [
+              "101"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "103"
+            ],
+            "active_id": "103",
+            "inspected_id": null,
+            "visible_ids": [
+              "102",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "logout clears scoped view state",
+          "event": {
+            "type": "clear_scope"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "bulk filtered selection preserves hidden IDs until explicit global clear",
+      "initial": {
+        "selected_ids": [
+          "101",
+          "102"
+        ],
+        "active_id": "101",
+        "inspected_id": null,
+        "visible_ids": [
+          "101",
+          "103"
+        ]
+      },
+      "steps": [
+        {
+          "name": "select all filtered uses union",
+          "event": {
+            "type": "select_all_filtered"
+          },
+          "expected": {
+            "selected_ids": [
+              "101",
+              "102",
+              "103"
+            ],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "deselect all filtered subtracts that scope only",
+          "event": {
+            "type": "deselect_all_filtered"
+          },
+          "expected": {
+            "selected_ids": [
+              "102"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "clear selection includes hidden IDs",
+          "event": {
+            "type": "clear_selection"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "103"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "filter hides inspected row without selecting another",
+      "initial": {
+        "selected_ids": [
+          "101"
+        ],
+        "active_id": "101",
+        "inspected_id": "102",
+        "visible_ids": [
+          "101",
+          "102",
+          "103"
+        ]
+      },
+      "steps": [
+        {
+          "name": "inspection closes when row disappears",
+          "event": {
+            "type": "set_visible",
+            "ids": [
+              "101",
+              "103"
+            ]
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "103"
+            ]
+          }
+        },
+        {
+          "name": "invalid activation never selects an ID",
+          "event": {
+            "type": "activate",
+            "id": "103"
+          },
+          "expected": {
+            "selected_ids": [
+              "101"
+            ],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [
+              "101",
+              "103"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "summaryScopeCase": {
+    "selected_ids": [
+      "101",
+      "102",
+      "103"
+    ],
+    "filtered_ids": [
+      "101",
+      "104"
+    ],
+    "page_ids": [
+      "101"
+    ],
+    "expected": {
+      "selected": [
+        "101",
+        "102",
+        "103"
+      ],
+      "filtered": [
+        "101",
+        "104"
+      ],
+      "page": [
+        "101"
+      ],
+      "selected_count": 3,
+      "hidden_selected_count": 2
+    }
+  },
+  "cachePresentationCases": [
+    {
+      "name": "old cache remains readable while authorized",
+      "session_valid": true,
+      "last_sync_age_days": 30,
+      "last_reconciliation": null,
+      "server_state": "current",
+      "bootstrap_complete": true,
+      "expected": "show_cached_offline"
+    },
+    {
+      "name": "old cache is not an expired sign-in",
+      "session_valid": true,
+      "last_sync_age_days": 30,
+      "last_reconciliation": null,
+      "server_state": "current",
+      "bootstrap_complete": true,
+      "transport_error": 503,
+      "expected": "show_cached_with_retry"
+    },
+    {
+      "name": "actual expired sign-in clears scoped data",
+      "session_valid": false,
+      "last_sync_age_days": 1,
+      "server_state": "current",
+      "bootstrap_complete": true,
+      "expected": "clear_scoped_data_sign_in_expired"
+    },
+    {
+      "name": "known source invalidation suppresses current chart",
+      "session_valid": true,
+      "last_sync_age_days": 0,
+      "server_state": "stale",
+      "bootstrap_complete": true,
+      "expected": "profile_not_current"
+    },
+    {
+      "name": "expired change cursor requires bounded snapshot replacement",
+      "session_valid": true,
+      "last_sync_age_days": 30,
+      "server_state": "current",
+      "bootstrap_complete": true,
+      "response_code": "sync_rebootstrap_required",
+      "expected": "rebootstrap_once_reconcile_orphan_data"
+    }
+  ],
+  "profileCases": [
+    {
+      "name": "ordinary distance elevation profile",
+      "summary": {
+        "version": 1,
+        "basis": "distance",
+        "distance": [
+          100,
+          200,
+          300
+        ],
+        "altitude": [
+          0,
+          10,
+          5
+        ]
+      },
+      "expected": {
+        "available": true,
+        "relative_distance": [
+          0,
+          100,
+          200
+        ],
+        "distance_unit": "m",
+        "altitude_min": 0,
+        "altitude_max": 10
+      }
+    },
+    {
+      "name": "constant altitude is a valid profile",
+      "summary": {
+        "version": 1,
+        "basis": "distance",
+        "distance": [
+          0,
+          1000
+        ],
+        "altitude": [
+          -2,
+          -2
+        ]
+      },
+      "expected": {
+        "available": true,
+        "relative_distance": [
+          0,
+          1000
+        ],
+        "distance_unit": "km",
+        "altitude_min": -2,
+        "altitude_max": -2
+      }
+    },
+    {
+      "name": "time-only data does not masquerade as distance",
+      "summary": {
+        "version": 1,
+        "basis": "time",
+        "time": [
+          0,
+          60
+        ],
+        "altitude": [
+          10,
+          12
+        ]
+      },
+      "expected": {
+        "available": false
+      }
+    },
+    {
+      "name": "no forward distance does not become zero chart",
+      "summary": {
+        "version": 1,
+        "basis": "distance",
+        "distance": [
+          10,
+          10
+        ],
+        "altitude": [
+          0,
+          1
+        ]
+      },
+      "expected": {
+        "available": false
+      }
+    },
+    {
+      "name": "missing altitude is not measured zero",
+      "summary": {
+        "version": 1,
+        "basis": "distance",
+        "distance": [
+          0,
+          100
+        ]
+      },
+      "expected": {
+        "available": false
+      }
+    }
+  ]
+}
