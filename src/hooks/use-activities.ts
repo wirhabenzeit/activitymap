@@ -18,7 +18,7 @@ import { useShallowStore } from '~/store';
 import type { Activity } from '~/server/db/schema';
 import { toActivityDTO } from '~/contracts/v1/activity';
 import { getCachedActivityDTOs, upsertActivityDTOs } from '~/lib/sync/v1-store';
-import { dtoToActivity } from '~/lib/sync/v1-mappers';
+import { dtoToActivity, type ActivityWithStreams } from '~/lib/sync/v1-mappers';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 
 // Issue #126 (phase 2): this cache used to read/write
@@ -28,12 +28,12 @@ import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 // cache's own persisted type is `~/contracts/v1/activity.ts`'s
 // `ActivityDTO`, not a Drizzle model, while every consumer of this hook
 // keeps seeing plain `Activity[]` exactly as before.
-const getCachedActivities = async (scope: string): Promise<Activity[]> =>
+const getCachedActivities = async (scope: string): Promise<ActivityWithStreams[]> =>
     (await getCachedActivityDTOs(scope)).map(dtoToActivity);
 const upsertCachedActivities = (scope: string, activities: Activity[]): Promise<void> =>
     upsertActivityDTOs(scope, activities.map(toActivityDTO));
 
-const memoryActivitiesByScope = new Map<string, Activity[]>();
+const memoryActivitiesByScope = new Map<string, ActivityWithStreams[]>();
 
 const buildCacheScope = (params: {
     isGuest: boolean;

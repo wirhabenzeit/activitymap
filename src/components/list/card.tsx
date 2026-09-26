@@ -79,6 +79,8 @@ import { usePhotos } from '~/hooks/use-photos';
 import { useQueryClient } from '@tanstack/react-query';
 import { refreshActivity } from '~/server/strava/actions';
 import { useToast } from '~/hooks/use-toast';
+import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
+import { reloadStreamSummaryActivity } from '~/lib/activity-stream-summary';
 
 /** Route details shown in place of a table row (map panel and list). */
 export function ActivityCardContent({
@@ -153,6 +155,14 @@ export function ActivityCardContent({
     try {
       await refreshActivity(row.original.id);
 
+      if (userId) {
+        await reloadStreamSummaryActivity(
+          queryClient,
+          userId,
+          String(row.original.id),
+        );
+      }
+
       await queryClient.invalidateQueries({ queryKey: ['activities'] });
       await queryClient.invalidateQueries({ queryKey: ['photos'] });
 
@@ -221,7 +231,11 @@ export function ActivityCardContent({
 
   const elevationProfile =
     !isGuest && stravaConnected && userId ? (
-      <ElevationChart activityId={String(activityId)} userId={userId} />
+      <ElevationChart
+        activityId={String(activityId)}
+        userId={userId}
+        streamMetadata={activityStreamMetadata(row.original)}
+      />
     ) : null;
 
   return (

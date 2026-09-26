@@ -1,94 +1,33 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { areaY, defineChart, lineY } from '@tanstack/charts';
 import { Chart } from '@tanstack/charts/react';
 import { scaleLinear } from '@tanstack/charts/scales/linear';
 import { Loader2 } from 'lucide-react';
 
-import {
-  activityStreamSummariesDTOSchema,
-  activityStreamSummaryDTOSchema,
-  type ActivityStreamSummaryDTO,
-} from '~/contracts/v1/activity-streams';
-import { responseEnvelope } from '~/contracts/v1/envelope';
-import { errorEnvelopeSchema } from '~/contracts/v1/error';
+import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import { Button } from '~/components/ui/button';
+import {
+  fetchActivityStreamSummary,
+  fetchStoredStreamSummaryBatch,
+  canManuallyRetryStreamSummary,
+  isStreamSummaryCurrent,
+  isStreamSummaryResultReusable,
+  reconcileStreamSummaryMetadata,
+  STREAM_SUMMARY_PREFETCH_BATCH,
+  STREAM_SUMMARY_PREFETCH_CONCURRENCY,
+  streamSummaryQueryKey,
+  streamSummaryRefetchInterval,
+  type ElevationProfile,
+  type StreamSummaryResult,
+} from '~/lib/activity-stream-summary';
 
-type StreamResult = {
-  profile: { altitude: number[]; distance: number[] } | null;
-  pending: boolean;
-  retryAfterMs: number;
+export type StreamSummaryActivity = {
+  id: number;
+  streamsMetadata?: StreamMetadata;
 };
-
-const summaryKey = (userId: string, activityId: string) => [
-  'activity-stream-summary',
-  userId,
-  activityId,
-];
-
-function toProfile({
-  metadata,
-  summary,
-}: ActivityStreamSummaryDTO): StreamResult['profile'] {
-  // Summary series are index-aligned; the chart still needs forward distance.
-  const distance = summary?.distance;
-  const altitude = summary?.altitude;
-  if (metadata.state !== 'current' || !distance || !altitude) return null;
-  const forward =
-    distance.length > 1 &&
-    distance[distance.length - 1]! > distance[0]! &&
-    distance.every(
-      (value, index) => index === 0 || value >= distance[index - 1]!,
-    );
-  return forward ? { altitude, distance } : null;
-}
-
-async function fetchSummary(
-  activityId: string,
-  signal: AbortSignal,
-): Promise<StreamResult> {
-  const response = await fetch(
-    `/api/v1/activities/${activityId}/streams/summary`,
-    {
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json' },
-      signal,
-    },
-  );
-  const body: unknown = await response.json();
-
-  if (!response.ok) {
-    const error = errorEnvelopeSchema.safeParse(body);
-    if (response.status === 429)
-      throw new Error('Stream requests are limited. Try again later.');
-    if (response.status === 404)
-      throw new Error('Elevation data is unavailable for this activity.');
-    throw new Error(
-      error.success
-        ? error.data.error.message
-        : 'Could not load elevation data.',
-    );
-  }
-
-  const parsed = responseEnvelope(activityStreamSummaryDTOSchema).safeParse(
-    body,
-  );
-  if (!parsed.success) throw new Error('Could not read elevation data.');
-
-  const retryAfter = Number(response.headers.get('Retry-After'));
-  return {
-    profile: toProfile(parsed.data.data),
-    pending: response.status === 202,
-    retryAfterMs:
-      Number.isFinite(retryAfter) && retryAfter > 0
-        ? Math.min(retryAfter * 1000, 30_000)
-        : 3000,
-  };
-}
-
-const PREFETCH_BATCH = 100;
 
 /**
  * Loads the stored summaries of the given activities in batches so their
@@ -96,50 +35,85 @@ const PREFETCH_BATCH = 100;
  * stored set are left for the chart to load when opened.
  */
 export function usePrefetchStreamSummaries(
-  activityIds: number[],
+  activities: StreamSummaryActivity[],
   userId: string | undefined,
 ) {
   const queryClient = useQueryClient();
+  const selection = useMemo(() => {
+    const unique = new Map<string, StreamMetadata | undefined>();
+    for (const activity of activities) {
+      unique.set(String(activity.id), activity.streamsMetadata);
+    }
+    return unique;
+  }, [activities]);
+  const selectionIdentity = [...selection]
+    .map(
+      ([id, metadata]) =>
+        `${id}:${metadata?.generation ?? ''}:${metadata?.revision ?? '0'}:${metadata?.state ?? ''}`,
+    )
+    .join(',');
+
   useEffect(() => {
     if (!userId) return;
-    const missing = activityIds
-      .map(String)
-      .filter((id) => !queryClient.getQueryData(summaryKey(userId, id)));
+    const missing = [...selection.keys()].filter((id) => {
+      const existing = queryClient.getQueryData<StreamSummaryResult>(
+        streamSummaryQueryKey(userId, id),
+      );
+      return !isStreamSummaryResultReusable(existing, selection.get(id));
+    });
     if (missing.length === 0) return;
     const controller = new AbortController();
-    for (let start = 0; start < missing.length; start += PREFETCH_BATCH) {
-      const ids = missing.slice(start, start + PREFETCH_BATCH);
-      void fetch(`/api/v1/stream-summaries?ids=${ids.join(',')}`, {
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json' },
-        signal: controller.signal,
-      })
-        .then(async (response) => {
-          if (!response.ok) return;
-          const parsed = responseEnvelope(
-            activityStreamSummariesDTOSchema,
-          ).safeParse(await response.json());
-          if (!parsed.success) return;
-          for (const entry of parsed.data.data.summaries) {
-            if (entry.metadata.state !== 'current') continue;
-            queryClient.setQueryData<StreamResult>(
-              summaryKey(userId, entry.activity_id),
-              { profile: toProfile(entry), pending: false, retryAfterMs: 0 },
-            );
-          }
-        })
-        // Prefetching is best effort; the chart loads on its own when opened.
-        .catch(() => undefined);
+    const batches: string[][] = [];
+    for (
+      let start = 0;
+      start < missing.length;
+      start += STREAM_SUMMARY_PREFETCH_BATCH
+    ) {
+      batches.push(missing.slice(start, start + STREAM_SUMMARY_PREFETCH_BATCH));
+    }
+    let nextBatch = 0;
+    const worker = async () => {
+      while (!controller.signal.aborted) {
+        const index = nextBatch++;
+        const ids = batches[index];
+        if (!ids) return;
+        const results = await fetchStoredStreamSummaryBatch({
+          activityIds: ids,
+          userId,
+          signal: controller.signal,
+          observedMetadata: selection,
+        });
+        if (controller.signal.aborted) return;
+        for (const [id, result] of results) {
+          queryClient.setQueryData<StreamSummaryResult>(
+            streamSummaryQueryKey(userId, id),
+            (current) =>
+              isStreamSummaryResultReusable(current, selection.get(id))
+                ? current
+                : result,
+          );
+        }
+      }
+    };
+    for (
+      let index = 0;
+      index < Math.min(STREAM_SUMMARY_PREFETCH_CONCURRENCY, batches.length);
+      index += 1
+    ) {
+      // Best effort; a visible chart performs its own demand load.
+      void worker().catch(() => undefined);
     }
     return () => controller.abort();
-  }, [activityIds, userId, queryClient]);
+    // selectionIdentity captures only fields that affect summary validity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectionIdentity, userId, queryClient]);
 }
 
 function ElevationPlot({
   profile,
   height = 118,
 }: {
-  profile: NonNullable<StreamResult['profile']>;
+  profile: ElevationProfile;
   height?: number;
 }) {
   const plot = useMemo(() => {
@@ -237,26 +211,67 @@ function ElevationPlot({
 export function ElevationChart({
   activityId,
   userId,
+  streamMetadata,
 }: {
   activityId: string;
   userId: string;
+  streamMetadata?: StreamMetadata;
 }) {
+  const queryClient = useQueryClient();
+  const [retryClock, setRetryClock] = useState(() => Date.now());
+  const queryKey = streamSummaryQueryKey(userId, activityId);
   const query = useQuery({
-    queryKey: summaryKey(userId, activityId),
-    queryFn: ({ signal }) => fetchSummary(activityId, signal),
+    queryKey,
+    queryFn: ({ signal }) =>
+      fetchActivityStreamSummary({
+        activityId,
+        userId,
+        signal,
+        observedMetadata: streamMetadata,
+        previous: queryClient.getQueryData<StreamSummaryResult>(queryKey),
+      }),
     retry: false,
-    // Stored streams rarely change, and edits invalidate them on the server;
-    // a background check after a minute is plenty.
-    staleTime: 60_000,
+    // Source generation/revision/state, not fetch age, controls validity.
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchInterval: (current) =>
-      current.state.status !== 'error' && current.state.data?.pending
-        ? current.state.data.retryAfterMs
+      current.state.status !== 'error'
+        ? streamSummaryRefetchInterval(current.state.data)
         : false,
   });
 
-  const profile = query.data?.profile;
+  useEffect(() => {
+    void reconcileStreamSummaryMetadata(
+      queryClient,
+      userId,
+      activityId,
+      streamMetadata,
+    );
+  }, [activityId, queryClient, streamMetadata, userId]);
+
+  useEffect(() => {
+    const retryAt =
+      query.data?.status === 'paused' ? query.data.retryAt : null;
+    if (retryAt === null) return;
+    const now = Date.now();
+    const remaining = retryAt - now;
+    if (remaining <= 0) {
+      if (retryClock >= retryAt) return;
+      const timeout = window.setTimeout(() => setRetryClock(Date.now()), 0);
+      return () => window.clearTimeout(timeout);
+    }
+    const timeout = window.setTimeout(
+      () => setRetryClock(Date.now()),
+      Math.min(remaining, 2_147_483_647),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [query.data?.retryAt, query.data?.status, retryClock]);
+
+  const profile = isStreamSummaryCurrent(query.data, streamMetadata)
+    ? query.data!.profile
+    : null;
   const height = 135;
+  const canRetry = canManuallyRetryStreamSummary(query.data, retryClock);
 
   return (
     <section
@@ -269,20 +284,26 @@ export function ElevationChart({
         {profile ? (
           // Keep showing the last profile while it revalidates in the background.
           <ElevationPlot profile={profile} height={height} />
-        ) : query.isError ? (
+        ) : query.isError ||
+          query.data?.status === 'failed' ||
+          query.data?.status === 'paused' ? (
           <div className="flex h-full flex-col items-start justify-center gap-2 rounded-md bg-muted/40 px-3">
             <p className="text-xs text-muted-foreground">
-              {query.error.message}
+              {query.error?.message ?? query.data?.message}
             </p>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void query.refetch()}
+              disabled={!canRetry}
+              onClick={() => {
+                if (!canManuallyRetryStreamSummary(query.data)) return;
+                void queryClient.resetQueries({ queryKey, exact: true });
+              }}
             >
-              Try again
+              {canRetry ? 'Try again' : 'Try again later'}
             </Button>
           </div>
-        ) : query.isPending || query.data?.pending ? (
+        ) : query.isPending || query.data?.status === 'pending' ? (
           <div
             className="flex h-full animate-pulse items-center justify-center gap-2 rounded-md bg-muted/60 text-xs text-muted-foreground"
             role="status"

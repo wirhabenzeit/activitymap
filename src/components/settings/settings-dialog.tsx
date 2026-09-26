@@ -32,6 +32,8 @@ import { deleteActivities } from '~/server/strava/actions';
 import { useToast } from '~/hooks/use-toast';
 import { useActivities } from '~/hooks/use-activities';
 import type { Activity as DbActivity } from '~/server/db/schema';
+import { useShallowStore } from '~/store';
+import { removeStreamSummaryActivity } from '~/lib/activity-stream-summary';
 
 type YearlyStat = {
     year: number;
@@ -105,6 +107,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 function YearlyHistory({ activities, globalLoading }: { activities: DbActivity[]; globalLoading: boolean }) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const userId = useShallowStore((state) => state.user?.id);
 
     const [syncingYear, setSyncingYear] = React.useState<number | null>(null);
     const [repairingYear, setRepairingYear] = React.useState<number | null>(null);
@@ -220,9 +223,14 @@ function YearlyHistory({ activities, globalLoading }: { activities: DbActivity[]
         mutationFn: ({ ids, year }: { ids: number[], year: number }) => deleteActivities(ids).then(res => ({ ...res, year })),
         onMutate: ({ year }) => setDeletingYear(year),
         onSettled: () => setDeletingYear(null),
-        onSuccess: (data, variables) => {
+        onSuccess: async (data, variables) => {
             setConfirmDelete(null); // Close dialog on success
             if (data.deletedCount > 0) {
+                if (userId) {
+                    for (const id of variables.ids) {
+                        await removeStreamSummaryActivity(queryClient, userId, String(id));
+                    }
+                }
                 toast({
                     title: 'Cleanup Complete',
                     description: `Removed ${data.deletedCount} obsolete activities.`,
