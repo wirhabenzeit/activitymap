@@ -61,6 +61,7 @@ import { updateActivity } from '~/server/strava/actions';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '~/hooks/use-toast';
 import { useState } from 'react';
+import { reloadStreamSummaryActivity } from '~/lib/activity-stream-summary';
 
 export function ProfileForm({
   row,
@@ -72,6 +73,7 @@ export function ProfileForm({
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const userId = useShallowStore((state) => state.user?.id);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -93,6 +95,14 @@ export function ProfileForm({
       };
 
       await updateActivity(activityUpdate);
+
+      if (userId) {
+        await reloadStreamSummaryActivity(
+          queryClient,
+          userId,
+          String(row.original.id),
+        );
+      }
 
       await queryClient.invalidateQueries({ queryKey: ['activities'] });
 

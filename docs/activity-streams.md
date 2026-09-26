@@ -99,9 +99,23 @@ follow the payload's lifecycle: they are served only while the set is
   owned activities without contacting Strava. The web map uses it to prefetch
   the selected routes.
 
+The web chart keeps this contract's generation, revision and state beside the
+decoded profile. Activity sync metadata invalidates only the affected query;
+same-generation revisions move forward, while generation/state changes remove
+the profile before refetching. Account changes, tombstones and rebootstrap
+clear and fence the relevant in-flight requests. Pending `202` responses and
+retryable `429`/`503` errors honor either Retry-After form and stop after a
+bounded polling window. Selected-route prefetch remains stored-only,
+deduplicated and limited to batches of 100; omitted or current-but-unusable
+summaries never become zero charts. Current-but-unusable summaries are
+remembered as unavailable, while an omitted entry remains eligible for the
+authoritative demand request if its card is still visible.
+
 ## Follow-up boundary
 
-- #185 adds iOS loading/cache. Charts and any downsampling remain deferred.
+- #185 adds iOS loading/cache. The web elevation chart consumes the existing
+  server-generated summary; additional chart types and native presentation
+  remain separate work.
 
 Follow [the migration deployment sequence](database-migrations.md) before
 enabling a production consumer.

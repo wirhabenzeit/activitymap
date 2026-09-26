@@ -74,6 +74,7 @@ import type { Activity } from '~/server/db/schema';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { LegacySharingDisabledNotice } from '~/components/map/legacy-sharing-disabled-notice';
 import { useSearchParams } from 'next/navigation';
+import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 
 type OverlayMapId = keyof typeof overlayMaps;
 
@@ -287,7 +288,17 @@ export default function InteractiveMap() {
     summaryUserId:
       !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
   }));
-  usePrefetchStreamSummaries(selected, summaryUserId);
+  const selectedSummaryActivities = useMemo(
+    () =>
+      selected.flatMap((id) => {
+        const activity = activityDict[id];
+        return activity
+          ? [{ id, streamsMetadata: activityStreamMetadata(activity) }]
+          : [];
+      }),
+    [activityDict, selected],
+  );
+  usePrefetchStreamSummaries(selectedSummaryActivities, summaryUserId);
   const { open } = useSidebar();
   const mapRefLoc = useRef<MapRef>(null);
   const columnFilters = [{ id: 'id', value: filterIDs }];
