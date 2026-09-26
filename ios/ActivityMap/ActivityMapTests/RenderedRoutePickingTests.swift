@@ -7,7 +7,7 @@ import UIKit
 
 /// Exercise the real renderer/query adapter with a bundled, network-free style.
 /// This is intentionally separate from native touch/VoiceOver device acceptance.
-@MainActor
+@MainActor @Suite(.serialized)
 struct RenderedRoutePickingTests {
     @Test func renderedOverlapsFiltersAndSelectionReuseOneSource() async throws {
         let oldToken = MapboxOptions.accessToken

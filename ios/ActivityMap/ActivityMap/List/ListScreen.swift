@@ -19,8 +19,8 @@ struct ListScreen: View {
 
     private var inspectedActivity: Binding<Activity?> {
         Binding(
-            get: { store.inspectedActivity },
-            set: { if $0 == nil { store.dismissInspection() } }
+            get: { store.selectedTab == .list ? store.inspectedActivity : nil },
+            set: { if $0 == nil, store.selectedTab == .list { store.dismissInspection() } }
         )
     }
 }
