@@ -102,7 +102,17 @@ The floating **N selected** menu provides **Show selected routes**, **Add routes
 
 Selected routes have a wider white casing; the active route adds a dark outer casing. All layers share one cached GeoJSON snapshot per activity revision, retained across tab changes and cleared on scope reset. Selection/filter updates change layer filters only. Canonical string feature IDs avoid precision loss through Double. Picking queries only the ordinary activity route layer; raster/POI layers cannot enter the hit set. Native annotation controls consume their own taps before route handling; photo-marker integration remains #219.
 
-`RoutePickingTests` covers hit ordering, tolerance, duplicate tile fragments, partial geometry, filtered/hidden selection, stale responses and geometry reuse with 2,000 activities. `RenderedRoutePickingTests` exercises the production layers and query adapter in the real Mapbox renderer. Physical-device gesture/VoiceOver checks and dense-library performance measurements remain acceptance work; the cache build counter is not a frame-time benchmark. The reusable detail design (#208) and persistent results panel (#209) remain separate follow-ups.
+`RoutePickingTests` covers hit ordering, tolerance, duplicate tile fragments, partial geometry, filtered/hidden selection, stale responses and geometry reuse with 2,000 activities. `RenderedRoutePickingTests` exercises the production layers and query adapter in the real Mapbox renderer. Physical-device gesture/VoiceOver checks and dense-library performance measurements remain acceptance work; the cache build counter is not a frame-time benchmark. The persistent results panel (#209) remains a separate follow-up.
+
+## Activity details
+
+Map results and independent list inspection share `ActivityDetailPanel` and `ActivityDetailContent`. The panel resolves the current activity by ID, so committed sync updates redraw an open detail and a removed activity cannot leave stale metrics/actions behind. Compact list layouts use a detented sheet; regular-width layouts expand one row into a bounded scrolling panel. Opening/closing list details does not change map selection. Selection, map and detail buttons remain separate controls with at least 44-point targets.
+
+The hierarchy is sport/name/local date, then distance/elapsed time/elevation gain, followed by available time/speed, elevation extrema, heart-rate and power/energy groups. Missing headline values show an em dash (VoiceOver: “Not recorded”); measured zero remains a value. Additional measurements render independently. Long titles/descriptions wrap, metric rows stack when needed, and accessibility text sizes stack the highlights. The shared action bar remains outside the detail scroll view.
+
+Show on map is functional, with an explicit explanation when there is no GPS route. Edit, Strava refresh, GPX sharing and Strava links are disabled in a menu labelled **Not available yet** until #220–#222 implement them; simulated refresh success has been removed. The reusable content has profile/photo builder slots for #217/#218, with no placeholder charts, media fetches or raw-stream decoding.
+
+`RenderedActivityDetailTests` hosts the production views in the simulator and checks redraw after same-ID updates/deletion, independent inspection and scrolling across compact, regular-width, landscape, accessibility-text and dark GPS-less fixtures. It writes synthetic review captures to `/tmp/activitymap-detail-preview`; these are visual-review artifacts, not pixel-golden assertions or physical-iPad/VoiceOver certification.
 
 ## Map context and navigation
 

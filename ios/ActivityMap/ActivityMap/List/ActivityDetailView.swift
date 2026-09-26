@@ -1,86 +1,93 @@
 import SwiftUI
 
+/// Sheet wrapper only. The panel is also embedded in the wide list expansion.
 struct ActivityDetailView: View {
-    let activity: Activity
-
-    @State private var isRefreshing = false
+    @Bindable var store: ActivityStore
+    let activityID: Int
     @Environment(\.dismiss) private var dismiss
-
-    private var stats: [ActivityMetricRow] { ActivityMetricRow.rows(for: activity) }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 12) {
-                        Image(systemName: activity.category.symbolName)
-                            .font(.title2)
-                            .foregroundStyle(activity.category.color)
-                        VStack(alignment: .leading) {
-                            Text(activity.name)
-                                .font(.title3.bold())
-                            if let description = activity.description {
-                                Text(description)
-                                    .font(.subheadline)
-                                    .italic()
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(stats) { stat in
-                            HStack(spacing: 8) {
-                                Image(systemName: stat.icon)
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 20)
-                                Text("\(stat.title): \(stat.value)")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-
-                    Spacer()
-
-                    HStack(spacing: 10) {
-                        Button("Edit") {}
-                            .buttonStyle(.borderedProminent)
-
-                        Button {
-                            isRefreshing = true
-                            Task {
-                                try? await Task.sleep(for: .seconds(1))
-                                isRefreshing = false
-                            }
-                        } label: {
-                            if isRefreshing {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isRefreshing)
-
-                        Button {} label: {
-                            Image(systemName: "square.and.arrow.down")
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button("Strava") {}
-                            .buttonStyle(.bordered)
+            ActivityDetailPanel(store: store, activityID: activityID)
+                .navigationTitle("Activity")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
                     }
                 }
-                .padding()
-            }
-            .navigationTitle("Activity")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+/// Resolve by identity on every update, never retain the sheet's initial snapshot.
+/// The action bar is outside the scroll view so long content cannot bury actions.
+struct ActivityDetailPanel: View {
+    @Bindable var store: ActivityStore
+    let activityID: Int
+
+    private var activity: Activity? { store.activities.first { $0.id == activityID } }
+
+    var body: some View {
+        Group {
+            if let activity {
+                ScrollView {
+                    ActivityDetailContent(activity: activity)
+                }
+                .accessibilityIdentifier("activity-detail-scroll")
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    ActivityDetailActions(store: store, activity: activity)
+                }
+            } else {
+                ContentUnavailableView("Activity unavailable", systemImage: "figure.run.circle",
+                                       description: Text("This activity is no longer in your library."))
+            }
+        }
+        .background(Color(uiColor: .systemGroupedBackground))
+    }
+}
+
+/// Single integration point for real edit/refresh/share actions (#220–#222).
+/// Until those land, the menu explicitly identifies them as unavailable.
+private struct ActivityDetailActions: View {
+    @Bindable var store: ActivityStore
+    let activity: Activity
+
+    private var hasRoute: Bool { RouteExtent(coordinates: activity.coordinates) != nil }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Button {
+                    store.showOnMap(activity.id)
+                } label: {
+                    Label("Show on map", systemImage: "map")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!hasRoute)
+                .accessibilityIdentifier("activity-show-on-map")
+                .accessibilityHint(hasRoute ? "Select this activity and frame its route" : "This activity has no GPS route")
+                Menu {
+                    Section("Not available yet") {
+                        Button("Edit activity", systemImage: "pencil") {}.disabled(true)
+                        Button("Refresh from Strava", systemImage: "arrow.clockwise") {}.disabled(true)
+                        Button("Share GPX", systemImage: "square.and.arrow.up") {}.disabled(true)
+                        Button("Open in Strava", systemImage: "arrow.up.right.square") {}.disabled(true)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis").frame(minWidth: 44, minHeight: 44)
+                }
+                .accessibilityLabel("More activity actions")
+                .accessibilityHint("Editing, refresh, GPX sharing and Strava links are not available yet")
+            }
+            if !hasRoute {
+                Text("No GPS route recorded").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(.bar)
     }
 }

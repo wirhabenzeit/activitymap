@@ -14,7 +14,7 @@ struct RoutePickerSheet: View {
     var body: some View {
         Group {
             if let id = picker.detailID, let activity = candidates.first(where: { $0.id == id }) {
-                ActivityDetailView(activity: activity)
+                ActivityDetailView(store: store, activityID: activity.id)
                     .safeAreaInset(edge: .top, spacing: 0) {
                         if candidates.count > 1 {
                             Button {

@@ -2,25 +2,43 @@ import SwiftUI
 
 struct ListScreen: View {
     @Bindable var store: ActivityStore
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        List(store.filteredActivities) { activity in
-            ActivityRowView(store: store, activity: activity)
-        }
-        .listStyle(.plain)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            SelectionBar(store: store)
+        GeometryReader { geometry in
+            List(store.filteredActivities) { activity in
+                ActivityRowView(store: store, activity: activity)
+                if sizeClass == .regular, store.inspectedActivityID == activity.id {
+                    VStack(spacing: 0) {
+                        HStack {
+                            Text("Activity details").font(.headline)
+                            Spacer()
+                            Button("Close") { store.dismissInspection() }
+                                .frame(minWidth: 44, minHeight: 44)
+                                .accessibilityLabel("Close activity details")
+                        }
+                        .padding(.horizontal, 20)
+                        ActivityDetailPanel(store: store, activityID: activity.id)
+                            .frame(height: max(220, min(560, geometry.size.height - 160)))
+                    }
+                    .listRowInsets(EdgeInsets())
+                }
+            }
+            .listStyle(.plain)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                SelectionBar(store: store)
+            }
         }
         // List inspection is independent of selection and the active route.
         .sheet(item: inspectedActivity) { activity in
-            ActivityDetailView(activity: activity)
+            ActivityDetailView(store: store, activityID: activity.id)
         }
     }
 
     private var inspectedActivity: Binding<Activity?> {
         Binding(
-            get: { store.selectedTab == .list ? store.inspectedActivity : nil },
-            set: { if $0 == nil, store.selectedTab == .list { store.dismissInspection() } }
+            get: { sizeClass != .regular && store.selectedTab == .list ? store.inspectedActivity : nil },
+            set: { if $0 == nil, sizeClass != .regular, store.selectedTab == .list { store.dismissInspection() } }
         )
     }
 }
