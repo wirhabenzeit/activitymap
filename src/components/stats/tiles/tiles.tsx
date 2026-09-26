@@ -127,11 +127,7 @@ function FillChart({
 }: {
   children: (size: { width: number; height: number }) => ReactNode;
 }) {
-  return (
-    <Measure className="mt-2 min-h-0 flex-1">
-      {children}
-    </Measure>
-  );
+  return <Measure className="mt-2 min-h-0 flex-1">{children}</Measure>;
 }
 
 function DetailChart({
@@ -657,7 +653,7 @@ const sportMixView: TileView = {
             />
           ))}
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground">
+        <div className="mt-1.5 flex h-4 flex-wrap gap-x-2.5 overflow-hidden text-[11px] leading-4 text-muted-foreground">
           {shares.slice(0, 3).map(({ sport, share }) => (
             <span key={sport} className="flex items-center gap-1">
               <i

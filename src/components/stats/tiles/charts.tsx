@@ -21,6 +21,7 @@ import {
   crosshair,
 } from '@tanstack/charts';
 import { tooltip } from '@tanstack/charts/tooltip';
+import { portal } from '@tanstack/charts/tooltip/portal';
 import { Chart } from '@tanstack/charts/react';
 
 import { categorySettings } from '~/settings/category';
@@ -172,6 +173,8 @@ export function CumulativeLines({
     },
     tooltip: {
       use: tooltip,
+      // Tiles clip their content; render the tooltip outside them.
+      portal,
       items: [
         {
           channel: 'group',
@@ -264,6 +267,8 @@ export function SportBars({
     color: { domain: [...sportOrder], range: sportColors },
     tooltip: {
       use: tooltip,
+      // Tiles clip their content; render the tooltip outside them.
+      portal,
       items: [
         {
           channel: 'group',
@@ -355,6 +360,8 @@ export function PlainBars({
     },
     tooltip: {
       use: tooltip,
+      // Tiles clip their content; render the tooltip outside them.
+      portal,
       items: [
         {
           channel: 'group',
@@ -419,6 +426,8 @@ export function DistanceElevationDots({
     color: { domain: [...sportOrder], range: sportColors },
     tooltip: {
       use: tooltip,
+      // Tiles clip their content; render the tooltip outside them.
+      portal,
       items: [
         {
           channel: 'group',

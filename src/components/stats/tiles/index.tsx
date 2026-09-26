@@ -130,7 +130,7 @@ function Headline({
     <>
       <div
         className={cn(
-          'truncate font-mono font-medium tabular-nums leading-tight tracking-tight',
+          'shrink-0 truncate font-mono font-medium tabular-nums leading-tight tracking-tight',
           size === 'tile' && 'mt-1 text-[26px]',
           size === 'large' && 'mt-1 text-[36px]',
         )}
@@ -142,7 +142,7 @@ function Headline({
           </small>
         )}
       </div>
-      <div className="truncate text-xs text-muted-foreground">
+      <div className="shrink-0 truncate text-xs text-muted-foreground">
         {summary.sub}
       </div>
     </>
