@@ -27,6 +27,19 @@ After fixing the cause, run the workflow manually. It uses the bounded defaults
 of 25 events and concurrency 5; repeat completed runs if necessary. Do not send
 larger ad-hoc overrides while Strava or the database is unhealthy.
 
+## Summary reconciliation freshness
+
+The **Reconcile Strava summaries** workflow runs hourly and is what keeps
+cached Strava data within the seven-day limit. Each run reports `overdue`: the
+number of connected athletes whose last complete scan (or sign-up, before the
+first scan) is more than seven days old. A non-zero value is also logged as
+`[Summary reconciliation] Athletes past the freshness limit`.
+
+`overdue` should stay at zero. If it rises, check the workflow's recent runs
+for failures, `stoppedForRateLimit`, or `stoppedForTimeBudget`. One athlete is
+handled per run with three pages of 200 summaries, so a steadily growing count
+means the job no longer keeps up and needs a larger `batchSize`.
+
 ## Dead letters
 
 Inspect recent rows without selecting `payload` unless it is necessary:

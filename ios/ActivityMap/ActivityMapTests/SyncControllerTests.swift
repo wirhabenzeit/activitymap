@@ -96,19 +96,19 @@ struct SyncControllerTests {
         #expect(!invalidated)
     }
 
-    @Test func staleOfflineDataAndDisconnectedAccountsArePurged() async throws {
+    @Test func oldOfflineDataStaysAndDisconnectedAccountsArePurged() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         var checkpoint = Fixtures.checkpoint
-        checkpoint.lastSyncAt = Date().addingTimeInterval(-8 * 86400)
+        // The server enforces freshness; the device keeps its copy until it syncs.
+        checkpoint.lastSyncAt = Date().addingTimeInterval(-30 * 86400)
         checkpoint.freshness = SyncFixtures.freshness
         try await storage.apply([.upsertActivity(try Fixtures.activity())], checkpoint: checkpoint, scope: Fixtures.scope)
         let source = ScriptedSyncSource([])
         let controller = SyncController(activities: ActivityStore(), source: { _ in source }, invalidate: { _ in })
         controller.setSession(SyncFixtures.session(verified: false), storage: storage)
         await controller.refresh()
-        #expect(controller.status == .expired)
-        #expect(try await storage.snapshot(scope: Fixtures.scope).activities.isEmpty)
-        try await storage.apply([.upsertActivity(try Fixtures.activity())], scope: Fixtures.scope)
+        #expect(controller.status == .offline && controller.activities.activities.count == 1)
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities.count == 1)
         controller.setSession(SyncFixtures.session(connected: false), storage: storage)
         await controller.refresh()
         #expect(controller.status == .disconnected)

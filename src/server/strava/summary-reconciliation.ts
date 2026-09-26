@@ -16,7 +16,17 @@ import {
 } from '~/server/strava/client';
 import type { StravaActivity } from '~/server/strava/types';
 
-export const SUMMARY_RECONCILIATION_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * Strava data must be revalidated within seven days. This server-side scan is
+ * what enforces it (docs/strava-data-policy.md); clients just mirror the server.
+ */
+export const STRAVA_FRESHNESS_LIMIT_MS = 7 * DAY_MS;
+/**
+ * Start a new scan a day before the limit: a scan spans several hourly runs
+ * (3 pages of 200 summaries each), so it must finish inside the limit.
+ */
+export const SUMMARY_RECONCILIATION_INTERVAL_MS = 6 * DAY_MS;
 export const SUMMARY_RECONCILIATION_LEASE_MS = 10 * 60 * 1000;
 export const SUMMARY_RECONCILIATION_PAGE_SIZE = 200;
 export const DEFAULT_RECONCILIATION_BATCH_SIZE = 1;
@@ -48,6 +58,8 @@ export type SummaryReconciliationRunResult = {
   failed: number;
   stoppedForTimeBudget: number;
   stoppedForRateLimit: number;
+  /** Eligible athletes whose data is older than the freshness limit. */
+  overdue: number;
   elapsedMs: number;
 };
 
@@ -158,6 +170,7 @@ export async function reconcileStravaSummaries({
     failed: 0,
     stoppedForTimeBudget: 0,
     stoppedForRateLimit: 0,
+    overdue: 0,
     elapsedMs: 0,
   };
   logger.info('[Summary reconciliation] Cycle started', {
@@ -333,6 +346,16 @@ export async function reconcileStravaSummaries({
 
   result.stoppedForTimeBudget = stopReason === 'time_budget' ? 1 : 0;
   result.stoppedForRateLimit = stopReason === 'rate_limit' ? 1 : 0;
+  // The freshness guarantee depends on this job keeping up; surface any
+  // athlete that has slipped past the limit so a stalled cron is noticed.
+  result.overdue = await repository.countOverdue(
+    new Date(now.getTime() - STRAVA_FRESHNESS_LIMIT_MS),
+  );
+  if (result.overdue > 0) {
+    logger.warn('[Summary reconciliation] Athletes past the freshness limit', {
+      overdue: result.overdue,
+    });
+  }
   result.elapsedMs = elapsedMs();
   logger.info('[Summary reconciliation] Cycle complete', result);
   return result;

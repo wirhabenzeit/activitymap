@@ -19,6 +19,7 @@ import { createSummaryReconciliationRepository } from '../../src/server/reposito
 import { StravaApiError } from '../../src/server/strava/client.ts';
 import {
   reconcileStravaSummaries,
+  STRAVA_FRESHNESS_LIMIT_MS,
   SUMMARY_RECONCILIATION_INTERVAL_MS,
   type SummaryReconciliationSource,
 } from '../../src/server/strava/summary-reconciliation.ts';
@@ -368,6 +369,36 @@ async function run(): Promise<void> {
         change.operation === 'delete',
     ),
   );
+
+  // Overdue reporting: an eligible athlete is overdue once their last complete
+  // scan, or their sign-up before the first scan, passes the freshness limit.
+  const DAY = 24 * 60 * 60 * 1000;
+  const freshBefore = new Date(NOW.getTime() - STRAVA_FRESHNESS_LIMIT_MS);
+  const setUser = (values: Partial<typeof users.$inferInsert>) =>
+    testDb.update(users).set(values).where(eq(users.id, USER_ID));
+  await setUser({ lastSummaryReconciledAt: NOW, createdAt: NOW });
+  const baseline = await repository.countOverdue(freshBefore);
+  await setUser({ lastSummaryReconciledAt: new Date(NOW.getTime() - 8 * DAY) });
+  assert.equal(await repository.countOverdue(freshBefore), baseline + 1);
+  await setUser({ lastSummaryReconciledAt: null, createdAt: NOW });
+  assert.equal(
+    await repository.countOverdue(freshBefore),
+    baseline,
+    'a new athlete before the first scan is not overdue',
+  );
+  await setUser({ createdAt: new Date(NOW.getTime() - 8 * DAY) });
+  assert.equal(await repository.countOverdue(freshBefore), baseline + 1);
+  await testDb
+    .update(accounts)
+    .set({ revokedAt: NOW })
+    .where(eq(accounts.id, ACCOUNT_ID));
+  assert.equal(
+    await repository.countOverdue(freshBefore),
+    baseline,
+    'revoked accounts are not counted',
+  );
+  // A scan becomes due a day before the limit, so it can finish inside it.
+  assert.ok(SUMMARY_RECONCILIATION_INTERVAL_MS < STRAVA_FRESHNESS_LIMIT_MS);
 }
 
 try {

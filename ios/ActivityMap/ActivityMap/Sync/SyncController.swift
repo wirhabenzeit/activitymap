@@ -24,7 +24,7 @@ final class SyncController {
             case .syncing: "Syncing activities…"
             case .ready: "Activities up to date"
             case .offline: "Offline · reconnect to sync"
-            case .expired: "Saved activities expired · reconnect to refresh"
+            case .expired: "Sign-in expired · sign in again to sync"
             case .disconnected: "Strava is not connected"
             case .failed: "Couldn’t sync activities"
             case .rateLimited: "Sync paused · try again later"
@@ -127,12 +127,10 @@ final class SyncController {
                 if current == generation { status = session.user.stravaConnected ? .expired : .disconnected }
                 return
             }
-            try await loadCache(
-                session, storage: storage, generation: current,
-                clearExpired: !session.verified)
+            try await loadCache(session, storage: storage, generation: current)
             guard current == generation, !Task.isCancelled else { return }
             guard session.verified else {
-                if status != .expired { status = .offline }
+                status = .offline
                 return
             }
             if let retryAt, retryAt > now() { status = .rateLimited(retryAt); return }
@@ -141,7 +139,7 @@ final class SyncController {
             _ = try await engine.run()
             guard current == generation, !Task.isCancelled else { return }
             try await loadCache(session, storage: storage, generation: current)
-            if current == generation, status != .expired { status = .ready }
+            if current == generation { status = .ready }
         } catch {
             guard current == generation, !Task.isCancelled else { return }
             if AuthController.isExplicitlyUnauthenticated(error) {
@@ -168,32 +166,24 @@ final class SyncController {
                 retryAt = date
                 status = .rateLimited(date)
             } else if case .transport = error as? APIClient.RequestError {
-                if status != .expired { status = .offline }
+                status = .offline
             } else {
                 status = .failed(String(describing: error))
             }
         }
     }
 
-    private func loadCache(
-        _ session: SyncSession, storage: LocalStore, generation current: Int,
-        clearExpired: Bool = true
-    ) async throws {
+    /// The cache has no age limit of its own: the server revalidates Strava data
+    /// within seven days (docs/strava-data-policy.md), and every sync applies
+    /// its upserts and tombstones. Sign-out, sign-in expiry, disconnection and
+    /// an explicit 401 still clear it.
+    private func loadCache(_ session: SyncSession, storage: LocalStore, generation current: Int) async throws {
         let snapshot = try await storage.snapshot(scope: session.scope)
         guard current == generation, !Task.isCancelled else { throw CancellationError() }
         checkpoint = snapshot.checkpoint
-        guard let checkpoint, checkpoint.bootstrapComplete, let synced = checkpoint.lastSyncAt else {
+        guard let checkpoint, checkpoint.bootstrapComplete, checkpoint.lastSyncAt != nil else {
             activities.activities = []
             photos = []
-            return
-        }
-        // The server owns Strava reconciliation. A device cache is seven-day
-        // bounded from its last successful backend sync, even during outages.
-        guard now().timeIntervalSince(synced) < 7 * 24 * 60 * 60 else {
-            clearVisible()
-            status = .expired
-            // A verified session can still resume from the saved cursor.
-            if clearExpired { try await storage.clear(scope: session.scope) }
             return
         }
         let mapped = try snapshot.activities.map(StoredModelMapper.activity)
