@@ -25,7 +25,10 @@ struct NumericFilter: Equatable {
 @Observable
 final class ActivityStore {
     var activities: [Activity] {
-        didSet { activitiesRevision &+= 1 }
+        didSet {
+            activitiesRevision &+= 1
+            reconcileSelectionWithActivities()
+        }
     }
 
     /// Bumped on every `activities` assignment so views can rebuild derived
@@ -34,6 +37,7 @@ final class ActivityStore {
 
     init(activities: [Activity] = []) {
         self.activities = activities
+        selection.setVisible(Set(filteredActivities.map(\.id)))
     }
 
     /// The sync coordinator will call this after a committed sync pass.
@@ -42,19 +46,49 @@ final class ActivityStore {
         activities = try snapshot.activities.map(StoredModelMapper.activity)
     }
 
-    var activeCategories: Set<ActivityCategory> = Set(ActivityCategory.allCases)
-    var activeSportTypes: Set<SportType> = Set(SportType.allCases)
+    // Every filter change reconciles selection visibility: hidden selections
+    // stay selected, but a hidden active route or list detail is closed.
+    var activeCategories: Set<ActivityCategory> = Set(ActivityCategory.allCases) {
+        didSet { reconcileSelectionVisibility() }
+    }
+    var activeSportTypes: Set<SportType> = Set(SportType.allCases) {
+        didSet { reconcileSelectionVisibility() }
+    }
 
-    var dateRange: ClosedRange<Date>?
-    var distanceFilter: NumericFilter?
-    var elevationFilter: NumericFilter?
-    var durationFilter: NumericFilter?
-    var commuteOnly: Bool?
+    var dateRange: ClosedRange<Date>? = nil {
+        didSet { reconcileSelectionVisibility() }
+    }
+    var distanceFilter: NumericFilter? = nil {
+        didSet { reconcileSelectionVisibility() }
+    }
+    var elevationFilter: NumericFilter? = nil {
+        didSet { reconcileSelectionVisibility() }
+    }
+    var durationFilter: NumericFilter? = nil {
+        didSet { reconcileSelectionVisibility() }
+    }
+    var commuteOnly: Bool? = nil {
+        didSet { reconcileSelectionVisibility() }
+    }
 
+    /// Switching tabs never changes selection, focus or list inspection.
     var selectedTab: AppTab = .map
     var sidebarExpanded = false
-    var highlightedActivityID: Int?
-    var selectedActivityIDs: Set<Int> = []
+
+    /// Mutate only through the operations below so the parity invariants hold.
+    private(set) var selection = SelectionState()
+
+    var selectedActivityIDs: Set<Int> { selection.selectedIDs }
+    /// The selected, filter-visible activity emphasised on the map.
+    var activeActivityID: Int? { selection.activeID }
+    /// The list detail opened independently of selection.
+    var inspectedActivityID: Int? { selection.inspectedID }
+    var hiddenSelectedCount: Int { selection.hiddenSelectedCount }
+
+    var inspectedActivity: Activity? {
+        guard let id = selection.inspectedID else { return nil }
+        return activities.first { $0.id == id }
+    }
 
     var filteredActivities: [Activity] {
         activities.filter { activity in
@@ -125,11 +159,80 @@ final class ActivityStore {
         }
     }
 
+    // MARK: Selection (docs/map-list-parity-contract.md)
+
+    /// Replace the selection with the given existing activities.
+    func replaceSelection(with activityIDs: some Sequence<Int>) {
+        selection.replaceSelection(with: existing(activityIDs))
+    }
+
+    func addToSelection(_ activityIDs: some Sequence<Int>) {
+        selection.addToSelection(existing(activityIDs))
+    }
+
+    func removeFromSelection(_ activityIDs: some Sequence<Int>) {
+        selection.removeFromSelection(activityIDs)
+    }
+
     func toggleSelection(_ activityID: Int) {
-        if selectedActivityIDs.contains(activityID) {
-            selectedActivityIDs.remove(activityID)
-        } else {
-            selectedActivityIDs.insert(activityID)
+        if selection.selectedIDs.contains(activityID) {
+            selection.removeFromSelection([activityID])
+        } else if activityIndex.contains(activityID) {
+            selection.addToSelection([activityID])
         }
+    }
+
+    /// Adds every filtered activity to the selection, keeping hidden ones.
+    func selectAllFiltered() { selection.selectAllVisible() }
+
+    /// Removes every filtered activity from the selection, keeping hidden ones.
+    func deselectAllFiltered() { selection.deselectAllVisible() }
+
+    /// Clears the whole selection, including filter-hidden activities.
+    func clearSelection() { selection.clearSelection() }
+
+    func activate(_ activityID: Int) { selection.activate(activityID) }
+
+    func inspect(_ activityID: Int) { selection.inspect(activityID) }
+
+    func dismissInspection() { selection.dismissInspection() }
+
+    /// Selects and activates the activity, then switches to the map.
+    /// GPS-less and filter-hidden activities leave all state unchanged.
+    @discardableResult
+    func showOnMap(_ activityID: Int) -> SelectionState.ShowOnMapOutcome {
+        guard let activity = activities.first(where: { $0.id == activityID }) else {
+            return .notFound
+        }
+        let outcome = selection.showOnMap(activityID, hasGeometry: !activity.coordinates.isEmpty)
+        if outcome == .shown { selectedTab = .map }
+        return outcome
+    }
+
+    /// Logout, account or deployment transition.
+    func clearScope() {
+        activities = []
+        selection.clearScope()
+    }
+
+    private var activityIndex: Set<Int> { Set(activities.map(\.id)) }
+
+    private func existing(_ activityIDs: some Sequence<Int>) -> [Int] {
+        let known = activityIndex
+        return activityIDs.filter { known.contains($0) }
+    }
+
+    private func reconcileSelectionVisibility() {
+        selection.setVisible(Set(filteredActivities.map(\.id)))
+    }
+
+    /// Committed deletions and rebootstrap removals drop absent IDs using
+    /// the removal rule, then visibility follows the new activity set.
+    private func reconcileSelectionWithActivities() {
+        let known = activityIndex
+        let referenced = selection.selectedIDs
+            .union([selection.activeID, selection.inspectedID].compactMap { $0 })
+        selection.removeActivities(referenced.subtracting(known))
+        reconcileSelectionVisibility()
     }
 }

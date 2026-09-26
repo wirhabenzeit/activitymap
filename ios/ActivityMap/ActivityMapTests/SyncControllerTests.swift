@@ -66,8 +66,10 @@ struct SyncControllerTests {
     @Test func logoutCancelsSyncAndClearsCacheAndSelection() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let source = GatedSyncSource()
-        let activities = ActivityStore()
-        activities.selectedActivityIDs = [42]
+        let activities = ActivityStore(activities: [ActivityStoreSelectionTests.activity(42)])
+        activities.replaceSelection(with: [42])
+        activities.inspect(42)
+        #expect(activities.selectedActivityIDs == [42])
         let controller = SyncController(activities: activities, source: { _ in source }, invalidate: { _ in })
         controller.setSession(SyncFixtures.session(), storage: storage)
         await source.waitForRequest()
@@ -75,6 +77,7 @@ struct SyncControllerTests {
         await source.release(SyncFixtures.activities([try Fixtures.activity()]))
         await controller.refresh()
         #expect(controller.status == .signedOut && activities.activities.isEmpty && activities.selectedActivityIDs.isEmpty)
+        #expect(activities.activeActivityID == nil && activities.inspectedActivityID == nil)
         #expect(try await storage.snapshot(scope: Fixtures.scope).checkpoint == nil)
     }
 

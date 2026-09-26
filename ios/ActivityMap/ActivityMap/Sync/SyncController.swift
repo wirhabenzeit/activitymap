@@ -187,17 +187,14 @@ final class SyncController {
             return
         }
         let mapped = try snapshot.activities.map(StoredModelMapper.activity)
+        // Assigning activities drops selection/focus/inspection of absent IDs
+        // (committed deletions and rebootstrap removals) inside ActivityStore.
         activities.activities = mapped
         photos = snapshot.photos.map(StoredModelMapper.photo)
-        let ids = Set(mapped.map(\.id))
-        activities.selectedActivityIDs.formIntersection(ids)
-        if let id = activities.highlightedActivityID, !ids.contains(id) { activities.highlightedActivityID = nil }
     }
 
     private func clearVisible() {
-        activities.activities = []
-        activities.selectedActivityIDs = []
-        activities.highlightedActivityID = nil
+        activities.clearScope()
         photos = []
         checkpoint = nil
     }

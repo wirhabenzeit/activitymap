@@ -83,13 +83,13 @@ struct MapScreen: View {
             .lineJoin(.round)
             .lineCap(.round)
 
-        if let highlightedID = store.highlightedActivityID {
+        if let activeID = store.activeActivityID {
             LineLayer(id: "routeLayerHigh", source: RouteSource.id)
                 .filter(Exp(.all) {
                     visibleFilter
                     Exp(.eq) {
                         Exp(.get) { "id" }
-                        Double(highlightedID)
+                        Double(activeID)
                     }
                 })
                 .lineColor(RouteSource.lineColor)
