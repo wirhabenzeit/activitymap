@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { areaY, defineChart, lineY } from '@tanstack/charts';
 import { Chart } from '@tanstack/charts/react';
@@ -12,6 +12,7 @@ import { Button } from '~/components/ui/button';
 import {
   fetchActivityStreamSummary,
   fetchStoredStreamSummaryBatch,
+  canManuallyRetryStreamSummary,
   isStreamSummaryCurrent,
   isStreamSummaryResultReusable,
   reconcileStreamSummaryMetadata,
@@ -217,6 +218,7 @@ export function ElevationChart({
   streamMetadata?: StreamMetadata;
 }) {
   const queryClient = useQueryClient();
+  const [retryClock, setRetryClock] = useState(() => Date.now());
   const queryKey = streamSummaryQueryKey(userId, activityId);
   const query = useQuery({
     queryKey,
@@ -247,10 +249,29 @@ export function ElevationChart({
     );
   }, [activityId, queryClient, streamMetadata, userId]);
 
+  useEffect(() => {
+    const retryAt =
+      query.data?.status === 'paused' ? query.data.retryAt : null;
+    if (retryAt === null) return;
+    const now = Date.now();
+    const remaining = retryAt - now;
+    if (remaining <= 0) {
+      if (retryClock >= retryAt) return;
+      const timeout = window.setTimeout(() => setRetryClock(Date.now()), 0);
+      return () => window.clearTimeout(timeout);
+    }
+    const timeout = window.setTimeout(
+      () => setRetryClock(Date.now()),
+      Math.min(remaining, 2_147_483_647),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [query.data?.retryAt, query.data?.status, retryClock]);
+
   const profile = isStreamSummaryCurrent(query.data, streamMetadata)
     ? query.data!.profile
     : null;
   const height = 135;
+  const canRetry = canManuallyRetryStreamSummary(query.data, retryClock);
 
   return (
     <section
@@ -263,7 +284,9 @@ export function ElevationChart({
         {profile ? (
           // Keep showing the last profile while it revalidates in the background.
           <ElevationPlot profile={profile} height={height} />
-        ) : query.isError || query.data?.status === 'failed' ? (
+        ) : query.isError ||
+          query.data?.status === 'failed' ||
+          query.data?.status === 'paused' ? (
           <div className="flex h-full flex-col items-start justify-center gap-2 rounded-md bg-muted/40 px-3">
             <p className="text-xs text-muted-foreground">
               {query.error?.message ?? query.data?.message}
@@ -271,11 +294,13 @@ export function ElevationChart({
             <Button
               variant="outline"
               size="sm"
+              disabled={!canRetry}
               onClick={() => {
+                if (!canManuallyRetryStreamSummary(query.data)) return;
                 void queryClient.resetQueries({ queryKey, exact: true });
               }}
             >
-              Try again
+              {canRetry ? 'Try again' : 'Try again later'}
             </Button>
           </div>
         ) : query.isPending || query.data?.status === 'pending' ? (

@@ -11,6 +11,7 @@ import type {
   StreamMetadata,
 } from '~/contracts/v1/activity-streams';
 import {
+  canManuallyRetryStreamSummary,
   captureStreamSummaryFence,
   fenceStreamSummaryActivity,
   fenceStreamSummaryScope,
@@ -149,15 +150,24 @@ void test('retryable 429 and 503 responses remain eligible for bounded polling',
     assert.equal(result.retryAt, NOW + 75_000);
   }
 
-  const bounded = await fetchActivityStreamSummary({
-    activityId: '503-long',
-    userId: 'errors-user',
-    signal: new AbortController().signal,
-    fetchImpl: async () => apiError(503, true, '601'),
-    now: () => NOW,
-  });
-  assert.equal(bounded.status, 'failed');
-  assert.equal(bounded.retryAt, null);
+  for (const [status, message] of [
+    [429, /rate limited/i],
+    [503, /temporarily unavailable/i],
+  ] as const) {
+    const bounded = await fetchActivityStreamSummary({
+      activityId: `${status}-long`,
+      userId: 'errors-user',
+      signal: new AbortController().signal,
+      fetchImpl: async () => apiError(status, true, '601'),
+      now: () => NOW,
+    });
+    assert.equal(bounded.status, 'paused');
+    assert.equal(bounded.retryAt, NOW + 601_000);
+    assert.match(bounded.message!, message);
+    assert.equal(streamSummaryRefetchInterval(bounded, NOW), false);
+    assert.equal(canManuallyRetryStreamSummary(bounded, NOW + 600_999), false);
+    assert.equal(canManuallyRetryStreamSummary(bounded, NOW + 601_000), true);
+  }
 
   await assert.rejects(
     fetchActivityStreamSummary({
@@ -165,6 +175,42 @@ void test('retryable 429 and 503 responses remain eligible for bounded polling',
       userId: 'errors-user',
       signal: new AbortController().signal,
       fetchImpl: async () => apiError(503, false, '75'),
+      now: () => NOW,
+    }),
+    /Try later/,
+  );
+});
+
+void test('non-JSON 429/503 responses use status and Retry-After unless JSON explicitly disables retry', async () => {
+  for (const status of [429, 503]) {
+    const result = await fetchActivityStreamSummary({
+      activityId: `plain-${status}`,
+      userId: 'plain-error-user',
+      signal: new AbortController().signal,
+      fetchImpl: async () =>
+        new Response('<html>temporary proxy response</html>', {
+          status,
+          headers: {
+            'Content-Type': 'text/html',
+            'Retry-After': '95',
+          },
+        }),
+      now: () => NOW,
+    });
+    assert.equal(result.status, 'pending');
+    assert.equal(result.retryAt, NOW + 95_000);
+    assert.match(
+      result.message!,
+      status === 429 ? /rate limited/i : /temporarily unavailable/i,
+    );
+  }
+
+  await assert.rejects(
+    fetchActivityStreamSummary({
+      activityId: 'explicit-terminal',
+      userId: 'plain-error-user',
+      signal: new AbortController().signal,
+      fetchImpl: async () => apiError(503, false, '95'),
       now: () => NOW,
     }),
     /Try later/,
@@ -370,15 +416,24 @@ void test('metadata invalidation resets and reloads a mounted query observer', a
   const queryKey = streamSummaryQueryKey(userId, activityId);
   queryClient.setQueryData(queryKey, oldResult);
   let requests = 0;
+  let resolveRefetch!: (value: StreamSummaryResult) => void;
   const observer = new QueryObserver(queryClient, {
     queryKey,
-    queryFn: async () => {
+    queryFn: () => {
       requests += 1;
-      return newResult;
+      return new Promise<StreamSummaryResult>((resolve) => {
+        resolveRefetch = resolve;
+      });
     },
     staleTime: Infinity,
   });
-  const unsubscribe = observer.subscribe(() => undefined);
+  let publish!: () => void;
+  const published = new Promise<void>((resolve) => {
+    publish = resolve;
+  });
+  const unsubscribe = observer.subscribe((state) => {
+    if (state.data?.metadata?.generation === 'new') publish();
+  });
 
   await reconcileStreamSummaryMetadata(
     queryClient,
@@ -388,6 +443,10 @@ void test('metadata invalidation resets and reloads a mounted query observer', a
   );
 
   assert.equal(requests, 1);
+  assert.equal(queryClient.getQueryData(queryKey), undefined);
+
+  resolveRefetch(newResult);
+  await published;
   assert.equal(
     queryClient.getQueryData<StreamSummaryResult>(queryKey)?.metadata
       ?.generation,
@@ -437,7 +496,13 @@ void test('metadata change fences an in-flight first request with no cached data
     },
     staleTime: Infinity,
   });
-  const unsubscribe = observer.subscribe(() => undefined);
+  let publish!: () => void;
+  const published = new Promise<void>((resolve) => {
+    publish = resolve;
+  });
+  const unsubscribe = observer.subscribe((state) => {
+    if (state.data?.metadata?.generation === 'new') publish();
+  });
   await Promise.resolve();
   assert.equal(requests, 1);
   assert.equal(queryClient.getQueryData(queryKey), undefined);
@@ -449,6 +514,7 @@ void test('metadata change fences an in-flight first request with no cached data
     newMetadata,
   );
   assert.equal(requests, 2);
+  await published;
   assert.equal(
     queryClient.getQueryData<StreamSummaryResult>(queryKey)?.metadata
       ?.generation,

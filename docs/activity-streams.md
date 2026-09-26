@@ -105,11 +105,13 @@ same-generation revisions move forward, while generation/state changes remove
 the profile before refetching. Account changes, tombstones and rebootstrap
 clear and fence the relevant in-flight requests. Pending `202` responses and
 retryable `429`/`503` errors honor either Retry-After form and stop after a
-bounded polling window. Selected-route prefetch remains stored-only,
-deduplicated and limited to batches of 100; omitted or current-but-unusable
-summaries never become zero charts. Current-but-unusable summaries are
-remembered as unavailable, while an omitted entry remains eligible for the
-authoritative demand request if its card is still visible.
+bounded polling window. A server delay beyond that window pauses automatic
+polling while retaining the exact retry deadline, message and manual-retry
+guard. Selected-route prefetch remains stored-only, deduplicated and limited
+to batches of 100; omitted or current-but-unusable summaries never become zero
+charts. Current-but-unusable summaries are remembered as unavailable, while an
+omitted entry remains eligible for the authoritative demand request if its
+card is still visible.
 
 ## Follow-up boundary
 

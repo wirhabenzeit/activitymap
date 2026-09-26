@@ -15,7 +15,7 @@ export type StreamSummaryResult = {
   profile: ElevationProfile | null;
   metadata: StreamMetadata | null;
   requestedAgainst: StreamMetadata | null;
-  status: 'ready' | 'pending' | 'unavailable' | 'failed';
+  status: 'ready' | 'pending' | 'paused' | 'unavailable' | 'failed';
   message: string | null;
   retryAt: number | null;
   pollStartedAt: number;
@@ -52,6 +52,17 @@ export function streamSummaryRefetchInterval(
   return result?.status === 'pending' && result.retryAt !== null
     ? Math.max(1, result.retryAt - now)
     : false;
+}
+
+export function canManuallyRetryStreamSummary(
+  result: StreamSummaryResult | undefined,
+  now = Date.now(),
+): boolean {
+  return (
+    result?.status !== 'paused' ||
+    result.retryAt === null ||
+    now >= result.retryAt
+  );
 }
 
 export function toElevationProfile({
@@ -217,38 +228,42 @@ function pendingResult(options: {
   metadata?: StreamMetadata | null;
   retryAfterMs: number;
   now: number;
-  message?: string;
+  message: string;
 }): StreamSummaryResult {
   const previous =
     options.previous?.status === 'pending' ? options.previous : undefined;
   const pollStartedAt = previous?.pollStartedAt ?? options.now;
   const pollAttempts = (previous?.pollAttempts ?? 0) + 1;
   const retryAt = options.now + options.retryAfterMs;
-  if (
+  const automaticPollingExhausted =
     pollAttempts >= STREAM_SUMMARY_MAX_POLL_ATTEMPTS ||
-    retryAt - pollStartedAt > STREAM_SUMMARY_MAX_POLL_MS
-  ) {
-    return {
-      profile: null,
-      metadata: options.metadata ?? null,
-      requestedAgainst: options.requestedAgainst ?? null,
-      status: 'failed',
-      message: 'Elevation data is still being prepared. Try again later.',
-      retryAt: null,
-      pollStartedAt,
-      pollAttempts,
-    };
-  }
+    retryAt - pollStartedAt > STREAM_SUMMARY_MAX_POLL_MS;
   return {
     profile: null,
     metadata: options.metadata ?? null,
     requestedAgainst: options.requestedAgainst ?? null,
-    status: 'pending',
-    message: options.message ?? null,
+    status: automaticPollingExhausted ? 'paused' : 'pending',
+    message: automaticPollingExhausted
+      ? `${options.message} Automatic retries are paused; try again after ${new Date(retryAt).toISOString()}.`
+      : options.message,
     retryAt,
     pollStartedAt,
     pollAttempts,
   };
+}
+
+async function readJsonBody(response: Response): Promise<unknown> {
+  const contentType = response.headers.get('Content-Type')?.toLowerCase();
+  if (
+    !contentType?.includes('application/json') &&
+    !contentType?.includes('+json')
+  )
+    return undefined;
+  try {
+    return await response.json();
+  } catch {
+    return undefined;
+  }
 }
 
 export async function fetchActivityStreamSummary(options: {
@@ -275,7 +290,7 @@ export async function fetchActivityStreamSummary(options: {
       signal: options.signal,
     },
   );
-  const body: unknown = await response.json();
+  const body = await readJsonBody(response);
   // Delta-seconds starts when the response is received. Reading the clock
   // after transport/body work is conservative and cannot shorten that delay.
   const now = options.now?.() ?? Date.now();
@@ -284,16 +299,23 @@ export async function fetchActivityStreamSummary(options: {
   if (!response.ok) {
     const parsed = errorEnvelopeSchema.safeParse(body);
     const retryableStatus = response.status === 429 || response.status === 503;
-    if (retryableStatus && parsed.success && parsed.data.error.retryable) {
+    if (
+      retryableStatus &&
+      (!parsed.success || parsed.data.error.retryable)
+    ) {
       const retryAfterMs =
         parseRetryAfterMs(response.headers.get('Retry-After'), now) ??
         DEFAULT_ERROR_RETRY_MS;
+      const message =
+        response.status === 429
+          ? 'Stream requests are rate limited.'
+          : 'Elevation data is temporarily unavailable.';
       return pendingResult({
         previous: options.previous,
         requestedAgainst: options.observedMetadata,
         retryAfterMs,
         now,
-        message: parsed.data.error.message,
+        message,
       });
     }
     if (response.status === 404) {
@@ -329,6 +351,7 @@ export async function fetchActivityStreamSummary(options: {
         parseRetryAfterMs(response.headers.get('Retry-After'), now) ??
         DEFAULT_PENDING_RETRY_MS,
       now,
+      message: 'Elevation data is still being prepared.',
     });
   }
 
@@ -433,8 +456,11 @@ export async function reloadStreamSummaryActivity(
   const queryKey = streamSummaryQueryKey(userId, activityId);
   await queryClient.cancelQueries({ queryKey, exact: true });
   // Reset drops invalid data immediately and refetches an active observer.
-  // Inactive entries stay empty until a chart requests them again.
-  await queryClient.resetQueries({ queryKey, exact: true });
+  // Inactive entries stay empty until a chart requests them again. Do not
+  // make activity sync wait for an active chart's network request.
+  void queryClient
+    .resetQueries({ queryKey, exact: true })
+    .catch(() => undefined);
 }
 
 export async function removeStreamSummaryScope(
@@ -462,7 +488,9 @@ export async function reloadStreamSummaryScope(
   }
   const queryKey = [...STREAM_SUMMARY_QUERY_ROOT, userId];
   await queryClient.cancelQueries({ queryKey });
-  await queryClient.resetQueries({ queryKey });
+  // Cache reset happens synchronously; its active-query refetch continues
+  // independently so bootstrap can clear/apply the sync scope immediately.
+  void queryClient.resetQueries({ queryKey }).catch(() => undefined);
 }
 
 export async function reconcileStreamSummaryMetadata(
