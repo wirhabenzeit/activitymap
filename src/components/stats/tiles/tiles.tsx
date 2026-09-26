@@ -26,8 +26,8 @@ import {
   activeDaysPerWeek,
   activeDayFlags,
   bestWindow,
-  climbingBands,
-  climbingDistribution,
+  climbRate,
+  climbRateByMonth,
   cumulativeByDay,
   dailyTotals,
   dateOfDay,
@@ -198,6 +198,24 @@ function SportLegend({ sports }: { sports: Sport[] }) {
 }
 
 // A small labelled number for the stat grids on tile faces.
+// A stat label with the swatch of the chart mark it names.
+function LegendLabel({
+  swatch,
+  children,
+}: {
+  swatch: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className="flex items-center gap-1">
+      <i
+        className={cn('inline-block h-2 w-2 shrink-0 rounded-[2px]', swatch)}
+      />
+      {children}
+    </span>
+  );
+}
+
 function Stat({
   label,
   value,
@@ -205,7 +223,7 @@ function Stat({
   note,
   large = false,
 }: {
-  label: string;
+  label: ReactNode;
   value: string;
   unit?: string;
   note?: string;
@@ -910,62 +928,64 @@ const consistencyView: TileView = {
 
 // Distance vs elevation -----------------------------------------------------
 
-// Flat is lightest, mountainous darkest.
-const climbShade = [0.18, 0.4, 0.65, 0.9];
-
-const climbRange = (index: number) => {
-  const below = climbingBands[index]!.below;
-  const above = index > 0 ? climbingBands[index - 1]!.below : 0;
-  return Number.isFinite(below) ? `${above}–${below} m/km` : `${above}+ m/km`;
-};
-
+// Climbing is a trend: how hilly the last 12 months were, month by month,
+// against the 12 months before.
 const distanceVsElevationView: TileView = {
   period: () => 'Last 12 months',
   summary: ({ activities, today }) => {
-    const { points, metersPerKm } = distanceVsElevation(activities, today);
+    const oneYearAgo = lastYearStart(today);
+    const current = climbRate(activities, oneYearAgo, today);
+    const previous = climbRate(
+      activities,
+      lastYearStart(oneYearAgo - 1),
+      oneYearAgo - 1,
+    );
     return {
-      value: formatMetric(metersPerKm * 100, 'elevation'),
-      unit: 'm per 100 km',
-      sub: `average climb over ${points.length} activities`,
+      value: formatMetric(current, 'elevation'),
+      unit: 'm climbed per 100 km',
+      sub: (
+        <Delta
+          current={current}
+          previous={previous}
+          text="vs the 12 months before"
+        />
+      ),
     };
   },
-  face: ({ activities, today }) => {
-    const bands = climbingDistribution(activities, lastYearStart(today), today);
-    const total = bands.reduce((sum, band) => sum + band.count, 0);
-    const share = (count: number) =>
-      total ? Math.round((count / total) * 100) : 0;
+  face: (context) => {
+    const months = climbRateByMonth(context.activities, context.today);
     return (
-      <div className="mt-auto">
-        <div className="mt-3 flex h-3 gap-0.5 overflow-hidden rounded-sm">
-          {bands.map((band, index) => (
-            <i
-              key={band.id}
-              className="block h-full bg-foreground"
-              style={{ flex: band.count, opacity: climbShade[index] }}
-              title={`${band.label}: ${band.count} activities`}
+      <>
+        <FillChart>
+          {({ width, height }) => (
+            <PlainBars
+              rows={months.map((month, index) => ({
+                x: String(month.monthStart),
+                value: month.rate,
+                highlight: index === months.length - 1,
+              }))}
+              width={width}
+              height={height}
+              detail={false}
+              palette={context.palette}
+              xTickFormat={(x) => {
+                const date = dateOfDay(Number(x));
+                return `${monthName(date)} ${date.getUTCFullYear()}`;
+              }}
+              valueFormat={(value) =>
+                `${formatMetric(value, 'elevation')} m per 100 km`
+              }
             />
+          )}
+        </FillChart>
+        <div className="mt-1 grid shrink-0 grid-cols-12 text-center text-[10px] text-muted-foreground">
+          {months.map((month) => (
+            <span key={month.monthStart}>
+              {monthName(dateOfDay(month.monthStart)).slice(0, 1)}
+            </span>
           ))}
         </div>
-        <div className="mt-2 grid grid-cols-4 gap-2">
-          {bands.map((band, index) => (
-            <div key={band.id} className="min-w-0">
-              <div className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-                <i
-                  className="inline-block h-2 w-2 shrink-0 rounded-[2px] bg-foreground"
-                  style={{ opacity: climbShade[index] }}
-                />
-                {band.label}
-              </div>
-              <div className="font-mono text-[15px] font-medium tabular-nums">
-                {share(band.count)}%
-              </div>
-              <div className="truncate text-[11px] text-muted-foreground">
-                {climbRange(index)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      </>
     );
   },
   detail: ({ activities, today }) => {
@@ -1131,23 +1151,51 @@ const yearPaceView: TileView = {
     const pace = yearPace(activities, today, metric);
     const year = dateOfDay(today).getUTCFullYear();
     const unit = metricUnit[metric];
+    const scale = Math.max(pace.projected, pace.lastYear, 1);
+    const at = (value: number) => `${(value / scale) * 100}%`;
     return (
-      <div className="mt-auto grid grid-cols-3 gap-2 border-t pt-2">
-        <Stat
-          label="So far"
-          value={formatMetric(pace.current, metric)}
-          unit={unit}
-        />
-        <Stat
-          label="Projected"
-          value={formatMetric(pace.projected, metric)}
-          unit={unit}
-        />
-        <Stat
-          label={String(year - 1)}
-          value={pace.lastYear > 0 ? formatMetric(pace.lastYear, metric) : '–'}
-          unit={pace.lastYear > 0 ? unit : undefined}
-        />
+      <div className="mt-auto">
+        <div className="relative h-2.5 rounded-sm bg-muted">
+          <div
+            className="absolute inset-y-0 left-0 rounded-sm bg-foreground/25"
+            style={{ width: at(pace.projected) }}
+          />
+          <div
+            className="absolute inset-y-0 left-0 rounded-sm bg-foreground"
+            style={{ width: at(pace.current) }}
+          />
+          {pace.lastYear > 0 && (
+            <div
+              className="absolute -inset-y-1 w-0.5 bg-orange-600 dark:bg-orange-400"
+              style={{ left: at(pace.lastYear) }}
+            />
+          )}
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          <Stat
+            label={<LegendLabel swatch="bg-foreground">So far</LegendLabel>}
+            value={formatMetric(pace.current, metric)}
+            unit={unit}
+          />
+          <Stat
+            label={
+              <LegendLabel swatch="bg-foreground/25">Projected</LegendLabel>
+            }
+            value={formatMetric(pace.projected, metric)}
+            unit={unit}
+          />
+          <Stat
+            label={
+              <LegendLabel swatch="w-0.5 bg-orange-600 dark:bg-orange-400">
+                {String(year - 1)}
+              </LegendLabel>
+            }
+            value={
+              pace.lastYear > 0 ? formatMetric(pace.lastYear, metric) : '–'
+            }
+            unit={pace.lastYear > 0 ? unit : undefined}
+          />
+        </div>
       </div>
     );
   },

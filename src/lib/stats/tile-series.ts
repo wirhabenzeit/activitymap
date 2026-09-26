@@ -263,29 +263,39 @@ export function yearPace(
   return { current, perDay, projected: perDay * daysInYear, lastYear };
 }
 
-export const climbingBands = [
-  { id: 'flat', label: 'Flat', below: 8 },
-  { id: 'rolling', label: 'Rolling', below: 15 },
-  { id: 'hilly', label: 'Hilly', below: 30 },
-  { id: 'mountainous', label: 'Mountainous', below: Infinity },
-] as const;
-
-// Activities of at least 1 km from `first` through `today`, counted by climb
-// rate (metres of elevation gain per km).
-export function climbingDistribution(
+// Metres climbed per 100 km over activities with a distance, from `first`
+// through `last`.
+export function climbRate(
   activities: readonly StatsActivity[],
   first: number,
-  today: number,
-) {
-  const counts = climbingBands.map((band) => ({ ...band, count: 0 }));
+  last: number,
+): number {
+  let distance = 0;
+  let elevation = 0;
   for (const activity of activities) {
     const day = dayOf(activity.start_date_local);
-    const distance = metricValue(activity, 'distance');
-    if (day < first || day > today || distance < 1) continue;
-    const rate = metricValue(activity, 'elevation') / distance;
-    counts.find((band) => rate < band.below)!.count += 1;
+    const km = metricValue(activity, 'distance');
+    if (day < first || day > last || km <= 0) continue;
+    distance += km;
+    elevation += metricValue(activity, 'elevation');
   }
-  return counts;
+  return distance > 0 ? (elevation / distance) * 100 : 0;
+}
+
+// Metres per 100 km for each of the last 12 calendar months, oldest first;
+// the current month runs through today.
+export function climbRateByMonth(
+  activities: readonly StatsActivity[],
+  today: number,
+) {
+  const date = dateOfDay(today);
+  return Array.from({ length: 12 }, (_, index) => {
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth() - 11 + index;
+    const first = monthStart(year, month);
+    const last = Math.min(today, monthStart(year, month + 1) - 1);
+    return { monthStart: first, rate: climbRate(activities, first, last) };
+  });
 }
 
 export type ActivityRecord = { value: number; day: number; sport: Sport };
