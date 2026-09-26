@@ -17,10 +17,9 @@ import { updateIncompleteActivities } from './sync.ts';
  * transaction/rollback behavior itself is covered by
  * `~/server/repositories/activities.test.ts`.
  */
-function fakeActivitiesRepo(overrides: Partial<ActivitiesRepository> = {}): {
-  repo: ActivitiesRepository;
-  deleteCalls: { athleteId: number; ids: number[] }[];
-} {
+function fakeActivitiesRepo(
+  overrides: Partial<ActivitiesRepository> = {},
+): { repo: ActivitiesRepository; deleteCalls: { athleteId: number; ids: number[] }[] } {
   const deleteCalls: { athleteId: number; ids: number[] }[] = [];
   const repo: ActivitiesRepository = {
     findManyByAthlete: async () => [],

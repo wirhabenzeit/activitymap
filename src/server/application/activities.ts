@@ -3,7 +3,11 @@ import 'server-only';
 import { getAccountInternal } from '~/server/db/internal';
 import type { Activity, Photo } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
-import { StravaApiError, StravaClient } from '~/server/strava/client';
+import {
+  isStravaActivityNotFoundError,
+  StravaApiError,
+  StravaClient,
+} from '~/server/strava/client';
 import {
   fetchStravaActivities,
   StravaPersistenceError,
@@ -44,6 +48,7 @@ export type ActivityMutationErrorCode =
   | 'strava_not_connected'
   | 'external_effects_disabled'
   | 'rate_limited'
+  | 'local_state_conflict'
   | 'upstream_rejected'
   | 'upstream_unavailable'
   | 'local_persistence_failed';
@@ -186,7 +191,7 @@ function mutationFailure(error: unknown): ActivityMutationError {
       { cause: error },
     );
   if (error instanceof StravaApiError) {
-    if (error.status === 404)
+    if (isStravaActivityNotFoundError(error))
       return new ActivityMutationError(
         'activity_unavailable',
         'The activity is unavailable.',
@@ -301,7 +306,7 @@ export async function updateActivityForActor(
     stravaActivity = await client.updateActivity(act.id, updateData);
   } catch (error) {
     logger.error('Failed to update activity:', error);
-    if (error instanceof StravaApiError && error.status === 404) {
+    if (isStravaActivityNotFoundError(error)) {
       try {
         await activitiesRepo.deleteManyForAthlete(actor.athleteId, [act.id]);
       } catch (persistenceError) {
@@ -324,10 +329,24 @@ export async function updateActivityForActor(
       transformedActivity,
       existing.last_updated,
     );
-    // A null update means either deletion won the row lock or another
-    // committed mutation changed the optimistic fence while Strava was in
-    // flight. Reread: missing stays 404; present is the newer authority.
-    if (!saved) return await requireOwnedActivity(activitiesRepo, actor, act.id);
+    // Strava accepted the edit, but a local delete or newer commit won the
+    // row lock. Never retry this write automatically: doing so could
+    // overwrite the newer state. Missing remains a 404; a present row is an
+    // explicit reconciliation conflict.
+    if (!saved) {
+      await requireOwnedActivity(activitiesRepo, actor, act.id);
+      throw new ActivityMutationError(
+        'local_state_conflict',
+        'Strava accepted the edit, but local activity state changed before it could be saved.',
+        409,
+        false,
+        undefined,
+        {
+          upstreamSucceeded: true,
+          recovery: 'refresh_before_retry',
+        },
+      );
+    }
     return await requireOwnedActivity(activitiesRepo, actor, act.id);
   } catch (error) {
     if (error instanceof ActivityMutationError) throw error;
@@ -393,6 +412,22 @@ export async function refreshActivityForActor(
       'activity_unavailable',
       'The activity is unavailable.',
       404,
+    );
+  }
+
+  const activityFailure = result.failures?.find(
+    (failure) => failure.activityId === activityId,
+  );
+  if (result.failedIds?.includes(activityId)) {
+    throw mutationFailure(
+      activityFailure?.error ??
+        new ActivityMutationError(
+          'upstream_unavailable',
+          'Strava could not complete the request.',
+          503,
+          true,
+          60,
+        ),
     );
   }
 

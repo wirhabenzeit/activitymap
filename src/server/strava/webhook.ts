@@ -260,8 +260,13 @@ export async function processWebhookEvent(
     );
   }
 
-  const { activities: fetchedActivities, photos: fetchedPhotos, notFoundIds } =
-    await fetchActivities({
+  const {
+    activities: fetchedActivities,
+    photos: fetchedPhotos,
+    notFoundIds,
+    photoRefreshAuthoritativeIds = [],
+    photoRefreshFailedIds = [],
+  } = await fetchActivities({
       accessToken: account.access_token,
       activityIds: [object_id],
       includePhotos: true,
@@ -343,6 +348,9 @@ export async function processWebhookEvent(
       `Strava did not return activity ${object_id} for athlete ${owner_id}, and it was not reported deleted`,
     );
   }
+  const photosAreAuthoritative =
+    photoRefreshAuthoritativeIds.includes(object_id) &&
+    !photoRefreshFailedIds.includes(object_id);
 
   // Database Operations within a transaction for atomicity
   await database.transaction(async (tx) => {
@@ -352,7 +360,12 @@ export async function processWebhookEvent(
       .values(activityToSave) // Already includes athlete ID from transform
       .onConflictDoUpdate({
         target: activities.id,
-        set: activityToSave,
+        set: {
+          ...activityToSave,
+          ...(photosAreAuthoritative
+            ? {}
+            : { photosState: sql`${activities.photosState}` }),
+        },
       });
 
     if (data.aspect_type === 'update') {
@@ -360,25 +373,28 @@ export async function processWebhookEvent(
     }
 
     // 2. Handle photos: Delete existing, then insert new ones
-    const existingPhotos = await tx
-      .select({
-        photo_id: photos.unique_id,
-        activity_id: photos.activity_id,
-      })
-      .from(photos)
-      .where(eq(photos.activity_id, activityToSave.id));
-    await tx.delete(photos).where(eq(photos.activity_id, activityToSave.id));
+    let removedPhotos: { photo_id: string; activity_id: number }[] = [];
+    if (photosAreAuthoritative) {
+      const existingPhotos = await tx
+        .select({
+          photo_id: photos.unique_id,
+          activity_id: photos.activity_id,
+        })
+        .from(photos)
+        .where(eq(photos.activity_id, activityToSave.id));
+      await tx.delete(photos).where(eq(photos.activity_id, activityToSave.id));
 
-    if (fetchedPhotos.length > 0) {
-      await tx.insert(photos).values(fetchedPhotos);
+      if (fetchedPhotos.length > 0) {
+        await tx.insert(photos).values(fetchedPhotos);
+      }
+
+      const incomingPhotoIds = new Set(
+        fetchedPhotos.map((photo) => photo.unique_id),
+      );
+      removedPhotos = existingPhotos.filter(
+        ({ photo_id }) => !incomingPhotoIds.has(photo_id),
+      );
     }
-
-    const incomingPhotoIds = new Set(
-      fetchedPhotos.map((photo) => photo.unique_id),
-    );
-    const removedPhotos = existingPhotos.filter(
-      ({ photo_id }) => !incomingPhotoIds.has(photo_id),
-    );
 
     if (removedPhotos.length > 0) {
       await tx
@@ -417,7 +433,7 @@ export async function processWebhookEvent(
           entityId: photo_id,
           operation: 'delete' as const,
         })),
-        ...fetchedPhotos.map((photo) => ({
+        ...(photosAreAuthoritative ? fetchedPhotos : []).map((photo) => ({
           athleteId: owner_id,
           entityType: 'photo' as const,
           entityId: photo.unique_id,

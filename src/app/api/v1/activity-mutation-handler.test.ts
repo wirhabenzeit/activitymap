@@ -103,6 +103,9 @@ void test('PATCH validates ownership boundary inputs and preserves omitted versu
     ['/api/v1/activities/0', { name: 'x' }],
     ['/api/v1/activities/7', {}],
     ['/api/v1/activities/7', { access_token: 'must-not-be-accepted' }],
+    ['/api/v1/activities/7', { name: '   ' }],
+    ['/api/v1/activities/7', { name: 'x'.repeat(256) }],
+    ['/api/v1/activities/7', { description: 'x'.repeat(10_001) }],
   ] as const) {
     assert.equal((await handler(request(path, body))).status, 400);
   }
@@ -139,6 +142,18 @@ void test('mutation errors retain status, retryability, retry guidance and recov
       503,
       null,
     ],
+    [
+      new ActivityMutationError(
+        'local_state_conflict',
+        'refresh first',
+        409,
+        false,
+        undefined,
+        { upstreamSucceeded: true, recovery: 'refresh_before_retry' },
+      ),
+      409,
+      null,
+    ],
   ] as const) {
     const handler = createUpdateActivityHandler({
       resolveActor: async () => actor,
@@ -156,7 +171,10 @@ void test('mutation errors retain status, retryability, retry guidance and recov
     };
     assert.equal(body.error.code, error.code);
     assert.equal(body.error.retryable, error.retryable);
-    if (error.code === 'local_persistence_failed')
+    if (
+      error.code === 'local_persistence_failed' ||
+      error.code === 'local_state_conflict'
+    )
       assert.deepEqual(body.error.details, error.details);
   }
 });

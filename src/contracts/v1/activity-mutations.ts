@@ -5,6 +5,19 @@ import { sportTypes } from '~/server/strava/types';
 import { activityDTOSchema } from './activity';
 import { photoDTOSchema } from './photo';
 
+// Application API payload bounds. These protect request parsing and local
+// persistence independently of any undocumented upstream Strava limit.
+export const ACTIVITY_NAME_MAX_LENGTH = 255;
+export const ACTIVITY_DESCRIPTION_MAX_LENGTH = 10_000;
+
+const activityNameSchema = z
+  .string()
+  .min(1)
+  .max(ACTIVITY_NAME_MAX_LENGTH)
+  .refine((name) => name.trim().length > 0, {
+    message: 'Name must contain a non-whitespace character',
+  });
+
 /**
  * Editable fields exposed to first-party clients. Omission means "leave the
  * upstream value unchanged"; an empty description is intentional and clears
@@ -12,8 +25,8 @@ import { photoDTOSchema } from './photo';
  */
 export const updateActivityRequestSchema = z
   .strictObject({
-    name: z.string().min(1).optional(),
-    description: z.string().optional(),
+    name: activityNameSchema.optional(),
+    description: z.string().max(ACTIVITY_DESCRIPTION_MAX_LENGTH).optional(),
     sport_type: z.enum(sportTypes).optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {

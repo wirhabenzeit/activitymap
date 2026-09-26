@@ -10,7 +10,10 @@ import {
 
 import { db } from '~/server/db';
 import { logger } from '~/server/logging/logger';
-import { StravaClient } from './client';
+import {
+  isStravaActivityNotFoundError,
+  StravaClient,
+} from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type StravaPhoto } from './types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -63,11 +66,6 @@ export async function withLockedExistingActivities<T>(
  * directly network-callable with client-supplied credentials. See issue #116.
  */
 
-interface StravaApiError extends Error {
-  status?: number;
-  details?: { message?: string };
-}
-
 /** Strava succeeded, but its response could not be committed locally. */
 export class StravaPersistenceError extends Error {
   constructor(
@@ -83,13 +81,72 @@ export type FetchStravaActivitiesResult = {
   activities: Activity[];
   photos: Photo[];
   notFoundIds: number[];
+  failedIds?: number[];
+  /** Internal errors retained so single-activity callers can classify them. */
+  failures?: Array<{ activityId: number; error: unknown }>;
+  /** IDs whose returned photo sets are authoritative, including known-empty. */
+  photoRefreshAuthoritativeIds?: number[];
   photoRefreshFailedIds?: number[];
   /** Internal errors retained so the application service can classify a partial refresh. */
   photoRefreshFailures?: Array<{ activityId: number; error: unknown }>;
 };
 
+type ActivityDetailClient = Pick<
+  StravaClient,
+  'getActivity' | 'getActivities' | 'getActivityPhotos'
+>;
+
+export type FetchStravaActivitiesDeps = {
+  createClient?: (accessToken: string) => ActivityDetailClient;
+};
+
+export async function fetchRequestedStravaActivities(
+  client: Pick<ActivityDetailClient, 'getActivity'>,
+  activityIds: number[],
+): Promise<{
+  activities: StravaActivity[];
+  notFoundIds: number[];
+  failedIds: number[];
+  failures: Array<{ activityId: number; error: unknown }>;
+}> {
+  const notFoundIds: number[] = [];
+  const failedIds: number[] = [];
+  const failures: Array<{ activityId: number; error: unknown }> = [];
+  const results = await Promise.all(
+    activityIds.map(async (id) => {
+      try {
+        return await client.getActivity(id);
+      } catch (error: unknown) {
+        if (isStravaActivityNotFoundError(error)) {
+          logger.warn(
+            `Activity ${id} explicitly reported missing by Strava. Marked for removal.`,
+          );
+          notFoundIds.push(id);
+          return null;
+        }
+        logger.error('Failed to fetch individual activity:', {
+          id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        failedIds.push(id);
+        failures.push({ activityId: id, error });
+        return null;
+      }
+    }),
+  );
+  return {
+    activities: results.filter(
+      (activity): activity is StravaActivity => activity !== null,
+    ),
+    notFoundIds,
+    failedIds,
+    failures,
+  };
+}
+
 export async function fetchStravaActivities(
   input: FetchActivitiesInput,
+  deps: FetchStravaActivitiesDeps = {},
 ): Promise<FetchStravaActivitiesResult> {
   const {
     accessToken,
@@ -107,44 +164,26 @@ export async function fetchStravaActivities(
   } = fetchActivitiesSchema.parse(input);
 
   // Token refresh is now handled outside this function
-  const client = StravaClient.withAccessToken(accessToken);
+  const client = (deps.createClient ?? StravaClient.withAccessToken)(accessToken);
   const photos: Photo[] = [];
-  const notFoundIds: number[] = [];
+  let notFoundIds: number[] = [];
+  let failedIds: number[] = [];
+  let failures: Array<{ activityId: number; error: unknown }> = [];
   const photoRefreshFailed = new Set<number>();
   const photoRefreshFailures: Array<{ activityId: number; error: unknown }> =
     [];
 
-  let stravaActivitiesResult: (StravaActivity | null)[];
+  let stravaActivitiesResult: StravaActivity[];
 
   if (requestedActivityIds) {
-    stravaActivitiesResult = await Promise.all(
-      requestedActivityIds.map(async (id) => {
-        try {
-          const activity = await client.getActivity(id);
-
-          return activity;
-        } catch (error: unknown) {
-          const isNotFoundError =
-            typeof error === 'object' &&
-            error !== null &&
-            (error as StravaApiError).status === 404;
-
-          if (isNotFoundError) {
-            logger.warn(
-              `Activity ${id} not found on Strava (404). Marked for removal.`,
-            );
-            notFoundIds.push(id);
-            return null;
-          }
-          logger.error('Failed to fetch individual activity:', {
-            id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          throw error;
-        }
-      }),
+    const requested = await fetchRequestedStravaActivities(
+      client,
+      requestedActivityIds,
     );
-    stravaActivitiesResult = stravaActivitiesResult;
+    stravaActivitiesResult = requested.activities;
+    notFoundIds = requested.notFoundIds;
+    failedIds = requested.failedIds;
+    failures = requested.failures;
   } else {
     // List/Summary mode
     const params: Parameters<StravaClient['getActivities']>[0] = {
@@ -157,24 +196,46 @@ export async function fetchStravaActivities(
     stravaActivitiesResult = await client.getActivities(params);
   }
 
-  const validStravaActivities = stravaActivitiesResult.filter(
-    (activity): activity is StravaActivity => activity !== null,
-  );
-
-  const fetchedActivities: StravaActivity[] = validStravaActivities;
+  const fetchedActivities = stravaActivitiesResult;
 
   if (!fetchedActivities || fetchedActivities.length === 0) {
     return {
       activities: [],
       photos: [],
       notFoundIds,
+      failedIds,
+      failures,
+      photoRefreshAuthoritativeIds: [],
       photoRefreshFailedIds: [],
     };
   }
 
   const photoRefreshSucceeded = new Set<number>();
   if (includePhotos && requestedActivityIds) {
-    const photoFetchPromises = fetchedActivities.map(async (act) => {
+    // A detailed Strava response with both counts at zero is authoritative
+    // without spending a second request. Explicit user refreshes still call
+    // the photo endpoint so they can reconcile independently of count data.
+    if (!requireExisting) {
+      for (const activity of fetchedActivities) {
+        if (
+          activity.total_photo_count === 0 &&
+          activity.photo_count === 0 &&
+          !activity.map?.polyline &&
+          !activity.map?.summary_polyline
+        ) {
+          photoRefreshSucceeded.add(activity.id);
+        }
+      }
+    }
+    const photoCandidates = fetchedActivities.filter(
+      (activity) =>
+        requireExisting ||
+        !!activity.map?.polyline ||
+        !!activity.map?.summary_polyline ||
+        activity.total_photo_count > 0 ||
+        activity.photo_count > 0,
+    );
+    const photoFetchPromises = photoCandidates.map(async (act) => {
       try {
         const activityPhotos: StravaPhoto[] = await client.getActivityPhotos(
           act.id,
@@ -474,6 +535,9 @@ export async function fetchStravaActivities(
     activities: savedActivities,
     photos,
     notFoundIds,
+    failedIds,
+    failures,
+    photoRefreshAuthoritativeIds: [...photoRefreshSucceeded],
     photoRefreshFailedIds: [...photoRefreshFailed],
     photoRefreshFailures,
   };

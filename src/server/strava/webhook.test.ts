@@ -129,6 +129,7 @@ void test('processWebhookEvent upserts the activity and records one change entry
         activities: [{ id: 100, athlete: 42 } as never],
         photos: [{ unique_id: 'new-photo' } as never],
         notFoundIds: [],
+        photoRefreshAuthoritativeIds: [100],
       }),
     }),
   );
@@ -144,6 +145,70 @@ void test('processWebhookEvent upserts the activity and records one change entry
     { athleteId: 42, entityType: 'activity', entityId: '100', operation: 'upsert' },
     { athleteId: 42, entityType: 'photo', entityId: 'old-photo', operation: 'delete' },
     { athleteId: 42, entityType: 'photo', entityId: 'new-photo', operation: 'upsert' },
+  ]);
+});
+
+void test('processWebhookEvent preserves existing photos when the photo result is non-authoritative', async () => {
+  const { db, calls, recordedChanges } = buildFakeDb({
+    existingPhotos: [{ photo_id: 'old-photo', activity_id: 100 }],
+  });
+
+  await processWebhookEvent(
+    baseEvent,
+    db as unknown as Parameters<typeof processWebhookEvent>[1],
+    deps({
+      fetchActivities: async () => ({
+        activities: [{ id: 100, athlete: 42 } as never],
+        photos: [],
+        notFoundIds: [],
+        photoRefreshFailedIds: [100],
+      }),
+    }),
+  );
+
+  assert.deepEqual(
+    calls.map((call) => call.method),
+    ['insertActivity', 'insertChange'],
+  );
+  assert.deepEqual(recordedChanges, [
+    {
+      athleteId: 42,
+      entityType: 'activity',
+      entityId: '100',
+      operation: 'upsert',
+    },
+  ]);
+});
+
+void test('processWebhookEvent preserves existing photos when a skipped fetch has no authoritative count', async () => {
+  const { db, calls, recordedChanges } = buildFakeDb({
+    existingPhotos: [{ photo_id: 'old-photo', activity_id: 100 }],
+  });
+
+  await processWebhookEvent(
+    baseEvent,
+    db as unknown as Parameters<typeof processWebhookEvent>[1],
+    deps({
+      fetchActivities: async () => ({
+        activities: [{ id: 100, athlete: 42 } as never],
+        photos: [],
+        notFoundIds: [],
+        photoRefreshAuthoritativeIds: [],
+      }),
+    }),
+  );
+
+  assert.deepEqual(
+    calls.map((call) => call.method),
+    ['insertActivity', 'insertChange'],
+  );
+  assert.deepEqual(recordedChanges, [
+    {
+      athleteId: 42,
+      entityType: 'activity',
+      entityId: '100',
+      operation: 'upsert',
+    },
   ]);
 });
 
@@ -184,6 +249,7 @@ void test('a failed change-record insert rejects the whole delivery instead of c
             activities: [{ id: 100, athlete: 42 } as never],
             photos: [],
             notFoundIds: [],
+            photoRefreshAuthoritativeIds: [100],
           }),
         }),
       ),
@@ -201,6 +267,7 @@ void test('replaying the same webhook delivery (idempotent retry) upserts the ac
     activities: [{ id: 100, athlete: 42 } as never],
     photos: [],
     notFoundIds: [],
+    photoRefreshAuthoritativeIds: [100],
   });
 
   await processWebhookEvent(

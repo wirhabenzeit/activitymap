@@ -723,10 +723,12 @@
         "properties": {
           "name": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 255
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 10000
           },
           "sport_type": {
             "type": "string",
@@ -3336,7 +3338,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Updates an existing activity owned by the caller. Omitted fields remain unchanged; an empty description clears it. The response is reread after commit and includes current stream generation/revision/state metadata. A local_persistence_failed response means Strava accepted the edit but the local commit failed; recovery requires an explicit retry or reconciliation.",
+        "description": "Updates an existing activity owned by the caller. Omitted fields remain unchanged; an empty description clears it. The response is reread after commit and includes current stream generation/revision/state metadata. A local_persistence_failed response means Strava accepted the edit but the local commit failed. A local_state_conflict response means Strava accepted the edit but a newer local write won the optimistic fence; clients must refresh before deciding whether to retry.",
         "parameters": [
           {
             "name": "id",
@@ -3401,7 +3403,7 @@
             }
           },
           "409": {
-            "description": "The connected Strava account is unavailable",
+            "description": "The connected Strava account is unavailable, or Strava accepted the edit but newer local state requires reconciliation",
             "content": {
               "application/json": {
                 "schema": {

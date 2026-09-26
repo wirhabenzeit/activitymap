@@ -440,7 +440,7 @@ void test('updateActivityForActor preserves empty descriptions and returns the r
   });
 });
 
-void test('updateActivityForActor does not let a late response overwrite a newer committed row', async () => {
+void test('updateActivityForActor reports a conflict when a late upstream success loses the local fence', async () => {
   const original = buildActivity({
     id: 7,
     athlete: ATHLETE_A,
@@ -459,20 +459,30 @@ void test('updateActivityForActor does not let a late response overwrite a newer
     return null;
   };
 
-  const result = await updateActivityForActor(
-    ACTOR_A,
-    { id: 7, name: 'Late stale edit' },
-    {
-      activitiesRepo,
-      resolveAccount: async () => stubAccount(),
-      createClient: () => ({
-        async updateActivity() {
-          return stravaActivity({ name: 'Late stale edit' });
+  await assert.rejects(
+    () =>
+      updateActivityForActor(
+        ACTOR_A,
+        { id: 7, name: 'Late stale edit' },
+        {
+          activitiesRepo,
+          resolveAccount: async () => stubAccount(),
+          createClient: () => ({
+            async updateActivity() {
+              return stravaActivity({ name: 'Late stale edit' });
+            },
+          }),
         },
-      }),
-    },
+      ),
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'local_state_conflict' &&
+      error.status === 409 &&
+      !error.retryable &&
+      error.details?.upstreamSucceeded === true &&
+      error.details?.recovery === 'refresh_before_retry',
   );
-  assert.equal(result.name, 'Newer committed edit');
+  assert.equal((await activitiesRepo.findManyByIds([7]))[0]?.name, newer.name);
 });
 
 void test('updateActivityForActor preserves rate-limit classification and local-save recovery state', async () => {
@@ -527,29 +537,7 @@ void test('updateActivityForActor preserves rate-limit classification and local-
   );
 });
 
-void test('updateActivityForActor classifies disabled external effects and reconciles an upstream 404 locally', async () => {
-  const disabledRepo = createFakeActivitiesRepository([
-    buildActivity({ id: 7, athlete: ATHLETE_A }),
-  ]);
-  await assert.rejects(
-    () =>
-      updateActivityForActor(
-        ACTOR_A,
-        { id: 7, name: 'Updated' },
-        {
-          activitiesRepo: disabledRepo,
-          resolveAccount: async () => stubAccount(),
-          createClient: () => {
-            throw new Error(EXTERNAL_EFFECTS_DISABLED_MESSAGE);
-          },
-        },
-      ),
-    (error: unknown) =>
-      error instanceof ActivityMutationError &&
-      error.code === 'external_effects_disabled' &&
-      !error.retryable,
-  );
-
+void test('updateActivityForActor only deletes locally for a verified Strava missing-record response', async () => {
   const deletedRepo = createFakeActivitiesRepository([
     buildActivity({ id: 7, athlete: ATHLETE_A }),
   ]);
@@ -573,6 +561,55 @@ void test('updateActivityForActor classifies disabled external effects and recon
       error.code === 'activity_unavailable',
   );
   assert.deepEqual(await deletedRepo.findManyByIds([7]), []);
+
+  const ambiguous404Repo = createFakeActivitiesRepository([
+    buildActivity({ id: 7, athlete: ATHLETE_A }),
+  ]);
+  await assert.rejects(
+    () =>
+      updateActivityForActor(
+        ACTOR_A,
+        { id: 7, name: 'Still private upstream' },
+        {
+          activitiesRepo: ambiguous404Repo,
+          resolveAccount: async () => stubAccount(),
+          createClient: () => ({
+            async updateActivity() {
+              throw new StravaApiError('Authorization Error', 404);
+            },
+          }),
+        },
+      ),
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'upstream_rejected' &&
+      error.status === 502,
+  );
+  assert.equal((await ambiguous404Repo.findManyByIds([7])).length, 1);
+});
+
+void test('updateActivityForActor classifies disabled external effects', async () => {
+  const activitiesRepo = createFakeActivitiesRepository([
+    buildActivity({ id: 7, athlete: ATHLETE_A }),
+  ]);
+  await assert.rejects(
+    () =>
+      updateActivityForActor(
+        ACTOR_A,
+        { id: 7, name: 'Updated' },
+        {
+          activitiesRepo,
+          resolveAccount: async () => stubAccount(),
+          createClient: () => {
+            throw new Error(EXTERNAL_EFFECTS_DISABLED_MESSAGE);
+          },
+        },
+      ),
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'external_effects_disabled' &&
+      !error.retryable,
+  );
 });
 
 void test('refreshActivityForActor requests guarded existing-row persistence and reports partial photos', async () => {
@@ -657,6 +694,33 @@ void test('refreshActivityForActor maps upstream 429 and 503 without flattening 
         error.retryable,
     );
   }
+});
+
+void test('refreshActivityForActor classifies a collected single-ID failure instead of reporting a 404', async () => {
+  const activitiesRepo = createFakeActivitiesRepository([
+    buildActivity({ id: 7, athlete: ATHLETE_A }),
+  ]);
+  const upstream = new StravaApiError('limited', 429);
+  await assert.rejects(
+    () =>
+      refreshActivityForActor(ACTOR_A, 7, {
+        activitiesRepo,
+        resolveAccount: async () => stubAccount(),
+        fetchActivities: async () => ({
+          activities: [],
+          photos: [],
+          notFoundIds: [],
+          failedIds: [7],
+          failures: [{ activityId: 7, error: upstream }],
+        }),
+      }),
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'rate_limited' &&
+      error.status === 429 &&
+      error.retryable,
+  );
+  assert.equal((await activitiesRepo.findManyByIds([7])).length, 1);
 });
 
 void test('deleteActivitiesForActor only deletes activities owned by the actor athlete', async () => {
