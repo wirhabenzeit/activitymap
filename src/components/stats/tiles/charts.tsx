@@ -1,7 +1,7 @@
 'use client';
 
-// Small TanStack Charts builders shared by the tile faces (no guides, no
-// tooltip) and the detail views (axes and tooltips).
+// Small TanStack Charts builders shared by the tile faces (no axes or grid)
+// and the detail views (with axes). Both have hover tooltips.
 
 import {
   useLayoutEffect,
@@ -134,7 +134,7 @@ export function CumulativeLines({
         color: 'key',
         r: 3.5,
       }),
-      ...(detail ? [crosshair({ marker: true })] : []),
+      crosshair({ marker: true }),
     ],
     guides: detail,
     margin: detail ? undefined : { top: 4, right: 4, bottom: 2, left: 2 },
@@ -170,28 +170,26 @@ export function CumulativeLines({
             )(series.length > 2 ? index / (series.length - 2) : 1),
       ),
     },
-    tooltip: detail
-      ? {
-          use: tooltip,
-          items: [
-            {
-              channel: 'group',
-              label: '',
-              text: (point) => String(point.datum.label),
-            },
-            {
-              id: 'x',
-              label: 'Date',
-              text: (point) => xLabel(point.datum.day),
-            },
-            {
-              id: 'y',
-              label: 'Total',
-              text: (point) => valueFormat(point.datum.y),
-            },
-          ],
-        }
-      : false,
+    tooltip: {
+      use: tooltip,
+      items: [
+        {
+          channel: 'group',
+          label: '',
+          text: (point) => String(point.datum.label),
+        },
+        {
+          id: 'x',
+          label: 'Date',
+          text: (point) => xLabel(point.datum.day),
+        },
+        {
+          id: 'y',
+          label: 'Total',
+          text: (point) => valueFormat(point.datum.y),
+        },
+      ],
+    },
   });
 
   return (
@@ -264,29 +262,26 @@ export function SportBars({
       },
     },
     color: { domain: [...sportOrder], range: sportColors },
-    tooltip: detail
-      ? {
-          use: tooltip,
-          items: [
-            {
-              channel: 'group',
-              label: 'Sport',
-              text: (point) => sportName(point.datum.sport),
-            },
-            {
-              id: 'x',
-              label: 'When',
-              text: (point) =>
-                (xTickFormat ?? ((x: string) => x))(point.datum.x),
-            },
-            {
-              id: 'value',
-              label: 'Value',
-              text: (point) => valueFormat(point.datum.value),
-            },
-          ],
-        }
-      : false,
+    tooltip: {
+      use: tooltip,
+      items: [
+        {
+          channel: 'group',
+          label: 'Sport',
+          text: (point) => sportName(point.datum.sport),
+        },
+        {
+          id: 'x',
+          label: 'When',
+          text: (point) => (xTickFormat ?? ((x: string) => x))(point.datum.x),
+        },
+        {
+          id: 'value',
+          label: 'Value',
+          text: (point) => valueFormat(point.datum.value),
+        },
+      ],
+    },
   });
   return (
     <Chart
@@ -358,24 +353,21 @@ export function PlainBars({
       domain: ['current', 'past'],
       range: [palette.foreground, palette.bar],
     },
-    tooltip: detail
-      ? {
-          use: tooltip,
-          items: [
-            {
-              channel: 'group',
-              label: '',
-              text: (point) =>
-                (xTickFormat ?? ((x: string) => x))(point.datum.x),
-            },
-            {
-              id: 'value',
-              label: 'Value',
-              text: (point) => valueFormat(point.datum.value),
-            },
-          ],
-        }
-      : false,
+    tooltip: {
+      use: tooltip,
+      items: [
+        {
+          channel: 'group',
+          label: '',
+          text: (point) => (xTickFormat ?? ((x: string) => x))(point.datum.x),
+        },
+        {
+          id: 'value',
+          label: 'Value',
+          text: (point) => valueFormat(point.datum.value),
+        },
+      ],
+    },
   });
   return (
     <Chart
@@ -408,7 +400,7 @@ export function DistanceElevationDots({
         fillOpacity: 0.7,
         strokeOpacity: 0,
       }),
-      ...(detail ? [crosshair({ marker: true })] : []),
+      crosshair({ marker: true }),
     ],
     guides: detail,
     margin: detail ? undefined : 3,
@@ -425,28 +417,26 @@ export function DistanceElevationDots({
       },
     },
     color: { domain: [...sportOrder], range: sportColors },
-    tooltip: detail
-      ? {
-          use: tooltip,
-          items: [
-            {
-              channel: 'group',
-              label: 'Sport',
-              text: (point) => sportName(point.datum.sport),
-            },
-            {
-              id: 'distance',
-              label: 'Distance',
-              text: (point) => `${point.datum.distance.toFixed(1)} km`,
-            },
-            {
-              id: 'elevation',
-              label: 'Elevation',
-              text: (point) => `${Math.round(point.datum.elevation)} m`,
-            },
-          ],
-        }
-      : false,
+    tooltip: {
+      use: tooltip,
+      items: [
+        {
+          channel: 'group',
+          label: 'Sport',
+          text: (point) => sportName(point.datum.sport),
+        },
+        {
+          id: 'distance',
+          label: 'Distance',
+          text: (point) => `${point.datum.distance.toFixed(1)} km`,
+        },
+        {
+          id: 'elevation',
+          label: 'Elevation',
+          text: (point) => `${Math.round(point.datum.elevation)} m`,
+        },
+      ],
+    },
   });
   return (
     <Chart

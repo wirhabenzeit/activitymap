@@ -128,7 +128,7 @@ function FillChart({
   children: (size: { width: number; height: number }) => ReactNode;
 }) {
   return (
-    <Measure className="pointer-events-none mt-2 min-h-0 flex-1">
+    <Measure className="mt-2 min-h-0 flex-1">
       {children}
     </Measure>
   );
@@ -346,6 +346,8 @@ const totalsView: TileView = {
 
 // Weekly volume -------------------------------------------------------------
 
+const weekOf = (x: string) => `Week of ${shortDate(dateOfDay(Number(x)))}`;
+
 function weekRows(context: TileContext, metric: StatsMetric) {
   return weeklyVolumeBySport(context.activities, context.today, metric).flatMap(
     ({ weekStart, bySport }) =>
@@ -384,6 +386,7 @@ const weeklyVolumeView: TileView = {
             detail={false}
             palette={context.palette}
             valueFormat={(value) => formatWithUnit(value, metric)}
+            xTickFormat={weekOf}
           />
         )}
       </FillChart>
@@ -810,6 +813,7 @@ const consistencyView: TileView = {
           height={height}
           detail={false}
           palette={context.palette}
+          xTickFormat={weekOf}
           valueFormat={(value) =>
             option === 'days' ? `${value} days` : formatWithUnit(value, 'time')
           }

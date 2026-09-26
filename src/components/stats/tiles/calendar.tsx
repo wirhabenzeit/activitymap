@@ -4,6 +4,7 @@
 // calendar tab it is drawn as plain SVG with d3 helpers, one cell per day,
 // weeks as columns starting on Monday.
 
+import { useState } from 'react';
 import * as d3 from 'd3';
 
 import { categorySettings } from '~/settings/category';
@@ -49,6 +50,15 @@ export function CalendarHeatmap({
   );
   const gap = Math.max(1, Math.round(cell * 0.18));
   const firstWeek = mondayOf(today) - (weeks - 1) * 7;
+  // The hovered day's label, drawn above its cell.
+  const [hover, setHover] = useState<{
+    x: number;
+    y: number;
+    text: string;
+  } | null>(null);
+  const hoverProps = (x: number, y: number, text: string) => ({
+    onPointerEnter: () => setHover({ x: x + (cell - gap) / 2, y, text }),
+  });
 
   const values = [...totals.values()]
     .map((day) => (colour === 'sport' ? day.time : day[colour]))
@@ -84,6 +94,7 @@ export function CalendarHeatmap({
             height={cell - gap}
             rx={cell > 8 ? 2 : 1}
             fill={palette.empty}
+            {...hoverProps(x, y, `${shortDate(date)}: no activity`)}
           />,
         );
         continue;
@@ -101,40 +112,53 @@ export function CalendarHeatmap({
             colour === 'sport' ? categorySettings[sport].color : palette.heat
           }
           fillOpacity={0.3 + 0.7 * intensity(value)}
-        >
-          <title>
-            {`${shortDate(date)}: ${categorySettings[sport].name}, ${
+          {...hoverProps(
+            x,
+            y,
+            `${shortDate(date)}: ${categorySettings[sport].name}, ${
               colour === 'sport'
                 ? formatWithUnit(dayTotals.time, 'time')
                 : formatWithUnit(value, colour)
-            }`}
-          </title>
-        </rect>,
+            }`,
+          )}
+        />,
       );
     }
   }
 
+  const svgWidth = Math.min(width, left + cell * weeks);
   return (
-    <svg
-      width={Math.min(width, left + cell * weeks)}
-      height={top + cell * 7}
-      role="img"
-      aria-label="Activity calendar"
-      className="mx-auto block text-[10px]"
-    >
-      {labels &&
-        ['Mon', 'Wed', 'Fri'].map((label, index) => (
-          <text
-            key={label}
-            x={0}
-            y={top + cell * index * 2 + cell * 0.75}
-            className="fill-muted-foreground"
-          >
-            {label}
-          </text>
-        ))}
-      {monthLabels}
-      {cells}
-    </svg>
+    <div className="relative mx-auto" style={{ width: svgWidth }}>
+      <svg
+        width={svgWidth}
+        height={top + cell * 7}
+        role="img"
+        aria-label="Activity calendar"
+        className="block text-[10px]"
+        onPointerLeave={() => setHover(null)}
+      >
+        {labels &&
+          ['Mon', 'Wed', 'Fri'].map((label, index) => (
+            <text
+              key={label}
+              x={0}
+              y={top + cell * index * 2 + cell * 0.75}
+              className="fill-muted-foreground"
+            >
+              {label}
+            </text>
+          ))}
+        {monthLabels}
+        {cells}
+      </svg>
+      {hover && (
+        <div
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border bg-popover px-1.5 py-0.5 text-[11px] text-popover-foreground shadow-sm"
+          style={{ left: hover.x, top: hover.y - 4 }}
+        >
+          {hover.text}
+        </div>
+      )}
+    </div>
   );
 }
