@@ -52,15 +52,17 @@ struct MapScreen: View {
             }
 
             mapControls
-                .padding(16)
+                .padding(.trailing, 16)
+                // Leave the native Mapbox attribution button unobstructed.
+                .padding(.bottom, 56)
 
             if let attribution {
                 Text(attribution)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
-                    .glassEffect(.clear, in: Capsule())
+                    .modifier(MapChromeSurface())
                     .padding(.leading, 8)
                     .padding(.bottom, 42)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
@@ -100,7 +102,7 @@ struct MapScreen: View {
     }
 
     private var mapControls: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             Menu {
                 Section("Base Map") {
                     Picker("Base Map", selection: $baseStyle) {
@@ -126,26 +128,39 @@ struct MapScreen: View {
                 }
             } label: {
                 Image(systemName: "square.3.layers.3d")
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 48)
             }
+            .accessibilityLabel("Map layers")
+
+            Divider().frame(width: 24)
 
             Button {
                 isPitched.toggle()
                 updateViewport()
             } label: {
                 Image(systemName: "view.3d")
-                    .frame(width: 36, height: 36)
+                    .foregroundStyle(isPitched ? Color.blue : Color.primary)
+                    .frame(width: 44, height: 48)
             }
+            .accessibilityLabel("3D map")
+            .accessibilityValue(isPitched ? "On" : "Off")
+
+            Divider().frame(width: 24)
 
             Button {
                 isPitched = false
                 updateViewport()
             } label: {
                 Image(systemName: "scope")
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 48)
             }
+            .accessibilityLabel("Reset map view")
         }
-        .buttonStyle(.glass(.clear))
+        .buttonStyle(.plain)
+        .font(.body.weight(.semibold))
+        .foregroundStyle(Color.primary)
+        .padding(4)
+        .modifier(MapChromeSurface())
     }
 
     private var mapStyle: MapStyle {

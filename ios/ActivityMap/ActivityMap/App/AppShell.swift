@@ -40,11 +40,6 @@ struct AppShell: View {
                         await refresh()
                     }
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if let sync {
-                        SyncStatusView(sync: sync, refresh: refresh)
-                    }
-                }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Menu {
@@ -69,8 +64,12 @@ struct AppShell: View {
                             }
                         } label: {
                             Image(systemName: "person.crop.circle")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(Color.primary)
+                                .frame(width: 44, height: 44)
+                                .modifier(MapChromeSurface())
                         }
-                        .buttonStyle(.glass(.clear))
+                        .buttonStyle(.plain)
                         .accessibilityLabel("Account and Settings")
                     }
                     .sharedBackgroundVisibility(.hidden)
@@ -88,7 +87,7 @@ struct AppShell: View {
                                 ? "line.3.horizontal.decrease"
                                 : "line.3.horizontal.decrease.circle.fill")
                         }
-                        .buttonStyle(.glass(.clear))
+                        .buttonStyle(MapChromeButtonStyle(isSelected: store.activeFilterCount > 0))
                         .accessibilityLabel(filterButtonLabel)
                     }
                     .sharedBackgroundVisibility(.hidden)
@@ -138,11 +137,12 @@ struct AppShell: View {
                     Text(tab.title)
                         .font(.subheadline)
                         .fontWeight(store.selectedTab == tab ? .semibold : .regular)
+                        .foregroundStyle(Color.primary)
                         .frame(minWidth: 54)
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 7)
+                        .frame(minHeight: 44)
                         .background(
-                            store.selectedTab == tab ? Color.accentColor.opacity(0.18) : .clear,
+                            store.selectedTab == tab ? Color.primary.opacity(0.12) : .clear,
                             in: Capsule()
                         )
                 }
@@ -151,7 +151,7 @@ struct AppShell: View {
             }
         }
         .padding(3)
-        .glassEffect(.clear, in: Capsule())
+        .modifier(MapChromeSurface())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("View")
     }
