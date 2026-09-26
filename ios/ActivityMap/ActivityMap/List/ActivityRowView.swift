@@ -21,6 +21,7 @@ struct ActivityRowView: View {
                             .strokeBorder(isSelected ? activity.category.color : .clear, lineWidth: 1.5)
                     )
             }
+            .frame(minWidth: 44, minHeight: 44)
             .buttonStyle(.plain)
             .accessibilityLabel(isSelected ? "Deselect \(activity.name)" : "Select \(activity.name)")
             .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -45,6 +46,7 @@ struct ActivityRowView: View {
                 store.showOnMap(activity.id)
             } label: {
                 Image(systemName: hasGeometry ? "map" : "map.slash")
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
             .disabled(!hasGeometry)
@@ -52,12 +54,14 @@ struct ActivityRowView: View {
             .accessibilityHint(hasGeometry ? "" : "This activity has no GPS route.")
 
             Button {
-                store.inspect(activity.id)
+                if store.inspectedActivityID == activity.id { store.dismissInspection() }
+                else { store.inspect(activity.id) }
             } label: {
-                Image(systemName: "info.circle")
+                Image(systemName: store.inspectedActivityID == activity.id ? "xmark.circle" : "info.circle")
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Details for \(activity.name)")
+            .accessibilityLabel("\(store.inspectedActivityID == activity.id ? "Close details for" : "Details for") \(activity.name)")
         }
         .contentShape(Rectangle())
     }
