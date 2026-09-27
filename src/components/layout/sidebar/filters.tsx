@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
-import { MoreHorizontal, Search, RotateCcw } from 'lucide-react';
+import { MoreHorizontal, Search, FunnelX } from 'lucide-react';
 
 import { useShallowStore } from '~/store';
 
@@ -535,13 +535,13 @@ export function ResetFilters() {
     <SidebarMenuItem className="mx-2 mt-2 group-data-[collapsible=icon]:mx-0">
       <SidebarMenuButton
         variant="outline"
-        aria-label="Reset filters"
-        tooltip="Reset filters"
+        aria-label="Clear filters"
+        tooltip="Clear filters"
         onClick={resetFilters}
       >
-        <RotateCcw />
+        <FunnelX />
         <span className="group-data-[collapsible=icon]:hidden">
-          Reset filters
+          Clear filters
         </span>
       </SidebarMenuButton>
     </SidebarMenuItem>
