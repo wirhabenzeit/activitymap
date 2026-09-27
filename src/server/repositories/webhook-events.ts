@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, asc, eq, inArray, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lt, lte, min, sql } from 'drizzle-orm';
 
 import { db as defaultDb } from '~/server/db';
 import { stravaWebhookEvents, type StravaWebhookEventRow } from '~/server/db/schema';
@@ -246,7 +246,7 @@ export function createWebhookEventsRepository(
       const countsByStatus = Object.fromEntries(rows.map((r) => [r.status, r.count]));
 
       const [oldestPending] = await database
-        .select({ oldest: sql<Date | null>`min(${stravaWebhookEvents.eventTime})` })
+        .select({ oldest: min(stravaWebhookEvents.eventTime) })
         .from(stravaWebhookEvents)
         .where(inArray(stravaWebhookEvents.status, ACTIVE_STATUSES));
 
