@@ -11,13 +11,15 @@
 // section in a row sized to its content, pushing the other cards down, and
 // Motion animates the reflow. Expanded, a tile is the same tile drawn
 // larger (the same headline and visual, with axes on charts), plus any
-// extra context the tile has. Clicking outside, Escape or the collapse
-// button returns it.
+// extra context the tile has. Escape or the collapse button returns it;
+// interacting outside the card leaves it open, including touch scrolling.
 
 import {
+  useCallback,
   useEffect,
-  useMemo,
+  useLayoutEffect,
   useRef,
+  useMemo,
   useState,
   type CSSProperties,
 } from 'react';
@@ -177,6 +179,18 @@ export default function StatsTiles() {
   );
 }
 
+// offsetTop ignores Motion's temporary transforms, so this measures the final
+// layout even while desktop cards animate between their grid positions.
+function layoutTop(element: HTMLElement, container: HTMLElement) {
+  let top = 0;
+  let current: HTMLElement | null = element;
+  while (current && current !== container) {
+    top += current.offsetTop;
+    current = current.offsetParent as HTMLElement | null;
+  }
+  return top;
+}
+
 export function StatsTileGrid({
   activities,
   filtered = false,
@@ -214,9 +228,43 @@ export function StatsTileGrid({
   );
 
   const [expandedID, setExpandedID] = useState<StatsTileID | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollAnchor = useRef<{ id: StatsTileID; top: number } | null>(null);
+  const changeExpansion = useCallback(
+    (id: StatsTileID | null) => {
+      const container = scrollRef.current;
+      const anchorID = id ?? expandedID;
+      const card = container?.querySelector<HTMLElement>(
+        `[data-tile-id="${anchorID}"]`,
+      );
+      if (container && card && anchorID) {
+        scrollAnchor.current = {
+          id: anchorID,
+          top: layoutTop(card, container) - container.scrollTop,
+        };
+      }
+      setExpandedID(id);
+    },
+    [expandedID],
+  );
 
-  // Escape or a press anywhere outside the expanded card collapses it. A
-  // press on another expandable tile then expands that one instead.
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    const anchor = scrollAnchor.current;
+    scrollAnchor.current = null;
+    if (!container || !anchor) return;
+    const card = container.querySelector<HTMLElement>(
+      `[data-tile-id="${anchor.id}"]`,
+    );
+    if (card) {
+      // Keep the selected header under the user's finger when a previously
+      // expanded card above it shrinks. Adjust only this scroller, before paint.
+      container.scrollTop = layoutTop(card, container) - anchor.top;
+    }
+  }, [expandedID]);
+
+  // Inline details stay open while scrolling or interacting elsewhere. Only
+  // the collapse control, Escape, or opening another tile changes expansion.
   useEffect(() => {
     if (!expandedID || detailsOpen) return;
     const onKey = (event: KeyboardEvent) => {
@@ -226,48 +274,47 @@ export function StatsTileGrid({
             `[data-tile-id="${expandedID}"] button[aria-expanded]`,
           )
           ?.focus({ preventScroll: true });
-        setExpandedID(null);
+        changeExpansion(null);
       }
     };
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Element | null;
-      if (!target?.closest(`[data-tile-id="${expandedID}"]`))
-        setExpandedID(null);
-    };
     window.addEventListener('keydown', onKey);
-    document.addEventListener('pointerdown', onPointerDown);
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.removeEventListener('pointerdown', onPointerDown);
     };
-  }, [expandedID, detailsOpen]);
+  }, [expandedID, detailsOpen, changeExpansion]);
 
   return (
-    <Measure className="h-full w-full overflow-y-auto">
-      {({ width }) => {
-        const padding = width < 520 ? 12 : 16;
-        return (
-          <LayoutGroup>
-            <div className="flex flex-col gap-5" style={{ padding }}>
-              {statsTileGroups.map((group) => (
-                <BentoGroup
-                  key={group.id}
-                  title={group.title}
-                  tiles={shownTiles.filter(
-                    ({ tile }) => tile.group === group.id,
-                  )}
-                  width={width - 2 * padding}
-                  context={context}
-                  expandedID={expandedID}
-                  onExpand={setExpandedID}
-                  onCollapse={() => setExpandedID(null)}
-                />
-              ))}
-            </div>
-          </LayoutGroup>
-        );
-      }}
-    </Measure>
+    <motion.div
+      ref={scrollRef}
+      layoutScroll
+      className="relative h-full w-full overflow-y-auto overscroll-y-contain [overflow-anchor:none]"
+    >
+      <Measure className="h-full w-full">
+        {({ width }) => {
+          const padding = width < 520 ? 12 : 16;
+          return (
+            <LayoutGroup>
+              <div className="flex flex-col gap-5" style={{ padding }}>
+                {statsTileGroups.map((group) => (
+                  <BentoGroup
+                    key={group.id}
+                    title={group.title}
+                    tiles={shownTiles.filter(
+                      ({ tile }) => tile.group === group.id,
+                    )}
+                    width={width - 2 * padding}
+                    context={context}
+                    expandedID={expandedID}
+                    onExpand={changeExpansion}
+                    onCollapse={() => changeExpansion(null)}
+                  />
+                ))}
+              </div>
+            </LayoutGroup>
+          );
+        }}
+      </Measure>
+    </motion.div>
   );
 }
 
@@ -296,6 +343,10 @@ function BentoGroup({
       : width >= compact.minWidth
         ? compact
         : narrow;
+  const reduceMotion = useReducedMotion();
+  // A single-column list should stay anchored under the finger while changing
+  // height; there is no sideways reflow to animate on narrow screens.
+  const animateLayout = !reduceMotion && grid.columns > 1;
   // Collapsed, tiles pack as the manifest says. An expanded tile spans the
   // whole section in one content-sized row, starting on the row it was on,
   // so that row and the ones below move down; the other tiles keep their
@@ -351,7 +402,10 @@ function BentoGroup({
   if (tiles.length === 0) return null;
 
   return (
-    <motion.section aria-label={title} layout="position">
+    <motion.section
+      aria-label={title}
+      layout={animateLayout ? 'position' : false}
+    >
       <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {title}
       </h2>
@@ -375,6 +429,7 @@ function BentoGroup({
               tile={tile}
               view={view}
               context={context}
+              animateLayout={animateLayout}
               large={'primary' in tile && tile.primary}
               expanded={tile.id === expandedID}
               onExpand={() => onExpand(tile.id)}
@@ -426,6 +481,7 @@ function TileCard({
   view,
   context,
   large,
+  animateLayout,
   expanded,
   onExpand,
   onCollapse,
@@ -435,14 +491,12 @@ function TileCard({
   view: TileView;
   context: TileContext;
   large: boolean;
+  animateLayout: boolean;
   expanded: boolean;
   onExpand: () => void;
   onCollapse: () => void;
   style: CSSProperties;
 }) {
-  const cardRef = useRef<HTMLElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const reduceMotion = useReducedMotion();
   const toggle = toggleOf(tile);
   // One switch state for both sizes, so expanding keeps the chosen metric.
   const [option, setOption] = useState<string | undefined>(
@@ -450,24 +504,12 @@ function TileCard({
   );
   const summary = view.summary(context, option);
 
-  useEffect(() => {
-    if (!expanded) return;
-    // Bring the whole expanded card into view once the reflow has settled.
-    const scroll = window.setTimeout(
-      () =>
-        cardRef.current?.scrollIntoView({
-          block: 'nearest',
-          behavior: reduceMotion ? 'instant' : 'smooth',
-        }),
-      350,
-    );
-    return () => window.clearTimeout(scroll);
-  }, [expanded, reduceMotion]);
+  // Keep the user's scroll position. scrollIntoView after an animation races
+  // with touch scrolling and can also scroll the app's overflow-hidden shell.
 
   return (
     <motion.section
-      ref={cardRef}
-      layout={!reduceMotion}
+      layout={animateLayout}
       transition={layoutTransition}
       aria-label={tile.title}
       data-tile-id={tile.id}
@@ -490,7 +532,7 @@ function TileCard({
       style={style}
     >
       <motion.div
-        layout="position"
+        layout={animateLayout ? 'position' : false}
         className={cn(
           'flex min-w-0 flex-col p-3.5',
           // Collapsed, the face fills the tile; expanded, the card sizes
@@ -500,7 +542,6 @@ function TileCard({
       >
         <div className="flex items-start justify-between gap-2">
           <button
-            ref={triggerRef}
             type="button"
             aria-expanded={expanded}
             aria-label={`${expanded ? 'Collapse' : 'Expand'} ${tile.title}`}
@@ -545,8 +586,14 @@ function TileCard({
           )}
         {expanded && view.more && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: { delay: 0.2, duration: 0.2 } }}
+            initial={animateLayout ? { opacity: 0 } : false}
+            animate={{
+              opacity: 1,
+              transition: {
+                delay: animateLayout ? 0.2 : 0,
+                duration: animateLayout ? 0.2 : 0,
+              },
+            }}
           >
             {view.more(context, option)}
           </motion.div>
