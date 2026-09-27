@@ -4,7 +4,6 @@ enum StatsTab: String, CaseIterable, Identifiable {
     case calendar = "Calendar"
     case timeline = "Timeline"
     case progress = "Progress"
-    case scatter = "Scatter"
 
     var id: String { rawValue }
 }
@@ -30,7 +29,6 @@ struct StatsScreen: View {
                     case .calendar: CalendarHeatmapView(activities: store.filteredActivities)
                     case .timeline: TimelineChartView(activities: store.filteredActivities)
                     case .progress: ProgressChartView(activities: store.filteredActivities)
-                    case .scatter: ScatterChartView(activities: store.filteredActivities)
                     }
                 }
                 .padding()

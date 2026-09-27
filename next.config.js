@@ -34,6 +34,11 @@ const config = {
         permanent: true,
       },
       {
+        source: "/stats/scatter",
+        destination: "/stats/tiles",
+        permanent: true,
+      },
+      {
         source: "/stats",
         destination: "/stats/calendar",
         permanent: true,

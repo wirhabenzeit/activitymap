@@ -9,7 +9,6 @@ export enum StatsPlots {
   calendar = '/stats/calendar',
   progress = '/stats/progress',
   timeline = '/stats/timeline',
-  scatter = '/stats/scatter',
 }
 
 export type StatsTab = typeof StatsPlots[keyof typeof StatsPlots];

@@ -99,10 +99,6 @@ const exploreLinks: Partial<
     href: '/stats/progress',
     label: 'Compare other years, months and weeks',
   },
-  distanceVsElevation: {
-    href: '/stats/scatter',
-    label: 'Explore activity relationships',
-  },
 };
 
 const toggleOf = (tile: StatsTile) => ('toggle' in tile ? tile.toggle : null);

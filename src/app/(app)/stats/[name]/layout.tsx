@@ -23,7 +23,7 @@ type StatsPlotsKeys = keyof typeof statsPlots;
 type TabKeys = `/stats/${StatsPlotsKeys | 'tiles'}`;
 type TabValue = { label: string; index: number };
 
-// The tile-based view is a proof of concept that sits next to the four
+// The tile-based view is a proof of concept that sits next to the three
 // configurable charts until it replaces them.
 const tabs = (Object.keys(statsPlots) as (keyof typeof statsPlots)[]).reduce(
   (acc, name, index) => ({

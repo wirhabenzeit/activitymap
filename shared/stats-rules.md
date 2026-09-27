@@ -69,4 +69,4 @@ Tiles respect sport, search, numeric and binary activity filters for both the re
 
 ## Presentation
 
-Every declared tile switch is available on the web, with the manifest's first option as its default. Expanding a tile preserves the selected metric or range, including Consistency and Sport mix. Calendar metric colouring uses a linear scale from zero to the largest daily value in its window. Time always means moving time; sidebar duration thresholds still mean elapsed time. Narrow layouts use the manifest's single-column grid. The existing calendar, timeline, progress and scatter tabs remain available for historical exploration.
+Every declared tile switch is available on the web, with the manifest's first option as its default. Expanding a tile preserves the selected metric or range, including Consistency and Sport mix. Calendar metric colouring uses a linear scale from zero to the largest daily value in its window. Time always means moving time; sidebar duration thresholds still mean elapsed time. Narrow layouts use the manifest's single-column grid. The existing calendar, timeline and progress tabs remain available for historical exploration.
