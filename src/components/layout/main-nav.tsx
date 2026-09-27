@@ -3,12 +3,10 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Map } from "lucide-react";
 import { cn } from "~/lib/utils";
-import { useShallowStore } from "~/store";
 
 export function MainNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const activeTab = useShallowStore((state) => state.activeTab);
 
   const handleNavigation = (path: string) => {
     router.push(path);
@@ -50,7 +48,7 @@ export function MainNav() {
           List
         </button>
         <button
-          onClick={() => handleNavigation(activeTab)}
+          onClick={() => handleNavigation('/stats/tiles')}
           className={cn(
             "hover:text-header-foreground",
             currentView === 'stats'

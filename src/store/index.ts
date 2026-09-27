@@ -8,7 +8,6 @@ import {
 import { immer } from 'zustand/middleware/immer';
 import { useShallow } from 'zustand/shallow';
 
-import { type StatsSlice, createStatsSlice } from './stats';
 import { type ListSlice, createListSlice } from './list';
 import { type SelectionSlice, createSelectionSlice } from './selection';
 import { type MapSlice, createMapSlice } from './map';
@@ -31,8 +30,7 @@ import {
 import { baseMaps, overlayMaps, defaultMapPosition } from '~/settings/map';
 
 // Combine all slice types into the root state type
-export type RootState = StatsSlice &
-  ListSlice &
+export type RootState = ListSlice &
   SelectionSlice &
   MapSlice &
   ActivitySlice &
@@ -144,7 +142,6 @@ export const store = create<RootState>()(
   devtools(
     persist(
       immer((set, get, store) => ({
-        ...createStatsSlice(set, get, store),
         ...createListSlice(set, get, store),
         ...createSelectionSlice(set, get, store),
         ...createMapSlice(set, get, store),

@@ -35,7 +35,7 @@ const config = {
       },
       {
         source: "/stats",
-        destination: "/stats/calendar",
+        destination: "/stats/tiles",
         permanent: true,
       },
     ];

@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
-import { MoreHorizontal, Search, RotateCcw } from 'lucide-react';
+import { MoreHorizontal, Search, FunnelX } from 'lucide-react';
 
 import { useShallowStore } from '~/store';
 
@@ -179,6 +180,45 @@ export function CategoryFilter() {
   );
 }
 
+// Collapsed controls need their own content surface: clipping a full form leaves
+// invisible focus targets and unreadable labels in the icon rail.
+function CollapsedFilter({
+  label,
+  icon,
+  active = false,
+  children,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <SidebarMenuItem>
+      <Popover>
+        <PopoverTrigger asChild>
+          <SidebarMenuButton
+            aria-label={label}
+            tooltip={label}
+            isActive={active}
+          >
+            {icon}
+          </SidebarMenuButton>
+        </PopoverTrigger>
+        <PopoverContent
+          side="right"
+          align="start"
+          aria-label={label}
+          className="w-64 space-y-2 p-3"
+        >
+          <p className="text-sm font-medium">{label}</p>
+          {children}
+        </PopoverContent>
+      </Popover>
+    </SidebarMenuItem>
+  );
+}
+
 function InequalityFilterContent({
   operator,
   toggleOperator,
@@ -253,7 +293,7 @@ export function InequalityFilter({
     }));
   };
 
-  const { open } = useSidebar();
+  const { state } = useSidebar();
 
   const toggleOperator = () => {
     const next = operator === '>=' ? '<=' : '>=';
@@ -261,38 +301,42 @@ export function InequalityFilter({
     setValueOperator(name, next);
   };
 
+  const content = (
+    <InequalityFilterContent
+      operator={operator}
+      toggleOperator={toggleOperator}
+      unit={inequalityFilters[name].unit}
+      label={inequalityFilters[name].label}
+      input={input}
+      validateInput={validateInput}
+    />
+  );
+
+  if (state === 'collapsed') {
+    return (
+      <CollapsedFilter
+        label={`${inequalityFilters[name].label} filter`}
+        icon={inequalityFilters[name].icon}
+        active={Boolean(filter)}
+      >
+        {content}
+      </CollapsedFilter>
+    );
+  }
+
   return (
-    <SidebarMenuItem className="peer/menu-button flex w-full items-center gap-0 overflow-hidden rounded-md text-left outline-hidden transition-[width,height,padding] group-data-[collapsible=icon]:size-8! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 h-8 text-sm">
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button className="size-8 px-2" variant="ghost" disabled={open}>
-            {inequalityFilters[name].icon}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-2">
-          <InequalityFilterContent
-            operator={operator}
-            toggleOperator={toggleOperator}
-            unit={inequalityFilters[name].unit}
-            label={inequalityFilters[name].label}
-            input={input}
-            validateInput={validateInput}
-          />
-        </PopoverContent>
-      </Popover>
-      <InequalityFilterContent
-        operator={operator}
-        toggleOperator={toggleOperator}
-        unit={inequalityFilters[name].unit}
-        label={inequalityFilters[name].label}
-        input={input}
-        validateInput={validateInput}
-      />
+    <SidebarMenuItem className="flex h-8 w-full items-center text-sm">
+      <span className="flex size-8 shrink-0 items-center justify-center [&>svg]:size-4">
+        {inequalityFilters[name].icon}
+      </span>
+      {content}
     </SidebarMenuItem>
   );
 }
 
 export function MonthPicker() {
+  const { state } = useSidebar();
+  const pathname = usePathname();
   const [dates, setDates] = useShallowStore((state) => [
     state.dateRange,
     state.setDateRange,
@@ -312,6 +356,30 @@ export function MonthPicker() {
   const dateStr = [validSelectedDates?.start, validSelectedDates?.end].map(
     (date) => (date ? format(date, 'MMM yyyy') : undefined),
   );
+
+  if (pathname === '/stats/tiles') {
+    const explanation = (
+      <span>
+        Each stats card uses its own period. Your date range is kept for other
+        views.
+      </span>
+    );
+    if (state === 'collapsed') {
+      return (
+        <CollapsedFilter label="Stats date periods" icon={<CalendarIcon />}>
+          <p className="text-sm text-muted-foreground">{explanation}</p>
+        </CollapsedFilter>
+      );
+    }
+    return (
+      <SidebarMenuItem>
+        <div className="flex gap-2 px-2 py-2 text-xs text-muted-foreground">
+          <CalendarIcon className="h-4 w-4 shrink-0" />
+          {explanation}
+        </div>
+      </SidebarMenuItem>
+    );
+  }
 
   return (
     <SidebarMenuItem>
@@ -373,29 +441,46 @@ export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
 
   const id = React.useId();
 
+  const { state } = useSidebar();
+  const control = (
+    <Select
+      value={binary}
+      onValueChange={(value) => handleChange(value as BinaryFilterMode)}
+    >
+      <SelectTrigger
+        id={id}
+        className="ml-auto h-8 w-24"
+        aria-label={`${binaryFilters[name].label} filter`}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="any">Any</SelectItem>
+        <SelectItem value="yes">Yes</SelectItem>
+        <SelectItem value="no">No</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+
+  if (state === 'collapsed') {
+    return (
+      <CollapsedFilter
+        label={`${binaryFilters[name].label} filter`}
+        icon={binaryFilters[name].icon}
+        active={binary !== 'any'}
+      >
+        {control}
+      </CollapsedFilter>
+    );
+  }
+
   return (
     <SidebarMenuItem className="mx-2 flex h-9 items-center gap-3">
       {binaryFilters[name].icon}
       <label htmlFor={id} className="min-w-16 text-sm font-medium leading-none">
         {binaryFilters[name].label}
       </label>
-      <Select
-        value={binary}
-        onValueChange={(value) => handleChange(value as BinaryFilterMode)}
-      >
-        <SelectTrigger
-          id={id}
-          className="ml-auto h-8 w-24"
-          aria-label={`${binaryFilters[name].label} filter`}
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">Any</SelectItem>
-          <SelectItem value="yes">Yes</SelectItem>
-          <SelectItem value="no">No</SelectItem>
-        </SelectContent>
-      </Select>
+      {control}
     </SidebarMenuItem>
   );
 }
@@ -406,30 +491,59 @@ export function SearchFilter() {
     state.setSearch,
   ]);
 
+  const { state } = useSidebar();
+  const input = (
+    <Input
+      aria-label="Search activity names"
+      className={cn('h-8', state === 'expanded' && 'pl-8')}
+      placeholder="Search activities"
+      type="search"
+      value={search}
+      onChange={(event) => setSearch(event.target.value)}
+    />
+  );
+
+  if (state === 'collapsed') {
+    return (
+      <CollapsedFilter
+        label="Search activities"
+        icon={<Search />}
+        active={Boolean(search)}
+      >
+        {input}
+      </CollapsedFilter>
+    );
+  }
+
   return (
     <SidebarMenuItem className="relative mx-2">
       <Search className="pointer-events-none absolute left-2 top-2 size-4 text-muted-foreground" />
-      <Input
-        aria-label="Search activity names"
-        className="h-8 pl-8"
-        placeholder="Search activities"
-        type="search"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
+      {input}
     </SidebarMenuItem>
   );
 }
 
 export function ResetFilters() {
-  const resetFilters = useShallowStore((state) => state.resetFilters);
+  const pathname = usePathname();
+  const resetFilters = useShallowStore((state) =>
+    pathname === '/stats/tiles'
+      ? state.resetActivityFilters
+      : state.resetFilters,
+  );
 
   return (
-    <SidebarMenuItem className="mx-2 mt-2">
-      <Button className="h-8 w-full" variant="outline" onClick={resetFilters}>
-        <RotateCcw />
-        Reset filters
-      </Button>
+    <SidebarMenuItem className="mx-2 mt-2 group-data-[collapsible=icon]:mx-0">
+      <SidebarMenuButton
+        variant="outline"
+        aria-label="Clear filters"
+        tooltip="Clear filters"
+        onClick={resetFilters}
+      >
+        <FunnelX />
+        <span className="group-data-[collapsible=icon]:hidden">
+          Clear filters
+        </span>
+      </SidebarMenuButton>
     </SidebarMenuItem>
   );
 }

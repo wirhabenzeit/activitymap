@@ -26,6 +26,7 @@
     "db:schema:fingerprint": "tsx scripts/database/migrate.ts fingerprint",
     "db:baseline:adopt": "tsx scripts/database/migrate.ts adopt-baseline",
     "test": "tsx --conditions=react-server --test \"src/**/*.test.ts\"",
+    "test:stats-ui": "tsx --test src/components/stats/tiles/*.test.tsx",
     "test:sync": "tsx src/scripts/test-sync-activities.ts",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
     "openapi:verify-swift": "bash scripts/verify-swift-client.sh",
@@ -36,7 +37,9 @@
     "api-dtos:check": "tsx scripts/generate-api-dtos-swift.ts --check",
     "friflyt:enrich": "node scripts/enrich-friflyt-geojson.mjs",
     "friflyt:enrich:translate": "node scripts/enrich-friflyt-geojson.mjs --translate",
-    "db:test-stream-backfill": "tsx --conditions=react-server scripts/database/test-stream-backfill.ts"
+    "db:test-stream-backfill": "tsx --conditions=react-server scripts/database/test-stream-backfill.ts",
+    "stats-tiles:generate": "tsx scripts/generate-stats-tiles.ts",
+    "stats-tiles:check": "tsx scripts/generate-stats-tiles.ts --check"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
@@ -93,6 +96,7 @@
     "immer": "^11.1.18",
     "lucide-react": "^1.45.0",
     "mapbox-gl": "^3.30.0",
+    "motion": "^13.4.4",
     "next": "^16.3.5",
     "next-themes": "^0.4.6",
     "postgres": "^3.4.9",
