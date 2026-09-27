@@ -7,10 +7,12 @@
 // layout's columns, so tiles widen on big screens. Only primary tiles get
 // the large headline numerals.
 //
-// Tiles are static summaries by default. The few with more to show expand
-// in place: the card takes the full width of its section and as many rows
-// as its detail needs, pushing the other cards down, and Motion animates
-// the reflow. Clicking outside, Escape or the collapse button returns it.
+// Every tile expands in place: the card takes the full width of its
+// section in a row sized to its content, pushing the other cards down, and
+// Motion animates the reflow. Expanded, a tile is the same tile drawn
+// larger (the same headline and visual, with axes on charts), plus any
+// extra context the tile has. Clicking outside, Escape or the collapse
+// button returns it.
 
 import {
   useEffect,
@@ -54,17 +56,6 @@ const shownTiles: ShownTile[] = statsTiles.flatMap((tile) => {
   return view ? [{ tile, view }] : [];
 });
 
-// Only these tiles expand; the rest are summary indicators, so the page
-// does not feel like every number is secretly a button.
-const expandableIDs = new Set<StatsTileID>([
-  'weeklyVolume',
-  'yearToDate',
-  'monthVsLastMonth',
-  'activityCalendar',
-  'distanceVsElevation',
-  'sportMix',
-]);
-
 const toggleOf = (tile: StatsTile) => ('toggle' in tile ? tile.toggle : null);
 
 const layoutTransition = {
@@ -93,7 +84,6 @@ export function StatsTileGrid({ activities }: { activities: StatsActivity[] }) {
   );
 
   const [expandedID, setExpandedID] = useState<StatsTileID | null>(null);
-  const [expandedRows, setExpandedRows] = useState(3);
 
   // Escape or a press anywhere outside the expanded card collapses it. A
   // press on another expandable tile then expands that one instead.
@@ -133,13 +123,8 @@ export function StatsTileGrid({ activities }: { activities: StatsActivity[] }) {
                   width={width - 2 * padding}
                   context={context}
                   expandedID={expandedID}
-                  expandedRows={expandedRows}
-                  onExpand={(id) => {
-                    setExpandedRows(3);
-                    setExpandedID(id);
-                  }}
+                  onExpand={setExpandedID}
                   onCollapse={() => setExpandedID(null)}
-                  onExpandedRows={setExpandedRows}
                 />
               ))}
             </div>
@@ -159,10 +144,8 @@ function BentoGroup({
   width,
   context,
   expandedID,
-  expandedRows,
   onExpand,
   onCollapse,
-  onExpandedRows,
 }: {
   title: string;
   collapsed: boolean;
@@ -170,17 +153,15 @@ function BentoGroup({
   width: number;
   context: TileContext;
   expandedID: StatsTileID | null;
-  expandedRows: number;
   onExpand: (id: StatsTileID) => void;
   onCollapse: () => void;
-  onExpandedRows: (rows: number) => void;
 }) {
   const [folded, setFolded] = useState(collapsed);
   const grid = width >= regular.minWidth ? regular : compact;
   // Collapsed, tiles pack as the manifest says. An expanded tile spans the
-  // whole section and as many rows as its detail needs, starting on the
-  // row it was on, so that row and the ones below move down; the other
-  // tiles keep their size meanwhile.
+  // whole section in one content-sized row, starting on the row it was on,
+  // so that row and the ones below move down; the other tiles keep their
+  // size meanwhile.
   const collapsedPlacements = placeBento(
     tiles.map(({ tile }) => tile.span),
     grid.columns,
@@ -212,7 +193,7 @@ function BentoGroup({
           const placed = placeBento(
             order.map((index) =>
               index === expandedIndex
-                ? { columns: grid.columns, rows: expandedRows }
+                ? { columns: grid.columns, rows: 1 }
                 : tiles[index]!.tile.span,
             ),
             grid.columns,
@@ -224,6 +205,11 @@ function BentoGroup({
           });
           return byTile;
         })();
+  const rowCount = Math.max(
+    0,
+    ...placements.map((placement) => placement.row + placement.rows - 1),
+  );
+  const expandedRow = expandedIndex < 0 ? null : placements[expandedIndex]!.row;
   if (tiles.length === 0) return null;
 
   const heading = (
@@ -257,12 +243,15 @@ function BentoGroup({
           style={{
             gap,
             gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
-            gridAutoRows: grid.rowHeight,
+            // The expanded tile sits in one row sized to its content; every
+            // other row keeps the grid's row height.
+            gridTemplateRows: Array.from({ length: rowCount }, (_, index) =>
+              index + 1 === expandedRow ? 'auto' : `${grid.rowHeight}px`,
+            ).join(' '),
           }}
         >
           {tiles.map(({ tile, view }, index) => {
             const placement = placements[index]!;
-            const expandable = expandableIDs.has(tile.id) && !!view.detail;
             return (
               <TileCard
                 key={tile.id}
@@ -271,16 +260,8 @@ function BentoGroup({
                 context={context}
                 large={'primary' in tile && tile.primary}
                 expanded={tile.id === expandedID}
-                onExpand={expandable ? () => onExpand(tile.id) : undefined}
+                onExpand={() => onExpand(tile.id)}
                 onCollapse={onCollapse}
-                onHeight={(height) =>
-                  onExpandedRows(
-                    Math.max(
-                      2,
-                      Math.ceil((height + gap) / (grid.rowHeight + gap)),
-                    ),
-                  )
-                }
                 style={{
                   gridColumn: `${placement.column} / span ${placement.columns}`,
                   gridRow: `${placement.row} / span ${placement.rows}`,
@@ -299,7 +280,7 @@ function Headline({
   size,
 }: {
   summary: TileSummary;
-  size: 'tile' | 'large' | 'detail';
+  size: 'tile' | 'large';
 }) {
   return (
     <>
@@ -308,7 +289,6 @@ function Headline({
           'shrink-0 truncate font-mono font-medium tabular-nums leading-tight tracking-tight',
           size === 'tile' && 'mt-1 text-[20px]',
           size === 'large' && 'mt-1 text-[32px]',
-          size === 'detail' && 'mt-1 text-[32px]',
         )}
       >
         {summary.value}
@@ -333,7 +313,6 @@ function TileCard({
   expanded,
   onExpand,
   onCollapse,
-  onHeight,
   style,
 }: {
   tile: StatsTile;
@@ -341,23 +320,19 @@ function TileCard({
   context: TileContext;
   large: boolean;
   expanded: boolean;
-  // Set when the tile can expand.
-  onExpand?: () => void;
+  onExpand: () => void;
   onCollapse: () => void;
-  // The expanded content's natural height, so the grid can size its rows.
-  onHeight: (height: number) => void;
   style: CSSProperties;
 }) {
   const cardRef = useRef<HTMLElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
+  // One switch state for both sizes, so expanding keeps the chosen metric.
+  const [option, setOption] = useState(
+    view.faceOptions?.[0] ?? toggleOf(tile)?.options[0],
+  );
+  const summary = view.summary(context, option);
 
   useEffect(() => {
-    const content = contentRef.current;
-    if (!expanded || !content) return;
-    const observer = new ResizeObserver(() =>
-      onHeight(content.getBoundingClientRect().height),
-    );
-    observer.observe(content);
+    if (!expanded) return;
     // Bring the whole expanded card into view once the reflow has settled.
     const scroll = window.setTimeout(
       () =>
@@ -367,119 +342,100 @@ function TileCard({
         }),
       350,
     );
-    return () => {
-      observer.disconnect();
-      window.clearTimeout(scroll);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => window.clearTimeout(scroll);
   }, [expanded]);
 
-  const interactive = !!onExpand && !expanded;
   return (
     <motion.section
       ref={cardRef}
       layout
       transition={layoutTransition}
       aria-label={tile.title}
-      aria-expanded={onExpand ? expanded : undefined}
+      aria-expanded={expanded}
       data-tile-id={tile.id}
-      role={interactive ? 'button' : undefined}
-      tabIndex={interactive ? 0 : undefined}
-      onClick={interactive ? onExpand : undefined}
+      role={expanded ? undefined : 'button'}
+      tabIndex={expanded ? undefined : 0}
+      onClick={expanded ? undefined : onExpand}
       onKeyDown={(event) => {
         if (
-          interactive &&
+          !expanded &&
           event.target === event.currentTarget &&
           (event.key === 'Enter' || event.key === ' ')
         ) {
           event.preventDefault();
-          onExpand?.();
+          onExpand();
         }
       }}
       className={cn(
         'group relative min-w-0 overflow-hidden rounded-lg border bg-card text-left text-card-foreground',
-        expanded ? 'shadow-md' : 'shadow-xs',
-        interactive &&
-          'cursor-pointer transition-shadow hover:shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
+        expanded
+          ? 'shadow-md'
+          : 'cursor-pointer shadow-xs transition-shadow hover:shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
       )}
       style={style}
     >
-      {expanded ? (
-        <motion.div
-          ref={contentRef}
-          key="expanded"
-          layout="position"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1, transition: { delay: 0.15, duration: 0.2 } }}
-        >
-          <ExpandedTile
-            tile={tile}
-            view={view}
-            context={context}
-            onCollapse={onCollapse}
-          />
-        </motion.div>
-      ) : (
-        <motion.div
-          key="face"
-          layout="position"
-          className="flex h-full min-w-0 flex-col p-3.5"
-        >
-          <TileFace tile={tile} view={view} context={context} large={large} />
-        </motion.div>
-      )}
-      {interactive && (
+      <motion.div
+        layout="position"
+        className={cn(
+          'flex min-w-0 flex-col p-3.5',
+          // Collapsed, the face fills the tile; expanded, the card sizes
+          // itself to the content.
+          !expanded && 'h-full',
+        )}
+      >
+        <div className="flex w-full items-baseline justify-between gap-2">
+          <span
+            className="min-w-0 truncate text-[13px] font-medium"
+            title={view.period(context)}
+          >
+            {tile.title}
+          </span>
+          <div className="flex min-w-0 items-baseline gap-2">
+            {(expanded || !view.faceOptions) && (
+              <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                {view.period(context)}
+              </span>
+            )}
+            {view.faceOptions && (
+              <FaceSwitch
+                label={`${tile.title} shows`}
+                options={view.faceOptions}
+                value={option}
+                onChange={setOption}
+              />
+            )}
+            {expanded && (
+              <button
+                type="button"
+                onClick={onCollapse}
+                aria-label={`Collapse ${tile.title}`}
+                className="-my-1 grid h-6 w-6 shrink-0 place-items-center self-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Minimize2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+        {summary && (
+          <Headline summary={summary} size={large ? 'large' : 'tile'} />
+        )}
+        {view.face(context, option, expanded)}
+        {expanded && view.more && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { delay: 0.2, duration: 0.2 } }}
+          >
+            {view.more(context, option)}
+          </motion.div>
+        )}
+      </motion.div>
+      {!expanded && (
         <Maximize2
           aria-hidden
           className="absolute bottom-2.5 right-2.5 h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
         />
       )}
     </motion.section>
-  );
-}
-
-function TileFace({
-  tile,
-  view,
-  context,
-  large,
-}: {
-  tile: StatsTile;
-  view: TileView;
-  context: TileContext;
-  large: boolean;
-}) {
-  const [option, setOption] = useState(
-    view.faceOptions?.[0] ?? toggleOf(tile)?.options[0],
-  );
-  const summary = view.summary(context, option);
-  return (
-    <>
-      <div className="flex w-full items-baseline justify-between gap-2">
-        <span
-          className="min-w-0 truncate text-[13px] font-medium"
-          title={view.period(context)}
-        >
-          {tile.title}
-        </span>
-        {view.faceOptions ? (
-          <FaceSwitch
-            label={`${tile.title} shows`}
-            options={view.faceOptions}
-            value={option}
-            onChange={setOption}
-          />
-        ) : (
-          <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-            {view.period(context)}
-          </span>
-        )}
-      </div>
-      {summary && (
-        <Headline summary={summary} size={large ? 'large' : 'tile'} />
-      )}
-      {view.face(context, option)}
-    </>
   );
 }
 
@@ -521,72 +477,6 @@ function FaceSwitch({
           {faceOptionLabels[option] ?? option}
         </button>
       ))}
-    </div>
-  );
-}
-
-function ExpandedTile({
-  tile,
-  view,
-  context,
-  onCollapse,
-}: {
-  tile: StatsTile;
-  view: TileView;
-  context: TileContext;
-  onCollapse: () => void;
-}) {
-  const toggle = toggleOf(tile);
-  const [option, setOption] = useState<string | undefined>(toggle?.options[0]);
-  const summary = view.summary(context, option);
-  return (
-    <div className="flex min-w-0 flex-col gap-4 p-4">
-      <div className="flex items-baseline gap-2">
-        <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium">
-          {tile.title}
-        </h3>
-        <span className="whitespace-nowrap text-[11px] text-muted-foreground">
-          {view.period(context)}
-        </span>
-        <button
-          type="button"
-          onClick={onCollapse}
-          aria-label={`Collapse ${tile.title}`}
-          className="-my-1 grid h-6 w-6 shrink-0 place-items-center self-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <Minimize2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        {summary && (
-          <div className="min-w-0">
-            <Headline summary={summary} size="detail" />
-          </div>
-        )}
-        {toggle && (
-          <div
-            role="group"
-            aria-label={toggle.label}
-            className="inline-flex flex-wrap gap-0.5 rounded-lg border bg-muted p-0.5"
-          >
-            {toggle.options.map((value: string) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={value === option}
-                onClick={() => setOption(value)}
-                className={cn(
-                  'whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground',
-                  value === option && 'bg-background text-foreground shadow-xs',
-                )}
-              >
-                {optionLabels[value] ?? value}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      {view.detail?.(context, option)}
     </div>
   );
 }

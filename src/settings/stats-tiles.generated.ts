@@ -3,12 +3,12 @@
 export const statsTileLayout = {
   regular: {
     columns: 4,
-    rowHeight: 168,
+    rowHeight: 200,
     minWidth: 720,
   },
   compact: {
     columns: 2,
-    rowHeight: 156,
+    rowHeight: 184,
   },
   gap: 12,
 } as const;

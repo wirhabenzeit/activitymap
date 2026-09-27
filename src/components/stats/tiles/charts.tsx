@@ -241,6 +241,7 @@ export function VolumeArea({
   weeks,
   trend = [],
   trendLabel = '',
+  detail = false,
   width,
   height,
   palette,
@@ -250,6 +251,8 @@ export function VolumeArea({
   trend?: WeekPoint[];
   // Named at the trend line's start, away from the partial week.
   trendLabel?: string;
+  // Axes, for the expanded tile.
+  detail?: boolean;
   width: number;
   height: number;
   palette: TilePalette;
@@ -311,18 +314,20 @@ export function VolumeArea({
       }),
       crosshair({ marker: true }),
     ],
-    guides: false,
-    margin: { top: 16, right: 6, bottom: 2, left: 2 },
+    guides: detail,
+    margin: detail ? { top: 16 } : { top: 16, right: 6, bottom: 2, left: 2 },
     scales: {
       x: {
         scale: d3
           .scaleUtc()
           .domain([weeks[0]?.x ?? new Date(0), weeks.at(-1)?.x ?? new Date(0)]),
-        axis: false,
+        axis: detail
+          ? { ticks: { format: (x: Date) => d3.utcFormat('%b %-d')(x) } }
+          : false,
       },
       y: {
         scale: d3.scaleLinear().domain([floor, Math.max(high, floor + 1)]),
-        axis: false,
+        axis: detail ? { ticks: { format: formatShort } } : false,
       },
     },
     tooltip: {
@@ -552,77 +557,6 @@ export function PlainBars({
       width={width}
       height={height}
       ariaLabel="Bars"
-    />
-  );
-}
-
-export function DistanceElevationDots({
-  points,
-  width,
-  height,
-  detail,
-}: {
-  points: { distance: number; elevation: number; sport: Sport }[];
-  width: number;
-  height: number;
-  detail: boolean;
-}) {
-  const definition = defineChart({
-    marks: [
-      dot(points, {
-        x: 'distance',
-        y: 'elevation',
-        color: 'sport',
-        r: detail ? 3 : 1.75,
-        fillOpacity: 0.7,
-        strokeOpacity: 0,
-      }),
-      crosshair({ marker: true }),
-    ],
-    guides: detail,
-    margin: detail ? undefined : 3,
-    scales: {
-      x: {
-        scale: d3.scaleLinear,
-        nice: true,
-        axis: detail ? { ticks: { format: formatShort } } : false,
-      },
-      y: {
-        scale: d3.scaleLinear,
-        nice: true,
-        axis: detail ? { ticks: { format: formatShort } } : false,
-      },
-    },
-    color: { domain: [...sportOrder], range: sportColors },
-    tooltip: {
-      use: tooltip,
-      // Tiles clip their content; render the tooltip outside them.
-      portal,
-      items: [
-        {
-          channel: 'group',
-          label: 'Sport',
-          text: (point) => sportName(point.datum.sport),
-        },
-        {
-          id: 'distance',
-          label: 'Distance',
-          text: (point) => `${point.datum.distance.toFixed(1)} km`,
-        },
-        {
-          id: 'elevation',
-          label: 'Elevation',
-          text: (point) => `${Math.round(point.datum.elevation)} m`,
-        },
-      ],
-    },
-  });
-  return (
-    <Chart
-      definition={definition}
-      width={width}
-      height={height}
-      ariaLabel="Distance against elevation"
     />
   );
 }

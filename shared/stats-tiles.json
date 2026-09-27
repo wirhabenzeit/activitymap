@@ -1,8 +1,8 @@
 {
   "version": 1,
   "layout": {
-    "regular": { "columns": 4, "rowHeight": 168, "minWidth": 720 },
-    "compact": { "columns": 2, "rowHeight": 156 },
+    "regular": { "columns": 4, "rowHeight": 200, "minWidth": 720 },
+    "compact": { "columns": 2, "rowHeight": 184 },
     "gap": 12
   },
   "metrics": {

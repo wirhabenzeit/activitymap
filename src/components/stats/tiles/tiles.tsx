@@ -13,9 +13,9 @@ import {
 } from '~/settings/stats-tiles.generated';
 import {
   activityCalendar,
+  dayOf,
   mondayOf,
   consistency,
-  distanceVsElevation,
   monthVsLastMonth,
   sportMix,
   weeklyVolume,
@@ -44,10 +44,9 @@ import {
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
-import { CalendarHeatmap, MonthRows, type CalendarColour } from './calendar';
+import { MonthRows } from './calendar';
 import {
   CumulativeLines,
-  DistanceElevationDots,
   Measure,
   PlainBars,
   SportBars,
@@ -82,9 +81,15 @@ export type TileView = {
   ) => TileSummary | null;
   // The face's own small switch (first option is the default), if any.
   faceOptions?: readonly string[];
-  face: (context: TileContext, option: string | undefined) => ReactNode;
-  // The drill-down panel's content, for tiles that have one.
-  detail?: (context: TileContext, option: string | undefined) => ReactNode;
+  // The tile's visual. Expanded, it is the same visual drawn larger, with
+  // axes where it is a chart.
+  face: (
+    context: TileContext,
+    option: string | undefined,
+    expanded: boolean,
+  ) => ReactNode;
+  // Extra context shown below the face only when the tile is expanded.
+  more?: (context: TileContext, option: string | undefined) => ReactNode;
 };
 
 const metricFaceOptions = ['distance', 'time', 'elevation'] as const;
@@ -141,12 +146,22 @@ function Delta({
   );
 }
 
+// A chart filling the rest of a collapsed tile, or a fixed, taller area
+// in an expanded one (whose height follows its content).
 function FillChart({
+  expanded = false,
   children,
 }: {
+  expanded?: boolean;
   children: (size: { width: number; height: number }) => ReactNode;
 }) {
-  return <Measure className="mt-2 min-h-0 flex-1">{children}</Measure>;
+  return expanded ? (
+    <Measure className="mt-4 w-full" style={{ height: 300 }}>
+      {children}
+    </Measure>
+  ) : (
+    <Measure className="mt-2 min-h-0 flex-1">{children}</Measure>
+  );
 }
 
 function DetailChart({
@@ -302,65 +317,40 @@ const yearToDateView: TileView = {
     };
   },
   faceOptions: metricFaceOptions,
-  face: (context, option) => {
+  face: (context, option, expanded) => {
     const metric = asMetric(option, 'distance');
     const year = dateOfDay(context.today).getUTCFullYear();
+    // Expanded, the grey lines go back up to four more years.
+    const firstYear = expanded
+      ? Math.max(
+          year - 4,
+          Math.min(
+            year - 1,
+            ...context.activities.map((a) =>
+              a.start_date_local.getUTCFullYear(),
+            ),
+          ),
+        )
+      : year - 1;
     return (
-      <FillChart>
+      <FillChart expanded={expanded}>
         {({ width, height }) => (
           <CumulativeLines
-            series={[
-              yearSeries(context, year - 1, metric),
-              yearSeries(context, year, metric),
-            ]}
+            series={Array.from({ length: year - firstYear + 1 }, (_, index) =>
+              yearSeries(context, firstYear + index, metric),
+            )}
+            monthAxisFrom={expanded ? yearStart(2001) : undefined}
             xMax={365}
             width={width}
             height={height}
             palette={context.palette}
-            detail={false}
+            detail={expanded}
             endLabels
             valueFormat={(y) => formatWithUnit(y, metric)}
             xLabel={dayOfYearLabel}
           />
         )}
       </FillChart>
-    );
-  },
-  detail: (context, option) => {
-    const metric = asMetric(option, 'distance');
-    const year = dateOfDay(context.today).getUTCFullYear();
-    const firstYear = Math.max(
-      year - 4,
-      Math.min(
-        year,
-        ...context.activities.map((a) => a.start_date_local.getUTCFullYear()),
-      ),
-    );
-    const series = Array.from({ length: year - firstYear + 1 }, (_, index) =>
-      yearSeries(context, firstYear + index, metric),
-    );
-    return (
-      <>
-        <DetailChart height={300}>
-          {({ width, height }) => (
-            <CumulativeLines
-              series={series}
-              xMax={365}
-              width={width}
-              height={height}
-              palette={context.palette}
-              detail
-              monthAxisFrom={yearStart(2001)}
-              valueFormat={(y) => formatWithUnit(y, metric)}
-              xLabel={dayOfYearLabel}
-            />
-          )}
-        </DetailChart>
-        <p className="text-xs text-muted-foreground">
-          The dark line is {year}. Grey lines are the years before it, older
-          ones lighter.
-        </p>
-      </>
     );
   },
 };
@@ -431,7 +421,7 @@ const weeklyVolumeView: TileView = {
     };
   },
   faceOptions: metricFaceOptions,
-  face: (context, option) => {
+  face: (context, option, expanded) => {
     const metric = asMetric(option, 'distance');
     const { weekStarts, values } = weeklyVolume(
       context.activities,
@@ -440,9 +430,10 @@ const weeklyVolumeView: TileView = {
     );
     return (
       <>
-        <FillChart>
+        <FillChart expanded={expanded}>
           {({ width, height }) => (
             <VolumeArea
+              detail={expanded}
               weeks={weekStarts.map((weekStart, index) => ({
                 x: dateOfDay(weekStart),
                 value: values[index]!,
@@ -462,7 +453,7 @@ const weeklyVolumeView: TileView = {
       </>
     );
   },
-  detail: (context, option) => {
+  more: (context, option) => {
     const metric = asMetric(option, 'distance');
     const rows = weekRows(context, metric);
     const { values } = weeklyVolume(context.activities, context.today, metric);
@@ -474,7 +465,10 @@ const weeklyVolumeView: TileView = {
     );
     return (
       <>
-        <DetailChart height={260}>
+        <h4 className="mt-5 text-xs font-medium text-muted-foreground">
+          Weekly totals by sport
+        </h4>
+        <DetailChart height={200}>
           {({ width, height }) => (
             <SportBars
               rows={rows}
@@ -489,10 +483,6 @@ const weeklyVolumeView: TileView = {
           )}
         </DetailChart>
         <Legend sports={sports} />
-        <p className="text-xs text-muted-foreground">
-          The dashed line is the average of the 11 full weeks. The last bar is
-          this week so far.
-        </p>
       </>
     );
   },
@@ -519,7 +509,7 @@ const activityCalendarView: TileView = {
       sub: `${Math.round((activeDays / days) * 100)}% of days in the last 12 months`,
     };
   },
-  face: (context) => {
+  face: (context, _option, expanded) => {
     const { dominantSport } = activityCalendar(
       context.activities,
       context.today,
@@ -536,7 +526,7 @@ const activityCalendarView: TileView = {
     const sports = [...dayCounts.entries()]
       .sort((x, y) => y[1] - x[1])
       .map(([sport]) => sport);
-    return (
+    const rows = (
       <MonthRows
         today={context.today}
         dominantSport={dominantSport}
@@ -545,48 +535,13 @@ const activityCalendarView: TileView = {
         footer={<SportLegend sports={sports} />}
       />
     );
-  },
-  detail: (context, option) => {
-    const colour = (option ?? 'sport') as CalendarColour;
-    const { dominantSport } = activityCalendar(
-      context.activities,
-      context.today,
-    );
-    const days = dailyTotals(
-      context.activities,
-      lastYearStart(context.today),
-      context.today,
-    );
-    const sports = Object.keys(categorySettings).filter((sport) =>
-      [...dominantSport.values()].includes(sport as never),
-    );
-    return (
-      <>
-        <div className="overflow-x-auto">
-          <DetailChart height={150}>
-            {({ width, height }) => (
-              <CalendarHeatmap
-                today={context.today}
-                weeks={53}
-                width={Math.max(width, 480)}
-                height={height}
-                dominantSport={dominantSport}
-                totals={days}
-                colour={colour}
-                palette={context.palette}
-                labels
-              />
-            )}
-          </DetailChart>
-        </div>
-        {colour === 'sport' ? (
-          <Legend sports={sports} />
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Darker means more {metricLabel[colour].toLowerCase()} that day.
-          </p>
-        )}
-      </>
+    // Expanded, the same month rows get a fixed, taller area.
+    return expanded ? (
+      <div className="flex flex-col" style={{ height: 380 }}>
+        {rows}
+      </div>
+    ) : (
+      rows
     );
   },
 };
@@ -665,10 +620,10 @@ const monthVsLastMonthView: TileView = {
     };
   },
   faceOptions: metricFaceOptions,
-  face: (context, option) => {
+  face: (context, option, expanded) => {
     const metric = asMetric(option, 'elevation');
     return (
-      <FillChart>
+      <FillChart expanded={expanded}>
         {({ width, height }) => (
           <CumulativeLines
             series={monthPair(context, metric)}
@@ -676,31 +631,12 @@ const monthVsLastMonthView: TileView = {
             width={width}
             height={height}
             palette={context.palette}
-            detail={false}
+            detail={expanded}
             valueFormat={(y) => formatWithUnit(y, metric)}
             xLabel={(x) => `Day ${x}`}
           />
         )}
       </FillChart>
-    );
-  },
-  detail: (context, option) => {
-    const metric = asMetric(option, 'elevation');
-    return (
-      <DetailChart height={260}>
-        {({ width, height }) => (
-          <CumulativeLines
-            series={monthPair(context, metric)}
-            xMax={31}
-            width={width}
-            height={height}
-            palette={context.palette}
-            detail
-            valueFormat={(y) => formatWithUnit(y, metric)}
-            xLabel={(x) => `Day ${x}`}
-          />
-        )}
-      </DetailChart>
     );
   },
 };
@@ -757,7 +693,7 @@ const sportMixView: TileView = {
       </div>
     );
   },
-  detail: ({ activities, today }, option) => {
+  more: ({ activities, today }, option) => {
     const range = (option ?? 'currentYear') as MixRange;
     const shares = sportMix(activities, today, range);
     const breakdown = new Map(
@@ -771,7 +707,7 @@ const sportMixView: TileView = {
     );
     const largest = shares[0]?.share ?? 1;
     return (
-      <div className="overflow-x-auto">
+      <div className="mt-5 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-xs text-muted-foreground">
@@ -854,9 +790,10 @@ const consistencyView: TileView = {
     };
   },
   // One column per week (Monday on top), one dot per day: filled when
-  // active, hollow when not.
-  face: (context) => {
-    const first = mondayOf(context.today) - 11 * 7;
+  // active, hollow when not. Expanded, it covers a year of weeks.
+  face: (context, _option, expanded) => {
+    const weeks = expanded ? 52 : 12;
+    const first = mondayOf(context.today) - (weeks - 1) * 7;
     const flags = activeDayFlags(
       context.activities,
       context.today,
@@ -864,22 +801,26 @@ const consistencyView: TileView = {
     );
     return (
       <div
-        className="mt-auto grid grid-flow-col gap-[3px]"
+        className={cn(
+          'grid grid-flow-col',
+          expanded ? 'mt-4 gap-1' : 'mt-auto gap-[3px]',
+        )}
         style={{
           gridTemplateRows: 'repeat(7, minmax(0, 1fr))',
-          gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+          gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))`,
         }}
         role="img"
-        aria-label="Active days, last 12 weeks"
+        aria-label={`Active days, last ${weeks} weeks`}
       >
-        {Array.from({ length: 12 * 7 }, (_, index) => {
+        {Array.from({ length: weeks * 7 }, (_, index) => {
           const day = first + index;
           const active = flags[index];
           return (
             <i
               key={index}
               className={cn(
-                'mx-auto block h-1.5 w-1.5 rounded-full',
+                'mx-auto block rounded-full',
+                expanded ? 'h-2 w-2' : 'h-1.5 w-1.5',
                 day > context.today
                   ? 'bg-transparent'
                   : active
@@ -895,44 +836,6 @@ const consistencyView: TileView = {
           );
         })}
       </div>
-    );
-  },
-  detail: (context, option) => {
-    const weeks = weeksOf(option);
-    const { activeDaysPerWeek: average } = consistency(
-      context.activities,
-      context.today,
-      weeks,
-    );
-    return (
-      <>
-        <DetailChart height={220}>
-          {({ width, height }) => (
-            <PlainBars
-              rows={activeDaysPerWeek(
-                context.activities,
-                context.today,
-                weeks,
-              ).map((week, index, all) => ({
-                x: String(week.weekStart),
-                value: week.activeDays,
-                highlight: index === all.length - 1,
-              }))}
-              width={width}
-              height={height}
-              detail
-              average={average}
-              palette={context.palette}
-              valueFormat={(value) => `${value} active days`}
-              xTickFormat={(x) => shortDate(dateOfDay(Number(x)))}
-            />
-          )}
-        </DetailChart>
-        <p className="text-xs text-muted-foreground">
-          Active days per week. The dark bar is this week so far; the dashed
-          line is the average over the full weeks.
-        </p>
-      </>
     );
   },
 };
@@ -963,11 +866,11 @@ const distanceVsElevationView: TileView = {
       ),
     };
   },
-  face: (context) => {
+  face: (context, _option, expanded) => {
     const months = climbRateByMonth(context.activities, context.today);
     return (
       <>
-        <FillChart>
+        <FillChart expanded={expanded}>
           {({ width, height }) => (
             <PlainBars
               rows={months.map((month, index) => ({
@@ -977,7 +880,7 @@ const distanceVsElevationView: TileView = {
               }))}
               width={width}
               height={height}
-              detail={false}
+              detail={expanded}
               palette={context.palette}
               xTickFormat={(x) => {
                 const date = dateOfDay(Number(x));
@@ -989,38 +892,68 @@ const distanceVsElevationView: TileView = {
             />
           )}
         </FillChart>
-        <div className="mt-1 grid shrink-0 grid-cols-12 text-center text-[10px] text-muted-foreground">
-          {months.map((month) => (
-            <span key={month.monthStart}>
-              {monthName(dateOfDay(month.monthStart)).slice(0, 1)}
-            </span>
-          ))}
-        </div>
+        {!expanded && (
+          <div className="mt-1 grid shrink-0 grid-cols-12 text-center text-[10px] text-muted-foreground">
+            {months.map((month) => (
+              <span key={month.monthStart}>
+                {monthName(dateOfDay(month.monthStart)).slice(0, 1)}
+              </span>
+            ))}
+          </div>
+        )}
       </>
     );
   },
-  detail: ({ activities, today }) => {
-    const { points } = distanceVsElevation(activities, today);
-    const sports = Object.keys(categorySettings).filter((sport) =>
-      points.some((point) => point.sport === sport),
-    );
+  more: ({ activities, today }) => {
+    const first = lastYearStart(today);
+    const hilliest = activities
+      .flatMap((activity) => {
+        const day = dayOf(activity.start_date_local);
+        const km = (activity.distance ?? 0) / 1000;
+        if (day < first || day > today || km < 5) return [];
+        const climb = activity.total_elevation_gain ?? 0;
+        return [
+          { day, sport: activity.sport, km, climb, rate: (climb / km) * 100 },
+        ];
+      })
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 5);
     return (
-      <>
-        <DetailChart height={320}>
-          {({ width, height }) => (
-            <DistanceElevationDots
-              points={points}
-              width={width}
-              height={height}
-              detail
-            />
-          )}
-        </DetailChart>
-        <Legend sports={sports} />
-        <p className="text-xs text-muted-foreground">
-          Distance in km across, elevation gain in m up.
-        </p>
-      </>
+      <div className="mt-5">
+        <h4 className="mb-1 text-xs font-medium text-muted-foreground">
+          Hilliest activities (5 km or more)
+        </h4>
+        <table className="w-full text-sm">
+          <tbody className="font-mono tabular-nums">
+            {hilliest.map((activity) => (
+              <tr
+                key={`${activity.day}-${activity.km}`}
+                className="border-b border-muted"
+              >
+                <td className="whitespace-nowrap py-1.5 font-sans">
+                  <span
+                    className="mr-2 inline-block h-2 w-2 rounded-full"
+                    style={{
+                      background: categorySettings[activity.sport].color,
+                    }}
+                  />
+                  {categorySettings[activity.sport].name},{' '}
+                  {shortDate(dateOfDay(activity.day))}
+                </td>
+                <td className="px-2 text-right">
+                  {formatWithUnit(activity.km, 'distance')}
+                </td>
+                <td className="px-2 text-right">
+                  {formatWithUnit(activity.climb, 'elevation')}
+                </td>
+                <td className="px-2 text-right">
+                  {formatMetric(activity.rate, 'elevation')} m / 100 km
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   },
 };
@@ -1058,13 +991,13 @@ const thisWeekView: TileView = {
     };
   },
   faceOptions: metricFaceOptions,
-  face: (context, option) => {
+  face: (context, option, expanded) => {
     const metric = asMetric(option, 'distance');
     const days = thisWeekByDay(context.activities, context.today, metric);
     const todayIndex = days.filter((day) => day !== null).length - 1;
     return (
       <>
-        <FillChart>
+        <FillChart expanded={expanded}>
           {({ width, height }) => (
             <PlainBars
               rows={days.map((value, index) => ({
@@ -1074,24 +1007,26 @@ const thisWeekView: TileView = {
               }))}
               width={width}
               height={height}
-              detail={false}
+              detail={expanded}
               palette={context.palette}
               valueFormat={(value) => formatWithUnit(value, metric)}
             />
           )}
         </FillChart>
-        <div className="mt-1 grid shrink-0 grid-cols-7 text-center text-[10px] text-muted-foreground">
-          {weekdayNames.map((name, index) => (
-            <span
-              key={name}
-              className={cn(
-                index === todayIndex && 'font-medium text-foreground',
-              )}
-            >
-              {name.slice(0, 1)}
-            </span>
-          ))}
-        </div>
+        {!expanded && (
+          <div className="mt-1 grid shrink-0 grid-cols-7 text-center text-[10px] text-muted-foreground">
+            {weekdayNames.map((name, index) => (
+              <span
+                key={name}
+                className={cn(
+                  index === todayIndex && 'font-medium text-foreground',
+                )}
+              >
+                {name.slice(0, 1)}
+              </span>
+            ))}
+          </div>
+        )}
       </>
     );
   },
@@ -1208,9 +1143,104 @@ const yearPaceView: TileView = {
       </div>
     );
   },
+  more: ({ activities, today }) => {
+    const year = dateOfDay(today).getUTCFullYear();
+    return (
+      <table className="mt-5 w-full text-sm">
+        <thead>
+          <tr className="border-b text-xs text-muted-foreground">
+            <th className="py-1.5 text-left font-medium" />
+            {['Per day', 'So far', 'Projected', String(year - 1)].map(
+              (label) => (
+                <th key={label} className="px-2 py-1.5 text-right font-medium">
+                  {label}
+                </th>
+              ),
+            )}
+          </tr>
+        </thead>
+        <tbody className="font-mono tabular-nums">
+          {(['distance', 'time', 'elevation'] as const).map((metric) => {
+            const pace = yearPace(activities, today, metric);
+            return (
+              <tr key={metric} className="border-b border-muted">
+                <td className="py-1.5 font-sans">{metricLabel[metric]}</td>
+                <td className="px-2 text-right">
+                  {metric === 'elevation'
+                    ? formatWithUnit(pace.perDay, metric)
+                    : `${decimal(pace.perDay)} ${metricUnit[metric]}`}
+                </td>
+                <td className="px-2 text-right">
+                  {formatWithUnit(pace.current, metric)}
+                </td>
+                <td className="px-2 text-right">
+                  {formatWithUnit(pace.projected, metric)}
+                </td>
+                <td className="px-2 text-right">
+                  {formatWithUnit(pace.lastYear, metric)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  },
 };
 
 // Records --------------------------------------------------------------------
+
+// The four records side by side, with the sport and date of each.
+function RecordStats({ best }: { best: ReturnType<typeof records> }) {
+  const noteFor = (record: { day: number; sport: Sport } | undefined) =>
+    record
+      ? `${categorySettings[record.sport].name}, ${shortDate(dateOfDay(record.day))}`
+      : undefined;
+  return (
+    <div className="grid grid-cols-4 gap-3">
+      <Stat
+        large
+        label="Longest distance"
+        value={
+          best.distance ? formatMetric(best.distance.value, 'distance') : '–'
+        }
+        unit={best.distance ? 'km' : undefined}
+        note={noteFor(best.distance)}
+      />
+      <Stat
+        large
+        label="Longest time"
+        value={best.time ? formatMetric(best.time.value, 'time') : '–'}
+        unit={best.time ? 'h' : undefined}
+        note={noteFor(best.time)}
+      />
+      <Stat
+        large
+        label="Biggest climb"
+        value={
+          best.elevation ? formatMetric(best.elevation.value, 'elevation') : '–'
+        }
+        unit={best.elevation ? 'm' : undefined}
+        note={noteFor(best.elevation)}
+      />
+      <Stat
+        large
+        label="Biggest week"
+        value={
+          best.biggestWeek
+            ? formatMetric(best.biggestWeek.value, 'distance')
+            : '–'
+        }
+        unit={best.biggestWeek ? 'km' : undefined}
+        note={
+          best.biggestWeek
+            ? weekOf(String(best.biggestWeek.weekStart))
+            : undefined
+        }
+      />
+    </div>
+  );
+}
 
 const recordsView: TileView = {
   period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
@@ -1223,54 +1253,20 @@ const recordsView: TileView = {
       yearStart(dateOfDay(today).getUTCFullYear()),
       today,
     );
-    const noteFor = (record: { day: number; sport: Sport } | undefined) =>
-      record
-        ? `${categorySettings[record.sport].name}, ${shortDate(dateOfDay(record.day))}`
-        : undefined;
     return (
-      <div className="my-auto grid grid-cols-4 gap-3">
-        <Stat
-          large
-          label="Longest distance"
-          value={
-            best.distance ? formatMetric(best.distance.value, 'distance') : '–'
-          }
-          unit={best.distance ? 'km' : undefined}
-          note={noteFor(best.distance)}
-        />
-        <Stat
-          large
-          label="Longest time"
-          value={best.time ? formatMetric(best.time.value, 'time') : '–'}
-          unit={best.time ? 'h' : undefined}
-          note={noteFor(best.time)}
-        />
-        <Stat
-          large
-          label="Biggest climb"
-          value={
-            best.elevation
-              ? formatMetric(best.elevation.value, 'elevation')
-              : '–'
-          }
-          unit={best.elevation ? 'm' : undefined}
-          note={noteFor(best.elevation)}
-        />
-        <Stat
-          large
-          label="Biggest week"
-          value={
-            best.biggestWeek
-              ? formatMetric(best.biggestWeek.value, 'distance')
-              : '–'
-          }
-          unit={best.biggestWeek ? 'km' : undefined}
-          note={
-            best.biggestWeek
-              ? weekOf(String(best.biggestWeek.weekStart))
-              : undefined
-          }
-        />
+      <div className="my-auto">
+        <RecordStats best={best} />
+      </div>
+    );
+  },
+  more: ({ activities, today }) => {
+    const best = records(activities, -Infinity, today);
+    return (
+      <div className="mt-5 border-t pt-3">
+        <h4 className="mb-2 text-xs font-medium text-muted-foreground">
+          All time
+        </h4>
+        <RecordStats best={best} />
       </div>
     );
   },

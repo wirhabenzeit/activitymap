@@ -111,9 +111,9 @@ struct StatsGridDefinition: Hashable, Sendable {
 }
 
 enum SharedStatsTiles {
-    static let regularGrid = StatsGridDefinition(columns: 4, rowHeight: 168)
+    static let regularGrid = StatsGridDefinition(columns: 4, rowHeight: 200)
     static let regularMinWidth: Double = 720
-    static let compactGrid = StatsGridDefinition(columns: 2, rowHeight: 156)
+    static let compactGrid = StatsGridDefinition(columns: 2, rowHeight: 184)
     static let gap: Double = 12
 
     static let tiles: [StatsTileDefinition] = [
