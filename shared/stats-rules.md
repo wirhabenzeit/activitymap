@@ -58,3 +58,7 @@ Unless a rule says otherwise, a tile's metric is the one its switch shows, and "
 - **speedTrend**: optional and not specified yet. It gets rules and fixtures before either platform builds it.
 
 Fixture numbers are compared with a tolerance of 0.000001.
+
+## Chart dates
+
+Year-comparison charts align calendar month/day on the leap reference year 2000. February 29 has a point only in leap years; March 1 and December 31 align in every year. The rolling-year calendar includes both partial boundary months (normally 13 month rows), with cells outside its inclusive window blank.

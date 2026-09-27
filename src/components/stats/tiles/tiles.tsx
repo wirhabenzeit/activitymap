@@ -34,6 +34,8 @@ import {
 import {
   activeDayFlags,
   cumulativeByDay,
+  cumulativeYearPoints,
+  comparisonYear,
   dailyTotals,
   dateOfDay,
   monthStart,
@@ -280,19 +282,18 @@ function yearSeries(
   metric: StatsMetric,
 ): LineSeries {
   const currentYear = dateOfDay(context.today).getUTCFullYear();
-  const first = yearStart(year);
   const last = year === currentYear ? context.today : yearStart(year + 1) - 1;
-  const totals = cumulativeByDay(context.activities, metric, first, last);
+  const points = cumulativeYearPoints(context.activities, metric, year, last);
   return {
     key: String(year),
     label: String(year),
-    points: totals.map((y, x) => ({ x, y })),
+    points,
     current: year === currentYear,
   };
 }
 
 const dayOfYearLabel = (x: number) =>
-  shortDate(dateOfDay(yearStart(2001) + Math.round(x)));
+  shortDate(dateOfDay(yearStart(comparisonYear) + Math.round(x)));
 
 const yearToDateView: TileView = {
   period: ({ today }) => {
@@ -338,7 +339,7 @@ const yearToDateView: TileView = {
             series={Array.from({ length: year - firstYear + 1 }, (_, index) =>
               yearSeries(context, firstYear + index, metric),
             )}
-            monthAxisFrom={expanded ? yearStart(2001) : undefined}
+            monthAxisFrom={expanded ? yearStart(comparisonYear) : undefined}
             xMax={365}
             width={width}
             height={height}

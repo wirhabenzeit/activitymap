@@ -9,6 +9,7 @@ import { type Activity } from '~/server/db/schema';
 
 import {
   dayOf,
+  sameDateLastYear,
   metricValue,
   mondayOf,
   sportOrder,
@@ -158,4 +159,60 @@ export function activeDayFlags(
     if (day >= first && day <= today) flags[day - first] = true;
   }
   return flags;
+}
+
+// A leap reference year keeps March–December aligned across every year.
+export const comparisonYear = 2000;
+export function cumulativeYearPoints(
+  activities: readonly StatsActivity[],
+  metric: StatsMetric,
+  year: number,
+  last: number,
+): { x: number; y: number }[] {
+  const first = yearStart(year);
+  return cumulativeByDay(activities, metric, first, last).map((y, index) => {
+    const date = dateOfDay(first + index);
+    return {
+      x:
+        monthStart(comparisonYear, date.getUTCMonth()) +
+        date.getUTCDate() -
+        1 -
+        yearStart(comparisonYear),
+      y,
+    };
+  });
+}
+
+// A rolling year spans parts of thirteen calendar months, including both ends.
+export function calendarMonths(today: number) {
+  const first = sameDateLastYear(today);
+  const date = dateOfDay(first);
+  const end = dateOfDay(today);
+  const count =
+    (end.getUTCFullYear() - date.getUTCFullYear()) * 12 +
+    end.getUTCMonth() -
+    date.getUTCMonth() +
+    1;
+  return Array.from({ length: count }, (_, index) => {
+    const start = monthStart(date.getUTCFullYear(), date.getUTCMonth() + index);
+    const next = monthStart(
+      date.getUTCFullYear(),
+      date.getUTCMonth() + index + 1,
+    );
+    return {
+      start,
+      length: next - start,
+      first: Math.max(first, start),
+      last: Math.min(today, next - 1),
+    };
+  });
+}
+
+// Include the partial week as well as the trend in the visible domain.
+export function volumeDomain(values: readonly number[]): [number, number] {
+  if (values.length === 0) return [0, 1];
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const padding = Math.max((high - low) * 0.25, high * 0.05, 1);
+  return [Math.max(0, low - padding), Math.max(high + padding, 1)];
 }

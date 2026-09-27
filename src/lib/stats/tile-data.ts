@@ -49,7 +49,7 @@ function daysInMonth(year: number, monthIndex: number): number {
 }
 
 // The same calendar date one year earlier, with 29 February clamped to 28.
-function sameDateLastYear(day: Day): Day {
+export function sameDateLastYear(day: Day): Day {
   const date = new Date(day * millisecondsPerDay);
   const year = date.getUTCFullYear() - 1;
   const month = date.getUTCMonth();

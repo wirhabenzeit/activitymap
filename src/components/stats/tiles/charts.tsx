@@ -28,7 +28,7 @@ import { Chart } from '@tanstack/charts/react';
 
 import { categorySettings } from '~/settings/category';
 import { sportOrder, type Sport } from '~/lib/stats/tile-data';
-import { dateOfDay } from '~/lib/stats/tile-series';
+import { dateOfDay, volumeDomain } from '~/lib/stats/tile-series';
 
 import { formatShort, type TilePalette } from './format';
 
@@ -262,12 +262,9 @@ export function VolumeArea({
   const tail = weeks.slice(-2);
   // A trend line, not bars: the scale hugs the data so week-to-week change
   // is visible in a short tile, and the area fills down to the scale's floor.
-  const values = [...full, ...trend].map((week) => week.value);
-  const low = Math.min(...values, Infinity);
-  const high = Math.max(...values, 0);
-  const floor = Number.isFinite(low)
-    ? Math.max(0, low - (high - low) * 0.25)
-    : 0;
+  const [floor, ceiling] = volumeDomain(
+    [...weeks, ...trend].map((week) => week.value),
+  );
   const definition = defineChart({
     marks: [
       areaY(full, {
@@ -326,7 +323,7 @@ export function VolumeArea({
           : false,
       },
       y: {
-        scale: d3.scaleLinear().domain([floor, Math.max(high, floor + 1)]),
+        scale: d3.scaleLinear().domain([floor, ceiling]),
         axis: detail ? { ticks: { format: formatShort } } : false,
       },
     },

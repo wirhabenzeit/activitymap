@@ -6,8 +6,8 @@ import { useState, type ReactNode } from 'react';
 
 import { categorySettings } from '~/settings/category';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
-import { dayOf, type Sport } from '~/lib/stats/tile-data';
-import { dateOfDay } from '~/lib/stats/tile-series';
+import { type Sport } from '~/lib/stats/tile-data';
+import { dateOfDay, calendarMonths } from '~/lib/stats/tile-series';
 
 import {
   formatWithUnit,
@@ -33,36 +33,31 @@ export function MonthRows({
   footer: ReactNode;
 }) {
   const [hover, setHover] = useState<string | null>(null);
-  const date = dateOfDay(today);
-  const months = Array.from({ length: 12 }, (_, index) => {
-    const start = new Date(
-      Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 11 + index, 1),
-    );
-    const length = new Date(
-      Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0),
-    ).getUTCDate();
-    return { start, first: dayOf(start), length };
-  });
+  const months = calendarMonths(today);
 
   return (
     <div className="mt-2 flex min-h-0 flex-1 flex-col">
       <div
         className="grid min-h-0 flex-1 gap-[2px]"
-        style={{ gridTemplateRows: 'repeat(12, minmax(0, 1fr))' }}
+        style={{ gridTemplateRows: `repeat(${months.length}, minmax(0, 1fr))` }}
         onPointerLeave={() => setHover(null)}
       >
         {months.map((month) => (
-          <div key={month.first} className="flex min-h-0 items-stretch gap-1">
-            <span className="w-7 shrink-0 self-center text-[10px] leading-none text-muted-foreground">
-              {monthName(month.start)}
+          <div key={month.start} className="flex min-h-0 items-stretch gap-1">
+            <span className="w-11 shrink-0 self-center text-[10px] leading-none text-muted-foreground">
+              {`${monthName(dateOfDay(month.start))} '${String(dateOfDay(month.start).getUTCFullYear()).slice(-2)}`}
             </span>
             <div
               className="grid min-w-0 flex-1 gap-[2px]"
               style={{ gridTemplateColumns: 'repeat(31, minmax(0, 1fr))' }}
             >
               {Array.from({ length: 31 }, (_, index) => {
-                const day = month.first + index;
-                if (index >= month.length || day > today)
+                const day = month.start + index;
+                if (
+                  index >= month.length ||
+                  day < month.first ||
+                  day > month.last
+                )
                   return <i key={index} />;
                 const sport = dominantSport.get(day);
                 const dayTotals = totals.get(day);
