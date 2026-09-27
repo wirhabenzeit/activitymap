@@ -2,7 +2,7 @@
 // Tiles go in manifest order into the first free cell that fits them (like
 // CSS `grid-auto-flow: dense`). A span wider than the grid is clamped, so the
 // same spans work on the 4-column and 2-column grids. A gap left at the end
-// of a row goes to the tile before it.
+// of a row goes to the tile before it, unless `fillGaps` is off.
 
 export type BentoSpan = { columns: number; rows: number };
 
@@ -16,6 +16,7 @@ export type BentoPlacement = {
 export function placeBento(
   spans: readonly BentoSpan[],
   columns: number,
+  { fillGaps = true }: { fillGaps?: boolean } = {},
 ): BentoPlacement[] {
   const taken: boolean[][] = [];
   const isFree = (row: number, column: number) => !taken[row]?.[column];
@@ -48,6 +49,7 @@ export function placeBento(
 
   // Close gaps: a tile with free cells to its right, across all its rows,
   // grows into them.
+  if (!fillGaps) return placements;
   for (const placement of placements) {
     const rows = Array.from(
       { length: placement.rows },

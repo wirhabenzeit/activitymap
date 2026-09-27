@@ -73,3 +73,22 @@ void test('fills earlier holes with later small tiles', () => {
     ],
   );
 });
+
+void test('leaves gaps open when fillGaps is off', () => {
+  assert.deepEqual(
+    placeBento(
+      [
+        { columns: 4, rows: 2 },
+        { columns: 1, rows: 1 },
+        { columns: 1, rows: 1 },
+      ],
+      4,
+      { fillGaps: false },
+    ),
+    [
+      { column: 1, row: 1, columns: 4, rows: 2 },
+      { column: 1, row: 3, columns: 1, rows: 1 },
+      { column: 2, row: 3, columns: 1, rows: 1 },
+    ],
+  );
+});
