@@ -186,8 +186,7 @@ export function cumulativeYearPoints(
 }
 
 // A rolling year spans parts of thirteen calendar months, including both ends.
-export function calendarMonths(today: number) {
-  const first = sameDateLastYear(today);
+export function calendarMonths(today: number, first = sameDateLastYear(today)) {
   const date = dateOfDay(first);
   const end = dateOfDay(today);
   const count =

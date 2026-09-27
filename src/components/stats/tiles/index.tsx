@@ -24,7 +24,6 @@ import {
   type CSSProperties,
 } from 'react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react';
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -63,43 +62,6 @@ const shownTiles: ShownTile[] = statsTiles.flatMap((tile) => {
   const view = tileView(tile.id);
   return view ? [{ tile, view }] : [];
 });
-
-const exploreLinks: Partial<
-  Record<StatsTileID, { href: string; label: string }>
-> = {
-  activityCalendar: {
-    href: '/stats/calendar',
-    label: 'Explore the full activity calendar',
-  },
-  weeklyVolume: {
-    href: '/stats/timeline',
-    label: 'Explore history and time periods',
-  },
-  thisWeek: {
-    href: '/stats/timeline',
-    label: 'Explore history and time periods',
-  },
-  typicalWeek: {
-    href: '/stats/timeline',
-    label: 'Explore history and time periods',
-  },
-  best30Days: {
-    href: '/stats/timeline',
-    label: 'Explore history and time periods',
-  },
-  restDays: {
-    href: '/stats/calendar',
-    label: 'Explore the full activity calendar',
-  },
-  yearToDate: {
-    href: '/stats/progress',
-    label: 'Compare other years, months and weeks',
-  },
-  monthVsLastMonth: {
-    href: '/stats/progress',
-    label: 'Compare other years, months and weeks',
-  },
-};
 
 const toggleOf = (tile: StatsTile) => ('toggle' in tile ? tile.toggle : null);
 
@@ -264,7 +226,15 @@ export function StatsTileGrid({
   useEffect(() => {
     if (!expandedID || detailsOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      // A dialog may unmount before this event reaches window. Its original
+      // propagation path still identifies Escape as belonging to that dialog.
+      const fromDialog = event
+        .composedPath()
+        .some(
+          (node) =>
+            node instanceof Element && node.getAttribute('role') === 'dialog',
+        );
+      if (event.key === 'Escape' && !event.defaultPrevented && !fromDialog) {
         document
           .querySelector<HTMLButtonElement>(
             `[data-tile-id="${expandedID}"] button[aria-expanded]`,
@@ -499,6 +469,7 @@ function TileCard({
     toggleOf(tile)?.options[0],
   );
   const summary = view.summary(context, option);
+  const detail = expanded && view.detail ? view.detail(context, option) : null;
 
   // Keep the user's scroll position. scrollIntoView after an animation races
   // with touch scrolling and can also scroll the app's overflow-hidden shell.
@@ -558,7 +529,7 @@ function TileCard({
         </div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <span className="text-[11px] text-muted-foreground">
-            {view.period(context, option)}
+            {detail ? 'History & details' : view.period(context, option)}
           </span>
           {toggle && (
             <FaceSwitch
@@ -569,17 +540,17 @@ function TileCard({
             />
           )}
         </div>
-        {summary && (
+        {!detail && summary && (
           <Headline summary={summary} size={large ? 'large' : 'tile'} />
         )}
-        {view.face(context, option, expanded)}
+        {detail ?? view.face(context, option, expanded)}
         {context.filtered && tile.id === 'consistency' && (
           <p className="mt-2 shrink-0 text-[11px] leading-snug text-muted-foreground">
             Filtered view: only matching activities count. Other activity may
             have occurred.
           </p>
         )}
-        {expanded && view.more && (
+        {expanded && !detail && view.more && (
           <motion.div
             initial={animateLayout ? { opacity: 0 } : false}
             animate={{
@@ -592,14 +563,6 @@ function TileCard({
           >
             {view.more(context, option)}
           </motion.div>
-        )}
-        {expanded && exploreLinks[tile.id] && (
-          <Link
-            className="mt-4 text-xs underline underline-offset-2"
-            href={exploreLinks[tile.id]!.href}
-          >
-            {exploreLinks[tile.id]!.label}
-          </Link>
         )}
       </motion.div>
     </motion.section>

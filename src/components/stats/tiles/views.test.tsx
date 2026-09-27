@@ -165,3 +165,56 @@ void test('rest-day weeks cross a year boundary without adding future rest days'
   assert.match(days[89]!, /Jan 1: no matching activity/);
   assert.match(days[89]!, /grid-column:15;grid-row:4/);
 });
+
+void test('expanded training history exposes bounded presets and period totals', () => {
+  const view = tileView('weeklyVolume')!;
+  const html = renderToStaticMarkup(
+    view.detail!(context, 'time') as ReactElement,
+  );
+  assert.match(html, /Volume history range/);
+  assert.match(html, />12 weeks</);
+  assert.match(html, />12 months</);
+  assert.match(html, />All years</);
+  assert.match(html, /2\.0 h/);
+  assert.match(html, /Period totals/);
+  assert.match(html, /current period is incomplete/);
+});
+
+void test('calendar history supports year and day selection, and mixed days stay identifiable', () => {
+  const view = tileView('activityCalendar')!;
+  const html = renderToStaticMarkup(
+    view.detail!(context, 'sport') as ReactElement,
+  );
+  assert.match(html, /Calendar period/);
+  assert.match(html, /value="2025"/);
+  assert.match(html, /Open calendar day/);
+  const day = dayFromISODate('2024-02-29');
+  const mixed = renderToStaticMarkup(
+    createElement(MonthRows, {
+      today: dayFromISODate('2024-12-31'),
+      first: dayFromISODate('2024-01-01'),
+      dominantSport: new Map([[day, 'ride' as const]]),
+      mixedDays: new Set([day]),
+      totals: new Map([
+        [day, { count: 2, distance: 20, time: 3, elevation: 200 }],
+      ]),
+      palette: context.palette,
+    }),
+  );
+  assert.match(mixed, /Feb 29, 2024: Multiple sports, 3.0 h/);
+  assert.match(mixed, /repeating-linear-gradient/);
+  assert.equal((mixed.match(/<button/g) ?? []).length, 366);
+});
+
+void test('year and month details expose earlier-period navigation with complete comparison summaries', () => {
+  for (const id of ['yearToDate', 'monthVsLastMonth'] as const) {
+    const view = tileView(id)!;
+    const html = renderToStaticMarkup(
+      view.detail!(context, 'distance') as ReactElement,
+    );
+    assert.match(html, /Previous period/);
+    assert.match(html, /Next period/);
+    assert.match(html, /2026/);
+    assert.match(html, /vs/);
+  }
+});

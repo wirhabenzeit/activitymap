@@ -29,6 +29,9 @@ export function MonthRows({
   palette,
   footer,
   colorBy = 'sport',
+  first,
+  mixedDays = new Set<number>(),
+  onSelectDay,
 }: {
   today: number;
   dominantSport: Map<number, Sport>;
@@ -36,9 +39,12 @@ export function MonthRows({
   palette: TilePalette;
   footer?: ReactNode;
   colorBy?: 'sport' | StatsMetric;
+  first?: number;
+  mixedDays?: Set<number>;
+  onSelectDay?: (day: number) => void;
 }) {
   const [hover, setHover] = useState<string | null>(null);
-  const months = calendarMonths(today);
+  const months = calendarMonths(today, first);
   const [focusedDay, setFocusedDay] = useState(today);
   const cells = useRef(new Map<number, HTMLButtonElement>());
   const max =
@@ -86,7 +92,7 @@ export function MonthRows({
                 const dayTotals = totals.get(day);
                 const label = `${shortDate(dateOfDay(day))}, ${dateOfDay(day).getUTCFullYear()}: ${
                   sport && dayTotals
-                    ? `${categorySettings[sport].name}, ${formatWithUnit(dayTotals[colorBy === 'sport' ? 'time' : colorBy], colorBy === 'sport' ? 'time' : colorBy)}`
+                    ? `${mixedDays.has(day) ? 'Multiple sports' : categorySettings[sport].name}, ${formatWithUnit(dayTotals[colorBy === 'sport' ? 'time' : colorBy], colorBy === 'sport' ? 'time' : colorBy)}`
                     : 'no matching activities'
                 }`;
                 return (
@@ -109,7 +115,9 @@ export function MonthRows({
                       background:
                         colorBy === 'sport'
                           ? sport
-                            ? categorySettings[sport].color
+                            ? mixedDays.has(day)
+                              ? `repeating-linear-gradient(135deg, ${categorySettings[sport].color} 0 3px, ${palette.empty} 3px 5px)`
+                              : categorySettings[sport].color
                             : palette.empty
                           : interpolateRgb(
                               palette.empty,
@@ -124,6 +132,7 @@ export function MonthRows({
                     onClick={(event) => {
                       event.stopPropagation();
                       setHover(label);
+                      onSelectDay?.(day);
                     }}
                     onKeyDown={(event) => {
                       const offsets: Record<string, number> = {

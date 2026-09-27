@@ -23,9 +23,9 @@ Map, list, and analyze all your Strava activities.
 
 ### Stats View
 
-- Calendar heatmap
-- Timeline of total distance/elevation/time per period, with local averaging
-- Progress plot per year or month
+- Stats tiles with recent volume, comparisons, records and activity patterns
+- Expanded training history by week, month and year
+- Activity calendar with year navigation and individual day activities
 
 ## Tech stack
 

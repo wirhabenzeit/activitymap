@@ -28,7 +28,6 @@ import {
   weeklyVolume,
   yearPace,
   yearToDate,
-  type Sport,
   type ActivityRecord,
   type StatsActivity,
 } from '~/lib/stats/tile-data';
@@ -37,21 +36,19 @@ import {
   cumulativeByDay,
   cumulativeYearPoints,
   comparisonYear,
-  dailyTotals,
   dateOfDay,
   monthStart,
   sportBreakdown,
-  weeklyVolumeBySport,
   yearStart,
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
-import { MonthRows, RestDayCalendar } from './calendar';
+import { RestDayCalendar } from './calendar';
+import { VolumeHistory, CalendarHistory, ComparisonHistory } from './history';
 import {
   CumulativeLines,
   Measure,
   PlainBars,
-  SportBars,
   VolumeArea,
   type LineSeries,
 } from './charts';
@@ -93,6 +90,7 @@ export type TileView = {
   ) => ReactNode;
   // Extra context shown below the face only when the tile is expanded.
   more?: (context: TileContext, option: string | undefined) => ReactNode;
+  detail?: (context: TileContext, option: string | undefined) => ReactNode;
 };
 
 // Short labels for the face switches, which have little room.
@@ -174,57 +172,6 @@ function FillChart({
   );
 }
 
-function DetailChart({
-  height = 280,
-  children,
-}: {
-  height?: number;
-  children: (size: { width: number; height: number }) => ReactNode;
-}) {
-  return (
-    <Measure className="w-full" style={{ height }}>
-      {children}
-    </Measure>
-  );
-}
-
-function Legend({ sports }: { sports: string[] }) {
-  return (
-    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      {sports.map((sport) => {
-        const setting =
-          categorySettings[sport as keyof typeof categorySettings];
-        return (
-          <span key={sport} className="flex items-center gap-1">
-            <i
-              className="inline-block h-2 w-2 rounded-sm"
-              style={{ background: setting.color }}
-            />
-            {setting.name}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
-// One line of sports, as many as fit, for a tile face.
-function SportLegend({ sports }: { sports: Sport[] }) {
-  return (
-    <div className="mt-1.5 flex h-4 shrink-0 flex-wrap gap-x-2.5 overflow-hidden text-[11px] leading-4 text-muted-foreground">
-      {sports.map((sport) => (
-        <span key={sport} className="flex items-center gap-1">
-          <i
-            className="inline-block h-1.5 w-1.5 rounded-full"
-            style={{ background: categorySettings[sport].color }}
-          />
-          {categorySettings[sport].name}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 // A small labelled number for the stat grids on tile faces.
 // A stat label with the swatch of the chart mark it names.
 function LegendLabel({
@@ -278,8 +225,42 @@ function Stat({
   );
 }
 
+const weekOf = (x: string) => `Week of ${shortDate(dateOfDay(Number(x)))}`;
+
 const asMetric = (option: string | undefined, fallback: StatsMetric) =>
   (option ?? fallback) as StatsMetric;
+
+function comparisonDetail(
+  view: TileView,
+  period: 'year' | 'month',
+  context: TileContext,
+  option: string | undefined,
+) {
+  return (
+    <ComparisonHistory context={context} period={period}>
+      {(historical) => {
+        const summary = view.summary(historical, option)!;
+        return (
+          <>
+            <p className="text-xs text-muted-foreground">
+              {view.period(historical, option)}
+            </p>
+            <div>
+              <p className="font-mono text-2xl">
+                {summary.value}{' '}
+                <span className="text-sm text-muted-foreground">
+                  {summary.unit}
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground">{summary.sub}</p>
+            </div>
+            {view.face(historical, option, true)}
+          </>
+        );
+      }}
+    </ComparisonHistory>
+  );
+}
 
 // Year to date --------------------------------------------------------------
 
@@ -303,6 +284,8 @@ const dayOfYearLabel = (x: number) =>
   shortDate(dateOfDay(yearStart(comparisonYear) + Math.round(x)));
 
 const yearToDateView: TileView = {
+  detail: (context, option) =>
+    comparisonDetail(yearToDateView, 'year', context, option),
   period: ({ today }) => {
     const year = dateOfDay(today).getUTCFullYear();
     return `${year} vs ${year - 1}`;
@@ -363,19 +346,6 @@ const yearToDateView: TileView = {
 
 // Weekly volume -------------------------------------------------------------
 
-const weekOf = (x: string) => `Week of ${shortDate(dateOfDay(Number(x)))}`;
-
-function weekRows(context: TileContext, metric: StatsMetric) {
-  return weeklyVolumeBySport(context.activities, context.today, metric).flatMap(
-    ({ weekStart, bySport }) =>
-      Object.entries(bySport).map(([sport, value]) => ({
-        x: String(weekStart),
-        sport: sport as keyof typeof bySport,
-        value,
-      })),
-  );
-}
-
 // Total of `metric` over the `days` days ending on `last`.
 // Mean of each full week and the three full weeks before it; the current,
 // partial week gets no point.
@@ -399,6 +369,9 @@ function rollingFourWeeks(context: TileContext, metric: StatsMetric) {
 }
 
 const weeklyVolumeView: TileView = {
+  detail: (context, option) => (
+    <VolumeHistory context={context} metric={asMetric(option, 'distance')} />
+  ),
   period: () => 'Last 4 weeks',
   summary: (context, option) => {
     const metric = asMetric(option, 'distance');
@@ -452,39 +425,6 @@ const weeklyVolumeView: TileView = {
       </>
     );
   },
-  more: (context, option) => {
-    const metric = asMetric(option, 'distance');
-    const rows = weekRows(context, metric);
-    const { values } = weeklyVolume(context.activities, context.today, metric);
-    const fullWeeks = values.slice(0, -1);
-    const average =
-      fullWeeks.reduce((sum, value) => sum + value, 0) / fullWeeks.length;
-    const sports = Object.keys(categorySettings).filter((sport) =>
-      rows.some((row) => row.sport === sport && row.value > 0),
-    );
-    return (
-      <>
-        <h4 className="mt-5 text-xs font-medium text-muted-foreground">
-          Weekly totals by sport
-        </h4>
-        <DetailChart height={200}>
-          {({ width, height }) => (
-            <SportBars
-              rows={rows}
-              width={width}
-              height={height}
-              detail
-              average={average}
-              palette={context.palette}
-              valueFormat={(value) => formatWithUnit(value, metric)}
-              xTickFormat={(x) => shortDate(dateOfDay(Number(x)))}
-            />
-          )}
-        </DetailChart>
-        <Legend sports={sports} />
-      </>
-    );
-  },
 };
 
 // Activity calendar ---------------------------------------------------------
@@ -508,45 +448,20 @@ const activityCalendarView: TileView = {
       sub: `${Math.round((activeDays / days) * 100)}% of days in the last 12 months`,
     };
   },
-  face: (context, option, expanded) => {
-    const colorBy = (option ?? 'sport') as 'sport' | StatsMetric;
-    const { dominantSport } = activityCalendar(
-      context.activities,
-      context.today,
-    );
-    const days = dailyTotals(
-      context.activities,
-      lastYearStart(context.today),
-      context.today,
-    );
-    // Sports by how many days they coloured, for the legend.
-    const dayCounts = new Map<Sport, number>();
-    for (const sport of dominantSport.values())
-      dayCounts.set(sport, (dayCounts.get(sport) ?? 0) + 1);
-    const sports = [...dayCounts.entries()]
-      .sort((x, y) => y[1] - x[1])
-      .map(([sport]) => sport);
-    const rows = (
-      <MonthRows
-        today={context.today}
-        colorBy={colorBy}
-        dominantSport={dominantSport}
-        totals={days}
-        palette={context.palette}
-        footer={
-          colorBy === 'sport' ? <SportLegend sports={sports} /> : undefined
-        }
-      />
-    );
-    // Expanded, the same month rows get a fixed, taller area.
-    return expanded ? (
-      <div className="flex flex-col" style={{ height: 380 }}>
-        {rows}
-      </div>
-    ) : (
-      rows
-    );
-  },
+  face: (context, option, expanded) => (
+    <CalendarHistory
+      context={context}
+      colorBy={(option ?? 'sport') as 'sport' | StatsMetric}
+      expanded={expanded}
+    />
+  ),
+  detail: (context, option) => (
+    <CalendarHistory
+      context={context}
+      colorBy={(option ?? 'sport') as 'sport' | StatsMetric}
+      expanded
+    />
+  ),
 };
 
 // This month vs last month --------------------------------------------------
@@ -599,6 +514,8 @@ function samePeriodLastMonth(today: number) {
 }
 
 const monthVsLastMonthView: TileView = {
+  detail: (context, option) =>
+    comparisonDetail(monthVsLastMonthView, 'month', context, option),
   period: ({ today }) => {
     const date = dateOfDay(today);
     const previous = new Date(
