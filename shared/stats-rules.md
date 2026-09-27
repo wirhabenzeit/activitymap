@@ -62,3 +62,7 @@ Fixture numbers are compared with a tolerance of 0.000001.
 ## Chart dates
 
 Year-comparison charts align calendar month/day on the leap reference year 2000. February 29 has a point only in leap years; March 1 and December 31 align in every year. The rolling-year calendar includes both partial boundary months (normally 13 month rows), with cells outside its inclusive window blank.
+
+## Activity scope
+
+Tiles respect sport, search, numeric and binary activity filters for both the reporting window and all comparisons. The shared sidebar date range does not remove history from tiles: each tile owns its period. The web replaces the date picker on Tiles with an explanation and preserves its value for the other views. A visible filter summary and reset apply to activity scope only. Filtered rest days and consistency carry a fixed explanation that only matching activities are counted; titles do not change with individual filter combinations. Sport mix retains its position and explains a single-category scope. Missing/loading history is not presented as recorded inactivity.

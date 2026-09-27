@@ -68,6 +68,8 @@ import {
 export type TileContext = {
   activities: StatsActivity[];
   today: number;
+  filtered?: boolean;
+  singleSport?: boolean;
   palette: TilePalette;
 };
 
@@ -641,7 +643,7 @@ type MixRange = 'currentYear' | 'allTime';
 
 const sportMixView: TileView = {
   period: ({ today }) => `${dateOfDay(today).getUTCFullYear()} by time`,
-  summary: ({ activities, today }, option) => {
+  summary: ({ activities, today, singleSport }, option) => {
     const range = (option ?? 'currentYear') as MixRange;
     const [top] = sportMix(activities, today, range);
     if (!top) return { value: '–', unit: '', sub: 'No moving time yet' };
@@ -657,7 +659,9 @@ const sportMixView: TileView = {
     return {
       value: `${Math.round(top.share * 100)}%`,
       unit: categorySettings[top.sport].name,
-      sub: `of ${formatWithUnit(hours, 'time')} moving time`,
+      sub: singleSport
+        ? 'One sport selected; no mix to compare'
+        : `of ${formatWithUnit(hours, 'time')} moving time`,
     };
   },
   face: ({ activities, today }) => {

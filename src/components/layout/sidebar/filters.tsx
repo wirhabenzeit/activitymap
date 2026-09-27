@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
 import { MoreHorizontal, Search, RotateCcw } from 'lucide-react';
 
@@ -293,6 +294,7 @@ export function InequalityFilter({
 }
 
 export function MonthPicker() {
+  const pathname = usePathname();
   const [dates, setDates] = useShallowStore((state) => [
     state.dateRange,
     state.setDateRange,
@@ -312,6 +314,20 @@ export function MonthPicker() {
   const dateStr = [validSelectedDates?.start, validSelectedDates?.end].map(
     (date) => (date ? format(date, 'MMM yyyy') : undefined),
   );
+
+  if (pathname === '/stats/tiles') {
+    return (
+      <SidebarMenuItem>
+        <div className="flex gap-2 px-2 py-2 text-xs text-muted-foreground">
+          <CalendarIcon className="h-4 w-4 shrink-0" />
+          <span>
+            Each stats card uses its own period. Your date range is kept for
+            other views.
+          </span>
+        </div>
+      </SidebarMenuItem>
+    );
+  }
 
   return (
     <SidebarMenuItem>

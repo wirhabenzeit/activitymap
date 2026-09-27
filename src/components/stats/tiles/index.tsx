@@ -25,7 +25,7 @@ import { useTheme } from 'next-themes';
 import { LayoutGroup, motion } from 'motion/react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
-import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+import { FilterScope, useStatsActivities } from './scope';
 import {
   statsTileGroups,
   statsTileLayout,
@@ -35,7 +35,7 @@ import {
 } from '~/settings/stats-tiles.generated';
 import { type StatsActivity } from '~/lib/stats/tile-data';
 import { placeBento } from '~/lib/stats/bento';
-import { localToday, toStatsActivity } from '~/lib/stats/tile-series';
+import { localToday } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
 import { Measure } from './charts';
@@ -63,24 +63,84 @@ const layoutTransition = {
 };
 
 export default function StatsTiles() {
-  const { filteredActivities } = useFilteredActivities();
-  const activities = useMemo(
-    () => filteredActivities.map(toStatsActivity),
-    [filteredActivities],
+  const { query, activities, scope, reset } = useStatsActivities();
+  const empty = activities.length === 0;
+  const loading = query.isLoading || (empty && query.isFetching);
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <FilterScope labels={scope.labels} onReset={reset} />
+      {query.isError && (
+        <div role="alert" className="px-4 py-3 text-sm">
+          Could not load activity history.{' '}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => void query.refetch()}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {loading ? (
+        <p role="status" className="p-6 text-sm text-muted-foreground">
+          Loading activity history…
+        </p>
+      ) : empty ? (
+        <div className="p-6 text-sm text-muted-foreground">
+          <p>
+            {scope.filtered && (query.data?.length ?? 0) > 0
+              ? 'No activities match these filters.'
+              : 'No activity history available yet.'}
+          </p>
+          {scope.filtered && (
+            <button type="button" onClick={reset} className="mt-3 underline">
+              Clear activity filters
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          {(query.isFetching || query.hasNextPage) && (
+            <p
+              role="status"
+              className="px-4 py-2 text-xs text-muted-foreground"
+            >
+              Loading more history; comparisons may be incomplete.
+            </p>
+          )}
+          <div className="min-h-0 flex-1">
+            <StatsTileGrid
+              activities={activities}
+              filtered={scope.filtered}
+              singleSport={scope.singleSport}
+            />
+          </div>
+        </>
+      )}
+    </div>
   );
-  return <StatsTileGrid activities={activities} />;
 }
 
-export function StatsTileGrid({ activities }: { activities: StatsActivity[] }) {
+export function StatsTileGrid({
+  activities,
+  filtered = false,
+  singleSport = false,
+}: {
+  activities: StatsActivity[];
+  filtered?: boolean;
+  singleSport?: boolean;
+}) {
   const { resolvedTheme } = useTheme();
   const today = useMemo(() => localToday(), []);
   const context: TileContext = useMemo(
     () => ({
       activities,
       today,
+      filtered,
+      singleSport,
       palette: tilePalette(resolvedTheme === 'dark'),
     }),
-    [activities, today, resolvedTheme],
+    [activities, today, resolvedTheme, filtered, singleSport],
   );
 
   const [expandedID, setExpandedID] = useState<StatsTileID | null>(null);
@@ -394,6 +454,13 @@ function TileCard({
           <Headline summary={summary} size={large ? 'large' : 'tile'} />
         )}
         {view.face(context, option, expanded)}
+        {context.filtered &&
+          (tile.id === 'restDays' || tile.id === 'consistency') && (
+            <p className="mt-2 shrink-0 text-[11px] leading-snug text-muted-foreground">
+              Filtered view: only matching activities count. Other activity may
+              have occurred.
+            </p>
+          )}
         {expanded && view.more && (
           <motion.div
             initial={{ opacity: 0 }}
