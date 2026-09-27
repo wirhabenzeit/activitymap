@@ -1,5 +1,5 @@
 {
-  "description": "Sixteen activities around Saturday 26 September 2026, chosen to hit the edges in shared/stats-rules.md: two activities on one day, a late-evening and a just-after-midnight start, an activity without distance, the same date last year (also the first day of the 12-month window), the day after it, and a last-month activity after today's day of the month.",
+  "description": "Sixteen activities around Saturday 26 September 2026, chosen to hit the edges in shared/stats-rules.md: two activities on one day, a late-evening and a just-after-midnight start, an activity without distance, the same date last year (also the first day of the 12-month window), the day after it, and a last-month activity after today's day of the month. The same activities pin the tiles added from the web prototype.",
   "today": "2026-09-26",
   "activities": [
     {
@@ -159,7 +159,8 @@
         "2026-09-14",
         "2026-09-21"
       ],
-      "distance": [12, 0, 0, 0, 0, 0, 50, 10, 8, 0, 0, 127]
+      "distance": [12, 0, 0, 0, 0, 0, 50, 10, 8, 0, 0, 127],
+      "lastFourWeeks": { "distance": { "current": 135, "previous": 60 } }
     },
     "activityCalendar": {
       "activeDays": 13,
@@ -192,7 +193,84 @@
         { "sport": "misc", "share": 0.049383 }
       ]
     },
-    "consistency": { "activeDaysPerWeek": 0.363636, "currentStreak": 3 },
-    "distanceVsElevation": { "activities": 13, "metersPerKm": 19.390681 }
+    "consistency": {
+      "activeDaysPerWeek": 0.363636,
+      "currentStreak": 3,
+      "solidWeeks": 0
+    },
+    "distanceVsElevation": {
+      "activities": 13,
+      "metersPerKm": 19.390681,
+      "climbing": {
+        "current": 1939.0681,
+        "previous": 6666.666667,
+        "months": [
+          { "monthStart": "2025-10-01", "rate": 0 },
+          { "monthStart": "2025-11-01", "rate": 0 },
+          { "monthStart": "2025-12-01", "rate": 0 },
+          { "monthStart": "2026-01-01", "rate": 0 },
+          { "monthStart": "2026-02-01", "rate": 1200 },
+          { "monthStart": "2026-03-01", "rate": 0 },
+          { "monthStart": "2026-04-01", "rate": 0 },
+          { "monthStart": "2026-05-01", "rate": 0 },
+          { "monthStart": "2026-06-01", "rate": 1000 },
+          { "monthStart": "2026-07-01", "rate": 1250 },
+          { "monthStart": "2026-08-01", "rate": 2500 },
+          { "monthStart": "2026-09-01", "rate": 2148.148148 }
+        ]
+      }
+    },
+    "thisWeek": {
+      "distance": {
+        "days": [60, 0, 0, 17, 10, 40, null],
+        "current": 127,
+        "typical": 7.272727
+      },
+      "elevation": { "current": 2820, "typical": 157.272727 }
+    },
+    "typicalWeek": {
+      "count": 0.363636,
+      "distance": 7.272727,
+      "elevation": 157.272727,
+      "time": 0.606061,
+      "activeDays": 0.363636
+    },
+    "yearPace": {
+      "distance": {
+        "current": 242,
+        "perDay": 0.899628,
+        "projected": 328.364312,
+        "lastYear": 52
+      },
+      "time": {
+        "current": 20.25,
+        "perDay": 0.075279,
+        "projected": 27.476766,
+        "lastYear": 6.75
+      }
+    },
+    "records": {
+      "currentYear": {
+        "distance": { "value": 60, "day": "2026-09-21" },
+        "time": { "value": 4, "day": "2026-09-24" },
+        "elevation": { "value": 1200, "day": "2026-09-21" },
+        "biggestWeek": { "value": 127, "weekStart": "2026-09-21" }
+      },
+      "allTime": {
+        "distance": { "value": 60, "day": "2026-09-21" },
+        "time": { "value": 5, "day": "2025-03-10" },
+        "elevation": { "value": 1200, "day": "2026-09-21" },
+        "biggestWeek": { "value": 127, "weekStart": "2026-09-21" }
+      }
+    },
+    "best30Days": {
+      "distance": {
+        "total": 145,
+        "start": "2026-08-28",
+        "end": "2026-09-26",
+        "current": 145
+      }
+    },
+    "restDays": { "last30": 24, "last90": 81 }
   }
 }

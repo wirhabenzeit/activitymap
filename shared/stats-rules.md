@@ -31,15 +31,30 @@ Sport means the category from `src/settings/category.tsx` on the web and `Activi
 
 ## Tiles
 
-- **yearToDate**: the chosen metric summed over `yearToDate` for this year (`current`) and last year (`previous`).
-- **totals**: all four metrics over `currentYear`. The web folds these into yearToDate and yearPace and does not draw this tile.
-- **weeklyVolume**: the chosen metric per week over `last12Weeks`, oldest first. The last bar is the current, partial week.
-- **activityCalendar**: `activeDays` is the number of days in `last12Months` with at least one activity. A day's dominant sport is the one with the most moving time. Ties go to the order in the Sports list above.
+Unless a rule says otherwise, a tile's metric is the one its switch shows, and "full weeks" means the 11 full weeks of `last12Weeks` before the current, partial week.
+
+### Now
+
+- **thisWeek**: the metric per day of `currentWeek`, Monday first, with `null` for the days after today. `current` is their sum. `typical` is the mean, over the full weeks, of each week's total from Monday through today's weekday, so an unfinished week is compared with the same part of a typical week.
+- **weeklyVolume** (Training volume): the metric per week over `last12Weeks`, oldest first. The last bar is the current, partial week. `lastFourWeeks.current` is the metric over the 28 days ending today; `previous` is the 28 days before those.
 - **monthVsLastMonth**: the chosen metric over `monthToDate` for this month (`current`) and last month (`previous`).
+
+### This year
+
+- **yearToDate**: the chosen metric summed over `yearToDate` for this year (`current`) and last year (`previous`).
+- **yearPace**: `current` is the metric over `yearToDate`. `perDay` divides it by the number of days from 1 January through today. `projected` is `perDay` times the number of days in this year. `lastYear` is the metric over the whole previous calendar year.
+- **records**: over `currentYear`, or over `allTime` for the second row: the single activity with the most distance, the most moving time and the most elevation, and the Monday-to-Sunday week with the most distance. A record needs a value above 0, and a tie goes to the earlier activity or week.
+- **totals**: all four metrics over `currentYear`. Optional: the web folds these into yearToDate and yearPace and does not draw this tile.
+
+### Patterns
+
+- **activityCalendar**: `activeDays` is the number of days in `last12Months` with at least one activity. A day's dominant sport is the one with the most moving time. Ties go to the order in the Sports list above.
+- **consistency**: over the full weeks of the chosen range (11 for `last12Weeks`, 51 for `last52Weeks`), `activeDaysPerWeek` is the mean number of active days per week and `solidWeeks` counts the weeks with at least five active days. `currentStreak` counts consecutive active days, ending today, or yesterday when today has no activity yet.
 - **sportMix**: each sport's share of moving time over the chosen range, largest first. Sports with no moving time are left out.
-- **consistency**: `activeDaysPerWeek` is the mean number of active days per full week, over the full weeks of the range (11 for `last12Weeks`). The current, partial week is not counted. `currentStreak` counts consecutive active days, ending today, or yesterday when today has no activity yet.
-- **distanceVsElevation**: one point per activity with a distance above 0 in `last12Months`. `metersPerKm` is the total elevation of those points divided by their total distance. The web tile (titled Climbing) shows it per 100 km, against the 12 months before, with one bar per calendar month.
-- **thisWeek**, **typicalWeek**, **yearPace**, **records**, **best30Days**, **restDays**: no fixtures yet; they get fixtures before a second platform builds them. This week compares with the typical total from Monday through the same weekday. Typical week averages the same full weeks as consistency. Best 30 days is the 30-day window this year with the largest total. Rest days are days without an activity. Pace is this year's total divided by the days so far, projected over the whole year. Records are this year's single activities with the most distance, time and elevation, and the week (Monday to Sunday) with the most distance.
+- **distanceVsElevation** (Climbing): one point per activity with a distance above 0 in `last12Months`. `metersPerKm` is the total elevation of those points divided by their total distance. `climbing.current` is the same per 100 km; `climbing.previous` is the same over the 12 months before `last12Months` (from the same date two years ago through the day before `last12Months` starts). `climbing.months` gives it for each calendar month, the 11 before this one and this one through today; a month without distance has 0.
+- **typicalWeek**: the mean per full week of each metric and of active days.
+- **best30Days**: the 30-day window with the largest total of the metric, among windows that start on or after 1 January of this year and end by today; a tie goes to the earlier window. Before 30 January the only window is 1 January through today. `current` is the metric over the 30 days ending today.
+- **restDays**: the number of days without an activity among the last 30 days (today included) and among `last90Days`.
 - **speedTrend**: optional and not specified yet. It gets rules and fixtures before either platform builds it.
 
 Fixture numbers are compared with a tolerance of 0.000001.

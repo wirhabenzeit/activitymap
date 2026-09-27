@@ -13,33 +13,32 @@ import {
 } from '~/settings/stats-tiles.generated';
 import {
   activityCalendar,
-  dayOf,
-  mondayOf,
+  best30Days,
+  climbing,
   consistency,
+  dayOf,
+  fourWeekVolume,
+  mondayOf,
   monthVsLastMonth,
+  records,
+  restDays,
   sportMix,
+  thisWeek,
+  typicalWeek,
   weeklyVolume,
+  yearPace,
   yearToDate,
   type Sport,
   type StatsActivity,
 } from '~/lib/stats/tile-data';
 import {
-  activeDaysPerWeek,
   activeDayFlags,
-  bestWindow,
-  climbRate,
-  climbRateByMonth,
   cumulativeByDay,
   dailyTotals,
   dateOfDay,
   monthStart,
-  records,
   sportBreakdown,
-  thisWeekByDay,
-  typicalThroughWeekday,
-  typicalWeek,
   weeklyVolumeBySport,
-  yearPace,
   yearStart,
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
@@ -371,15 +370,6 @@ function weekRows(context: TileContext, metric: StatsMetric) {
 }
 
 // Total of `metric` over the `days` days ending on `last`.
-const sumOver = (
-  context: TileContext,
-  metric: StatsMetric,
-  last: number,
-  days: number,
-) =>
-  cumulativeByDay(context.activities, metric, last - days + 1, last).at(-1) ??
-  0;
-
 // Mean of each full week and the three full weeks before it; the current,
 // partial week gets no point.
 function rollingFourWeeks(context: TileContext, metric: StatsMetric) {
@@ -405,8 +395,11 @@ const weeklyVolumeView: TileView = {
   period: () => 'Last 4 weeks',
   summary: (context, option) => {
     const metric = asMetric(option, 'distance');
-    const current = sumOver(context, metric, context.today, 28);
-    const previous = sumOver(context, metric, context.today - 28, 28);
+    const { current, previous } = fourWeekVolume(
+      context.activities,
+      context.today,
+      metric,
+    );
     return {
       value: formatMetric(current, metric),
       unit: `${metricUnit[metric]} · last 4 weeks`,
@@ -777,16 +770,10 @@ const consistencyView: TileView = {
       context.today,
       weeksOf(option),
     );
-    const fullWeeks = activeDaysPerWeek(
-      context.activities,
-      context.today,
-      weeksOf(option),
-    ).slice(0, -1);
-    const solid = fullWeeks.filter((week) => week.activeDays >= 5).length;
     return {
       value: result.activeDaysPerWeek.toFixed(1),
       unit: 'days / week',
-      sub: `5+ active days in ${solid} of ${fullWeeks.length} weeks`,
+      sub: `5+ active days in ${result.solidWeeks} of ${weeksOf(option) - 1} weeks`,
     };
   },
   // One column per week (Monday on top), one dot per day: filled when
@@ -847,13 +834,7 @@ const consistencyView: TileView = {
 const distanceVsElevationView: TileView = {
   period: () => 'Last 12 months',
   summary: ({ activities, today }) => {
-    const oneYearAgo = lastYearStart(today);
-    const current = climbRate(activities, oneYearAgo, today);
-    const previous = climbRate(
-      activities,
-      lastYearStart(oneYearAgo - 1),
-      oneYearAgo - 1,
-    );
+    const { current, previous } = climbing(activities, today);
     return {
       value: formatMetric(current, 'elevation'),
       unit: 'm climbed per 100 km',
@@ -867,7 +848,7 @@ const distanceVsElevationView: TileView = {
     };
   },
   face: (context, _option, expanded) => {
-    const months = climbRateByMonth(context.activities, context.today);
+    const { months } = climbing(context.activities, context.today);
     return (
       <>
         <FillChart expanded={expanded}>
@@ -968,22 +949,16 @@ const thisWeekView: TileView = {
   // total is not held against a full week.
   summary: (context, option) => {
     const metric = asMetric(option, 'distance');
-    const days = thisWeekByDay(context.activities, context.today, metric);
-    const weekday = weekdayNames[days.filter((day) => day !== null).length - 1];
+    const week = thisWeek(context.activities, context.today, metric);
+    const weekday =
+      weekdayNames[week.days.filter((day) => day !== null).length - 1];
     return {
-      value: formatMetric(
-        days.reduce<number>((sum, day) => sum + (day ?? 0), 0),
-        metric,
-      ),
+      value: formatMetric(week.current, metric),
       unit: `${metricUnit[metric]} so far`,
       sub: (
         <Delta
-          current={days.reduce<number>((sum, day) => sum + (day ?? 0), 0)}
-          previous={typicalThroughWeekday(
-            context.activities,
-            context.today,
-            metric,
-          )}
+          current={week.current}
+          previous={week.typical}
           metric={metric}
           text={`vs typical by ${weekday}`}
         />
@@ -993,7 +968,7 @@ const thisWeekView: TileView = {
   faceOptions: metricFaceOptions,
   face: (context, option, expanded) => {
     const metric = asMetric(option, 'distance');
-    const days = thisWeekByDay(context.activities, context.today, metric);
+    const { days } = thisWeek(context.activities, context.today, metric);
     const todayIndex = days.filter((day) => day !== null).length - 1;
     return (
       <>
@@ -1248,11 +1223,7 @@ const recordsView: TileView = {
   // year's total.
   summary: () => null,
   face: ({ activities, today }) => {
-    const best = records(
-      activities,
-      yearStart(dateOfDay(today).getUTCFullYear()),
-      today,
-    );
+    const best = records(activities, today, 'currentYear');
     return (
       <div className="my-auto">
         <RecordStats best={best} />
@@ -1260,7 +1231,7 @@ const recordsView: TileView = {
     );
   },
   more: ({ activities, today }) => {
-    const best = records(activities, -Infinity, today);
+    const best = records(activities, today, 'allTime');
     return (
       <div className="mt-5 border-t pt-3">
         <h4 className="mb-2 text-xs font-medium text-muted-foreground">
@@ -1278,12 +1249,7 @@ const best30DaysView: TileView = {
   period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
   summary: ({ activities, today }, option) => {
     const metric = asMetric(option, 'distance');
-    const best = bestWindow(
-      activities,
-      yearStart(dateOfDay(today).getUTCFullYear()),
-      today,
-      metric,
-    );
+    const best = best30Days(activities, today, metric);
     if (best.total === 0)
       return { value: '–', unit: '', sub: 'No activities this year yet' };
     return {
@@ -1295,12 +1261,7 @@ const best30DaysView: TileView = {
   faceOptions: metricFaceOptions,
   face: ({ activities, today }, option) => {
     const metric = asMetric(option, 'distance');
-    const best = bestWindow(
-      activities,
-      yearStart(dateOfDay(today).getUTCFullYear()),
-      today,
-      metric,
-    );
+    const best = best30Days(activities, today, metric);
     const share = best.total > 0 ? best.current / best.total : 0;
     return (
       <div className="mt-auto">
@@ -1331,12 +1292,11 @@ const best30DaysView: TileView = {
 const restDaysView: TileView = {
   period: () => 'Last 90 days',
   summary: ({ activities, today }) => {
-    const flags = activeDayFlags(activities, today, 90);
-    const rest = (days: boolean[]) => days.filter((active) => !active).length;
+    const { last30, last90 } = restDays(activities, today);
     return {
-      value: String(rest(flags.slice(-30))),
+      value: String(last30),
       unit: 'in 30 days',
-      sub: `${rest(flags)} in the last 90 days`,
+      sub: `${last90} in the last 90 days`,
     };
   },
   face: ({ activities, today }) => {
