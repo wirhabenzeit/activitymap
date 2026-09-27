@@ -76,7 +76,9 @@ jobs:
           sys.exit("No available iOS 27 iPhone simulator")
           ')
           echo "IOS_TEST_SIMULATOR=$simulator_id" >> "$GITHUB_ENV"
-      - name: Build app and run Swift Testing persistence tests
+      # Keep assertion failures and logs in xcresult, without the simulator
+      # sysdiagnose collection that can add a ten-minute timeout after failures.
+      - name: Build app and run Swift Testing tests
         run: |
           xcodebuild test \
             -project ios/ActivityMap/ActivityMap.xcodeproj \
@@ -84,6 +86,7 @@ jobs:
             -configuration Debug \
             -destination "platform=iOS Simulator,id=$IOS_TEST_SIMULATOR" \
             -parallel-testing-enabled NO \
+            -collect-test-diagnostics never \
             -resultBundlePath ios-test-results.xcresult \
             CODE_SIGNING_ALLOWED=NO
       - uses: actions/upload-artifact@v7

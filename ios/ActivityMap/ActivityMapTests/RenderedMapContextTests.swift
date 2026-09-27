@@ -106,7 +106,8 @@ extension RenderedRoutePickingTests {
         let oldWindow = scene.keyWindow
         let window = UIWindow(windowScene: scene)
         let store = ActivityStore(activities: (1...200).map { ActivityStoreSelectionTests.activity($0) })
-        let host = UIHostingController(rootView: NavigationStack { BrowseContent(store: store) })
+        let host = UIHostingController(rootView: NavigationStack { BrowseContent(store: store) }
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)))
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
@@ -115,7 +116,6 @@ extension RenderedRoutePickingTests {
         var idle = false
         let idleEvent = firstMap.mapboxMap.onMapIdle.observe { _ in idle = true }
         defer { idleEvent.cancel() }
-        firstMap.mapboxMap.loadStyle(CameraHarness.style)
         try await cameraWait { idle && firstMap.mapboxMap.layerExists(withId: RouteSource.ordinaryLayerID) }
         firstMap.mapboxMap.setCamera(to: CameraOptions(center: CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005), zoom: 13))
         try await Task.sleep(for: .milliseconds(150))
@@ -151,7 +151,8 @@ extension RenderedRoutePickingTests {
         let window = UIWindow(windowScene: scene)
         let store = ActivityStore(activities: (1...200).map { ActivityStoreSelectionTests.activity($0) })
         store.selectedTab = .list
-        let host = UIHostingController(rootView: NavigationStack { BrowseContent(store: store) })
+        let host = UIHostingController(rootView: NavigationStack { BrowseContent(store: store) }
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)))
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
@@ -162,9 +163,13 @@ extension RenderedRoutePickingTests {
         store.selectedTab = .map
         try await cameraWait { !descendants(host.view, of: MapView.self).isEmpty }
         let firstMap = try #require(descendants(host.view, of: MapView.self).first)
-        firstMap.mapboxMap.loadStyle(CameraHarness.style)
         try await cameraWait { firstMap.mapboxMap.isStyleLoaded }
-        try await Task.sleep(for: .milliseconds(150))
+        // Style readiness alone precedes SwiftUI's camera initialization. Wait
+        // for a real command to be consumed and its viewport transition to finish
+        // before simulating a user camera change on a cold simulator.
+        store.mapContext.request(.resetView)
+        try await cameraWait { store.mapContext.pendingRequest == nil }
+        try await Task.sleep(for: .milliseconds(650))
         firstMap.mapboxMap.setCamera(to: CameraOptions(center: CLLocationCoordinate2D(latitude: 47.1, longitude: 8.7),
                                                       zoom: 10, bearing: 25, pitch: 40))
         try await cameraWait { abs(store.mapContext.camera.zoom - 10) < 0.01 }
@@ -197,7 +202,7 @@ extension RenderedRoutePickingTests {
 }
 
 @MainActor
-private final class CameraHarness {
+final class CameraHarness {
     static let style = ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##
     let window: UIWindow
     let map: MapView
@@ -228,10 +233,10 @@ private final class CameraHarness {
 }
 
 @MainActor
-private func cameraWait(_ condition: () -> Bool) async throws {
+private func cameraWait(sourceLocation: SourceLocation = #_sourceLocation, _ condition: () -> Bool) async throws {
     let deadline = Date().addingTimeInterval(10)
     while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(30)) }
-    try #require(condition(), "Native map/list state timed out")
+    try #require(condition(), "Native map/list state timed out", sourceLocation: sourceLocation)
 }
 
 @MainActor

@@ -9,6 +9,7 @@ struct MapScreen: View {
     @Bindable private var context: MapContext
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.mapStyleOverride) private var mapStyleOverride
     @State private var viewport: Viewport
     @State private var acceptsCameraEvents = false
 
@@ -129,7 +130,16 @@ struct MapScreen: View {
             acceptsCameraEvents = true
             applyNavigation(proxy: proxy, geometry: geometry)
         }
-        .onMapIdle { _ in applyNavigation(proxy: proxy, geometry: geometry) }
+        .onMapIdle { _ in
+            // A local/cached style can finish before SwiftUI installs its
+            // onStyleLoaded subscription. Recover readiness at the first idle
+            // frame as well, or camera persistence and queued fits stay blocked.
+            if !acceptsCameraEvents, proxy.map?.isStyleLoaded == true {
+                viewport = context.camera.viewport
+                acceptsCameraEvents = true
+            }
+            applyNavigation(proxy: proxy, geometry: geometry)
+        }
         .ignoresSafeArea()
         .onChange(of: store.selectedTab) { _, tab in
             if tab == .map { applyNavigation(proxy: proxy, geometry: geometry) }
@@ -336,6 +346,7 @@ struct MapScreen: View {
     }
 
     private var mapStyle: MapStyle {
+        if let mapStyleOverride { return mapStyleOverride }
         if let styleURL = context.baseStyle.styleURL,
            let url = URL(string: styleURL),
            let styleURI = StyleURI(url: url) {
@@ -378,4 +389,18 @@ struct MapScreen: View {
 private extension SharedRasterOverlayDefinition {
     var sourceID: String { "\(id)-source" }
     var layerID: String { "\(id)-layer" }
+}
+
+// Inject a local style for rendered previews/tests through the same declarative
+// path as the real map. Loading a style directly on the underlying MapView races
+// SwiftUI's next update, which reapplies the declared (normally remote) style.
+private struct MapStyleOverrideKey: EnvironmentKey {
+    static let defaultValue: MapStyle? = nil
+}
+
+extension EnvironmentValues {
+    var mapStyleOverride: MapStyle? {
+        get { self[MapStyleOverrideKey.self] }
+        set { self[MapStyleOverrideKey.self] = newValue }
+    }
 }

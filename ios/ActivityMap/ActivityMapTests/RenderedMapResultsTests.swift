@@ -27,6 +27,7 @@ extension RenderedRoutePickingTests {
         let size = scenario == "wide" ? CGSize(width: 768, height: 1024) : scenario == "landscape" ? CGSize(width: 844, height: 390) : CGSize(width: 390, height: 844)
         window.frame = CGRect(origin: .zero, size: size)
         let root = MapScreen(store: store, topOcclusion: 62, picker: picker)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style))
             .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility2 : .large)
         let host = UIHostingController(rootView: root)
         window.rootViewController = host
@@ -35,7 +36,6 @@ extension RenderedRoutePickingTests {
         host.view.frame = window.bounds
         try await resultsWait { self.mapView(in: host.view) != nil }
         let map = try #require(mapView(in: host.view))
-        map.mapboxMap.loadStyle(##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e1e9df"}}]}"##)
         try await resultsWait { map.mapboxMap.isStyleLoaded }
         try await Task.sleep(for: .milliseconds(100))
         map.mapboxMap.setCamera(to: CameraOptions(center: CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005), zoom: 13))
@@ -52,6 +52,7 @@ extension RenderedRoutePickingTests {
         }
         try await Task.sleep(for: .milliseconds(200))
         if scenario == "hidden-request" {
+            try await resultsWait { store.mapContext.pendingRequest == nil }
             #expect(store.activeActivityID == nil && store.mapContext.hiddenTargetID == 1,
                     "A now-hidden queued target must not activate another remaining result")
         }
@@ -105,10 +106,10 @@ extension RenderedRoutePickingTests {
         return view.subviews.compactMap { mapView(in: $0) }.first
     }
 
-    private func resultsWait(_ condition: () -> Bool) async throws {
+    private func resultsWait(sourceLocation: SourceLocation = #_sourceLocation, _ condition: () -> Bool) async throws {
         let end = Date().addingTimeInterval(10)
         while !condition(), Date() < end { try await Task.sleep(for: .milliseconds(30)) }
-        try #require(condition())
+        try #require(condition(), "Map results state timed out", sourceLocation: sourceLocation)
     }
 
     private func saveResults(_ view: UIView, name: String) throws {
