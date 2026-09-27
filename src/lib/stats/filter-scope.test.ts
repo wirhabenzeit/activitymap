@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createStore } from 'zustand/vanilla';
+import { immer } from 'zustand/middleware/immer';
+import { type StateCreator } from 'zustand';
 import { filterStatsActivities, statsFilterScope } from './filter-scope';
 import { dayFromISODate, yearToDate } from './tile-data';
 import { toStatsActivity } from './tile-series';
 import {
+  createFilterSlice,
+  type FilterSlice,
   initializeSportType,
   initializeSportGroup,
   initializeValues,
@@ -91,4 +96,33 @@ void test('date range alone is not an activity-scope indicator; single-category 
   assert.equal(scope.singleSport, true);
   assert.equal(scope.filtered, true);
   assert.deepEqual(scope.labels, ['Ride (some types)']);
+});
+
+void test('clearing stats activity filters preserves the hidden date range', () => {
+  const store = createStore<FilterSlice>()(
+    immer(
+      createFilterSlice as unknown as StateCreator<
+        FilterSlice,
+        [['zustand/immer', never]],
+        [],
+        FilterSlice
+      >,
+    ),
+  );
+  const range = { start: '2024-01-01', end: '2024-12-31' };
+  store.getState().setDateRange(range);
+  store.getState().setSearch('ride');
+  store
+    .getState()
+    .setValues((values) => ({
+      ...values,
+      distance: { operator: '>=', value: 10000 },
+    }));
+  store.getState().setBinary((binary) => ({ ...binary, commute: 'no' }));
+  store.getState().setSportType((types) => ({ ...types, Run: false }));
+  store.getState().resetActivityFilters();
+  assert.deepEqual(store.getState().dateRange, range);
+  assert.equal(statsFilterScope(store.getState()).filtered, false);
+  store.getState().resetFilters();
+  assert.equal(store.getState().dateRange, undefined);
 });

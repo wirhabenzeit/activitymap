@@ -438,7 +438,12 @@ export function SearchFilter() {
 }
 
 export function ResetFilters() {
-  const resetFilters = useShallowStore((state) => state.resetFilters);
+  const pathname = usePathname();
+  const resetFilters = useShallowStore((state) =>
+    pathname === '/stats/tiles'
+      ? state.resetActivityFilters
+      : state.resetFilters,
+  );
 
   return (
     <SidebarMenuItem className="mx-2 mt-2">

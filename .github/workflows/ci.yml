@@ -20,6 +20,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - run: pnpm test:stats-ui
       - run: pnpm exec tsc --noEmit
       - run: pnpm lint
       - name: Validate shared map catalogue and generated Swift

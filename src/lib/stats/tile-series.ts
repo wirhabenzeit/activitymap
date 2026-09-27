@@ -21,6 +21,8 @@ const millisecondsPerDay = 86_400_000;
 
 export function toStatsActivity(activity: Activity): StatsActivity {
   return {
+    id: activity.id,
+    name: activity.name,
     sport: aliasMap[activity.sport_type] ?? 'misc',
     start_date_local: new Date(activity.start_date_local),
     distance: activity.distance,

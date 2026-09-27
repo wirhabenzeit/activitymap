@@ -5,11 +5,6 @@ import { Filter } from 'lucide-react';
 import { useActivities } from '~/hooks/use-activities';
 import { useShallowStore } from '~/store';
 import {
-  initializeBinary,
-  initializeSportType,
-  initializeValues,
-} from '~/store/filter';
-import {
   filterStatsActivities,
   statsFilterScope,
 } from '~/lib/stats/filter-scope';
@@ -25,12 +20,7 @@ export function useStatsActivities() {
     binary: s.binary,
     search: s.search,
   }));
-  const reset = useShallowStore((s) => ({
-    setSportType: s.setSportType,
-    setValues: s.setValues,
-    setBinary: s.setBinary,
-    setSearch: s.setSearch,
-  }));
+  const reset = useShallowStore((s) => s.resetActivityFilters);
   const activities = useMemo(
     () => filterStatsActivities(query.data ?? [], state).map(toStatsActivity),
     [query.data, state],
@@ -39,12 +29,7 @@ export function useStatsActivities() {
     query,
     activities,
     scope: statsFilterScope(state),
-    reset: () => {
-      reset.setSportType(initializeSportType());
-      reset.setValues(initializeValues());
-      reset.setBinary(initializeBinary());
-      reset.setSearch('');
-    },
+    reset,
   };
 }
 

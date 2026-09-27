@@ -66,3 +66,7 @@ Year-comparison charts align calendar month/day on the leap reference year 2000.
 ## Activity scope
 
 Tiles respect sport, search, numeric and binary activity filters for both the reporting window and all comparisons. The shared sidebar date range does not remove history from tiles: each tile owns its period. The web replaces the date picker on Tiles with an explanation and preserves its value for the other views. A visible filter summary and reset apply to activity scope only. Filtered rest days and consistency carry a fixed explanation that only matching activities are counted; titles do not change with individual filter combinations. Sport mix retains its position and explains a single-category scope. Missing/loading history is not presented as recorded inactivity.
+
+## Presentation
+
+Every declared tile switch is available on the web, with the manifest's first option as its default. Expanding a tile preserves the selected metric or range, including Consistency and Sport mix. Calendar metric colouring uses a linear scale from zero to the largest daily value in its window. Time always means moving time; sidebar duration thresholds still mean elapsed time. Narrow layouts use the manifest's single-column grid. The existing calendar, timeline, progress and scatter tabs remain available for historical exploration.

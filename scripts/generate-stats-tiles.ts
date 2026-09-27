@@ -49,7 +49,10 @@ const manifestSchema = z
         regular: gridSchema
           .extend({ minWidth: z.number().positive() })
           .strict(),
-        compact: gridSchema,
+        compact: gridSchema
+          .extend({ minWidth: z.number().positive() })
+          .strict(),
+        narrow: gridSchema,
         gap: z.number().nonnegative(),
       })
       .strict(),
@@ -308,6 +311,8 @@ enum SharedStatsTiles {
     static let regularGrid = StatsGridDefinition(columns: ${layout.regular.columns}, rowHeight: ${layout.regular.rowHeight})
     static let regularMinWidth: Double = ${layout.regular.minWidth}
     static let compactGrid = StatsGridDefinition(columns: ${layout.compact.columns}, rowHeight: ${layout.compact.rowHeight})
+    static let compactMinWidth: Double = ${layout.compact.minWidth}
+    static let narrowGrid = StatsGridDefinition(columns: ${layout.narrow.columns}, rowHeight: ${layout.narrow.rowHeight})
     static let gap: Double = ${layout.gap}
 
     static let tiles: [StatsTileDefinition] = [

@@ -109,9 +109,11 @@ struct StatsGridDefinition: Hashable, Sendable {
 }
 
 enum SharedStatsTiles {
-    static let regularGrid = StatsGridDefinition(columns: 4, rowHeight: 200)
-    static let regularMinWidth: Double = 720
-    static let compactGrid = StatsGridDefinition(columns: 2, rowHeight: 184)
+    static let regularGrid = StatsGridDefinition(columns: 4, rowHeight: 216)
+    static let regularMinWidth: Double = 1040
+    static let compactGrid = StatsGridDefinition(columns: 2, rowHeight: 216)
+    static let compactMinWidth: Double = 520
+    static let narrowGrid = StatsGridDefinition(columns: 1, rowHeight: 220)
     static let gap: Double = 12
 
     static let tiles: [StatsTileDefinition] = [
@@ -157,7 +159,7 @@ enum SharedStatsTiles {
         ),
         .init(
             id: .yearPace,
-            title: "Pace",
+            title: "Year-end projection",
             window: .yearToDate,
             group: .thisYear,
             isPrimary: false,

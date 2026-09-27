@@ -1,8 +1,9 @@
 {
   "version": 1,
   "layout": {
-    "regular": { "columns": 4, "rowHeight": 200, "minWidth": 720 },
-    "compact": { "columns": 2, "rowHeight": 184 },
+    "regular": { "columns": 4, "rowHeight": 216, "minWidth": 1040 },
+    "compact": { "columns": 2, "rowHeight": 216, "minWidth": 520 },
+    "narrow": { "columns": 1, "rowHeight": 220 },
     "gap": 12
   },
   "metrics": {
@@ -65,7 +66,7 @@
     },
     {
       "id": "yearPace",
-      "title": "Pace",
+      "title": "Year-end projection",
       "window": "yearToDate",
       "group": "thisYear",
       "span": { "columns": 1, "rows": 1 },

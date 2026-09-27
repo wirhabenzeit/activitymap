@@ -17,7 +17,7 @@ export const metricLabel: Record<StatsMetric, string> = {
   count: 'Activities',
   distance: 'Distance',
   elevation: 'Elevation',
-  time: 'Time',
+  time: 'Moving time',
 };
 
 export function formatMetric(value: number, metric: StatsMetric): string {

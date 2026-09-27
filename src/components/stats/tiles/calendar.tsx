@@ -2,7 +2,9 @@
 
 // The activity calendar tile's grid: one row per month, one cell per day.
 
-import { useState, type ReactNode } from 'react';
+import { useState, useRef, type ReactNode } from 'react';
+
+import { interpolateRgb } from 'd3';
 
 import { categorySettings } from '~/settings/category';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
@@ -25,15 +27,35 @@ export function MonthRows({
   totals,
   palette,
   footer,
+  colorBy = 'sport',
 }: {
   today: number;
   dominantSport: Map<number, Sport>;
   totals: Map<number, Record<StatsMetric, number>>;
   palette: TilePalette;
-  footer: ReactNode;
+  footer?: ReactNode;
+  colorBy?: 'sport' | StatsMetric;
 }) {
   const [hover, setHover] = useState<string | null>(null);
   const months = calendarMonths(today);
+  const [focusedDay, setFocusedDay] = useState(today);
+  const cells = useRef(new Map<number, HTMLButtonElement>());
+  const max =
+    colorBy === 'sport'
+      ? 0
+      : Math.max(0, ...Array.from(totals.values(), (day) => day[colorBy]));
+  const numericLegend = colorBy !== 'sport' && (
+    <div className="mt-1.5 flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
+      <span>0</span>
+      <span
+        className="h-2 w-16 rounded"
+        style={{
+          background: `linear-gradient(to right, ${palette.empty}, ${palette.heat})`,
+        }}
+      />
+      <span>{formatWithUnit(max, colorBy)}</span>
+    </div>
+  );
 
   return (
     <div className="mt-2 flex min-h-0 flex-1 flex-col">
@@ -61,21 +83,67 @@ export function MonthRows({
                   return <i key={index} />;
                 const sport = dominantSport.get(day);
                 const dayTotals = totals.get(day);
-                const label = `${shortDate(dateOfDay(day))}: ${
+                const label = `${shortDate(dateOfDay(day))}, ${dateOfDay(day).getUTCFullYear()}: ${
                   sport && dayTotals
-                    ? `${categorySettings[sport].name}, ${formatWithUnit(dayTotals.time, 'time')}`
-                    : 'rest day'
+                    ? `${categorySettings[sport].name}, ${formatWithUnit(dayTotals[colorBy === 'sport' ? 'time' : colorBy], colorBy === 'sport' ? 'time' : colorBy)}`
+                    : 'no matching activities'
                 }`;
                 return (
-                  <i
+                  <button
+                    type="button"
                     key={index}
-                    className="block rounded-[2px]"
+                    ref={(element) => {
+                      if (element) cells.current.set(day, element);
+                      else {
+                        // This is a DOM-ref Map, not a database operation.
+                        // eslint-disable-next-line drizzle/enforce-delete-with-where
+                        cells.current.delete(day);
+                      }
+                    }}
+                    tabIndex={day === focusedDay ? 0 : -1}
+                    aria-label={label}
+                    title={label}
+                    className="block min-w-0 rounded-[2px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
                     style={{
-                      background: sport
-                        ? categorySettings[sport].color
-                        : palette.empty,
+                      background:
+                        colorBy === 'sport'
+                          ? sport
+                            ? categorySettings[sport].color
+                            : palette.empty
+                          : interpolateRgb(
+                              palette.empty,
+                              palette.heat,
+                            )(max > 0 ? (dayTotals?.[colorBy] ?? 0) / max : 0),
                     }}
                     onPointerEnter={() => setHover(label)}
+                    onFocus={() => {
+                      setFocusedDay(day);
+                      setHover(label);
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setHover(label);
+                    }}
+                    onKeyDown={(event) => {
+                      const offsets: Record<string, number> = {
+                        ArrowLeft: -1,
+                        ArrowRight: 1,
+                        ArrowUp: -7,
+                        ArrowDown: 7,
+                      };
+                      const offset = offsets[event.key];
+                      if (offset !== undefined) {
+                        event.preventDefault();
+                        cells.current
+                          .get(
+                            Math.max(
+                              months[0]!.first,
+                              Math.min(today, day + offset),
+                            ),
+                          )
+                          ?.focus();
+                      }
+                    }}
                   />
                 );
               })}
@@ -84,11 +152,13 @@ export function MonthRows({
         ))}
       </div>
       {hover ? (
-        <div className="mt-1.5 h-4 shrink-0 truncate text-[11px] leading-4">
+        <div className="mt-1.5 min-h-4 shrink-0 text-[11px] leading-4">
           {hover}
         </div>
-      ) : (
+      ) : colorBy === 'sport' ? (
         footer
+      ) : (
+        numericLegend
       )}
     </div>
   );

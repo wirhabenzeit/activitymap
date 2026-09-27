@@ -3,12 +3,17 @@
 export const statsTileLayout = {
   regular: {
     columns: 4,
-    rowHeight: 200,
-    minWidth: 720,
+    rowHeight: 216,
+    minWidth: 1040,
   },
   compact: {
     columns: 2,
-    rowHeight: 184,
+    rowHeight: 216,
+    minWidth: 520,
+  },
+  narrow: {
+    columns: 1,
+    rowHeight: 220,
   },
   gap: 12,
 } as const;
@@ -108,7 +113,7 @@ export const statsTiles = [
   },
   {
     id: 'yearPace',
-    title: 'Pace',
+    title: 'Year-end projection',
     window: 'yearToDate',
     group: 'thisYear',
     span: {

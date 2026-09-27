@@ -2,8 +2,8 @@
 
 // The tile-based stats view: the bento grid from shared/stats-tiles.json,
 // one titled section per tile group (Now, This year, Patterns). Every tile
-// reads the activities the sidebar filters
-// already narrowed down. The grid fills the full width with the regular
+// respects sidebar activity filters while retaining the date history needed
+// for its own reporting and comparison periods. The grid fills the full width with the regular
 // layout's columns, so tiles widen on big screens. Only primary tiles get
 // the large headline numerals.
 //
@@ -21,8 +21,10 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { LayoutGroup, motion } from 'motion/react';
+import { LayoutGroup, motion, useReducedMotion } from 'motion/react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
 import { FilterScope, useStatsActivities } from './scope';
@@ -49,12 +51,57 @@ import {
   type TileView,
 } from './tiles';
 
+const ActivityDetails = dynamic(() => import('./activity-details'), {
+  ssr: false,
+});
+
 type ShownTile = { tile: StatsTile; view: TileView };
 
 const shownTiles: ShownTile[] = statsTiles.flatMap((tile) => {
   const view = tileView(tile.id);
   return view ? [{ tile, view }] : [];
 });
+
+const exploreLinks: Partial<
+  Record<StatsTileID, { href: string; label: string }>
+> = {
+  activityCalendar: {
+    href: '/stats/calendar',
+    label: 'Explore the full activity calendar',
+  },
+  weeklyVolume: {
+    href: '/stats/timeline',
+    label: 'Explore history and time periods',
+  },
+  thisWeek: {
+    href: '/stats/timeline',
+    label: 'Explore history and time periods',
+  },
+  typicalWeek: {
+    href: '/stats/timeline',
+    label: 'Explore history and time periods',
+  },
+  best30Days: {
+    href: '/stats/timeline',
+    label: 'Explore history and time periods',
+  },
+  restDays: {
+    href: '/stats/calendar',
+    label: 'Explore the full activity calendar',
+  },
+  yearToDate: {
+    href: '/stats/progress',
+    label: 'Compare other years, months and weeks',
+  },
+  monthVsLastMonth: {
+    href: '/stats/progress',
+    label: 'Compare other years, months and weeks',
+  },
+  distanceVsElevation: {
+    href: '/stats/scatter',
+    label: 'Explore activity relationships',
+  },
+};
 
 const toggleOf = (tile: StatsTile) => ('toggle' in tile ? tile.toggle : null);
 
@@ -64,8 +111,14 @@ const layoutTransition = {
 
 export default function StatsTiles() {
   const { query, activities, scope, reset } = useStatsActivities();
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const detailActivity = query.data?.find(
+    (activity) => activity.id === detailId,
+  );
   const empty = activities.length === 0;
-  const loading = query.isLoading || (empty && query.isFetching);
+  const loading =
+    !query.isError &&
+    (query.isLoading || (empty && (query.isFetching || query.hasNextPage)));
   return (
     <div className="flex h-full min-h-0 flex-col">
       <FilterScope labels={scope.labels} onReset={reset} />
@@ -85,18 +138,13 @@ export default function StatsTiles() {
         <p role="status" className="p-6 text-sm text-muted-foreground">
           Loading activity history…
         </p>
-      ) : empty ? (
+      ) : empty && query.isError ? null : empty ? (
         <div className="p-6 text-sm text-muted-foreground">
           <p>
             {scope.filtered && (query.data?.length ?? 0) > 0
               ? 'No activities match these filters.'
               : 'No activity history available yet.'}
           </p>
-          {scope.filtered && (
-            <button type="button" onClick={reset} className="mt-3 underline">
-              Clear activity filters
-            </button>
-          )}
         </div>
       ) : (
         <>
@@ -113,9 +161,17 @@ export default function StatsTiles() {
               activities={activities}
               filtered={scope.filtered}
               singleSport={scope.singleSport}
+              onOpenActivity={setDetailId}
+              detailsOpen={Boolean(detailActivity)}
             />
           </div>
         </>
+      )}
+      {detailActivity && (
+        <ActivityDetails
+          activity={detailActivity}
+          onClose={() => setDetailId(null)}
+        />
       )}
     </div>
   );
@@ -125,22 +181,36 @@ export function StatsTileGrid({
   activities,
   filtered = false,
   singleSport = false,
+  onOpenActivity,
+  detailsOpen = false,
 }: {
   activities: StatsActivity[];
   filtered?: boolean;
   singleSport?: boolean;
+  onOpenActivity?: (id: number) => void;
+  detailsOpen?: boolean;
 }) {
   const { resolvedTheme } = useTheme();
-  const today = useMemo(() => localToday(), []);
+  const [today, setToday] = useState(localToday);
+  useEffect(() => {
+    const update = () => setToday(localToday());
+    const timer = window.setInterval(update, 60_000);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, []);
   const context: TileContext = useMemo(
     () => ({
       activities,
       today,
       filtered,
       singleSport,
+      onOpenActivity,
       palette: tilePalette(resolvedTheme === 'dark'),
     }),
-    [activities, today, resolvedTheme, filtered, singleSport],
+    [activities, today, resolvedTheme, filtered, singleSport, onOpenActivity],
   );
 
   const [expandedID, setExpandedID] = useState<StatsTileID | null>(null);
@@ -148,9 +218,16 @@ export function StatsTileGrid({
   // Escape or a press anywhere outside the expanded card collapses it. A
   // press on another expandable tile then expands that one instead.
   useEffect(() => {
-    if (!expandedID) return;
+    if (!expandedID || detailsOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setExpandedID(null);
+      if (event.key === 'Escape') {
+        document
+          .querySelector<HTMLButtonElement>(
+            `[data-tile-id="${expandedID}"] button[aria-expanded]`,
+          )
+          ?.focus({ preventScroll: true });
+        setExpandedID(null);
+      }
     };
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Element | null;
@@ -163,7 +240,7 @@ export function StatsTileGrid({
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onPointerDown);
     };
-  }, [expandedID]);
+  }, [expandedID, detailsOpen]);
 
   return (
     <Measure className="h-full w-full overflow-y-auto">
@@ -194,7 +271,7 @@ export function StatsTileGrid({
   );
 }
 
-const { regular, compact, gap } = statsTileLayout;
+const { regular, compact, narrow, gap } = statsTileLayout;
 
 function BentoGroup({
   title,
@@ -213,7 +290,12 @@ function BentoGroup({
   onExpand: (id: StatsTileID) => void;
   onCollapse: () => void;
 }) {
-  const grid = width >= regular.minWidth ? regular : compact;
+  const grid =
+    width >= regular.minWidth
+      ? regular
+      : width >= compact.minWidth
+        ? compact
+        : narrow;
   // Collapsed, tiles pack as the manifest says. An expanded tile spans the
   // whole section in one content-sized row, starting on the row it was on,
   // so that row and the ones below move down; the other tiles keep their
@@ -320,7 +402,7 @@ function Headline({
     <>
       <div
         className={cn(
-          'shrink-0 truncate font-mono font-medium tabular-nums leading-tight tracking-tight',
+          'shrink-0 font-mono font-medium tabular-nums leading-tight tracking-tight',
           size === 'tile' && 'mt-1 text-[20px]',
           size === 'large' && 'mt-1 text-[32px]',
         )}
@@ -332,7 +414,7 @@ function Headline({
           </small>
         )}
       </div>
-      <div className="shrink-0 truncate text-xs text-muted-foreground">
+      <div className="shrink-0 text-xs text-muted-foreground">
         {summary.sub}
       </div>
     </>
@@ -359,9 +441,12 @@ function TileCard({
   style: CSSProperties;
 }) {
   const cardRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const reduceMotion = useReducedMotion();
+  const toggle = toggleOf(tile);
   // One switch state for both sizes, so expanding keeps the chosen metric.
-  const [option, setOption] = useState(
-    view.faceOptions?.[0] ?? toggleOf(tile)?.options[0],
+  const [option, setOption] = useState<string | undefined>(
+    toggleOf(tile)?.options[0],
   );
   const summary = view.summary(context, option);
 
@@ -372,36 +457,32 @@ function TileCard({
       () =>
         cardRef.current?.scrollIntoView({
           block: 'nearest',
-          behavior: 'smooth',
+          behavior: reduceMotion ? 'instant' : 'smooth',
         }),
       350,
     );
     return () => window.clearTimeout(scroll);
-  }, [expanded]);
+  }, [expanded, reduceMotion]);
 
   return (
     <motion.section
       ref={cardRef}
-      layout
+      layout={!reduceMotion}
       transition={layoutTransition}
       aria-label={tile.title}
-      aria-expanded={expanded}
       data-tile-id={tile.id}
-      role={expanded ? undefined : 'button'}
-      tabIndex={expanded ? undefined : 0}
-      onClick={expanded ? undefined : onExpand}
-      onKeyDown={(event) => {
-        if (
-          !expanded &&
-          event.target === event.currentTarget &&
-          (event.key === 'Enter' || event.key === ' ')
-        ) {
-          event.preventDefault();
-          onExpand();
-        }
-      }}
+      onClick={
+        expanded
+          ? undefined
+          : (event) => {
+              if (
+                !(event.target as Element).closest('button, a, input, select')
+              )
+                onExpand();
+            }
+      }
       className={cn(
-        'group relative min-w-0 overflow-hidden rounded-lg border bg-card text-left text-card-foreground',
+        'group @container relative min-w-0 overflow-hidden rounded-lg border bg-card text-left text-card-foreground',
         expanded
           ? 'shadow-md'
           : 'cursor-pointer shadow-xs transition-shadow hover:shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
@@ -417,38 +498,39 @@ function TileCard({
           !expanded && 'h-full',
         )}
       >
-        <div className="flex w-full items-baseline justify-between gap-2">
-          <span
-            className="min-w-0 truncate text-[13px] font-medium"
-            title={view.period(context)}
+        <div className="flex items-start justify-between gap-2">
+          <button
+            ref={triggerRef}
+            type="button"
+            aria-expanded={expanded}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${tile.title}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (expanded) onCollapse();
+              else onExpand();
+            }}
+            className="flex min-h-8 w-full items-center justify-between gap-2 rounded text-left text-[13px] font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {tile.title}
+            <span>{tile.title}</span>
+            {expanded ? (
+              <Minimize2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <Maximize2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            )}
+          </button>
+        </div>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <span className="text-[11px] text-muted-foreground">
+            {view.period(context, option)}
           </span>
-          <div className="flex min-w-0 items-baseline gap-2">
-            {(expanded || !view.faceOptions) && (
-              <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-                {view.period(context)}
-              </span>
-            )}
-            {view.faceOptions && (
-              <FaceSwitch
-                label={`${tile.title} shows`}
-                options={view.faceOptions}
-                value={option}
-                onChange={setOption}
-              />
-            )}
-            {expanded && (
-              <button
-                type="button"
-                onClick={onCollapse}
-                aria-label={`Collapse ${tile.title}`}
-                className="-my-1 grid h-6 w-6 shrink-0 place-items-center self-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <Minimize2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+          {toggle && (
+            <FaceSwitch
+              label={`${tile.title}: ${toggle.label}`}
+              options={toggle.options}
+              value={option}
+              onChange={setOption}
+            />
+          )}
         </div>
         {summary && (
           <Headline summary={summary} size={large ? 'large' : 'tile'} />
@@ -469,13 +551,15 @@ function TileCard({
             {view.more(context, option)}
           </motion.div>
         )}
+        {expanded && exploreLinks[tile.id] && (
+          <Link
+            className="mt-4 text-xs underline underline-offset-2"
+            href={exploreLinks[tile.id]!.href}
+          >
+            {exploreLinks[tile.id]!.label}
+          </Link>
+        )}
       </motion.div>
-      {!expanded && (
-        <Maximize2
-          aria-hidden
-          className="absolute bottom-2.5 right-2.5 h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-        />
-      )}
     </motion.section>
   );
 }
@@ -511,7 +595,7 @@ function FaceSwitch({
           title={optionLabels[option] ?? option}
           onClick={() => onChange(option)}
           className={cn(
-            'rounded-[5px] px-1.5 py-0.5 text-[11px] font-medium leading-none text-muted-foreground hover:text-foreground',
+            'min-h-7 min-w-7 rounded-[5px] px-1.5 py-1 text-[11px] font-medium leading-none text-muted-foreground hover:text-foreground',
             option === value && 'bg-background text-foreground shadow-xs',
           )}
         >

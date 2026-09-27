@@ -58,6 +58,7 @@ export type FilterActions = {
     update: SetStateAction<Record<BinaryColumn, BinaryFilterMode>>,
   ) => void;
   resetFilters: () => void;
+  resetActivityFilters: () => void;
 };
 
 export type FilterSlice = FilterState & FilterActions;
@@ -411,6 +412,16 @@ export const createFilterSlice: StateCreator<
       set((state) => {
         state.binary =
           typeof update === 'function' ? update(state.binary) : update;
+      });
+    },
+
+    resetActivityFilters: () => {
+      set((state) => {
+        state.sportType = initializeSportType();
+        state.sportGroup = initializeSportGroup();
+        state.values = initializeValues();
+        state.search = '';
+        state.binary = initializeBinary();
       });
     },
 

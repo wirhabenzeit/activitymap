@@ -15,6 +15,8 @@ export const sportOrder: readonly Sport[] = [
 ];
 
 export type StatsActivity = {
+  id?: number;
+  name?: string;
   sport: Sport;
   // Wall-clock start time, encoded as if it were UTC.
   start_date_local: Date;
@@ -444,7 +446,13 @@ export function yearPace(
   };
 }
 
-export type ActivityRecord = { value: number; day: Day; sport: Sport };
+export type ActivityRecord = {
+  value: number;
+  day: Day;
+  sport: Sport;
+  activityId?: number;
+  name?: string;
+};
 export type Records = {
   distance?: ActivityRecord;
   time?: ActivityRecord;
@@ -483,7 +491,13 @@ export function records(
     for (const metric of ['distance', 'time', 'elevation'] as const) {
       const value = metricValue(activity, metric);
       if (value > (best[metric]?.value ?? 0))
-        best[metric] = { value, day, sport: activity.sport };
+        best[metric] = {
+          value,
+          day,
+          sport: activity.sport,
+          activityId: activity.id,
+          name: activity.name,
+        };
     }
     const week = mondayOf(day);
     weeks.set(week, (weeks.get(week) ?? 0) + metricValue(activity, 'distance'));
