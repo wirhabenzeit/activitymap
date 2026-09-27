@@ -73,7 +73,7 @@ jobs:
             -scheme ActivityMap \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO
+            ARCHS=arm64 CODE_SIGNING_ALLOWED=NO
 
   migrations:
     runs-on: ubuntu-24.04
