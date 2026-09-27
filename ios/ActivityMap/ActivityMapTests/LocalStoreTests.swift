@@ -19,7 +19,10 @@ struct LocalStoreTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appending(path: "test.store")
-        let activity = try Fixtures.activity()
+        let activity = try Fixtures.activity([
+            "distance": NSNull(), "commute": NSNull(), "private": true, "elapsed_time": 0,
+            "map_polyline": "_", "elev_high": NSNull(), "elev_low": -12,
+        ])
         let photo = try Fixtures.photo()
         // The helper releases the first container before opening another SQLite connection.
         try await writeDiskFixture(url: url, activity: activity, photo: photo)
@@ -28,6 +31,13 @@ struct LocalStoreTests {
         #expect(snapshot.activities == [activity])
         #expect(snapshot.photos == [photo])
         #expect(snapshot.checkpoint == Fixtures.checkpoint)
+        let viewStore = ActivityStore()
+        try await viewStore.load(from: reopened, scope: Fixtures.scope)
+        let model = try #require(viewStore.activities.first)
+        #expect(model.distance == nil && model.commute == nil && model.isPrivate == true && model.elapsedTime == 0)
+        #expect(model.elevLow == -12 && model.elevHigh == nil)
+        #expect(model.startDateLocal == activity.startDateLocal && model.geometrySource == .summary)
+        #expect(model.hasInvalidGeometry)
     }
 
     private func writeDiskFixture(

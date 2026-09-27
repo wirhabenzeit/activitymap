@@ -4,108 +4,284 @@ import UIKit
 
 struct MapScreen: View {
     @Bindable var store: ActivityStore
+    private let topOcclusion: CGFloat
 
-    private static let defaultCenter = CLLocationCoordinate2D(latitude: 46.95, longitude: 9.1)
-
+    @Bindable private var context: MapContext
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
-    @State private var viewport: Viewport = .camera(center: defaultCenter, zoom: 6.5)
-    @State private var isPitched = false
-    @State private var baseStyle = BaseStyle.standard
-    @State private var activeOverlays = Set(
-        SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault)
-    )
-    /// Built once per activities change and handed to the source unchanged,
-    /// so re-renders compare it by storage identity instead of re-uploading.
-    @State private var routeData: GeoJSONSourceData = .featureCollection(FeatureCollection(features: []))
+    @Environment(\.mapStyleOverride) private var mapStyleOverride
+    @State private var viewport: Viewport
+    @State private var acceptsCameraEvents = false
 
+    init(store: ActivityStore, topOcclusion: CGFloat = 0, picker: RoutePicker? = nil) {
+        _picker = State(initialValue: picker ?? RoutePicker())
+        self.topOcclusion = topOcclusion
+        self.store = store
+        self.context = store.mapContext
+        _viewport = State(initialValue: store.mapContext.camera.viewport)
+    }
+
+    @State private var picker: RoutePicker
+    @ScaledMetric(relativeTo: .caption2) private var attributionFontSize: CGFloat = 11
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Map(viewport: $viewport) {
-                if let raster = baseStyle.rasterSource {
-                    rasterSource(
-                        id: "selected-raster-base",
-                        url: raster.url,
-                        tileSize: raster.tileSize
-                    )
-
-                    RasterLayer(id: "selected-raster-base-layer", source: "selected-raster-base")
+            GeometryReader { geometry in
+                MapReader { proxy in
+                    mapView(proxy: proxy, geometry: geometry)
                 }
-
-                ForEvery(SharedMapCatalog.rasterOverlays.filter(activeOverlays.contains)) { overlay in
-                    rasterSource(
-                        id: overlay.sourceID,
-                        url: overlay.url,
-                        tileSize: overlay.tileSize
-                    )
-
-                    RasterLayer(id: overlay.layerID, source: overlay.sourceID)
-                        .rasterOpacity(overlay.opacity)
+                if let attribution {
+                    let layout = attributionLayout(in: geometry)
+                    Text(attribution)
+                        .font(.system(size: attributionFontSize))
+                        .foregroundStyle(Color.primary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .frame(width: layout.creditSize.width, height: layout.creditSize.height)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
+                        .position(layout.creditCenter)
+                        .allowsHitTesting(false)
                 }
-
-                routeContent
+                let layout = resultsLayout(in: geometry)
+                let showingResults = picker.isPresented
+                let horizontalTools = showingResults && !layout.isSidePanel
+                mapControls(horizontal: horizontalTools)
+                    .position(x: geometry.size.width - (horizontalTools ? 96 : 42),
+                              y: horizontalTools ? layout.frame.minY - 96 : geometry.size.height - 112)
+                // BrowseContent hides this whole map on the list tab. Keep the
+                // results subtree mounted too, preserving its exact scroll offset.
+                if showingResults {
+                    RoutePickerSheet(picker: picker, store: store, isSidePanel: layout.isSidePanel)
+                        .frame(width: layout.frame.width, height: layout.frame.height)
+                        .position(x: layout.frame.midX, y: layout.frame.midY)
+                } else {
+                    VStack {
+                        Spacer()
+                        HStack { selectionMenu; Spacer(minLength: 132) }
+                            .padding(.horizontal, 16).padding(.bottom, 32)
+                    }
+                }
             }
-            .mapStyle(mapStyle)
-            .ignoresSafeArea()
-            .task(id: store.activitiesRevision) {
-                routeData = RouteSource.data(for: store.activities)
-            }
 
-            mapControls
-                .padding(.trailing, 16)
-                // Leave the native Mapbox attribution button unobstructed.
-                .padding(.bottom, 56)
-
-            if let attribution {
-                Text(attribution)
-                    .font(.caption2)
-                    .foregroundStyle(Color.primary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .modifier(MapChromeSurface())
-                    .padding(.leading, 8)
-                    .padding(.bottom, 42)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .allowsHitTesting(false)
+        }
+        .alert("Route selection", isPresented: Binding(
+            get: { picker.errorMessage != nil },
+            set: { if !$0 { picker.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { picker.errorMessage = nil }
+        } message: {
+            Text(picker.errorMessage ?? "")
+        }
+        .onChange(of: store.selection.visibleIDs) { _, _ in picker.reconcile(with: store) }
+        .onChange(of: store.activeActivityID) { _, _ in picker.reconcile(with: store) }
+        .onChange(of: store.selectedActivityIDs) { _, ids in
+            picker.reconcile(with: store)
+            if ids.isEmpty {
+                picker.isAdding = false
+                picker.isPresented = false
             }
+        }
+        .onChange(of: store.selectedTab) { _, tab in
+            if tab != .map {
+                picker.invalidateQuery()
+            }
+        }
+        .onChange(of: picker.isAdding) { _, _ in picker.invalidateQuery() }
+        .onChange(of: context.baseStyle) { oldStyle, newStyle in
+            if oldStyle.styleURL != newStyle.styleURL { acceptsCameraEvents = false }
+            picker.invalidateQuery()
+        }
+        .onChange(of: context.activeOverlays) { _, _ in picker.invalidateQuery() }
+        .onChange(of: context.scopeRevision) { _, _ in
+            picker.isPresented = false
+            picker.isAdding = false
+            viewport = context.camera.viewport
+        }
+        .onDisappear {
+            acceptsCameraEvents = false
+            picker.invalidateQuery()
+        }
+    }
+
+    private func mapView(proxy: MapProxy, geometry: GeometryProxy) -> some View {
+        Map(viewport: $viewport) {
+            baseContent
+            RouteLayers(data: store.routeGeometry.data, visibleIDs: store.selection.visibleIDs,
+                        selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
+
+            routeInteraction(proxy: proxy)
+            TapInteraction { context in
+                if let map = proxy.map { picker.pick(at: context.point, map: map, store: store) }
+                return true
+            }
+        }
+        .mapStyle(mapStyle)
+        .ornamentOptions(attributionLayout(in: geometry).ornamentOptions)
+        .gestureHandlers(MapGestureHandlers(onBegin: { gesture in
+            if gesture != .singleTap { picker.invalidateQuery() }
+        }))
+        .onCameraChanged { event in
+            picker.invalidateQuery()
+            if acceptsCameraEvents, store.selectedTab == .map { context.record(event.cameraState) }
+        }
+        .onStyleLoaded { _ in
+            viewport = context.camera.viewport
+            acceptsCameraEvents = true
+            applyNavigation(proxy: proxy, geometry: geometry)
+        }
+        .onMapIdle { _ in
+            // A local/cached style can finish before SwiftUI installs its
+            // onStyleLoaded subscription. Recover readiness at the first idle
+            // frame as well, or camera persistence and queued fits stay blocked.
+            if !acceptsCameraEvents, proxy.map?.isStyleLoaded == true {
+                viewport = context.camera.viewport
+                acceptsCameraEvents = true
+            }
+            applyNavigation(proxy: proxy, geometry: geometry)
+        }
+        .ignoresSafeArea()
+        .onChange(of: store.selectedTab) { _, tab in
+            if tab == .map { applyNavigation(proxy: proxy, geometry: geometry) }
+        }
+        .onChange(of: context.pendingRequest?.id) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
+        .onChange(of: picker.detent) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
+        .onChange(of: picker.isPresented) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
+        .onChange(of: geometry.size) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
+        .onChange(of: store.activitiesRevision, initial: true) { _, revision in
+            picker.reconcile(with: store)
+            store.routeGeometry.update(activities: store.activities, revision: revision)
+        }
+    }
+
+    private func applyNavigation(proxy: MapProxy, geometry: GeometryProxy) {
+        guard acceptsCameraEvents, store.selectedTab == .map, let map = proxy.map else { return }
+        if case let .activity(id) = context.pendingRequest?.action,
+           store.selection.visibleSelectedIDs.contains(id) {
+            // Do not activate a different remaining result if filters/deletion
+            // invalidate a queued Show on map target before the renderer is ready.
+            picker.reconcile(with: store)
+            picker.showDetail(id, store: store)
+            picker.detent = .compact
+        }
+        if let action = context.pendingRequest?.action,
+           action == .fitSelection || action == .fitFiltered {
+            // Explicit fits leave enough map space for the route and chrome.
+            picker.detent = .compact
+        }
+        let layout = resultsLayout(in: geometry)
+        let showingResults = picker.isPresented
+        let safeArea = geometry.safeAreaInsets
+        // The map extends under navigation; retain its original occluded height
+        // from BrowseContent, plus the fitter's 16-point breathing room.
+        // Map ignores safe areas; camera fitting uses its full physical size.
+        let size = CGSize(width: geometry.size.width + safeArea.leading + safeArea.trailing,
+                          height: geometry.size.height + safeArea.bottom)
+        guard let camera = MapNavigation.resolve(
+            store: store, map: map, size: size,
+            safeArea: UIEdgeInsets(top: safeArea.top, left: safeArea.leading,
+                                  bottom: safeArea.bottom, right: safeArea.trailing),
+            // Include the tools and attribution row above a bottom panel.
+            sheetHeight: showingResults && !layout.isSidePanel ? layout.bottomOcclusion + 104 : 0, topOcclusion: topOcclusion,
+            leadingOcclusion: showingResults && layout.isSidePanel ? layout.leadingOcclusion + safeArea.leading : 0
+        ) else { return }
+        withViewportAnimation(.default(maxDuration: 0.5)) {
+            viewport = .camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
+        }
+    }
+
+    private func attributionLayout(in geometry: GeometryProxy) -> MapAttributionLayout {
+        let layout = resultsLayout(in: geometry)
+        let showingResults = picker.isPresented
+        return MapAttributionLayout(size: geometry.size, bottomInset: geometry.safeAreaInsets.bottom,
+                                    credit: attribution, fontSize: attributionFontSize,
+                                    bottomOcclusion: showingResults ? layout.bottomOcclusion : 0,
+                                    leadingOcclusion: showingResults ? layout.leadingOcclusion : 0)
+    }
+
+    private func resultsLayout(in geometry: GeometryProxy) -> MapResultsLayout {
+        MapResultsLayout(size: geometry.size, topInset: max(topOcclusion, geometry.safeAreaInsets.top),
+                         bottomInset: geometry.safeAreaInsets.bottom, detent: picker.detent,
+                         largeText: typeSize.isAccessibilitySize)
+    }
+
+    private func routeInteraction(proxy: MapProxy) -> TapInteraction {
+        // Route hits take priority over external feature overlays. Photo
+        // annotations consume their own taps before this layer interaction.
+        TapInteraction(.layer(RouteSource.ordinaryLayerID), radius: RouteHitTesting.radius) { _, context in
+            if let map = proxy.map { picker.pick(at: context.point, map: map, store: store) }
+            return true
         }
     }
 
     @MapContentBuilder
-    private var routeContent: some MapContent {
-        let visibleFilter = RouteSource.filter(ids: store.filteredActivities.map(\.id))
+    private var baseContent: some MapContent {
+        if let raster = context.baseStyle.rasterSource {
+            rasterSource(
+                id: "selected-raster-base",
+                url: raster.url,
+                tileSize: raster.tileSize,
+                attribution: context.baseStyle.attribution
+            )
 
-        GeoJSONSource(id: RouteSource.id)
-            .data(routeData)
+            RasterLayer(id: "selected-raster-base-layer", source: "selected-raster-base")
+        }
 
-        LineLayer(id: "routeLayer", source: RouteSource.id)
-            .filter(visibleFilter)
-            .lineColor(RouteSource.lineColor)
-            .lineWidth(3)
-            .lineJoin(.round)
-            .lineCap(.round)
+        ForEvery(SharedMapCatalog.rasterOverlays.filter(context.activeOverlays.contains)) { overlay in
+            rasterSource(
+                id: overlay.sourceID,
+                url: overlay.url,
+                tileSize: overlay.tileSize,
+                attribution: overlay.attribution
+            )
 
-        if let highlightedID = store.highlightedActivityID {
-            LineLayer(id: "routeLayerHigh", source: RouteSource.id)
-                .filter(Exp(.all) {
-                    visibleFilter
-                    Exp(.eq) {
-                        Exp(.get) { "id" }
-                        Double(highlightedID)
+            RasterLayer(id: overlay.layerID, source: overlay.sourceID)
+                .rasterOpacity(overlay.opacity)
+        }
+
+    }
+
+    @ViewBuilder
+    private var selectionMenu: some View {
+        if !store.selectedActivityIDs.isEmpty {
+            Menu {
+                Button {
+                    picker.reviewSelection(store: store)
+                } label: {
+                    Label("Show selected activities", systemImage: "list.bullet")
+                }
+                Toggle("Add routes to selection", isOn: $picker.isAdding)
+                Button("Clear selection", role: .destructive) { store.clearSelection() }
+            } label: {
+                HStack(spacing: 6) {
+                    if picker.isAdding { Image(systemName: "plus.circle") }
+                    VStack(spacing: 2) {
+                        Text("\(store.selectedActivityIDs.count) selected")
+                            .font(.subheadline.weight(.semibold))
+                        if store.hiddenSelectedCount > 0 {
+                            Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption2)
+                        }
                     }
-                })
-                .lineColor(RouteSource.lineColor)
-                .lineWidth(5)
-                .lineJoin(.round)
-                .lineCap(.round)
+                    Image(systemName: "chevron.down").font(.caption.weight(.semibold))
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.primary)
+            .accessibilityLabel("\(store.selectedActivityIDs.count) selected, \(store.hiddenSelectedCount) hidden by filters")
+            .accessibilityValue(picker.isAdding ? "Add routes enabled" : "Replace selection")
+            .accessibilityHint("Show selected activities, add routes or clear selection")
+            .modifier(MapChromeSurface())
         }
     }
 
-    private var mapControls: some View {
-        VStack(spacing: 0) {
+    private func mapControls(horizontal: Bool) -> some View {
+        let layout = horizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+        return layout {
             Menu {
                 Section("Base Map") {
-                    Picker("Base Map", selection: $baseStyle) {
+                    Picker("Base Map", selection: $context.baseStyle) {
                         ForEach(BaseStyle.all) { style in
                             Label(style.title, systemImage: style.systemImage)
                                 .tag(style)
@@ -118,7 +294,7 @@ struct MapScreen: View {
                         Button {
                             toggleOverlay(overlay)
                         } label: {
-                            if activeOverlays.contains(overlay) {
+                            if context.activeOverlays.contains(overlay) {
                                 Label(overlay.label, systemImage: "checkmark")
                             } else {
                                 Text(overlay.label)
@@ -132,39 +308,46 @@ struct MapScreen: View {
             }
             .accessibilityLabel("Map layers")
 
-            Divider().frame(width: 24)
+            Divider().frame(width: horizontal ? 1 : 24, height: horizontal ? 24 : 1)
 
             Button {
-                isPitched.toggle()
-                updateViewport()
+                context.request(.pitch(context.isPitched ? 0 : 50))
             } label: {
                 Image(systemName: "view.3d")
-                    .foregroundStyle(isPitched ? Color.blue : Color.primary)
+                    .foregroundStyle(context.isPitched ? Color.blue : Color.primary)
                     .frame(width: 44, height: 48)
             }
             .accessibilityLabel("3D map")
-            .accessibilityValue(isPitched ? "On" : "Off")
+            .accessibilityValue(context.isPitched ? "On" : "Off")
 
-            Divider().frame(width: 24)
+            Divider().frame(width: horizontal ? 1 : 24, height: horizontal ? 24 : 1)
 
-            Button {
-                isPitched = false
-                updateViewport()
+            Menu {
+                Button("Fit selection", systemImage: "selection.pin.in.out") { context.request(.fitSelection) }
+                    .disabled(!store.filteredActivities.contains {
+                        store.selectedActivityIDs.contains($0.id) && !$0.coordinates.isEmpty
+                    })
+                Button("Fit filtered routes", systemImage: "map") { context.request(.fitFiltered) }
+                    .disabled(!store.filteredActivities.contains { !$0.coordinates.isEmpty })
+                Divider()
+                Button("Reset bearing", systemImage: "location.north") { context.request(.resetBearing) }
+                Button("Reset map view", systemImage: "arrow.counterclockwise") { context.request(.resetView) }
             } label: {
                 Image(systemName: "scope")
                     .frame(width: 44, height: 48)
             }
-            .accessibilityLabel("Reset map view")
+            .accessibilityLabel("Map camera")
         }
         .buttonStyle(.plain)
-        .font(.body.weight(.semibold))
+        .font(.system(size: 18, weight: .semibold))
         .foregroundStyle(Color.primary)
         .padding(4)
         .modifier(MapChromeSurface())
     }
 
     private var mapStyle: MapStyle {
-        if let styleURL = baseStyle.styleURL,
+        if let mapStyleOverride { return mapStyleOverride }
+        if let styleURL = context.baseStyle.styleURL,
            let url = URL(string: styleURL),
            let styleURI = StyleURI(url: url) {
             return MapStyle(uri: styleURI)
@@ -174,9 +357,9 @@ struct MapScreen: View {
     }
 
     private var attribution: String? {
-        var providers = activeOverlays.compactMap(\.attribution)
+        var providers = context.activeOverlays.compactMap(\.attribution)
 
-        if let baseAttribution = baseStyle.attribution {
+        if let baseAttribution = context.baseStyle.attribution {
             providers.append(baseAttribution)
         }
 
@@ -185,104 +368,39 @@ struct MapScreen: View {
     }
 
     private func toggleOverlay(_ overlay: SharedRasterOverlayDefinition) {
-        if activeOverlays.contains(overlay) {
-            activeOverlays.remove(overlay)
+        if context.activeOverlays.contains(overlay) {
+            context.activeOverlays.remove(overlay)
         } else {
-            activeOverlays.insert(overlay)
+            context.activeOverlays.insert(overlay)
         }
     }
 
-    private func rasterSource(id: String, url: String, tileSize: Double) -> RasterSource {
+    private func rasterSource(id: String, url: String, tileSize: Double, attribution: String?) -> RasterSource {
         var source = RasterSource(id: id)
             .tiles([url])
         source.tileSize = tileSize
+        source.attribution = attribution
         return source
     }
 
-    private func updateViewport() {
-        withViewportAnimation(.default(maxDuration: 0.6)) {
-            viewport = .camera(
-                center: Self.defaultCenter,
-                zoom: 6.5,
-                bearing: 0,
-                pitch: isPitched ? 50 : 0
-            )
-        }
-    }
-}
 
-private struct RasterConfiguration {
-    let url: String
-    let tileSize: Double
-}
-
-private enum BaseStyle: Hashable, Identifiable {
-    case standard
-    case shared(SharedBaseMapDefinition)
-
-    static let all: [BaseStyle] = [.standard]
-        + SharedMapCatalog.baseMaps.map(BaseStyle.shared)
-
-    var id: String {
-        switch self {
-        case .standard:
-            "native.standard"
-        case let .shared(definition):
-            definition.id
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .standard:
-            "Standard"
-        case let .shared(definition):
-            definition.label
-        }
-    }
-
-    var systemImage: String {
-        switch id {
-        case "mapboxSatellite", "swisstopoSatellite":
-            "globe.americas"
-        case "mapboxOutdoors", "swisstopoVectorWinter", "swisstopoWinter":
-            "mountain.2"
-        case "mapboxDark":
-            "moon"
-        case "mapboxLight", "mapboxTopolight", "swisstopoVectorLight":
-            "sun.max"
-        default:
-            "map"
-        }
-    }
-
-    var styleURL: String? {
-        guard case let .shared(definition) = self,
-              case let .style(url) = definition.source else {
-            return nil
-        }
-        return url
-    }
-
-    var rasterSource: RasterConfiguration? {
-        guard case let .shared(definition) = self,
-              case let .raster(url, tileSize) = definition.source else {
-            return nil
-        }
-        return RasterConfiguration(url: url, tileSize: tileSize)
-    }
-
-    var attribution: String? {
-        switch self {
-        case .standard:
-            nil
-        case let .shared(definition):
-            definition.attribution
-        }
-    }
 }
 
 private extension SharedRasterOverlayDefinition {
     var sourceID: String { "\(id)-source" }
     var layerID: String { "\(id)-layer" }
+}
+
+// Inject a local style for rendered previews/tests through the same declarative
+// path as the real map. Loading a style directly on the underlying MapView races
+// SwiftUI's next update, which reapplies the declared (normally remote) style.
+private struct MapStyleOverrideKey: EnvironmentKey {
+    static let defaultValue: MapStyle? = nil
+}
+
+extension EnvironmentValues {
+    var mapStyleOverride: MapStyle? {
+        get { self[MapStyleOverrideKey.self] }
+        set { self[MapStyleOverrideKey.self] = newValue }
+    }
 }

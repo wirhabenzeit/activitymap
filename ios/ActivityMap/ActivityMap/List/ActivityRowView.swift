@@ -4,10 +4,9 @@ struct ActivityRowView: View {
     @Bindable var store: ActivityStore
     let activity: Activity
 
-    @State private var showDetail = false
-
     private var isSelected: Bool { store.selectedActivityIDs.contains(activity.id) }
-    private var isHighlighted: Bool { store.highlightedActivityID == activity.id }
+    private var isActive: Bool { store.activeActivityID == activity.id }
+    private var hasGeometry: Bool { !activity.coordinates.isEmpty }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -22,13 +21,17 @@ struct ActivityRowView: View {
                             .strokeBorder(isSelected ? activity.category.color : .clear, lineWidth: 1.5)
                     )
             }
+            .frame(minWidth: 44, minHeight: 44)
             .buttonStyle(.plain)
+            .accessibilityLabel(isSelected ? "Deselect \(activity.name)" : "Select \(activity.name)")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(activity.name)
-                    .foregroundStyle(isHighlighted ? AppTheme.headerBackground : .primary)
+                    .foregroundStyle(isActive ? AppTheme.headerBackground : .primary)
+                    .fontWeight(isActive ? .semibold : .regular)
                     .lineLimit(1)
-                Text(Formatters.shortDate(activity.startDate))
+                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -40,23 +43,26 @@ struct ActivityRowView: View {
                 .foregroundStyle(.secondary)
 
             Button {
-                store.highlightedActivityID = activity.id
-                store.selectedTab = .map
+                store.showOnMap(activity.id)
             } label: {
-                Image(systemName: "map")
+                Image(systemName: hasGeometry ? "map" : "map.slash")
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
+            .disabled(!hasGeometry)
+            .accessibilityLabel("Show on map")
+            .accessibilityHint(hasGeometry ? "" : "This activity has no GPS route.")
 
             Button {
-                showDetail = true
+                if store.inspectedActivityID == activity.id { store.dismissInspection() }
+                else { store.inspect(activity.id) }
             } label: {
-                Image(systemName: "info.circle")
+                Image(systemName: store.inspectedActivityID == activity.id ? "xmark.circle" : "info.circle")
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("\(store.inspectedActivityID == activity.id ? "Close details for" : "Details for") \(activity.name)")
         }
         .contentShape(Rectangle())
-        .sheet(isPresented: $showDetail) {
-            ActivityDetailView(activity: activity)
-        }
     }
 }

@@ -6,17 +6,18 @@ struct CalendarHeatmapView: View {
     private var weekCount: Int { 52 }
 
     private var dailyDistance: [Date: Double] {
-        let calendar = Calendar.current
+        let calendar = Formatters.activityCalendar
         var totals: [Date: Double] = [:]
         for activity in activities {
-            let day = calendar.startOfDay(for: activity.startDate)
-            totals[day, default: 0] += activity.distance
+            guard let distance = activity.distance else { continue }
+            let day = calendar.startOfDay(for: activity.startDateLocal)
+            totals[day, default: 0] += distance
         }
         return totals
     }
 
     private var days: [Date] {
-        let calendar = Calendar.current
+        let calendar = Formatters.activityCalendar
         let today = calendar.startOfDay(for: Date())
         return (0..<(weekCount * 7)).reversed().map {
             calendar.date(byAdding: .day, value: -$0, to: today) ?? today
@@ -44,7 +45,7 @@ struct CalendarHeatmapView: View {
                     HStack(spacing: 3) {
                         ForEach(0..<weekCount, id: \.self) { col in
                             let day = grid[row][col]
-                            let distance = dailyDistance[day] ?? 0
+                            let distance = dailyDistance[day]
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(colorFor(distance))
                                 .frame(width: 11, height: 11)
@@ -56,8 +57,8 @@ struct CalendarHeatmapView: View {
         }
     }
 
-    private func colorFor(_ distance: Double) -> Color {
-        guard distance > 0 else { return Color(uiColor: .systemGray5) }
+    private func colorFor(_ distance: Double?) -> Color {
+        guard let distance, distance > 0 else { return Color(uiColor: .systemGray5) }
         let intensity = min(distance / maxDistance, 1)
         return Color.orange.opacity(0.25 + intensity * 0.75)
     }

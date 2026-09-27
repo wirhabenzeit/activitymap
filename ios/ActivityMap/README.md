@@ -68,6 +68,8 @@ Use Profile to sign in. `AuthController` stores the ActivityMap session in the K
 
 `LocalStore` owns all SwiftData reads and writes. Records are scoped by deployment URL and authenticated user ID. Activities and photos retain the complete generated DTO as encoded data, with unique scoped keys; UI mappers consume detached values. Each page and its optional sync checkpoint commit in one explicit save, with autosave disabled and rollback on failure. CloudKit is disabled.
 
+The detached activity model preserves unknown metrics and flags as optionals, separately from measured zero and false. Rows show an em dash for unknown distance; detail renders each available measurement independently. Activity dates use the components of `start_date_local` without applying another timezone conversion. Geometry/photo freshness, counts, stream metadata and validated bounds remain available to presentation consumers; no raw stream arrays are loaded into ordinary activity snapshots. Malformed detailed routes fall back to a valid summary, and unreadable geometry never prevents the activity's other fields from loading. These presentation changes require no SwiftData migration or new bootstrap.
+
 `ActivityMapApp` creates the disk store. `SyncController` loads committed snapshots into the UI after sign-in, on foreground entry, every minute while foregrounded, and on manual refresh (list pull-to-refresh, or Profile / Settings → Refresh Activities). Sync status and errors live in Profile and Settings rather than a persistent bottom bar. The network engine pages activities and photos, then catches up from the first snapshot cursor. Later passes use the last committed change cursor. A `409 sync_rebootstrap_required` triggers one fresh bootstrap.
 
 The account sheet shows sync errors, rate-limit retry time, last successful sync and Strava reconciliation time. Offline launch uses the last verified user identity, bound to the Keychain token and deployment. The app keeps its saved activities until it next syncs: the server revalidates Strava data within seven days, and each sync applies its changes and deletions (see `docs/strava-data-policy.md`). Session expiry, logout, account changes and deauthorization clear scoped data. Transient network/server errors keep the session and usable cache.
@@ -82,7 +84,7 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
   -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
 ```
 
-CI runs the same Swift Testing target. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and Mapbox initialization. No credentials or local server are required.
+Required iOS CI compiles the app and Swift Testing target with `build-for-testing` against a generic simulator destination; it does not boot a simulator or execute these runtime tests. Run the tests locally before review using the command above. This keeps slow simulator startup and native Mapbox rendering out of the required PR checks. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
 
 To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
 
@@ -91,6 +93,46 @@ node --env-file=.env scripts/verify-ios-sync-local.mjs <simulator-udid>
 ```
 
 This opt-in test uses an existing connected account in the local database. It creates and removes a temporary 30-minute local session, verifies bootstrap, delta catch-up, disk reload and offline UI loading, and prints only counts. It rejects non-local database targets. Normal CI skips this test and uses deterministic HTTP/page fixtures.
+
+## Map route selection
+
+Tap within 22 points of a visible route to select it. A normal tap replaces selection with all nearby routes; a single hit opens detail, while overlapping hits open a chooser ordered by screen distance, then numeric activity ID descending. The results panel has separate deselection and detail controls. List inspection stays independent.
+
+When results are hidden, the floating **N selected** menu provides **Show selected activities**, **Add routes to selection**, and **Clear selection**. It appears after the first selection; clearing selection also exits Add mode. Add unions the hit set without changing the active route; choose a result explicitly to activate it. An empty-map tap clears selection in either mode. The selected-count menu discloses how many selections are hidden by filters; clearing and changing Add mode remain available even when all selected routes are hidden. Hidden routes are neither rendered nor picked. Pans/zooms use Mapbox's native gesture recognition and cancel any pending hit query; loading/query errors preserve selection.
+
+Selected routes have a wider white casing; the active route adds a dark outer casing. All layers share one cached GeoJSON snapshot per activity revision, retained across tab changes and cleared on scope reset. Selection/filter updates change layer filters only. Canonical string feature IDs avoid precision loss through Double. Picking queries only the ordinary activity route layer; raster/POI layers cannot enter the hit set. Native annotation controls consume their own taps before route handling; photo-marker integration remains #219.
+
+`RoutePickingTests` covers hit ordering, tolerance, duplicate tile fragments, partial geometry, filtered/hidden selection, stale responses and geometry reuse with 2,000 activities. `RenderedRoutePickingTests` exercises the production layers and query adapter in the real Mapbox renderer. Physical-device gesture/VoiceOver checks and dense-library performance measurements remain acceptance work; the cache build counter is not a frame-time benchmark. `MapResultsTests` and the rendered results scenarios additionally cover the persistent panel, filtering, GPS-less selections, route switching, camera padding and retained presentation.
+
+## Adaptive map results
+
+Map results use an in-map panel with **compact**, **medium** and **expanded** states, keeping the uncovered map interactive. Phones place it at the bottom; wide/landscape layouts use a leading panel. The header offers explicit size buttons and an accessibility adjustment action; dragging is confined to the header. Scroll gestures inside results never resize the panel. Navigation stays reachable, map tools move above bottom results, and Mapbox/provider attribution moves into the uncovered map area.
+
+A single picked activity opens the shared detail directly. Overlapping hits open the collection in hit-test order; existing selected activities added to that collection follow in descending ID order. The panel always covers the complete visible selected set, including GPS-less activities. Selecting a result activates it; previous/next follows the same order and wraps. Browsing results and changing detents do not move the camera. **Frame route** and **Fit selection** are explicit actions; fits collapse the results and reserve space for the panel, controls and attribution.
+
+The header counts all selected IDs and discloses hidden selections. The selection menu contains Add, Fit, Clear and Hide; active detail also offers Frame and Deselect. Per-row deselection does not open another row accidentally. If filters hide every selection, the panel explains that state and offers an explicit filter reset. Restoring filters does not silently reactivate an old detail. Last-item removal, deletion and scope reset close empty results cleanly; ordinary sync and tab switches preserve the presentation. The map renderer remains mounted across tabs.
+
+Rendered simulator scenarios save synthetic review captures under `/tmp/activitymap-results-preview`. They cover single/multiple/hidden/no-GPS selections, compact/expanded states, accessibility text and wide/landscape windows. Camera tests project route coordinates outside both bottom and side panels. These checks do not replace physical-device drag/VoiceOver review.
+
+## Activity details
+
+Map results and independent list inspection share `ActivityDetailContent`; list presentations wrap it in `ActivityDetailPanel`. The panel resolves the current activity by ID, so committed sync updates redraw an open detail and a removed activity cannot leave stale metrics/actions behind. Compact list layouts use a detented sheet; regular-width layouts expand one row into a bounded scrolling panel. Opening/closing list details does not change map selection. Selection, map and detail buttons remain separate controls with at least 44-point targets.
+
+The hierarchy is sport/name/local date, then distance/elapsed time/elevation gain, followed by available time/speed, elevation extrema, heart-rate and power/energy groups. Missing headline values show an em dash (VoiceOver: “Not recorded”); measured zero remains a value. Additional measurements render independently. Long titles/descriptions wrap, metric rows stack when needed, and accessibility text sizes stack the highlights. The shared action bar remains outside the detail scroll view.
+
+Show on map is functional, with an explicit explanation when there is no GPS route. Edit, Strava refresh, GPX sharing and Strava links are disabled in a menu labelled **Not available yet** until #220–#222 implement them; simulated refresh success has been removed. The reusable content has profile/photo builder slots for #217/#218, with no placeholder charts, media fetches or raw-stream decoding.
+
+`RenderedActivityDetailTests` hosts the production views in the simulator and checks redraw after same-ID updates/deletion, independent inspection and scrolling across compact, regular-width, landscape, accessibility-text and dark GPS-less fixtures. It writes synthetic review captures to `/tmp/activitymap-detail-preview`; these are visual-review artifacts, not pixel-golden assertions or physical-iPad/VoiceOver certification.
+
+## Map context and navigation
+
+Map/list switches preserve the actual camera (center, zoom, bearing and pitch), basemap and overlays. Both map and list stay mounted across tab switches: this preserves the loaded route renderer without a delayed source reload, as well as the exact list scroll offset. Inactive views ignore touches and are hidden from accessibility; leaving the map cancels pending hit queries while preserving results visibility, detent, Add mode and detail for the return trip. The shared `MapContext` can also restore the camera after renderer recreation. Account/scope resets recreate both views and clear camera and pending navigation, while retaining display preferences.
+
+**Show on map** adds/activates the activity through the shared selection store and frames its latest geometry. Hidden targets require an explicit **Clear filters and show on map** confirmation; GPS-less activities remain inspectable with framing disabled. The camera menu offers **Fit selection**, **Fit filtered routes**, **Reset bearing** and **Reset map view** separately. Switching 2D/3D retains location and zoom.
+
+Fits reserve space for navigation, safe areas, floating controls and the current results sheet. A sheet covering the map’s center defers the request until it shrinks or closes, as the native fit requires a visible projection center. Requests are consumed once after style readiness; later redraws, filter/selection changes and sheet resizing do not repeatedly fit. Point routes use a small extent and zoom cap of 16; date-line routes use the shortest longitude interval. Framing uses Mercator for consistent native camera fitting across styles.
+
+The native renderer tests cover phone/tablet frame sizes, sheet padding, point/date-line routes, deferred requests, pitch/reset behavior, and a real SwiftUI map/list round trip with camera and exact list-offset restoration, immediate reuse of all 200 rendered routes without a reload, and renderer disposal on scope reset. Physical-device layout and gesture validation remains part of review.
 
 ## Shared configuration direction
 

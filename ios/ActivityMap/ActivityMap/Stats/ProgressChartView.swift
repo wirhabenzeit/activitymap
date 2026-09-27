@@ -12,16 +12,17 @@ struct ProgressChartView: View {
     }
 
     private var points: [ProgressPoint] {
-        let calendar = Calendar.current
-        let byYear = Dictionary(grouping: activities) { calendar.component(.year, from: $0.startDate) }
+        let calendar = Formatters.activityCalendar
+        let byYear = Dictionary(grouping: activities) { calendar.component(.year, from: $0.startDateLocal) }
 
         var result: [ProgressPoint] = []
         for (year, yearActivities) in byYear {
-            let sorted = yearActivities.sorted { $0.startDate < $1.startDate }
+            let sorted = yearActivities.sorted { $0.startDateLocal < $1.startDateLocal }
             var cumulative: Double = 0
             for activity in sorted {
-                cumulative += activity.distance / 1000
-                let day = calendar.ordinality(of: .day, in: .year, for: activity.startDate) ?? 0
+                guard let distance = activity.distance else { continue }
+                cumulative += distance / 1000
+                let day = calendar.ordinality(of: .day, in: .year, for: activity.startDateLocal) ?? 0
                 result.append(ProgressPoint(year: year, dayOfYear: day, cumulativeKm: cumulative))
             }
         }
