@@ -29,11 +29,9 @@ void test('packs each group of starter tiles on the 4-column grid', () => {
     { column: 3, row: 1, columns: 1, rows: 1 }, // consistency
     { column: 4, row: 1, columns: 1, rows: 1 }, // sport mix
     { column: 3, row: 2, columns: 2, rows: 1 }, // climbing
-  ]);
-  assert.deepEqual(placeBento(groupSpans('more'), 4), [
-    { column: 1, row: 1, columns: 1, rows: 1 }, // typical week
-    { column: 2, row: 1, columns: 1, rows: 1 }, // best 30 days
-    { column: 3, row: 1, columns: 2, rows: 1 }, // rest days, grown
+    { column: 1, row: 3, columns: 1, rows: 1 }, // typical week
+    { column: 2, row: 3, columns: 1, rows: 1 }, // best 30 days
+    { column: 3, row: 3, columns: 2, rows: 1 }, // rest days, grown
   ]);
 });
 
@@ -53,6 +51,9 @@ void test('clamps spans to the 2-column grid and fills the gaps they leave', () 
     { column: 1, row: 3, columns: 1, rows: 1 },
     { column: 2, row: 3, columns: 1, rows: 1 },
     { column: 1, row: 4, columns: 2, rows: 1 },
+    { column: 1, row: 5, columns: 1, rows: 1 },
+    { column: 2, row: 5, columns: 1, rows: 1 },
+    { column: 1, row: 6, columns: 2, rows: 1 },
   ]);
 });
 

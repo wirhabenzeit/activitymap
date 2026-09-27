@@ -43,14 +43,12 @@ enum StatsTileGroup: String, CaseIterable, Hashable, Sendable {
     case now
     case thisYear
     case patterns
-    case more
 
     var title: String {
         switch self {
         case .now: return "Now"
         case .thisYear: return "This year"
         case .patterns: return "Patterns"
-        case .more: return "More"
         }
     }
 }
@@ -231,7 +229,7 @@ enum SharedStatsTiles {
             id: .typicalWeek,
             title: "Typical week",
             window: .last12Weeks,
-            group: .more,
+            group: .patterns,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
             isOptional: false,
@@ -241,7 +239,7 @@ enum SharedStatsTiles {
             id: .best30Days,
             title: "Best 30 days",
             window: .currentYear,
-            group: .more,
+            group: .patterns,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
             isOptional: false,
@@ -251,7 +249,7 @@ enum SharedStatsTiles {
             id: .restDays,
             title: "Rest days",
             window: .last90Days,
-            group: .more,
+            group: .patterns,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
             isOptional: false,

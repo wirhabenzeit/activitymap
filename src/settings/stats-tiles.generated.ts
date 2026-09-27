@@ -45,11 +45,6 @@ export const statsTileGroups = [
     id: 'patterns',
     title: 'Patterns',
   },
-  {
-    id: 'more',
-    title: 'More',
-    collapsed: true,
-  },
 ] as const;
 
 export const statsTiles = [
@@ -206,7 +201,7 @@ export const statsTiles = [
     id: 'typicalWeek',
     title: 'Typical week',
     window: 'last12Weeks',
-    group: 'more',
+    group: 'patterns',
     span: {
       columns: 1,
       rows: 1,
@@ -216,7 +211,7 @@ export const statsTiles = [
     id: 'best30Days',
     title: 'Best 30 days',
     window: 'currentYear',
-    group: 'more',
+    group: 'patterns',
     span: {
       columns: 1,
       rows: 1,
@@ -230,7 +225,7 @@ export const statsTiles = [
     id: 'restDays',
     title: 'Rest days',
     window: 'last90Days',
-    group: 'more',
+    group: 'patterns',
     span: {
       columns: 1,
       rows: 1,

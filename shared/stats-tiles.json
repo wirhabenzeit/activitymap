@@ -14,8 +14,7 @@
   "groups": [
     { "id": "now", "title": "Now" },
     { "id": "thisYear", "title": "This year" },
-    { "id": "patterns", "title": "Patterns" },
-    { "id": "more", "title": "More", "collapsed": true }
+    { "id": "patterns", "title": "Patterns" }
   ],
   "tiles": [
     {
@@ -132,14 +131,14 @@
       "id": "typicalWeek",
       "title": "Typical week",
       "window": "last12Weeks",
-      "group": "more",
+      "group": "patterns",
       "span": { "columns": 1, "rows": 1 }
     },
     {
       "id": "best30Days",
       "title": "Best 30 days",
       "window": "currentYear",
-      "group": "more",
+      "group": "patterns",
       "span": { "columns": 1, "rows": 1 },
       "toggle": {
         "label": "Metric",
@@ -150,7 +149,7 @@
       "id": "restDays",
       "title": "Rest days",
       "window": "last90Days",
-      "group": "more",
+      "group": "patterns",
       "span": { "columns": 1, "rows": 1 }
     },
     {

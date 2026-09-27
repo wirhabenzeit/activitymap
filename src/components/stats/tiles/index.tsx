@@ -1,8 +1,8 @@
 'use client';
 
 // The tile-based stats view: the bento grid from shared/stats-tiles.json,
-// one titled section per tile group (Now, This year, Patterns, and a
-// collapsed More). Every tile reads the activities the sidebar filters
+// one titled section per tile group (Now, This year, Patterns). Every tile
+// reads the activities the sidebar filters
 // already narrowed down. The grid fills the full width with the regular
 // layout's columns, so tiles widen on big screens. Only primary tiles get
 // the large headline numerals.
@@ -23,7 +23,7 @@ import {
 } from 'react';
 import { useTheme } from 'next-themes';
 import { LayoutGroup, motion } from 'motion/react';
-import { ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import {
@@ -116,7 +116,6 @@ export function StatsTileGrid({ activities }: { activities: StatsActivity[] }) {
                 <BentoGroup
                   key={group.id}
                   title={group.title}
-                  collapsed={'collapsed' in group && group.collapsed}
                   tiles={shownTiles.filter(
                     ({ tile }) => tile.group === group.id,
                   )}
@@ -139,7 +138,6 @@ const { regular, compact, gap } = statsTileLayout;
 
 function BentoGroup({
   title,
-  collapsed,
   tiles,
   width,
   context,
@@ -148,7 +146,6 @@ function BentoGroup({
   onCollapse,
 }: {
   title: string;
-  collapsed: boolean;
   tiles: ShownTile[];
   width: number;
   context: TileContext;
@@ -156,7 +153,6 @@ function BentoGroup({
   onExpand: (id: StatsTileID) => void;
   onCollapse: () => void;
 }) {
-  const [folded, setFolded] = useState(collapsed);
   const grid = width >= regular.minWidth ? regular : compact;
   // Collapsed, tiles pack as the manifest says. An expanded tile spans the
   // whole section in one content-sized row, starting on the row it was on,
@@ -212,65 +208,43 @@ function BentoGroup({
   const expandedRow = expandedIndex < 0 ? null : placements[expandedIndex]!.row;
   if (tiles.length === 0) return null;
 
-  const heading = (
-    <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-      {title}
-    </h2>
-  );
   return (
     <motion.section aria-label={title} layout="position">
-      {collapsed ? (
-        <button
-          type="button"
-          aria-expanded={!folded}
-          onClick={() => setFolded(!folded)}
-          className="mb-2 flex items-center gap-1 text-muted-foreground hover:text-foreground"
-        >
-          {heading}
-          <ChevronDown
-            className={cn(
-              'h-3.5 w-3.5 transition-transform',
-              folded && '-rotate-90',
-            )}
-          />
-        </button>
-      ) : (
-        <div className="mb-2">{heading}</div>
-      )}
-      {!folded && (
-        <div
-          className="grid"
-          style={{
-            gap,
-            gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
-            // The expanded tile sits in one row sized to its content; every
-            // other row keeps the grid's row height.
-            gridTemplateRows: Array.from({ length: rowCount }, (_, index) =>
-              index + 1 === expandedRow ? 'auto' : `${grid.rowHeight}px`,
-            ).join(' '),
-          }}
-        >
-          {tiles.map(({ tile, view }, index) => {
-            const placement = placements[index]!;
-            return (
-              <TileCard
-                key={tile.id}
-                tile={tile}
-                view={view}
-                context={context}
-                large={'primary' in tile && tile.primary}
-                expanded={tile.id === expandedID}
-                onExpand={() => onExpand(tile.id)}
-                onCollapse={onCollapse}
-                style={{
-                  gridColumn: `${placement.column} / span ${placement.columns}`,
-                  gridRow: `${placement.row} / span ${placement.rows}`,
-                }}
-              />
-            );
-          })}
-        </div>
-      )}
+      <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h2>
+      <div
+        className="grid"
+        style={{
+          gap,
+          gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
+          // The expanded tile sits in one row sized to its content; every
+          // other row keeps the grid's row height.
+          gridTemplateRows: Array.from({ length: rowCount }, (_, index) =>
+            index + 1 === expandedRow ? 'auto' : `${grid.rowHeight}px`,
+          ).join(' '),
+        }}
+      >
+        {tiles.map(({ tile, view }, index) => {
+          const placement = placements[index]!;
+          return (
+            <TileCard
+              key={tile.id}
+              tile={tile}
+              view={view}
+              context={context}
+              large={'primary' in tile && tile.primary}
+              expanded={tile.id === expandedID}
+              onExpand={() => onExpand(tile.id)}
+              onCollapse={onCollapse}
+              style={{
+                gridColumn: `${placement.column} / span ${placement.columns}`,
+                gridRow: `${placement.row} / span ${placement.rows}`,
+              }}
+            />
+          );
+        })}
+      </div>
     </motion.section>
   );
 }
