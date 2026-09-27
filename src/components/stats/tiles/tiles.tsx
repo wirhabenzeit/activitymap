@@ -46,7 +46,7 @@ import {
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
-import { MonthRows } from './calendar';
+import { MonthRows, RestDayCalendar } from './calendar';
 import {
   CumulativeLines,
   Measure,
@@ -1365,38 +1365,13 @@ const restDaysView: TileView = {
       sub: `${last90} in the last 90 days`,
     };
   },
-  face: ({ activities, today }) => {
-    const flags = activeDayFlags(activities, today, 90);
-    return (
-      <div className="mt-auto">
-        <div
-          className="grid gap-[2px]"
-          style={{ gridTemplateColumns: 'repeat(30, minmax(0, 1fr))' }}
-          role="img"
-          aria-label="Rest days in the last 90 days"
-        >
-          {flags.map((active, index) => (
-            <i
-              key={index}
-              className={cn(
-                'block aspect-square rounded-[1px]',
-                active
-                  ? 'bg-muted-foreground/25'
-                  : 'bg-orange-600 dark:bg-orange-400',
-              )}
-              title={`${shortDate(dateOfDay(today - 89 + index))}: ${
-                active ? 'active' : 'rest day'
-              }`}
-            />
-          ))}
-        </div>
-        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
-          <span>90 days ago</span>
-          <span>today</span>
-        </div>
-      </div>
-    );
-  },
+  face: ({ activities, today }, _option, expanded) => (
+    <RestDayCalendar
+      today={today}
+      flags={activeDayFlags(activities, today, 90)}
+      expanded={expanded}
+    />
+  ),
 };
 
 // Speed trend is optional in the manifest and has no rules or fixtures yet,

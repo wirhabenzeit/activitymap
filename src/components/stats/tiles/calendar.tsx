@@ -8,7 +8,8 @@ import { interpolateRgb } from 'd3';
 
 import { categorySettings } from '~/settings/category';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
-import { type Sport } from '~/lib/stats/tile-data';
+import { mondayOf, type Sport } from '~/lib/stats/tile-data';
+import { cn } from '~/lib/utils';
 import { dateOfDay, calendarMonths } from '~/lib/stats/tile-series';
 
 import {
@@ -160,6 +161,126 @@ export function MonthRows({
       ) : (
         numericLegend
       )}
+    </div>
+  );
+}
+
+// Weeks run left to right; weekdays run Monday to Sunday down each column.
+export function RestDayCalendar({
+  today,
+  flags,
+  expanded,
+}: {
+  today: number;
+  flags: boolean[];
+  expanded: boolean;
+}) {
+  const first = today - flags.length + 1;
+  const firstMonday = mondayOf(first);
+  const weeks = Math.floor((today - firstMonday) / 7) + 1;
+  const [selected, setSelected] = useState<number | null>(null);
+  const [focusedDay, setFocusedDay] = useState(today);
+  const cells = useRef(new Map<number, HTMLButtonElement>());
+  const labelFor = (day: number) =>
+    `${shortDate(dateOfDay(day))}: ${flags[day - first] ? 'activity recorded' : 'no matching activity'}`;
+  const caption =
+    selected !== null && selected >= first && selected <= today
+      ? labelFor(selected)
+      : `${shortDate(dateOfDay(first))} – ${shortDate(dateOfDay(today))} · weeks →`;
+
+  return (
+    <div className="mt-2 flex min-h-0 flex-1 flex-col gap-1">
+      <p className="shrink-0 text-[10px] leading-3" aria-live="polite">
+        {caption}
+      </p>
+      <div
+        role="group"
+        aria-label="Last 90 days, one column per week, Monday to Sunday"
+        className="grid min-h-0 gap-[2px]"
+        style={{
+          gridTemplateColumns: `24px repeat(${weeks}, minmax(0, 1fr))`,
+          gridTemplateRows: 'repeat(7, minmax(0, 1fr))',
+          height: expanded ? 168 : 56,
+        }}
+      >
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(
+          (name, weekday) => (
+            <span
+              key={name}
+              className="self-center text-[9px] leading-none text-muted-foreground"
+              style={{ gridRow: weekday + 1, gridColumn: 1 }}
+            >
+              {expanded || weekday % 2 === 0 ? name : ''}
+            </span>
+          ),
+        )}
+        {Array.from({ length: weeks * 7 }, (_, index) => {
+          const day = firstMonday + index;
+          // Partial weeks are blank: neither future days nor days before the
+          // 90-day reporting window should be mistaken for rest days.
+          if (day < first || day > today) return null;
+          return (
+            <button
+              key={day}
+              type="button"
+              ref={(element) => {
+                if (element) cells.current.set(day, element);
+                else {
+                  // DOM references only; no database operation.
+                  // eslint-disable-next-line drizzle/enforce-delete-with-where
+                  cells.current.delete(day);
+                }
+              }}
+              tabIndex={day === focusedDay ? 0 : -1}
+              aria-label={labelFor(day)}
+              title={labelFor(day)}
+              className={cn(
+                'min-h-0 min-w-0 rounded-[1px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground',
+                flags[day - first]
+                  ? 'bg-muted-foreground/25'
+                  : 'bg-orange-600 dark:bg-orange-400',
+              )}
+              style={{
+                gridColumn: Math.floor(index / 7) + 2,
+                gridRow: (index % 7) + 1,
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelected(day);
+              }}
+              onFocus={() => {
+                setFocusedDay(day);
+                setSelected(day);
+              }}
+              onKeyDown={(event) => {
+                const offsets: Record<string, number> = {
+                  ArrowLeft: -7,
+                  ArrowRight: 7,
+                  ArrowUp: -1,
+                  ArrowDown: 1,
+                };
+                const offset = offsets[event.key];
+                if (offset !== undefined) {
+                  event.preventDefault();
+                  cells.current
+                    .get(Math.max(first, Math.min(today, day + offset)))
+                    ?.focus();
+                }
+              }}
+            />
+          );
+        })}
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-x-3 text-[10px] leading-3 text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <i className="size-2 rounded-[1px] bg-orange-600 dark:bg-orange-400" />
+          No matching activity
+        </span>
+        <span className="flex items-center gap-1">
+          <i className="size-2 rounded-[1px] bg-muted-foreground/25" />
+          Recorded
+        </span>
+      </div>
     </div>
   );
 }

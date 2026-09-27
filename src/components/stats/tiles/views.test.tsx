@@ -114,3 +114,54 @@ void test('expanded records retain activity identities for drill-down', () => {
   );
   assert.match(html, /<button[^>]*>Fixture ride<\/button>/);
 });
+
+void test('rest-day weeks align weekdays and exclude padding from the 90-day window', () => {
+  const view = tileView('restDays')!;
+  // Tuesday at the end and Thursday at the start exercise both partial weeks.
+  const sample = {
+    ...context,
+    activities: [make('2026-06-04', 'ride'), make('2026-09-01', 'run')],
+  };
+  for (const expanded of [false, true]) {
+    const html = renderToStaticMarkup(
+      view.face(sample, undefined, expanded) as ReactElement,
+    );
+    const days = html.match(/<button[^>]*>/g) ?? [];
+    assert.equal(days.length, 90);
+    assert.equal(
+      days.filter((day) => day.includes('bg-muted-foreground/25')).length,
+      2,
+    );
+    assert.equal(
+      days.filter((day) => day.includes('bg-orange-600')).length,
+      88,
+    );
+    assert.match(days[0], /Jun 4: activity recorded/);
+    assert.match(days[0], /grid-column:2;grid-row:4/);
+    assert.match(days[89]!, /Sep 1: activity recorded/);
+    assert.match(days[89]!, /grid-column:15;grid-row:2/);
+    assert.equal(days.filter((day) => day.includes('tabindex="0"')).length, 1);
+    assert.match(html, /one column per week, Monday to Sunday/);
+    assert.match(html, /No matching activity/);
+    assert.match(html, /Recorded/);
+  }
+  assert.equal(view.summary(sample, undefined)!.value, '29');
+  assert.equal(view.summary(sample, undefined)!.sub, '88 in the last 90 days');
+});
+
+void test('rest-day weeks cross a year boundary without adding future rest days', () => {
+  const view = tileView('restDays')!;
+  const html = renderToStaticMarkup(
+    view.face(
+      { ...context, today: dayFromISODate('2026-01-01'), activities: [] },
+      undefined,
+      false,
+    ) as ReactElement,
+  );
+  const days = html.match(/<button[^>]*>/g) ?? [];
+  assert.equal(days.length, 90);
+  assert.match(days[0], /Oct 4: no matching activity/);
+  assert.match(days[0], /grid-column:2;grid-row:6/);
+  assert.match(days[89]!, /Jan 1: no matching activity/);
+  assert.match(days[89]!, /grid-column:15;grid-row:4/);
+});

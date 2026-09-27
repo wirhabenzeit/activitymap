@@ -577,13 +577,12 @@ function TileCard({
           <Headline summary={summary} size={large ? 'large' : 'tile'} />
         )}
         {view.face(context, option, expanded)}
-        {context.filtered &&
-          (tile.id === 'restDays' || tile.id === 'consistency') && (
-            <p className="mt-2 shrink-0 text-[11px] leading-snug text-muted-foreground">
-              Filtered view: only matching activities count. Other activity may
-              have occurred.
-            </p>
-          )}
+        {context.filtered && tile.id === 'consistency' && (
+          <p className="mt-2 shrink-0 text-[11px] leading-snug text-muted-foreground">
+            Filtered view: only matching activities count. Other activity may
+            have occurred.
+          </p>
+        )}
         {expanded && view.more && (
           <motion.div
             initial={animateLayout ? { opacity: 0 } : false}
