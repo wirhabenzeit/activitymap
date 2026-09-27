@@ -84,7 +84,7 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
   -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
 ```
 
-CI runs the same Swift Testing target. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required. CI retains the `.xcresult` assertions and logs but disables verbose simulator diagnostic collection, which can hang for ten minutes after a failure.
+Required iOS CI compiles the app and Swift Testing target with `build-for-testing` against a generic simulator destination; it does not boot a simulator or execute these runtime tests. Run the tests locally before review using the command above. This keeps slow simulator startup and native Mapbox rendering out of the required PR checks. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
 
 To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
 

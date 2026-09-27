@@ -117,8 +117,11 @@ extension RenderedRoutePickingTests {
         let idleEvent = firstMap.mapboxMap.onMapIdle.observe { _ in idle = true }
         defer { idleEvent.cancel() }
         try await cameraWait { idle && firstMap.mapboxMap.layerExists(withId: RouteSource.ordinaryLayerID) }
+        // Query only after the tiles for the new camera have actually rendered;
+        // a fixed 150 ms delay is not enough on a shared CI simulator.
+        idle = false
         firstMap.mapboxMap.setCamera(to: CameraOptions(center: CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005), zoom: 13))
-        try await Task.sleep(for: .milliseconds(150))
+        try await cameraWait { idle }
         let picker = RoutePicker()
         let point = firstMap.mapboxMap.point(for: CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005))
         picker.pick(at: point, map: firstMap.mapboxMap, store: store)
