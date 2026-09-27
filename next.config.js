@@ -34,16 +34,6 @@ const config = {
         permanent: true,
       },
       {
-        source: "/stats/scatter",
-        destination: "/stats/tiles",
-        permanent: true,
-      },
-      ...['calendar', 'timeline', 'progress'].map((name) => ({
-        source: `/stats/${name}`,
-        destination: '/stats/tiles',
-        permanent: true,
-      })),
-      {
         source: "/stats",
         destination: "/stats/tiles",
         permanent: true,
