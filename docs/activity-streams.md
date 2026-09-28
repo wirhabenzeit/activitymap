@@ -89,7 +89,7 @@ time buckets when there is no usable distance stream), with the bucket average o
 all included series are index-aligned. Bucket means are not necessarily evenly
 spaced, so explicit axes are retained. The summary can be stored as legacy JSON
 arrays or a versioned compact envelope; see [compact summaries](compact-stream-summaries.md)
-for the codec, opt-in endpoints, measurements and guarded rollout/rollback. `summary.version` names the algorithm; rows stored
+for the codec, opt-in endpoints, measurements and guarded rollout/rollback. `summary.version` (legacy) or `summary.algorithm_version` (compact) names the algorithm; rows stored
 without a summary, or with an older version, are summarized the first time
 they are read, guarded by `revision` so a concurrent commit wins. Summaries
 follow the payload's lifecycle: they are served only while the set is

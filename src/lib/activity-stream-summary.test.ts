@@ -23,6 +23,7 @@ import {
   reconcileStreamSummaryMetadata,
   streamSummaryQueryKey,
   streamSummaryRefetchInterval,
+  toElevationProfile,
   type FetchLike,
   type StreamSummaryResult,
 } from './activity-stream-summary.ts';
@@ -577,3 +578,42 @@ void test('prefetch retains only encoded samples; decoding is deferred to the vi
     null,
   );
 });
+
+for (const [name, distance, ready] of [
+  ['stationary', [0, 0, 0], false],
+  ['regression', [0, 10, 5], false],
+  ['paused then advancing', [0, 0, 10], true],
+  ['advancing', [0, 10, 20], true],
+] as const) {
+  void test(`direct and batch readiness matches the chart for ${name} time-based summaries`, async () => {
+    const entry = summary({
+      summary: encodeStreamSummary({
+        version: 1,
+        basis: 'time',
+        time: [0, 10, 20],
+        distance: [...distance],
+        altitude: [5, 6, 7],
+      }),
+    });
+    const direct = await fetchActivityStreamSummary({
+      activityId: '42',
+      userId: `readiness-${name}`,
+      signal: new AbortController().signal,
+      fetchImpl: async () => success(entry),
+      now: () => NOW,
+    });
+    const batch = await fetchStoredStreamSummaryBatch({
+      activityIds: ['42'],
+      userId: `batch-readiness-${name}`,
+      signal: new AbortController().signal,
+      fetchImpl: async () =>
+        Response.json(makeEnvelope({ summaries: [entry] }, new Date(NOW))),
+      now: () => NOW,
+    });
+    assert.equal(Boolean(toElevationProfile(entry)), ready);
+    assert.equal(direct.status, ready ? 'ready' : 'unavailable');
+    assert.equal(batch.get('42')?.status, direct.status);
+    assert.equal(direct.retryAt, null);
+    assert.equal(batch.get('42')?.retryAt, null);
+  });
+}

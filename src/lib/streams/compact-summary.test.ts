@@ -5,6 +5,8 @@ import {
   decodeStreamSummary,
   encodeStreamSummary,
   MAX_SCALED_VALUE,
+  summaryAlgorithmVersion,
+  hasCompactElevationProfile,
 } from './compact-summary';
 import { streamSummarySchema } from '~/server/strava/stream-summary';
 
@@ -18,14 +20,15 @@ for (const vector of vectors) {
 void test('bounded decoder rejects unknown versions, malformed encodings and allocations', () => {
   const base = {
     codec: 'polyline-v1',
-    version: 1,
+    algorithm_version: 1,
     basis: 'distance',
     count: 1,
     distance: '?',
   };
   for (const change of [
     { codec: 'polyline-v2' },
-    { version: 2 },
+    { algorithm_version: 0 },
+    { algorithm_version: 1.5 },
     { count: -1 },
     { count: 301 },
     { count: 1.5 },
@@ -47,13 +50,13 @@ void test('bounded decoder rejects unknown versions, malformed encodings and all
       JSON.stringify(change),
     );
 });
-void test('encoding rejects extra precision, misalignment, coordinates and unsupported sampling versions', () => {
+void test('encoding rejects extra precision, misalignment, coordinates and invalid sampling versions', () => {
   const base = { version: 1, basis: 'distance' as const, distance: [0, 1] };
   for (const summary of [
     { ...base, distance: [0, 0.01] },
     { ...base, altitude: [5] },
     { ...base, distance: [0, Infinity] },
-    { ...base, version: 2 },
+    { ...base, version: 0 },
     {
       ...base,
       latlng: [
@@ -91,5 +94,41 @@ void test('randomized rounded summaries round-trip including signed deltas and a
       decodeStreamSummary(encodeStreamSummary(summary)),
       summary,
     );
+  }
+});
+
+void test('algorithm versions survive storage round trips independently from codec version', () => {
+  for (const version of [1, 2, 37]) {
+    const summary = {
+      version,
+      basis: 'distance' as const,
+      distance: [0, 10],
+      altitude: [5, 6],
+    };
+    const compact = encodeStreamSummary(summary);
+    assert.equal(compact.codec, 'polyline-v1');
+    assert.equal(compact.algorithm_version, version);
+    assert.equal(summaryAlgorithmVersion(compact), version);
+    assert.equal(summaryAlgorithmVersion(summary), version);
+    assert.deepEqual(decodeStreamSummary(compact), summary);
+    assert.equal(hasCompactElevationProfile(compact), true);
+  }
+  assert.equal(summaryAlgorithmVersion(null), undefined);
+});
+void test('chart eligibility rejects malformed series without materializing a profile', () => {
+  const compact = encodeStreamSummary({
+    version: 1,
+    basis: 'distance',
+    distance: [0, 1],
+    altitude: [5, 6],
+  });
+  for (const change of [
+    { distance: '_' },
+    { altitude: '?' },
+    { watts: '_' },
+    { latlng: '?????' },
+    { algorithm_version: 0 },
+  ]) {
+    assert.equal(hasCompactElevationProfile({ ...compact, ...change }), false);
   }
 });

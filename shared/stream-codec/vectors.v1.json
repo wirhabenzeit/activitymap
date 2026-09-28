@@ -7,9 +7,9 @@
     },
     "compact": {
       "codec": "polyline-v1",
-      "version": 1,
       "basis": null,
-      "count": 0
+      "count": 0,
+      "algorithm_version": 1
     }
   },
   {
@@ -22,11 +22,11 @@
     },
     "compact": {
       "codec": "polyline-v1",
-      "version": 1,
       "basis": "distance",
       "count": 0,
       "distance": "",
-      "altitude": ""
+      "altitude": "",
+      "algorithm_version": 1
     }
   },
   {
@@ -94,7 +94,6 @@
     },
     "compact": {
       "codec": "polyline-v1",
-      "version": 1,
       "basis": "distance",
       "count": 5,
       "time": "?CIWA",
@@ -102,7 +101,8 @@
       "altitude": "~@?_AqFfG",
       "watts": "?il@hg@~CoK",
       "heartrate": "?oFg@?bB",
-      "latlng": "??A@}`tqG_gsia@?zngtcA~bidP}fsia@"
+      "latlng": "??A@}`tqG_gsia@?zngtcA~bidP}fsia@",
+      "algorithm_version": 1
     }
   },
   {
@@ -123,11 +123,11 @@
     },
     "compact": {
       "codec": "polyline-v1",
-      "version": 1,
       "basis": "time",
       "count": 3,
       "time": "?AO",
-      "heartrate": "?gER"
+      "heartrate": "?gER",
+      "algorithm_version": 1
     }
   },
   {
@@ -157,11 +157,11 @@
     },
     "compact": {
       "codec": "polyline-v1",
-      "version": 1,
       "basis": "distance",
       "count": 3,
       "distance": "?SS",
-      "latlng": "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
+      "latlng": "_p~iF~ps|U_ulLnnqC_mqNvxq`@",
+      "algorithm_version": 1
     }
   },
   {
@@ -182,11 +182,87 @@
     },
     "compact": {
       "codec": "polyline-v1",
-      "version": 1,
       "basis": "distance",
       "count": 3,
       "distance": "?__n`yqD~~m`yqD",
-      "altitude": "}~~~~~~~@z~~~~~~~B}~~~~~~~@"
+      "altitude": "}~~~~~~~@z~~~~~~~B}~~~~~~~@",
+      "algorithm_version": 1
+    }
+  },
+  {
+    "name": "algorithm-version-two",
+    "summary": {
+      "version": 2,
+      "basis": "distance",
+      "distance": [
+        0,
+        0,
+        0.1,
+        35.7,
+        40
+      ],
+      "time": [
+        0,
+        2,
+        7,
+        19,
+        20
+      ],
+      "altitude": [
+        -3.2,
+        -3.2,
+        0,
+        12.1,
+        -1.1
+      ],
+      "watts": [
+        0,
+        725,
+        80,
+        0,
+        200
+      ],
+      "heartrate": [
+        0,
+        120,
+        140,
+        140,
+        90
+      ],
+      "latlng": [
+        [
+          0,
+          0
+        ],
+        [
+          1e-05,
+          -1e-05
+        ],
+        [
+          45,
+          179.99999
+        ],
+        [
+          45,
+          -179.99999
+        ],
+        [
+          -45,
+          0
+        ]
+      ]
+    },
+    "compact": {
+      "codec": "polyline-v1",
+      "basis": "distance",
+      "count": 5,
+      "time": "?CIWA",
+      "distance": "??AgUuA",
+      "altitude": "~@?_AqFfG",
+      "watts": "?il@hg@~CoK",
+      "heartrate": "?oFg@?bB",
+      "latlng": "??A@}`tqG_gsia@?zngtcA~bidP}fsia@",
+      "algorithm_version": 2
     }
   }
 ]

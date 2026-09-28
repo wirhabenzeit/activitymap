@@ -17,7 +17,7 @@ const encodedSeries = z
 export const compactStreamSummarySchema = z
   .object({
     codec: z.literal(COMPACT_SUMMARY_CODEC),
-    version: z.number().int().min(1).max(1),
+    algorithm_version: z.number().int().positive(),
     basis: z.enum(['distance', 'time']).nullable(),
     count: z.number().int().min(0).max(MAX_SUMMARY_POINTS),
     time: encodedSeries.optional(),
@@ -72,15 +72,15 @@ function encodeValues(values: number[], scale: number, stride = 1): string {
   return text;
 }
 
-function decodeValues(
+function visitDecodedValues(
   text: string,
   count: number,
   scale: number,
-  stride = 1,
-): number[] {
+  stride: number,
+  visit: (value: number) => void,
+): void {
   if (text.length > count * MAX_CHARACTERS_PER_VALUE) invalid();
   const previous = Array<number>(stride).fill(0);
-  const values: number[] = [];
   let offset = 0;
   for (let index = 0; index < count; index++) {
     let unsigned = 0,
@@ -105,9 +105,19 @@ function decodeValues(
     const scaled = previous[component]! + delta;
     if (Math.abs(scaled) > MAX_SCALED_VALUE) invalid();
     previous[component] = scaled;
-    values.push(scaled / scale);
+    visit(scaled / scale);
   }
   if (offset !== text.length) invalid();
+}
+
+function decodeValues(
+  text: string,
+  count: number,
+  scale: number,
+  stride = 1,
+): number[] {
+  const values: number[] = [];
+  visitDecodedValues(text, count, scale, stride, (value) => values.push(value));
   return values;
 }
 
@@ -115,12 +125,11 @@ export function encodeStreamSummary(
   input: StreamSummary,
 ): CompactStreamSummary {
   const summary = streamSummarySchema.parse(input);
-  if (summary.version !== 1) invalid();
   const count = summary.basis ? summary[summary.basis]?.length : 0;
   if (count === undefined || count > MAX_SUMMARY_POINTS) invalid();
   const result: CompactStreamSummary = {
     codec: COMPACT_SUMMARY_CODEC,
-    version: 1,
+    algorithm_version: summary.version,
     basis: summary.basis,
     count,
   };
@@ -144,7 +153,7 @@ export function encodeStreamSummary(
   return result;
 }
 
-export function decodeStreamSummary(input: unknown): StreamSummary {
+function parseCompactSummary(input: unknown): CompactStreamSummary {
   const compact = compactStreamSummarySchema.parse(input);
   if (
     compact.basis === null
@@ -152,8 +161,64 @@ export function decodeStreamSummary(input: unknown): StreamSummary {
       : compact[compact.basis] === undefined
   )
     invalid();
+  return compact;
+}
+
+/** Check chart eligibility without allocating or retaining decoded sample arrays. */
+export function hasCompactElevationProfile(input: unknown): boolean {
+  try {
+    const compact = parseCompactSummary(input);
+    if (
+      compact.count < 2 ||
+      compact.distance === undefined ||
+      compact.altitude === undefined
+    )
+      return false;
+    let firstDistance: number | undefined;
+    let lastDistance: number | undefined;
+    let nondecreasing = true;
+    for (const key of keys) {
+      const text = compact[key];
+      if (text === undefined) continue;
+      visitDecodedValues(text, compact.count, scales[key], 1, (value) => {
+        if (key === 'distance') {
+          firstDistance ??= value;
+          if (lastDistance !== undefined && value < lastDistance)
+            nondecreasing = false;
+          lastDistance = value;
+        }
+      });
+    }
+    if (compact.latlng !== undefined) {
+      let component = 0;
+      visitDecodedValues(compact.latlng, compact.count * 2, 1e5, 2, (value) => {
+        if (Math.abs(value) > (component++ % 2 === 0 ? 90 : 180)) invalid();
+      });
+    }
+    return (
+      nondecreasing &&
+      firstDistance !== undefined &&
+      lastDistance! > firstDistance
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function summaryAlgorithmVersion(
+  summary: StoredStreamSummary | null,
+): number | undefined {
+  return summary === null
+    ? undefined
+    : isCompactSummary(summary)
+      ? summary.algorithm_version
+      : summary.version;
+}
+
+export function decodeStreamSummary(input: unknown): StreamSummary {
+  const compact = parseCompactSummary(input);
   const result: StreamSummary = {
-    version: compact.version,
+    version: compact.algorithm_version,
     basis: compact.basis,
   };
   for (const key of keys) {

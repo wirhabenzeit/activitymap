@@ -13,17 +13,17 @@
         "brotli": 319
       },
       "compact": {
-        "json": 311,
-        "gzip": 169,
-        "brotli": 150
+        "json": 321,
+        "gzip": 175,
+        "brotli": 153
       },
       "encode": {
-        "medianUs": 6.332999999983713,
-        "p95Us": 6.875000000007958
+        "medianUs": 6.2910000000044874,
+        "p95Us": 6.750000000010914
       },
       "decode": {
-        "medianUs": 3.333999999995285,
-        "p95Us": 5.124999999992497
+        "medianUs": 4.166999999995369,
+        "p95Us": 5.1660000000026685
       }
     },
     {
@@ -36,17 +36,17 @@
         "brotli": 2890
       },
       "compact": {
-        "json": 3498,
-        "gzip": 810,
-        "brotli": 713
+        "json": 3508,
+        "gzip": 818,
+        "brotli": 718
       },
       "encode": {
-        "medianUs": 60.625000000015916,
-        "p95Us": 116.41600000001517
+        "medianUs": 61.16599999998584,
+        "p95Us": 103.3339999999896
       },
       "decode": {
-        "medianUs": 16.37500000003911,
-        "p95Us": 17.333000000007814
+        "medianUs": 17.666999999988775,
+        "p95Us": 19.1250000000025
       }
     },
     {
@@ -59,17 +59,17 @@
         "brotli": 3084
       },
       "compact": {
-        "json": 4426,
-        "gzip": 1227,
-        "brotli": 1198
+        "json": 4436,
+        "gzip": 1233,
+        "brotli": 1200
       },
       "encode": {
-        "medianUs": 63.667000000009466,
-        "p95Us": 78.41600000000426
+        "medianUs": 63.91600000000608,
+        "p95Us": 70.83399999999074
       },
       "decode": {
-        "medianUs": 19.33400000001484,
-        "p95Us": 22.957999999960066
+        "medianUs": 20.832999999981894,
+        "p95Us": 21.54200000001083
       }
     },
     {
@@ -82,17 +82,17 @@
         "brotli": 3243
       },
       "compact": {
-        "json": 3660,
-        "gzip": 1051,
-        "brotli": 978
+        "json": 3670,
+        "gzip": 1057,
+        "brotli": 980
       },
       "encode": {
-        "medianUs": 62.33299999996689,
-        "p95Us": 68.58400000004394
+        "medianUs": 61.666999999999916,
+        "p95Us": 127.37499999997226
       },
       "decode": {
-        "medianUs": 16.666999999984,
-        "p95Us": 18.832999999972344
+        "medianUs": 18.167000000005373,
+        "p95Us": 20.916999999997188
       }
     },
     {
@@ -105,17 +105,17 @@
         "brotli": 2216
       },
       "compact": {
-        "json": 3260,
-        "gzip": 503,
-        "brotli": 436
+        "json": 3270,
+        "gzip": 510,
+        "brotli": 439
       },
       "encode": {
-        "medianUs": 60.12500000002774,
-        "p95Us": 65.58400000005804
+        "medianUs": 60.20800000004556,
+        "p95Us": 71.95799999999508
       },
       "decode": {
-        "medianUs": 15.99999999996271,
-        "p95Us": 16.666999999984
+        "medianUs": 16.999999999995907,
+        "p95Us": 19.833999999946172
       }
     },
     {
@@ -128,17 +128,17 @@
         "brotli": 1729
       },
       "compact": {
-        "json": 2190,
-        "gzip": 621,
-        "brotli": 573
+        "json": 2200,
+        "gzip": 629,
+        "brotli": 576
       },
       "encode": {
-        "medianUs": 32.042000000046755,
-        "p95Us": 33.999999999991815
+        "medianUs": 32.83299999998235,
+        "p95Us": 37.8329999999778
       },
       "decode": {
-        "medianUs": 9.374999999977263,
-        "p95Us": 9.749999999939973
+        "medianUs": 10.24999999992815,
+        "p95Us": 11.833000000024185
       }
     },
     {
@@ -151,17 +151,17 @@
         "brotli": 1530
       },
       "compact": {
-        "json": 1961,
-        "gzip": 759,
-        "brotli": 672
+        "json": 1971,
+        "gzip": 765,
+        "brotli": 676
       },
       "encode": {
-        "medianUs": 29.417000000080407,
-        "p95Us": 31.791999999995824
+        "medianUs": 29.792000000043117,
+        "p95Us": 36.66699999996581
       },
       "decode": {
-        "medianUs": 10.0840000000062,
-        "p95Us": 11.91700000003948
+        "medianUs": 10.5829999999969,
+        "p95Us": 12.000000000057298
       }
     },
     {
@@ -174,17 +174,17 @@
         "brotli": 2387
       },
       "compact": {
-        "json": 2761,
-        "gzip": 470,
-        "brotli": 417
+        "json": 2771,
+        "gzip": 479,
+        "brotli": 420
       },
       "encode": {
-        "medianUs": 46.45900000002712,
-        "p95Us": 49.08299999999599
+        "medianUs": 47.207999999955064,
+        "p95Us": 49.58299999998417
       },
       "decode": {
-        "medianUs": 13.665999999943779,
-        "p95Us": 14.916999999968539
+        "medianUs": 13.583000000039647,
+        "p95Us": 28.95899999998619
       }
     },
     {
@@ -197,17 +197,17 @@
         "brotli": 2659
       },
       "compact": {
-        "json": 3504,
-        "gzip": 821,
-        "brotli": 724
+        "json": 3514,
+        "gzip": 830,
+        "brotli": 728
       },
       "encode": {
-        "medianUs": 59.08399999998437,
-        "p95Us": 62.45799999999235
+        "medianUs": 60.417000000029475,
+        "p95Us": 67.49999999999545
       },
       "decode": {
-        "medianUs": 16.75000000000182,
-        "p95Us": 17.500000000040927
+        "medianUs": 17.665999999962878,
+        "p95Us": 18.917000000101325
       }
     },
     {
@@ -220,17 +220,17 @@
         "brotli": 30
       },
       "compact": {
-        "json": 58,
-        "gzip": 77,
-        "brotli": 58
+        "json": 68,
+        "gzip": 85,
+        "brotli": 62
       },
       "encode": {
         "medianUs": 0.12500000002546585,
-        "p95Us": 0.12500000002546585
+        "p95Us": 0.16700000003311288
       },
       "decode": {
         "medianUs": 0.8750000000645741,
-        "p95Us": 1.082999999994172
+        "p95Us": 0.9170000000722212
       }
     }
   ],
@@ -238,52 +238,52 @@
     {
       "name": "flat-negative-altitude",
       "legacy_bytes": 5406,
-      "compact_bytes": 651
+      "compact_bytes": 659
     },
     {
       "name": "gps-discontinuity",
       "legacy_bytes": 5452,
-      "compact_bytes": 1117
+      "compact_bytes": 1125
     },
     {
       "name": "indoor-time-no-gps",
       "legacy_bytes": 2906,
-      "compact_bytes": 1036
+      "compact_bytes": 1044
     },
     {
       "name": "long-ride",
       "legacy_bytes": 6858,
-      "compact_bytes": 1763
+      "compact_bytes": 1771
     },
     {
       "name": "no-axis",
       "legacy_bytes": 35,
-      "compact_bytes": 67
+      "compact_bytes": 77
     },
     {
       "name": "noisy-power",
       "legacy_bytes": 6829,
-      "compact_bytes": 1518
+      "compact_bytes": 1525
     },
     {
       "name": "pauses-irregular-axis",
       "legacy_bytes": 3446,
-      "compact_bytes": 854
+      "compact_bytes": 861
     },
     {
       "name": "short-ride",
       "legacy_bytes": 897,
-      "compact_bytes": 323
+      "compact_bytes": 333
     },
     {
       "name": "smooth-ride",
       "legacy_bytes": 6330,
-      "compact_bytes": 1105
+      "compact_bytes": 1113
     },
     {
       "name": "sparse-sensors",
       "legacy_bytes": 5561,
-      "compact_bytes": 670
+      "compact_bytes": 677
     }
   ]
 }

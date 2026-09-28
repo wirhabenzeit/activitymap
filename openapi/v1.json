@@ -1964,10 +1964,10 @@
                         "type": "string",
                         "const": "polyline-v1"
                       },
-                      "version": {
+                      "algorithm_version": {
                         "type": "integer",
-                        "minimum": 1,
-                        "maximum": 1
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
                       },
                       "basis": {
                         "anyOf": [
@@ -2015,7 +2015,7 @@
                     },
                     "required": [
                       "codec",
-                      "version",
+                      "algorithm_version",
                       "basis",
                       "count"
                     ],
@@ -2200,10 +2200,10 @@
                               "type": "string",
                               "const": "polyline-v1"
                             },
-                            "version": {
+                            "algorithm_version": {
                               "type": "integer",
-                              "minimum": 1,
-                              "maximum": 1
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
                             },
                             "basis": {
                               "anyOf": [
@@ -2251,7 +2251,7 @@
                           },
                           "required": [
                             "codec",
-                            "version",
+                            "algorithm_version",
                             "basis",
                             "count"
                           ],

@@ -13,11 +13,14 @@ backfill enablement goal remain separate work. This change does not close #230.
 ## Format
 
 ```json
-{"codec":"polyline-v1","version":1,"basis":"distance","count":2,"distance":"?gE","altitude":"?S"}
+{"codec":"polyline-v1","algorithm_version":1,"basis":"distance","count":2,"distance":"?gE","altitude":"?S"}
 ```
 
 The example decodes to distance `[0,10]` metres and altitude `[0,1]` metres.
-`codec` versions the representation; `version` versions the sampling algorithm.
+`codec` versions the representation; `algorithm_version` versions the sampling algorithm. Legacy JSON keeps its
+existing `version` field. Positive algorithm versions (including future versions)
+round-trip without changing the codec; repository freshness checks compare the
+algorithm version with `STREAM_SUMMARY_VERSION`.
 Source generation/revision/state stay in the existing response metadata. No TTL
 is added. A codec conversion does not change source revision or generation.
 
@@ -44,7 +47,7 @@ Envelope `summary: null` retains its existing unavailable/not-current meaning.
 The codec never infers distance from time or from the route polyline: real bucket
 means are irregular and are encoded explicitly.
 
-Decoders reject unknown codec/sampling versions, counts outside 0–300,
+Decoders reject unknown codecs, invalid algorithm versions, counts outside 0–300,
 truncation, trailing/overlong encodings, invalid characters, mismatched lengths,
 out-of-range GPS and numeric overflow. Absolute scaled values are bounded by
 2^40−1; a value consumes at most nine characters. TypeScript uses arithmetic
@@ -54,9 +57,10 @@ Encoders reject extra precision rather than quietly introducing quantization.
 ## Storage and APIs
 
 `activity_streams.summary` remains JSONB and accepts either legacy arrays or the
-tagged compact envelope. New ingestion and lazy regeneration write compact data
-by default. `ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT=json` selects legacy
-writes for a reader-only rollout or rollback; both formats remain readable.
+tagged compact envelope. New ingestion and lazy regeneration write legacy JSON
+by default. Set `ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT=polyline-v1` to opt
+into compact writes after old servers have drained. An unset value or `json`
+keeps legacy writes for the reader-only rollout or rollback; both formats remain readable.
 There is no DDL migration and no second copy of every summary. Raw JSONB is
 untouched. Legacy summaries can be converted directly without loading raw data
 or making Strava requests. Lazy generation for a previously missing/outdated
@@ -73,7 +77,9 @@ endpoints retain their exact JSON-array contract. New opt-in endpoints:
 Both retain ownership, session/rate-limit checks, state/revision fencing and
 `private, no-store`. Stale data is withheld in both representations. No response
 contains both representations. The web now uses the compact endpoints and keeps
-encoded envelopes in its query cache; only mounted charts materialize arrays.
+encoded envelopes in its query cache; only mounted charts materialize arrays. Readiness checks validate the encoded
+series and require nondecreasing distance with a positive span, matching the
+chart even for stationary time-based activities.
 Decoded arrays leave memory when that chart unmounts. This does not add a web
 persistent/offline stream cache.
 
@@ -83,7 +89,7 @@ encoded file reopen are tested without a simulator. The native stream branch
 should reuse its current scopes, request fences, retries and independent raw
 cache, changing the summary transport/storage DTO to
 `ActivityCompactStreamSummary`. Persist that encoded DTO as Data and track
-`summary.codec` independently from `summary.version`. Decode off the main actor
+`summary.codec` independently from `summary.algorithm_version`. Decode off the main actor
 only for a visible consumer. The native cache/loader itself is still #214/#215.
 
 ## Bounded conversion and rollback
@@ -94,7 +100,7 @@ compact summaries. Use this deployment sequence:
 1. Deploy the dual-reader server with
    `ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT=json`. Keep old endpoints available.
 2. After old server/worker invocations have drained, switch writes to
-   `polyline-v1` (the default) and migrate existing summaries in bounded batches.
+   `polyline-v1` explicitly and migrate existing summaries in bounded batches.
 3. Verify both endpoint formats and continue tracking ingestion/retry errors.
 
 The converter uses the existing guarded migration connection/host/database
@@ -111,17 +117,27 @@ pnpm db:convert-stream-summaries --format polyline-v1 --limit 100 --apply --conf
 ```
 
 Each invocation processes at most 100 rows by default (maximum 1000), in a
-transaction with a five-second statement timeout, row locks and SKIP LOCKED.
-It is restartable: already converted rows are excluded. Reported byte counts
+transaction with a five-second statement timeout and row locks. Invalid summaries
+are left untouched and reported in `failures` by activity ID; successful rows in
+the same batch still commit. A report with failures exits with status 2. SQL or
+connection errors still abort the transaction; retry those with the same cursor.
+Pass the returned `nextAfterId` as `--after-id ID` on the next invocation,
+including after a batch with failures. This advances past invalid rows even when
+an entire batch fails. Keep the failure list for repair; reaching the end of a
+scan does not mean those rows were converted. Restart from the beginning after
+repairs or to include rows inserted behind the cursor. A dry-run cursor must not
+be reused to start the apply scan. Already converted rows are excluded.
+Reported byte counts
 are serialized JSON, not measured disk savings. The existing stream update
 trigger emits ordinary activity upserts for changed rows; conversion can thus
 produce one additional delta event per activity. It does not repeatedly rewrite
 current-format rows or change source freshness. Sync still contains no arrays.
-Zero selected rows can mean another worker holds locks; verify remaining rows
-when workers are quiet before declaring conversion complete.
+The cursor never skips locked rows: a lock timeout fails the invocation, and
+retrying uses the same cursor. Verify remaining rows before declaring completion.
 
 For rollback, first deploy the dual-reader build with legacy writes enabled,
-then run the same converter with `--format json` until no compact rows remain.
+then run the same converter with `--format json`, advancing the cursor and
+repairing every reported failure until no compact rows remain.
 Verify with `SELECT count(*) FROM activity_streams WHERE summary->>'codec' IS
 NOT NULL` before reverting to an array-only server. Coordinate the web rollback
 as well: the new web client expects the compact endpoints. Codec-compatible
@@ -139,9 +155,9 @@ The synthetic signals are deliberately structured; they are not representative
 p95 real-world compression statistics. #230's earlier real-activity prototype
 remains separate evidence.
 
-On the local run, the nine nonempty cases reduced gzip size by 56–88% and stored
-JSONB column size by 64–88%. A no-axis summary grows from 26 to 58 JSON bytes
-because of the codec header. Warm JavaScript decode p95 was below 25 µs for this
+On the local run, the nine nonempty cases reduced gzip size by 55–88% and stored
+JSONB column size by 63–88%. A no-axis summary grows from 26 to 68 JSON bytes
+because of the codec header. Warm JavaScript decode p95 was below 30 µs for this
 small corpus on the development Mac. This is not an iPhone/UI performance budget
 or a peak-memory measurement. Raw storage is unchanged, so these percentages
 must not be applied to the entire database.

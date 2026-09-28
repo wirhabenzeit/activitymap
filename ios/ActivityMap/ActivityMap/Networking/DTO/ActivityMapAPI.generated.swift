@@ -209,7 +209,7 @@ nonisolated extension ActivityMapAPI {
 
     struct CompactStreamSummary: Codable, Hashable, Sendable {
         let codec: String
-        let version: Int
+        let algorithmVersion: Int
         let basis: StreamSeriesType?
         let count: Int
         let time: String?
@@ -218,6 +218,19 @@ nonisolated extension ActivityMapAPI {
         let watts: String?
         let heartrate: String?
         let latlng: String?
+
+        enum CodingKeys: String, CodingKey {
+            case codec
+            case algorithmVersion = "algorithm_version"
+            case basis
+            case count
+            case time
+            case distance
+            case altitude
+            case watts
+            case heartrate
+            case latlng
+        }
     }
 
     /// The shape of `ActivityCompactStreamSummary.last_error`.

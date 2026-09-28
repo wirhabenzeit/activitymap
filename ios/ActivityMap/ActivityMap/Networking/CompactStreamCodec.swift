@@ -44,7 +44,7 @@ nonisolated enum CompactStreamCodec {
     }
 
     static func decode(_ summary: ActivityMapAPI.CompactStreamSummary) throws -> ActivityMapAPI.StreamSummary {
-        guard summary.codec == "polyline-v1", summary.version == 1, (0...maxPoints).contains(summary.count) else { throw Failure.invalid }
+        guard summary.codec == "polyline-v1", summary.algorithmVersion > 0, summary.algorithmVersion <= 9_007_199_254_740_991, (0...maxPoints).contains(summary.count) else { throw Failure.invalid }
         switch summary.basis {
         case .distance: guard summary.distance != nil else { throw Failure.invalid }
         case .time: guard summary.time != nil else { throw Failure.invalid }
@@ -60,7 +60,7 @@ nonisolated enum CompactStreamCodec {
             }
         }
         return try ActivityMapAPI.StreamSummary(
-            version: summary.version, basis: summary.basis,
+            version: summary.algorithmVersion, basis: summary.basis,
             time: decodeValues(summary.time, count: summary.count, scale: 1),
             distance: decodeValues(summary.distance, count: summary.count, scale: 10),
             latlng: latlng,
@@ -92,7 +92,7 @@ nonisolated enum CompactStreamCodec {
     }
 
     static func encode(_ summary: ActivityMapAPI.StreamSummary) throws -> ActivityMapAPI.CompactStreamSummary {
-        guard summary.version == 1 else { throw Failure.invalid }
+        guard summary.version > 0, summary.version <= 9_007_199_254_740_991 else { throw Failure.invalid }
         let count: Int
         switch summary.basis {
         case .distance: guard let axis = summary.distance else { throw Failure.invalid }; count = axis.count
@@ -106,7 +106,7 @@ nonisolated enum CompactStreamCodec {
             }) else { throw Failure.invalid }
         }
         return try ActivityMapAPI.CompactStreamSummary(
-            codec: "polyline-v1", version: 1, basis: summary.basis, count: count,
+            codec: "polyline-v1", algorithmVersion: summary.version, basis: summary.basis, count: count,
             time: encodeValues(summary.time, count: count, scale: 1),
             distance: encodeValues(summary.distance, count: count, scale: 10),
             altitude: encodeValues(summary.altitude, count: count, scale: 10),

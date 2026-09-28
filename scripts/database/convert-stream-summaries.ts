@@ -33,6 +33,7 @@ try {
     {
       format,
       apply,
+      afterId: value('--after-id'),
       limit: value('--limit') === undefined ? 100 : Number(value('--limit')),
     },
   );
@@ -44,6 +45,7 @@ try {
       ...result,
     }),
   );
+  if (result.failures.length) process.exitCode = 2;
 } finally {
   await client.end();
 }

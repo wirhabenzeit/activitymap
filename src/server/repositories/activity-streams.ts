@@ -32,7 +32,11 @@ import {
   type StreamSummary,
 } from '~/server/strava/stream-summary';
 
-import { encodeStreamSummary, type StoredStreamSummary } from '~/lib/streams/compact-summary';
+import {
+  encodeStreamSummary,
+  summaryAlgorithmVersion,
+  type StoredStreamSummary,
+} from '~/lib/streams/compact-summary';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type StoredStreams = typeof activityStreams.$inferSelect;
@@ -164,9 +168,11 @@ async function lockClaim(tx: Transaction, claim: StreamFetchClaim) {
 
 /** Reader-only/rollback deployments can keep writing legacy JSON. */
 function storeSummary(summary: StreamSummary): StoredStreamSummary {
-  const format = process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT ?? 'polyline-v1';
+  const format =
+    process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT ?? 'json';
   if (format === 'json') return summary;
-  if (format !== 'polyline-v1') throw new Error('Invalid stream summary storage format');
+  if (format !== 'polyline-v1')
+    throw new Error('Invalid stream summary storage format');
   return encodeStreamSummary(summary);
 }
 
@@ -240,7 +246,7 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           if (
             stream.fetchedAt &&
             !stream.invalidatedAt &&
-            summary?.version !== STREAM_SUMMARY_VERSION
+            summaryAlgorithmVersion(summary) !== STREAM_SUMMARY_VERSION
           ) {
             const [stored] = await tx
               .select({ payload: activityStreams.payload })

@@ -19,9 +19,9 @@ for vector in vectors {
     let reopened = try JSONDecoder().decode(ActivityMapAPI.CompactStreamSummary.self, from: Data(contentsOf: url))
     precondition(reopened == encoded)
 }
-let base: [String: Any] = ["codec": "polyline-v1", "version": 1, "basis": "distance", "count": 1, "distance": "?"]
+let base: [String: Any] = ["codec": "polyline-v1", "algorithm_version": 1, "basis": "distance", "count": 1, "distance": "?"]
 let invalid: [[String: Any]] = [
-    ["codec": "polyline-v2"], ["version": 2], ["count": -1], ["count": 301],
+    ["codec": "polyline-v2"], ["algorithm_version": 0], ["algorithm_version": -1], ["count": -1], ["count": 301],
     ["distance": ""], ["distance": "??"], ["distance": "_"], ["distance": "_?"],
     ["distance": "!"], ["distance": "é"], ["distance": String(repeating: "~", count: 10)],
     ["distance": String(repeating: "~", count: 8) + "^"], ["altitude": ""],

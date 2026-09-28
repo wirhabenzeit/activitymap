@@ -12,6 +12,7 @@ import { errorEnvelopeSchema } from '~/contracts/v1/error';
 
 import {
   decodeStreamSummary,
+  hasCompactElevationProfile,
   type CompactStreamSummary,
 } from '~/lib/streams/compact-summary';
 
@@ -370,10 +371,7 @@ export async function fetchActivityStreamSummary(options: {
 
   const hasProfile =
     entry.metadata.state === 'current' &&
-    entry.summary !== null &&
-    entry.summary.count > 1 &&
-    entry.summary.distance !== undefined &&
-    entry.summary.altitude !== undefined;
+    hasCompactElevationProfile(entry.summary);
   return {
     summary: entry.summary,
     metadata: entry.metadata,
@@ -439,10 +437,7 @@ export async function fetchStoredStreamSummaryBatch(options: {
     if (entry.metadata.state !== 'current') continue;
     const hasProfile =
       entry.metadata.state === 'current' &&
-      entry.summary !== null &&
-      entry.summary.count > 1 &&
-      entry.summary.distance !== undefined &&
-      entry.summary.altitude !== undefined;
+      hasCompactElevationProfile(entry.summary);
     results.set(id, {
       summary: entry.summary,
       metadata: entry.metadata,

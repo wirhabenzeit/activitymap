@@ -250,12 +250,14 @@ async function run() {
     .where(eq(activityStreams.activityId, BigInt(ID)));
   assert.deepEqual(
     storedSummary?.summary,
-    encodeStreamSummary(expectedSummary),
+    expectedSummary,
+    'unset storage format defaults to legacy JSON writes',
   );
   await testDb
     .update(activityStreams)
     .set({ summary: null })
     .where(eq(activityStreams.activityId, BigInt(ID)));
+  process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT = 'polyline-v1';
   const [lazy] = await repository.readSummaries(actor, [ID, '9183999']);
   assert.equal(lazy?.activityId, ID);
   assert.deepEqual(lazy?.row?.summary, encodeStreamSummary(expectedSummary));
@@ -267,6 +269,21 @@ async function run() {
     refilled?.summary,
     encodeStreamSummary(expectedSummary),
     'a lazily computed summary is stored',
+  );
+  await testDb
+    .update(activityStreams)
+    .set({
+      summary: {
+        ...encodeStreamSummary(expectedSummary),
+        algorithm_version: expectedSummary.version + 1,
+      },
+    })
+    .where(eq(activityStreams.activityId, BigInt(ID)));
+  const [regenerated] = await repository.readSummaries(actor, [ID]);
+  assert.deepEqual(
+    regenerated?.row?.summary,
+    encodeStreamSummary(expectedSummary),
+    'repository rebuilds a different algorithm version even when the codec matches',
   );
   assert.deepEqual(
     await repository.readSummaries(other, [ID]),
@@ -390,6 +407,126 @@ async function run() {
     ).updated,
     0,
   );
+
+  // Invalid rows do not prevent healthy neighbors from converting, in either
+  // direction. A cursor also advances when an entire small batch is invalid.
+  const conversionIds = [9183200, 9183201, 9183202];
+  for (const id of conversionIds) {
+    await testDb.insert(activities).values({
+      id,
+      public_id: id,
+      athlete: actor.athleteId,
+      name: 'Converter proof',
+      sport_type: 'Ride',
+      start_date: NOW,
+      start_date_local: NOW,
+      timezone: 'UTC',
+      geometryState: 'summary',
+    });
+    await testDb.insert(activityStreams).values({
+      activityId: BigInt(id),
+      generation: 'converter-proof',
+      requestedTypes: [],
+      lastAttemptAt: NOW,
+      lastAttemptStatus: 'succeeded',
+    });
+  }
+  const goodLegacy = {
+    version: 2,
+    basis: 'distance' as const,
+    distance: [0, 10],
+    altitude: [5, 6],
+  };
+  const goodCompact = encodeStreamSummary(goodLegacy);
+  for (const format of ['polyline-v1', 'json'] as const) {
+    const good = format === 'json' ? goodCompact : goodLegacy;
+    const bad =
+      format === 'json'
+        ? { ...goodCompact, distance: '_' }
+        : { ...goodLegacy, distance: [0, 0.01] };
+    for (const [index, id] of conversionIds.entries())
+      await testDb
+        .update(activityStreams)
+        .set({ summary: index === 1 ? bad : good })
+        .where(eq(activityStreams.activityId, BigInt(id)));
+    const options = { format, afterId: '9183199', limit: 3 };
+    const preview = await convertStreamSummaryBatch(conversionDb, options);
+    assert.equal(preview.selected, 3);
+    assert.equal(preview.converted, 2);
+    assert.equal(preview.updated, 0);
+    assert.deepEqual(preview.failures, [
+      { activityId: '9183201', code: 'invalid_summary' },
+    ]);
+    assert.equal(preview.nextAfterId, '9183202');
+    const readConversionRow = async (id: number) =>
+      (
+        await testDb
+          .select({ summary: activityStreams.summary })
+          .from(activityStreams)
+          .where(eq(activityStreams.activityId, BigInt(id)))
+      )[0]!.summary;
+    assert.deepEqual(
+      await readConversionRow(9183200),
+      good,
+      'dry run leaves rows unchanged',
+    );
+    const applied = await convertStreamSummaryBatch(conversionDb, {
+      ...options,
+      apply: true,
+    });
+    assert.equal(applied.updated, 2);
+    assert.deepEqual(applied.failures, preview.failures);
+    assert.deepEqual(
+      await readConversionRow(9183200),
+      format === 'json' ? goodLegacy : goodCompact,
+    );
+    assert.deepEqual(
+      await readConversionRow(9183202),
+      format === 'json' ? goodLegacy : goodCompact,
+    );
+    assert.deepEqual(
+      await readConversionRow(9183201),
+      bad,
+      'invalid row is preserved for repair',
+    );
+    // Reintroduce an unconverted row after the invalid one; limit 1 must not stall.
+    await testDb
+      .update(activityStreams)
+      .set({ summary: good })
+      .where(eq(activityStreams.activityId, 9183202n));
+    const failedOnly = await convertStreamSummaryBatch(conversionDb, {
+      ...options,
+      apply: true,
+      limit: 1,
+    });
+    assert.equal(failedOnly.selected, 1);
+    assert.equal(failedOnly.updated, 0);
+    assert.equal(failedOnly.nextAfterId, '9183201');
+    const resumed = await convertStreamSummaryBatch(conversionDb, {
+      ...options,
+      apply: true,
+      limit: 1,
+      afterId: failedOnly.nextAfterId,
+    });
+    assert.equal(resumed.updated, 1);
+    assert.deepEqual(resumed.failures, []);
+    assert.equal(
+      (
+        await convertStreamSummaryBatch(conversionDb, {
+          ...options,
+          afterId: resumed.nextAfterId!,
+        })
+      ).selected,
+      0,
+    );
+  }
+  await assert.rejects(
+    convertStreamSummaryBatch(conversionDb, {
+      format: 'json',
+      afterId: 'invalid',
+    }),
+  );
+  await testDb.delete(activities).where(inArray(activities.id, conversionIds));
 
   const generation = (await repository.read(actor, ID))!.generation;
   const beforeInvalidation = await changes.latestSequence(actor.athleteId);
@@ -613,12 +750,20 @@ async function run() {
     'late old-window headers cannot poison the next day',
   );
 }
+const initialStorageFormat =
+  process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT;
+delete process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT;
 try {
   await run();
   console.log(
     'Stream API, lifecycle, feed and shared-budget PostgreSQL proof passed.',
   );
 } finally {
+  if (initialStorageFormat === undefined)
+    delete process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT;
+  else
+    process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT =
+      initialStorageFormat;
   await cleanup();
   await client.end({ timeout: 5 });
 }
