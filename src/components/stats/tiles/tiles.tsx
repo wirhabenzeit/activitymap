@@ -18,10 +18,8 @@ import {
   consistency,
   dayOf,
   fourWeekVolume,
-  mondayOf,
   monthVsLastMonth,
   records,
-  restDays,
   sportMix,
   thisWeek,
   typicalWeek,
@@ -32,7 +30,7 @@ import {
   type StatsActivity,
 } from '~/lib/stats/tile-data';
 import {
-  activeDayFlags,
+  weeklyActiveDays,
   cumulativeByDay,
   cumulativeYearPoints,
   comparisonYear,
@@ -43,7 +41,6 @@ import {
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
-import { ConsistencyCalendar, RestDayCalendar } from './calendar';
 import { VolumeHistory, CalendarHistory, ComparisonHistory } from './history';
 import {
   CumulativeLines,
@@ -716,66 +713,87 @@ const consistencyView: TileView = {
     );
     return {
       value: result.activeDaysPerWeek.toFixed(1),
-      unit: 'days / week',
-      sub: `5+ active days in ${result.solidWeeks} of ${weeksOf(option) - 1} weeks`,
+      unit: 'active days / week',
+      sub: `Average over ${weeksOf(option) - 1} full weeks`,
     };
   },
-  // One column per week (Monday on top), one dot per day: filled when
-  // active, hollow when not. Both sizes show the selected range.
-  face: (context, _option, expanded) => {
-    const weeks = weeksOf(_option);
-    const first = mondayOf(context.today) - (weeks - 1) * 7;
-    const flags = activeDayFlags(
-      context.activities,
-      context.today,
-      context.today - first + 1,
-    );
-    if (expanded) {
-      return (
-        <ConsistencyCalendar
-          today={context.today}
-          first={first}
-          weeks={weeks}
-          flags={flags}
-        />
-      );
-    }
+  face: (context, option, expanded) => {
+    const weeks = weeksOf(option);
+    const rows = weeklyActiveDays(context.activities, context.today, weeks);
     return (
       <div
-        className="mt-auto grid grid-flow-col gap-[2px]"
-        style={{
-          gridTemplateRows: 'repeat(7, minmax(0, 1fr))',
-          gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))`,
-        }}
-        role="img"
-        aria-label={`Active days, last ${weeks} weeks`}
+        className="flex min-h-0 flex-1 flex-col"
+        aria-label={`Weekly active days, last ${weeks} weeks`}
       >
-        {Array.from({ length: weeks * 7 }, (_, index) => {
-          const day = first + index;
-          const active = flags[index];
-          return (
-            <i
-              key={index}
-              className={cn(
-                'mx-auto block rounded-full',
-                'aspect-square w-full max-w-2',
-                day > context.today
-                  ? 'bg-transparent'
-                  : active
-                    ? 'bg-foreground'
-                    : 'border border-muted-foreground/40',
+        <div
+          className={
+            expanded ? 'overflow-x-auto' : 'flex min-h-0 flex-1 flex-col'
+          }
+        >
+          <div
+            className="flex min-h-0 flex-1 flex-col"
+            style={{ minWidth: expanded && weeks === 52 ? 780 : undefined }}
+          >
+            <FillChart expanded={expanded}>
+              {({ width, height }) => (
+                <PlainBars
+                  rows={rows.map((week) => ({
+                    x: String(week.start),
+                    value: week.activeDays,
+                    highlight: week.partial,
+                  }))}
+                  width={width}
+                  height={height}
+                  palette={context.palette}
+                  detail={expanded}
+                  yDomain={[0, 7]}
+                  ariaLabel={`Weekly active days, last ${weeks} weeks, zero to seven days`}
+                  valueFormat={(value) =>
+                    `${value} active ${value === 1 ? 'day' : 'days'}`
+                  }
+                  xTickFormat={(x) => shortDate(dateOfDay(Number(x)))}
+                />
               )}
-              title={
-                day > context.today
-                  ? undefined
-                  : `${shortDate(dateOfDay(day))}: ${active ? 'active' : 'rest day'}`
-              }
-            />
-          );
-        })}
+            </FillChart>
+          </div>
+        </div>
+        <p className="mt-1 shrink-0 text-[10px] text-muted-foreground">
+          0–7 days · Last bar: current week, incomplete
+        </p>
       </div>
     );
   },
+  more: (context, option) => (
+    <details className="mt-3 text-xs">
+      <summary className="cursor-pointer text-muted-foreground">
+        Weekly active days
+      </summary>
+      <table className="mt-2 w-full text-left">
+        <thead>
+          <tr>
+            <th className="py-1 font-medium">Week starting</th>
+            <th className="text-right font-medium">Active days</th>
+          </tr>
+        </thead>
+        <tbody>
+          {weeklyActiveDays(
+            context.activities,
+            context.today,
+            weeksOf(option),
+          ).map((week) => (
+            <tr key={week.start} className="border-t border-muted">
+              <td className="py-1">
+                {shortDate(dateOfDay(week.start))},{' '}
+                {dateOfDay(week.start).getUTCFullYear()}
+                {week.partial ? ' · incomplete' : ''}
+              </td>
+              <td className="text-right font-mono">{week.activeDays}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
+  ),
 };
 
 // Distance vs elevation -----------------------------------------------------
@@ -1292,30 +1310,9 @@ const best30DaysView: TileView = {
   },
 };
 
-// Rest days ------------------------------------------------------------------
-
-const restDaysView: TileView = {
-  expandable: true,
-  period: () => 'Last 90 days',
-  summary: ({ activities, today }) => {
-    const { last30, last90 } = restDays(activities, today);
-    return {
-      value: String(last30),
-      unit: 'in 30 days',
-      sub: `${last90} in the last 90 days`,
-    };
-  },
-  face: ({ activities, today }, _option, expanded) => (
-    <RestDayCalendar
-      today={today}
-      flags={activeDayFlags(activities, today, 90)}
-      expanded={expanded}
-    />
-  ),
-};
-
 // Speed trend is optional in the manifest and has no rules or fixtures yet,
-// so no platform draws it. Totals is folded into Year to date and Pace.
+// so no platform draws it. Totals is folded into Year to date and Pace;
+// Rest days is consolidated into Consistency on the web.
 export function tileView(id: StatsTileID): TileView | null {
   switch (id) {
     case 'thisWeek':
@@ -1329,7 +1326,7 @@ export function tileView(id: StatsTileID): TileView | null {
     case 'best30Days':
       return best30DaysView;
     case 'restDays':
-      return restDaysView;
+      return null;
     case 'yearToDate':
       return yearToDateView;
     case 'totals':

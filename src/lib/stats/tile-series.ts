@@ -19,6 +19,31 @@ import {
 
 const millisecondsPerDay = 86_400_000;
 
+// Count calendar days, not activities; keep empty weeks and the partial current week.
+export function weeklyActiveDays(
+  activities: readonly StatsActivity[],
+  today: number,
+  weeks: 12 | 52,
+) {
+  const currentWeek = mondayOf(today);
+  const first = currentWeek - (weeks - 1) * 7;
+  const activeDays = new Set(
+    activities
+      .map((activity) => dayOf(activity.start_date_local))
+      .filter((day) => day >= first && day <= today),
+  );
+  return Array.from({ length: weeks }, (_, index) => {
+    const start = first + index * 7;
+    return {
+      start,
+      activeDays: Array.from({ length: 7 }, (_, day) => start + day).filter(
+        (day) => activeDays.has(day),
+      ).length,
+      partial: start === currentWeek,
+    };
+  });
+}
+
 export function toStatsActivity(activity: Activity): StatsActivity {
   return {
     id: activity.id,

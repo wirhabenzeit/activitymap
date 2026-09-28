@@ -54,35 +54,30 @@ void test('consistency expansion preserves the selected chart and headline perio
     assert.equal(view.period(context, option), `Last ${weeks} weeks`);
     const sub = view.summary(context, option)!.sub;
     assert.equal(typeof sub, 'string');
-    assert.match(sub as string, new RegExp(`of ${weeks - 1} weeks`));
+    assert.match(sub as string, new RegExp(`${weeks - 1} full weeks`));
     for (const expanded of [false, true]) {
       const html = renderToStaticMarkup(
         view.face(context, option, expanded) as ReactElement,
       );
-      assert.match(html, new RegExp(`Active days, last ${weeks} weeks`));
+      assert.match(html, new RegExp(`Weekly active days, last ${weeks} weeks`));
     }
   }
 });
 
-void test('expanded consistency labels dates and exposes only recorded calendar days', () => {
+void test('consistency offers weekly counts instead of a separate rest-day tile', () => {
+  assert.equal(tileView('restDays'), null);
   const view = tileView('consistency')!;
-  for (const [option, weeks] of [
-    ['last12Weeks', 12],
-    ['last52Weeks', 52],
-  ] as const) {
-    const html = renderToStaticMarkup(
-      view.face(context, option, true) as ReactElement,
-    );
-    const days = html.match(/<button[^>]*>/g) ?? [];
-    // Today is Tuesday: 11/51 full weeks, then Monday and Tuesday.
-    assert.equal(days.length, (weeks - 1) * 7 + 2);
-    assert.equal(days.filter((day) => day.includes('tabindex="0"')).length, 1);
-    assert.match(days.at(-1)!, /Sep 1, 2026: no matching activity/);
-    assert.match(days.at(-2)!, /Aug 31, 2026: activity recorded/);
-    assert.match(html, />Mon</);
-    assert.match(html, />Sun</);
-    assert.match(html, /use arrow keys/);
-  }
+  const html = renderToStaticMarkup(
+    view.more!(context, 'last12Weeks') as ReactElement,
+  );
+  assert.match(html, /Week starting/);
+  assert.match(html, /Aug 31, 2026/);
+  assert.match(html, /incomplete/);
+  assert.equal((html.match(/<tr/g) ?? []).length, 13);
+  assert.doesNotMatch(
+    view.summary(context, 'last12Weeks')!.sub as string,
+    /5\+/,
+  );
 });
 
 void test('all-time sport mix uses the same range for summary, chart and table', () => {
@@ -134,57 +129,6 @@ void test('expanded records retain activity identities for drill-down', () => {
     ) as ReactElement,
   );
   assert.match(html, /<button[^>]*>Fixture ride<\/button>/);
-});
-
-void test('rest-day weeks align weekdays and exclude padding from the 90-day window', () => {
-  const view = tileView('restDays')!;
-  // Tuesday at the end and Thursday at the start exercise both partial weeks.
-  const sample = {
-    ...context,
-    activities: [make('2026-06-04', 'ride'), make('2026-09-01', 'run')],
-  };
-  for (const expanded of [false, true]) {
-    const html = renderToStaticMarkup(
-      view.face(sample, undefined, expanded) as ReactElement,
-    );
-    const days = html.match(/<button[^>]*>/g) ?? [];
-    assert.equal(days.length, 90);
-    assert.equal(
-      days.filter((day) => day.includes('bg-muted-foreground/25')).length,
-      2,
-    );
-    assert.equal(
-      days.filter((day) => day.includes('bg-orange-600')).length,
-      88,
-    );
-    assert.match(days[0], /Jun 4: activity recorded/);
-    assert.match(days[0], /grid-column:2;grid-row:4/);
-    assert.match(days[89]!, /Sep 1: activity recorded/);
-    assert.match(days[89]!, /grid-column:15;grid-row:2/);
-    assert.equal(days.filter((day) => day.includes('tabindex="0"')).length, 1);
-    assert.match(html, /one column per week, Monday to Sunday/);
-    assert.match(html, /No matching activity/);
-    assert.match(html, /Recorded/);
-  }
-  assert.equal(view.summary(sample, undefined)!.value, '29');
-  assert.equal(view.summary(sample, undefined)!.sub, '88 in the last 90 days');
-});
-
-void test('rest-day weeks cross a year boundary without adding future rest days', () => {
-  const view = tileView('restDays')!;
-  const html = renderToStaticMarkup(
-    view.face(
-      { ...context, today: dayFromISODate('2026-01-01'), activities: [] },
-      undefined,
-      false,
-    ) as ReactElement,
-  );
-  const days = html.match(/<button[^>]*>/g) ?? [];
-  assert.equal(days.length, 90);
-  assert.match(days[0], /Oct 4: no matching activity/);
-  assert.match(days[0], /grid-column:2;grid-row:6/);
-  assert.match(days[89]!, /Jan 1: no matching activity/);
-  assert.match(days[89]!, /grid-column:15;grid-row:4/);
 });
 
 void test('expanded training history exposes bounded presets and period totals', () => {
