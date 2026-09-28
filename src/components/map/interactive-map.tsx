@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
-import { Camera, ChevronDown, ChevronUp, Globe } from 'lucide-react';
+import { Camera, Maximize2, Minimize2, Globe, X } from 'lucide-react';
 import { columns } from '~/components/list/columns';
 import {
   ActivityCard,
@@ -224,6 +224,7 @@ export default function InteractiveMap() {
   );
   const [cursor, setCursor] = useState('auto');
   const [panelExpanded, setPanelExpanded] = useState(false);
+  const [panelOverflow, setPanelOverflow] = useState(false);
   // Bumped on every map pick so a new list starts scrolled to the top.
   const [pickCount, setPickCount] = useState(0);
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
@@ -625,48 +626,57 @@ export default function InteractiveMap() {
         {showPhotos && <PhotoLayer />}
       </ReactMapGL>
       <div
+        id="map-route-panel"
         className={cn(
           'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,48rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
           { hidden: rows.length == 0 },
         )}
       >
         {selected.length > 1 && (
-          <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
-            <span className="font-semibold">Routes</span>
-            <span className="text-muted-foreground">
-              {selected.length} selected
+          <div className="flex items-center gap-1 border-b px-3 py-2 text-xs sm:gap-2">
+            <span className="whitespace-nowrap font-semibold">
+              {selected.length} routes
             </span>
             <div className="flex-1" />
             <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2"
-              onClick={clearSelection}
-            >
-              Clear selection
-            </Button>
-            <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
-              aria-label={
-                panelExpanded ? 'Collapse route panel' : 'Expand route panel'
-              }
-              onClick={() => setPanelExpanded(!panelExpanded)}
+              className="h-9 w-9 shrink-0"
+              aria-label="Clear selection"
+              title="Clear selection"
+              onClick={clearSelection}
             >
-              {panelExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronUp className="h-4 w-4" />
-              )}
+              <X aria-hidden="true" />
             </Button>
+            {(panelExpanded || panelOverflow) && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 shrink-0"
+                aria-label={
+                  panelExpanded ? 'Shrink route list' : 'Expand route list'
+                }
+                title={
+                  panelExpanded ? 'Shrink route list' : 'Expand route list'
+                }
+                aria-expanded={panelExpanded}
+                aria-controls="map-route-panel"
+                onClick={() => setPanelExpanded((value) => !value)}
+              >
+                {panelExpanded ? (
+                  <Minimize2 aria-hidden="true" />
+                ) : (
+                  <Maximize2 aria-hidden="true" />
+                )}
+              </Button>
+            )}
           </div>
         )}
         <DataTable
           key={pickCount}
           className={
-            // Only the chevron grows the list; opening a route's card keeps
-            // the panel compact (card plus a few rows) instead.
+            // Opening a card keeps the panel compact (card plus a few rows).
+            // The list size control explicitly makes more room for rows.
             selected.length === 1
               ? 'max-h-[70vh]'
               : panelExpanded
@@ -676,6 +686,7 @@ export default function InteractiveMap() {
                   : 'max-h-[12.5rem]'
           }
           scrollHint
+          onOverflowChange={setPanelOverflow}
           columns={mapColumns}
           data={rows}
           selected={selected}

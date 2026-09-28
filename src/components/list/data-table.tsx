@@ -83,6 +83,8 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   renderSingleDetails?: (row: Row<Features, TData>) => React.ReactNode;
   /** Fade the bottom edge while more rows are hidden below the fold. */
   scrollHint?: boolean;
+  /** Report whether the list has hidden rows, independent of its scroll position. */
+  onOverflowChange?: (overflow: boolean) => void;
 }
 
 interface RowWithId {
@@ -110,6 +112,7 @@ export const DataTable = React.memo(function DataTable<
   renderInlineDetails,
   renderSingleDetails,
   scrollHint = false,
+  onOverflowChange,
   setSorting,
   setColumnVisibility,
   setSelected,
@@ -250,7 +253,8 @@ export const DataTable = React.memo(function DataTable<
     setMoreBelow(
       scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > 4,
     );
-  }, []);
+    onOverflowChange?.(scroller.scrollHeight - scroller.clientHeight > 4);
+  }, [onOverflowChange]);
 
   // Bring a newly opened card into view below the sticky header, but only
   // when part of it is hidden, so opening a visible row doesn't jump.
@@ -268,7 +272,7 @@ export const DataTable = React.memo(function DataTable<
   }, [activeId, sorting]);
 
   React.useEffect(() => {
-    if (!scrollHint) return;
+    if (!scrollHint && !onOverflowChange) return;
     updateMoreBelow();
     const scroller =
       containerRef.current?.querySelector('#table-main')?.parentElement;
@@ -277,7 +281,7 @@ export const DataTable = React.memo(function DataTable<
     observer.observe(scroller);
     observer.observe(scroller.firstElementChild ?? scroller);
     return () => observer.disconnect();
-  }, [scrollHint, updateMoreBelow, data.length, activeId]);
+  }, [scrollHint, onOverflowChange, updateMoreBelow, data.length, activeId]);
 
   const singleRow = table.getRowModel().rows[0];
   if (data.length === 1 && singleRow && renderSingleDetails) {
@@ -292,7 +296,9 @@ export const DataTable = React.memo(function DataTable<
     <div
       ref={containerRef}
       className={cn('relative flex flex-col', className)}
-      onScrollCapture={scrollHint ? updateMoreBelow : undefined}
+      onScrollCapture={
+        scrollHint || onOverflowChange ? updateMoreBelow : undefined
+      }
     >
       <Table
         id="table-main"

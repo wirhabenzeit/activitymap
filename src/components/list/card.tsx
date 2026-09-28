@@ -2,7 +2,7 @@
 
 import {
   Map,
-  ChevronUp,
+  Minus,
   Download,
   MoreHorizontal,
   Pencil,
@@ -25,7 +25,6 @@ import { type Features } from './table-extensions';
 
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -39,6 +38,7 @@ import { LngLatBounds } from 'mapbox-gl';
 import { useShallowStore } from '~/store';
 import { PhotoLightbox } from './photo';
 import { ElevationChart } from './elevation-chart';
+import { RouteDetailsContent } from './route-details-content';
 import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
@@ -338,12 +338,12 @@ export function ActivityCardContent({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-9 w-9 shrink-0"
                 onClick={onCollapse}
                 aria-label="Collapse route details"
-                title="Collapse"
+                title="Collapse route details"
               >
-                <ChevronUp className="h-4 w-4" />
+                <Minus className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
             {onClearSelection && (
@@ -365,7 +365,7 @@ export function ActivityCardContent({
             </CardDescription>
           )}
         </CardHeader>
-        <CardContent className="px-4 pb-4 pt-0 @2xl:grid @2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] @2xl:gap-4">
+        <RouteDetailsContent key={activityId} elevation={elevationProfile}>
           <dl className="grid self-start grid-cols-2 gap-x-5 gap-y-2.5">
             {mapStats.map((stat) => (
               <div className="min-w-0" key={stat.label}>
@@ -401,12 +401,7 @@ export function ActivityCardContent({
               </div>
             )}
           </dl>
-          {elevationProfile && (
-            <div className="mt-3 min-w-0 @2xl:mt-0 @2xl:border-l @2xl:pl-4">
-              {elevationProfile}
-            </div>
-          )}
-        </CardContent>
+        </RouteDetailsContent>
       </Card>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
     </>
