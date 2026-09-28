@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dayFromISODate, isoDate, type StatsActivity } from './tile-data';
+import {
+  consistency,
+  dayFromISODate,
+  isoDate,
+  type StatsActivity,
+} from './tile-data';
 import {
   calendarMonths,
   comparisonYear,
   cumulativeYearPoints,
   volumeDomain,
   yearStart,
+  weeklyActiveDays,
 } from './tile-series';
 
 const activity = (date: string): StatsActivity => ({
@@ -15,6 +21,53 @@ const activity = (date: string): StatsActivity => ({
   distance: 10000,
   moving_time: 3600,
   total_elevation_gain: 100,
+});
+
+void test('weekly active days count unique days, include empty weeks and exclude future activities', () => {
+  const today = dayFromISODate('2026-01-01');
+  const activities = [
+    '2025-12-22',
+    '2025-12-22',
+    '2025-12-28',
+    '2025-12-29',
+    '2026-01-01',
+    '2026-01-02',
+    '2024-01-01',
+  ].map(activity);
+  for (const weeks of [12, 52] as const) {
+    const rows = weeklyActiveDays(activities, today, weeks);
+    assert.equal(rows.length, weeks);
+    assert.deepEqual(rows.at(-1), {
+      start: dayFromISODate('2025-12-29'),
+      activeDays: 2,
+      partial: true,
+    });
+    assert.deepEqual(rows.at(-2), {
+      start: dayFromISODate('2025-12-22'),
+      activeDays: 2,
+      partial: false,
+    });
+    assert.ok(rows.slice(0, -2).every((row) => row.activeDays === 0));
+    assert.equal(rows.filter((row) => row.partial).length, 1);
+    assert.equal(
+      rows.slice(0, -1).reduce((sum, row) => sum + row.activeDays, 0) /
+        (weeks - 1),
+      consistency(activities, today, weeks).activeDaysPerWeek,
+    );
+  }
+});
+
+void test('weekly active days include the first Monday and cap a full week at seven days', () => {
+  const today = dayFromISODate('2026-09-28');
+  const first = today - 11 * 7;
+  const activities = Array.from({ length: 9 }, (_, i) =>
+    activity(isoDate(first + i - 1)),
+  );
+  const rows = weeklyActiveDays([...activities, ...activities], today, 12);
+  assert.equal(rows[0]!.activeDays, 7);
+  assert.equal(rows[1]!.activeDays, 1);
+  assert.equal(rows.at(-1)!.activeDays, 0);
+  assert.equal(rows.at(-1)!.partial, true);
 });
 
 void test('year curves align month/day across leap years and keep February 29 distinct', () => {

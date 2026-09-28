@@ -135,7 +135,7 @@ enum SharedStatsTiles {
             isPrimary: true,
             span: .init(columns: 2, rows: 1),
             isOptional: false,
-            toggle: .init(label: "Metric", options: [.distance, .elevation, .time, .count])
+            toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),
         .init(
             id: .monthVsLastMonth,
@@ -145,7 +145,7 @@ enum SharedStatsTiles {
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
             isOptional: false,
-            toggle: .init(label: "Metric", options: [.elevation, .distance, .time, .count])
+            toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),
         .init(
             id: .yearToDate,
@@ -155,7 +155,7 @@ enum SharedStatsTiles {
             isPrimary: true,
             span: .init(columns: 2, rows: 2),
             isOptional: false,
-            toggle: .init(label: "Metric", options: [.distance, .elevation, .time, .count])
+            toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),
         .init(
             id: .yearPace,
@@ -185,7 +185,7 @@ enum SharedStatsTiles {
             isPrimary: false,
             span: .init(columns: 2, rows: 1),
             isOptional: true,
-            toggle: .init(label: "Metric", options: [.count, .distance, .elevation, .time])
+            toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),
         .init(
             id: .activityCalendar,
@@ -195,7 +195,7 @@ enum SharedStatsTiles {
             isPrimary: false,
             span: .init(columns: 2, rows: 2),
             isOptional: false,
-            toggle: .init(label: "Colour by", options: [.sport, .distance, .elevation, .time])
+            toggle: .init(label: "Colour by", options: [.sport, .distance, .time, .elevation])
         ),
         .init(
             id: .consistency,
@@ -219,7 +219,7 @@ enum SharedStatsTiles {
         ),
         .init(
             id: .distanceVsElevation,
-            title: "Climbing",
+            title: "Hilliness",
             window: .last12Months,
             group: .patterns,
             isPrimary: false,

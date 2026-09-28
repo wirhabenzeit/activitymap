@@ -54,14 +54,30 @@ void test('consistency expansion preserves the selected chart and headline perio
     assert.equal(view.period(context, option), `Last ${weeks} weeks`);
     const sub = view.summary(context, option)!.sub;
     assert.equal(typeof sub, 'string');
-    assert.match(sub as string, new RegExp(`of ${weeks - 1} weeks`));
+    assert.match(sub as string, new RegExp(`${weeks - 1} full weeks`));
     for (const expanded of [false, true]) {
       const html = renderToStaticMarkup(
         view.face(context, option, expanded) as ReactElement,
       );
-      assert.match(html, new RegExp(`Active days, last ${weeks} weeks`));
+      assert.match(html, new RegExp(`Weekly active days, last ${weeks} weeks`));
     }
   }
+});
+
+void test('consistency offers weekly counts instead of a separate rest-day tile', () => {
+  assert.equal(tileView('restDays'), null);
+  const view = tileView('consistency')!;
+  const html = renderToStaticMarkup(
+    view.more!(context, 'last12Weeks') as ReactElement,
+  );
+  assert.match(html, /Week starting/);
+  assert.match(html, /Aug 31, 2026/);
+  assert.match(html, /incomplete/);
+  assert.equal((html.match(/<tr/g) ?? []).length, 13);
+  assert.doesNotMatch(
+    view.summary(context, 'last12Weeks')!.sub as string,
+    /5\+/,
+  );
 });
 
 void test('all-time sport mix uses the same range for summary, chart and table', () => {
@@ -115,55 +131,61 @@ void test('expanded records retain activity identities for drill-down', () => {
   assert.match(html, /<button[^>]*>Fixture ride<\/button>/);
 });
 
-void test('rest-day weeks align weekdays and exclude padding from the 90-day window', () => {
-  const view = tileView('restDays')!;
-  // Tuesday at the end and Thursday at the start exercise both partial weeks.
+void test('records wait for a full within-year 30-day window before comparing totals', () => {
+  assert.equal(tileView('best30Days'), null);
+  const view = tileView('records')!;
   const sample = {
     ...context,
-    activities: [make('2026-06-04', 'ride'), make('2026-09-01', 'run')],
+    activities: [
+      { ...make('2025-12-31', 'ride'), distance: 100000 },
+      make('2026-01-01', 'run'),
+    ],
   };
-  for (const expanded of [false, true]) {
+  for (const date of ['2026-01-01', '2026-01-29']) {
     const html = renderToStaticMarkup(
-      view.face(sample, undefined, expanded) as ReactElement,
+      view.more!(
+        { ...sample, today: dayFromISODate(date) },
+        undefined,
+      ) as ReactElement,
     );
-    const days = html.match(/<button[^>]*>/g) ?? [];
-    assert.equal(days.length, 90);
-    assert.equal(
-      days.filter((day) => day.includes('bg-muted-foreground/25')).length,
-      2,
-    );
-    assert.equal(
-      days.filter((day) => day.includes('bg-orange-600')).length,
-      88,
-    );
-    assert.match(days[0], /Jun 4: activity recorded/);
-    assert.match(days[0], /grid-column:2;grid-row:4/);
-    assert.match(days[89]!, /Sep 1: activity recorded/);
-    assert.match(days[89]!, /grid-column:15;grid-row:2/);
-    assert.equal(days.filter((day) => day.includes('tabindex="0"')).length, 1);
-    assert.match(html, /one column per week, Monday to Sunday/);
-    assert.match(html, /No matching activity/);
-    assert.match(html, /Recorded/);
+    assert.match(html, /first complete 30-day window/);
+    assert.doesNotMatch(html, /Last 30 days:|%/);
   }
-  assert.equal(view.summary(sample, undefined)!.value, '29');
-  assert.equal(view.summary(sample, undefined)!.sub, '88 in the last 90 days');
-});
-
-void test('rest-day weeks cross a year boundary without adding future rest days', () => {
-  const view = tileView('restDays')!;
   const html = renderToStaticMarkup(
-    view.face(
-      { ...context, today: dayFromISODate('2026-01-01'), activities: [] },
+    view.more!(
+      { ...sample, today: dayFromISODate('2026-01-30') },
       undefined,
-      false,
     ) as ReactElement,
   );
-  const days = html.match(/<button[^>]*>/g) ?? [];
-  assert.equal(days.length, 90);
-  assert.match(days[0], /Oct 4: no matching activity/);
-  assert.match(days[0], /grid-column:2;grid-row:6/);
-  assert.match(days[89]!, /Jan 1: no matching activity/);
-  assert.match(days[89]!, /grid-column:15;grid-row:4/);
+  assert.match(html, /Best 30 days/);
+  assert.match(html, /Jan 1.*Jan 30/);
+  assert.match(html, /Last 30 days: 10 km/);
+  assert.equal((html.match(/100%/g) ?? []).length, 6); // Text and bar width for all three metrics.
+  assert.doesNotMatch(html, /1100%/);
+});
+
+void test('records avoid percentages when a complete window has no recorded metric', () => {
+  const html = renderToStaticMarkup(
+    tileView('records')!.more!(
+      { ...context, activities: [] },
+      undefined,
+    ) as ReactElement,
+  );
+  assert.match(html, /No distance recorded this year/);
+  assert.doesNotMatch(html, /NaN|Infinity|%/);
+});
+
+void test('projection headline is the year-end total rather than its daily rate', () => {
+  const summary = tileView('yearPace')!.summary(
+    {
+      ...context,
+      today: dayFromISODate('2026-01-10'),
+      activities: [make('2026-01-01', 'run')],
+    },
+    'distance',
+  )!;
+  assert.equal(summary.value, '365');
+  assert.equal(summary.unit, 'km projected');
 });
 
 void test('expanded training history exposes bounded presets and period totals', () => {
@@ -178,6 +200,9 @@ void test('expanded training history exposes bounded presets and period totals',
   assert.match(html, /2\.0 h/);
   assert.match(html, /Period totals/);
   assert.match(html, /current period is incomplete/);
+  assert.match(html, /Total across the displayed 12 weeks/);
+  assert.equal(view.period(context), '12-week trend');
+  assert.match(view.summary(context, 'distance')!.unit, /last 28 days/);
 });
 
 void test('calendar history supports year and day selection, and mixed days stay identifiable', () => {

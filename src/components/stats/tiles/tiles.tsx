@@ -18,10 +18,8 @@ import {
   consistency,
   dayOf,
   fourWeekVolume,
-  mondayOf,
   monthVsLastMonth,
   records,
-  restDays,
   sportMix,
   thisWeek,
   typicalWeek,
@@ -32,7 +30,7 @@ import {
   type StatsActivity,
 } from '~/lib/stats/tile-data';
 import {
-  activeDayFlags,
+  weeklyActiveDays,
   cumulativeByDay,
   cumulativeYearPoints,
   comparisonYear,
@@ -43,7 +41,6 @@ import {
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
-import { RestDayCalendar } from './calendar';
 import { VolumeHistory, CalendarHistory, ComparisonHistory } from './history';
 import {
   CumulativeLines,
@@ -75,6 +72,8 @@ export type TileContext = {
 export type TileSummary = { value: string; unit: string; sub: ReactNode };
 
 export type TileView = {
+  // Expansion must offer useful details, controls, or a more inspectable chart.
+  expandable: boolean;
   period: (context: TileContext, option?: string) => string;
   // Null leaves the face without a headline number.
   summary: (
@@ -284,6 +283,7 @@ const dayOfYearLabel = (x: number) =>
   shortDate(dateOfDay(yearStart(comparisonYear) + Math.round(x)));
 
 const yearToDateView: TileView = {
+  expandable: true,
   detail: (context, option) =>
     comparisonDetail(yearToDateView, 'year', context, option),
   period: ({ today }) => {
@@ -369,10 +369,11 @@ function rollingFourWeeks(context: TileContext, metric: StatsMetric) {
 }
 
 const weeklyVolumeView: TileView = {
+  expandable: true,
   detail: (context, option) => (
     <VolumeHistory context={context} metric={asMetric(option, 'distance')} />
   ),
-  period: () => 'Last 4 weeks',
+  period: () => '12-week trend',
   summary: (context, option) => {
     const metric = asMetric(option, 'distance');
     const { current, previous } = fourWeekVolume(
@@ -382,13 +383,13 @@ const weeklyVolumeView: TileView = {
     );
     return {
       value: formatMetric(current, metric),
-      unit: `${metricUnit[metric]} · last 4 weeks`,
+      unit: `${metricUnit[metric]} · last 28 days`,
       sub: (
         <Delta
           current={current}
           previous={previous}
           metric={metric}
-          text="vs the 4 weeks before"
+          text="vs previous 28 days"
         />
       ),
     };
@@ -438,6 +439,7 @@ function lastYearStart(today: number) {
 }
 
 const activityCalendarView: TileView = {
+  expandable: true,
   period: () => 'Last 12 months',
   summary: ({ activities, today }) => {
     const { activeDays } = activityCalendar(activities, today);
@@ -514,6 +516,7 @@ function samePeriodLastMonth(today: number) {
 }
 
 const monthVsLastMonthView: TileView = {
+  expandable: true,
   detail: (context, option) =>
     comparisonDetail(monthVsLastMonthView, 'month', context, option),
   period: ({ today }) => {
@@ -524,7 +527,7 @@ const monthVsLastMonthView: TileView = {
     return `${monthName(date)} vs ${monthName(previous)}`;
   },
   summary: ({ activities, today }, option) => {
-    const metric = asMetric(option, 'elevation');
+    const metric = asMetric(option, 'distance');
     const { current, previous } = monthVsLastMonth(activities, today, metric);
     return {
       value: formatMetric(current, metric),
@@ -540,12 +543,13 @@ const monthVsLastMonthView: TileView = {
     };
   },
   face: (context, option, expanded) => {
-    const metric = asMetric(option, 'elevation');
+    const metric = asMetric(option, 'distance');
     return (
       <FillChart expanded={expanded}>
         {({ width, height }) => (
           <CumulativeLines
             series={monthPair(context, metric)}
+            endLabels
             xMax={31}
             width={width}
             height={height}
@@ -565,6 +569,7 @@ const monthVsLastMonthView: TileView = {
 type MixRange = 'currentYear' | 'allTime';
 
 const sportMixView: TileView = {
+  expandable: true,
   period: ({ today }, option) =>
     option === 'allTime'
       ? 'All time by moving time'
@@ -698,6 +703,7 @@ const weeksOf = (option: string | undefined) =>
   option === 'last52Weeks' ? 52 : 12;
 
 const consistencyView: TileView = {
+  expandable: true,
   period: (_context, option) => `Last ${weeksOf(option)} weeks`,
   summary: (context, option) => {
     const result = consistency(
@@ -707,59 +713,87 @@ const consistencyView: TileView = {
     );
     return {
       value: result.activeDaysPerWeek.toFixed(1),
-      unit: 'days / week',
-      sub: `5+ active days in ${result.solidWeeks} of ${weeksOf(option) - 1} weeks`,
+      unit: 'active days / week',
+      sub: `Average over ${weeksOf(option) - 1} full weeks`,
     };
   },
-  // One column per week (Monday on top), one dot per day: filled when
-  // active, hollow when not. Both sizes show the selected range.
-  face: (context, _option, expanded) => {
-    const weeks = weeksOf(_option);
-    const first = mondayOf(context.today) - (weeks - 1) * 7;
-    const flags = activeDayFlags(
-      context.activities,
-      context.today,
-      context.today - first + 1,
-    );
+  face: (context, option, expanded) => {
+    const weeks = weeksOf(option);
+    const rows = weeklyActiveDays(context.activities, context.today, weeks);
     return (
       <div
-        className={cn(
-          'grid grid-flow-col',
-          expanded ? 'mt-4 gap-[2px]' : 'mt-auto gap-[2px]',
-        )}
-        style={{
-          gridTemplateRows: 'repeat(7, minmax(0, 1fr))',
-          gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))`,
-        }}
-        role="img"
-        aria-label={`Active days, last ${weeks} weeks`}
+        className="flex min-h-0 flex-1 flex-col"
+        aria-label={`Weekly active days, last ${weeks} weeks`}
       >
-        {Array.from({ length: weeks * 7 }, (_, index) => {
-          const day = first + index;
-          const active = flags[index];
-          return (
-            <i
-              key={index}
-              className={cn(
-                'mx-auto block rounded-full',
-                'aspect-square w-full max-w-2',
-                day > context.today
-                  ? 'bg-transparent'
-                  : active
-                    ? 'bg-foreground'
-                    : 'border border-muted-foreground/40',
+        <div
+          className={
+            expanded ? 'overflow-x-auto' : 'flex min-h-0 flex-1 flex-col'
+          }
+        >
+          <div
+            className="flex min-h-0 flex-1 flex-col"
+            style={{ minWidth: expanded && weeks === 52 ? 780 : undefined }}
+          >
+            <FillChart expanded={expanded}>
+              {({ width, height }) => (
+                <PlainBars
+                  rows={rows.map((week) => ({
+                    x: String(week.start),
+                    value: week.activeDays,
+                    highlight: week.partial,
+                  }))}
+                  width={width}
+                  height={height}
+                  palette={context.palette}
+                  detail={expanded}
+                  yDomain={[0, 7]}
+                  ariaLabel={`Weekly active days, last ${weeks} weeks, zero to seven days`}
+                  valueFormat={(value) =>
+                    `${value} active ${value === 1 ? 'day' : 'days'}`
+                  }
+                  xTickFormat={(x) => shortDate(dateOfDay(Number(x)))}
+                />
               )}
-              title={
-                day > context.today
-                  ? undefined
-                  : `${shortDate(dateOfDay(day))}: ${active ? 'active' : 'rest day'}`
-              }
-            />
-          );
-        })}
+            </FillChart>
+          </div>
+        </div>
+        <p className="mt-1 shrink-0 text-[10px] text-muted-foreground">
+          0–7 days · Last bar: current week, incomplete
+        </p>
       </div>
     );
   },
+  more: (context, option) => (
+    <details className="mt-3 text-xs">
+      <summary className="cursor-pointer text-muted-foreground">
+        Weekly active days
+      </summary>
+      <table className="mt-2 w-full text-left">
+        <thead>
+          <tr>
+            <th className="py-1 font-medium">Week starting</th>
+            <th className="text-right font-medium">Active days</th>
+          </tr>
+        </thead>
+        <tbody>
+          {weeklyActiveDays(
+            context.activities,
+            context.today,
+            weeksOf(option),
+          ).map((week) => (
+            <tr key={week.start} className="border-t border-muted">
+              <td className="py-1">
+                {shortDate(dateOfDay(week.start))},{' '}
+                {dateOfDay(week.start).getUTCFullYear()}
+                {week.partial ? ' · incomplete' : ''}
+              </td>
+              <td className="text-right font-mono">{week.activeDays}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
+  ),
 };
 
 // Distance vs elevation -----------------------------------------------------
@@ -767,6 +801,7 @@ const consistencyView: TileView = {
 // Climbing is a trend: how hilly the last 12 months were, month by month,
 // against the 12 months before.
 const distanceVsElevationView: TileView = {
+  expandable: true,
   period: () => 'Last 12 months',
   summary: ({ activities, today }) => {
     const { current, previous } = climbing(activities, today);
@@ -897,6 +932,7 @@ const distanceVsElevationView: TileView = {
 const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const thisWeekView: TileView = {
+  expandable: false,
   period: () => 'This week',
   // Compared with a typical week up to the same weekday, so an early-week
   // total is not held against a full week.
@@ -964,6 +1000,7 @@ const thisWeekView: TileView = {
 const decimal = (value: number) => value.toFixed(1);
 
 const typicalWeekView: TileView = {
+  expandable: false,
   period: () => 'Last 11 full weeks',
   summary: ({ activities, today }) => {
     const week = typicalWeek(activities, today);
@@ -1003,17 +1040,15 @@ const paceUnit: Record<StatsMetric, string> = {
 };
 
 const yearPaceView: TileView = {
+  expandable: false,
   period: ({ today }) => `${dateOfDay(today).getUTCFullYear()} projection`,
   summary: ({ activities, today }, option) => {
     const metric = asMetric(option, 'distance');
     const pace = yearPace(activities, today, metric);
     return {
-      value:
-        metric === 'elevation'
-          ? formatMetric(pace.perDay, metric)
-          : decimal(pace.perDay),
-      unit: paceUnit[metric],
-      sub: 'this year so far, projected to Dec 31',
+      value: formatMetric(pace.projected, metric),
+      unit: `${metricUnit[metric]} projected`,
+      sub: 'By Dec 31 at the current daily average',
     };
   },
   face: ({ activities, today }, option) => {
@@ -1048,11 +1083,13 @@ const yearPaceView: TileView = {
             unit={unit}
           />
           <Stat
-            label={
-              <LegendLabel swatch="bg-foreground/25">Projected</LegendLabel>
+            label="Daily average"
+            value={
+              metric === 'elevation'
+                ? formatMetric(pace.perDay, metric)
+                : decimal(pace.perDay)
             }
-            value={formatMetric(pace.projected, metric)}
-            unit={unit}
+            unit={paceUnit[metric]}
           />
           <Stat
             label={
@@ -1066,54 +1103,6 @@ const yearPaceView: TileView = {
             unit={pace.lastYear > 0 ? unit : undefined}
           />
         </div>
-      </div>
-    );
-  },
-  more: ({ activities, today }) => {
-    const year = dateOfDay(today).getUTCFullYear();
-    return (
-      <div className="overflow-x-auto">
-        <table className="mt-5 w-full text-sm">
-          <thead>
-            <tr className="border-b text-xs text-muted-foreground">
-              <th className="py-1.5 text-left font-medium" />
-              {['Per day', 'So far', 'Projected', String(year - 1)].map(
-                (label) => (
-                  <th
-                    key={label}
-                    className="px-2 py-1.5 text-right font-medium"
-                  >
-                    {label}
-                  </th>
-                ),
-              )}
-            </tr>
-          </thead>
-          <tbody className="font-mono tabular-nums">
-            {(['distance', 'time', 'elevation'] as const).map((metric) => {
-              const pace = yearPace(activities, today, metric);
-              return (
-                <tr key={metric} className="border-b border-muted">
-                  <td className="py-1.5 font-sans">{metricLabel[metric]}</td>
-                  <td className="px-2 text-right">
-                    {metric === 'elevation'
-                      ? formatWithUnit(pace.perDay, metric)
-                      : `${decimal(pace.perDay)} ${metricUnit[metric]}`}
-                  </td>
-                  <td className="px-2 text-right">
-                    {formatWithUnit(pace.current, metric)}
-                  </td>
-                  <td className="px-2 text-right">
-                    {formatWithUnit(pace.projected, metric)}
-                  </td>
-                  <td className="px-2 text-right">
-                    {formatWithUnit(pace.lastYear, metric)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
       </div>
     );
   },
@@ -1198,6 +1187,7 @@ function RecordStats({
 }
 
 const recordsView: TileView = {
+  expandable: true,
   period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
   // No headline: the records sit side by side so none competes with the
   // year's total.
@@ -1214,85 +1204,93 @@ const recordsView: TileView = {
       </div>
     );
   },
-  more: ({ activities, today, onOpenActivity }) => {
+  more: (context) => {
+    const { activities, today, onOpenActivity } = context;
     const best = records(activities, today, 'allTime');
     return (
-      <div className="mt-5 border-t pt-3">
-        <h4 className="mb-2 text-xs font-medium text-muted-foreground">
-          All time
-        </h4>
-        <RecordStats best={best} detailed onOpenActivity={onOpenActivity} />
-      </div>
+      <>
+        <Best30DayRecords context={context} />
+        <div className="mt-5 border-t pt-3">
+          <h4 className="mb-2 text-xs font-medium text-muted-foreground">
+            All time
+          </h4>
+          <RecordStats best={best} detailed onOpenActivity={onOpenActivity} />
+        </div>
+      </>
     );
   },
 };
 
 // Best 30 days ---------------------------------------------------------------
 
-const best30DaysView: TileView = {
-  period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
-  summary: ({ activities, today }, option) => {
-    const metric = asMetric(option, 'distance');
-    const best = best30Days(activities, today, metric);
-    if (best.total === 0)
-      return { value: '–', unit: '', sub: 'No activities this year yet' };
-    return {
-      value: formatMetric(best.total, metric),
-      unit: metricUnit[metric],
-      sub: `${shortDate(dateOfDay(best.start))} – ${shortDate(dateOfDay(best.end))}`,
-    };
-  },
-  face: ({ activities, today }, option) => {
-    const metric = asMetric(option, 'distance');
-    const best = best30Days(activities, today, metric);
-    const share = best.total > 0 ? best.current / best.total : 0;
-    return (
-      <div className="mt-auto">
-        <div className="flex justify-between gap-2 text-[11px] text-muted-foreground">
-          <span className="truncate">
-            Last 30 days {formatWithUnit(best.current, metric)}
-          </span>
-          <span className="font-mono tabular-nums">
-            {Math.round(share * 100)}%
-          </span>
+function Best30DayRecords({ context }: { context: TileContext }) {
+  const { activities, today } = context;
+  const year = dateOfDay(today).getUTCFullYear();
+  const hasFullWindow = today - yearStart(year) + 1 >= 30;
+  return (
+    <section className="mt-5 border-t pt-3" aria-label="Best 30 days">
+      <h4 className="mb-2 text-xs font-medium text-muted-foreground">
+        Best 30 days · {year}
+      </h4>
+      {!hasFullWindow ? (
+        <p className="text-sm text-muted-foreground">
+          The first complete 30-day window this year ends on Jan 30.
+        </p>
+      ) : (
+        <div className="grid gap-4 @min-[600px]:grid-cols-3">
+          {(['distance', 'time', 'elevation'] as const).map((metric) => {
+            const best = best30Days(activities, today, metric);
+            const share = best.total > 0 ? best.current / best.total : null;
+            return (
+              <div key={metric}>
+                <Stat
+                  label={metricLabel[metric]}
+                  value={
+                    best.total > 0 ? formatMetric(best.total, metric) : '–'
+                  }
+                  unit={best.total > 0 ? metricUnit[metric] : undefined}
+                />
+                {share === null ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    No {metricLabel[metric].toLowerCase()} recorded this year.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {shortDate(dateOfDay(best.start))} –{' '}
+                      {shortDate(dateOfDay(best.end))}
+                    </p>
+                    <div className="mt-2 flex justify-between gap-2 text-xs">
+                      <span>
+                        Last 30 days: {formatWithUnit(best.current, metric)}
+                      </span>
+                      <span className="font-mono">
+                        {Math.round(share * 100)}%
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-sm bg-muted">
+                      <div
+                        className="h-full rounded-sm bg-foreground"
+                        style={{ width: `${share * 100}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      of the best 30 days
+                    </p>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
-        <div className="mt-1 h-2 overflow-hidden rounded-sm bg-muted">
-          <div
-            className="h-full rounded-sm bg-foreground"
-            style={{ width: `${Math.min(1, share) * 100}%` }}
-          />
-        </div>
-        <div className="mt-1 text-[11px] text-muted-foreground">
-          of the best 30 days
-        </div>
-      </div>
-    );
-  },
-};
-
-// Rest days ------------------------------------------------------------------
-
-const restDaysView: TileView = {
-  period: () => 'Last 90 days',
-  summary: ({ activities, today }) => {
-    const { last30, last90 } = restDays(activities, today);
-    return {
-      value: String(last30),
-      unit: 'in 30 days',
-      sub: `${last90} in the last 90 days`,
-    };
-  },
-  face: ({ activities, today }, _option, expanded) => (
-    <RestDayCalendar
-      today={today}
-      flags={activeDayFlags(activities, today, 90)}
-      expanded={expanded}
-    />
-  ),
-};
+      )}
+    </section>
+  );
+}
 
 // Speed trend is optional in the manifest and has no rules or fixtures yet,
-// so no platform draws it. Totals is folded into Year to date and Pace.
+// so no platform draws it. Totals is folded into Year to date and Pace;
+// Rest days is consolidated into Consistency, and Best 30 days into Records on the web.
 export function tileView(id: StatsTileID): TileView | null {
   switch (id) {
     case 'thisWeek':
@@ -1304,9 +1302,9 @@ export function tileView(id: StatsTileID): TileView | null {
     case 'records':
       return recordsView;
     case 'best30Days':
-      return best30DaysView;
+      return null;
     case 'restDays':
-      return restDaysView;
+      return null;
     case 'yearToDate':
       return yearToDateView;
     case 'totals':

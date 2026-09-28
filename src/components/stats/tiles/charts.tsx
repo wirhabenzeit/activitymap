@@ -481,6 +481,8 @@ export function PlainBars({
   palette,
   valueFormat,
   xTickFormat,
+  yDomain,
+  ariaLabel = 'Bars',
 }: {
   rows: PlainBar[];
   width: number;
@@ -490,6 +492,8 @@ export function PlainBars({
   palette: TilePalette;
   valueFormat: (value: number) => string;
   xTickFormat?: (x: string) => string;
+  yDomain?: [number, number];
+  ariaLabel?: string;
 }) {
   const definition = defineChart({
     marks: [
@@ -521,8 +525,8 @@ export function PlainBars({
           : false,
       },
       y: {
-        scale: d3.scaleLinear,
-        nice: true,
+        scale: yDomain ? d3.scaleLinear().domain(yDomain) : d3.scaleLinear,
+        nice: !yDomain,
         axis: detail ? { ticks: { format: formatShort } } : false,
       },
     },
@@ -553,7 +557,7 @@ export function PlainBars({
       definition={definition}
       width={width}
       height={height}
-      ariaLabel="Bars"
+      ariaLabel={ariaLabel}
     />
   );
 }
