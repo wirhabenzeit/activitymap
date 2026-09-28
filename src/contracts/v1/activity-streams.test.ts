@@ -95,3 +95,48 @@ void test('SQL invalidation projection tracks the documented source fields', () 
   );
   assert.deepEqual(fields, [...STREAM_SOURCE_FIELDS]);
 });
+
+void test('compact and legacy endpoints preserve identical samples and stale/absent states', async () => {
+  const { toActivityStreamSummaryDTO, toCompactStreamSummaryDTO } =
+    await import('./activity-streams');
+  const { encodeStreamSummary, decodeStreamSummary } =
+    await import('~/lib/streams/compact-summary');
+  const summary = {
+    version: 1,
+    basis: 'distance' as const,
+    distance: [0, 0.1, 30],
+    altitude: [-1, 0, 12.3],
+  };
+  for (const stored of [summary, encodeStreamSummary(summary)]) {
+    const read = {
+      activityId: streamSnapshotFixture.activityId,
+      row: { ...streamSnapshotFixture, summary: stored },
+    };
+    const compact = toCompactStreamSummaryDTO(read);
+    assert.deepEqual(toActivityStreamSummaryDTO(read).summary, summary);
+    assert.deepEqual(decodeStreamSummary(compact.summary), summary);
+    assert.equal(typeof compact.summary!.altitude, 'string');
+    assert.equal(
+      toCompactStreamSummaryDTO({
+        ...read,
+        row: { ...read.row, invalidatedAt: now },
+      }).summary,
+      null,
+    );
+    assert.equal(
+      toActivityStreamSummaryDTO({
+        ...read,
+        row: { ...read.row, invalidatedAt: now },
+      }).summary,
+      null,
+    );
+  }
+  assert.equal(
+    toCompactStreamSummaryDTO({ activityId: '1', row: null }).summary,
+    null,
+  );
+  assert.equal(
+    toCompactStreamSummaryDTO({ activityId: '1', row: null }).metadata.state,
+    'not_fetched',
+  );
+});

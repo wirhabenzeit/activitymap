@@ -9,7 +9,8 @@ export const STREAM_SUMMARY_POINTS = 300;
 const series = z.array(z.number());
 /**
  * Downsampled, index-aligned streams: every present array has one entry per
- * point. `basis` is the axis the points are evenly spaced along.
+ * point. `basis` selects equal-width sampling buckets. Returned axis values are
+ * bucket means; empty buckets are omitted, so actual positions are irregular.
  */
 export const streamSummarySchema = z.object({
   version: z.number().int().positive(),

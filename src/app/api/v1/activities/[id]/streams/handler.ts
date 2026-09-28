@@ -4,6 +4,8 @@ import type { Actor } from '~/server/auth/actor';
 import { errorEnvelope } from '~/contracts/v1/error';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import {
+  activityCompactStreamSummaryDTOSchema,
+  toCompactStreamSummaryDTO,
   activityStreamSummaryDTOSchema,
   activityStreamsDTOSchema,
   toActivityStreamSummaryDTO,
@@ -28,12 +30,14 @@ export function createActivityStreamsHandler(deps: {
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
   /** `summary` serves the downsampled streams instead of the raw samples. */
-  view?: 'raw' | 'summary';
+  view?: 'raw' | 'summary' | 'compact';
 }) {
   const path =
-    deps.view === 'summary'
-      ? /^\/api\/v1\/activities\/([^/]+)\/streams\/summary\/?$/
-      : /^\/api\/v1\/activities\/([^/]+)\/streams\/?$/;
+    deps.view === 'compact'
+      ? /^\/api\/v1\/activities\/([^/]+)\/streams\/summary\/compact\/?$/
+      : deps.view === 'summary'
+        ? /^\/api\/v1\/activities\/([^/]+)\/streams\/summary\/?$/
+        : /^\/api\/v1\/activities\/([^/]+)\/streams\/?$/;
   return async (request: Request): Promise<Response> => {
     const requestId = requestIdFor(request);
     const headers = {
@@ -112,12 +116,21 @@ export function createActivityStreamsHandler(deps: {
         ...headers,
         ...(status === 202 ? { 'Retry-After': '3' } : {}),
       };
-      if (deps.view === 'summary') {
+      if (deps.view === 'summary' || deps.view === 'compact') {
         const [read] = await deps.repository.readSummaries(actor, [id]);
         if (!read) throw new ActivityStreamsUnavailableError();
         return Response.json(
-          responseEnvelope(activityStreamSummaryDTOSchema).parse(
-            makeEnvelope(toActivityStreamSummaryDTO(read), now()),
+          responseEnvelope(
+            deps.view === 'compact'
+              ? activityCompactStreamSummaryDTOSchema
+              : activityStreamSummaryDTOSchema,
+          ).parse(
+            makeEnvelope(
+              deps.view === 'compact'
+                ? toCompactStreamSummaryDTO(read)
+                : toActivityStreamSummaryDTO(read),
+              now(),
+            ),
           ),
           { status, headers: responseHeaders },
         );

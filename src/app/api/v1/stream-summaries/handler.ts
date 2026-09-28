@@ -2,6 +2,8 @@ import type { Actor } from '~/server/auth/actor';
 import { errorEnvelope } from '~/contracts/v1/error';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import {
+  activityCompactStreamSummariesDTOSchema,
+  toCompactStreamSummaryDTO,
   activityStreamSummariesDTOSchema,
   toActivityStreamSummaryDTO,
 } from '~/contracts/v1/activity-streams';
@@ -22,6 +24,7 @@ export const STREAM_SUMMARIES_MAX_IDS = 100;
 export function createStreamSummariesHandler(deps: {
   resolveActor: (request: Request) => Promise<Actor | null>;
   repository: Pick<ActivityStreamsRepository, 'readSummaries'>;
+  compact?: boolean;
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
 }) {
@@ -60,9 +63,19 @@ export function createStreamSummariesHandler(deps: {
       const reads = await deps.repository.readSummaries(actor, ids);
       const now = deps.now ?? (() => new Date());
       return Response.json(
-        responseEnvelope(activityStreamSummariesDTOSchema).parse(
+        responseEnvelope(
+          deps.compact
+            ? activityCompactStreamSummariesDTOSchema
+            : activityStreamSummariesDTOSchema,
+        ).parse(
           makeEnvelope(
-            { summaries: reads.map(toActivityStreamSummaryDTO) },
+            {
+              summaries: reads.map((read) =>
+                deps.compact
+                  ? toCompactStreamSummaryDTO(read)
+                  : toActivityStreamSummaryDTO(read),
+              ),
+            },
             now(),
           ),
         ),

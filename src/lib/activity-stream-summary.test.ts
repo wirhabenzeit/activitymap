@@ -1,3 +1,4 @@
+import { encodeStreamSummary } from './streams/compact-summary';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
@@ -7,7 +8,7 @@ import type * as ReactQuery from '@tanstack/react-query';
 
 import { makeEnvelope } from '~/contracts/v1/envelope';
 import type {
-  ActivityStreamSummaryDTO,
+  ActivityCompactStreamSummaryDTO,
   StreamMetadata,
 } from '~/contracts/v1/activity-streams';
 import {
@@ -22,6 +23,7 @@ import {
   reconcileStreamSummaryMetadata,
   streamSummaryQueryKey,
   streamSummaryRefetchInterval,
+  toElevationProfile,
   type FetchLike,
   type StreamSummaryResult,
 } from './activity-stream-summary.ts';
@@ -56,23 +58,23 @@ const metadata = (overrides: Partial<StreamMetadata> = {}): StreamMetadata => ({
 });
 
 const summary = (
-  overrides: Partial<ActivityStreamSummaryDTO> = {},
-): ActivityStreamSummaryDTO => ({
+  overrides: Partial<ActivityCompactStreamSummaryDTO> = {},
+): ActivityCompactStreamSummaryDTO => ({
   activity_id: '42',
   metadata: metadata(),
-  summary: {
+  summary: encodeStreamSummary({
     version: 1,
     basis: 'distance',
     distance: [0, 100, 200],
     altitude: [500, 520, 510],
-  },
+  }),
   last_error: null,
   next_retry_at: null,
   ...overrides,
 });
 
 const success = (
-  entry: ActivityStreamSummaryDTO,
+  entry: ActivityCompactStreamSummaryDTO,
   options: { status?: number; retryAfter?: string } = {},
 ) =>
   Response.json(makeEnvelope(entry, new Date(NOW)), {
@@ -225,7 +227,7 @@ void test('unavailable summaries are terminal while omitted batch entries remain
     fetchImpl: async () =>
       success(
         summary({
-          summary: { version: 1, basis: null },
+          summary: encodeStreamSummary({ version: 1, basis: null }),
         }),
       ),
     now: () => NOW,
@@ -262,9 +264,7 @@ void test('stored-only summary requests deduplicate and never exceed 100 IDs', a
         .split(',');
       assert.equal(requested.length, 100);
       assert.equal(new Set(requested).size, 100);
-      return Response.json(
-        makeEnvelope({ summaries: [] }, new Date(NOW)),
-      );
+      return Response.json(makeEnvelope({ summaries: [] }, new Date(NOW)));
     },
     now: () => NOW,
   });
@@ -272,7 +272,7 @@ void test('stored-only summary requests deduplicate and never exceed 100 IDs', a
 
 void test('pending reopen scheduling waits until Retry-After and never disables an overdue poll', () => {
   const pending: StreamSummaryResult = {
-    profile: null,
+    summary: null,
     metadata: metadata({ state: 'not_fetched', fetch_status: 'pending' }),
     requestedAgainst: metadata({ state: 'not_fetched' }),
     status: 'pending',
@@ -288,7 +288,12 @@ void test('pending reopen scheduling waits until Retry-After and never disables 
 void test('same-generation direct data beats delayed older sync metadata but newer revisions invalidate it', () => {
   const requestedAgainst = metadata({ revision: '1' });
   const result: StreamSummaryResult = {
-    profile: { distance: [0, 1], altitude: [5, 6] },
+    summary: encodeStreamSummary({
+      version: 1,
+      basis: 'distance',
+      distance: [0, 1],
+      altitude: [5, 6],
+    }),
     metadata: metadata({ revision: '3' }),
     requestedAgainst,
     status: 'ready',
@@ -359,7 +364,7 @@ void test('metadata reconciliation preserves matching pending/unavailable states
   const activityId = '42';
   const observed = metadata({ state: 'not_fetched', fetch_status: 'pending' });
   const pending: StreamSummaryResult = {
-    profile: null,
+    summary: null,
     metadata: observed,
     requestedAgainst: observed,
     status: 'pending',
@@ -399,7 +404,12 @@ void test('metadata invalidation resets and reloads a mounted query observer', a
   const oldMetadata = metadata({ generation: 'old', revision: '2' });
   const newMetadata = metadata({ generation: 'new', revision: '1' });
   const oldResult: StreamSummaryResult = {
-    profile: { distance: [0, 1], altitude: [5, 6] },
+    summary: encodeStreamSummary({
+      version: 1,
+      basis: 'distance',
+      distance: [0, 1],
+      altitude: [5, 6],
+    }),
     metadata: oldMetadata,
     requestedAgainst: oldMetadata,
     status: 'ready',
@@ -464,7 +474,12 @@ void test('metadata change fences an in-flight first request with no cached data
   const oldMetadata = metadata({ generation: 'old', revision: '2' });
   const newMetadata = metadata({ generation: 'new', revision: '1' });
   const result = (source: StreamMetadata): StreamSummaryResult => ({
-    profile: { distance: [0, 1], altitude: [5, 6] },
+    summary: encodeStreamSummary({
+      version: 1,
+      basis: 'distance',
+      distance: [0, 1],
+      altitude: [5, 6],
+    }),
     metadata: source,
     requestedAgainst: source,
     status: 'ready',
@@ -530,3 +545,75 @@ void test('metadata change fences an in-flight first request with no cached data
   );
   unsubscribe();
 });
+
+void test('prefetch retains only encoded samples; decoding is deferred to the visible chart', async () => {
+  const { toElevationProfile } = await import('./activity-stream-summary');
+  const batch = await fetchStoredStreamSummaryBatch({
+    activityIds: ['42'],
+    userId: 'compact-prefetch-proof',
+    signal: new AbortController().signal,
+    fetchImpl: async (url) => {
+      assert.match(url, /stream-summaries\/compact\?ids=42/);
+      return Response.json(
+        makeEnvelope({ summaries: [summary()] }, new Date(NOW)),
+      );
+    },
+  });
+  const result = batch.get('42')!;
+  assert.equal(typeof result.summary!.altitude, 'string');
+  assert.equal('profile' in result, false);
+  assert.deepEqual(
+    toElevationProfile({ metadata: result.metadata!, summary: result.summary }),
+    {
+      altitude: [500, 520, 510],
+      distance: [0, 100, 200],
+    },
+  );
+  // A malformed payload cannot crash a chart or become fabricated samples.
+  assert.equal(
+    toElevationProfile({
+      metadata: result.metadata!,
+      summary: { ...result.summary!, altitude: '_' },
+    }),
+    null,
+  );
+});
+
+for (const [name, distance, ready] of [
+  ['stationary', [0, 0, 0], false],
+  ['regression', [0, 10, 5], false],
+  ['paused then advancing', [0, 0, 10], true],
+  ['advancing', [0, 10, 20], true],
+] as const) {
+  void test(`direct and batch readiness matches the chart for ${name} time-based summaries`, async () => {
+    const entry = summary({
+      summary: encodeStreamSummary({
+        version: 1,
+        basis: 'time',
+        time: [0, 10, 20],
+        distance: [...distance],
+        altitude: [5, 6, 7],
+      }),
+    });
+    const direct = await fetchActivityStreamSummary({
+      activityId: '42',
+      userId: `readiness-${name}`,
+      signal: new AbortController().signal,
+      fetchImpl: async () => success(entry),
+      now: () => NOW,
+    });
+    const batch = await fetchStoredStreamSummaryBatch({
+      activityIds: ['42'],
+      userId: `batch-readiness-${name}`,
+      signal: new AbortController().signal,
+      fetchImpl: async () =>
+        Response.json(makeEnvelope({ summaries: [entry] }, new Date(NOW))),
+      now: () => NOW,
+    });
+    assert.equal(Boolean(toElevationProfile(entry)), ready);
+    assert.equal(direct.status, ready ? 'ready' : 'unavailable');
+    assert.equal(batch.get('42')?.status, direct.status);
+    assert.equal(direct.retryAt, null);
+    assert.equal(batch.get('42')?.retryAt, null);
+  });
+}
