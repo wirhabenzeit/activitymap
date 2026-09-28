@@ -1,0 +1,192 @@
+[
+  {
+    "name": "absent-axis",
+    "summary": {
+      "version": 1,
+      "basis": null
+    },
+    "compact": {
+      "codec": "polyline-v1",
+      "version": 1,
+      "basis": null,
+      "count": 0
+    }
+  },
+  {
+    "name": "empty-axis",
+    "summary": {
+      "version": 1,
+      "basis": "distance",
+      "distance": [],
+      "altitude": []
+    },
+    "compact": {
+      "codec": "polyline-v1",
+      "version": 1,
+      "basis": "distance",
+      "count": 0,
+      "distance": "",
+      "altitude": ""
+    }
+  },
+  {
+    "name": "irregular-signed-zero",
+    "summary": {
+      "version": 1,
+      "basis": "distance",
+      "distance": [
+        0,
+        0,
+        0.1,
+        35.7,
+        40
+      ],
+      "time": [
+        0,
+        2,
+        7,
+        19,
+        20
+      ],
+      "altitude": [
+        -3.2,
+        -3.2,
+        0,
+        12.1,
+        -1.1
+      ],
+      "watts": [
+        0,
+        725,
+        80,
+        0,
+        200
+      ],
+      "heartrate": [
+        0,
+        120,
+        140,
+        140,
+        90
+      ],
+      "latlng": [
+        [
+          0,
+          0
+        ],
+        [
+          1e-05,
+          -1e-05
+        ],
+        [
+          45,
+          179.99999
+        ],
+        [
+          45,
+          -179.99999
+        ],
+        [
+          -45,
+          0
+        ]
+      ]
+    },
+    "compact": {
+      "codec": "polyline-v1",
+      "version": 1,
+      "basis": "distance",
+      "count": 5,
+      "time": "?CIWA",
+      "distance": "??AgUuA",
+      "altitude": "~@?_AqFfG",
+      "watts": "?il@hg@~CoK",
+      "heartrate": "?oFg@?bB",
+      "latlng": "??A@}`tqG_gsia@?zngtcA~bidP}fsia@"
+    }
+  },
+  {
+    "name": "time-only",
+    "summary": {
+      "version": 1,
+      "basis": "time",
+      "time": [
+        0,
+        1,
+        9
+      ],
+      "heartrate": [
+        0,
+        100,
+        90
+      ]
+    },
+    "compact": {
+      "codec": "polyline-v1",
+      "version": 1,
+      "basis": "time",
+      "count": 3,
+      "time": "?AO",
+      "heartrate": "?gER"
+    }
+  },
+  {
+    "name": "google-gps",
+    "summary": {
+      "version": 1,
+      "basis": "distance",
+      "distance": [
+        0,
+        1,
+        2
+      ],
+      "latlng": [
+        [
+          38.5,
+          -120.2
+        ],
+        [
+          40.7,
+          -120.95
+        ],
+        [
+          43.252,
+          -126.453
+        ]
+      ]
+    },
+    "compact": {
+      "codec": "polyline-v1",
+      "version": 1,
+      "basis": "distance",
+      "count": 3,
+      "distance": "?SS",
+      "latlng": "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
+    }
+  },
+  {
+    "name": "beyond-int32",
+    "summary": {
+      "version": 1,
+      "basis": "distance",
+      "distance": [
+        0,
+        300000000,
+        0
+      ],
+      "altitude": [
+        109951162777.5,
+        -109951162777.5,
+        0
+      ]
+    },
+    "compact": {
+      "codec": "polyline-v1",
+      "version": 1,
+      "basis": "distance",
+      "count": 3,
+      "distance": "?__n`yqD~~m`yqD",
+      "altitude": "}~~~~~~~@z~~~~~~~B}~~~~~~~@"
+    }
+  }
+]

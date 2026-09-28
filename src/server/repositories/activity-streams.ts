@@ -32,6 +32,8 @@ import {
   type StreamSummary,
 } from '~/server/strava/stream-summary';
 
+import { encodeStreamSummary, type StoredStreamSummary } from '~/lib/streams/compact-summary';
+
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type StoredStreams = typeof activityStreams.$inferSelect;
 export type StreamSnapshot = Omit<StoredStreams, 'activityId' | 'revision'> & {
@@ -160,6 +162,14 @@ async function lockClaim(tx: Transaction, claim: StreamFetchClaim) {
   return source;
 }
 
+/** Reader-only/rollback deployments can keep writing legacy JSON. */
+function storeSummary(summary: StreamSummary): StoredStreamSummary {
+  const format = process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT ?? 'polyline-v1';
+  if (format === 'json') return summary;
+  if (format !== 'polyline-v1') throw new Error('Invalid stream summary storage format');
+  return encodeStreamSummary(summary);
+}
+
 export function createActivityStreamsRepository(database: typeof db = db) {
   return {
     async isCurrent(claim: StreamFetchClaim): Promise<boolean> {
@@ -226,7 +236,7 @@ export function createActivityStreamsRepository(database: typeof db = db) {
             reads.push({ activityId: ownedId, row: null });
             continue;
           }
-          let summary: StreamSummary | null = stream.summary;
+          let summary: StoredStreamSummary | null = stream.summary;
           if (
             stream.fetchedAt &&
             !stream.invalidatedAt &&
@@ -237,7 +247,7 @@ export function createActivityStreamsRepository(database: typeof db = db) {
               .from(activityStreams)
               .where(eq(activityStreams.activityId, stream.activityId));
             if (stored?.payload) {
-              summary = summarizeStreams(stored.payload);
+              summary = storeSummary(summarizeStreams(stored.payload));
               // Guard on revision so a concurrent commit's summary wins.
               await tx
                 .update(activityStreams)
@@ -355,7 +365,7 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           .update(activityStreams)
           .set({
             payload,
-            summary: summarizeStreams(payload),
+            summary: storeSummary(summarizeStreams(payload)),
             availableTypes: ACTIVITY_STREAM_TYPES.filter(
               (type) => payload[type] !== undefined,
             ),

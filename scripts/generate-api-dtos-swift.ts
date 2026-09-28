@@ -33,8 +33,12 @@ import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
 
+import { compactStreamSummarySchema } from '../src/lib/streams/compact-summary';
+import { streamSummarySchema } from '../src/server/strava/stream-summary';
 import { authenticationDTOSchema } from '../src/contracts/v1/auth';
 import { streamTypeSchema, streamFreshnessSchema, streamFetchStatusSchema, streamFailureCodeSchema,
+  activityCompactStreamSummaryDTOSchema, activityCompactStreamSummariesDTOSchema,
+  activityStreamSummaryDTOSchema, activityStreamSummariesDTOSchema,
   streamMetadataSchema, timeStreamSchema, distanceStreamSchema, latlngStreamSchema, altitudeStreamSchema,
   wattsStreamSchema, heartrateStreamSchema, rawStreamsDTOSchema, activityStreamsDTOSchema,
 } from '../src/contracts/v1/activity-streams';
@@ -92,6 +96,12 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['LatlngStream', latlngStreamSchema], ['AltitudeStream', altitudeStreamSchema],
   ['WattsStream', wattsStreamSchema], ['HeartrateStream', heartrateStreamSchema],
   ['RawStreams', rawStreamsDTOSchema], ['ActivityStreams', activityStreamsDTOSchema],
+  ['StreamSummary', streamSummarySchema],
+  ['ActivityStreamSummary', activityStreamSummaryDTOSchema],
+  ['ActivityStreamSummaries', activityStreamSummariesDTOSchema],
+  ['CompactStreamSummary', compactStreamSummarySchema],
+  ['ActivityCompactStreamSummary', activityCompactStreamSummaryDTOSchema],
+  ['ActivityCompactStreamSummaries', activityCompactStreamSummariesDTOSchema],
   ['GeometryState', geometryStateSchema],
   ['PhotosState', photosStateSchema],
   ['SyncResource', syncResourceSchema],

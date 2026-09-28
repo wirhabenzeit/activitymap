@@ -65,6 +65,8 @@ jobs:
         run: |
           git fetch origin +refs/heads/main:refs/remotes/origin/main --depth=1
           bash scripts/verify-stream-dtos.sh origin/main
+      - name: Verify compact summary codecs and encoded cache round trips
+        run: bash scripts/verify-compact-stream-codec.sh
       # Compile the app and its test target without starting a simulator. Native
       # rendering and app-hosted runtime tests are run locally before review;
       # simulator startup on this preview runner can take several minutes.

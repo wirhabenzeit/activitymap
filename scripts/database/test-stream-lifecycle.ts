@@ -19,11 +19,15 @@ import { createActivityStreamsHandler } from '../../src/app/api/v1/activities/[i
 import { toActivityDTO } from '../../src/contracts/v1/activity';
 import {
   activityStreamSummariesDTOSchema,
+  activityCompactStreamSummaryDTOSchema,
+  activityCompactStreamSummariesDTOSchema,
   activityStreamSummaryDTOSchema,
   activityStreamsDTOSchema,
   toActivityStreamsDTO,
 } from '../../src/contracts/v1/activity-streams';
 import { RAW_STREAMS_FIXTURE } from '../../src/server/strava/streams.fixture';
+import { encodeStreamSummary } from '../../src/lib/streams/compact-summary';
+import { convertStreamSummaryBatch } from '../../src/server/repositories/stream-summary-storage';
 import { summarizeStreams } from '../../src/server/strava/stream-summary';
 import { createStreamSummariesHandler } from '../../src/app/api/v1/stream-summaries/handler';
 import { StravaApiError } from '../../src/server/strava/client';
@@ -78,20 +82,18 @@ async function cleanup() {
     .where(inArray(stravaRequestBudgets.key, budgetKeys));
 }
 async function seedActivity() {
-  await testDb
-    .insert(activities)
-    .values({
-      id: Number(ID),
-      public_id: Number(ID),
-      athlete: actor.athleteId,
-      name: 'Stream lifecycle',
-      sport_type: 'Ride',
-      start_date: NOW,
-      start_date_local: NOW,
-      timezone: 'UTC',
-      geometryState: 'summary',
-      distance: 1000,
-    });
+  await testDb.insert(activities).values({
+    id: Number(ID),
+    public_id: Number(ID),
+    athlete: actor.athleteId,
+    name: 'Stream lifecycle',
+    sport_type: 'Ride',
+    start_date: NOW,
+    start_date_local: NOW,
+    timezone: 'UTC',
+    geometryState: 'summary',
+    distance: 1000,
+  });
 }
 async function fetch(force = false) {
   return fetchActivityStreams(actor, ID, {
@@ -105,7 +107,7 @@ const request = (query = '') =>
   new Request(`https://app.test/api/v1/activities/${ID}/streams?${query}`);
 const makeHandlerView = (
   caller: Actor,
-  view: 'raw' | 'summary',
+  view: 'raw' | 'summary' | 'compact',
   createSource = source,
 ) =>
   createActivityStreamsHandler({
@@ -130,16 +132,14 @@ async function run() {
     await testDb
       .insert(users)
       .values({ id: owner.userId, athlete_id: owner.athleteId });
-    await testDb
-      .insert(accounts)
-      .values({
-        id: owner.userId,
-        userId: owner.userId,
-        providerId: 'strava',
-        accountId: String(owner.athleteId),
-        accessToken: 'synthetic-access',
-        accessTokenExpiresAt: new Date('2030-01-01'),
-      });
+    await testDb.insert(accounts).values({
+      id: owner.userId,
+      userId: owner.userId,
+      providerId: 'strava',
+      accountId: String(owner.athleteId),
+      accessToken: 'synthetic-access',
+      accessTokenExpiresAt: new Date('2030-01-01'),
+    });
   }
   await seedActivity();
   const ownerHandler = makeHandler(actor);
@@ -194,10 +194,7 @@ async function run() {
   );
   const listed = toActivityDTO(bootstrap[0]!);
   assert.equal(listed.streams?.revision, '1');
-  assert.deepEqual(
-    listed.streams,
-    toActivityStreamsDTO(ID, stored).metadata,
-  );
+  assert.deepEqual(listed.streams, toActivityStreamsDTO(ID, stored).metadata);
   assert.doesNotMatch(
     JSON.stringify(listed),
     /"data":|original_size|upstream_metadata/,
@@ -251,21 +248,24 @@ async function run() {
     .select({ summary: activityStreams.summary })
     .from(activityStreams)
     .where(eq(activityStreams.activityId, BigInt(ID)));
-  assert.deepEqual(storedSummary?.summary, expectedSummary);
+  assert.deepEqual(
+    storedSummary?.summary,
+    encodeStreamSummary(expectedSummary),
+  );
   await testDb
     .update(activityStreams)
     .set({ summary: null })
     .where(eq(activityStreams.activityId, BigInt(ID)));
   const [lazy] = await repository.readSummaries(actor, [ID, '9183999']);
   assert.equal(lazy?.activityId, ID);
-  assert.deepEqual(lazy?.row?.summary, expectedSummary);
+  assert.deepEqual(lazy?.row?.summary, encodeStreamSummary(expectedSummary));
   const [refilled] = await testDb
     .select({ summary: activityStreams.summary })
     .from(activityStreams)
     .where(eq(activityStreams.activityId, BigInt(ID)));
   assert.deepEqual(
     refilled?.summary,
-    expectedSummary,
+    encodeStreamSummary(expectedSummary),
     'a lazily computed summary is stored',
   );
   assert.deepEqual(
@@ -273,9 +273,10 @@ async function run() {
     [],
     "another athlete's activity is omitted",
   );
-  const summaryResponse = await makeHandlerView(actor, 'summary')(
-    new Request(`https://app.test/api/v1/activities/${ID}/streams/summary`),
-  );
+  const summaryResponse = await makeHandlerView(
+    actor,
+    'summary',
+  )(new Request(`https://app.test/api/v1/activities/${ID}/streams/summary`));
   assert.equal(summaryResponse.status, 200);
   const summaryBody = activityStreamSummaryDTOSchema.parse(
     ((await summaryResponse.json()) as { data: unknown }).data,
@@ -295,6 +296,101 @@ async function run() {
     [[ID, expectedSummary]],
   );
 
+  // Compact reads and bounded storage migration must preserve source identity,
+  // raw bytes and the default legacy endpoint throughout a mixed-format rollout.
+  const previousStorageFormat =
+    process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT;
+  try {
+    process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT = 'json';
+    await testDb
+      .update(activityStreams)
+      .set({ summary: null })
+      .where(eq(activityStreams.activityId, BigInt(ID)));
+    const [legacyWrite] = await repository.readSummaries(actor, [ID]);
+    assert.deepEqual(legacyWrite?.row?.summary, expectedSummary);
+  } finally {
+    if (previousStorageFormat === undefined)
+      delete process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT;
+    else
+      process.env.ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT =
+        previousStorageFormat;
+  }
+  await convertStreamSummaryBatch(
+    testDb as unknown as Parameters<typeof convertStreamSummaryBatch>[0],
+    { format: 'polyline-v1', apply: true },
+  );
+  const beforeConversion = (await repository.read(actor, ID))!;
+  const compactResponse = await makeHandlerView(
+    actor,
+    'compact',
+  )(
+    new Request(
+      `https://app.test/api/v1/activities/${ID}/streams/summary/compact?fetch=none`,
+    ),
+  );
+  assert.equal(compactResponse.status, 200);
+  assert.deepEqual(
+    activityCompactStreamSummaryDTOSchema.parse(
+      ((await compactResponse.json()) as { data: unknown }).data,
+    ).summary,
+    encodeStreamSummary(expectedSummary),
+  );
+  const compactBatch = await createStreamSummariesHandler({
+    repository,
+    compact: true,
+    resolveActor: async () => actor,
+  })(new Request(`https://app.test/api/v1/stream-summaries/compact?ids=${ID}`));
+  assert.deepEqual(
+    activityCompactStreamSummariesDTOSchema.parse(
+      ((await compactBatch.json()) as { data: unknown }).data,
+    ).summaries[0]!.summary,
+    encodeStreamSummary(expectedSummary),
+  );
+  const conversionDb = testDb as unknown as Parameters<
+    typeof convertStreamSummaryBatch
+  >[0];
+  const dryRun = await convertStreamSummaryBatch(conversionDb, {
+    format: 'json',
+    limit: 1,
+  });
+  assert.equal(dryRun.updated, 0);
+  assert.deepEqual(
+    (await repository.read(actor, ID))!.summary,
+    encodeStreamSummary(expectedSummary),
+  );
+  await convertStreamSummaryBatch(conversionDb, {
+    format: 'json',
+    apply: true,
+    limit: 1000,
+  });
+  assert.deepEqual(
+    (await repository.read(actor, ID))!.summary,
+    expectedSummary,
+  );
+  await convertStreamSummaryBatch(conversionDb, {
+    format: 'polyline-v1',
+    apply: true,
+    limit: 1000,
+  });
+  const afterConversion = (await repository.read(actor, ID))!;
+  assert.deepEqual(
+    afterConversion.summary,
+    encodeStreamSummary(expectedSummary),
+  );
+  assert.deepEqual(afterConversion.payload, beforeConversion.payload);
+  assert.equal(afterConversion.revision, beforeConversion.revision);
+  assert.equal(afterConversion.generation, beforeConversion.generation);
+  assert.equal(afterConversion.invalidatedAt, beforeConversion.invalidatedAt);
+  assert.equal(
+    (
+      await convertStreamSummaryBatch(conversionDb, {
+        format: 'polyline-v1',
+        apply: true,
+      })
+    ).updated,
+    0,
+  );
+
   const generation = (await repository.read(actor, ID))!.generation;
   const beforeInvalidation = await changes.latestSequence(actor.athleteId);
   await testDb
@@ -312,8 +408,7 @@ async function run() {
   await fetch();
   await testDb.execute(sql`select invalidate_activity_streams(${ID}::bigint)`);
   assert.equal(
-    toActivityStreamsDTO(ID, await repository.read(actor, ID)).metadata
-      .state,
+    toActivityStreamsDTO(ID, await repository.read(actor, ID)).metadata.state,
     'stale',
   );
 

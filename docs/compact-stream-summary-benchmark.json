@@ -1,0 +1,289 @@
+{
+  "node": "v22.22.0",
+  "platform": "darwin/arm64",
+  "description": "Synthetic summary payloads, Node gzip defaults/Brotli q5; PostgreSQL pg_column_size on stored JSONB, not full-table/disk allocation. Times are local warmed calls. No deployed HTTP, activity-sync page or device-memory claim.",
+  "rows": [
+    {
+      "name": "short-ride",
+      "rawSamples": 20,
+      "samples": 20,
+      "legacy": {
+        "json": 885,
+        "gzip": 386,
+        "brotli": 319
+      },
+      "compact": {
+        "json": 311,
+        "gzip": 169,
+        "brotli": 150
+      },
+      "encode": {
+        "medianUs": 6.332999999983713,
+        "p95Us": 6.875000000007958
+      },
+      "decode": {
+        "medianUs": 3.333999999995285,
+        "p95Us": 5.124999999992497
+      }
+    },
+    {
+      "name": "smooth-ride",
+      "rawSamples": 4500,
+      "samples": 300,
+      "legacy": {
+        "json": 13361,
+        "gzip": 4468,
+        "brotli": 2890
+      },
+      "compact": {
+        "json": 3498,
+        "gzip": 810,
+        "brotli": 713
+      },
+      "encode": {
+        "medianUs": 60.625000000015916,
+        "p95Us": 116.41600000001517
+      },
+      "decode": {
+        "medianUs": 16.37500000003911,
+        "p95Us": 17.333000000007814
+      }
+    },
+    {
+      "name": "long-ride",
+      "rawSamples": 18000,
+      "samples": 300,
+      "legacy": {
+        "json": 13151,
+        "gzip": 4658,
+        "brotli": 3084
+      },
+      "compact": {
+        "json": 4426,
+        "gzip": 1227,
+        "brotli": 1198
+      },
+      "encode": {
+        "medianUs": 63.667000000009466,
+        "p95Us": 78.41600000000426
+      },
+      "decode": {
+        "medianUs": 19.33400000001484,
+        "p95Us": 22.957999999960066
+      }
+    },
+    {
+      "name": "noisy-power",
+      "rawSamples": 4500,
+      "samples": 300,
+      "legacy": {
+        "json": 13424,
+        "gzip": 4731,
+        "brotli": 3243
+      },
+      "compact": {
+        "json": 3660,
+        "gzip": 1051,
+        "brotli": 978
+      },
+      "encode": {
+        "medianUs": 62.33299999996689,
+        "p95Us": 68.58400000004394
+      },
+      "decode": {
+        "medianUs": 16.666999999984,
+        "p95Us": 18.832999999972344
+      }
+    },
+    {
+      "name": "flat-negative-altitude",
+      "rawSamples": 4500,
+      "samples": 300,
+      "legacy": {
+        "json": 13555,
+        "gzip": 3788,
+        "brotli": 2216
+      },
+      "compact": {
+        "json": 3260,
+        "gzip": 503,
+        "brotli": 436
+      },
+      "encode": {
+        "medianUs": 60.12500000002774,
+        "p95Us": 65.58400000005804
+      },
+      "decode": {
+        "medianUs": 15.99999999996271,
+        "p95Us": 16.666999999984
+      }
+    },
+    {
+      "name": "pauses-irregular-axis",
+      "rawSamples": 4500,
+      "samples": 150,
+      "legacy": {
+        "json": 6418,
+        "gzip": 2268,
+        "brotli": 1729
+      },
+      "compact": {
+        "json": 2190,
+        "gzip": 621,
+        "brotli": 573
+      },
+      "encode": {
+        "medianUs": 32.042000000046755,
+        "p95Us": 33.999999999991815
+      },
+      "decode": {
+        "medianUs": 9.374999999977263,
+        "p95Us": 9.749999999939973
+      }
+    },
+    {
+      "name": "indoor-time-no-gps",
+      "rawSamples": 4500,
+      "samples": 300,
+      "legacy": {
+        "json": 5363,
+        "gzip": 1924,
+        "brotli": 1530
+      },
+      "compact": {
+        "json": 1961,
+        "gzip": 759,
+        "brotli": 672
+      },
+      "encode": {
+        "medianUs": 29.417000000080407,
+        "p95Us": 31.791999999995824
+      },
+      "decode": {
+        "medianUs": 10.0840000000062,
+        "p95Us": 11.91700000003948
+      }
+    },
+    {
+      "name": "sparse-sensors",
+      "rawSamples": 4500,
+      "samples": 300,
+      "legacy": {
+        "json": 11118,
+        "gzip": 3850,
+        "brotli": 2387
+      },
+      "compact": {
+        "json": 2761,
+        "gzip": 470,
+        "brotli": 417
+      },
+      "encode": {
+        "medianUs": 46.45900000002712,
+        "p95Us": 49.08299999999599
+      },
+      "decode": {
+        "medianUs": 13.665999999943779,
+        "p95Us": 14.916999999968539
+      }
+    },
+    {
+      "name": "gps-discontinuity",
+      "rawSamples": 4500,
+      "samples": 300,
+      "legacy": {
+        "json": 12911,
+        "gzip": 3769,
+        "brotli": 2659
+      },
+      "compact": {
+        "json": 3504,
+        "gzip": 821,
+        "brotli": 724
+      },
+      "encode": {
+        "medianUs": 59.08399999998437,
+        "p95Us": 62.45799999999235
+      },
+      "decode": {
+        "medianUs": 16.75000000000182,
+        "p95Us": 17.500000000040927
+      }
+    },
+    {
+      "name": "no-axis",
+      "rawSamples": 1,
+      "samples": 0,
+      "legacy": {
+        "json": 26,
+        "gzip": 46,
+        "brotli": 30
+      },
+      "compact": {
+        "json": 58,
+        "gzip": 77,
+        "brotli": 58
+      },
+      "encode": {
+        "medianUs": 0.12500000002546585,
+        "p95Us": 0.12500000002546585
+      },
+      "decode": {
+        "medianUs": 0.8750000000645741,
+        "p95Us": 1.082999999994172
+      }
+    }
+  ],
+  "postgresColumns": [
+    {
+      "name": "flat-negative-altitude",
+      "legacy_bytes": 5406,
+      "compact_bytes": 651
+    },
+    {
+      "name": "gps-discontinuity",
+      "legacy_bytes": 5452,
+      "compact_bytes": 1117
+    },
+    {
+      "name": "indoor-time-no-gps",
+      "legacy_bytes": 2906,
+      "compact_bytes": 1036
+    },
+    {
+      "name": "long-ride",
+      "legacy_bytes": 6858,
+      "compact_bytes": 1763
+    },
+    {
+      "name": "no-axis",
+      "legacy_bytes": 35,
+      "compact_bytes": 67
+    },
+    {
+      "name": "noisy-power",
+      "legacy_bytes": 6829,
+      "compact_bytes": 1518
+    },
+    {
+      "name": "pauses-irregular-axis",
+      "legacy_bytes": 3446,
+      "compact_bytes": 854
+    },
+    {
+      "name": "short-ride",
+      "legacy_bytes": 897,
+      "compact_bytes": 323
+    },
+    {
+      "name": "smooth-ride",
+      "legacy_bytes": 6330,
+      "compact_bytes": 1105
+    },
+    {
+      "name": "sparse-sensors",
+      "legacy_bytes": 5561,
+      "compact_bytes": 670
+    }
+  ]
+}

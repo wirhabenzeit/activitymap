@@ -11,6 +11,7 @@ import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import { Button } from '~/components/ui/button';
 import {
   fetchActivityStreamSummary,
+  toElevationProfile,
   fetchStoredStreamSummaryBatch,
   canManuallyRetryStreamSummary,
   isStreamSummaryCurrent,
@@ -267,9 +268,14 @@ export function ElevationChart({
     return () => window.clearTimeout(timeout);
   }, [query.data?.retryAt, query.data?.status, retryClock]);
 
-  const profile = isStreamSummaryCurrent(query.data, streamMetadata)
-    ? query.data!.profile
-    : null;
+  // Keep prefetched/cached summaries encoded. Materialize samples only while
+  // this chart is mounted, and release them with the view.
+  const profile = useMemo(() => {
+    const data = query.data;
+    return data?.metadata && isStreamSummaryCurrent(data, streamMetadata)
+      ? toElevationProfile({ metadata: data.metadata, summary: data.summary })
+      : null;
+  }, [query.data, streamMetadata]);
   const height = 135;
   const canRetry = canManuallyRetryStreamSummary(query.data, retryClock);
 

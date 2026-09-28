@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import {
+  compactStreamSummarySchema,
+  packStreamSummary,
+  unpackStreamSummary,
+} from '~/lib/streams/compact-summary';
+import {
   ACTIVITY_STREAM_TYPES,
   rawActivityStreamsSchema,
 } from '~/server/strava/streams';
@@ -96,6 +101,34 @@ export const activityStreamSummariesDTOSchema = z.object({
   summaries: z.array(activityStreamSummaryDTOSchema),
 });
 
+export const activityCompactStreamSummaryDTOSchema =
+  activityStreamSummaryDTOSchema.extend({
+    summary: compactStreamSummarySchema.nullable(),
+  });
+export type ActivityCompactStreamSummaryDTO = z.infer<
+  typeof activityCompactStreamSummaryDTOSchema
+>;
+export const activityCompactStreamSummariesDTOSchema = z.object({
+  summaries: z.array(activityCompactStreamSummaryDTOSchema),
+});
+
+export function toCompactStreamSummaryDTO({
+  activityId,
+  row,
+}: StreamSummaryRead): ActivityCompactStreamSummaryDTO {
+  const metadata = toStreamMetadata(row);
+  return activityCompactStreamSummaryDTOSchema.parse({
+    activity_id: activityId,
+    metadata,
+    summary:
+      metadata.state === 'current' && row?.summary
+        ? packStreamSummary(row.summary)
+        : null,
+    last_error: row?.lastError ?? null,
+    next_retry_at: row?.nextRetryAt?.toISOString() ?? null,
+  });
+}
+
 export function toStreamMetadata(
   row: StreamSummarySnapshot | null,
 ): StreamMetadata {
@@ -139,7 +172,10 @@ export function toActivityStreamSummaryDTO({
     activity_id: activityId,
     metadata,
     // Same rule as raw samples: never serve an invalidated set.
-    summary: metadata.state === 'current' ? (row?.summary ?? null) : null,
+    summary:
+      metadata.state === 'current' && row?.summary
+        ? unpackStreamSummary(row.summary)
+        : null,
     last_error: row?.lastError ?? null,
     next_retry_at: row?.nextRetryAt?.toISOString() ?? null,
   });

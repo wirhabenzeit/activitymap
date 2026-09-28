@@ -170,6 +170,82 @@ nonisolated extension ActivityMapAPI {
         }
     }
 
+    struct StreamSummary: Codable, Hashable, Sendable {
+        let version: Int
+        let basis: StreamSeriesType?
+        let time: [Double]?
+        let distance: [Double]?
+        let latlng: [[Double]]?
+        let altitude: [Double]?
+        let watts: [Double]?
+        let heartrate: [Double]?
+    }
+
+    /// The shape of `ActivityStreamSummary.last_error`.
+    struct ActivityStreamSummaryLastError: Codable, Hashable, Sendable {
+        let code: StreamFailureCode
+        let retryable: Bool
+    }
+
+    struct ActivityStreamSummary: Codable, Hashable, Sendable {
+        let activityID: String
+        let metadata: StreamMetadata
+        let summary: StreamSummary?
+        let lastError: ActivityStreamSummaryLastError?
+        let nextRetryAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case activityID = "activity_id"
+            case metadata
+            case summary
+            case lastError = "last_error"
+            case nextRetryAt = "next_retry_at"
+        }
+    }
+
+    struct ActivityStreamSummaries: Codable, Hashable, Sendable {
+        let summaries: [ActivityStreamSummary]
+    }
+
+    struct CompactStreamSummary: Codable, Hashable, Sendable {
+        let codec: String
+        let version: Int
+        let basis: StreamSeriesType?
+        let count: Int
+        let time: String?
+        let distance: String?
+        let altitude: String?
+        let watts: String?
+        let heartrate: String?
+        let latlng: String?
+    }
+
+    /// The shape of `ActivityCompactStreamSummary.last_error`.
+    struct ActivityCompactStreamSummaryLastError: Codable, Hashable, Sendable {
+        let code: StreamFailureCode
+        let retryable: Bool
+    }
+
+    struct ActivityCompactStreamSummary: Codable, Hashable, Sendable {
+        let activityID: String
+        let metadata: StreamMetadata
+        let summary: CompactStreamSummary?
+        let lastError: ActivityCompactStreamSummaryLastError?
+        let nextRetryAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case activityID = "activity_id"
+            case metadata
+            case summary
+            case lastError = "last_error"
+            case nextRetryAt = "next_retry_at"
+        }
+    }
+
+    struct ActivityCompactStreamSummaries: Codable, Hashable, Sendable {
+        let summaries: [ActivityCompactStreamSummary]
+    }
+
     struct Authentication: Codable, Hashable, Sendable {
         let method: AuthenticationMethod
         let sessionExpiresAt: Date
@@ -625,8 +701,8 @@ nonisolated extension ActivityMapAPI {
     }
 
     enum StreamSeriesType: String, Codable, Hashable, Sendable {
-        case time = "time"
         case distance = "distance"
+        case time = "time"
     }
 
     enum StreamType: String, Codable, Hashable, Sendable {

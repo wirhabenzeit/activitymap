@@ -1,18 +1,24 @@
 import type { QueryClient } from '@tanstack/react-query';
 
 import {
-  activityStreamSummariesDTOSchema,
-  activityStreamSummaryDTOSchema,
+  activityCompactStreamSummariesDTOSchema,
+  activityCompactStreamSummaryDTOSchema,
   type ActivityStreamSummaryDTO,
+  type ActivityCompactStreamSummaryDTO,
   type StreamMetadata,
 } from '~/contracts/v1/activity-streams';
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
 
+import {
+  decodeStreamSummary,
+  type CompactStreamSummary,
+} from '~/lib/streams/compact-summary';
+
 export type ElevationProfile = { altitude: number[]; distance: number[] };
 
 export type StreamSummaryResult = {
-  profile: ElevationProfile | null;
+  summary: CompactStreamSummary | null;
   metadata: StreamMetadata | null;
   requestedAgainst: StreamMetadata | null;
   status: 'ready' | 'pending' | 'paused' | 'unavailable' | 'failed';
@@ -29,7 +35,7 @@ export type FetchLike = (
 
 export const STREAM_SUMMARY_QUERY_ROOT = [
   'activity-stream-summary',
-  'v1',
+  'polyline-v1',
 ] as const;
 export const STREAM_SUMMARY_PREFETCH_BATCH = 100;
 export const STREAM_SUMMARY_PREFETCH_CONCURRENCY = 2;
@@ -67,8 +73,18 @@ export function canManuallyRetryStreamSummary(
 
 export function toElevationProfile({
   metadata,
-  summary,
-}: ActivityStreamSummaryDTO): ElevationProfile | null {
+  summary: stored,
+}: Pick<
+  ActivityStreamSummaryDTO | ActivityCompactStreamSummaryDTO,
+  'metadata' | 'summary'
+>): ElevationProfile | null {
+  let summary;
+  try {
+    summary =
+      stored && 'codec' in stored ? decodeStreamSummary(stored) : stored;
+  } catch {
+    return null;
+  }
   const distance = summary?.distance;
   const altitude = summary?.altitude;
   if (
@@ -121,7 +137,7 @@ export function isStreamSummaryCurrent(
 ): boolean {
   if (
     result?.status !== 'ready' ||
-    !result.profile ||
+    !result.summary ||
     result.metadata?.state !== 'current'
   )
     return false;
@@ -239,7 +255,7 @@ function pendingResult(options: {
     pollAttempts >= STREAM_SUMMARY_MAX_POLL_ATTEMPTS ||
     retryAt - pollStartedAt > STREAM_SUMMARY_MAX_POLL_MS;
   return {
-    profile: null,
+    summary: null,
     metadata: options.metadata ?? null,
     requestedAgainst: options.requestedAgainst ?? null,
     status: automaticPollingExhausted ? 'paused' : 'pending',
@@ -283,7 +299,7 @@ export async function fetchActivityStreamSummary(options: {
   );
   const fence = captureStreamSummaryFence(options.userId, options.activityId);
   const response = await fetchImpl(
-    `/api/v1/activities/${options.activityId}/streams/summary`,
+    `/api/v1/activities/${options.activityId}/streams/summary/compact`,
     {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
@@ -299,10 +315,7 @@ export async function fetchActivityStreamSummary(options: {
   if (!response.ok) {
     const parsed = errorEnvelopeSchema.safeParse(body);
     const retryableStatus = response.status === 429 || response.status === 503;
-    if (
-      retryableStatus &&
-      (!parsed.success || parsed.data.error.retryable)
-    ) {
+    if (retryableStatus && (!parsed.success || parsed.data.error.retryable)) {
       const retryAfterMs =
         parseRetryAfterMs(response.headers.get('Retry-After'), now) ??
         DEFAULT_ERROR_RETRY_MS;
@@ -320,7 +333,7 @@ export async function fetchActivityStreamSummary(options: {
     }
     if (response.status === 404) {
       return {
-        profile: null,
+        summary: null,
         metadata: null,
         requestedAgainst: options.observedMetadata ?? null,
         status: 'unavailable',
@@ -337,9 +350,9 @@ export async function fetchActivityStreamSummary(options: {
     );
   }
 
-  const parsed = responseEnvelope(activityStreamSummaryDTOSchema).safeParse(
-    body,
-  );
+  const parsed = responseEnvelope(
+    activityCompactStreamSummaryDTOSchema,
+  ).safeParse(body);
   if (!parsed.success) throw new Error('Could not read elevation data.');
   const entry = parsed.data.data;
   if (response.status === 202) {
@@ -355,12 +368,17 @@ export async function fetchActivityStreamSummary(options: {
     });
   }
 
-  const profile = toElevationProfile(entry);
+  const hasProfile =
+    entry.metadata.state === 'current' &&
+    entry.summary !== null &&
+    entry.summary.count > 1 &&
+    entry.summary.distance !== undefined &&
+    entry.summary.altitude !== undefined;
   return {
-    profile,
+    summary: entry.summary,
     metadata: entry.metadata,
     requestedAgainst: options.observedMetadata ?? null,
-    status: profile ? 'ready' : 'unavailable',
+    status: hasProfile ? 'ready' : 'unavailable',
     message: null,
     retryAt: null,
     pollStartedAt: now,
@@ -393,7 +411,7 @@ export async function fetchStoredStreamSummaryBatch(options: {
     }),
   );
   const response = await fetchImpl(
-    `/api/v1/stream-summaries?ids=${ids.join(',')}`,
+    `/api/v1/stream-summaries/compact?ids=${ids.join(',')}`,
     {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
@@ -401,9 +419,9 @@ export async function fetchStoredStreamSummaryBatch(options: {
     },
   );
   if (!response.ok) return new Map();
-  const parsed = responseEnvelope(activityStreamSummariesDTOSchema).safeParse(
-    await response.json(),
-  );
+  const parsed = responseEnvelope(
+    activityCompactStreamSummariesDTOSchema,
+  ).safeParse(await response.json());
   if (!parsed.success) return new Map();
   const entries = new Map(
     parsed.data.data.summaries.map((entry) => [entry.activity_id, entry]),
@@ -419,12 +437,17 @@ export async function fetchStoredStreamSummaryBatch(options: {
     // eligible for its authoritative single-activity demand request.
     if (!entry) continue;
     if (entry.metadata.state !== 'current') continue;
-    const profile = toElevationProfile(entry);
+    const hasProfile =
+      entry.metadata.state === 'current' &&
+      entry.summary !== null &&
+      entry.summary.count > 1 &&
+      entry.summary.distance !== undefined &&
+      entry.summary.altitude !== undefined;
     results.set(id, {
-      profile,
+      summary: entry.summary,
       metadata: entry.metadata,
       requestedAgainst,
-      status: profile ? 'ready' : 'unavailable',
+      status: hasProfile ? 'ready' : 'unavailable',
       message: null,
       retryAt: null,
       pollStartedAt: now,

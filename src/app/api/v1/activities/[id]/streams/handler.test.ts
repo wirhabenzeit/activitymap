@@ -120,3 +120,40 @@ void test('shared per-user rate limiting rejects across sessions before a fetch'
   assert.equal(response.status, 429);
   assert.ok(response.headers.has('retry-after'));
 });
+
+void test('compact summary boundary retains authentication, validation and pending retry semantics', async () => {
+  const compactRequest = (query = 'fetch=none') =>
+    new Request(
+      `https://app.test/api/v1/activities/42/streams/summary/compact?${query}`,
+    );
+  const compactRepository = {
+    ...repository,
+    readSummaries: async () => [{ activityId: '42', row: null }],
+  };
+  const handler = createActivityStreamsHandler({
+    view: 'compact',
+    repository: compactRepository,
+    resolveActor: async () => actor,
+    fetch: async () => ({ status: 'superseded' }),
+  });
+  assert.equal(
+    (
+      await createActivityStreamsHandler({
+        view: 'compact',
+        repository: compactRepository,
+        resolveActor: async () => null,
+      })(compactRequest())
+    ).status,
+    401,
+  );
+  assert.equal(
+    (await handler(compactRequest('fetch=none&refresh=true'))).status,
+    400,
+  );
+  const response = await handler(compactRequest('fetch=auto'));
+  assert.equal(response.status, 202);
+  assert.equal(response.headers.get('retry-after'), '3');
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  const body = (await response.json()) as { data: { summary: unknown } };
+  assert.equal(body.data.summary, null);
+});
