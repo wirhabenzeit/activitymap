@@ -552,6 +552,7 @@ const monthVsLastMonthView: TileView = {
         {({ width, height }) => (
           <CumulativeLines
             series={monthPair(context, metric)}
+            endLabels
             xMax={31}
             width={width}
             height={height}
