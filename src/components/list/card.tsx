@@ -337,13 +337,13 @@ export function ActivityCardContent({
             {onCollapse && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-9 shrink-0 gap-1 px-2"
+                size="icon"
+                className="h-9 w-9 shrink-0"
                 onClick={onCollapse}
                 aria-label="Collapse route details"
+                title="Collapse route details"
               >
                 <Minus className="h-4 w-4" aria-hidden="true" />
-                Collapse
               </Button>
             )}
             {onClearSelection && (

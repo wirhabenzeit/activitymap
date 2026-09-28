@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
-import { Camera, Maximize2, Minimize2, Globe } from 'lucide-react';
+import { Camera, Maximize2, Minimize2, Globe, X } from 'lucide-react';
 import { columns } from '~/components/list/columns';
 import {
   ActivityCard,
@@ -639,19 +639,24 @@ export default function InteractiveMap() {
             </span>
             <div className="flex-1" />
             <Button
-              size="sm"
+              size="icon"
               variant="ghost"
-              className="h-7 px-2"
+              className="h-9 w-9 shrink-0"
+              aria-label="Clear selection"
+              title="Clear selection"
               onClick={clearSelection}
             >
-              Clear selection
+              <X aria-hidden="true" />
             </Button>
             {(panelExpanded || panelOverflow) && (
               <Button
-                size="sm"
+                size="icon"
                 variant="ghost"
-                className="h-9 shrink-0 gap-1 px-2"
+                className="h-9 w-9 shrink-0"
                 aria-label={
+                  panelExpanded ? 'Shrink route list' : 'Expand route list'
+                }
+                title={
                   panelExpanded ? 'Shrink route list' : 'Expand route list'
                 }
                 aria-expanded={panelExpanded}
@@ -663,7 +668,6 @@ export default function InteractiveMap() {
                 ) : (
                   <Maximize2 aria-hidden="true" />
                 )}
-                {panelExpanded ? 'Shrink list' : 'Expand list'}
               </Button>
             )}
           </div>

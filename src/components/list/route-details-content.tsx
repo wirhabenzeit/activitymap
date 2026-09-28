@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { ChartArea } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { CardContent } from '~/components/ui/card';
 import { cn } from '~/lib/utils';
@@ -48,19 +48,16 @@ export function RouteDetailsContent({
         >
           <Button
             type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 px-2 lg:hidden"
+            variant={showElevation ? 'secondary' : 'ghost'}
+            size="icon"
+            className="h-9 w-9 lg:hidden"
+            aria-label={showElevation ? 'Hide elevation' : 'Show elevation'}
+            title={showElevation ? 'Hide elevation' : 'Show elevation'}
             aria-expanded={showElevation}
             aria-controls={profileId}
             onClick={() => setExpanded((value) => !value)}
           >
-            {showElevation ? (
-              <Minus aria-hidden="true" />
-            ) : (
-              <Plus aria-hidden="true" />
-            )}
-            {showElevation ? 'Hide elevation' : 'Show elevation'}
+            <ChartArea aria-hidden="true" />
           </Button>
           <div id={profileId} hidden={!showElevation} className="mt-2 lg:mt-0">
             {showElevation && elevation}
