@@ -7,7 +7,7 @@
 // layout's columns, so tiles widen on big screens. Only primary tiles get
 // the large headline numerals.
 //
-// Every tile expands in place: the card takes the full width of its
+// Eligible tiles expand via their corner button: the card takes the full width of its
 // section in a row sized to its content, pushing the other cards down, and
 // Motion animates the reflow. Expanded, a tile is the same tile drawn
 // larger (the same headline and visual, with axes on charts), plus any
@@ -15,6 +15,7 @@
 // interacting outside the card leaves it open, including touch scrolling.
 
 import {
+  Activity,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -469,7 +470,7 @@ function TileCard({
     toggleOf(tile)?.options[0],
   );
   const summary = view.summary(context, option);
-  const detail = expanded && view.detail ? view.detail(context, option) : null;
+  const hasDetail = expanded && Boolean(view.detail);
 
   // Keep the user's scroll position. scrollIntoView after an animation races
   // with touch scrolling and can also scroll the app's overflow-hidden shell.
@@ -480,21 +481,9 @@ function TileCard({
       transition={layoutTransition}
       aria-label={tile.title}
       data-tile-id={tile.id}
-      onClick={
-        expanded
-          ? undefined
-          : (event) => {
-              if (
-                !(event.target as Element).closest('button, a, input, select')
-              )
-                onExpand();
-            }
-      }
       className={cn(
         'group @container relative min-w-0 overflow-hidden rounded-lg border bg-card text-left text-card-foreground',
-        expanded
-          ? 'shadow-md'
-          : 'cursor-pointer shadow-xs transition-shadow hover:shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
+        expanded ? 'shadow-md' : 'shadow-xs',
       )}
       style={style}
     >
@@ -507,29 +496,32 @@ function TileCard({
           !expanded && 'h-full',
         )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <button
-            type="button"
-            aria-expanded={expanded}
-            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${tile.title}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (expanded) onCollapse();
-              else onExpand();
-            }}
-            className="flex min-h-8 w-full items-center justify-between gap-2 rounded text-left text-[13px] font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <span>{tile.title}</span>
-            {expanded ? (
-              <Minimize2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            ) : (
-              <Maximize2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            )}
-          </button>
+        <div className="flex min-h-11 items-center justify-between gap-2">
+          <h3 className="text-[13px] font-medium">{tile.title}</h3>
+          {view.expandable && (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={`${expanded ? 'Collapse' : 'Expand'} ${tile.title}`}
+              title={`${expanded ? 'Collapse' : 'Expand'} ${tile.title}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (expanded) onCollapse();
+                else onExpand();
+              }}
+              className="-mr-2 flex size-11 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {expanded ? (
+                <Minimize2 aria-hidden="true" className="size-3.5" />
+              ) : (
+                <Maximize2 aria-hidden="true" className="size-3.5" />
+              )}
+            </button>
+          )}
         </div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <span className="text-[11px] text-muted-foreground">
-            {detail ? 'History & details' : view.period(context, option)}
+            {hasDetail ? 'History & details' : view.period(context, option)}
           </span>
           {toggle && (
             <FaceSwitch
@@ -540,17 +532,25 @@ function TileCard({
             />
           )}
         </div>
-        {!detail && summary && (
+        {!hasDetail && summary && (
           <Headline summary={summary} size={large ? 'large' : 'tile'} />
         )}
-        {detail ?? view.face(context, option, expanded)}
+        <Activity mode={hasDetail ? 'hidden' : 'visible'}>
+          {view.face(context, option, expanded)}
+        </Activity>
+        {/* Preserve history controls while hidden; Activity suspends their effects. */}
+        {view.detail && (
+          <Activity mode={hasDetail ? 'visible' : 'hidden'}>
+            {view.detail(context, option)}
+          </Activity>
+        )}
         {context.filtered && tile.id === 'consistency' && (
           <p className="mt-2 shrink-0 text-[11px] leading-snug text-muted-foreground">
             Filtered view: only matching activities count. Other activity may
             have occurred.
           </p>
         )}
-        {expanded && !detail && view.more && (
+        {expanded && !hasDetail && view.more && (
           <motion.div
             initial={animateLayout ? { opacity: 0 } : false}
             animate={{

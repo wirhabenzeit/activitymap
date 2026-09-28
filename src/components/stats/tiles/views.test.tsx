@@ -64,6 +64,27 @@ void test('consistency expansion preserves the selected chart and headline perio
   }
 });
 
+void test('expanded consistency labels dates and exposes only recorded calendar days', () => {
+  const view = tileView('consistency')!;
+  for (const [option, weeks] of [
+    ['last12Weeks', 12],
+    ['last52Weeks', 52],
+  ] as const) {
+    const html = renderToStaticMarkup(
+      view.face(context, option, true) as ReactElement,
+    );
+    const days = html.match(/<button[^>]*>/g) ?? [];
+    // Today is Tuesday: 11/51 full weeks, then Monday and Tuesday.
+    assert.equal(days.length, (weeks - 1) * 7 + 2);
+    assert.equal(days.filter((day) => day.includes('tabindex="0"')).length, 1);
+    assert.match(days.at(-1)!, /Sep 1, 2026: no matching activity/);
+    assert.match(days.at(-2)!, /Aug 31, 2026: activity recorded/);
+    assert.match(html, />Mon</);
+    assert.match(html, />Sun</);
+    assert.match(html, /use arrow keys/);
+  }
+});
+
 void test('all-time sport mix uses the same range for summary, chart and table', () => {
   const view = tileView('sportMix')!;
   const summary = view.summary(context, 'allTime')!;

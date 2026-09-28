@@ -43,7 +43,7 @@ import {
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
-import { RestDayCalendar } from './calendar';
+import { ConsistencyCalendar, RestDayCalendar } from './calendar';
 import { VolumeHistory, CalendarHistory, ComparisonHistory } from './history';
 import {
   CumulativeLines,
@@ -75,6 +75,8 @@ export type TileContext = {
 export type TileSummary = { value: string; unit: string; sub: ReactNode };
 
 export type TileView = {
+  // Expansion must offer useful details, controls, or a more inspectable chart.
+  expandable: boolean;
   period: (context: TileContext, option?: string) => string;
   // Null leaves the face without a headline number.
   summary: (
@@ -284,6 +286,7 @@ const dayOfYearLabel = (x: number) =>
   shortDate(dateOfDay(yearStart(comparisonYear) + Math.round(x)));
 
 const yearToDateView: TileView = {
+  expandable: true,
   detail: (context, option) =>
     comparisonDetail(yearToDateView, 'year', context, option),
   period: ({ today }) => {
@@ -369,6 +372,7 @@ function rollingFourWeeks(context: TileContext, metric: StatsMetric) {
 }
 
 const weeklyVolumeView: TileView = {
+  expandable: true,
   detail: (context, option) => (
     <VolumeHistory context={context} metric={asMetric(option, 'distance')} />
   ),
@@ -438,6 +442,7 @@ function lastYearStart(today: number) {
 }
 
 const activityCalendarView: TileView = {
+  expandable: true,
   period: () => 'Last 12 months',
   summary: ({ activities, today }) => {
     const { activeDays } = activityCalendar(activities, today);
@@ -514,6 +519,7 @@ function samePeriodLastMonth(today: number) {
 }
 
 const monthVsLastMonthView: TileView = {
+  expandable: true,
   detail: (context, option) =>
     comparisonDetail(monthVsLastMonthView, 'month', context, option),
   period: ({ today }) => {
@@ -565,6 +571,7 @@ const monthVsLastMonthView: TileView = {
 type MixRange = 'currentYear' | 'allTime';
 
 const sportMixView: TileView = {
+  expandable: true,
   period: ({ today }, option) =>
     option === 'allTime'
       ? 'All time by moving time'
@@ -698,6 +705,7 @@ const weeksOf = (option: string | undefined) =>
   option === 'last52Weeks' ? 52 : 12;
 
 const consistencyView: TileView = {
+  expandable: true,
   period: (_context, option) => `Last ${weeksOf(option)} weeks`,
   summary: (context, option) => {
     const result = consistency(
@@ -721,12 +729,19 @@ const consistencyView: TileView = {
       context.today,
       context.today - first + 1,
     );
+    if (expanded) {
+      return (
+        <ConsistencyCalendar
+          today={context.today}
+          first={first}
+          weeks={weeks}
+          flags={flags}
+        />
+      );
+    }
     return (
       <div
-        className={cn(
-          'grid grid-flow-col',
-          expanded ? 'mt-4 gap-[2px]' : 'mt-auto gap-[2px]',
-        )}
+        className="mt-auto grid grid-flow-col gap-[2px]"
         style={{
           gridTemplateRows: 'repeat(7, minmax(0, 1fr))',
           gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))`,
@@ -767,6 +782,7 @@ const consistencyView: TileView = {
 // Climbing is a trend: how hilly the last 12 months were, month by month,
 // against the 12 months before.
 const distanceVsElevationView: TileView = {
+  expandable: true,
   period: () => 'Last 12 months',
   summary: ({ activities, today }) => {
     const { current, previous } = climbing(activities, today);
@@ -897,6 +913,7 @@ const distanceVsElevationView: TileView = {
 const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const thisWeekView: TileView = {
+  expandable: false,
   period: () => 'This week',
   // Compared with a typical week up to the same weekday, so an early-week
   // total is not held against a full week.
@@ -964,6 +981,7 @@ const thisWeekView: TileView = {
 const decimal = (value: number) => value.toFixed(1);
 
 const typicalWeekView: TileView = {
+  expandable: false,
   period: () => 'Last 11 full weeks',
   summary: ({ activities, today }) => {
     const week = typicalWeek(activities, today);
@@ -1003,6 +1021,7 @@ const paceUnit: Record<StatsMetric, string> = {
 };
 
 const yearPaceView: TileView = {
+  expandable: false,
   period: ({ today }) => `${dateOfDay(today).getUTCFullYear()} projection`,
   summary: ({ activities, today }, option) => {
     const metric = asMetric(option, 'distance');
@@ -1198,6 +1217,7 @@ function RecordStats({
 }
 
 const recordsView: TileView = {
+  expandable: true,
   period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
   // No headline: the records sit side by side so none competes with the
   // year's total.
@@ -1230,6 +1250,7 @@ const recordsView: TileView = {
 // Best 30 days ---------------------------------------------------------------
 
 const best30DaysView: TileView = {
+  expandable: false,
   period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
   summary: ({ activities, today }, option) => {
     const metric = asMetric(option, 'distance');
@@ -1273,6 +1294,7 @@ const best30DaysView: TileView = {
 // Rest days ------------------------------------------------------------------
 
 const restDaysView: TileView = {
+  expandable: true,
   period: () => 'Last 90 days',
   summary: ({ activities, today }) => {
     const { last30, last90 } = restDays(activities, today);

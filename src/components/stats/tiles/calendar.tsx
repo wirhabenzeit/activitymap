@@ -174,6 +174,137 @@ export function MonthRows({
   );
 }
 
+// The detailed consistency chart keeps days inspectable even over 52 weeks.
+export function ConsistencyCalendar({
+  today,
+  first,
+  weeks,
+  flags,
+}: {
+  today: number;
+  first: number;
+  weeks: number;
+  flags: boolean[];
+}) {
+  const [selected, setSelected] = useState(today);
+  const day = Math.max(first, Math.min(today, selected));
+  const cells = useRef(new Map<number, HTMLButtonElement>());
+  const labelFor = (value: number) =>
+    `${shortDate(dateOfDay(value))}, ${dateOfDay(value).getUTCFullYear()}: ${flags[value - first] ? 'activity recorded' : 'no matching activity'}`;
+  return (
+    <div className="mt-4 space-y-2">
+      <p className="text-xs" aria-live="polite">
+        {labelFor(day)}
+      </p>
+      <p className="text-[11px] text-muted-foreground">
+        Select a day to inspect it. Weeks run left to right; use arrow keys to
+        move between days.
+      </p>
+      <div className="overflow-x-auto pb-2">
+        <div
+          role="group"
+          aria-label={`Active days, last ${weeks} weeks`}
+          className="grid gap-1"
+          style={{
+            minWidth: 36 + weeks * 24,
+            gridTemplateColumns: `32px repeat(${weeks}, minmax(20px, 1fr))`,
+            gridTemplateRows: '20px repeat(7, 24px)',
+          }}
+        >
+          {Array.from(
+            { length: weeks },
+            (_, week) =>
+              week % 4 === 0 && (
+                <span
+                  key={week}
+                  className="whitespace-nowrap text-[10px] text-muted-foreground"
+                  style={{
+                    gridColumn: `${week + 2} / span ${Math.min(4, weeks - week)}`,
+                    gridRow: 1,
+                  }}
+                >
+                  {shortDate(dateOfDay(first + week * 7))}
+                </span>
+              ),
+          )}
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(
+            (name, weekday) => (
+              <span
+                key={name}
+                className="sticky left-0 z-10 flex h-full items-center bg-card text-[10px] text-muted-foreground"
+                style={{ gridColumn: 1, gridRow: weekday + 2 }}
+              >
+                {name}
+              </span>
+            ),
+          )}
+          {Array.from({ length: today - first + 1 }, (_, index) => {
+            const value = first + index;
+            return (
+              <button
+                key={value}
+                type="button"
+                ref={(element) => {
+                  if (element) cells.current.set(value, element);
+                  else {
+                    // DOM references only; no database operation.
+                    // eslint-disable-next-line drizzle/enforce-delete-with-where
+                    cells.current.delete(value);
+                  }
+                }}
+                aria-label={labelFor(value)}
+                aria-pressed={day === value}
+                title={labelFor(value)}
+                tabIndex={day === value ? 0 : -1}
+                className={cn(
+                  'flex items-center justify-center rounded-sm hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground',
+                  day === value &&
+                    'bg-muted ring-1 ring-inset ring-muted-foreground',
+                )}
+                style={{
+                  gridColumn: Math.floor(index / 7) + 2,
+                  gridRow: (index % 7) + 2,
+                }}
+                onClick={() => setSelected(value)}
+                onFocus={() => setSelected(value)}
+                onKeyDown={(event) => {
+                  const offsets: Record<string, number> = {
+                    ArrowLeft: -7,
+                    ArrowRight: 7,
+                    ArrowUp: -1,
+                    ArrowDown: 1,
+                  };
+                  const offset = offsets[event.key];
+                  if (offset !== undefined) {
+                    event.preventDefault();
+                    cells.current
+                      .get(Math.max(first, Math.min(today, value + offset)))
+                      ?.focus();
+                  }
+                }}
+              >
+                <i
+                  aria-hidden="true"
+                  className={cn(
+                    'size-2.5 rounded-full',
+                    flags[index]
+                      ? 'bg-foreground'
+                      : 'border border-muted-foreground/40',
+                  )}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Filled: activity recorded · Hollow: no matching activity · Current week
+        is incomplete
+      </p>
+    </div>
+  );
+}
+
 // Weeks run left to right; weekdays run Monday to Sunday down each column.
 export function RestDayCalendar({
   today,
