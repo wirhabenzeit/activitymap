@@ -38,7 +38,7 @@
       "primary": true,
       "toggle": {
         "label": "Metric",
-        "options": ["distance", "elevation", "time", "count"]
+        "options": ["distance", "time", "elevation", "count"]
       }
     },
     {
@@ -49,7 +49,7 @@
       "span": { "columns": 1, "rows": 1 },
       "toggle": {
         "label": "Metric",
-        "options": ["elevation", "distance", "time", "count"]
+        "options": ["distance", "time", "elevation", "count"]
       }
     },
     {
@@ -61,7 +61,7 @@
       "primary": true,
       "toggle": {
         "label": "Metric",
-        "options": ["distance", "elevation", "time", "count"]
+        "options": ["distance", "time", "elevation", "count"]
       }
     },
     {
@@ -91,7 +91,7 @@
       "optional": true,
       "toggle": {
         "label": "Metric",
-        "options": ["count", "distance", "elevation", "time"]
+        "options": ["distance", "time", "elevation", "count"]
       }
     },
     {
@@ -102,7 +102,7 @@
       "span": { "columns": 2, "rows": 2 },
       "toggle": {
         "label": "Colour by",
-        "options": ["sport", "distance", "elevation", "time"]
+        "options": ["sport", "distance", "time", "elevation"]
       }
     },
     {
@@ -123,7 +123,7 @@
     },
     {
       "id": "distanceVsElevation",
-      "title": "Climbing",
+      "title": "Hilliness",
       "window": "last12Months",
       "group": "patterns",
       "span": { "columns": 2, "rows": 1 }

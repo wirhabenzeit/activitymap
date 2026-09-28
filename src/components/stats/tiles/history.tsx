@@ -158,15 +158,18 @@ export function VolumeHistory({
         </p>
       )}
       <div>
+        <p className="text-xs text-muted-foreground">
+          Total across{' '}
+          {range === 'years'
+            ? 'all displayed years'
+            : `the displayed 12 ${range}`}
+          {page === 0 ? ' · current period is incomplete' : ''}
+        </p>
         <p className="font-mono text-2xl">
           {formatWithUnit(
             buckets.reduce((sum, bucket) => sum + bucket.total, 0),
             metric,
           )}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Total in this period
-          {page === 0 ? ' · current period is incomplete' : ''}
         </p>
       </div>
       <Measure className="w-full" style={{ height: 240 }}>

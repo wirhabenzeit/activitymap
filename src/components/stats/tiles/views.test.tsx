@@ -131,6 +131,63 @@ void test('expanded records retain activity identities for drill-down', () => {
   assert.match(html, /<button[^>]*>Fixture ride<\/button>/);
 });
 
+void test('records wait for a full within-year 30-day window before comparing totals', () => {
+  assert.equal(tileView('best30Days'), null);
+  const view = tileView('records')!;
+  const sample = {
+    ...context,
+    activities: [
+      { ...make('2025-12-31', 'ride'), distance: 100000 },
+      make('2026-01-01', 'run'),
+    ],
+  };
+  for (const date of ['2026-01-01', '2026-01-29']) {
+    const html = renderToStaticMarkup(
+      view.more!(
+        { ...sample, today: dayFromISODate(date) },
+        undefined,
+      ) as ReactElement,
+    );
+    assert.match(html, /first complete 30-day window/);
+    assert.doesNotMatch(html, /Last 30 days:|%/);
+  }
+  const html = renderToStaticMarkup(
+    view.more!(
+      { ...sample, today: dayFromISODate('2026-01-30') },
+      undefined,
+    ) as ReactElement,
+  );
+  assert.match(html, /Best 30 days/);
+  assert.match(html, /Jan 1.*Jan 30/);
+  assert.match(html, /Last 30 days: 10 km/);
+  assert.equal((html.match(/100%/g) ?? []).length, 6); // Text and bar width for all three metrics.
+  assert.doesNotMatch(html, /1100%/);
+});
+
+void test('records avoid percentages when a complete window has no recorded metric', () => {
+  const html = renderToStaticMarkup(
+    tileView('records')!.more!(
+      { ...context, activities: [] },
+      undefined,
+    ) as ReactElement,
+  );
+  assert.match(html, /No distance recorded this year/);
+  assert.doesNotMatch(html, /NaN|Infinity|%/);
+});
+
+void test('projection headline is the year-end total rather than its daily rate', () => {
+  const summary = tileView('yearPace')!.summary(
+    {
+      ...context,
+      today: dayFromISODate('2026-01-10'),
+      activities: [make('2026-01-01', 'run')],
+    },
+    'distance',
+  )!;
+  assert.equal(summary.value, '365');
+  assert.equal(summary.unit, 'km projected');
+});
+
 void test('expanded training history exposes bounded presets and period totals', () => {
   const view = tileView('weeklyVolume')!;
   const html = renderToStaticMarkup(
@@ -143,6 +200,9 @@ void test('expanded training history exposes bounded presets and period totals',
   assert.match(html, /2\.0 h/);
   assert.match(html, /Period totals/);
   assert.match(html, /current period is incomplete/);
+  assert.match(html, /Total across the displayed 12 weeks/);
+  assert.equal(view.period(context), '12-week trend');
+  assert.match(view.summary(context, 'distance')!.unit, /last 28 days/);
 });
 
 void test('calendar history supports year and day selection, and mixed days stay identifiable', () => {

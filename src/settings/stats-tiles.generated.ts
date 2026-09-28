@@ -79,7 +79,7 @@ export const statsTiles = [
     primary: true,
     toggle: {
       label: 'Metric',
-      options: ['distance', 'elevation', 'time', 'count'],
+      options: ['distance', 'time', 'elevation', 'count'],
     },
   },
   {
@@ -93,7 +93,7 @@ export const statsTiles = [
     },
     toggle: {
       label: 'Metric',
-      options: ['elevation', 'distance', 'time', 'count'],
+      options: ['distance', 'time', 'elevation', 'count'],
     },
   },
   {
@@ -108,7 +108,7 @@ export const statsTiles = [
     primary: true,
     toggle: {
       label: 'Metric',
-      options: ['distance', 'elevation', 'time', 'count'],
+      options: ['distance', 'time', 'elevation', 'count'],
     },
   },
   {
@@ -147,7 +147,7 @@ export const statsTiles = [
     optional: true,
     toggle: {
       label: 'Metric',
-      options: ['count', 'distance', 'elevation', 'time'],
+      options: ['distance', 'time', 'elevation', 'count'],
     },
   },
   {
@@ -161,7 +161,7 @@ export const statsTiles = [
     },
     toggle: {
       label: 'Colour by',
-      options: ['sport', 'distance', 'elevation', 'time'],
+      options: ['sport', 'distance', 'time', 'elevation'],
     },
   },
   {
@@ -194,7 +194,7 @@ export const statsTiles = [
   },
   {
     id: 'distanceVsElevation',
-    title: 'Climbing',
+    title: 'Hilliness',
     window: 'last12Months',
     group: 'patterns',
     span: {
