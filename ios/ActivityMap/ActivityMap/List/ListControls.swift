@@ -42,6 +42,13 @@ struct ListControls: View {
         .sheet(isPresented: $displayOpen) {
             NavigationStack {
                 Form {
+                    Section {
+                        Picker("Summary", selection: $presentation.settings.summaryMode) {
+                            ForEach(ActivitySummaryMode.allCases) { Text($0.title).tag($0) }
+                        }
+                    } footer: {
+                        Text("Filtered totals include every matching activity. Selected totals include selections hidden by filters. This continuous list has no page scope.")
+                    }
                     Section("Layout") {
                         Picker("Density", selection: $presentation.settings.density) {
                             ForEach(ActivityListDensity.allCases) { Text($0.title).tag($0) }

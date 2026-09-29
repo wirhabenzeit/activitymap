@@ -233,6 +233,20 @@ struct ActivityListSettings: Codable, Equatable {
     var visibleMetrics: Set<ActivityListMetric> = [.distance, .elapsedTime, .elevationGain]
     var density: ActivityListDensity = .comfortable
     var width: ActivityListWidth = .fitWidth
+    var summaryMode: ActivitySummaryMode = .off
+
+    init() {}
+    private enum CodingKeys: String, CodingKey { case sort, visibleMetrics, density, width, summaryMode }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        sort = try values.decodeIfPresent(ActivityListSort.self, forKey: .sort) ?? ActivityListSort()
+        visibleMetrics = try values.decodeIfPresent(Set<ActivityListMetric>.self, forKey: .visibleMetrics)
+            ?? [.distance, .elapsedTime, .elevationGain]
+        density = try values.decodeIfPresent(ActivityListDensity.self, forKey: .density) ?? .comfortable
+        width = try values.decodeIfPresent(ActivityListWidth.self, forKey: .width) ?? .fitWidth
+        // Preserve all existing #211 preferences when decoding its v1 payload.
+        summaryMode = try values.decodeIfPresent(ActivitySummaryMode.self, forKey: .summaryMode) ?? .off
+    }
 
     var orderedMetrics: [ActivityListMetric] { ActivityListMetric.allCases.filter { visibleMetrics.contains($0) } }
 }

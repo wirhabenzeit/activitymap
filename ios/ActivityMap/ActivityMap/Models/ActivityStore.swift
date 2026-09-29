@@ -36,6 +36,7 @@ final class ActivityStore {
     private(set) var activitiesRevision = 0
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
+    @ObservationIgnored let summaryCache = ActivitySummaryCache()
     let mapContext = MapContext()
     let listPresentation: ActivityListPresentation
 
@@ -140,6 +141,12 @@ final class ActivityStore {
 
     /// Sort is a list presentation concern; shared filter order stays intact.
     var listedActivities: [Activity] { listPresentation.settings.sort.sorted(filteredActivities) }
+
+    var activitySummary: ActivitySummary? {
+        let mode = listPresentation.settings.summaryMode
+        let ids = mode == .selected ? selection.selectedIDs : selection.visibleIDs
+        return summaryCache.summary(mode: mode, revision: activitiesRevision, activities: activities, ids: ids)
+    }
 
     var activeFilterCount: Int {
         var count = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0 : 1
@@ -277,6 +284,7 @@ final class ActivityStore {
 
     /// Logout, account or deployment transition.
     func clearScope() {
+        summaryCache.clear()
         activities = []
         routeGeometry.update(activities: [], revision: activitiesRevision)
         selection.clearScope()

@@ -6,22 +6,27 @@ struct ListScreen: View {
 
     var body: some View {
         GeometryReader { geometry in
-            List(store.listedActivities) { activity in
-                ActivityRowView(store: store, activity: activity)
-                if sizeClass == .regular, store.inspectedActivityID == activity.id {
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("Activity details").font(.headline)
-                            Spacer()
-                            Button("Close") { store.dismissInspection() }
-                                .frame(minWidth: 44, minHeight: 44)
-                                .accessibilityLabel("Close activity details")
+            List {
+                if store.listPresentation.settings.summaryMode != .off {
+                    ActivitySummaryView(store: store)
+                }
+                ForEach(store.listedActivities) { activity in
+                    ActivityRowView(store: store, activity: activity)
+                    if sizeClass == .regular, store.inspectedActivityID == activity.id {
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text("Activity details").font(.headline)
+                                Spacer()
+                                Button("Close") { store.dismissInspection() }
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .accessibilityLabel("Close activity details")
+                            }
+                            .padding(.horizontal, 20)
+                            ActivityDetailPanel(store: store, activityID: activity.id)
+                                .frame(height: max(220, min(560, geometry.size.height - 160)))
                         }
-                        .padding(.horizontal, 20)
-                        ActivityDetailPanel(store: store, activityID: activity.id)
-                            .frame(height: max(220, min(560, geometry.size.height - 160)))
+                        .listRowInsets(EdgeInsets())
                     }
-                    .listRowInsets(EdgeInsets())
                 }
             }
             .listStyle(.plain)
