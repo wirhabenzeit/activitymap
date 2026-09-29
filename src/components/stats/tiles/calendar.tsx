@@ -20,7 +20,7 @@ import {
 
 // The tile face's calendar: one row per month (oldest at the top), one cell
 // per day of the month, coloured by the day's dominant sport. Hovering a day
-// names it in the footer, in place of the legend.
+// names it on a line above the legend, which stays visible.
 export function MonthRows({
   today,
   dominantSport,
@@ -51,7 +51,7 @@ export function MonthRows({
       ? 0
       : Math.max(0, ...Array.from(totals.values(), (day) => day[colorBy]));
   const numericLegend = colorBy !== 'sport' && (
-    <div className="mt-1.5 flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
+    <div className="mt-1 flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
       <span>0</span>
       <span
         className="h-2 w-16 rounded"
@@ -160,15 +160,10 @@ export function MonthRows({
           </div>
         ))}
       </div>
-      {hover ? (
-        <div className="mt-1.5 min-h-4 shrink-0 text-[11px] leading-4">
-          {hover}
-        </div>
-      ) : colorBy === 'sport' ? (
-        footer
-      ) : (
-        numericLegend
-      )}
+      <div className="mt-1.5 min-h-4 shrink-0 truncate text-[11px] leading-4">
+        {hover ?? '\u00a0'}
+      </div>
+      {colorBy === 'sport' ? footer : numericLegend}
     </div>
   );
 }

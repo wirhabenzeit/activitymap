@@ -355,35 +355,24 @@ export function CalendarHistory({
             <strong className="font-mono">{days.size}</strong> active days ·{' '}
             {dateLabel(first)} – {dateLabel(last)}
           </p>
-          <form
-            key={`${first}-${last}`}
-            className="flex flex-wrap items-center gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = new FormData(event.currentTarget).get('day');
-              if (typeof value !== 'string') return;
-              const day = dayFromISODate(value);
-              if (day >= first && day <= last) setSelectedDay(day);
-            }}
-          >
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Jump to day
             <input
-              name="day"
+              key={`${first}-${last}`}
               type="date"
-              required
-              aria-label="Open calendar day"
-              className="h-8 min-w-0 max-w-full rounded border bg-background px-2 text-xs"
+              aria-label="Jump to calendar day"
+              className="h-8 min-w-0 max-w-full rounded border bg-background px-2 text-xs text-foreground"
               min={isoDate(first)}
               max={isoDate(last)}
-              defaultValue={isoDate(last)}
+              onChange={(event) => {
+                if (!event.target.value) return;
+                const day = dayFromISODate(event.target.value);
+                if (day >= first && day <= last) setSelectedDay(day);
+                // Clear, so picking the same date again re-opens it.
+                event.target.value = '';
+              }}
             />
-            <Button
-              type="submit"
-              variant="outline"
-              className="h-8 px-2 text-xs"
-            >
-              Open day
-            </Button>
-          </form>
+          </label>
         </div>
       )}
       <div
