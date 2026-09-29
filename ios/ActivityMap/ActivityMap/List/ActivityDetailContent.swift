@@ -47,6 +47,8 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
             metricSection("Elevation", ids: ["elevHigh", "elevLow"])
             metricSection("Heart rate", ids: ["averageHeartrate", "maxHeartrate"])
             metricSection("Power & energy", ids: ["averageWatts", "weightedAverageWatts", "maxWatts", "calories", "kilojoules"])
+            metricSection("Activity information", ids: ["id", "geometry", "photos", "kudos", "achievements", "comments",
+                                                         "commute", "privacy", "flagged", "trainer", "manual"])
             photos(activity)
 
             if let description = activity.description, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

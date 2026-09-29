@@ -37,8 +37,10 @@ final class ActivityStore {
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
     let mapContext = MapContext()
+    let listPresentation: ActivityListPresentation
 
-    init(activities: [Activity] = []) {
+    init(activities: [Activity] = [], listPresentation: ActivityListPresentation = ActivityListPresentation()) {
+        self.listPresentation = listPresentation
         self.activities = activities
         selection.setVisible(Set(filteredActivities.map(\.id)))
     }
@@ -135,6 +137,9 @@ final class ActivityStore {
             return true
         }
     }
+
+    /// Sort is a list presentation concern; shared filter order stays intact.
+    var listedActivities: [Activity] { listPresentation.settings.sort.sorted(filteredActivities) }
 
     var activeFilterCount: Int {
         var count = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0 : 1

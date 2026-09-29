@@ -31,6 +31,10 @@ struct ActivityMetricRow: Identifiable {
         add("weightedAverageWatts", "Weighted average power", "bolt", Formatters.watts(activity.weightedAverageWatts))
         add("calories", "Energy", "flame", Formatters.number(activity.calories, decimals: 0, unit: "kcal"))
         add("kilojoules", "Work", "bolt", Formatters.number(activity.kilojoules, decimals: 0, unit: "kJ"))
+        for metric in [ActivityListMetric.id, .geometry, .photos, .kudos, .achievements, .comments,
+                       .commute, .privacy, .flagged, .trainer, .manual] {
+            add(metric.rawValue, metric.title, "info.circle", metric.value(for: activity))
+        }
         return rows
     }
 }
