@@ -6,9 +6,10 @@ value in the existing rounded, version-1 summary; it does not change the
 300-bucket sampling algorithm or the independently stored raw payload.
 
 This implements compact storage and demand/batch transport. Activity DTOs,
-bootstrap and delta sync still carry metadata only. Production rollout, native
-cache/loader integration (#214/#215), library-page delivery measurements and the
-backfill enablement goal remain separate work. This change does not close #230.
+bootstrap and delta sync still carry metadata only. Native demand transport and
+encoded summary persistence are implemented separately from raw caching and
+chart presentation. Production rollout, library-page delivery measurements and
+the backfill enablement goal remain separate work. This change does not close #230.
 
 ## Format
 
@@ -87,11 +88,30 @@ The generated Swift DTOs include both contracts. `CompactStreamCodec` is a
 Foundation-only encoder/decoder. Its golden vectors, malformed inputs, and
 encoded file reopen are tested without a simulator. Native `StreamsAPI` now
 uses `ActivityCompactStreamSummary` for single reads and stored-only batches,
-retaining encoded strings and HTTP retry metadata. The native cache/loader is
-still #215, with independent raw persistence in #216. Persist the encoded DTO
-as Data and track `summary.codec` independently from
-`summary.algorithm_version`. Decode off the main actor only for a visible
-consumer.
+retaining encoded strings and HTTP retry metadata. `LocalStore` persists the
+encoded DTO as Data in a separately addressed, deployment/user/activity-scoped
+summary record; codec and sampling version are tracked independently.
+`StreamSummaryLoader`, exposed as `SyncController.summaries`, deduplicates
+visible-consumer requests and bounds cancellable polling. It honors the later
+of HTTP Retry-After and body `next_retry_at`, including delays beyond its polling
+window. No ordinary sync, map, list or detail load requests summaries. Raw
+persistence remains independent work in #216.
+
+The loader exposes progress/retry through `state(for:)` and keeps a valid
+last-good encoded DTO available through `currentSummary(for:)` during refresh,
+pending and transient errors. Old current data reopens offline while its scoped
+session is valid, without a cache-age or reconciliation-age expiry. Committed
+stream/source invalidations make it stale immediately; tombstones and security
+cleanup remove it. Revision ordering preserves newer direct responses against
+delayed sync. Atomic authoritative replacement also removes orphan summaries,
+handles generation resets and fences in-flight responses after a successful
+commit. Failed replacement preserves both cache validity and request fences.
+
+The #217 chart consumer must call load only while visible, cancel on
+disappearance, and decode/validate samples off the main actor.
+`hasElevationProfileCandidate` checks encoded metadata only: aligned altitude,
+nondecreasing distance and positive span still require decoded validation. No
+expanded sample arrays are stored or published by persistence or the loader.
 
 ## Bounded conversion and rollback
 

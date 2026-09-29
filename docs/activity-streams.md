@@ -146,9 +146,10 @@ URLProtocol, alongside the existing sync/auth compatibility tests.
 
 ## Follow-up boundary
 
-- #215/#216 add native summary/raw loading and caches under #185. The web
-  elevation chart consumes the existing server-generated summary; additional chart types and native presentation
-  remain separate work.
+- Native encoded summary loading and persistence are implemented under #215;
+  see [the cache and chart handoff](compact-stream-summaries.md#storage-and-apis).
+  Independent raw loading/persistence remains #216. The web elevation chart
+  consumes server-generated summaries; native chart presentation remains #217.
 
 Follow [the migration deployment sequence](database-migrations.md) before
 enabling a production consumer.

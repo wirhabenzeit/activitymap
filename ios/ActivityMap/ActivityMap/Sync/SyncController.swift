@@ -35,6 +35,7 @@ final class SyncController {
         }
     }
 
+    let summaries: StreamSummaryLoader
     let activities: ActivityStore
     private(set) var status: Status = .signedOut
     private(set) var checkpoint: SyncCheckpoint?
@@ -68,8 +69,12 @@ final class SyncController {
         activities: ActivityStore,
         now: @escaping () -> Date = Date.init,
         source: @escaping (SyncSession) -> any SyncPageSource = { SyncAPI(baseURL: $0.deployment, token: $0.token) },
+        summarySource: @escaping (SyncSession) -> any CompactSummarySource = {
+            StreamsAPI(baseURL: $0.deployment, token: $0.token)
+        },
         invalidate: @escaping (String) -> Void
     ) {
+        self.summaries = StreamSummaryLoader(source: summarySource, invalidate: invalidate)
         self.activities = activities
         self.now = now
         self.source = source
@@ -111,6 +116,8 @@ final class SyncController {
                 try await storage.clearExcept(scope: active?.scope)
                 guard current == generation, !Task.isCancelled else { return }
                 needsCleanup = false
+                await summaries.configure(active, storage: storage)
+                guard current == generation, !Task.isCancelled else { return }
                 if let active {
                     await perform(active, storage: storage, generation: current)
                 } else if let next {
@@ -150,8 +157,10 @@ final class SyncController {
 
     func pause() {
         work?.cancel()
+        summaries.pause()
         if status == .syncing { status = .paused }
     }
+
 
     private func perform(_ session: SyncSession, storage: LocalStore, generation current: Int) async {
         do {
@@ -244,6 +253,7 @@ final class SyncController {
     }
 
     private func clearVisible() {
+        summaries.reset()
         activities.clearScope()
         photos = []
         checkpoint = nil

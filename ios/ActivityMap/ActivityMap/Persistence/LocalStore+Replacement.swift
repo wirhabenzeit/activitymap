@@ -14,6 +14,7 @@ extension LocalStore {
         let context = makeContext()
         let key = scope.key
         do {
+            try reconcileSummaryReplacement(snapshot.activities, scopeKey: key, context: context)
             let existingActivities = try context.fetch(FetchDescriptor<StoredActivity>(
                 predicate: #Predicate { $0.scope == key }))
             let existingPhotos = try context.fetch(FetchDescriptor<StoredPhoto>(
@@ -43,6 +44,7 @@ extension LocalStore {
             } else { context.insert(try SyncState(scope: key, checkpoint: checkpoint)) }
             try Task.checkCancellation()
             try save(context)
+            summaryReplacementCommitted(scopeKey: key)
         } catch {
             context.rollback()
             throw error

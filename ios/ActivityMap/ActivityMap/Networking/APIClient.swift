@@ -131,6 +131,7 @@ nonisolated enum APIClient {
         try await performResponse(request, session: session, as: payloadType).payload
     }
 
+    @concurrent
     private static func performResponse<Payload: Decodable & Sendable>(
         _ request: URLRequest,
         session: URLSession,
