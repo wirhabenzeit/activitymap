@@ -85,12 +85,13 @@ persistent/offline stream cache.
 
 The generated Swift DTOs include both contracts. `CompactStreamCodec` is a
 Foundation-only encoder/decoder. Its golden vectors, malformed inputs, and
-encoded file reopen are tested without a simulator. The native stream branch
-should reuse its current scopes, request fences, retries and independent raw
-cache, changing the summary transport/storage DTO to
-`ActivityCompactStreamSummary`. Persist that encoded DTO as Data and track
-`summary.codec` independently from `summary.algorithm_version`. Decode off the main actor
-only for a visible consumer. The native cache/loader itself is still #214/#215.
+encoded file reopen are tested without a simulator. Native `StreamsAPI` now
+uses `ActivityCompactStreamSummary` for single reads and stored-only batches,
+retaining encoded strings and HTTP retry metadata. The native cache/loader is
+still #215, with independent raw persistence in #216. Persist the encoded DTO
+as Data and track `summary.codec` independently from
+`summary.algorithm_version`. Decode off the main actor only for a visible
+consumer.
 
 ## Bounded conversion and rollback
 

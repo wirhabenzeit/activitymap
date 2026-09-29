@@ -116,10 +116,38 @@ charts. Current-but-unusable summaries are remembered as unavailable, while an
 omitted entry remains eligible for the authoritative demand request if its
 card is still visible.
 
+## Native transport (#214)
+
+`StreamsAPI` shares the existing `APIClient` with authentication and sync. Single
+summary reads use `/streams/summary/compact`; stored prefetch uses
+`/stream-summaries/compact` in deduplicated batches of at most 100. The generated
+legacy and compact DTOs retain basis, algorithm version, optional series and
+stream lifecycle metadata. Native transport retains compact strings; a visible
+chart consumer can decode them later with `CompactStreamCodec`.
+
+`StreamFetchMode.storedOnly` sends `fetch=none`, ordinary demand loading sends
+`fetch=auto`, and only `.refresh` sends `refresh=true`. The raw `/streams`
+request is independent and retains exact response bytes, including unknown
+per-stream metadata. Adding this transport does not issue requests on map/list
+launch or during sync.
+
+Existing payload-only auth/sync calls continue to unwrap envelopes. Stream
+responses additionally retain status, request ID, Retry-After and exact bytes;
+202 remains visibly pending. Numeric and HTTP-date delays are not capped, and
+date parsing accounts for an ahead-of-server client clock. A missing/invalid
+429 delay retains the existing 60-second fallback. Retryable error envelopes
+retain the server delay; an envelope-less proxy 503 also retains its delay and
+request ID. Transport makes no automatic retries. Cancellation before/during a
+request is propagated as cancellation, and the shared schema-version check is
+applied to every successful envelope.
+
+`StreamsAPITests` verifies this without live credentials using a dedicated
+URLProtocol, alongside the existing sync/auth compatibility tests.
+
 ## Follow-up boundary
 
-- #185 adds iOS loading/cache. The web elevation chart consumes the existing
-  server-generated summary; additional chart types and native presentation
+- #215/#216 add native summary/raw loading and caches under #185. The web
+  elevation chart consumes the existing server-generated summary; additional chart types and native presentation
   remain separate work.
 
 Follow [the migration deployment sequence](database-migrations.md) before

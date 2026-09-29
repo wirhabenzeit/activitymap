@@ -119,7 +119,7 @@ Compact elevation charts use server summaries; full raw samples are independent.
 
 In `profileCases`, `relative_distance` is always in **metres**, computed by subtracting the first distance sample; `distance_unit` specifies axis display formatting only. Use metres when the relative span is less than 1,000 m and kilometres at or above 1,000 m, dividing relative metres by 1,000 only for display. Altitude values/extrema remain metres. Thus `[0, 1000]` with `distance_unit: "km"` displays from 0 to 1 km, not 0 to 1,000 km.
 
-Respect server retry timing for pending/429/retryable 503 and bound/cancel requests. No raw download or decode on ordinary map/list launch, compact detail open or sync. #230 may change the encoded summary format and delivery after measurement; it has not yet selected a codec or shipped activity-embedded samples.
+Respect server retry timing for pending/429/retryable 503 and bound/cancel requests. No raw download or decode on ordinary map/list launch, compact detail open or sync. #246 ships the opt-in polyline-v1 compact summary contracts and codec; #230 still owns production conversion/backfill and any measured activity-sync embedding. Native transport uses the compact endpoints and retains encoded strings until a visible consumer needs samples.
 
 Photo metadata is already synced. Galleries preserve activity association and distinguish cached bytes from merely known URLs. Valid zero latitude/longitude are valid map locations; null/out-of-range coordinates omit only the map marker. Image failure is neither an empty library nor an expired session.
 
