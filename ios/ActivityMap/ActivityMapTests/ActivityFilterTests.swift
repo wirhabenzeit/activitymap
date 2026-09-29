@@ -134,6 +134,23 @@ struct ActivityFilterTests {
         #expect(store.filteredActivities.map(\.id) == [1])
     }
 
+    @Test(arguments: ["ar_EG", "fa_IR"])
+    func localizedDecimalDigitsRoundtrip(localeIdentifier: String) {
+        let locale = Locale(identifier: localeIdentifier)
+        let displayed = 1.25.formatted(.number.locale(locale).grouping(.never).precision(.fractionLength(0...12)))
+        if case .valid(let value) = NumericFilterInput.parse(displayed, scale: 1000, locale: locale) {
+            #expect(value == 1250, "Applied thresholds must stay editable in \(localeIdentifier)")
+        } else { Issue.record("Localized decimal rejected: \(displayed)") }
+        let zero = 0.formatted(.number.locale(locale).grouping(.never))
+        if case .valid(let value) = NumericFilterInput.parse(zero, scale: 3600, locale: locale) {
+            #expect(value == 0)
+        } else { Issue.record("Localized measured zero rejected: \(zero)") }
+        for invalid in ["١٬٢٥", "۱٬۲۵", "−١", "-۱", "١٫٢٫٥", "۱٫۲٫۵", "Ⅷ", "²", "½"] {
+            if case .invalid = NumericFilterInput.parse(invalid, scale: 1000, locale: locale) { }
+            else { Issue.record("Nondecimal or malformed number accepted: \(invalid)") }
+        }
+    }
+
     @Test func dayKeysRejectInvalidOrInvertedDates() {
         #expect(ActivityDayRange(start: "2026-03-30", end: "2026-03-29") == nil)
         #expect(ActivityDayRange(start: "2026-02-29", end: "2026-03-01") == nil)

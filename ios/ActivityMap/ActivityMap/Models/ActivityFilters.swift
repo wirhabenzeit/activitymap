@@ -112,7 +112,17 @@ enum NumericFilterInput {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .empty }
         let separator = locale.decimalSeparator ?? "."
-        let normalized = separator == "." ? trimmed : trimmed.replacingOccurrences(of: separator, with: ".")
+        let decimalNormalized = separator == "." ? trimmed : trimmed.replacingOccurrences(of: separator, with: ".")
+        // Number formatting and native keyboards can use Arabic/Persian (or
+        // other Unicode decimal) digits. Normalize only decimal digits; signs,
+        // grouping marks, numeric symbols and fractions still fail validation.
+        let normalized = decimalNormalized.unicodeScalars.map { scalar in
+            if scalar.properties.numericType == .decimal,
+               let value = scalar.properties.numericValue {
+                return String(Int(value))
+            }
+            return String(scalar)
+        }.joined()
         guard normalized.range(of: #"^(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$"#, options: .regularExpression) != nil,
               let number = Double(normalized), number.isFinite,
               scale.isFinite, scale > 0, (number * scale).isFinite else { return .invalid }
