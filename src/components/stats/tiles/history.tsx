@@ -12,8 +12,6 @@ import {
 import { categorySettings } from '~/settings/category';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
 import {
-  dayFromISODate,
-  isoDate,
   sameDateLastYear,
   metricValue,
   sportOrder,
@@ -355,24 +353,6 @@ export function CalendarHistory({
             <strong className="font-mono">{days.size}</strong> active days ·{' '}
             {dateLabel(first)} – {dateLabel(last)}
           </p>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            Jump to day
-            <input
-              key={`${first}-${last}`}
-              type="date"
-              aria-label="Jump to calendar day"
-              className="h-8 min-w-0 max-w-full rounded border bg-background px-2 text-xs text-foreground"
-              min={isoDate(first)}
-              max={isoDate(last)}
-              onChange={(event) => {
-                if (!event.target.value) return;
-                const day = dayFromISODate(event.target.value);
-                if (day >= first && day <= last) setSelectedDay(day);
-                // Clear, so picking the same date again re-opens it.
-                event.target.value = '';
-              }}
-            />
-          </label>
         </div>
       )}
       <div
