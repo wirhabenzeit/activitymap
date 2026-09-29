@@ -205,14 +205,14 @@ void test('expanded training history exposes bounded presets and period totals',
   assert.match(view.summary(context, 'distance')!.unit, /last 28 days/);
 });
 
-void test('calendar history supports year and day selection, and mixed days stay identifiable', () => {
+void test('calendar history supports year selection, and mixed days stay identifiable', () => {
   const view = tileView('activityCalendar')!;
   const html = renderToStaticMarkup(
     view.detail!(context, 'sport') as ReactElement,
   );
   assert.match(html, /Calendar period/);
   assert.match(html, /value="2025"/);
-  assert.match(html, /Open calendar day/);
+  assert.doesNotMatch(html, /calendar day/);
   const day = dayFromISODate('2024-02-29');
   const mixed = renderToStaticMarkup(
     createElement(MonthRows, {
