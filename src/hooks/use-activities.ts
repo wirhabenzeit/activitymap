@@ -20,6 +20,7 @@ import { toActivityDTO } from '~/contracts/v1/activity';
 import { getCachedActivityDTOs, upsertActivityDTOs } from '~/lib/sync/v1-store';
 import { dtoToActivity, type ActivityWithStreams } from '~/lib/sync/v1-mappers';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
+import { fetchAndPersistPage } from '~/lib/sync/persisted-page';
 
 // Issue #126 (phase 2): this cache used to read/write
 // `~/lib/offline/db.ts`'s Drizzle-shaped `Activity` rows directly. It now
@@ -33,7 +34,7 @@ const getCachedActivities = async (scope: string): Promise<ActivityWithStreams[]
 const upsertCachedActivities = (scope: string, activities: Activity[]): Promise<void> =>
     upsertActivityDTOs(scope, activities.map(toActivityDTO));
 
-const memoryActivitiesByScope = new Map<string, ActivityWithStreams[]>();
+const selectActivities = (data: InfiniteData<Activity[], number>) => data.pages.flat();
 
 const buildCacheScope = (params: {
     isGuest: boolean;
@@ -124,33 +125,33 @@ export function useActivities() {
             }),
         [isGuest, userId, guestMode.type, guestMode.userId, guestActivityIds],
     );
-    const initialData = useMemo(() => {
-        if (!cacheScope) return undefined;
-        const seed = memoryActivitiesByScope.get(cacheScope);
-        if (!seed || seed.length === 0) return undefined;
-        return {
-            pages: [seed],
-            pageParams: [0],
-        } satisfies InfiniteData<Activity[], number>;
-    }, [cacheScope]);
-
     const query = useInfiniteQuery({
         queryKey,
-        queryFn: ({ pageParam }) => {
-            if (canFetchGuestActivities) {
-                return getPublicActivities(guestActivityIds);
-            }
+        // React Query deduplicates this fetch across all consumers. Persist
+        // only its page, once, before ActivityStreamer requests the next one.
+        queryFn: ({ pageParam }) => fetchAndPersistPage({
+            fetchPage: () => {
+                if (canFetchGuestActivities) {
+                    return getPublicActivities(guestActivityIds);
+                }
 
-            if (canFetchGuestUser) {
-                return getPublicUserActivities({
-                    userId: guestMode.userId!,
-                    offset: pageParam,
-                    limit: 500,
-                });
-            }
+                if (canFetchGuestUser) {
+                    return getPublicUserActivities({
+                        userId: guestMode.userId!,
+                        offset: pageParam,
+                        limit: 500,
+                    });
+                }
 
-            return getUserActivities({ offset: pageParam, limit: 500 });
-        },
+                return getUserActivities({ offset: pageParam, limit: 500 });
+            },
+            persistPage: (page) => cacheScope
+                ? upsertCachedActivities(cacheScope, page)
+                : Promise.resolve(),
+            onPersistenceError: (error) => {
+                console.error('Failed to persist activities in IndexedDB cache:', error);
+            },
+        }),
         enabled: canFetchActivities,
         initialPageParam: 0,
         getNextPageParam: (lastPage, allPages) => {
@@ -161,15 +162,13 @@ export function useActivities() {
             if (lastPage.length < 500) return undefined;
             return allPages.length * 500;
         },
-        select: (data) => data.pages.flat(),
+        select: selectActivities,
         // Data is valid forever until explicitly invalidated (local-first)
         staleTime: Infinity,
         gcTime: Infinity,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
-        initialData,
-
     });
 
     const cacheQuery = useQuery({
@@ -191,8 +190,6 @@ export function useActivities() {
             return;
         }
 
-        memoryActivitiesByScope.set(cacheScope, cacheQuery.data);
-
         queryClient.setQueryData<InfiniteData<Activity[], number>>(
             queryKey,
             (current) =>
@@ -202,18 +199,6 @@ export function useActivities() {
                 },
         );
     }, [cacheQuery.data, cacheScope, queryClient, queryKey]);
-
-    useEffect(() => {
-        if (!cacheScope || !query.data || query.data.length === 0) {
-            return;
-        }
-
-        memoryActivitiesByScope.set(cacheScope, query.data);
-
-        void upsertCachedActivities(cacheScope, query.data).catch((error: unknown) => {
-            console.error('Failed to persist activities in IndexedDB cache:', error);
-        });
-    }, [cacheScope, query.data]);
 
     const data = query.data ?? cacheQuery.data;
 
