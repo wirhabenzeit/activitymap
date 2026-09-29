@@ -67,7 +67,10 @@ extension RenderedRoutePickingTests {
             if tablet {
                 ScrollView { ActivitySummaryView(store: store, allMetricsExpanded: true).padding() }
             } else {
-                ListScreen(store: store)
+                ListScreen(store: store,
+                    emptyState: scenario == "selected-hidden" || scenario == "empty-filtered"
+                        ? BrowsingPresentation(store: store, sync: nil).empty : nil,
+                    recover: { if $0 == .clearFilters { store.resetFilters() } })
             }
         }
         .environment(\.horizontalSizeClass, tablet ? .regular : .compact)
