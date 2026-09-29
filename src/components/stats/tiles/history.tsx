@@ -12,8 +12,6 @@ import {
 import { categorySettings } from '~/settings/category';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
 import {
-  dayFromISODate,
-  isoDate,
   sameDateLastYear,
   metricValue,
   sportOrder,
@@ -355,35 +353,6 @@ export function CalendarHistory({
             <strong className="font-mono">{days.size}</strong> active days ·{' '}
             {dateLabel(first)} – {dateLabel(last)}
           </p>
-          <form
-            key={`${first}-${last}`}
-            className="flex flex-wrap items-center gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = new FormData(event.currentTarget).get('day');
-              if (typeof value !== 'string') return;
-              const day = dayFromISODate(value);
-              if (day >= first && day <= last) setSelectedDay(day);
-            }}
-          >
-            <input
-              name="day"
-              type="date"
-              required
-              aria-label="Open calendar day"
-              className="h-8 min-w-0 max-w-full rounded border bg-background px-2 text-xs"
-              min={isoDate(first)}
-              max={isoDate(last)}
-              defaultValue={isoDate(last)}
-            />
-            <Button
-              type="submit"
-              variant="outline"
-              className="h-8 px-2 text-xs"
-            >
-              Open day
-            </Button>
-          </form>
         </div>
       )}
       <div
