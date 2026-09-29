@@ -141,3 +141,13 @@ Portable map sources live in the validated `shared/map-catalog.json` catalogue. 
 The v1 wire types are generated the same way. `pnpm api-dtos:generate` derives `Networking/DTO/ActivityMapAPI.generated.swift` from the Zod contracts in `src/contracts/v1`, and `pnpm api-dtos:check` fails CI if the committed Swift no longer matches them. Do not edit that file by hand; change the Zod schema and regenerate. Its hand-written companion `Networking/DTO/APISupport.swift` holds the pieces generics cannot express — the response envelope, paged lists, `JSONValue`, and the date-tolerant JSON decoder.
 
 Each client composes those sources with platform-native additions. The React-based Friflyt GeoJSON layer therefore stays in the web adapter, and Mapbox Standard stays native to iOS. UI implementation, icons, gestures, and locale-aware date, duration, measurement, and number formatting remain native. API payloads remain defined by OpenAPI.
+
+## Native filters
+
+The Filters inspector exposes name search, individual canonical sports, coordinated sport groups, custom inclusive activity-local days and calendar presets. Group controls derive all/none/mixed from the selected sports; toggling a mixed group selects all its members, while **Only** explicitly isolates a group. There is one sport predicate for map and list.
+
+Distance (km), elapsed duration (h) and elevation gain (m) offer inclusive minimum/maximum comparisons. Decimal drafts use the device decimal separator and apply after validation; input is converted once to canonical metres/seconds. Invalid input retains the labelled applied restriction, and clearing/resetting removes it. Commute, private and flagged each expose Any/Yes/No: Any includes unknown values, while No requires a recorded false.
+
+Date picker assignments capture Gregorian calendar-day keys immediately, so travelling to another device timezone cannot shift an applied range. The pre-existing filter state was in memory only, so there are no persisted instant bounds to migrate. Calendar presets resolve on selection, include the full year/month, and clamp the last-12-months start on leap days. Filters operate only on the cached activity snapshot and never request streams.
+
+`ActivityFilterTests` runs all shared filter projections through the production cache mapper and predicate in UTC, Europe/Zurich and America/Los_Angeles, plus group coordination, filter-induced selection/detail transitions, numeric validation, preset boundaries and offline cached loading. `RenderedFilterTests` captures phone, larger text and tablet presentations plus numeric editor units/reset under `/tmp/activitymap-filter-preview`. Physical-device interaction and VoiceOver certification remain part of #228.

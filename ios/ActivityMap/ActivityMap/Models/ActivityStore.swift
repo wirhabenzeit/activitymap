@@ -51,15 +51,32 @@ final class ActivityStore {
 
     // Every filter change reconciles selection visibility: hidden selections
     // stay selected, but a hidden active route or list detail is closed.
-    var activeCategories: Set<ActivityCategory> = Set(ActivityCategory.allCases) {
+    // Groups are derived from the checked sports; there is no second category
+    // predicate that can hide an individually checked sport.
+    var activeCategories: Set<ActivityCategory> {
+        get { Set(activeSportTypes.map(\.category)) }
+        set { activeSportTypes = Set(newValue.flatMap(\.sportTypes)) }
+    }
+    var searchText = "" {
         didSet { reconcileSelectionVisibility() }
     }
     var activeSportTypes: Set<SportType> = Set(SportType.allCases) {
         didSet { reconcileSelectionVisibility() }
     }
 
-    var dateRange: ClosedRange<Date>? = nil {
+    var dateDayRange: ActivityDayRange? = nil {
         didSet { reconcileSelectionVisibility() }
+    }
+    /// Compatibility for DatePicker callers. Convert at assignment time so a
+    /// later timezone change cannot move the chosen calendar-day boundaries.
+    /// Filter state was not persisted before day keys were introduced.
+    var dateRange: ClosedRange<Date>? {
+        get { dateDayRange?.pickerRange() }
+        set {
+            dateDayRange = newValue.flatMap {
+                ActivityDayRange(start: $0.lowerBound, end: $0.upperBound)
+            }
+        }
     }
     var distanceFilter: NumericFilter? = nil {
         didSet { reconcileSelectionVisibility() }
@@ -71,6 +88,12 @@ final class ActivityStore {
         didSet { reconcileSelectionVisibility() }
     }
     var commuteOnly: Bool? = nil {
+        didSet { reconcileSelectionVisibility() }
+    }
+    var privateFilter: Bool? = nil {
+        didSet { reconcileSelectionVisibility() }
+    }
+    var flaggedFilter: Bool? = nil {
         didSet { reconcileSelectionVisibility() }
     }
 
@@ -94,52 +117,61 @@ final class ActivityStore {
     }
 
     var filteredActivities: [Activity] {
-        // DatePicker values carry the user's chosen calendar components;
-        // activity-local timestamps carry theirs in UTC-shaped encoding.
-        let lowerDay = dateRange.map { Formatters.dayKey($0.lowerBound, timeZone: .current) }
-        let upperDay = dateRange.map { Formatters.dayKey($0.upperBound, timeZone: .current) }
+        let query = Self.normalizedSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
         return activities.filter { activity in
-            guard activeCategories.contains(activity.category) else { return false }
+            if !query.isEmpty, !Self.normalizedSearch(activity.name).contains(query) { return false }
             guard activeSportTypes.contains(activity.sportType) else { return false }
 
-            if let lowerDay, let upperDay,
-               !(lowerDay...upperDay).contains(activity.localDayKey) { return false }
+            if let dateDayRange, !dateDayRange.contains(activity.localDayKey) { return false }
 
             if let distanceFilter, !matches(distanceFilter, activity.distance) { return false }
             if let elevationFilter, !matches(elevationFilter, activity.totalElevationGain) { return false }
             if let durationFilter, !matches(durationFilter, activity.elapsedTime.map(Double.init)) { return false }
 
             if let commuteOnly, activity.commute != commuteOnly { return false }
+            if let privateFilter, activity.isPrivate != privateFilter { return false }
+            if let flaggedFilter, activity.flagged != flaggedFilter { return false }
 
             return true
         }
     }
 
     var activeFilterCount: Int {
-        var count = activeCategories == Set(ActivityCategory.allCases) ? 0 : 1
+        var count = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0 : 1
         count += activeSportTypes == Set(SportType.allCases) ? 0 : 1
-        count += dateRange == nil ? 0 : 1
+        count += dateDayRange == nil ? 0 : 1
         count += distanceFilter == nil ? 0 : 1
         count += elevationFilter == nil ? 0 : 1
         count += durationFilter == nil ? 0 : 1
         count += commuteOnly == nil ? 0 : 1
+        count += privateFilter == nil ? 0 : 1
+        count += flaggedFilter == nil ? 0 : 1
         return count
     }
 
     private func matches(_ filter: NumericFilter, _ value: Double?) -> Bool {
-        guard let value, value.isFinite else { return false }
+        guard let value, value.isFinite, filter.value.isFinite else { return false }
         switch filter.operatorType {
         case .gte: return value >= filter.value
         case .lte: return value <= filter.value
         }
     }
 
+    private static func normalizedSearch(_ text: String) -> String {
+        text.precomposedStringWithCanonicalMapping.lowercased()
+    }
+
+    func categorySelection(_ category: ActivityCategory) -> SportGroupSelection {
+        let selected = activeSportTypes.intersection(category.sportTypes)
+        if selected.isEmpty { return .none }
+        return selected.count == category.sportTypes.count ? .all : .mixed
+    }
+
     func toggleCategory(_ category: ActivityCategory) {
-        if activeCategories.contains(category) {
-            activeCategories.remove(category)
-        } else {
-            activeCategories.insert(category)
-        }
+        let members = Set(category.sportTypes)
+        activeSportTypes = categorySelection(category) == .all
+            ? activeSportTypes.subtracting(members)
+            : activeSportTypes.union(members)
     }
 
     func isolateCategory(_ category: ActivityCategory) {
@@ -150,14 +182,19 @@ final class ActivityStore {
         activeCategories = Set(ActivityCategory.allCases)
     }
 
+    private(set) var filterResetRevision = 0
+
     func resetFilters() {
-        activeCategories = Set(ActivityCategory.allCases)
+        filterResetRevision &+= 1
+        searchText = ""
         activeSportTypes = Set(SportType.allCases)
-        dateRange = nil
+        dateDayRange = nil
         distanceFilter = nil
         elevationFilter = nil
         durationFilter = nil
         commuteOnly = nil
+        privateFilter = nil
+        flaggedFilter = nil
     }
 
     func toggleSportType(_ sportType: SportType) {
