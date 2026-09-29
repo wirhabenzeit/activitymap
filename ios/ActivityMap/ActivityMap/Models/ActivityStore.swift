@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import Observation
 
@@ -37,6 +38,24 @@ final class ActivityStore {
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
     @ObservationIgnored let summaryCache = ActivitySummaryCache()
+    @ObservationIgnored private var routeAvailabilityRevision: Int?
+    @ObservationIgnored private var routeAvailabilityIDs: Set<Int> = []
+
+    /// Browsing status needs only drawable-route availability, not geographic
+    /// bounds. Validate at most two vertices per route once per activity revision;
+    /// filter/status/selection renders then compare IDs without sorting vertices.
+    var routableActivityIDs: Set<Int> {
+        if routeAvailabilityRevision != activitiesRevision {
+            routeAvailabilityIDs = Set(activities.filter { activity in
+                activity.coordinates.lazy.filter {
+                    $0.latitude.isFinite && $0.longitude.isFinite
+                        && (-90...90).contains($0.latitude) && (-180...180).contains($0.longitude)
+                }.prefix(2).count == 2
+            }.map(\.id))
+            routeAvailabilityRevision = activitiesRevision
+        }
+        return routeAvailabilityIDs
+    }
     let mapContext = MapContext()
     let listPresentation: ActivityListPresentation
 

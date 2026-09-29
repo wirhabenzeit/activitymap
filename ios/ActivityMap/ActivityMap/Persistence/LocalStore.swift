@@ -19,7 +19,7 @@ nonisolated struct StoreSnapshot: Sendable {
 /// the checkpoint reach disk in one save, or are rolled back together.
 actor LocalStore {
     private let container: ModelContainer
-    private let save: @Sendable (ModelContext) throws -> Void
+    let save: @Sendable (ModelContext) throws -> Void
 
     init(
         container: ModelContainer,
@@ -156,7 +156,7 @@ actor LocalStore {
         }
     }
 
-    private func makeContext() -> ModelContext {
+    func makeContext() -> ModelContext {
         let context = ModelContext(container)
         context.autosaveEnabled = false
         return context

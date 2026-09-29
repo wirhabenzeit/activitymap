@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ListScreen: View {
     @Bindable var store: ActivityStore
+    var emptyState: BrowsingPresentation.EmptyState? = nil
+    var recover: (BrowsingPresentation.Recovery) -> Void = { _ in }
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
@@ -27,6 +29,11 @@ struct ListScreen: View {
                         }
                         .listRowInsets(EdgeInsets())
                     }
+                }
+                if let emptyState {
+                    BrowsingEmptyView(state: emptyState, recover: recover, scrolls: false)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                 }
             }
             .listStyle(.plain)

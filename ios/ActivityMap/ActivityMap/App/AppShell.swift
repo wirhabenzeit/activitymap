@@ -107,11 +107,18 @@ struct AppShell: View {
     }
 
     private var content: some View {
-        BrowseContent(store: store, refresh: refresh)
+        BrowseContent(store: store, refresh: refresh, sync: sync, isSigningIn: auth.status == .signingIn,
+                      openAccount: { accountDestination = .profile })
     }
 
     private func refresh() async {
         guard let localStore else { return }
+        if let sync, let retry = sync.retryNotBefore, retry > Date() {
+            // The controller still applies expiry/disconnection cleanup during
+            // a server wait, without issuing another session/sync request.
+            await sync.refresh()
+            return
+        }
         await auth.restoreSession()
         sync?.setSession(auth.syncSession, storage: localStore)
         await sync?.refresh()

@@ -232,7 +232,7 @@ struct SyncControllerTests {
         controller.setSession(SyncFixtures.session(), storage: storage)
         await controller.refresh()
         #expect(token == "test-token-alice")
-        #expect(controller.status == .signedOut && controller.activities.activities.isEmpty)
+        #expect(controller.status == .expired && controller.activities.activities.isEmpty)
         #expect(try await storage.snapshot(scope: Fixtures.scope).checkpoint == nil)
     }
 

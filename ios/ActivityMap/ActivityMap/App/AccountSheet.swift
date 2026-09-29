@@ -118,6 +118,14 @@ struct AccountSheet: View {
                 LabeledContent("Session", value: user.authentication.method.rawValue.capitalized)
             }
 
+            if !user.stravaConnected || user.authentication.sessionExpiresAt <= Date() {
+                Section {
+                    Button(user.stravaConnected ? "Sign in Again" : "Reconnect Strava") {
+                        Task { await auth.signIn() }
+                    }
+                }
+            }
+
             Section {
                 Button("Sign Out", role: .destructive) {
                     Task { await auth.signOut() }
@@ -226,7 +234,7 @@ struct AccountSheet: View {
                 if case .failed(let message) = sync.status {
                     Text(message).font(.footnote).foregroundStyle(.secondary)
                 }
-                if case .rateLimited(let date) = sync.status {
+                if let date = sync.retryNotBefore {
                     LabeledContent("Retry after") { Text(date, style: .time) }
                 }
                 if let refresh, sync.session != nil {
@@ -235,7 +243,7 @@ struct AccountSheet: View {
                     } label: {
                         Label("Refresh Activities", systemImage: "arrow.clockwise")
                     }
-                        .disabled(sync.status == .syncing)
+                        .disabled(!sync.canRefresh)
                 }
             }
         }
