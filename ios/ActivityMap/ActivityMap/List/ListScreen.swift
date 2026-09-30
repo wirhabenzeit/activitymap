@@ -14,6 +14,8 @@ struct ListScreen: View {
                 }
                 ForEach(store.listedActivities) { activity in
                     ActivityRowView(store: store, activity: activity)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                     if sizeClass == .regular, store.inspectedActivityID == activity.id {
                         VStack(spacing: 0) {
                             HStack {
@@ -38,10 +40,19 @@ struct ListScreen: View {
             }
             .listStyle(.plain)
             .safeAreaInset(edge: .top, spacing: 0) {
-                VStack(spacing: 0) {
-                    ListControls(presentation: store.listPresentation)
-                    SelectionBar(store: store)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: AppTheme.Spacing.small) {
+                        SelectionBar(store: store)
+                        Spacer(minLength: 0)
+                        ListControls(presentation: store.listPresentation)
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        SelectionBar(store: store)
+                        ListControls(presentation: store.listPresentation).padding(.leading, 44)
+                    }
                 }
+                .padding(.horizontal, AppTheme.Spacing.small)
+                .background(.bar, ignoresSafeAreaEdges: [])
             }
         }
         // List inspection is independent of selection and the active route.
@@ -74,25 +85,25 @@ private struct SelectionBar: View {
     }
 
     private var visibleSummary: String {
-        guard typeSize.isAccessibilitySize else { return summary }
         let count = selectedCount - store.hiddenSelectedCount
-        let scope = "\(count)/\(store.filteredActivities.count) selected"
+        let scope = selectedCount == 0 ? "\(store.filteredActivities.count) activities" : "\(count)/\(store.filteredActivities.count) selected"
         return store.hiddenSelectedCount > 0 ? "\(scope) · \(store.hiddenSelectedCount) hidden" : scope
     }
 
-    private var selectionSymbol: String {
+    private var allFilteredSelected: Bool {
         let count = selectedCount - store.hiddenSelectedCount
-        if count == 0 { return "square" }
-        return count == store.filteredActivities.count ? "checkmark.square.fill" : "minus.square.fill"
+        return count > 0 && count == store.filteredActivities.count
     }
 
     var body: some View {
-        HStack {
-            Text(visibleSummary)
-                .accessibilityLabel(summary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
+        HStack(spacing: 0) {
+            BrowseSelectionButton(title: allFilteredSelected ? "Deselect all filtered activities" : "Select all filtered activities",
+                                  isSelected: allFilteredSelected,
+                                  isMixed: !allFilteredSelected && selectedCount > store.hiddenSelectedCount) {
+                if allFilteredSelected { store.deselectAllFiltered() }
+                else { store.selectAllFiltered() }
+            }
+            .disabled(store.filteredActivities.isEmpty)
             Menu {
                 Button("Select All Filtered Activities") {
                     store.selectAllFiltered()
@@ -107,14 +118,17 @@ private struct SelectionBar: View {
                 }
                 .disabled(selectedCount == 0)
             } label: {
-                Label("Selection", systemImage: selectionSymbol)
-                    .labelStyle(.iconOnly)
-                    .frame(minWidth: 44, minHeight: 44)
+                HStack(spacing: 4) {
+                    Text(visibleSummary).font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Image(systemName: "chevron.down").font(.system(size: 9))
+                }
+                .foregroundStyle(.secondary)
+                .frame(minHeight: 44)
             }
             .accessibilityLabel("Selection actions for all filtered activities")
             .accessibilityValue(summary)
         }
-        .padding(.horizontal)
-        .background(.bar, ignoresSafeAreaEdges: [])
+        .buttonStyle(.plain)
     }
 }

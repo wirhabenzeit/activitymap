@@ -7,14 +7,13 @@ struct ListControls: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) { controls }
-            VStack(alignment: .leading, spacing: 0) { controls }
-        }
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal)
-        .background(.bar, ignoresSafeAreaEdges: [])
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+            : AnyLayout(HStackLayout(spacing: AppTheme.Spacing.small))
+        layout { controls }
+        .font(.caption)
+        .foregroundStyle(.primary)
+        .buttonStyle(.plain)
         .sheet(isPresented: $sortOpen) {
             NavigationStack {
                 Form {
@@ -82,18 +81,18 @@ struct ListControls: View {
 
     @ViewBuilder private var controls: some View {
         Button { sortOpen = true } label: {
-            Label(typeSize.isAccessibilitySize ? "Sort" : "\(presentation.settings.sort.field.title) · \(presentation.settings.sort.direction.title)", systemImage: "arrow.up.arrow.down")
+            Label("Sort", systemImage: "arrow.up.arrow.down")
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(minHeight: 44, alignment: .leading)
+                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
         }
         .accessibilityLabel("Sort activities")
         .accessibilityValue("\(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
         .accessibilityIdentifier("list-sort-control")
         Button { displayOpen = true } label: {
-            Label("Display", systemImage: "slider.horizontal.3")
-                .frame(minHeight: 44)
+            Label("Columns", systemImage: "rectangle.split.3x1")
+                .frame(minWidth: 44, minHeight: 44)
         }
-        .accessibilityLabel("List display options")
+        .accessibilityLabel("Columns and list layout")
         .accessibilityIdentifier("list-display-control")
     }
 }

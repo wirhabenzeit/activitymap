@@ -84,6 +84,47 @@ struct BrowseBadge: View {
     }
 }
 
+struct BrowseSelectionButton: View {
+    let title: String
+    let isSelected: Bool
+    var isMixed = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: isMixed ? "minus.square.fill" : isSelected ? "checkmark.square.fill" : "square")
+                .font(AppTheme.Typography.icon)
+                .foregroundStyle(isSelected || isMixed ? AppTheme.accent : Color.secondary)
+                .frame(minWidth: AppTheme.minimumTarget, minHeight: AppTheme.minimumTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(isMixed ? "Partially selected" : isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// Repeated List metrics use units and compact symbols instead of three
+/// stacked label/value blocks. VoiceOver still receives their full names.
+struct BrowseInlineMetric: View {
+    let title: String
+    let value: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: systemImage).font(.system(size: 10)).foregroundStyle(.secondary)
+            Text(value).font(.caption).monospacedDigit()
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(value == Formatters.unknown ? "Not recorded" : value)
+    }
+}
+
 /// Values arrive already formatted by their existing domain owner. In
 /// particular, an unavailable measurement must not be converted to zero.
 struct BrowseMetricValue: View {
@@ -92,6 +133,7 @@ struct BrowseMetricValue: View {
     let value: String
     var emphasis: Emphasis = .compact
     var context: String? = nil
+    var valueFirst = false
 
     private var valueFont: Font {
         switch emphasis {
@@ -103,10 +145,11 @@ struct BrowseMetricValue: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
+            if valueFirst { Text(value).font(valueFont).monospacedDigit() }
             Text(title).font(AppTheme.Typography.caption).foregroundStyle(.secondary)
-            Text(value).font(valueFont).monospacedDigit()
+            if !valueFirst { Text(value).font(valueFont).monospacedDigit() }
             if let context {
-                Text(context).font(AppTheme.Typography.caption).foregroundStyle(.secondary)
+                Text(context).font(valueFirst ? .caption2 : AppTheme.Typography.caption).foregroundStyle(.secondary)
             }
         }
         .fixedSize(horizontal: false, vertical: true)

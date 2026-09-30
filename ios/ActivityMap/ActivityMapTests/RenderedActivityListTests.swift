@@ -45,6 +45,31 @@ extension RenderedRoutePickingTests {
         try host.save("list-tablet-retained-inspection")
     }
 
+    @Test(arguments: ["phone", "tablet"])
+    func defaultListDensityFitsAtLeastSixRows(scenario: String) async throws {
+        let tablet = scenario == "tablet"
+        let activities = try (1...20).map { id in
+            try StoredModelMapper.activity(Fixtures.activity([
+                "id": String(id), "sport_type": "Ride", "name": "Morning ride along the river",
+                "distance": 14800, "elapsed_time": 3600, "total_elevation_gain": 180,
+            ]))
+        }
+        let store = ActivityStore(activities: activities, listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        store.replaceSelection(with: [19])
+        let root = NavigationStack {
+            ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
+        }.environment(\.horizontalSizeClass, tablet ? .regular : .compact)
+        let host = try ListHarness(root: root, size: tablet ? CGSize(width: 820, height: 1180) : CGSize(width: 375, height: 812))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
+        let list = try #require(host.descendants(of: UICollectionView.self).first)
+        #expect(list.visibleCells.count >= 6, "A default phone List should show at least six activities, not three spacious cards")
+        #expect(list.visibleCells.allSatisfy { $0.bounds.height <= 90 }, "Default rows keep the name, local date/sport and three metrics within 90pt; measured heights: \(list.visibleCells.map { $0.bounds.height })")
+        #expect(store.selectedActivityIDs == [19])
+        try host.save("list-dense-\(scenario)")
+    }
+
     @Test(arguments: ["small-phone", "large-text", "tablet", "scrolling-metrics"])
     func listControlsAdaptToDeviceAndDensity(scenario: String) async throws {
         let presentation = ActivityListPresentation(defaults: nil)

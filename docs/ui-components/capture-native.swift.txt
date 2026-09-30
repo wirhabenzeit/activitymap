@@ -14,14 +14,20 @@ extension RenderedRoutePickingTests {
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = token }
         let rows: [[String: Any]] = [
-            ["id": "1", "name": "Morning ride along the river", "sport_type": "Ride", "distance": 14800, "elapsed_time": 3600, "total_elevation_gain": 180],
-            ["id": "2", "name": "Evening run through the park", "sport_type": "Run", "distance": 5200, "elapsed_time": 1800, "total_elevation_gain": 0],
-            ["id": "3", "name": "Indoor workout", "sport_type": "Workout", "distance": NSNull(), "elapsed_time": 0, "total_elevation_gain": NSNull(), "map_polyline": NSNull(), "map_summary_polyline": NSNull()],
+            ["id": "101", "name": "Morning ride along the river", "sport_type": "Ride", "distance": 14800, "moving_time": 3000, "elapsed_time": 3600, "total_elevation_gain": 180, "average_speed": 4.9, "max_speed": 12, "elev_low": 120, "elev_high": 300, "average_watts": 110, "weighted_average_watts": 130, "max_watts": 456, "average_heartrate": 138, "max_heartrate": 174],
+            ["id": "102", "name": "Evening run through the park", "sport_type": "Run", "distance": 5200, "elapsed_time": 1800, "total_elevation_gain": 0],
+            ["id": "103", "name": "Indoor workout", "sport_type": "Workout", "distance": NSNull(), "elapsed_time": 0, "total_elevation_gain": NSNull(), "map_polyline": NSNull(), "map_summary_polyline": NSNull()],
+            ["id": "100", "name": "Sunset hike above the lake", "sport_type": "Hike", "distance": 7300, "elapsed_time": 6600, "total_elevation_gain": 620],
+            ["id": "99", "name": "Coffee ride with friends", "sport_type": "Ride", "distance": 32600, "elapsed_time": 6000, "total_elevation_gain": 420],
+            ["id": "98", "name": "Lunch break loop", "sport_type": "Run", "distance": 4200, "elapsed_time": 1500, "total_elevation_gain": 35],
+            ["id": "97", "name": "Commute home", "sport_type": "Ride", "distance": 8700, "elapsed_time": 1860, "total_elevation_gain": 75],
+            ["id": "96", "name": "Easy recovery run", "sport_type": "Run", "distance": 6100, "elapsed_time": 2220, "total_elevation_gain": 18],
+            ["id": "95", "name": "Trail along the ridge", "sport_type": "TrailRun", "distance": 11200, "elapsed_time": 4800, "total_elevation_gain": 720],
         ]
         let activities = try rows.map { try StoredModelMapper.activity(Fixtures.activity($0)) }
         let store = ActivityStore(activities: activities, listPresentation: ActivityListPresentation(defaults: nil))
-        store.replaceSelection(with: [1])
-        store.activate(1)
+        store.replaceSelection(with: [101])
+        store.activate(101)
         let style = MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)
         for (name, size, scheme, type) in [
             ("phone-light", CGSize(width: 375, height: 812), ColorScheme.light, DynamicTypeSize.large),
@@ -38,8 +44,8 @@ extension RenderedRoutePickingTests {
                     .environment(\.horizontalSizeClass, regular ? .regular : .compact)),
                     size: size, name: "\(suffix)-\(name)", dark: scheme == .dark)
             }
-            try await present(AnyView(NavigationStack { ListScreen(store: store).navigationTitle("Activities") }), suffix: "list")
-            try await present(AnyView(ActivityDetailView(store: store, activityID: 1)), suffix: "detail")
+            try await present(AnyView(NavigationStack { ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline) }), suffix: "list")
+            try await present(AnyView(ActivityDetailView(store: store, activityID: 101)), suffix: "detail")
             try await present(AnyView(NavigationStack { SharedStatsExample().navigationTitle("Stats") }), suffix: "stats")
             try await present(AnyView(MapScreen(store: store).environment(\.mapStyleOverride, style)), suffix: "map")
         }

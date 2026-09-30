@@ -63,9 +63,12 @@ private struct ActivityDetailActions: View {
                     store.showOnMap(activity.id)
                 } label: {
                     Label("Show on map", systemImage: "map")
+                        .font(.subheadline.weight(.medium))
                         .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(AppTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius))
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.plain)
+                .foregroundStyle(AppTheme.accent)
                 .disabled(!hasRoute)
                 .accessibilityIdentifier("activity-show-on-map")
                 .accessibilityHint(hasRoute ? "Select this activity and frame its route" : "This activity has no GPS route")
@@ -77,7 +80,7 @@ private struct ActivityDetailActions: View {
                         Button("Open in Strava", systemImage: "arrow.up.right.square") {}.disabled(true)
                     }
                 } label: {
-                    Image(systemName: "ellipsis").frame(minWidth: 44, minHeight: 44)
+                    BrowseIconLabel(systemImage: "ellipsis")
                 }
                 .accessibilityLabel("More activity actions")
                 .accessibilityHint("Editing, refresh, GPX sharing and Strava links are not available yet")
@@ -86,8 +89,8 @@ private struct ActivityDetailActions: View {
                 Text("No GPS route recorded").font(.caption).foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.horizontal, AppTheme.Spacing.large)
+        .padding(.vertical, AppTheme.Spacing.small)
         .background(.bar)
     }
 }

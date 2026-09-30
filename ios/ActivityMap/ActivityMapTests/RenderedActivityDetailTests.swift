@@ -37,7 +37,9 @@ extension RenderedRoutePickingTests {
         let size = tablet ? CGSize(width: 768, height: 1024) : landscape ? CGSize(width: 844, height: 390) : CGSize(width: 390, height: 844)
         var activity = try StoredModelMapper.activity(Fixtures.activity([
             "sport_type": "Ride", "name": "A long ride through the hills and home along the river",
-            "description": String(repeating: "Quiet roads, a steep climb, and a stop by the lake.\n", count: 20),
+            // Keep this genuinely overflowing now that default details are
+            // denser; the test still exercises scroll reachability in all hosts.
+            "description": String(repeating: "Quiet roads, a steep climb, and a stop by the lake.\n", count: 40),
             "distance": 31200, "elapsed_time": 4476, "total_elevation_gain": 820,
             "moving_time": 4000, "average_speed": 7.8, "max_speed": 16,
             "elev_high": NSNull(), "elev_low": -12, "average_heartrate": 124, "max_heartrate": NSNull(),
@@ -66,6 +68,7 @@ extension RenderedRoutePickingTests {
         let detailScroll = try #require(scrolls.first { $0.contentSize.height > $0.bounds.height + 100 })
         detailScroll.setContentOffset(CGPoint(x: 0, y: detailScroll.contentSize.height - detailScroll.bounds.height), animated: false)
         try await Task.sleep(for: .milliseconds(100))
+        #expect(detailScroll.contentOffset.y > 0, "Long detail content remains reachable by scrolling")
         try host.save(host.snapshot(), name: "detail-\(scenario)-scrolled")
     }
 }

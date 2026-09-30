@@ -34,6 +34,8 @@ enum AppTheme {
     static let cornerRadius: CGFloat = 10
     static let minimumTarget: CGFloat = 44
     static let minimumMetricColumnWidth: CGFloat = 100
+    static let minimumInlineMetricColumnWidth: CGFloat = 72
+    static let minimumDetailColumnWidth: CGFloat = 180
 
     /// Small glyphs need more contrast than route strokes or chart fills. Keep
     /// the catalogue hue, but use readable tones for light/dark foregrounds.
