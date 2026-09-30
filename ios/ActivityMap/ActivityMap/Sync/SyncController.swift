@@ -14,24 +14,28 @@ nonisolated struct SyncSession: Equatable, Sendable {
 @Observable
 final class SyncController {
     enum Status: Equatable {
-        case signedOut, syncing, ready, offline, expired, disconnected
+        case signedOut, syncing, ready, offline, expired, disconnected, paused
         case failed(String)
         case rateLimited(Date)
+        case retryAfter(Date)
 
         var title: String {
             switch self {
             case .signedOut: "Sign in to load activities"
             case .syncing: "Syncing activities…"
-            case .ready: "Activities up to date"
+            case .ready: "Activity sync complete"
             case .offline: "Offline · reconnect to sync"
             case .expired: "Sign-in expired · sign in again to sync"
             case .disconnected: "Strava is not connected"
+            case .paused: "Activity sync paused"
             case .failed: "Couldn’t sync activities"
             case .rateLimited: "Sync paused · try again later"
+            case .retryAfter: "Server unavailable · try again later"
             }
         }
     }
 
+    let summaries: StreamSummaryLoader
     let activities: ActivityStore
     private(set) var status: Status = .signedOut
     private(set) var checkpoint: SyncCheckpoint?
@@ -41,6 +45,21 @@ final class SyncController {
     private var work: Task<Void, Never>?
     private var generation = 0
     private var retryAt: Date?
+    private var retryIsRateLimit = true
+
+    var hasCompletedCache: Bool { checkpoint?.bootstrapComplete == true && checkpoint?.lastSyncAt != nil }
+    var lastSyncAt: Date? { checkpoint?.lastSyncAt }
+    var lastReconciliationAt: Date? { checkpoint?.freshness?.lastSummaryReconciledAt }
+    var retryNotBefore: Date? { retryAt }
+    var canRefresh: Bool {
+        guard let session, session.user.stravaConnected,
+              session.user.authentication.sessionExpiresAt > now(), status != .syncing else { return false }
+        return retryAt.map { $0 <= now() } ?? true
+    }
+    private var deferredStatus: Status {
+        let date = retryAt ?? now()
+        return retryIsRateLimit ? .rateLimited(date) : .retryAfter(date)
+    }
     private var needsCleanup = false
     private let now: () -> Date
     private let source: (SyncSession) -> any SyncPageSource
@@ -50,8 +69,12 @@ final class SyncController {
         activities: ActivityStore,
         now: @escaping () -> Date = Date.init,
         source: @escaping (SyncSession) -> any SyncPageSource = { SyncAPI(baseURL: $0.deployment, token: $0.token) },
+        summarySource: @escaping (SyncSession) -> any CompactSummarySource = {
+            StreamsAPI(baseURL: $0.deployment, token: $0.token)
+        },
         invalidate: @escaping (String) -> Void
     ) {
+        self.summaries = StreamSummaryLoader(source: summarySource, invalidate: invalidate)
         self.activities = activities
         self.now = now
         self.source = source
@@ -63,6 +86,7 @@ final class SyncController {
     func setSession(_ next: SyncSession?, storage: LocalStore) {
         guard self.storage == nil || session != next || (needsCleanup && work == nil) else { return }
         let sameCredential = session?.token == next?.token && session?.scope == next?.scope
+        let expiredSignIn = status == .expired && next == nil
         self.storage = storage
         session = next
         generation += 1
@@ -77,6 +101,11 @@ final class SyncController {
         } == true
         if !retainsVisibleState { clearVisible() }
         if !sameCredential { retryAt = nil }
+        status = next.map { session in
+            if !session.user.stravaConnected { return .disconnected }
+            if session.user.authentication.sessionExpiresAt <= now() { return .expired }
+            return .syncing
+        } ?? (expiredSignIn ? .expired : .signedOut)
         needsCleanup = true
         work = Task {
             defer { if current == generation { work = nil } }
@@ -87,12 +116,14 @@ final class SyncController {
                 try await storage.clearExcept(scope: active?.scope)
                 guard current == generation, !Task.isCancelled else { return }
                 needsCleanup = false
+                await summaries.configure(active, storage: storage)
+                guard current == generation, !Task.isCancelled else { return }
                 if let active {
                     await perform(active, storage: storage, generation: current)
                 } else if let next {
                     status = next.user.stravaConnected ? .expired : .disconnected
                 } else {
-                    status = .signedOut
+                    status = expiredSignIn ? .expired : .signedOut
                 }
             } catch {
                 if current == generation { status = .failed(String(describing: error)) }
@@ -114,7 +145,8 @@ final class SyncController {
             return
         }
         guard let session else { return }
-        if let retryAt, retryAt > now() { status = .rateLimited(retryAt); return }
+        let authorized = session.user.stravaConnected && session.user.authentication.sessionExpiresAt > now()
+        if authorized, let retryAt, retryAt > now() { status = deferredStatus; return }
         let current = generation
         work = Task {
             defer { if current == generation { work = nil } }
@@ -123,7 +155,12 @@ final class SyncController {
         await work?.value
     }
 
-    func pause() { work?.cancel() }
+    func pause() {
+        work?.cancel()
+        summaries.pause()
+        if status == .syncing { status = .paused }
+    }
+
 
     private func perform(_ session: SyncSession, storage: LocalStore, generation current: Int) async {
         do {
@@ -139,18 +176,22 @@ final class SyncController {
                 status = .offline
                 return
             }
-            if let retryAt, retryAt > now() { status = .rateLimited(retryAt); return }
+            if let retryAt, retryAt > now() { status = deferredStatus; return }
             status = .syncing
             let engine = SyncEngine(source: source(session), store: storage, scope: session.scope)
             _ = try await engine.run()
             guard current == generation, !Task.isCancelled else { return }
             try await loadCache(session, storage: storage, generation: current)
-            if current == generation { status = .ready }
+            if current == generation {
+                retryAt = nil
+                status = .ready
+            }
         } catch {
             guard current == generation, !Task.isCancelled else { return }
             if AuthController.isExplicitlyUnauthenticated(error) {
                 clearVisible()
                 needsCleanup = true
+                status = .expired
                 invalidate(session.token)
                 do { try await storage.clear(scope: session.scope) }
                 catch {
@@ -159,7 +200,7 @@ final class SyncController {
                 }
                 guard current == generation else { return }
                 needsCleanup = false
-                status = .signedOut
+                status = .expired
                 return
             }
             // Reload committed pages even on failure: already-applied tombstones
@@ -168,14 +209,26 @@ final class SyncController {
             catch { if current == generation { clearVisible() } }
             guard current == generation else { return }
             if case .rateLimited(let delay, _) = error as? APIClient.RequestError {
-                let date = now().addingTimeInterval(delay)
-                retryAt = date
-                status = .rateLimited(date)
+                retryAt = now().addingTimeInterval(delay)
+                retryIsRateLimit = true
+                status = deferredStatus
+            } else if let delay = Self.serverRetryDelay(error) {
+                retryAt = now().addingTimeInterval(delay)
+                retryIsRateLimit = false
+                status = deferredStatus
             } else if case .transport = error as? APIClient.RequestError {
                 status = .offline
             } else {
                 status = .failed(String(describing: error))
             }
+        }
+    }
+
+    private static func serverRetryDelay(_ error: Error) -> TimeInterval? {
+        switch error as? APIClient.RequestError {
+        case .serviceUnavailable(let delay, _): return delay
+        case .server(_, _, _, _, true, let delay): return delay
+        default: return nil
         }
     }
 
@@ -200,6 +253,7 @@ final class SyncController {
     }
 
     private func clearVisible() {
+        summaries.reset()
         activities.clearScope()
         photos = []
         checkpoint = nil

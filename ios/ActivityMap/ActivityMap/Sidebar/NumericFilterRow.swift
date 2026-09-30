@@ -1,75 +1,107 @@
 import SwiftUI
 
-/// A `>= / <=` numeric filter row, matching the web sidebar's inequality filters
-/// (distance, elevation gain, elapsed time). Renders as an icon-only button that
-/// opens a popover when collapsed, or inline when the sidebar is expanded.
+/// A single editor for the active filter panel. Drafts apply only when valid;
+/// invalid or unfinished input never changes the last applied restriction.
 struct NumericFilterRow: View {
+    let title: String
     let icon: String
     let unit: String
-    let expanded: Bool
+    let scale: Double
     @Binding var filter: NumericFilter?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    @State private var input: String = ""
-    @State private var showPopover = false
+    @State private var input = ""
+    @State private var operatorType: FilterOperator = .gte
+
+    private var parsed: NumericFilterInput { NumericFilterInput.parse(input, scale: scale) }
+    private var invalid: Bool {
+        if case .invalid = parsed { return true }
+        return false
+    }
+    private var appliedLabel: String {
+        guard let filter else { return "Any" }
+        let number = (filter.value / scale).formatted(.number.grouping(.never).precision(.fractionLength(0...12)))
+        return "\(filter.operatorType.rawValue) \(number) \(unit)"
+    }
 
     var body: some View {
-        if expanded {
-            HStack(spacing: 8) {
-                operatorButton
-                textField
-                Text(unit)
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: icon)
+            if dynamicTypeSize.isAccessibilitySize {
+                comparison
+                valueField
+                appliedStatus
+                actions
+            } else {
+                HStack { comparison; valueField }
+                HStack { appliedStatus; Spacer(); actions }
+            }
+            if invalid {
+                Text("Enter a nonnegative decimal in \(unit), or clear this filter. The applied filter is unchanged.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.red)
             }
-            .frame(height: 32)
-        } else {
-            Button {
-                showPopover = true
-            } label: {
-                Image(systemName: icon)
-                    .frame(width: 32, height: 32)
+        }
+        .onAppear { loadApplied() }
+        .onChange(of: filter) { _, _ in loadApplied() }
+    }
+
+    private var appliedStatus: some View {
+        Text("Applied: \(appliedLabel)")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private var actions: some View {
+        HStack(spacing: 16) {
+            Button("Apply") { apply() }
+                .frame(minHeight: 44)
+                .disabled(invalid)
+                .accessibilityLabel("Apply \(title.lowercased()) filter")
+            Button("Clear") {
+                filter = nil
+                input = ""
+                operatorType = .gte
             }
-            .popover(isPresented: $showPopover) {
-                HStack(spacing: 8) {
-                    operatorButton
-                    textField
-                    Text(unit)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding()
-                .frame(minWidth: 180)
-            }
+            .frame(minHeight: 44)
+            .accessibilityLabel("Clear \(title.lowercased()) filter")
         }
     }
 
-    private var operatorButton: some View {
-        Button {
-            let next: FilterOperator = (filter?.operatorType ?? .gte) == .gte ? .lte : .gte
-            filter?.operatorType = next
-            if filter == nil { filter = NumericFilter(operatorType: next, value: 0) }
-        } label: {
-            Text((filter?.operatorType ?? .gte).rawValue)
-                .font(.caption.monospaced())
-                .frame(width: 28, height: 28)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+    private var comparison: some View {
+        Picker("\(title) comparison", selection: $operatorType) {
+            Text("≥").tag(FilterOperator.gte)
+            Text("≤").tag(FilterOperator.lte)
         }
-        .buttonStyle(.plain)
+        .pickerStyle(.segmented)
+        .frame(minWidth: 100, maxWidth: 160, minHeight: 44)
+        .accessibilityHint("Inclusive minimum or maximum")
     }
 
-    private var textField: some View {
-        TextField("0", text: $input)
-            #if os(iOS)
-            .keyboardType(.decimalPad)
-            #endif
-            .multilineTextAlignment(.trailing)
-            .textFieldStyle(.roundedBorder)
-            .onChange(of: input) { _, newValue in
-                guard let value = Double(newValue) else {
-                    if newValue.isEmpty { filter = nil }
-                    return
-                }
-                filter = NumericFilter(operatorType: filter?.operatorType ?? .gte, value: value)
-            }
+    private var valueField: some View {
+        HStack {
+            TextField("Any", text: $input)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .frame(minHeight: 44)
+                .accessibilityLabel("\(title) in \(unit)")
+                .onSubmit { if !invalid { apply() } }
+            Text(unit).foregroundStyle(.secondary)
+        }
+    }
+
+    private func apply() {
+        switch parsed {
+        case .empty: filter = nil
+        case .valid(let value): filter = NumericFilter(operatorType: operatorType, value: value)
+        case .invalid: break
+        }
+    }
+
+    private func loadApplied() {
+        operatorType = filter?.operatorType ?? .gte
+        input = filter.map {
+            ($0.value / scale).formatted(.number.grouping(.never).precision(.fractionLength(0...12)))
+        } ?? ""
     }
 }

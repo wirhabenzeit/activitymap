@@ -21,7 +21,8 @@
       "max_heartrate": null,
       "average_watts": null,
       "elev_high": 510,
-      "elev_low": null
+      "elev_low": null,
+      "geometry_state": "summary"
     },
     {
       "id": "102",
@@ -42,7 +43,8 @@
       "max_heartrate": 170,
       "average_watts": 120,
       "elev_high": 600,
-      "elev_low": 450
+      "elev_low": 450,
+      "geometry_state": "detailed"
     },
     {
       "id": "103",
@@ -63,7 +65,8 @@
       "max_heartrate": null,
       "average_watts": null,
       "elev_high": null,
-      "elev_low": null
+      "elev_low": null,
+      "geometry_state": "refresh_required"
     },
     {
       "id": "104",
@@ -807,6 +810,40 @@
         "106",
         "105",
         "112",
+        "101"
+      ]
+    },
+    {
+      "name": "geometry canonical state order ascending",
+      "ids": [
+        "103",
+        "101",
+        "102"
+      ],
+      "sort": {
+        "field": "geometry_state",
+        "direction": "asc"
+      },
+      "expected_ids": [
+        "101",
+        "102",
+        "103"
+      ]
+    },
+    {
+      "name": "geometry canonical state order descending",
+      "ids": [
+        "101",
+        "103",
+        "102"
+      ],
+      "sort": {
+        "field": "geometry_state",
+        "direction": "desc"
+      },
+      "expected_ids": [
+        "103",
+        "102",
         "101"
       ]
     }

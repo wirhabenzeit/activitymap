@@ -19,7 +19,10 @@ nonisolated struct StoreSnapshot: Sendable {
 /// the checkpoint reach disk in one save, or are rolled back together.
 actor LocalStore {
     private let container: ModelContainer
-    private let save: @Sendable (ModelContext) throws -> Void
+    let save: @Sendable (ModelContext) throws -> Void
+
+    var streamFences = StreamFences()
+    var summaryObservers: [UUID: AsyncStream<SummaryStoreChange>.Continuation] = [:]
 
     init(
         container: ModelContainer,
@@ -32,7 +35,7 @@ actor LocalStore {
     nonisolated static func makeContainer(
         inMemory: Bool = false, url: URL? = nil
     ) throws -> ModelContainer {
-        let schema = Schema([StoredActivity.self, StoredPhoto.self, SyncState.self])
+        let schema = Schema([StoredActivity.self, StoredPhoto.self, SyncState.self, StoredStreamSummary.self])
         let configuration: ModelConfiguration
         if let url {
             configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
@@ -68,6 +71,7 @@ actor LocalStore {
         try Task.checkCancellation()
         let context = makeContext()
         let scopeKey = scope.key
+        var invalidatedIDs = Set<String>()
         do {
             // Preserve feed order, including multiple operations on one entity.
             for mutation in mutations {
@@ -76,8 +80,15 @@ actor LocalStore {
                     let key = StoreScope.key([scopeKey, dto.id])
                     if let row = try context.fetch(FetchDescriptor<StoredActivity>(
                         predicate: #Predicate { $0.key == key })).first {
+                        let previous = try row.decoded()
+                        if try reconcileSummaryUpsert(dto, previous: previous, scopeKey: scopeKey, context: context) {
+                            invalidatedIDs.insert(dto.id)
+                        }
                         row.payload = try StoreCodec.encode(dto)
                     } else {
+                        if try reconcileSummaryUpsert(dto, previous: nil, scopeKey: scopeKey, context: context) {
+                            invalidatedIDs.insert(dto.id)
+                        }
                         context.insert(try StoredActivity(scope: scopeKey, dto: dto))
                     }
                 case .upsertPhoto(let dto):
@@ -90,6 +101,11 @@ actor LocalStore {
                         context.insert(try StoredPhoto(scope: scopeKey, dto: dto))
                     }
                 case .deleteActivity(let id):
+                    invalidatedIDs.insert(id)
+                    for row in try context.fetch(FetchDescriptor<StoredStreamSummary>(
+                        predicate: #Predicate { $0.scope == scopeKey && $0.activityID == id })) {
+                        context.delete(row)
+                    }
                     for row in try context.fetch(FetchDescriptor<StoredActivity>(
                         predicate: #Predicate { $0.scope == scopeKey && $0.activityID == id })) {
                         context.delete(row)
@@ -116,6 +132,8 @@ actor LocalStore {
             }
             try Task.checkCancellation()
             try save(context)
+            for id in invalidatedIDs { streamFences.invalidate(StoreScope.key([scopeKey, id])) }
+            if !invalidatedIDs.isEmpty { notifySummaryChange(scope: scopeKey, activityIDs: invalidatedIDs) }
         } catch {
             context.rollback()
             throw error
@@ -133,7 +151,11 @@ actor LocalStore {
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<SyncState>(
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredStreamSummary>(
+                predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             try save(context)
+            streamFences.invalidate(key)
+            notifySummaryChange(scope: key)
         } catch {
             context.rollback()
             throw error
@@ -149,14 +171,17 @@ actor LocalStore {
             for row in try context.fetch(FetchDescriptor<StoredActivity>()) where row.scope != keep { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<StoredPhoto>()) where row.scope != keep { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<SyncState>()) where row.scope != keep { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredStreamSummary>()) where row.scope != keep { context.delete(row) }
             try save(context)
+            streamFences.invalidateAll()
+            notifySummaryChange(scope: nil)
         } catch {
             context.rollback()
             throw error
         }
     }
 
-    private func makeContext() -> ModelContext {
+    func makeContext() -> ModelContext {
         let context = ModelContext(container)
         context.autosaveEnabled = false
         return context

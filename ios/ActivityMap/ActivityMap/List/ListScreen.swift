@@ -2,31 +2,46 @@ import SwiftUI
 
 struct ListScreen: View {
     @Bindable var store: ActivityStore
+    var emptyState: BrowsingPresentation.EmptyState? = nil
+    var recover: (BrowsingPresentation.Recovery) -> Void = { _ in }
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         GeometryReader { geometry in
-            List(store.filteredActivities) { activity in
-                ActivityRowView(store: store, activity: activity)
-                if sizeClass == .regular, store.inspectedActivityID == activity.id {
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("Activity details").font(.headline)
-                            Spacer()
-                            Button("Close") { store.dismissInspection() }
-                                .frame(minWidth: 44, minHeight: 44)
-                                .accessibilityLabel("Close activity details")
+            List {
+                if store.listPresentation.settings.summaryMode != .off {
+                    ActivitySummaryView(store: store)
+                }
+                ForEach(store.listedActivities) { activity in
+                    ActivityRowView(store: store, activity: activity)
+                    if sizeClass == .regular, store.inspectedActivityID == activity.id {
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text("Activity details").font(.headline)
+                                Spacer()
+                                Button("Close") { store.dismissInspection() }
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .accessibilityLabel("Close activity details")
+                            }
+                            .padding(.horizontal, 20)
+                            ActivityDetailPanel(store: store, activityID: activity.id)
+                                .frame(height: max(220, min(560, geometry.size.height - 160)))
                         }
-                        .padding(.horizontal, 20)
-                        ActivityDetailPanel(store: store, activityID: activity.id)
-                            .frame(height: max(220, min(560, geometry.size.height - 160)))
+                        .listRowInsets(EdgeInsets())
                     }
-                    .listRowInsets(EdgeInsets())
+                }
+                if let emptyState {
+                    BrowsingEmptyView(state: emptyState, recover: recover, scrolls: false)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                 }
             }
             .listStyle(.plain)
             .safeAreaInset(edge: .top, spacing: 0) {
-                SelectionBar(store: store)
+                VStack(spacing: 0) {
+                    ListControls(presentation: store.listPresentation)
+                    SelectionBar(store: store)
+                }
             }
         }
         // List inspection is independent of selection and the active route.
@@ -46,20 +61,35 @@ struct ListScreen: View {
 /// Selection count and scoped bulk actions for the list.
 private struct SelectionBar: View {
     @Bindable var store: ActivityStore
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var selectedCount: Int { store.selectedActivityIDs.count }
 
     private var summary: String {
-        guard selectedCount > 0 else { return "No activities selected" }
+        let filteredCount = store.filteredActivities.count
+        let visibleCount = selectedCount - store.hiddenSelectedCount
         let hidden = store.hiddenSelectedCount
-        return hidden > 0
-            ? "\(selectedCount) selected · \(hidden) hidden by filters"
-            : "\(selectedCount) selected"
+        let scope = "\(visibleCount) of \(filteredCount) filtered activities selected"
+        return hidden > 0 ? "\(scope) · \(hidden) hidden by filters" : scope
+    }
+
+    private var visibleSummary: String {
+        guard typeSize.isAccessibilitySize else { return summary }
+        let count = selectedCount - store.hiddenSelectedCount
+        let scope = "\(count)/\(store.filteredActivities.count) selected"
+        return store.hiddenSelectedCount > 0 ? "\(scope) · \(store.hiddenSelectedCount) hidden" : scope
+    }
+
+    private var selectionSymbol: String {
+        let count = selectedCount - store.hiddenSelectedCount
+        if count == 0 { return "square" }
+        return count == store.filteredActivities.count ? "checkmark.square.fill" : "minus.square.fill"
     }
 
     var body: some View {
         HStack {
-            Text(summary)
+            Text(visibleSummary)
+                .accessibilityLabel(summary)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -77,13 +107,14 @@ private struct SelectionBar: View {
                 }
                 .disabled(selectedCount == 0)
             } label: {
-                Label("Selection", systemImage: "checklist")
+                Label("Selection", systemImage: selectionSymbol)
                     .labelStyle(.iconOnly)
                     .frame(minWidth: 44, minHeight: 44)
             }
-            .accessibilityLabel("Selection actions")
+            .accessibilityLabel("Selection actions for all filtered activities")
+            .accessibilityValue(summary)
         }
         .padding(.horizontal)
-        .background(.bar)
+        .background(.bar, ignoresSafeAreaEdges: [])
     }
 }

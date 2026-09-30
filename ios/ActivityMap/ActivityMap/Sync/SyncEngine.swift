@@ -16,7 +16,7 @@ nonisolated struct SyncEngine: Sendable {
             }
             return try await bootstrap()
         } catch let error as APIClient.RequestError {
-            guard case .server("sync_rebootstrap_required", _, 409, _, _) = error else { throw error }
+            guard case .server("sync_rebootstrap_required", _, 409, _, _, _) = error else { throw error }
             // Exactly one fresh attempt; any second 409 escapes to the caller.
             return try await bootstrap()
         }
@@ -24,7 +24,15 @@ nonisolated struct SyncEngine: Sendable {
 
     private func bootstrap() async throws -> SyncCheckpoint {
         try Task.checkCancellation()
-        try await store.clear(scope: scope)
+        // A replacement must not erase an authorized completed cache if a
+        // later snapshot page/catch-up fails. Initial bootstrap still commits
+        // partial pages so its existing restart behavior is unchanged.
+        let previous = try await store.snapshot(scope: scope).checkpoint
+        let replacing = previous?.bootstrapComplete == true && previous?.lastSyncAt != nil
+        let destination = replacing
+            ? try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+            : store
+        try await destination.clear(scope: scope)
         var checkpoint = SyncCheckpoint()
         for resource in [ActivityMapAPI.SyncResource.activities, .photos] {
             var cursor: String?
@@ -62,18 +70,24 @@ nonisolated struct SyncEngine: Sendable {
                 }
                 // Persist partial bootstrap data with bootstrapComplete=false.
                 // On interruption the next pass clears it and starts again.
-                try await store.apply(mutations, checkpoint: checkpoint, scope: scope)
+                try await destination.apply(mutations, checkpoint: checkpoint, scope: scope)
                 cursor = next
             } while cursor != nil
         }
         checkpoint.bootstrapComplete = true
         checkpoint.changesCursor = checkpoint.bootstrapCursor
-        try await store.apply([], checkpoint: checkpoint, scope: scope)
+        try await destination.apply([], checkpoint: checkpoint, scope: scope)
         // Mutations during pagination are reconciled from the FIRST snapshot.
-        return try await catchUp(checkpoint)
+        let completed = try await catchUp(checkpoint, destination: destination)
+        if replacing {
+            let snapshot = try await destination.snapshot(scope: scope)
+            try await store.replaceSnapshot(snapshot, scope: scope)
+        }
+        return completed
     }
 
-    private func catchUp(_ initial: SyncCheckpoint) async throws -> SyncCheckpoint {
+    private func catchUp(_ initial: SyncCheckpoint, destination: LocalStore? = nil) async throws -> SyncCheckpoint {
+        let destination = destination ?? store
         var checkpoint = initial
         var seen = Set(initial.changesCursor.map { [$0] } ?? [])
         while true {
@@ -97,7 +111,7 @@ nonisolated struct SyncEngine: Sendable {
             checkpoint.retention = page.retention
             checkpoint.freshness = page.freshness
             if caughtUp { checkpoint.lastSyncAt = now() }
-            try await store.apply(mutations, checkpoint: checkpoint, scope: scope)
+            try await destination.apply(mutations, checkpoint: checkpoint, scope: scope)
             if caughtUp { return checkpoint }
         }
     }

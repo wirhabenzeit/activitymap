@@ -3,15 +3,21 @@ import SwiftUI
 struct BrowseContent: View {
     @Bindable var store: ActivityStore
     var refresh: () async -> Void = {}
+    var sync: SyncController? = nil
+    var isSigningIn = false
+    var openAccount: () -> Void = {}
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 // Retaining this native List preserves the exact scroll offset,
                 // including partially visible rows. No reconstructed anchor jump.
-                ListScreen(store: store)
+                ListScreen(store: store, emptyState: presentation.empty, recover: recover)
                     .id(store.mapContext.scopeRevision)
-                    .refreshable { await refresh() }
+                    .refreshable {
+                        guard sync?.canRefresh ?? true else { return }
+                        await refresh()
+                    }
                     .opacity(store.selectedTab == .list ? 1 : 0)
                     .allowsHitTesting(store.selectedTab == .list)
                     .accessibilityHidden(store.selectedTab != .list)
@@ -23,6 +29,21 @@ struct BrowseContent: View {
                     .opacity(store.selectedTab == .map ? 1 : 0)
                     .allowsHitTesting(store.selectedTab == .map)
                     .accessibilityHidden(store.selectedTab != .map)
+                if store.selectedTab == .map, let empty = presentation.empty {
+                    BrowsingEmptyView(state: empty, recover: recover)
+                        .frame(maxWidth: min(560, max(0, geometry.size.width - 32)))
+                        .frame(maxHeight: max(0, min(480, geometry.size.height - 196)))
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .padding(.top, 16)
+                }
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if sync != nil {
+                TimelineView(.periodic(from: .now, by: 5)) { _ in
+                    BrowsingStatusBar(presentation: presentation, failureMessage: failureMessage, recover: recover)
+                }
             }
         }
         .confirmationDialog("This activity is hidden by filters", isPresented: Binding(
@@ -41,6 +62,27 @@ struct BrowseContent: View {
             Button("OK", role: .cancel) { store.mapContext.navigationError = nil }
         } message: {
             Text(store.mapContext.navigationError ?? "")
+        }
+    }
+
+    private var presentation: BrowsingPresentation {
+        BrowsingPresentation(store: store, sync: sync, isSigningIn: isSigningIn)
+    }
+
+    private var failureMessage: String? {
+        if case .failed(let message) = sync?.status { return message }
+        return nil
+    }
+
+    private func recover(_ action: BrowsingPresentation.Recovery) {
+        switch action {
+        case .clearFilters: store.resetFilters()
+        case .retry:
+            guard sync?.canRefresh == true else { return }
+            Task { await refresh() }
+        case .account: openAccount()
+        case .showList: store.selectedTab = .list
+        case .cancelSync: sync?.pause()
         }
     }
 }

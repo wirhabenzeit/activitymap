@@ -194,9 +194,21 @@ extension RenderedRoutePickingTests {
         try await Task.sleep(for: .milliseconds(100))
         store.showOnMap(150)
         try await cameraWait { store.mapContext.pendingRequest == nil }
-        try await Task.sleep(for: .milliseconds(650))
+        let targetCoordinates = try #require(store.activities.first { $0.id == 150 }).coordinates
+        // Consuming the intent precedes SwiftUI's viewport update. Wait for the
+        // real transition to finish and the route to occupy the required screen
+        // rect, rather than assuming a 650 ms sleep covers renderer scheduling.
+        try await cameraWait {
+            guard case .state = secondMap.viewport.status,
+                  secondMap.mapboxMap.projection?.name == .mercator,
+                  abs(secondMap.mapboxMap.cameraState.center.latitude - 46.005) < 0.03 else { return false }
+            return secondMap.mapboxMap.points(for: targetCoordinates).allSatisfy {
+                $0.y >= secondMap.safeAreaInsets.top + 16
+                    && $0.y <= secondMap.bounds.height - secondMap.safeAreaInsets.bottom - 80
+            }
+        }
         #expect(abs(secondMap.mapboxMap.cameraState.center.latitude - 46.005) < 0.03)
-        let framed = secondMap.mapboxMap.points(for: try #require(store.activities.first { $0.id == 150 }).coordinates)
+        let framed = secondMap.mapboxMap.points(for: targetCoordinates)
         #expect(framed.allSatisfy { $0.y >= secondMap.safeAreaInsets.top + 16 && $0.y <= secondMap.bounds.height - secondMap.safeAreaInsets.bottom - 80 })
         store.selectedTab = .list
         try await Task.sleep(for: .milliseconds(100))
