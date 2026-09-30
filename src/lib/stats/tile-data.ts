@@ -25,6 +25,16 @@ export type StatsActivity = {
   total_elevation_gain: number | null;
 };
 
+// Equal wall-clock starts still need a stable cross-client identity order.
+// Anonymous synthetic rows retain their supplied order after identified rows.
+export function compareStatsActivities(a: StatsActivity, b: StatsActivity) {
+  const time = a.start_date_local.getTime() - b.start_date_local.getTime();
+  if (time !== 0) return time;
+  if (a.id === undefined) return b.id === undefined ? 0 : 1;
+  if (b.id === undefined) return -1;
+  return a.id - b.id;
+}
+
 // A calendar day, counted from 1970-01-01.
 type Day = number;
 
@@ -481,9 +491,7 @@ export function records(
       const day = dayOf(activity.start_date_local);
       return day >= first && day <= today;
     })
-    .sort(
-      (a, b) => a.start_date_local.getTime() - b.start_date_local.getTime(),
-    );
+    .sort(compareStatsActivities);
   const best: Records = {};
   const weeks = new Map<Day, number>();
   for (const activity of inRange) {

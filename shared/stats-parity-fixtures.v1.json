@@ -1,0 +1,2196 @@
+{
+  "version": 1,
+  "tolerance": 1e-6,
+  "fixtures": [
+    {
+      "id": "empty-complete-history",
+      "description": "No recorded activities after history is complete; numeric zeros are not permission to render loading/incomplete history as inactivity.",
+      "today": "2026-01-05",
+      "activities": [],
+      "cases": [
+        {
+          "id": "all-metrics-zero",
+          "operation": "totals",
+          "args": {},
+          "expected": {
+            "count": 0,
+            "distance": 0,
+            "elevation": 0,
+            "time": 0
+          }
+        },
+        {
+          "id": "no-records",
+          "operation": "records",
+          "args": {
+            "range": "currentYear"
+          },
+          "expected": {}
+        },
+        {
+          "id": "no-mix",
+          "operation": "sportMix",
+          "args": {
+            "range": "currentYear"
+          },
+          "expected": []
+        },
+        {
+          "id": "no-days",
+          "operation": "activityCalendar",
+          "args": {},
+          "expected": {
+            "activeDays": 0,
+            "dominantSport": {}
+          }
+        },
+        {
+          "id": "no-consistency",
+          "operation": "consistency",
+          "args": {},
+          "expected": {
+            "activeDaysPerWeek": 0,
+            "currentStreak": 0,
+            "solidWeeks": 0
+          }
+        },
+        {
+          "id": "monday-partial",
+          "operation": "thisWeek",
+          "args": {
+            "metric": "time"
+          },
+          "expected": {
+            "days": [0, null, null, null, null, null, null],
+            "current": 0,
+            "typical": 0
+          }
+        },
+        {
+          "id": "empty-history-year",
+          "operation": "volumeHistory",
+          "args": {
+            "metric": "count",
+            "range": "years"
+          },
+          "expected": [
+            {
+              "start": "2026-01-01",
+              "end": "2026-01-05",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "early-year-calculation",
+          "operation": "best30Days",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": {
+            "total": 0,
+            "start": "2026-01-01",
+            "end": "2026-01-05",
+            "current": 0
+          }
+        },
+        {
+          "id": "empty-period-average",
+          "operation": "typicalWeek",
+          "args": {},
+          "expected": {
+            "count": 0,
+            "distance": 0,
+            "elevation": 0,
+            "time": 0,
+            "activeDays": 0
+          }
+        },
+        {
+          "id": "empty-projection",
+          "operation": "yearPace",
+          "args": {},
+          "expected": {
+            "current": 0,
+            "perDay": 0,
+            "projected": 0,
+            "lastYear": 0
+          }
+        },
+        {
+          "id": "no-calendar-details",
+          "operation": "calendarDays",
+          "args": {
+            "first": "2025-01-01",
+            "last": "2026-01-05"
+          },
+          "expected": {
+            "days": {},
+            "dominantSport": {},
+            "mixedDays": []
+          }
+        },
+        {
+          "id": "empty-weeks-retained",
+          "operation": "weeklyActiveDays",
+          "args": {},
+          "expected": [
+            {
+              "start": "2025-10-20",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-10-27",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-11-03",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-11-10",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-11-17",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-11-24",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-12-01",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-12-08",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-12-15",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-12-22",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2025-12-29",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-01-05",
+              "activeDays": 0,
+              "partial": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sparse-null-zero-and-ties",
+      "description": "Shuffled multi-year history: two tied sports on one day, record ties on different days, nullable and recorded-zero metrics, elapsed/moving differences, sparse periods and retained browsing dates.",
+      "today": "2026-03-31",
+      "activities": [
+        {
+          "id": 9,
+          "sportType": "Ride",
+          "startDateLocal": "2026-03-31T00:15:00",
+          "distance": 10000,
+          "movingTime": 3600,
+          "elevationGain": 100,
+          "elapsedTime": 7200,
+          "name": "Morning ride"
+        },
+        {
+          "id": 8,
+          "sportType": "Run",
+          "startDateLocal": "2026-03-31T23:30:00",
+          "distance": 10000,
+          "movingTime": 3600,
+          "elevationGain": 100,
+          "elapsedTime": 4000,
+          "name": "Evening run"
+        },
+        {
+          "id": 7,
+          "sportType": "Yoga",
+          "startDateLocal": "2026-03-30T09:00:00",
+          "distance": null,
+          "movingTime": null,
+          "elevationGain": null,
+          "elapsedTime": 6000,
+          "name": "Yoga"
+        },
+        {
+          "id": 6,
+          "sportType": "Run",
+          "startDateLocal": "2026-03-23T09:00:00",
+          "distance": 0,
+          "movingTime": 0,
+          "elevationGain": 0,
+          "elapsedTime": 0,
+          "name": "Zero run"
+        },
+        {
+          "id": 5,
+          "sportType": "Ride",
+          "startDateLocal": "2026-02-28T09:00:00",
+          "distance": 20000,
+          "movingTime": 7200,
+          "elevationGain": 200,
+          "elapsedTime": 8000,
+          "name": "Long ride"
+        },
+        {
+          "id": 4,
+          "sportType": "Run",
+          "startDateLocal": "2026-02-27T09:00:00",
+          "distance": 20000,
+          "movingTime": 7200,
+          "elevationGain": 200,
+          "elapsedTime": 8000,
+          "name": "Long run"
+        },
+        {
+          "id": 3,
+          "sportType": "Ride",
+          "startDateLocal": "2025-03-31T09:00:00",
+          "distance": 30000,
+          "movingTime": 3600,
+          "elevationGain": 100,
+          "elapsedTime": 9000,
+          "name": "Previous ride"
+        },
+        {
+          "id": 2,
+          "sportType": "Run",
+          "startDateLocal": "2025-03-30T09:00:00",
+          "distance": 7000,
+          "movingTime": 1800.0,
+          "elevationGain": 20,
+          "elapsedTime": 2000,
+          "name": "Previous run"
+        },
+        {
+          "id": 1,
+          "sportType": "Ride",
+          "startDateLocal": "2024-01-01T09:00:00",
+          "distance": 1000,
+          "movingTime": 3600,
+          "elevationGain": 0,
+          "elapsedTime": 4000,
+          "name": "Old ride"
+        }
+      ],
+      "cases": [
+        {
+          "id": "known-values-count-unknown",
+          "operation": "totals",
+          "args": {},
+          "expected": {
+            "count": 6,
+            "distance": 60,
+            "elevation": 600,
+            "time": 6
+          }
+        },
+        {
+          "id": "month-end-cap",
+          "operation": "monthVsLastMonth",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": {
+            "current": 20,
+            "previous": 40
+          }
+        },
+        {
+          "id": "month-end-count",
+          "operation": "monthVsLastMonth",
+          "args": {
+            "metric": "count"
+          },
+          "expected": {
+            "current": 4,
+            "previous": 2
+          }
+        },
+        {
+          "id": "current-and-comparison",
+          "operation": "yearToDate",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": {
+            "current": 60,
+            "previous": 37
+          }
+        },
+        {
+          "id": "unknown-day-still-active",
+          "operation": "dailyTotals",
+          "args": {
+            "first": "2026-03-30",
+            "last": "2026-03-30"
+          },
+          "expected": {
+            "2026-03-30": {
+              "count": 1,
+              "distance": 0,
+              "elevation": 0,
+              "time": 0
+            }
+          }
+        },
+        {
+          "id": "zero-day-still-active",
+          "operation": "dailyTotals",
+          "args": {
+            "first": "2026-03-23",
+            "last": "2026-03-23"
+          },
+          "expected": {
+            "2026-03-23": {
+              "count": 1,
+              "distance": 0,
+              "elevation": 0,
+              "time": 0
+            }
+          }
+        },
+        {
+          "id": "wall-clock-days-no-zone-conversion",
+          "operation": "dailyTotals",
+          "args": {
+            "first": "2026-03-31",
+            "last": "2026-03-31"
+          },
+          "expected": {
+            "2026-03-31": {
+              "count": 2,
+              "distance": 20,
+              "elevation": 200,
+              "time": 2
+            }
+          }
+        },
+        {
+          "id": "calendar-tie-in-category-order",
+          "operation": "calendarDays",
+          "args": {
+            "first": "2026-03-31",
+            "last": "2026-03-31"
+          },
+          "expected": {
+            "days": {
+              "2026-03-31": [9, 8]
+            },
+            "dominantSport": {
+              "2026-03-31": "run"
+            },
+            "mixedDays": ["2026-03-31"]
+          }
+        },
+        {
+          "id": "calendar-headline-same-tie-rule",
+          "operation": "activityCalendar",
+          "args": {},
+          "expected": {
+            "activeDays": 6,
+            "dominantSport": {
+              "2025-03-31": "ride",
+              "2026-02-27": "run",
+              "2026-02-28": "ride",
+              "2026-03-23": "run",
+              "2026-03-30": "misc",
+              "2026-03-31": "run"
+            }
+          }
+        },
+        {
+          "id": "earliest-record-wins",
+          "operation": "records",
+          "args": {
+            "range": "currentYear"
+          },
+          "expected": {
+            "distance": {
+              "value": 20,
+              "day": "2026-02-27",
+              "activityId": 4
+            },
+            "time": {
+              "value": 2,
+              "day": "2026-02-27",
+              "activityId": 4
+            },
+            "elevation": {
+              "value": 200,
+              "day": "2026-02-27",
+              "activityId": 4
+            },
+            "biggestWeek": {
+              "value": 40,
+              "weekStart": "2026-02-23"
+            }
+          }
+        },
+        {
+          "id": "filter-every-period-retain-date",
+          "operation": "filterActivities",
+          "args": {
+            "filter": {
+              "sportTypes": ["Ride"],
+              "search": "ride",
+              "dateRange": {
+                "start": "2026-03-01",
+                "end": "2026-03-31"
+              },
+              "numeric": {
+                "elapsed_time": {
+                  "operator": ">=",
+                  "value": 7000
+                }
+              },
+              "binary": {
+                "commute": "no",
+                "private": "no",
+                "flagged": "no"
+              }
+            }
+          },
+          "expected": [9, 5, 3]
+        },
+        {
+          "id": "filtered-comparison-keeps-february",
+          "operation": "yearToDate",
+          "args": {
+            "metric": "distance",
+            "filter": {
+              "sportTypes": ["Ride"],
+              "search": "ride",
+              "dateRange": {
+                "start": "2026-03-01",
+                "end": "2026-03-31"
+              },
+              "numeric": {
+                "elapsed_time": {
+                  "operator": ">=",
+                  "value": 7000
+                }
+              },
+              "binary": {
+                "commute": "no",
+                "private": "no",
+                "flagged": "no"
+              }
+            }
+          },
+          "expected": {
+            "current": 30,
+            "previous": 30
+          }
+        },
+        {
+          "id": "duration-filter-elapsed-metric-moving",
+          "operation": "yearToDate",
+          "args": {
+            "metric": "time",
+            "filter": {
+              "sportTypes": ["Ride"],
+              "search": "ride",
+              "dateRange": {
+                "start": "2026-03-01",
+                "end": "2026-03-31"
+              },
+              "numeric": {
+                "elapsed_time": {
+                  "operator": ">=",
+                  "value": 7000
+                }
+              },
+              "binary": {
+                "commute": "no",
+                "private": "no",
+                "flagged": "no"
+              }
+            }
+          },
+          "expected": {
+            "current": 3,
+            "previous": 1
+          }
+        },
+        {
+          "id": "future-week-days-null",
+          "operation": "thisWeek",
+          "args": {
+            "metric": "count"
+          },
+          "expected": {
+            "days": [1, 2, null, null, null, null, null],
+            "current": 3,
+            "typical": 0.09090909090909091
+          }
+        },
+        {
+          "id": "partial-week-not-in-average",
+          "operation": "consistency",
+          "args": {},
+          "expected": {
+            "activeDaysPerWeek": 0.2727272727272727,
+            "currentStreak": 2,
+            "solidWeeks": 0
+          }
+        },
+        {
+          "id": "weekly-counts-full-and-partial",
+          "operation": "weeklyActiveDays",
+          "args": {},
+          "expected": [
+            {
+              "start": "2026-01-12",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-01-19",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-01-26",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-02-02",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-02-09",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-02-16",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-02-23",
+              "activeDays": 2,
+              "partial": false
+            },
+            {
+              "start": "2026-03-02",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-03-09",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-03-16",
+              "activeDays": 0,
+              "partial": false
+            },
+            {
+              "start": "2026-03-23",
+              "activeDays": 1,
+              "partial": false
+            },
+            {
+              "start": "2026-03-30",
+              "activeDays": 2,
+              "partial": true
+            }
+          ]
+        },
+        {
+          "id": "tied-sport-shares",
+          "operation": "sportMix",
+          "args": {
+            "range": "currentYear"
+          },
+          "expected": [
+            {
+              "sport": "run",
+              "share": 0.5
+            },
+            {
+              "sport": "ride",
+              "share": 0.5
+            }
+          ]
+        },
+        {
+          "id": "no-sports-is-empty",
+          "operation": "filterActivities",
+          "args": {
+            "filter": {
+              "sportTypes": []
+            }
+          },
+          "expected": []
+        },
+        {
+          "id": "null-moving-time-still-counts",
+          "operation": "totals",
+          "args": {
+            "filter": {
+              "sportTypes": ["Yoga"]
+            }
+          },
+          "expected": {
+            "count": 1,
+            "distance": 0,
+            "elevation": 0,
+            "time": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "leap-and-sparse-history",
+      "description": "Leap alignment, clamped year comparison, sparse all-year buckets, future exclusion and local today around time zone/DST boundaries.",
+      "today": "2024-03-01",
+      "activities": [
+        {
+          "id": 10,
+          "sportType": "Ride",
+          "startDateLocal": "2024-02-29T23:30:00",
+          "distance": 10000,
+          "movingTime": 7200,
+          "elevationGain": 100
+        },
+        {
+          "id": 11,
+          "sportType": "Run",
+          "startDateLocal": "2024-02-29T00:15:00",
+          "distance": 5000,
+          "movingTime": 3600,
+          "elevationGain": 50
+        },
+        {
+          "id": 12,
+          "sportType": "Yoga",
+          "startDateLocal": "2024-03-01T00:15:00",
+          "distance": null,
+          "movingTime": null,
+          "elevationGain": null
+        },
+        {
+          "id": 13,
+          "sportType": "Ride",
+          "startDateLocal": "2023-02-28T23:30:00",
+          "distance": 4000,
+          "movingTime": 3600,
+          "elevationGain": 10
+        },
+        {
+          "id": 14,
+          "sportType": "Run",
+          "startDateLocal": "2023-03-01T00:15:00",
+          "distance": 6000,
+          "movingTime": 3600,
+          "elevationGain": 20
+        },
+        {
+          "id": 15,
+          "sportType": "Ride",
+          "startDateLocal": "2021-12-31T12:00:00",
+          "distance": 1000,
+          "movingTime": 3600,
+          "elevationGain": 10
+        },
+        {
+          "id": 16,
+          "sportType": "Ride",
+          "startDateLocal": "2024-03-02T12:00:00",
+          "distance": 50000,
+          "movingTime": 18000,
+          "elevationGain": 1000
+        }
+      ],
+      "cases": [
+        {
+          "id": "leap-clamped-comparison",
+          "operation": "yearToDate",
+          "args": {
+            "metric": "distance",
+            "today": "2024-02-29"
+          },
+          "expected": {
+            "current": 15,
+            "previous": 4
+          }
+        },
+        {
+          "id": "march-aligns-after-leap",
+          "operation": "yearToDate",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": {
+            "current": 15,
+            "previous": 10
+          }
+        },
+        {
+          "id": "month-first-not-full-month",
+          "operation": "monthVsLastMonth",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": {
+            "current": 0,
+            "previous": 0
+          }
+        },
+        {
+          "id": "null-activity-counts",
+          "operation": "totals",
+          "args": {},
+          "expected": {
+            "count": 3,
+            "distance": 15,
+            "elevation": 150,
+            "time": 3
+          }
+        },
+        {
+          "id": "cumulative-includes-empty-day",
+          "operation": "cumulativeByDay",
+          "args": {
+            "metric": "distance",
+            "first": "2024-02-28",
+            "last": "2024-03-01"
+          },
+          "expected": [0, 15, 15]
+        },
+        {
+          "id": "leap-curve-coordinates",
+          "operation": "cumulativeYearPoints",
+          "args": {
+            "metric": "distance",
+            "year": 2024,
+            "last": "2024-03-01"
+          },
+          "expected": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 1,
+              "y": 0
+            },
+            {
+              "x": 2,
+              "y": 0
+            },
+            {
+              "x": 3,
+              "y": 0
+            },
+            {
+              "x": 4,
+              "y": 0
+            },
+            {
+              "x": 5,
+              "y": 0
+            },
+            {
+              "x": 6,
+              "y": 0
+            },
+            {
+              "x": 7,
+              "y": 0
+            },
+            {
+              "x": 8,
+              "y": 0
+            },
+            {
+              "x": 9,
+              "y": 0
+            },
+            {
+              "x": 10,
+              "y": 0
+            },
+            {
+              "x": 11,
+              "y": 0
+            },
+            {
+              "x": 12,
+              "y": 0
+            },
+            {
+              "x": 13,
+              "y": 0
+            },
+            {
+              "x": 14,
+              "y": 0
+            },
+            {
+              "x": 15,
+              "y": 0
+            },
+            {
+              "x": 16,
+              "y": 0
+            },
+            {
+              "x": 17,
+              "y": 0
+            },
+            {
+              "x": 18,
+              "y": 0
+            },
+            {
+              "x": 19,
+              "y": 0
+            },
+            {
+              "x": 20,
+              "y": 0
+            },
+            {
+              "x": 21,
+              "y": 0
+            },
+            {
+              "x": 22,
+              "y": 0
+            },
+            {
+              "x": 23,
+              "y": 0
+            },
+            {
+              "x": 24,
+              "y": 0
+            },
+            {
+              "x": 25,
+              "y": 0
+            },
+            {
+              "x": 26,
+              "y": 0
+            },
+            {
+              "x": 27,
+              "y": 0
+            },
+            {
+              "x": 28,
+              "y": 0
+            },
+            {
+              "x": 29,
+              "y": 0
+            },
+            {
+              "x": 30,
+              "y": 0
+            },
+            {
+              "x": 31,
+              "y": 0
+            },
+            {
+              "x": 32,
+              "y": 0
+            },
+            {
+              "x": 33,
+              "y": 0
+            },
+            {
+              "x": 34,
+              "y": 0
+            },
+            {
+              "x": 35,
+              "y": 0
+            },
+            {
+              "x": 36,
+              "y": 0
+            },
+            {
+              "x": 37,
+              "y": 0
+            },
+            {
+              "x": 38,
+              "y": 0
+            },
+            {
+              "x": 39,
+              "y": 0
+            },
+            {
+              "x": 40,
+              "y": 0
+            },
+            {
+              "x": 41,
+              "y": 0
+            },
+            {
+              "x": 42,
+              "y": 0
+            },
+            {
+              "x": 43,
+              "y": 0
+            },
+            {
+              "x": 44,
+              "y": 0
+            },
+            {
+              "x": 45,
+              "y": 0
+            },
+            {
+              "x": 46,
+              "y": 0
+            },
+            {
+              "x": 47,
+              "y": 0
+            },
+            {
+              "x": 48,
+              "y": 0
+            },
+            {
+              "x": 49,
+              "y": 0
+            },
+            {
+              "x": 50,
+              "y": 0
+            },
+            {
+              "x": 51,
+              "y": 0
+            },
+            {
+              "x": 52,
+              "y": 0
+            },
+            {
+              "x": 53,
+              "y": 0
+            },
+            {
+              "x": 54,
+              "y": 0
+            },
+            {
+              "x": 55,
+              "y": 0
+            },
+            {
+              "x": 56,
+              "y": 0
+            },
+            {
+              "x": 57,
+              "y": 0
+            },
+            {
+              "x": 58,
+              "y": 0
+            },
+            {
+              "x": 59,
+              "y": 15
+            },
+            {
+              "x": 60,
+              "y": 15
+            }
+          ]
+        },
+        {
+          "id": "nonleap-curve-skips-feb29",
+          "operation": "cumulativeYearPoints",
+          "args": {
+            "metric": "distance",
+            "year": 2023,
+            "last": "2023-03-01"
+          },
+          "expected": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 1,
+              "y": 0
+            },
+            {
+              "x": 2,
+              "y": 0
+            },
+            {
+              "x": 3,
+              "y": 0
+            },
+            {
+              "x": 4,
+              "y": 0
+            },
+            {
+              "x": 5,
+              "y": 0
+            },
+            {
+              "x": 6,
+              "y": 0
+            },
+            {
+              "x": 7,
+              "y": 0
+            },
+            {
+              "x": 8,
+              "y": 0
+            },
+            {
+              "x": 9,
+              "y": 0
+            },
+            {
+              "x": 10,
+              "y": 0
+            },
+            {
+              "x": 11,
+              "y": 0
+            },
+            {
+              "x": 12,
+              "y": 0
+            },
+            {
+              "x": 13,
+              "y": 0
+            },
+            {
+              "x": 14,
+              "y": 0
+            },
+            {
+              "x": 15,
+              "y": 0
+            },
+            {
+              "x": 16,
+              "y": 0
+            },
+            {
+              "x": 17,
+              "y": 0
+            },
+            {
+              "x": 18,
+              "y": 0
+            },
+            {
+              "x": 19,
+              "y": 0
+            },
+            {
+              "x": 20,
+              "y": 0
+            },
+            {
+              "x": 21,
+              "y": 0
+            },
+            {
+              "x": 22,
+              "y": 0
+            },
+            {
+              "x": 23,
+              "y": 0
+            },
+            {
+              "x": 24,
+              "y": 0
+            },
+            {
+              "x": 25,
+              "y": 0
+            },
+            {
+              "x": 26,
+              "y": 0
+            },
+            {
+              "x": 27,
+              "y": 0
+            },
+            {
+              "x": 28,
+              "y": 0
+            },
+            {
+              "x": 29,
+              "y": 0
+            },
+            {
+              "x": 30,
+              "y": 0
+            },
+            {
+              "x": 31,
+              "y": 0
+            },
+            {
+              "x": 32,
+              "y": 0
+            },
+            {
+              "x": 33,
+              "y": 0
+            },
+            {
+              "x": 34,
+              "y": 0
+            },
+            {
+              "x": 35,
+              "y": 0
+            },
+            {
+              "x": 36,
+              "y": 0
+            },
+            {
+              "x": 37,
+              "y": 0
+            },
+            {
+              "x": 38,
+              "y": 0
+            },
+            {
+              "x": 39,
+              "y": 0
+            },
+            {
+              "x": 40,
+              "y": 0
+            },
+            {
+              "x": 41,
+              "y": 0
+            },
+            {
+              "x": 42,
+              "y": 0
+            },
+            {
+              "x": 43,
+              "y": 0
+            },
+            {
+              "x": 44,
+              "y": 0
+            },
+            {
+              "x": 45,
+              "y": 0
+            },
+            {
+              "x": 46,
+              "y": 0
+            },
+            {
+              "x": 47,
+              "y": 0
+            },
+            {
+              "x": 48,
+              "y": 0
+            },
+            {
+              "x": 49,
+              "y": 0
+            },
+            {
+              "x": 50,
+              "y": 0
+            },
+            {
+              "x": 51,
+              "y": 0
+            },
+            {
+              "x": 52,
+              "y": 0
+            },
+            {
+              "x": 53,
+              "y": 0
+            },
+            {
+              "x": 54,
+              "y": 0
+            },
+            {
+              "x": 55,
+              "y": 0
+            },
+            {
+              "x": 56,
+              "y": 0
+            },
+            {
+              "x": 57,
+              "y": 0
+            },
+            {
+              "x": 58,
+              "y": 4
+            },
+            {
+              "x": 60,
+              "y": 10
+            }
+          ]
+        },
+        {
+          "id": "sparse-all-years-keep-gaps",
+          "operation": "volumeHistory",
+          "args": {
+            "metric": "distance",
+            "range": "years"
+          },
+          "expected": [
+            {
+              "start": "2021-01-01",
+              "end": "2021-12-31",
+              "total": 1,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 1,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2022-01-01",
+              "end": "2022-12-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-01-01",
+              "end": "2023-12-31",
+              "total": 10,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 6,
+                "ride": 4,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-01-01",
+              "end": "2024-03-01",
+              "total": 15,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 5,
+                "ride": 10,
+                "misc": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "leap-day-detail-time-order",
+          "operation": "calendarDays",
+          "args": {
+            "first": "2024-02-29",
+            "last": "2024-03-01"
+          },
+          "expected": {
+            "days": {
+              "2024-02-29": [11, 10],
+              "2024-03-01": [12]
+            },
+            "dominantSport": {
+              "2024-02-29": "ride",
+              "2024-03-01": "misc"
+            },
+            "mixedDays": ["2024-02-29"]
+          }
+        },
+        {
+          "id": "today-negative-offset",
+          "operation": "localToday",
+          "args": {
+            "now": "2024-03-01T00:30:00Z",
+            "timeZone": "America/Los_Angeles"
+          },
+          "expected": "2024-02-29"
+        },
+        {
+          "id": "today-positive-offset",
+          "operation": "localToday",
+          "args": {
+            "now": "2024-02-29T23:30:00Z",
+            "timeZone": "Europe/Zurich"
+          },
+          "expected": "2024-03-01"
+        },
+        {
+          "id": "today-dst-day",
+          "operation": "localToday",
+          "args": {
+            "now": "2024-03-10T10:30:00Z",
+            "timeZone": "America/Los_Angeles"
+          },
+          "expected": "2024-03-10"
+        },
+        {
+          "id": "today-date-line",
+          "operation": "localToday",
+          "args": {
+            "now": "2024-12-31T12:30:00Z",
+            "timeZone": "Pacific/Kiritimati"
+          },
+          "expected": "2025-01-01"
+        },
+        {
+          "id": "weekly-history-current-page",
+          "operation": "volumeHistory",
+          "args": {
+            "metric": "distance",
+            "range": "weeks"
+          },
+          "expected": [
+            {
+              "start": "2023-12-11",
+              "end": "2023-12-17",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-12-18",
+              "end": "2023-12-24",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-12-25",
+              "end": "2023-12-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-01-01",
+              "end": "2024-01-07",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-01-08",
+              "end": "2024-01-14",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-01-15",
+              "end": "2024-01-21",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-01-22",
+              "end": "2024-01-28",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-01-29",
+              "end": "2024-02-04",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-02-05",
+              "end": "2024-02-11",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-02-12",
+              "end": "2024-02-18",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-02-19",
+              "end": "2024-02-25",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-02-26",
+              "end": "2024-03-01",
+              "total": 15,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 5,
+                "ride": 10,
+                "misc": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "weekly-history-previous-page",
+          "operation": "volumeHistory",
+          "args": {
+            "metric": "distance",
+            "range": "weeks",
+            "page": 1
+          },
+          "expected": [
+            {
+              "start": "2023-09-18",
+              "end": "2023-09-24",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-09-25",
+              "end": "2023-10-01",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-10-02",
+              "end": "2023-10-08",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-10-09",
+              "end": "2023-10-15",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-10-16",
+              "end": "2023-10-22",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-10-23",
+              "end": "2023-10-29",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-10-30",
+              "end": "2023-11-05",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-11-06",
+              "end": "2023-11-12",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-11-13",
+              "end": "2023-11-19",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-11-20",
+              "end": "2023-11-26",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-11-27",
+              "end": "2023-12-03",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-12-04",
+              "end": "2023-12-10",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "partial-calendar-months",
+          "operation": "calendarMonths",
+          "args": {
+            "first": "2024-02-29"
+          },
+          "expected": [
+            {
+              "start": "2024-02-01",
+              "length": 29,
+              "first": "2024-02-29",
+              "last": "2024-02-29"
+            },
+            {
+              "start": "2024-03-01",
+              "length": 31,
+              "first": "2024-03-01",
+              "last": "2024-03-01"
+            }
+          ]
+        },
+        {
+          "id": "monthly-history-page-0",
+          "operation": "volumeHistory",
+          "args": {
+            "metric": "distance",
+            "range": "months",
+            "page": 0
+          },
+          "expected": [
+            {
+              "start": "2023-04-01",
+              "end": "2023-04-30",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-05-01",
+              "end": "2023-05-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-06-01",
+              "end": "2023-06-30",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-07-01",
+              "end": "2023-07-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-08-01",
+              "end": "2023-08-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-09-01",
+              "end": "2023-09-30",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-10-01",
+              "end": "2023-10-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-11-01",
+              "end": "2023-11-30",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-12-01",
+              "end": "2023-12-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-01-01",
+              "end": "2024-01-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-02-01",
+              "end": "2024-02-29",
+              "total": 15,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 5,
+                "ride": 10,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2024-03-01",
+              "end": "2024-03-01",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "monthly-history-page-1",
+          "operation": "volumeHistory",
+          "args": {
+            "metric": "distance",
+            "range": "months",
+            "page": 1
+          },
+          "expected": [
+            {
+              "start": "2022-04-01",
+              "end": "2022-04-30",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2022-05-01",
+              "end": "2022-05-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2022-06-01",
+              "end": "2022-06-30",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2022-07-01",
+              "end": "2022-07-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2022-08-01",
+              "end": "2022-08-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2022-09-01",
+              "end": "2022-09-30",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2022-10-01",
+              "end": "2022-10-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2022-11-01",
+              "end": "2022-11-30",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2022-12-01",
+              "end": "2022-12-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-01-01",
+              "end": "2023-01-31",
+              "total": 0,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 0,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-02-01",
+              "end": "2023-02-28",
+              "total": 4,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 0,
+                "ride": 4,
+                "misc": 0
+              }
+            },
+            {
+              "start": "2023-03-01",
+              "end": "2023-03-31",
+              "total": 6,
+              "bySport": {
+                "bcXcSki": 0,
+                "trailHike": 0,
+                "run": 6,
+                "ride": 0,
+                "misc": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "year-boundary-record-ties",
+      "description": "Equal timestamps must use activity identity rather than API/input order; current-year records use only current-year activities even when their week starts in the prior year.",
+      "today": "2026-01-01",
+      "activities": [
+        {
+          "id": 22,
+          "sportType": "Ride",
+          "startDateLocal": "2026-01-01T12:00:00",
+          "distance": 10000,
+          "movingTime": 3600,
+          "elevationGain": 100
+        },
+        {
+          "id": 21,
+          "sportType": "Run",
+          "startDateLocal": "2026-01-01T12:00:00",
+          "distance": 10000,
+          "movingTime": 3600,
+          "elevationGain": 100
+        },
+        {
+          "id": 20,
+          "sportType": "Ride",
+          "startDateLocal": "2025-12-31T23:30:00",
+          "distance": 30000,
+          "movingTime": 10800,
+          "elevationGain": 300
+        },
+        {
+          "id": 23,
+          "sportType": "Ride",
+          "startDateLocal": "2026-01-02T00:15:00",
+          "distance": 50000,
+          "movingTime": 18000,
+          "elevationGain": 500
+        }
+      ],
+      "cases": [
+        {
+          "id": "current-record-identity-tie",
+          "operation": "records",
+          "args": {
+            "range": "currentYear"
+          },
+          "expected": {
+            "distance": {
+              "value": 10,
+              "day": "2026-01-01",
+              "activityId": 21
+            },
+            "time": {
+              "value": 1,
+              "day": "2026-01-01",
+              "activityId": 21
+            },
+            "elevation": {
+              "value": 100,
+              "day": "2026-01-01",
+              "activityId": 21
+            },
+            "biggestWeek": {
+              "value": 20,
+              "weekStart": "2025-12-29"
+            }
+          }
+        },
+        {
+          "id": "all-time-week-includes-both-years",
+          "operation": "records",
+          "args": {
+            "range": "allTime"
+          },
+          "expected": {
+            "distance": {
+              "value": 30,
+              "day": "2025-12-31",
+              "activityId": 20
+            },
+            "time": {
+              "value": 3,
+              "day": "2025-12-31",
+              "activityId": 20
+            },
+            "elevation": {
+              "value": 300,
+              "day": "2025-12-31",
+              "activityId": 20
+            },
+            "biggestWeek": {
+              "value": 50,
+              "weekStart": "2025-12-29"
+            }
+          }
+        },
+        {
+          "id": "equal-time-day-order",
+          "operation": "calendarDays",
+          "args": {
+            "first": "2026-01-01",
+            "last": "2026-01-01"
+          },
+          "expected": {
+            "days": {
+              "2026-01-01": [21, 22]
+            },
+            "dominantSport": {
+              "2026-01-01": "run"
+            },
+            "mixedDays": ["2026-01-01"]
+          }
+        },
+        {
+          "id": "year-clipped-count",
+          "operation": "totals",
+          "args": {},
+          "expected": {
+            "count": 2,
+            "distance": 20,
+            "elevation": 200,
+            "time": 2
+          }
+        },
+        {
+          "id": "early-year-calculation-is-not-full-window",
+          "operation": "best30Days",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": {
+            "total": 20,
+            "start": "2026-01-01",
+            "end": "2026-01-01",
+            "current": 50
+          }
+        }
+      ]
+    }
+  ]
+}
