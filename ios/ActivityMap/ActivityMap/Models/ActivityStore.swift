@@ -13,12 +13,12 @@ enum AppTab: CaseIterable, Hashable {
     }
 }
 
-enum FilterOperator: String {
+nonisolated enum FilterOperator: String, Hashable, Sendable {
     case gte = ">="
     case lte = "<="
 }
 
-struct NumericFilter: Equatable {
+nonisolated struct NumericFilter: Hashable, Sendable {
     var operatorType: FilterOperator = .gte
     var value: Double = 0
 }
@@ -38,6 +38,7 @@ final class ActivityStore {
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
     @ObservationIgnored let summaryCache = ActivitySummaryCache()
+    let stats: StatsController
     @ObservationIgnored private var routeAvailabilityRevision: Int?
     @ObservationIgnored private var routeAvailabilityIDs: Set<Int> = []
 
@@ -59,7 +60,8 @@ final class ActivityStore {
     let mapContext = MapContext()
     let listPresentation: ActivityListPresentation
 
-    init(activities: [Activity] = [], listPresentation: ActivityListPresentation = ActivityListPresentation()) {
+    init(activities: [Activity] = [], listPresentation: ActivityListPresentation = ActivityListPresentation(), stats: StatsController = StatsController()) {
+        self.stats = stats
         self.listPresentation = listPresentation
         self.activities = activities
         selection.setVisible(Set(filteredActivities.map(\.id)))
@@ -138,13 +140,18 @@ final class ActivityStore {
         return activities.first { $0.id == id }
     }
 
-    var filteredActivities: [Activity] {
+    var filteredActivities: [Activity] { filterActivities(includeDate: true) }
+
+    /// Full authorized metadata; map/list dates and selection never narrow Stats.
+    var statsActivities: [Activity] { filterActivities(includeDate: false) }
+
+    private func filterActivities(includeDate: Bool) -> [Activity] {
         let query = Self.normalizedSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
         return activities.filter { activity in
             if !query.isEmpty, !Self.normalizedSearch(activity.name).contains(query) { return false }
             guard activeSportTypes.contains(activity.sportType) else { return false }
 
-            if let dateDayRange, !dateDayRange.contains(activity.localDayKey) { return false }
+            if includeDate, let dateDayRange, !dateDayRange.contains(activity.localDayKey) { return false }
 
             if let distanceFilter, !matches(distanceFilter, activity.distance) { return false }
             if let elevationFilter, !matches(elevationFilter, activity.totalElevationGain) { return false }
@@ -216,10 +223,15 @@ final class ActivityStore {
     private(set) var filterResetRevision = 0
 
     func resetFilters() {
+        dateDayRange = nil
+        resetStatsActivityFilters()
+    }
+
+    /// Preserve saved browsing dates, selected IDs, camera and list context.
+    func resetStatsActivityFilters() {
         filterResetRevision &+= 1
         searchText = ""
         activeSportTypes = Set(SportType.allCases)
-        dateDayRange = nil
         distanceFilter = nil
         elevationFilter = nil
         durationFilter = nil
@@ -303,6 +315,7 @@ final class ActivityStore {
 
     /// Logout, account or deployment transition.
     func clearScope() {
+        stats.clearScope()
         summaryCache.clear()
         activities = []
         routeGeometry.update(activities: [], revision: activitiesRevision)

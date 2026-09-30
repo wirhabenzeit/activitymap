@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum ActivityCategory: String, CaseIterable, Identifiable {
+nonisolated enum ActivityCategory: String, CaseIterable, Identifiable, Sendable {
     case bcXcSki
     case trailHike
     case run
@@ -19,7 +19,7 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
         }
     }
 
-    var color: Color {
+    @MainActor var color: Color {
         switch self {
         case .bcXcSki: return Color(hex: "1982C4")
         case .trailHike: return Color(hex: "FF595E")
@@ -44,7 +44,7 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
     }
 }
 
-enum SportType: String, CaseIterable, Identifiable {
+nonisolated enum SportType: String, CaseIterable, Identifiable, Sendable {
     case backcountrySki = "BackcountrySki"
     case nordicSki = "NordicSki"
     case rollerSki = "RollerSki"
