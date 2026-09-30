@@ -1,0 +1,19 @@
+/** Isolated reference harness: renders actual components with shared synthetic data. */
+import React, { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { ThemeProvider } from 'next-themes';
+import { StatsTileGrid } from '../../src/components/stats/tiles';
+import { SidebarProvider, SidebarMenu } from '../../src/components/ui/sidebar';
+import { CategoryFilter, SearchFilter, MonthPicker, InequalityFilter, BinaryFilter, ResetFilters } from '../../src/components/layout/sidebar/filters';
+import { DataTable } from '../../src/components/list/data-table';
+import { aliasMap } from '../../src/settings/category';
+import corpus from '../../shared/stats-parity-fixtures.v1.json';
+const fixture = corpus.fixtures.find(f => f.id === 'sparse-null-zero-and-ties')!;
+const activities = fixture.activities.map(a => ({id:a.id,name:a.name,start_date_local:new Date(a.startDateLocal+'Z'),sport:aliasMap[a.sportType as keyof typeof aliasMap],distance:a.distance,moving_time:a.movingTime,total_elevation_gain:a.elevationGain}));
+const rows = fixture.activities.map(a=>({...a,distance:a.distance === null?'—':(a.distance/1000).toFixed(1)+' km',duration:a.elapsedTime===null?'—':Math.floor(a.elapsedTime/3600)+'h '+Math.round(a.elapsedTime%3600/60)+'m',elevation:a.elevationGain===null?'—':a.elevationGain+' m'}));
+const columns = [{accessorKey:'name',header:'Activity',meta:{width:'220px',title:'Activity'}},{accessorKey:'sportType',header:'Sport',meta:{width:'120px',title:'Sport'}},{accessorKey:'distance',header:'Distance',meta:{width:'100px',title:'Distance'}},{accessorKey:'duration',header:'Elapsed',meta:{width:'120px',title:'Elapsed'}},{accessorKey:'elevation',header:'Elevation',meta:{width:'100px',title:'Elevation'}}];
+function Reference(){
+ const [selected,setSelected]=useState<number[]>([]);const mode=new URLSearchParams(location.search).get('surface')??'stats';
+ return <ThemeProvider forcedTheme="light"><p style={{padding:'12px 24px',background:'#edf2f8',fontSize:12}}>CURRENT WEB COMPONENT HOST · merged 58f731c · synthetic {fixture.id} · reporting date {fixture.today}</p>{mode==='stats'?<StatsTileGrid activities={activities}/>:mode==='filters'?<SidebarProvider><aside className="w-80 bg-sidebar p-4"><h2 className="mb-4 font-semibold">Categories</h2><CategoryFilter/><h2 className="my-4 font-semibold">Filters</h2><SidebarMenu><SearchFilter/><MonthPicker/><InequalityFilter name="distance"/><InequalityFilter name="total_elevation_gain"/><InequalityFilter name="elapsed_time"/><BinaryFilter name="commute"/><BinaryFilter name="private"/><BinaryFilter name="flagged"/><ResetFilters/></SidebarMenu></aside></SidebarProvider>:<div className="p-6"><DataTable columns={columns as any} data={rows} density="md" columnPinning={{start:[],end:[]}} columnVisibility={{}} sorting={[]} paginationControl selected={selected} setSelected={setSelected} columnFilters={[]} summaryRow={null} setSorting={()=>{}} setColumnVisibility={()=>{}} setDensity={()=>{}} setColumnPinning={()=>{}} setSummaryRow={()=>{}}/></div>}</ThemeProvider>
+}
+createRoot(document.getElementById('root')!).render(<Reference/>);

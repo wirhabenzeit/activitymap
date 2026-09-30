@@ -1,0 +1,147 @@
+{
+  "captured": "2026-09-30",
+  "fixture": "sparse-null-zero-and-ties",
+  "today": "2026-03-31",
+  "images": [
+    {
+      "file": "native-large-text-list.png",
+      "kind": "actual component host",
+      "width": 1125,
+      "height": 2436,
+      "sha256": "1b0258d863ccbbc395d24416bdaabc9edc8f5910a60763f643fe0a9d0857ee30"
+    },
+    {
+      "file": "native-large-text-shell-map.png",
+      "kind": "actual component host",
+      "width": 1125,
+      "height": 2436,
+      "sha256": "59ffd174a1389cd97b726b1284226b6d3de9818fb7c8101d3bfebd220f030e32"
+    },
+    {
+      "file": "native-phone-detail.png",
+      "kind": "actual component host",
+      "width": 1125,
+      "height": 2436,
+      "sha256": "b41c28c2af3f1cc021849a80f85a6c4da678fefccd4feaadb98b3bd5f0f79410"
+    },
+    {
+      "file": "native-phone-filters.png",
+      "kind": "actual component host",
+      "width": 1125,
+      "height": 2436,
+      "sha256": "7c060fd49d7e888d957f90955ad30107516cae8dd1a2c73fc2174f60f1d999e0"
+    },
+    {
+      "file": "native-phone-list.png",
+      "kind": "actual component host",
+      "width": 1125,
+      "height": 2436,
+      "sha256": "77cbb7963ebea621cb98e7f27b3f43d86701d711bf3623aff476a0d049b560db"
+    },
+    {
+      "file": "native-phone-shell-map.png",
+      "kind": "actual component host",
+      "width": 1125,
+      "height": 2436,
+      "sha256": "940d20e299204acf063f885c812becc0c0306351cea324527a32f07dcded62b8"
+    },
+    {
+      "file": "native-tablet-list.png",
+      "kind": "actual component host",
+      "width": 2460,
+      "height": 3540,
+      "sha256": "34f44a20405ce8e75edc648d4da69c8058206bc4c1f88f1ed8070b2f6710c849"
+    },
+    {
+      "file": "native-tablet-shell-map.png",
+      "kind": "actual component host",
+      "width": 2460,
+      "height": 3540,
+      "sha256": "19e35d91383ab3b1efb8dc20daeba6ccea55bb39a139fb8bf18102c76aa4d5ab"
+    },
+    {
+      "file": "proposed-landscape-map.png",
+      "kind": "proposed browser mockup",
+      "width": 812,
+      "height": 376,
+      "sha256": "a4cd965d8941c2c047a57c8f2bf8b334e78cb2552f15e9eed6535a11e1391a78"
+    },
+    {
+      "file": "proposed-landscape-stats.png",
+      "kind": "proposed browser mockup",
+      "width": 812,
+      "height": 376,
+      "sha256": "934b69ab3497e8abddfdd1607f5fbba8b89d12f3ab9a4a0395603721c3f3036a"
+    },
+    {
+      "file": "proposed-large-text-list.png",
+      "kind": "proposed browser mockup",
+      "width": 376,
+      "height": 813,
+      "sha256": "50d654e09b536eb257933a40d647aec99111bf03c7c218d3547db69b2e216214"
+    },
+    {
+      "file": "proposed-phone-map.png",
+      "kind": "proposed browser mockup",
+      "width": 376,
+      "height": 813,
+      "sha256": "76a97f29e113190ecb70cb604fa8ab2016fee2e17fd5ea4c5f234aa0af1fdb08"
+    },
+    {
+      "file": "proposed-phone-stats.png",
+      "kind": "proposed browser mockup",
+      "width": 376,
+      "height": 813,
+      "sha256": "18163574088218bd478a4f223ff891127c4784ea98832eea0ef72eda27aa6513"
+    },
+    {
+      "file": "proposed-small-map.png",
+      "kind": "proposed browser mockup",
+      "width": 320,
+      "height": 701,
+      "sha256": "9041876bae6d8fb8439b0d07fbb1cce1d8bc79bfa3dfc592b5e620f36af4b0c3"
+    },
+    {
+      "file": "proposed-small-stats.png",
+      "kind": "proposed browser mockup",
+      "width": 320,
+      "height": 701,
+      "sha256": "c9044a5f66d2d2816eb627df6032ba7e279dd6c7a362dc00d6c4b2651a780f04"
+    },
+    {
+      "file": "proposed-tablet-map.png",
+      "kind": "proposed browser mockup",
+      "width": 820,
+      "height": 1181,
+      "sha256": "8b0b528b0900384c56b897098e7c43f2bb5a343e6fc2160443ed4467bd8df698"
+    },
+    {
+      "file": "proposed-tablet-stats.png",
+      "kind": "proposed browser mockup",
+      "width": 820,
+      "height": 1181,
+      "sha256": "97cb777d2dcd9259b42f163a1477e29b8e57cb2aaa40b6e9cba1268ca3ea6120"
+    },
+    {
+      "file": "web-filters.png",
+      "kind": "actual component host",
+      "width": 1200,
+      "height": 1042,
+      "sha256": "9ab800c8088144d843d85f19e413239b72bcbc67df1f9452a8a3d86b5a3dbfd4"
+    },
+    {
+      "file": "web-list.png",
+      "kind": "actual component host",
+      "width": 1200,
+      "height": 1000,
+      "sha256": "4f4d55f27e32336a39e9af54a76f203f01ec48e2490b57541aad25c0d20d6719"
+    },
+    {
+      "file": "web-stats.png",
+      "kind": "actual component host",
+      "width": 1200,
+      "height": 1518,
+      "sha256": "db17228d08ecc43afcd6341e95fb46907b6a4821432d322c96b98c6d465744f9"
+    }
+  ]
+}
