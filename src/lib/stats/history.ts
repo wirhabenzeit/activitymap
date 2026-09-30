@@ -3,6 +3,7 @@ import {
   metricValue,
   mondayOf,
   sportOrder,
+  compareStatsActivities,
   type StatsActivity,
   type Sport,
 } from './tile-data';
@@ -87,16 +88,21 @@ export function calendarDays(
     days.set(day, rows);
   }
   for (const [day, rows] of days) {
-    rows.sort(
-      (a, b) => a.start_date_local.getTime() - b.start_date_local.getTime(),
-    );
+    rows.sort(compareStatsActivities);
     const times = new Map<Sport, number>();
     for (const row of rows)
       times.set(
         row.sport,
         (times.get(row.sport) ?? 0) + (row.moving_time ?? 0),
       );
-    dominantSport.set(day, [...times].sort((a, b) => b[1] - a[1])[0]![0]);
+    // Match the shared calendar rule even when input order differs.
+    dominantSport.set(
+      day,
+      [...times].sort(
+        (a, b) =>
+          b[1] - a[1] || sportOrder.indexOf(a[0]) - sportOrder.indexOf(b[0]),
+      )[0]![0],
+    );
     if (times.size > 1) mixedDays.add(day);
   }
   return { days, dominantSport, mixedDays };

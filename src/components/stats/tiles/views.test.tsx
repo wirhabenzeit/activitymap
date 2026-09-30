@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -7,6 +8,29 @@ import { dayFromISODate, type StatsActivity } from '~/lib/stats/tile-data';
 import { tileView, type TileContext } from './tiles';
 import { tilePalette } from './format';
 import { MonthRows } from './calendar';
+import { statsCapabilitiesSchema } from '../../../../scripts/lib/stats-parity-schema';
+
+void test('the shared capability matrix matches actual visible and expandable web tiles', () => {
+  const contract = statsCapabilitiesSchema.parse(
+    JSON.parse(readFileSync('shared/stats-capabilities.v1.json', 'utf8')),
+  );
+  assert.equal(
+    contract.tiles.filter((tile) => tile.visibility === 'visible').length,
+    11,
+  );
+  for (const tile of contract.tiles) {
+    const view = tileView(tile.id as (typeof statsTiles)[number]['id']);
+    assert.equal(Boolean(view), tile.visibility === 'visible', tile.id);
+    assert.equal(view?.expandable ?? false, tile.expandable, tile.id);
+  }
+  assert.deepEqual(
+    contract.tiles
+      .filter((tile) => tile.visibility === 'visible')
+      .map((tile) => tile.id),
+    statsTiles.filter((tile) => tileView(tile.id)).map((tile) => tile.id),
+    'section and within-section order must agree with the rendered catalogue',
+  );
+});
 
 const today = dayFromISODate('2026-09-01');
 const make = (
