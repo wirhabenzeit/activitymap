@@ -6,6 +6,10 @@ import { fileURLToPath } from 'node:url';
 
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
+import {
+  statsCapabilitiesSchema,
+  statsParitySchema,
+} from './lib/stats-parity-schema';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = resolve(repositoryRoot, 'shared/stats-tiles.json');
@@ -132,6 +136,40 @@ const fixtureSchema = z
 const manifest = manifestSchema.parse(
   JSON.parse(await readFile(manifestPath, 'utf8')) as unknown,
 );
+const capabilities = statsCapabilitiesSchema.parse(
+  JSON.parse(
+    await readFile(
+      resolve(repositoryRoot, 'shared/stats-capabilities.v1.json'),
+      'utf8',
+    ),
+  ),
+);
+statsParitySchema.parse(
+  JSON.parse(
+    await readFile(
+      resolve(repositoryRoot, 'shared/stats-parity-fixtures.v1.json'),
+      'utf8',
+    ),
+  ),
+);
+if (
+  new Set(capabilities.tiles.map((tile) => tile.id)).size !==
+    manifest.tiles.length ||
+  capabilities.tiles.length !== manifest.tiles.length
+)
+  throw new Error(
+    'Stats capabilities must cover each manifest tile exactly once.',
+  );
+for (const tile of capabilities.tiles) {
+  const declared = manifest.tiles.find((candidate) => candidate.id === tile.id);
+  if (
+    declared?.group !== tile.group ||
+    JSON.stringify(declared?.toggle?.options ?? []) !==
+      JSON.stringify(tile.options) ||
+    tile.defaultOption !== (declared?.toggle?.options[0] ?? null)
+  )
+    throw new Error(`Stats capability ${tile.id} disagrees with the manifest.`);
+}
 const layout = manifest.layout;
 
 const tileIDs = manifest.tiles.map((tile) => tile.id);
