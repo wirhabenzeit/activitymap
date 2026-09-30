@@ -142,6 +142,20 @@
       "width": 1200,
       "height": 1518,
       "sha256": "db17228d08ecc43afcd6341e95fb46907b6a4821432d322c96b98c6d465744f9"
+    },
+    {
+      "file": "web-header-detail.jpg",
+      "kind": "actual component host",
+      "width": 1000,
+      "height": 650,
+      "sha256": "63c2db0587e4f2e8930e5e703859544dd6ec405e786f6c2e106e4efc0756acc6"
+    },
+    {
+      "file": "web-header-map-controls.jpg",
+      "kind": "actual component host",
+      "width": 1000,
+      "height": 688,
+      "sha256": "745d778f4689ac8c7fb76aae5d5684b1717a8abfb0cbc165c298157a7d488ccb"
     }
   ]
 }

@@ -83,4 +83,12 @@ Visual review corrected dark text contrast and landscape map chrome allocation. 
 
 ## Remaining acceptance
 
-Product approval of navigation/control placement/adaptive hosts is pending. Full authenticated web Map/shared-detail/header context, matched landscape/dark app captures and named physical-device/VoiceOver evidence remain gaps unless separately recorded by the parent reviewer. Native Stats reference cannot exist before native Stats implementation. The plan does not claim these gaps are complete and does not close #228/#229.
+Product approval of navigation/control placement/adaptive hosts is pending. Full authenticated web Map/shared-detail context, matched landscape/dark app captures and named physical-device/VoiceOver evidence remain gaps unless separately recorded by the parent reviewer. Native Stats reference cannot exist before native Stats implementation. The plan does not claim these gaps are complete and does not close #228/#229.
+
+## Supplemental parent references
+
+The parent captured `web-header-detail.jpg` and `web-header-map-controls.jpg` through the Codex in-app browser on 2026-09-30. These mount actual `AppHeader`, `ActivityCardContent` and `LayerSwitcher` from merged `58f731c`, with sparse fixture ID 9. The disconnected synthetic account has no credentials; photos return an empty array, QueryClient queries are disabled, and server actions are replaced with throwing stand-ins. Neither capture uses a backend, media, stream or map tile request. Host arrangement is illustrative; the layer-control image does not show the full InteractiveMap surface.
+
+Browser viewport was 1000×650 and timezone UTC, so the fixture's UTC-shaped 00:15 wall-clock remains 00:15 in the existing detail formatter. No reporting-time calculation runs in these components; the banner identifies the fixture date rather than injecting a dashboard clock. The capture overrides were cleared and the temporary tab closed after saving JPEG screenshots. The parent visually inspected both images. These add actual shared-detail/header component evidence; full authenticated app composition remains a gap.
+
+[Supplemental host source](reference-tools/capture-parent-host.tsx.txt) and [bundle script](reference-tools/build-parent-host.cjs.txt) preserve the exact temporary capture recipe. Copy them to temporary paths, adjust local checkout paths, build, serve its output on loopback, and open `/?surface=detail` or `/?surface=map`. Use the bundled dependency runtime and browser screenshot API. No product SwiftUI or web component was changed for this capture.

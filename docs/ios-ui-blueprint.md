@@ -119,3 +119,5 @@ After acceptance, #253 implements tokens and representative shared components; #
 - [ ] Performance budgets measured under #229 and complete cross-client journeys remain #227.
 
 The outstanding human/design acceptance and reference gaps remain material limitations; automated artifact checks cannot close them.
+
+Supplemental current references now include actual web AppHeader, shared ActivityCardContent (ID 9), and LayerSwitcher component hosts. See capture-evidence.md for source, stand-ins and UTC capture timezone. Full authenticated app Map/detail composition remains unverified.

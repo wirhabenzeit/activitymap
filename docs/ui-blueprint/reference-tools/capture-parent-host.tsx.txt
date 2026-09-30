@@ -1,0 +1,33 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { ThemeProvider } from 'next-themes';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AppHeader } from '/private/tmp/activitymap-ios-252/src/components/layout/app-header';
+import { SidebarProvider } from '/private/tmp/activitymap-ios-252/src/components/ui/sidebar';
+import { ActivityCardContent } from '/private/tmp/activitymap-ios-252/src/components/list/card';
+import { LayerSwitcher } from '/private/tmp/activitymap-ios-252/src/components/map/layer-switcher';
+import { store } from '/private/tmp/activitymap-ios-252/src/store';
+import corpus from '/private/tmp/activitymap-ios-252/shared/stats-parity-fixtures.v1.json';
+
+const input = corpus.fixtures.find(f => f.id === 'sparse-null-zero-and-ties')!.activities.find(a => a.id === 9)!;
+const activity = {
+  id: input.id, name: input.name, sport_type: input.sportType,
+  start_date_local: new Date(input.startDateLocal + 'Z'),
+  start_date: new Date(input.startDateLocal + 'Z'),
+  distance: input.distance, moving_time: input.movingTime,
+  elapsed_time: input.elapsedTime, total_elevation_gain: input.elevationGain,
+  description: null, map_polyline: null, map_summary_polyline: null,
+};
+store.setState({ user: undefined, isGuest: false, isInitialized: true, selected: [], search: '', dateRange: undefined });
+const row = { original: activity, getValue: (key: string) => activity[key as keyof typeof activity] ?? null, toggleSelected() {}, getIsSelected: () => false };
+const queryClient = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
+const mode = new URLSearchParams(location.search).get('surface');
+createRoot(document.getElementById('root')!).render(
+  <QueryClientProvider client={queryClient}><ThemeProvider forcedTheme="light"><SidebarProvider>
+    <AppHeader />
+    <main style={{padding:'80px 24px 24px',width:'100%'}}>
+      <p style={{fontSize:12,background:'#edf2f8',padding:12,marginBottom:24}}>CURRENT WEB COMPONENT HOST · main 58f731c · sparse-null-zero-and-ties · ID 9 · 31 March 2026. Actual AppHeader and {mode === 'detail' ? 'ActivityCardContent' : 'LayerSwitcher'}. Synthetic metadata, disconnected account, no network. Host arrangement is illustrative; no basemap/route evidence.</p>
+      {mode === 'detail' ? <div style={{maxWidth:700,border:'1px solid #ddd',borderRadius:12}}><ActivityCardContent row={row as never}/></div> : <section style={{height:500,background:'#f4f5f6',border:'1px solid #ddd',position:'relative'}}><p style={{padding:20,color:'#667'}}>Map content deliberately absent in the isolated component host.</p><div style={{position:'absolute',right:16,top:16}}><LayerSwitcher/></div></section>}
+    </main>
+  </SidebarProvider></ThemeProvider></QueryClientProvider>
+);
