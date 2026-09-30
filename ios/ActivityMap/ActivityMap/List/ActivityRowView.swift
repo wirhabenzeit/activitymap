@@ -37,7 +37,7 @@ struct ActivityRowView: View {
                 } else {
                     LazyVGrid(columns: typeSize.isAccessibilitySize
                               ? [GridItem(.flexible(), alignment: .leading)]
-                              : [GridItem(.adaptive(minimum: 130), alignment: .leading)],
+                              : [GridItem(.adaptive(minimum: AppTheme.minimumMetricColumnWidth), alignment: .leading)],
                               alignment: .leading, spacing: settings.density == .compact ? 4 : 10) {
                         ForEach(settings.orderedMetrics) { metricView($0) }
                     }
@@ -52,20 +52,8 @@ struct ActivityRowView: View {
     private var identification: some View {
         HStack(alignment: .top, spacing: 8) {
             Button { store.toggleSelection(activity.id) } label: {
-                ZStack(alignment: .bottomTrailing) {
-                    Image(systemName: activity.category.symbolName)
-                        .font(.system(size: 20))
-                        .foregroundStyle(activity.category.color)
-                        .frame(width: 28, height: 28)
-                        .background(RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(isSelected ? activity.category.color : .clear, lineWidth: 2))
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 11)).foregroundStyle(activity.category.color)
-                            .background(.background, in: Circle())
-                    }
-                }
-                .frame(minWidth: 44, minHeight: 44)
+                BrowseSportSymbol(category: activity.category, isSelected: isSelected)
+                    .frame(minWidth: AppTheme.minimumTarget, minHeight: AppTheme.minimumTarget)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isSelected ? "Deselect \(activity.name)" : "Select \(activity.name)")
@@ -81,8 +69,7 @@ struct ActivityRowView: View {
                 Text(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))
                     .font(.caption).foregroundStyle(.secondary)
                 if isActive {
-                    Label("Active on map", systemImage: "location.fill")
-                        .font(.caption).foregroundStyle(.secondary)
+                    BrowseBadge(title: "Active on map", systemImage: "location.fill")
                 }
             }
             .padding(.top, 4)
@@ -91,36 +78,22 @@ struct ActivityRowView: View {
     }
 
     @ViewBuilder private var actions: some View {
-        Button { store.showOnMap(activity.id) } label: {
-            Image(systemName: hasGeometry ? "map" : "map.slash")
-                .frame(minWidth: 44, minHeight: 44)
+        BrowseIconButton(title: "Show \(activity.name) on map", systemImage: hasGeometry ? "map" : "map.slash") {
+            store.showOnMap(activity.id)
         }
-        .buttonStyle(.plain)
         .disabled(!hasGeometry)
-        .accessibilityLabel("Show \(activity.name) on map")
         .accessibilityHint(hasGeometry ? "" : "This activity has no GPS route.")
 
-        Button {
+        BrowseIconButton(
+            title: "\(store.inspectedActivityID == activity.id ? "Close details for" : "Details for") \(activity.name)",
+            systemImage: store.inspectedActivityID == activity.id ? "xmark.circle" : "info.circle"
+        ) {
             if store.inspectedActivityID == activity.id { store.dismissInspection() }
             else { store.inspect(activity.id) }
-        } label: {
-            Image(systemName: store.inspectedActivityID == activity.id ? "xmark.circle" : "info.circle")
-                .frame(minWidth: 44, minHeight: 44)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(store.inspectedActivityID == activity.id ? "Close details for" : "Details for") \(activity.name)")
     }
 
     private func metricView(_ metric: ActivityListMetric) -> some View {
-        let value = metric.value(for: activity)
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(metric.title).foregroundStyle(.secondary)
-            Text(value).monospacedDigit()
-        }
-        .font(settings.density == .compact ? .caption2 : .caption)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(metric.title)
-        .accessibilityValue(value == Formatters.unknown ? "Not recorded" : value)
+        BrowseMetricValue(title: metric.title, value: metric.value(for: activity))
     }
 }

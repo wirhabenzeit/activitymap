@@ -303,7 +303,7 @@ struct MapScreen: View {
                     }
                 }
             } label: {
-                Image(systemName: "square.3.layers.3d")
+                BrowseIconLabel(systemImage: "square.3.layers.3d")
                     .frame(width: 44, height: 48)
             }
             .accessibilityLabel("Map layers")
@@ -313,8 +313,7 @@ struct MapScreen: View {
             Button {
                 context.request(.pitch(context.isPitched ? 0 : 50))
             } label: {
-                Image(systemName: "view.3d")
-                    .foregroundStyle(context.isPitched ? Color.blue : Color.primary)
+                BrowseIconLabel(systemImage: "view.3d", isSelected: context.isPitched)
                     .frame(width: 44, height: 48)
             }
             .accessibilityLabel("3D map")
@@ -333,13 +332,13 @@ struct MapScreen: View {
                 Button("Reset bearing", systemImage: "location.north") { context.request(.resetBearing) }
                 Button("Reset map view", systemImage: "arrow.counterclockwise") { context.request(.resetView) }
             } label: {
-                Image(systemName: "scope")
+                BrowseIconLabel(systemImage: "scope")
                     .frame(width: 44, height: 48)
             }
             .accessibilityLabel("Map camera")
         }
         .buttonStyle(.plain)
-        .font(.system(size: 18, weight: .semibold))
+        .font(.body)
         .foregroundStyle(Color.primary)
         .padding(4)
         .modifier(MapChromeSurface())

@@ -11,13 +11,13 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     private var rows: [ActivityMetricRow] { ActivityMetricRow.rows(for: activity) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
                 Label(activity.sportType.rawValue.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression), systemImage: activity.category.symbolName)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text(activity.name)
-                    .font(.title2.bold())
+                    .font(AppTheme.Typography.title)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("activity-detail-name")
@@ -33,13 +33,11 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                 }
             }
 
-            if typeSize.isAccessibilitySize {
-                VStack(spacing: 12) { highlights }
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 12) { highlights }.fixedSize(horizontal: true, vertical: false)
-                    VStack(spacing: 12) { highlights }
-                }
+            LazyVGrid(columns: typeSize.isAccessibilitySize
+                      ? [GridItem(.flexible(), alignment: .leading)]
+                      : [GridItem(.adaptive(minimum: AppTheme.minimumMetricColumnWidth), alignment: .leading)],
+                      alignment: .leading, spacing: AppTheme.Spacing.medium) {
+                highlights
             }
 
             profile(activity)
@@ -66,10 +64,10 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     }
 
     @ViewBuilder private var badges: some View {
-        if activity.isPrivate == true { Label("Private", systemImage: "lock") }
-        if activity.commute == true { Label("Commute", systemImage: "arrow.left.arrow.right") }
-        if activity.trainer == true { Label("Indoor", systemImage: "house") }
-        if activity.flagged == true { Label("Flagged", systemImage: "flag") }
+        if activity.isPrivate == true { BrowseBadge(title: "Private", systemImage: "lock") }
+        if activity.commute == true { BrowseBadge(title: "Commute", systemImage: "arrow.left.arrow.right") }
+        if activity.trainer == true { BrowseBadge(title: "Indoor", systemImage: "house") }
+        if activity.flagged == true { BrowseBadge(title: "Flagged", systemImage: "flag") }
     }
 
     @ViewBuilder private var highlights: some View {
@@ -79,16 +77,8 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     }
 
     private func highlight(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title3.weight(.semibold)).monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .accessibilityValue(value == Formatters.unknown ? "Not recorded" : value)
+        BrowseMetricValue(title: title, value: value, emphasis: .detail)
+            .modifier(BrowseSurface(inset: AppTheme.Spacing.medium))
     }
 
     @ViewBuilder private func metricSection(_ title: String, ids: [String]) -> some View {
@@ -119,13 +109,13 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+                .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius))
             }
         }
     }
 
     private func sectionTitle(_ title: String) -> some View {
-        Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+        BrowseSectionHeading(title: title)
     }
 }
 

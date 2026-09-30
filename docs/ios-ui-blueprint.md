@@ -2,7 +2,7 @@
 
 Design handoff for [#252](https://github.com/wirhabenzeit/activitymap/issues/252), dated 2026-09-30. Open the self-contained [interactive review board](ui-blueprint/index.html) in a browser. It contains proposed phone, landscape, iPad, dark and large-text layouts, scenario switches and current reference images. It makes no network requests.
 
-**Status: proposed, awaiting product acceptance.** The artifact resolves placement and component ownership for review; it does not certify an installed device, implement the proposed UI or change the [Map/List behavior contract](map-list-parity-contract.md) or [Stats migration contract](stats-parity-contract.md). Closing the design issue requires a recorded human review of the decisions below. Dependent code should use the accepted revision.
+**Status: direction accepted on 2026-09-30.** The repository owner accepted revision `0f6e87ed17bf8757fd6f8011cef847ffc379e079`; [the recorded decision](https://github.com/wirhabenzeit/activitymap/issues/252#issuecomment-5919290478) calls for closer web presentation with sensible native SwiftUI controls, and detailed visual refinement through working screens. The artifact establishes placement and component ownership; it does not certify an installed device, implement the proposed UI or change the [Map/List behavior contract](map-list-parity-contract.md) or [Stats migration contract](stats-parity-contract.md).
 
 ## Reference and evidence ledger
 
@@ -20,7 +20,7 @@ Capture source, commands, clocks, dimensions and limitations are recorded in [ca
 
 Missing references remain explicit: authenticated full web Map and full shared-detail card were not captured; their query/server/map integrations are not bypassed with invented production screenshots. Their actual source hierarchy was inspected (`app-header.tsx`, `main-nav.tsx`, `interactive-map.tsx`, `selection-control.tsx`, `card.tsx`, `route-details-content.tsx`). Native Stats is not reachable in the current shell, so there is no current native Stats screenshot. No matched landscape/dark production capture or physical-device capture is claimed. Collect those during #228; this design board supplies the proposed variants now.
 
-## Product decisions to accept
+## Accepted product direction
 
 1. **Three equal primary destinations:** Map, List, Stats in a native tab bar. Keep all three mounted as needed for their retained contexts. The top bar names the destination; it has Account and Filters, without a second competing destination picker. On iPad, use the system's adaptive tab placement; the board's tab placement is illustrative, not a custom substitute for system behavior.
 2. **One search/filter owner:** activity-name search above List/Stats; on Map the compact search field shares the top chrome budget. In shallow landscape or accessibility layouts collapse search to the Filters destination. Search, sport, binary and numeric restrictions apply across destinations. Stats replaces date entry with its period explanation; retained browsing dates remain visible as saved context, not active Stats constraints.
@@ -29,7 +29,7 @@ Missing references remain explicit: authenticated full web Map and full shared-d
 5. **Quiet status:** no always-visible success or old-cache warning card. Show actionable recovery once near the content it affects; retain authorized content and context. Account contains explanatory sync detail. Never use visual simplification to change retry/expiry semantics.
 6. **Stats preserves its stabilized hierarchy:** Now → This year → Patterns, all eleven visible tiles. Primary tiles own large headlines; Records uses its record rows without a competing aggregate headline. Native charts provide touch inspection and accessible data equivalents. No extra Rest days, totals or speed-trend screen is introduced.
 
-A review should explicitly accept or amend navigation, control placement, default information hierarchy and adaptive hosts. Record reviewer/date/accepted commit in #252. There is no implied acceptance from automated rendering or the existence of this document.
+These decisions establish the implementation direction. Screen-level details remain open to concrete review and adjustment; the board is not a pixel-exact specification. The acceptance record is in #252, following review of the board and locally captured authenticated web screens at Mac and iPhone viewport sizes.
 
 ## Action ownership and contracts
 
@@ -111,13 +111,13 @@ Design/capture cases S0–S9 keep the contract's dataset-owned dates: empty `202
 
 After acceptance, #253 implements tokens and representative shared components; #254 implements shell/filter ownership. Then #255 List, #256 Map and #257 shared Detail can proceed independently against those interfaces. #263/#264 adopt the same shell/detail and #262 engine; #265 applies Stats composition. #258 resolves integrated status/account composition; #259 closes baseline visual polish. Preserve reviewed local #210–#215 work instead of replacing it with duplicated predicates/caches.
 
-- [ ] Reviewer/date/accepted revision recorded; navigation and adaptive presentation decisions accepted.
+- [x] Repository owner/date/accepted revision recorded in #252; navigation and adaptive presentation direction accepted.
 - [ ] Current reference gaps acknowledged and matched full app evidence scheduled under #228.
 - [ ] Small-phone/landscape/large-text action reachability, contrast, focus return and map gesture isolation checked on named physical devices under #228.
 - [ ] Camera and exact List/Stats context return verified in production composition; no passive refits/network/raw-stream work introduced.
 - [ ] Real tile histories/periods/tables and complete filter controls implemented by their owners; mockup placeholders replaced without weakening #196/#261.
 - [ ] Performance budgets measured under #229 and complete cross-client journeys remain #227.
 
-The outstanding human/design acceptance and reference gaps remain material limitations; automated artifact checks cannot close them.
+The remaining reference gaps and device checks are material limitations; automated artifact checks cannot close them.
 
 Supplemental current references now include actual web AppHeader, shared ActivityCardContent (ID 9), and LayerSwitcher component hosts. See capture-evidence.md for source, stand-ins and UTC capture timezone. Full authenticated app Map/detail composition remains unverified.

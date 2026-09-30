@@ -1,0 +1,120 @@
+// Copy into ActivityMapTests temporarily, run only captureSharedUIReferences,
+// then remove the copied file. Synthetic data only; this is a component review
+// fixture, not a Stats dashboard implementation or a physical-device capture.
+import Charts
+import MapboxMaps
+import SwiftUI
+import Testing
+import UIKit
+@testable import ActivityMap
+
+extension RenderedRoutePickingTests {
+    @Test func captureSharedUIReferences() async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let rows: [[String: Any]] = [
+            ["id": "1", "name": "Morning ride along the river", "sport_type": "Ride", "distance": 14800, "elapsed_time": 3600, "total_elevation_gain": 180],
+            ["id": "2", "name": "Evening run through the park", "sport_type": "Run", "distance": 5200, "elapsed_time": 1800, "total_elevation_gain": 0],
+            ["id": "3", "name": "Indoor workout", "sport_type": "Workout", "distance": NSNull(), "elapsed_time": 0, "total_elevation_gain": NSNull(), "map_polyline": NSNull(), "map_summary_polyline": NSNull()],
+        ]
+        let activities = try rows.map { try StoredModelMapper.activity(Fixtures.activity($0)) }
+        let store = ActivityStore(activities: activities, listPresentation: ActivityListPresentation(defaults: nil))
+        store.replaceSelection(with: [1])
+        store.activate(1)
+        let style = MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)
+        for (name, size, scheme, type) in [
+            ("phone-light", CGSize(width: 375, height: 812), ColorScheme.light, DynamicTypeSize.large),
+            ("phone-dark", CGSize(width: 375, height: 812), .dark, .large),
+            ("small-large-text", CGSize(width: 320, height: 700), .light, .accessibility3),
+            ("small-large-text-dark", CGSize(width: 320, height: 700), .dark, .accessibility3),
+            ("tablet", CGSize(width: 820, height: 1180), .light, .large),
+        ] {
+            let regular = name == "tablet"
+            func present(_ view: AnyView, suffix: String) async throws {
+                try await captureShared(AnyView(view
+                    .environment(\.colorScheme, scheme)
+                    .environment(\.dynamicTypeSize, type)
+                    .environment(\.horizontalSizeClass, regular ? .regular : .compact)),
+                    size: size, name: "\(suffix)-\(name)", dark: scheme == .dark)
+            }
+            try await present(AnyView(NavigationStack { ListScreen(store: store).navigationTitle("Activities") }), suffix: "list")
+            try await present(AnyView(ActivityDetailView(store: store, activityID: 1)), suffix: "detail")
+            try await present(AnyView(NavigationStack { SharedStatsExample().navigationTitle("Stats") }), suffix: "stats")
+            try await present(AnyView(MapScreen(store: store).environment(\.mapStyleOverride, style)), suffix: "map")
+        }
+    }
+
+    private func captureShared(_ root: AnyView, size: CGSize, name: String, dark: Bool) async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let oldWindow = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: size)
+        let host = UIHostingController(rootView: root)
+        host.overrideUserInterfaceStyle = dark ? .dark : .light
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
+        host.view.frame = window.bounds
+        try await Task.sleep(for: .seconds(1))
+        host.view.layoutIfNeeded()
+        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
+            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+        }
+        let directory = URL(fileURLWithPath: "/private/tmp/activitymap-253-captures")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try #require(image.pngData()).write(to: directory.appendingPathComponent("\(name).png"))
+    }
+}
+
+private struct SharedStatsExample: View {
+    @State private var metric = StatsMetric.distance
+    @State private var range = "Week"
+    private let days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    // Known zero is distinct from an unavailable future period.
+    private let values: [Double?] = [6, 0, 8.8, nil, nil, nil, nil]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+                BrowseSectionHeading(title: "Now", isStatsGroup: true)
+                StatsTileSurface(title: "This week", period: "Week to date · 30 Sep", expand: {}) {
+                    StatsMetricPicker(metrics: [.distance, .time, .elevation], selection: $metric)
+                } content: {
+                    BrowseMetricValue(title: "Distance", value: "14.8 km", emphasis: .headline)
+                    StatsComparison(value: "12%", context: "vs same point last week", direction: .higher)
+                    StatsChartSurface(title: "Daily distance, kilometres, week to date") {
+                        Chart {
+                            ForEach(days.indices, id: \.self) { index in
+                                if let value = values[index] {
+                                    BarMark(x: .value("Day", days[index]), y: .value("Distance, km", value))
+                                        .foregroundStyle(StatsChartPalette.current)
+                                }
+                            }
+                        }
+                        .chartXScale(domain: days)
+                    } dataRows: {
+                        ForEach(days.indices, id: \.self) { index in
+                            Text("\(days[index]): \(values[index].map { String(format: "%.1f km", $0) } ?? "Future, unavailable")\(index == 2 ? " · Partial day" : "")")
+                                .font(AppTheme.Typography.caption)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Text("Partial week · future days unavailable")
+                        .font(AppTheme.Typography.caption).foregroundStyle(.secondary)
+                }
+                BrowseSectionHeading(title: "Patterns", isStatsGroup: true)
+                StatsTileSurface(title: "Sport mix", period: "All recorded activities") {
+                    EmptyView()
+                } content: {
+                    StatsSportLegend(categories: ActivityCategory.allCases, includesMixedSports: true)
+                }
+                StatsRangePicker(title: "Period", ranges: ["Week", "Month", "Year"], selection: $range, label: { $0 })
+                BrowseStatusLine(title: "Some history is still loading", systemImage: "arrow.trianglehead.2.clockwise", actionTitle: "Retry", action: {})
+            }
+            .padding(AppTheme.Spacing.large)
+        }
+        .background(AppTheme.contentBackground)
+    }
+}
