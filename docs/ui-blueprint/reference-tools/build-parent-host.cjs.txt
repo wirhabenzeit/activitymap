@@ -1,0 +1,15 @@
+const fs = require('fs');
+const root = '/private/tmp/activitymap-ios-252';
+const req = require('module').createRequire(root + '/package.json');
+const esbuild = require(req.resolve('esbuild', {paths:[req.resolve('tsx')]}));
+const output = '/private/tmp/activitymap-252-parent-capture';
+fs.mkdirSync(output, {recursive:true});
+fs.writeFileSync(output+'/actions.js', `const unavailable=()=>{throw Error('Synthetic capture disables actions')};export const updateActivity=unavailable,deleteActivities=unavailable,refreshActivity=unavailable,checkWebhookStatus=unavailable,createWebhookSubscription=unavailable;`);
+fs.writeFileSync(output+'/shares.js', `const unavailable=()=>{throw Error('Synthetic capture disables sharing')};export const createShareLink=unavailable,listMyShareLinks=unavailable,revokeShareLink=unavailable;`);
+fs.writeFileSync(output+'/photos.js', `export const usePhotos=()=>({data:[]});`);
+fs.writeFileSync(output+'/navigation.js', `export const usePathname=()=>new URLSearchParams(location.search).get('surface')==='map'?'/':'/list';export const useRouter=()=>({push(){},refresh(){}});export const useSearchParams=()=>new URLSearchParams();`);
+(async()=>{
+  await esbuild.build({entryPoints:['/private/tmp/activitymap-252-parent-host.tsx'],outfile:output+'/web.js',bundle:true,platform:'browser',jsx:'automatic',nodePaths:[root+'/node_modules'],alias:{'~/server/strava/actions':output+'/actions.js','~/server/share-actions':output+'/shares.js','~/hooks/use-photos':output+'/photos.js','~/hooks/use-activities':'/private/tmp/activitymap-252-capture/activities.js','~/env':'/private/tmp/activitymap-252-capture/env.js','~':root+'/src','next/navigation':output+'/navigation.js'},define:{'process.env.NODE_ENV':'"production"','process.env':'{}'},logLevel:'warning'});
+  fs.copyFileSync('/private/tmp/activitymap-252-capture/web.css',output+'/web.css');
+  fs.writeFileSync(output+'/index.html', '<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="web.css"><style>body{margin:0;font-family:system-ui;background:#fff;color:#111}</style><div id="root"></div><script src="web.js"></script></html>');
+})();

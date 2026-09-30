@@ -1,0 +1,51 @@
+import SwiftUI
+import MapboxMaps
+import Testing
+import UIKit
+@testable import ActivityMap
+
+extension RenderedRoutePickingTests {
+    @Test func captureUIBlueprintReferences() async throws {
+        let oldToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = oldToken }
+        let corpus = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "/private/tmp/activitymap-ios-252/shared/stats-parity-fixtures.v1.json"))) as! [String: Any]
+        let fixture = (corpus["fixtures"] as! [[String: Any]]).first { $0["id"] as? String == "sparse-null-zero-and-ties" }!
+        let activities = try (fixture["activities"] as! [[String: Any]]).map { row in
+            try StoredModelMapper.activity(Fixtures.activity([
+                "map_polyline": NSNull(), "map_summary_polyline": NSNull(), "geometry_state": "summary", "average_speed": NSNull(), "max_watts": NSNull(), "weighted_average_watts": NSNull(), "last_summary_seen_at": NSNull(), "last_detailed_fetched_at": NSNull(), "start_date": (row["startDateLocal"] as! String) + "Z",
+                "id": String(row["id"] as! Int), "name": row["name"]!, "sport_type": row["sportType"]!,
+                "start_date_local": (row["startDateLocal"] as! String) + "Z",
+                "distance": row["distance"]!, "moving_time": row["movingTime"]!,
+                "elapsed_time": row["elapsedTime"]!, "total_elevation_gain": row["elevationGain"]!,
+            ]))
+        }
+        let store = ActivityStore(activities: activities)
+        let style = MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)
+        let configurations: [(String, CGSize, DynamicTypeSize)] = [("phone", CGSize(width: 375, height: 812), .large), ("large-text", CGSize(width: 375, height: 812), .accessibility3), ("tablet", CGSize(width: 820, height: 1180), .large)]
+        for (name, size, type) in configurations {
+            try await capture(AnyView(AppShell(activities: activities).environment(\.mapStyleOverride, style).environment(\.horizontalSizeClass, name == "tablet" ? .regular : .compact).environment(\.dynamicTypeSize, type)), size: size, name: "native-\(name)-shell-map")
+            store.selectedTab = .list
+            try await capture(AnyView(NavigationStack { ListScreen(store: store).navigationTitle("Activities") }.environment(\.horizontalSizeClass, name == "tablet" ? .regular : .compact).environment(\.dynamicTypeSize, type)), size: size, name: "native-\(name)-list")
+        }
+        try await capture(AnyView(NavigationStack { FilterPanel(store: store).navigationTitle("Filters") }), size: CGSize(width: 375, height: 812), name: "native-phone-filters")
+        try await capture(AnyView(ActivityDetailView(store: store, activityID: 9)), size: CGSize(width: 375, height: 812), name: "native-phone-detail")
+    }
+    private func capture(_ root: AnyView, size: CGSize, name: String) async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let old = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: size)
+        let host = UIHostingController(rootView: root)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        host.view.frame = window.bounds
+        try await Task.sleep(for: .seconds(1))
+        host.view.layoutIfNeeded()
+        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
+        let out = URL(fileURLWithPath: "/private/tmp/activitymap-ios-252/docs/ui-blueprint/references")
+        try image.pngData()!.write(to: out.appendingPathComponent(name + ".png"))
+        window.isHidden = true
+        old?.makeKeyAndVisible()
+    }
+}
