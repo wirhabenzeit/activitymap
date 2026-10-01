@@ -24,7 +24,10 @@ struct MapResultsLayout {
         // phone results. Wider layouts leave those controls beside the panel.
         let top = topInset + (isSidePanel ? 12 : 140)
         let available = max(120, size.height - top - 12)
-        let compact = min(available, largeText ? 240 : 156)
+        // The native grab area is 44pt tall. Compact must still fit navigation,
+        // the persistent activity identity and its one-line summary without
+        // compressing the heading during the first expansion frames.
+        let compact = min(available, (largeText ? 240 : 156) + (isSidePanel ? 0 : 32))
         let height: CGFloat
         switch detent {
         case .compact: height = compact

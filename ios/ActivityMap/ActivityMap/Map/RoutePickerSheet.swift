@@ -14,14 +14,12 @@ struct RoutePickerSheet: View {
     var dragChanged: ((CGFloat) -> Void)? = nil
     var dragEnded: ((CGFloat, CGFloat) -> Void)? = nil
     var dragCancelled: (() -> Void)? = nil
-    @GestureState private var isHandleDragging = false
     private var collapsed: Bool { collapsedOverride ?? (picker.detent == .compact) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var candidates: [Activity] {
-        let byID = Dictionary(uniqueKeysWithValues: store.filteredActivities.map { ($0.id, $0) })
-        return picker.candidateIDs.compactMap { byID[$0] }
+        picker.candidateIDs.filter(store.selection.visibleIDs.contains).compactMap { store.activity(id: $0) }
     }
     private var detail: Activity? { candidates.first { $0.id == picker.detailID } }
 
@@ -45,10 +43,7 @@ struct RoutePickerSheet: View {
                     .allowsHitTesting(detail == nil && expansion > 0.8)
                     .accessibilityHidden(detail != nil || expansion < 0.8)
                 if detail != nil {
-                    MapActivityPager(store: store, picker: picker, singleDetail: singleDetail, expansion: expansion)
-                        .overlay(alignment: .topTrailing) {
-                            if singleDetail { collapseButton.padding(.trailing, 16).padding(.top, 4) }
-                        }
+                    MapActivityPager(store: store, picker: picker, expansion: expansion)
                         .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
                         .transition(reduceMotion ? .opacity : .move(edge: .trailing))
                 }
@@ -93,7 +88,15 @@ struct RoutePickerSheet: View {
     private var header: some View {
         VStack(spacing: 0) {
             if !isSidePanel {
-                Capsule().fill(.secondary.opacity(0.4)).frame(width: 32, height: 4).padding(.top, 9)
+                MapResultsHandle(changed: { dragChanged?($0) }, ended: { dragEnded?($0, $1) },
+                                 cancelled: { dragCancelled?() })
+                    .frame(height: 44)
+                    .overlay(alignment: .trailing) {
+                        if singleDetail { collapseButton.padding(.trailing, 16) }
+                    }
+            }
+            if isSidePanel && singleDetail {
+                HStack { Spacer(); collapseButton }.padding(.trailing, 16)
             }
             if !singleDetail {
                 let layout = typeSize.isAccessibilitySize
@@ -125,19 +128,8 @@ struct RoutePickerSheet: View {
             }
         }
         .contentShape(Rectangle())
-        // Header drag resizes this one container; content scrolling never does.
-        .simultaneousGesture(DragGesture(minimumDistance: 3, coordinateSpace: .global)
-            .updating($isHandleDragging) { _, active, _ in active = true }
-            .onChanged { drag in
-                guard abs(drag.translation.height) > abs(drag.translation.width) * 1.5 else { return }
-                dragChanged?(drag.translation.height)
-            }
-            .onEnded { drag in
-                dragEnded?(drag.translation.height, drag.predictedEndTranslation.height)
-            })
-        .onChange(of: isHandleDragging) { _, active in
-            if !active { dragCancelled?() }
-        }
+        // A stable UIKit recognizer owns the grabber. SwiftUI content updates
+        // cannot reset its gesture state or race an onEnded cancellation.
         .accessibilityAdjustableAction { direction in
             let change = direction == .increment ? 1 : -1
             resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)

@@ -38,6 +38,18 @@ final class ActivityStore {
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
     @ObservationIgnored let summaryCache = ActivitySummaryCache()
+    @ObservationIgnored private var activityLookupRevision: Int?
+    @ObservationIgnored private var activityLookup: [Int: Activity] = [:]
+
+    /// Identity lookup does not filter or scan the library during sheet frames.
+    /// Read the observable revision even on a cache hit so open details stay live.
+    func activity(id: Int) -> Activity? {
+        if activityLookupRevision != activitiesRevision {
+            activityLookup = Dictionary(uniqueKeysWithValues: activities.map { ($0.id, $0) })
+            activityLookupRevision = activitiesRevision
+        }
+        return activityLookup[id]
+    }
     @ObservationIgnored private var routeAvailabilityRevision: Int?
     @ObservationIgnored private var routeAvailabilityIDs: Set<Int> = []
 

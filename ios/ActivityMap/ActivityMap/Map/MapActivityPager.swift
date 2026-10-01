@@ -1,12 +1,12 @@
 import SwiftUI
 import UIKit
+import Observation
 
 /// Native scroll physics owns the drag, cancellation and settling. Only the
 /// current page and its neighbours are hosted, even for a large selection.
 struct MapActivityPager: UIViewControllerRepresentable {
     let store: ActivityStore
     let picker: RoutePicker
-    let singleDetail: Bool
     var expansion: CGFloat = 1
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -36,8 +36,17 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
     @MainActor final class Page: UIHostingController<AnyView> {
         let activityID: Int
-        init(id: Int, content: AnyView) {
+        let expansion: MapActivityExpansion
+        private(set) var contentUpdateCount = 0
+
+        func replaceContent(_ content: AnyView) {
+            rootView = content
+            contentUpdateCount += 1
+        }
+
+        init(id: Int, expansion: MapActivityExpansion, content: AnyView) {
             activityID = id
+            self.expansion = expansion
             super.init(rootView: content)
             view.backgroundColor = .clear
             // The outer Map sheet owns the home-indicator inset once.
@@ -56,12 +65,19 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
         func update(_ next: MapActivityPager) {
             let appearanceChanged = parent.colorScheme != next.colorScheme || parent.typeSize != next.typeSize
-                || parent.sizeClass != next.sizeClass || parent.singleDetail != next.singleDetail || parent.expansion != next.expansion
+                || parent.sizeClass != next.sizeClass
             parent = next
             guard let controller else { return }
-            controller.dataSource = next.picker.candidateIDs.count > 1 ? self : nil
-            if appearanceChanged {
-                for (id, page) in pages { page.rootView = content(id) }
+            if next.picker.candidateIDs.count > 1 {
+                if controller.dataSource !== self { controller.dataSource = self }
+            } else if controller.dataSource != nil { controller.dataSource = nil }
+            // A frame changes only the small reveal subtree. Replacing hosting
+            // roots at 60/120Hz redoes metrics, route checks and UIKit layout.
+            for (id, page) in pages {
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { page.expansion.progress = next.expansion }
+                if appearanceChanged { page.replaceContent(content(id, expansion: page.expansion)) }
             }
             guard !transitioning, let id = next.picker.detailID else { return }
             if (controller.viewControllers?.first as? Page)?.activityID == id {
@@ -79,9 +95,9 @@ struct MapActivityPager: UIViewControllerRepresentable {
             }
         }
 
-        private func content(_ id: Int) -> AnyView {
+        private func content(_ id: Int, expansion: MapActivityExpansion) -> AnyView {
             AnyView(ActivityDetailPanel(store: parent.store, activityID: id,
-                headerTrailingInset: parent.singleDetail ? 44 : 0, mapExpansion: parent.expansion) { [weak self] id in
+                mapExpansion: expansion) { [weak self] id in
                     guard let self else { return }
                     self.parent.picker.detent = .compact
                     self.parent.store.showOnMap(id)
@@ -94,7 +110,8 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
         private func page(_ id: Int) -> Page {
             if let page = pages[id] { return page }
-            let page = Page(id: id, content: content(id))
+            let expansion = MapActivityExpansion(progress: parent.expansion)
+            let page = Page(id: id, expansion: expansion, content: content(id, expansion: expansion))
             pages[id] = page
             return page
         }
@@ -137,4 +154,11 @@ struct MapActivityPager: UIViewControllerRepresentable {
             update(parent)
         }
     }
+}
+
+/// Observed only by the summary/detail reveal, below the stable hosting root.
+@MainActor @Observable
+final class MapActivityExpansion {
+    var progress: CGFloat
+    init(progress: CGFloat) { self.progress = progress }
 }

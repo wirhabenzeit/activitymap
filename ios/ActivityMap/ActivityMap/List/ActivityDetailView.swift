@@ -23,17 +23,18 @@ struct ActivityDetailPanel: View {
     @Bindable var store: ActivityStore
     let activityID: Int
     var headerTrailingInset: CGFloat = 0
-    var mapExpansion: CGFloat? = nil
+    var mapExpansion: MapActivityExpansion? = nil
     var showOnMap: ((Int) -> Void)? = nil
 
-    private var activity: Activity? { store.activities.first { $0.id == activityID } }
+    private var activity: Activity? { store.activity(id: activityID) }
 
     var body: some View {
         Group {
             if let activity {
                 if let mapExpansion {
-                    MapActivityDetailReveal(activity: activity, progress: mapExpansion,
-                                            trailingInset: headerTrailingInset) { id in
+                    MapActivityDetailReveal(activity: activity, expansion: mapExpansion,
+                                            trailingInset: headerTrailingInset, hasRoute: store.routableActivityIDs.contains(activityID),
+                                            summary: "\(Formatters.distance(activity.distance))  ·  \(Formatters.duration(activity.elapsedTime))  ·  \(Formatters.elevation(activity.totalElevationGain)) ↑") { id in
                         if let showOnMap { showOnMap(id) }
                         else { store.showOnMap(id) }
                     }
@@ -44,7 +45,7 @@ struct ActivityDetailPanel: View {
                         }
                         .accessibilityIdentifier("activity-detail-scroll")
                         .clipped()
-                        ActivityDetailActions(activity: activity) { id in
+                        ActivityDetailActions(activity: activity, hasRoute: store.routableActivityIDs.contains(activityID)) { id in
                             if let showOnMap { showOnMap(id) }
                             else { store.showOnMap(id) }
                         }
@@ -63,8 +64,11 @@ struct ActivityDetailPanel: View {
 /// full metrics appear below it; there are never two activity-title layers.
 private struct MapActivityDetailReveal: View {
     let activity: Activity
-    let progress: CGFloat
+    let expansion: MapActivityExpansion
+    private var progress: CGFloat { expansion.progress }
     let trailingInset: CGFloat
+    let hasRoute: Bool
+    let summary: String
     let showOnMap: (Int) -> Void
     @State private var summaryHeight: CGFloat = 20
     @State private var actionHeight: CGFloat = 64
@@ -75,7 +79,7 @@ private struct MapActivityDetailReveal: View {
             ActivityDetailIdentity(activity: activity, trailingInset: trailingInset)
                 .padding(.horizontal, AppTheme.Spacing.large)
                 .padding(.vertical, AppTheme.Spacing.small)
-            Text("\(Formatters.distance(activity.distance))  ·  \(Formatters.duration(activity.elapsedTime))  ·  \(Formatters.elevation(activity.totalElevationGain)) ↑")
+            Text(summary)
                 .font(.caption).foregroundStyle(AppTheme.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, AppTheme.Spacing.large)
@@ -93,7 +97,7 @@ private struct MapActivityDetailReveal: View {
             .clipped()
             .allowsHitTesting(progress > 0.8)
             .accessibilityHidden(progress < 0.8)
-            ActivityDetailActions(activity: activity, showOnMap: showOnMap)
+            ActivityDetailActions(activity: activity, hasRoute: hasRoute, showOnMap: showOnMap)
                 .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { actionHeight = $0 }
                 .opacity(reveal)
@@ -110,9 +114,8 @@ private struct MapActivityDetailReveal: View {
 private struct ActivityDetailActions: View {
     @Environment(\.activityDetailOverMap) private var overMap
     let activity: Activity
+    let hasRoute: Bool
     let showOnMap: (Int) -> Void
-
-    private var hasRoute: Bool { RouteExtent(coordinates: activity.coordinates) != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
