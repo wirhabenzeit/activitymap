@@ -29,6 +29,35 @@ extension RenderedRoutePickingTests {
         try host.save(removed, name: "detail-deleted")
     }
 
+    @Test func mapResultsBackRetainsScrollAndBrowsingContext() async throws {
+        let store = ActivityStore(activities: (1...60).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: Array(1...60))
+        store.inspect(5)
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: false), size: CGSize(width: 375, height: 500))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(200))
+        let results = try #require(host.descendants(of: UIScrollView.self).first { $0.contentSize.height > $0.bounds.height + 100 })
+        results.setContentOffset(CGPoint(x: 0, y: 900), animated: false)
+        try await Task.sleep(for: .milliseconds(100))
+        let offset = results.contentOffset
+        let selection = store.selectedActivityIDs
+        let request = store.mapContext.pendingRequest
+        picker.showDetail(20, store: store)
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(host.descendants(of: UIScrollView.self).contains { $0 === results }, "Results remain mounted behind the detail destination")
+        #expect(picker.detailID == 20 && store.activeActivityID == 20)
+        try host.save(host.snapshot(), name: "map-flow-detail")
+        picker.showResults()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(results.contentOffset == offset, "Back restores the exact results scroll position")
+        #expect(picker.detailID == nil && picker.isPresented)
+        #expect(store.selectedActivityIDs == selection && store.activeActivityID == 20 && store.inspectedActivityID == 5)
+        #expect(store.mapContext.pendingRequest == request, "Moving between results and detail does not request a map refit")
+        try host.save(host.snapshot(), name: "map-flow-results-return")
+    }
+
     @Test(arguments: ["phone", "accessibility", "tablet", "landscape", "no-gps"])
     func detailAdaptivePresentation(scenario: String) async throws {
         let tablet = scenario == "tablet"

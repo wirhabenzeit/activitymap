@@ -5,6 +5,8 @@ struct RoutePickerSheet: View {
     @Bindable var picker: RoutePicker
     @Bindable var store: ActivityStore
     let isSidePanel: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var candidates: [Activity] {
         let byID = Dictionary(uniqueKeysWithValues: store.filteredActivities.map { ($0.id, $0) })
@@ -15,116 +17,154 @@ struct RoutePickerSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            if picker.detent == .compact {
-                compactSummary
-            } else if let activity = detail {
-                if candidates.count > 1 { detailNavigation(activity) }
-                if activity.coordinates.isEmpty {
-                    Label("No GPS route recorded", systemImage: "map.slash")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 20)
-                }
-                ScrollView {
-                    ActivityDetailContent(activity: activity)
-                }
-                .id(activity.id)
-            } else if candidates.isEmpty {
-                ContentUnavailableView("Selection hidden", systemImage: "line.3.horizontal.decrease.circle",
-                                       description: Text("Your selected activities are hidden by filters."))
-                Button("Clear filters") { store.resetFilters() }
-                    .buttonStyle(.bordered).padding(.bottom, 16)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(candidates) { activity in
-                            resultRow(activity)
-                            if activity.id != candidates.last?.id { Divider().padding(.leading, 56) }
-                        }
+            if picker.detent == .compact { compactSummary }
+            // Keep results mounted through detail and detent changes. Back
+            // restores the exact scroll position, without a second overlay.
+            ZStack {
+                results
+                    .opacity(detail == nil ? 1 : 0)
+                    .allowsHitTesting(detail == nil)
+                    .accessibilityHidden(detail != nil)
+                if let activity = detail {
+                    ActivityDetailPanel(store: store, activityID: activity.id) { id in
+                        picker.detent = .compact
+                        store.showOnMap(id)
                     }
+                    .id(activity.id)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: picker.detailID)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(height: picker.detent == .compact ? 0 : nil)
+            .clipped()
+            .accessibilityHidden(picker.detent == .compact)
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(.primary.opacity(0.08)))
+        // One continuous detail surface; only the outer host owns corners.
+        .background(AppTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: isSidePanel ? 20 : 32, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
         .accessibilityIdentifier("map-results-panel")
     }
 
+    @ViewBuilder private var results: some View {
+        if candidates.isEmpty {
+            VStack {
+                ContentUnavailableView("Selection hidden", systemImage: "line.3.horizontal.decrease.circle",
+                                       description: Text("Your selected activities are hidden by filters."))
+                Button("Clear filters") { store.resetFilters() }
+                    .buttonStyle(.bordered).padding(.bottom, 16)
+            }
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(candidates) { activity in
+                        resultRow(activity)
+                        if activity.id != candidates.last?.id { Divider().padding(.leading, 56) }
+                    }
+                }
+            }
+            .accessibilityIdentifier("map-results-scroll")
+        }
+    }
+
     private var header: some View {
         VStack(spacing: 0) {
-            Capsule().fill(.secondary.opacity(0.4)).frame(width: 32, height: 4).padding(.top, 9)
-                .opacity(isSidePanel ? 0 : 1)
-            HStack(spacing: 4) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(store.selectedActivityIDs.count) selected").font(.headline)
-                    if store.hiddenSelectedCount > 0 {
-                        Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption).foregroundStyle(.secondary)
-                    } else if picker.isAdding {
-                        Text("Tap routes to add").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .combine)
-                Menu {
-                    if let activity = detail {
-                        Section(activity.name) {
-                            Button("Frame route", systemImage: "scope") {
-                                picker.detent = .compact
-                                store.showOnMap(activity.id)
-                            }.disabled(activity.coordinates.isEmpty)
-                            Button("Deselect activity", systemImage: "minus.circle") { store.removeFromSelection([activity.id]) }
+            if !isSidePanel {
+                Capsule().fill(.secondary.opacity(0.4)).frame(width: 32, height: 4).padding(.top, 9)
+            }
+            let layout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                : AnyLayout(HStackLayout(spacing: 4))
+            layout {
+                if let activity = detail, picker.detent != .compact {
+                    if candidates.count > 1 {
+                        Button { picker.showResults() } label: {
+                            Label("Results", systemImage: "chevron.left")
+                                .font(.subheadline.weight(.medium))
+                                .frame(minHeight: 44)
                         }
+                        .accessibilityLabel("Back to selected activities")
+                        .accessibilityIdentifier("map-results-back")
                     }
-                    Toggle("Add routes to selection", isOn: $picker.isAdding)
-                    Button("Fit selection", systemImage: "scope") {
-                        picker.detent = .compact
-                        store.mapContext.request(.fitSelection)
-                    }
-                    .disabled(!candidates.contains { !$0.coordinates.isEmpty })
-                    Button("Clear selection", systemImage: "xmark.circle", role: .destructive) { store.clearSelection() }
-                    Button("Hide results", systemImage: "eye.slash") { picker.isPresented = false }
-                } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
+                    if !typeSize.isAccessibilitySize { Spacer(minLength: 0) }
+                    if candidates.count > 1 { detailNavigation(activity) }
+                } else {
+                    selectionSummary
                 }
-                .accessibilityLabel("Selection actions")
-                Button {
-                    withAnimation(.snappy) { picker.detent = picker.detent == .compact ? .medium : .compact }
-                } label: {
-                    Image(systemName: picker.detent == .compact ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
-                }
-                .accessibilityLabel(picker.detent == .compact ? "Expand results" : "Collapse results")
-                if picker.detent != .compact {
+                HStack(spacing: 4) {
+                    if detail == nil || picker.detent == .compact { selectionActions }
                     Button {
-                        withAnimation(.snappy) { picker.detent = picker.detent == .expanded ? .medium : .expanded }
+                        resize(to: picker.detent == .compact ? .medium : .compact)
                     } label: {
-                        Image(systemName: picker.detent == .expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        Image(systemName: picker.detent == .compact ? "chevron.up" : "chevron.down")
                             .font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
                     }
-                    .accessibilityLabel(picker.detent == .expanded ? "Medium results" : "Expand results fully")
+                    .accessibilityLabel(picker.detent == .compact ? "Expand results" : "Collapse results")
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 4)
         }
         .contentShape(Rectangle())
-        // Only the header drags; scrolling content never selects a route or resizes the panel.
+        // Header drag resizes this one container; content scrolling never does.
         .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { drag in
             let change = drag.translation.height < -30 ? 1 : drag.translation.height > 30 ? -1 : 0
-            withAnimation(.snappy) {
-                picker.detent = MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium
-            }
+            resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)
         })
         .accessibilityAdjustableAction { direction in
             let change = direction == .increment ? 1 : -1
-            picker.detent = MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium
+            resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)
         }
+        .accessibilityAction(named: "Expand results fully") { resize(to: .expanded) }
+    }
+
+    private func resize(to detent: MapResultsDetent) {
+        withAnimation(reduceMotion ? nil : .snappy) { picker.detent = detent }
+    }
+
+    private var selectionSummary: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(store.selectedActivityIDs.count) selected").font(.headline)
+            if store.hiddenSelectedCount > 0 {
+                Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption).foregroundStyle(.secondary)
+            } else if picker.isAdding {
+                Text("Tap routes to add").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var selectionActions: some View {
+        Menu {
+            if let activity = detail {
+                Section(activity.name) {
+                    Button("Frame route", systemImage: "scope") {
+                        picker.detent = .compact
+                        store.showOnMap(activity.id)
+                    }.disabled(activity.coordinates.isEmpty)
+                    Button("Deselect activity", systemImage: "minus.circle") { store.removeFromSelection([activity.id]) }
+                }
+            }
+            Toggle("Add routes to selection", isOn: $picker.isAdding)
+            Button("Fit selection", systemImage: "scope") {
+                picker.detent = .compact
+                store.mapContext.request(.fitSelection)
+            }
+            .disabled(!candidates.contains { !$0.coordinates.isEmpty })
+            Button("Expand results fully", systemImage: "arrow.up.left.and.arrow.down.right") { resize(to: .expanded) }
+            Button("Clear selection", systemImage: "xmark.circle", role: .destructive) { store.clearSelection() }
+            Button("Hide results", systemImage: "eye.slash") { picker.isPresented = false }
+        } label: {
+            BrowseIconLabel(systemImage: "ellipsis")
+        }
+        .accessibilityLabel("Selection actions")
     }
 
     private var compactSummary: some View {
         Button {
-            withAnimation(.snappy) { picker.detent = .medium }
+            resize(to: .medium)
         } label: {
             VStack(alignment: .leading, spacing: 6) {
                 if let activity = detail ?? (candidates.count == 1 ? candidates.first : nil) {
@@ -146,22 +186,16 @@ struct RoutePickerSheet: View {
 
     private func detailNavigation(_ activity: Activity) -> some View {
         HStack(spacing: 4) {
-            Button { picker.detailID = nil } label: {
-                Image(systemName: "list.bullet").frame(width: 44, height: 44)
-            }.accessibilityLabel("All selected activities")
-            Spacer(minLength: 0)
             Button { picker.step(-1, store: store) } label: {
                 Image(systemName: "chevron.left").frame(width: 44, height: 44)
             }.accessibilityLabel("Previous activity")
             Text("\((picker.candidateIDs.firstIndex(of: activity.id) ?? 0) + 1) of \(candidates.count)")
-                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                .font(.caption).monospacedDigit().foregroundStyle(.secondary).fixedSize()
             Button { picker.step(1, store: store) } label: {
                 Image(systemName: "chevron.right").frame(width: 44, height: 44)
             }.accessibilityLabel("Next activity")
         }
         .font(.system(size: 18, weight: .semibold))
-        .padding(.horizontal, 16)
-        .overlay(alignment: .bottom) { Divider() }
     }
 
     private func resultRow(_ activity: Activity) -> some View {

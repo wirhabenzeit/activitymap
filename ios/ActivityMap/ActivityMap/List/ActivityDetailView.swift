@@ -10,6 +10,7 @@ struct ActivityDetailView: View {
         ActivityDetailPanel(store: store, activityID: activityID)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+            .presentationBackground(AppTheme.surface)
             // The content's activity name is the sheet heading. Keep the
             // native escape gesture available without duplicating a toolbar.
             .accessibilityAction(.escape) { dismiss() }
@@ -21,6 +22,7 @@ struct ActivityDetailView: View {
 struct ActivityDetailPanel: View {
     @Bindable var store: ActivityStore
     let activityID: Int
+    var showOnMap: ((Int) -> Void)? = nil
 
     private var activity: Activity? { store.activities.first { $0.id == activityID } }
 
@@ -32,22 +34,25 @@ struct ActivityDetailPanel: View {
                 }
                 .accessibilityIdentifier("activity-detail-scroll")
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    ActivityDetailActions(store: store, activity: activity)
+                    ActivityDetailActions(activity: activity) { id in
+                        if let showOnMap { showOnMap(id) }
+                        else { store.showOnMap(id) }
+                    }
                 }
             } else {
                 ContentUnavailableView("Activity unavailable", systemImage: "figure.run.circle",
                                        description: Text("This activity is no longer in your library."))
             }
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(AppTheme.surface)
     }
 }
 
 /// Single integration point for real edit/refresh/share actions (#220–#222).
 /// Until those land, the menu explicitly identifies them as unavailable.
 private struct ActivityDetailActions: View {
-    @Bindable var store: ActivityStore
     let activity: Activity
+    let showOnMap: (Int) -> Void
 
     private var hasRoute: Bool { RouteExtent(coordinates: activity.coordinates) != nil }
 
@@ -55,7 +60,7 @@ private struct ActivityDetailActions: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Button {
-                    store.showOnMap(activity.id)
+                    showOnMap(activity.id)
                 } label: {
                     Label("Show on map", systemImage: "map")
                         .font(.subheadline.weight(.medium))
@@ -86,6 +91,6 @@ private struct ActivityDetailActions: View {
         }
         .padding(.horizontal, AppTheme.Spacing.large)
         .padding(.vertical, AppTheme.Spacing.small)
-        .background(.bar)
+        .background(AppTheme.surface)
     }
 }

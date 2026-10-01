@@ -111,6 +111,11 @@ final class RoutePicker {
         isPresented = !store.selectedActivityIDs.isEmpty
     }
 
+    /// Back changes presentation only: retain selection, active route and camera.
+    func showResults() {
+        detailID = nil
+    }
+
     func step(_ offset: Int, store: ActivityStore) {
         reconcile(with: store)
         guard !candidateIDs.isEmpty else { return }
