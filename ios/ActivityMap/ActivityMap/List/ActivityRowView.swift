@@ -4,6 +4,7 @@ struct ActivityRowView: View {
     @Bindable var store: ActivityStore
     let activity: Activity
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var isSelected: Bool { store.selectedActivityIDs.contains(activity.id) }
     private var isActive: Bool { store.activeActivityID == activity.id }
@@ -11,116 +12,115 @@ struct ActivityRowView: View {
     private var settings: ActivityListSettings { store.listPresentation.settings }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: settings.density == .compact ? 4 : 10) {
-            if typeSize.isAccessibilitySize {
-                identification
-                HStack { Spacer(); actions }
-            } else {
-                HStack(alignment: .top, spacing: 4) {
-                    identification
-                    Spacer(minLength: 0)
-                    actions
-                }
+        HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 0) {
+            BrowseSelectionButton(title: "\(isSelected ? "Deselect" : "Select") \(activity.name)", isSelected: isSelected) {
+                store.toggleSelection(activity.id)
             }
-            if !settings.visibleMetrics.isEmpty {
-                if settings.width == .scrollingMetrics && !typeSize.isAccessibilitySize {
-                    // Identifying context sits outside this scroller: horizontal
-                    // metric inspection never moves the name/date/actions away.
-                    ScrollView(.horizontal) {
-                        HStack(alignment: .top, spacing: 20) {
-                            ForEach(settings.orderedMetrics) { metric in
-                                metricView(metric).frame(minWidth: 110, alignment: .leading)
-                            }
-                        }
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
+                if sizeClass == .regular && !typeSize.isAccessibilitySize && settings.width == .fitWidth {
+                    HStack(spacing: AppTheme.Spacing.large) {
+                        identification.frame(maxWidth: .infinity, alignment: .leading)
+                        metrics.frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .accessibilityLabel("Metrics for \(activity.name)")
                 } else {
-                    LazyVGrid(columns: typeSize.isAccessibilitySize
-                              ? [GridItem(.flexible(), alignment: .leading)]
-                              : [GridItem(.adaptive(minimum: 130), alignment: .leading)],
-                              alignment: .leading, spacing: settings.density == .compact ? 4 : 10) {
-                        ForEach(settings.orderedMetrics) { metricView($0) }
-                    }
+                    identification
+                    metrics
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            actions
         }
-        .padding(.vertical, settings.density == .compact ? 0 : 6)
+        .padding(.vertical, settings.density == .compact ? 0 : AppTheme.Spacing.tight)
         .contentShape(Rectangle())
         .accessibilityIdentifier("activity-list-row-\(activity.id)")
     }
 
     private var identification: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Button { store.toggleSelection(activity.id) } label: {
-                ZStack(alignment: .bottomTrailing) {
-                    Image(systemName: activity.category.symbolName)
-                        .font(.system(size: 20))
-                        .foregroundStyle(activity.category.color)
-                        .frame(width: 28, height: 28)
-                        .background(RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(isSelected ? activity.category.color : .clear, lineWidth: 2))
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 11)).foregroundStyle(activity.category.color)
-                            .background(.background, in: Circle())
+        Button(action: inspect) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(activity.name)
+                        .font(.subheadline.weight(isActive ? .semibold : .medium))
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : settings.density == .compact ? 1 : 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if isActive {
+                        Image(systemName: "location.fill").font(.system(size: 10))
+                            .foregroundStyle(AppTheme.accent)
                     }
                 }
-                .frame(minWidth: 44, minHeight: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isSelected ? "Deselect \(activity.name)" : "Select \(activity.name)")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(activity.name)
-                    .fontWeight(isActive ? .semibold : .regular)
-                    .lineLimit(typeSize.isAccessibilitySize || settings.density == .comfortable ? nil : 2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(activity.sportType.rawValue)
-                    .font(.caption).foregroundStyle(.secondary)
-                Text(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))
-                    .font(.caption).foregroundStyle(.secondary)
-                if isActive {
-                    Label("Active on map", systemImage: "location.fill")
-                        .font(.caption).foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Image(systemName: activity.category.symbolName)
+                        .font(.system(size: 11)).foregroundStyle(AppTheme.sportSymbolColor(activity.category))
+                    Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.top, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: AppTheme.minimumTarget, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Details for \(activity.name)")
+        .accessibilityValue("\(activity.sportType.rawValue), \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))\(isActive ? ", active on map" : "")")
+        .accessibilityHint("Inspect activity without changing selection")
+    }
+
+    @ViewBuilder private var metrics: some View {
+        if !settings.visibleMetrics.isEmpty {
+            if settings.width == .scrollingMetrics && !typeSize.isAccessibilitySize {
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: AppTheme.Spacing.large) {
+                        ForEach(settings.orderedMetrics) { metric in
+                            metricView(metric).frame(minWidth: AppTheme.minimumMetricColumnWidth, alignment: .leading)
+                        }
+                    }
+                }
+                .accessibilityLabel("Metrics for \(activity.name)")
+            } else {
+                LazyVGrid(columns: typeSize.isAccessibilitySize
+                          ? [GridItem(.flexible(), alignment: .leading)]
+                          : [GridItem(.adaptive(minimum: metricColumnWidth), alignment: .leading)],
+                          alignment: .leading, spacing: AppTheme.Spacing.tight) {
+                    ForEach(settings.orderedMetrics) { metricView($0) }
+                }
+            }
         }
     }
 
-    @ViewBuilder private var actions: some View {
-        Button { store.showOnMap(activity.id) } label: {
-            Image(systemName: hasGeometry ? "map" : "map.slash")
-                .frame(minWidth: 44, minHeight: 44)
-        }
-        .buttonStyle(.plain)
-        .disabled(!hasGeometry)
-        .accessibilityLabel("Show \(activity.name) on map")
-        .accessibilityHint(hasGeometry ? "" : "This activity has no GPS route.")
+    private var metricColumnWidth: CGFloat {
+        settings.visibleMetrics.isSubset(of: [.distance, .elapsedTime, .elevationGain])
+            ? AppTheme.minimumInlineMetricColumnWidth : AppTheme.minimumMetricColumnWidth
+    }
 
-        Button {
-            if store.inspectedActivityID == activity.id { store.dismissInspection() }
-            else { store.inspect(activity.id) }
+    private var actions: some View {
+        Menu {
+            Button(store.inspectedActivityID == activity.id ? "Close details" : "Details", systemImage: "info.circle", action: inspect)
+            Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
+                .disabled(!hasGeometry)
         } label: {
-            Image(systemName: store.inspectedActivityID == activity.id ? "xmark.circle" : "info.circle")
-                .frame(minWidth: 44, minHeight: 44)
+            BrowseIconLabel(systemImage: "ellipsis")
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(store.inspectedActivityID == activity.id ? "Close details for" : "Details for") \(activity.name)")
+        .accessibilityLabel("Actions for \(activity.name)")
+        .accessibilityHint(hasGeometry ? "Details or show on map" : "No GPS route; details remain available")
     }
 
-    private func metricView(_ metric: ActivityListMetric) -> some View {
-        let value = metric.value(for: activity)
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(metric.title).foregroundStyle(.secondary)
-            Text(value).monospacedDigit()
+    private func inspect() {
+        if store.inspectedActivityID == activity.id { store.dismissInspection() }
+        else { store.inspect(activity.id) }
+    }
+
+    @ViewBuilder private func metricView(_ metric: ActivityListMetric) -> some View {
+        let symbol: String? = switch metric {
+        case .distance: "ruler"
+        case .elapsedTime: "clock"
+        case .elevationGain: "mountain.2"
+        default: nil
         }
-        .font(settings.density == .compact ? .caption2 : .caption)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(metric.title)
-        .accessibilityValue(value == Formatters.unknown ? "Not recorded" : value)
+        if let symbol, !typeSize.isAccessibilitySize {
+            BrowseInlineMetric(title: metric.title, value: metric.value(for: activity), systemImage: symbol)
+        } else {
+            BrowseMetricValue(title: metric.title, value: metric.value(for: activity))
+        }
     }
 }

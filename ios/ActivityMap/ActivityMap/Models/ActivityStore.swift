@@ -35,9 +35,26 @@ final class ActivityStore {
     /// Bumped on every `activities` assignment so views can rebuild derived
     /// data (e.g. the map's route source) only when the activities change.
     private(set) var activitiesRevision = 0
+    private var filterRevision = 0
+    @ObservationIgnored private var filteredSnapshot: (data: Int, filters: Int, activities: [Activity])?
+    @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, activities: [Activity])?
+    @ObservationIgnored private(set) var filterBuildCount = 0
+    @ObservationIgnored private(set) var sortBuildCount = 0
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
     @ObservationIgnored let summaryCache = ActivitySummaryCache()
+    @ObservationIgnored private var activityLookupRevision: Int?
+    @ObservationIgnored private var activityLookup: [Int: Activity] = [:]
+
+    /// Identity lookup does not filter or scan the library during sheet frames.
+    /// Read the observable revision even on a cache hit so open details stay live.
+    func activity(id: Int) -> Activity? {
+        if activityLookupRevision != activitiesRevision {
+            activityLookup = Dictionary(uniqueKeysWithValues: activities.map { ($0.id, $0) })
+            activityLookupRevision = activitiesRevision
+        }
+        return activityLookup[id]
+    }
     @ObservationIgnored private var routeAvailabilityRevision: Int?
     @ObservationIgnored private var routeAvailabilityIDs: Set<Int> = []
 
@@ -135,12 +152,16 @@ final class ActivityStore {
 
     var inspectedActivity: Activity? {
         guard let id = selection.inspectedID else { return nil }
-        return activities.first { $0.id == id }
+        return activity(id: id)
     }
 
     var filteredActivities: [Activity] {
+        // Read observable keys on cache hits too. Inspection/selection changes
+        // do not invalidate this snapshot; all filter setters bump the key.
+        let data = activitiesRevision, filters = filterRevision
+        if let cached = filteredSnapshot, cached.data == data, cached.filters == filters { return cached.activities }
         let query = Self.normalizedSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
-        return activities.filter { activity in
+        let result = activities.filter { activity in
             if !query.isEmpty, !Self.normalizedSearch(activity.name).contains(query) { return false }
             guard activeSportTypes.contains(activity.sportType) else { return false }
 
@@ -156,10 +177,22 @@ final class ActivityStore {
 
             return true
         }
+        filteredSnapshot = (data, filters, result)
+        filterBuildCount += 1
+        return result
     }
 
     /// Sort is a list presentation concern; shared filter order stays intact.
-    var listedActivities: [Activity] { listPresentation.settings.sort.sorted(filteredActivities) }
+    var listedActivities: [Activity] {
+        let data = activitiesRevision, filters = filterRevision, sort = listPresentation.settings.sort
+        if let cached = listedSnapshot, cached.data == data, cached.filters == filters, cached.sort == sort {
+            return cached.activities
+        }
+        let result = sort.sorted(filteredActivities)
+        listedSnapshot = (data, filters, sort, result)
+        sortBuildCount += 1
+        return result
+    }
 
     var activitySummary: ActivitySummary? {
         let mode = listPresentation.settings.summaryMode
@@ -304,6 +337,10 @@ final class ActivityStore {
     /// Logout, account or deployment transition.
     func clearScope() {
         summaryCache.clear()
+        filteredSnapshot = nil
+        listedSnapshot = nil
+        activityLookup = [:]
+        activityLookupRevision = nil
         activities = []
         routeGeometry.update(activities: [], revision: activitiesRevision)
         selection.clearScope()
@@ -318,6 +355,7 @@ final class ActivityStore {
     }
 
     private func reconcileSelectionVisibility() {
+        filterRevision &+= 1
         selection.setVisible(Set(filteredActivities.map(\.id)))
     }
 

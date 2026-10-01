@@ -1,6 +1,11 @@
 import Foundation
 
 enum Formatters {
+    private static let dateFormatters: NSCache<NSString, DateFormatter> = {
+        let cache = NSCache<NSString, DateFormatter>()
+        cache.countLimit = 24
+        return cache
+    }()
     static let unknown = "—"
 
     static func distance(_ meters: Double?, locale: Locale = .current) -> String {
@@ -52,10 +57,15 @@ enum Formatters {
     }
 
     private static func dateString(_ date: Date, template: String, timeZone: TimeZone, locale: Locale) -> String {
+        // Visible rows redraw during native navigation. Reuse immutable
+        // formatters; locale/timezone changes naturally select a different key.
+        let key = "\(locale.identifier)|\(locale.calendar.identifier)|\(timeZone.identifier)|\(template)" as NSString
+        if let formatter = dateFormatters.object(forKey: key) { return formatter.string(from: date) }
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.timeZone = timeZone
         formatter.setLocalizedDateFormatFromTemplate(template)
+        dateFormatters.setObject(formatter, forKey: key)
         return formatter.string(from: date)
     }
 

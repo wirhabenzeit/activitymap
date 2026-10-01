@@ -4,6 +4,41 @@ import Testing
 
 @MainActor
 struct ActivityListTests {
+    @Test func browsingSnapshotsReuseWorkAndInvalidateOnlyForTheirInputs() {
+        let presentation = ActivityListPresentation(defaults: nil)
+        let store = ActivityStore(activities: (1...4575).map { ActivityStoreSelectionTests.activity($0) },
+                                  listPresentation: presentation)
+        let ids = store.listedActivities.map(\.id)
+        let filters = store.filterBuildCount, sorts = store.sortBuildCount
+        for id in 1...50 {
+            store.inspect(id)
+            store.dismissInspection()
+            store.toggleSelection(id)
+            #expect(store.listedActivities.map(\.id) == ids)
+        }
+        presentation.settings.width = .scrollingMetrics
+        presentation.settings.density = .compact
+        _ = store.listedActivities
+        #expect(store.filterBuildCount == filters && store.sortBuildCount == sorts,
+                "Selection, inspection and display changes cannot filter/sort the library again")
+        presentation.settings.sort.direction = .ascending
+        #expect(store.listedActivities.first?.id == 1)
+        #expect(store.filterBuildCount == filters && store.sortBuildCount == sorts + 1)
+        store.searchText = "No matching activity"
+        #expect(store.listedActivities.isEmpty)
+        #expect(store.filterBuildCount == filters + 1 && store.sortBuildCount == sorts + 2)
+        store.searchText = ""
+        _ = store.listedActivities
+        let beforeData = store.filterBuildCount, beforeSort = store.sortBuildCount
+        store.activities[0].name = "Updated by sync"
+        #expect(store.listedActivities.first?.name == "Updated by sync")
+        #expect(store.filterBuildCount == beforeData + 1 && store.sortBuildCount == beforeSort + 1)
+        store.activities.removeFirst()
+        #expect(store.listedActivities.first?.id == 2)
+        store.clearScope()
+        #expect(store.listedActivities.isEmpty && store.activity(id: 2) == nil)
+    }
+
     @Test func sharedSortVectorsUseProductionOrdering() throws {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

@@ -17,7 +17,7 @@ struct AppShell: View {
         NavigationStack {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle("ActivityMap")
+                .navigationTitle(store.selectedTab == .list ? "Activities" : "ActivityMap")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
                 .task {
@@ -153,7 +153,7 @@ struct AppShell: View {
             }
         }
         .padding(3)
-        .modifier(MapChromeSurface())
+        .glassEffect(.regular, in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("View")
     }

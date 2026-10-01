@@ -12,15 +12,16 @@ struct AccountSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                switch destination {
-                case .profile:
-                    profileContent
-                    syncContent
-                case .settings:
-                    settingsContent
-                case .about:
-                    aboutContent
+            TimelineView(.periodic(from: .now, by: 5)) { _ in
+                Form {
+                    switch destination {
+                    case .profile:
+                        profileContent
+                    case .settings:
+                        settingsContent
+                    case .about:
+                        aboutContent
+                    }
                 }
             }
             .navigationTitle(title)
@@ -237,6 +238,15 @@ struct AccountSheet: View {
                 if let date = sync.retryNotBefore {
                     LabeledContent("Retry after") { Text(date, style: .time) }
                 }
+                NavigationLink("Sync Details") {
+                    BrowsingSyncDetails(presentation: BrowsingPresentation(store: sync.activities, sync: sync),
+                                        failureMessage: syncFailureMessage, recover: recoverSync)
+                        .navigationTitle("Sync Details")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+                if sync.status == .syncing {
+                    Button("Pause Sync") { sync.pause() }
+                }
                 if let refresh, sync.session != nil {
                     Button {
                         Task { await refresh() }
@@ -246,6 +256,22 @@ struct AccountSheet: View {
                         .disabled(!sync.canRefresh)
                 }
             }
+        }
+    }
+
+    private var syncFailureMessage: String? {
+        if case .failed(let message) = sync?.status { return message }
+        return nil
+    }
+
+    private func recoverSync(_ action: BrowsingPresentation.Recovery) {
+        switch action {
+        case .retry:
+            guard sync?.canRefresh == true, let refresh else { return }
+            Task { await refresh() }
+        case .cancelSync: sync?.pause()
+        case .account: Task { await auth.signIn() }
+        case .clearFilters, .showList: break
         }
     }
 

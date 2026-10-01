@@ -5,55 +5,99 @@ struct ListScreen: View {
     var emptyState: BrowsingPresentation.EmptyState? = nil
     var recover: (BrowsingPresentation.Recovery) -> Void = { _ in }
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var hasPushedDetail = false
 
     var body: some View {
         GeometryReader { geometry in
-            List {
-                if store.listPresentation.settings.summaryMode != .off {
-                    ActivitySummaryView(store: store)
-                }
-                ForEach(store.listedActivities) { activity in
-                    ActivityRowView(store: store, activity: activity)
-                    if sizeClass == .regular, store.inspectedActivityID == activity.id {
-                        VStack(spacing: 0) {
-                            HStack {
-                                Text("Activity details").font(.headline)
-                                Spacer()
-                                Button("Close") { store.dismissInspection() }
-                                    .frame(minWidth: 44, minHeight: 44)
-                                    .accessibilityLabel("Close activity details")
-                            }
-                            .padding(.horizontal, 20)
-                            ActivityDetailPanel(store: store, activityID: activity.id)
-                                .frame(height: max(220, min(560, geometry.size.height - 160)))
-                        }
-                        .listRowInsets(EdgeInsets())
-                    }
-                }
-                if let emptyState {
-                    BrowsingEmptyView(state: emptyState, recover: recover, scrolls: false)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
+            let sideBySide = sizeClass == .regular && geometry.size.width >= 650
+            HStack(spacing: 0) {
+                activityList
+                    .frame(width: sideBySide ? min(400, max(360, geometry.size.width * 0.45)) : nil)
+                    // The list column has phone-like width even on a wide host.
+                    .environment(\.horizontalSizeClass, sideBySide ? .compact : sizeClass)
+                if sideBySide {
+                    Divider()
+                    detailColumn
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .listStyle(.plain)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                VStack(spacing: 0) {
-                    ListControls(presentation: store.listPresentation)
-                    SelectionBar(store: store)
-                }
+            // Inspecting is ordinary navigation. Back only clears inspection;
+            // the retained list and selection/camera owners remain unchanged.
+            .navigationDestination(item: inspectionID(sideBySide: sideBySide)) { id in
+                ActivityDetailView(store: store, activityID: id)
             }
-        }
-        // List inspection is independent of selection and the active route.
-        .sheet(item: inspectedActivity) { activity in
-            ActivityDetailView(store: store, activityID: activity.id)
+            .onChange(of: store.inspectedActivityID, initial: true) { _, id in
+                if id == nil { hasPushedDetail = false }
+                else if !sideBySide { hasPushedDetail = true }
+            }
+            .onChange(of: sideBySide) { _, wide in
+                if !wide, store.inspectedActivityID != nil { hasPushedDetail = true }
+            }
         }
     }
 
-    private var inspectedActivity: Binding<Activity?> {
+    private var activityList: some View {
+        List {
+            ForEach(store.listedActivities) { activity in
+                ActivityRowView(store: store, activity: activity)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+            }
+            if let emptyState {
+                BrowsingEmptyView(state: emptyState, recover: recover, scrolls: false)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+        }
+        .listStyle(.plain)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: AppTheme.Spacing.small) {
+                    SelectionBar(store: store)
+                    Spacer(minLength: 0)
+                    ListControls(presentation: store.listPresentation)
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    SelectionBar(store: store)
+                    ListControls(presentation: store.listPresentation).padding(.leading, 44)
+                }
+            }
+            .padding(.horizontal, AppTheme.Spacing.small)
+            .background(.thinMaterial, ignoresSafeAreaEdges: [])
+            .accessibilityIdentifier("list-browse-toolbar")
+        }
+    }
+
+    @ViewBuilder private var detailColumn: some View {
+        if let id = store.inspectedActivityID {
+            ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: 44)
+                .overlay(alignment: .topTrailing) {
+                    Button { store.dismissInspection() } label: {
+                        Image(systemName: "xmark")
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, AppTheme.Spacing.large)
+                    .padding(.top, AppTheme.Spacing.small)
+                    .accessibilityLabel("Close activity details")
+                }
+        } else {
+            ContentUnavailableView("Choose an activity", systemImage: "figure.run",
+                                   description: Text("Open an activity from the list to see its details."))
+        }
+    }
+
+    private func inspectionID(sideBySide: Bool) -> Binding<Int?> {
         Binding(
-            get: { sizeClass != .regular && store.selectedTab == .list ? store.inspectedActivity : nil },
-            set: { if $0 == nil, sizeClass != .regular, store.selectedTab == .list { store.dismissInspection() } }
+            get: { (!sideBySide || hasPushedDetail) && store.selectedTab == .list ? store.inspectedActivityID : nil },
+            set: { id in
+                // Keep an already-pushed detail open through width changes.
+                // Tab changes retain inspection; native Back clears it in List.
+                if id == nil, (!sideBySide || hasPushedDetail), store.selectedTab == .list {
+                    store.dismissInspection()
+                    hasPushedDetail = false
+                }
+            }
         )
     }
 }
@@ -66,7 +110,7 @@ private struct SelectionBar: View {
     private var selectedCount: Int { store.selectedActivityIDs.count }
 
     private var summary: String {
-        let filteredCount = store.filteredActivities.count
+        let filteredCount = store.selection.visibleIDs.count
         let visibleCount = selectedCount - store.hiddenSelectedCount
         let hidden = store.hiddenSelectedCount
         let scope = "\(visibleCount) of \(filteredCount) filtered activities selected"
@@ -74,30 +118,30 @@ private struct SelectionBar: View {
     }
 
     private var visibleSummary: String {
-        guard typeSize.isAccessibilitySize else { return summary }
         let count = selectedCount - store.hiddenSelectedCount
-        let scope = "\(count)/\(store.filteredActivities.count) selected"
+        let scope = selectedCount == 0 ? "\(store.selection.visibleIDs.count) activities" : "\(count)/\(store.selection.visibleIDs.count) selected"
         return store.hiddenSelectedCount > 0 ? "\(scope) · \(store.hiddenSelectedCount) hidden" : scope
     }
 
-    private var selectionSymbol: String {
+    private var allFilteredSelected: Bool {
         let count = selectedCount - store.hiddenSelectedCount
-        if count == 0 { return "square" }
-        return count == store.filteredActivities.count ? "checkmark.square.fill" : "minus.square.fill"
+        return count > 0 && count == store.selection.visibleIDs.count
     }
 
     var body: some View {
-        HStack {
-            Text(visibleSummary)
-                .accessibilityLabel(summary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
+        HStack(spacing: 0) {
+            BrowseSelectionButton(title: allFilteredSelected ? "Deselect all filtered activities" : "Select all filtered activities",
+                                  isSelected: allFilteredSelected,
+                                  isMixed: !allFilteredSelected && selectedCount > store.hiddenSelectedCount) {
+                if allFilteredSelected { store.deselectAllFiltered() }
+                else { store.selectAllFiltered() }
+            }
+            .disabled(store.selection.visibleIDs.isEmpty)
             Menu {
                 Button("Select All Filtered Activities") {
                     store.selectAllFiltered()
                 }
-                .disabled(store.filteredActivities.isEmpty)
+                .disabled(store.selection.visibleIDs.isEmpty)
                 Button("Deselect All Filtered Activities") {
                     store.deselectAllFiltered()
                 }
@@ -107,14 +151,17 @@ private struct SelectionBar: View {
                 }
                 .disabled(selectedCount == 0)
             } label: {
-                Label("Selection", systemImage: selectionSymbol)
-                    .labelStyle(.iconOnly)
-                    .frame(minWidth: 44, minHeight: 44)
+                HStack(spacing: 4) {
+                    Text(visibleSummary).font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Image(systemName: "chevron.down").font(.system(size: 9))
+                }
+                .foregroundStyle(.secondary)
+                .frame(minHeight: 44)
             }
             .accessibilityLabel("Selection actions for all filtered activities")
             .accessibilityValue(summary)
         }
-        .padding(.horizontal)
-        .background(.bar, ignoresSafeAreaEdges: [])
+        .buttonStyle(.plain)
     }
 }

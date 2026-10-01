@@ -1,4 +1,5 @@
 import MapboxMaps
+import Observation
 import SwiftUI
 import Testing
 import UIKit
@@ -41,8 +42,151 @@ extension RenderedRoutePickingTests {
         #expect(presentation.settings == settings)
         #expect(store.inspectedActivityID == 2000 && store.selectedActivityIDs.isEmpty)
         #expect(host.descendants(of: UICollectionView.self).contains { $0 === list })
-        #expect(abs(list.contentOffset.y - offset) < 1, "Retained List restores its exact scroll position and inline expansion")
+        #expect(abs(list.contentOffset.y - offset) < 1, "Retained List restores its exact scroll position and adjacent detail")
         try host.save("list-tablet-retained-inspection")
+    }
+
+    @Test(arguments: ["phone", "large-text", "tablet"])
+    func listDetailUsesNavigationAndBackRetainsContext(scenario: String) async throws {
+        let tablet = scenario == "tablet"
+        let presentation = ActivityListPresentation(defaults: nil)
+        presentation.settings.sort = .init(field: .id, direction: .ascending)
+        let store = ActivityStore(activities: (1...200).map { ActivityStoreSelectionTests.activity($0) }, listPresentation: presentation)
+        store.selectedTab = .list
+        store.replaceSelection(with: [3])
+        store.activate(3)
+        let host = try ListHarness(root: NavigationStack {
+            ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
+        }
+        .environment(\.horizontalSizeClass, tablet ? .regular : .compact)
+        .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility3 : .large),
+        size: tablet ? CGSize(width: 820, height: 1180) : CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
+        let list = try #require(host.descendants(of: UICollectionView.self).first)
+        list.setContentOffset(CGPoint(x: 0, y: 617), animated: false)
+        try await Task.sleep(for: .milliseconds(150))
+        let offset = list.contentOffset
+        let selection = store.selectedActivityIDs
+        let settings = presentation.settings
+        func cameraValues() -> [Double] {
+            let value = store.mapContext.camera
+            return [value.center.latitude, value.center.longitude, Double(value.zoom), value.bearing, Double(value.pitch)]
+        }
+        let camera = cameraValues()
+        let request = store.mapContext.pendingRequest
+        let navigation = try #require(host.controllers(of: UINavigationController.self).first)
+        store.inspect(10)
+        if tablet {
+            try await Task.sleep(for: .milliseconds(250))
+            #expect(navigation.viewControllers.count == 1, "Wide List shows adjacent detail without pushing")
+            #expect(list.contentOffset == offset)
+        } else {
+            try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+            #expect(host.host.presentedViewController == nil, "Phone detail is a navigation destination, not a modal sheet")
+            #expect(host.controllers(of: UIPageViewController.self).isEmpty, "List detail has no neighbouring-activity pager")
+        }
+        try host.save("list-detail-\(scenario)")
+        #expect(store.selectedActivityIDs == selection && store.activeActivityID == 3)
+        #expect(cameraValues() == camera && store.mapContext.pendingRequest == request)
+        if tablet { store.dismissInspection() }
+        else { navigation.popViewController(animated: false) }
+        try await listWait { store.inspectedActivityID == nil && navigation.viewControllers.count == 1 }
+        #expect(host.descendants(of: UICollectionView.self).contains { $0 === list }, "Back returns to the same retained native List")
+        #expect(abs(list.contentOffset.y - offset.y) < 1, "Back restores the exact scroll offset")
+        #expect(presentation.settings == settings && store.selectedActivityIDs == selection && store.activeActivityID == 3)
+        #expect(cameraValues() == camera && store.mapContext.pendingRequest == request)
+        try host.save("list-back-\(scenario)")
+        // Filter invalidation also closes the destination, with selection intact.
+        store.inspect(10)
+        if !tablet { try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil } }
+        store.searchText = "No matching activity"
+        try await listWait { store.inspectedActivityID == nil && navigation.viewControllers.count == 1 }
+        #expect(store.selectedActivityIDs == selection)
+    }
+
+    @Test func largeListNavigationReusesBrowsingSnapshots() async throws {
+        let presentation = ActivityListPresentation(defaults: nil)
+        // Persisted totals preferences cannot reinsert the removed summary UI.
+        presentation.settings.summaryMode = .filtered
+        let store = ActivityStore(activities: (1...4575).map { ActivityStoreSelectionTests.activity($0) },
+                                  listPresentation: presentation)
+        store.selectedTab = .list
+        let host = try ListHarness(root: NavigationStack {
+            ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
+        }.environment(\.horizontalSizeClass, .compact), size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
+        let list = try #require(host.descendants(of: UICollectionView.self).first)
+        #expect((0..<list.numberOfSections).reduce(0) { $0 + list.numberOfItems(inSection: $1) } == 4575,
+                "The List contains activities only, even with a saved summary preference")
+        list.setContentOffset(CGPoint(x: 0, y: 617), animated: false)
+        try await Task.sleep(for: .milliseconds(100))
+        let offset = list.contentOffset
+        let filters = store.filterBuildCount, sorts = store.sortBuildCount
+        let navigation = try #require(host.controllers(of: UINavigationController.self).first)
+        for id in [4567, 4566, 4565] {
+            store.inspect(id)
+            try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+            #expect(navigation.interactivePopGestureRecognizer?.isEnabled == true)
+            navigation.popViewController(animated: true)
+            try await listWait { store.inspectedActivityID == nil && navigation.transitionCoordinator == nil }
+            #expect(host.descendants(of: UICollectionView.self).contains { $0 === list })
+            #expect(list.contentOffset == offset)
+            #expect(store.filterBuildCount == filters && store.sortBuildCount == sorts,
+                    "Native push/pop uses warm browsing snapshots instead of sorting all 4,575 activities")
+        }
+        try host.save("list-glass-no-summary")
+    }
+
+    @Test func listPushedDetailSurvivesWindowResizing() async throws {
+        let store = ActivityStore(activities: (1...20).map { ActivityStoreSelectionTests.activity($0) })
+        store.selectedTab = .list
+        let layout = ListLayoutFixture()
+        let host = try ListHarness(root: AdaptiveListFixture(store: store, layout: layout), size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
+        let navigation = try #require(host.controllers(of: UINavigationController.self).first)
+        store.inspect(10)
+        try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        host.window.frame.size = CGSize(width: 820, height: 1180)
+        host.host.view.frame = host.window.bounds
+        layout.sizeClass = .regular
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(navigation.viewControllers.count == 2 && store.inspectedActivityID == 10,
+                "Resizing keeps the open detail and its navigation context")
+        host.window.frame.size = CGSize(width: 390, height: 844)
+        host.host.view.frame = host.window.bounds
+        layout.sizeClass = .compact
+        try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        #expect(store.inspectedActivityID == 10, "Returning to compact layout retains the open detail")
+        navigation.popViewController(animated: false)
+        try await listWait { store.inspectedActivityID == nil }
+    }
+
+    @Test(arguments: ["phone", "tablet"])
+    func defaultListDensityFitsAtLeastSixRows(scenario: String) async throws {
+        let tablet = scenario == "tablet"
+        let activities = try (1...20).map { id in
+            try StoredModelMapper.activity(Fixtures.activity([
+                "id": String(id), "sport_type": "Ride", "name": "Morning ride along the river",
+                "distance": 14800, "elapsed_time": 3600, "total_elevation_gain": 180,
+            ]))
+        }
+        let store = ActivityStore(activities: activities, listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        store.replaceSelection(with: [19])
+        let root = NavigationStack {
+            ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
+        }.environment(\.horizontalSizeClass, tablet ? .regular : .compact)
+        let host = try ListHarness(root: root, size: tablet ? CGSize(width: 820, height: 1180) : CGSize(width: 375, height: 812))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
+        let list = try #require(host.descendants(of: UICollectionView.self).first)
+        #expect(list.visibleCells.count >= 6, "A default phone List should show at least six activities, not three spacious cards")
+        #expect(list.visibleCells.allSatisfy { $0.bounds.height <= 90 }, "Default rows keep the name, local date/sport and three metrics within 90pt; measured heights: \(list.visibleCells.map { $0.bounds.height })")
+        #expect(store.selectedActivityIDs == [19])
+        try host.save("list-dense-\(scenario)")
     }
 
     @Test(arguments: ["small-phone", "large-text", "tablet", "scrolling-metrics"])
@@ -79,10 +223,10 @@ extension RenderedRoutePickingTests {
 }
 
 @MainActor
-private func listWait(_ condition: () -> Bool) async throws {
+private func listWait(sourceLocation: SourceLocation = #_sourceLocation, _ condition: () -> Bool) async throws {
     let deadline = Date().addingTimeInterval(8)
     while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
-    try #require(condition())
+    try #require(condition(), sourceLocation: sourceLocation)
 }
 
 @MainActor
@@ -114,5 +258,26 @@ private final class ListHarness<Content: View> {
         func visit(_ view: UIView) -> [T] { ((view as? T).map { [$0] } ?? []) + view.subviews.flatMap(visit) }
         return visit(host.view)
     }
+    func controllers<T: UIViewController>(of type: T.Type) -> [T] {
+        func visit(_ controller: UIViewController) -> [T] {
+            ((controller as? T).map { [$0] } ?? []) + controller.children.flatMap(visit)
+        }
+        return visit(host)
+    }
     func close() { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
+}
+
+@MainActor @Observable
+private final class ListLayoutFixture {
+    var sizeClass = UserInterfaceSizeClass.compact
+}
+
+private struct AdaptiveListFixture: View {
+    let store: ActivityStore
+    @Bindable var layout: ListLayoutFixture
+    var body: some View {
+        NavigationStack {
+            ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
+        }.environment(\.horizontalSizeClass, layout.sizeClass)
+    }
 }
