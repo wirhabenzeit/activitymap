@@ -59,6 +59,31 @@ struct MapResultsTests {
         #expect(!picker.isPresented)
     }
 
+    @Test func draggingTracksTotalTranslationClampsAndSettlesToMeasuredHeights() {
+        let sizes = [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)]
+        for size in sizes {
+            let heights = MapResultsDetent.allCases.map {
+                MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: $0).contentHeight
+            }
+            let medium = heights[1]
+            var drag = MapResultsDrag()
+            #expect(drag.update(translation: -20, currentHeight: medium, heights: heights) == min(heights[2], medium + 20))
+            #expect(drag.update(translation: -40, currentHeight: medium + 20, heights: heights) == min(heights[2], medium + 40),
+                    "Moving the handle must not feed its changing position back into the total drag")
+            #expect(drag.update(translation: -10000, currentHeight: medium, heights: heights) == heights[2])
+            #expect(drag.update(translation: 10000, currentHeight: medium, heights: heights) == heights[0])
+            #expect(drag.finish(translation: 10000, prediction: 10000, heights: heights) == .compact)
+            #expect(!drag.isDragging)
+            let midway = (heights[1] + heights[2]) / 2
+            #expect(drag.update(translation: 0, currentHeight: midway, heights: heights) == midway,
+                    "A new drag starts from the visible height while a spring is settling")
+            #expect(drag.finish(translation: -10, prediction: -10, heights: heights) == (heights[2] > heights[1] ? .expanded : .medium))
+            let layout = MapResultsLayout(size: size, topInset: 106, bottomInset: 34,
+                                          detent: .medium, heightOverride: midway)
+            if !layout.isSidePanel { #expect(layout.frame.maxY == size.height + 34) }
+        }
+    }
+
     @Test(arguments: [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)])
     func anchoredControlsStayClearOfNavigationAndEveryResultsDetent(size: CGSize) {
         let center = MapResultsLayout.controlsCenter(size: size, topInset: 106)

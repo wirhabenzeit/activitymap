@@ -6,6 +6,13 @@ struct RoutePickerSheet: View {
     @Bindable var store: ActivityStore
     let isSidePanel: Bool
     var bottomInset: CGFloat = 0
+    var collapsedOverride: Bool? = nil
+    var resizeAction: ((MapResultsDetent) -> Void)? = nil
+    var dragChanged: ((CGFloat) -> Void)? = nil
+    var dragEnded: ((CGFloat, CGFloat) -> Void)? = nil
+    var dragCancelled: (() -> Void)? = nil
+    @GestureState private var isHandleDragging = false
+    private var collapsed: Bool { collapsedOverride ?? (picker.detent == .compact) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -15,11 +22,11 @@ struct RoutePickerSheet: View {
     }
     private var detail: Activity? { candidates.first { $0.id == picker.detailID } }
 
-    private var singleDetail: Bool { detail != nil && candidates.count == 1 && picker.detent != .compact }
+    private var singleDetail: Bool { detail != nil && candidates.count == 1 && !collapsed }
     var body: some View {
         VStack(spacing: 0) {
             header
-            if picker.detent == .compact { compactSummary }
+            if collapsed { compactSummary }
             // Keep results mounted through detail and detent changes. Back
             // restores the exact scroll position, without a second overlay.
             ZStack {
@@ -38,9 +45,9 @@ struct RoutePickerSheet: View {
             }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: detail != nil)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .frame(height: picker.detent == .compact ? 0 : nil)
+            .frame(height: collapsed ? 0 : nil)
             .clipped()
-            .accessibilityHidden(picker.detent == .compact)
+            .accessibilityHidden(collapsed)
         }
         // One continuous detail surface; only the outer host owns corners.
         .padding(.bottom, bottomInset)
@@ -83,7 +90,7 @@ struct RoutePickerSheet: View {
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
                     : AnyLayout(HStackLayout(spacing: 4))
                 layout {
-                    if let activity = detail, picker.detent != .compact {
+                    if let activity = detail, !collapsed {
                         if candidates.count > 1 {
                             Button { picker.showResults() } label: {
                                 Label("Results", systemImage: "chevron.left")
@@ -99,7 +106,7 @@ struct RoutePickerSheet: View {
                         selectionSummary
                     }
                     HStack(spacing: 4) {
-                        if detail == nil || picker.detent == .compact { selectionActions }
+                        if detail == nil || collapsed { selectionActions }
                         collapseButton
                     }
                 }
@@ -109,11 +116,18 @@ struct RoutePickerSheet: View {
         }
         .contentShape(Rectangle())
         // Header drag resizes this one container; content scrolling never does.
-        .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { drag in
-            guard abs(drag.translation.height) > abs(drag.translation.width) * 1.5 else { return }
-            let change = drag.translation.height < -30 ? 1 : drag.translation.height > 30 ? -1 : 0
-            resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)
-        })
+        .simultaneousGesture(DragGesture(minimumDistance: 3, coordinateSpace: .global)
+            .updating($isHandleDragging) { _, active, _ in active = true }
+            .onChanged { drag in
+                guard abs(drag.translation.height) > abs(drag.translation.width) * 1.5 else { return }
+                dragChanged?(drag.translation.height)
+            }
+            .onEnded { drag in
+                dragEnded?(drag.translation.height, drag.predictedEndTranslation.height)
+            })
+        .onChange(of: isHandleDragging) { _, active in
+            if !active { dragCancelled?() }
+        }
         .accessibilityAdjustableAction { direction in
             let change = direction == .increment ? 1 : -1
             resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)
@@ -122,15 +136,16 @@ struct RoutePickerSheet: View {
     }
 
     private var collapseButton: some View {
-        Button { resize(to: picker.detent == .compact ? .medium : .compact) } label: {
-            Image(systemName: picker.detent == .compact ? "chevron.up" : "chevron.down")
+        Button { resize(to: collapsed ? .medium : .compact) } label: {
+            Image(systemName: collapsed ? "chevron.up" : "chevron.down")
                 .font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
         }
-        .accessibilityLabel(picker.detent == .compact ? "Expand results" : "Collapse results")
+        .accessibilityLabel(collapsed ? "Expand results" : "Collapse results")
     }
 
     private func resize(to detent: MapResultsDetent) {
-        withAnimation(reduceMotion ? nil : .snappy) { picker.detent = detent }
+        if let resizeAction { resizeAction(detent) }
+        else { picker.detent = detent }
     }
 
     private var selectionSummary: some View {

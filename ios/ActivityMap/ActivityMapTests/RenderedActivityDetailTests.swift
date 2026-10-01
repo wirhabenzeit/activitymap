@@ -59,6 +59,51 @@ extension RenderedRoutePickingTests {
         try host.save(host.snapshot(), name: "map-flow-results-return")
     }
 
+    @Test func mapSheetTracksDragBeforeReleaseAndKeepsOneContentDuringSettling() async throws {
+        var activity = ActivityStoreSelectionTests.activity(1)
+        activity.name = "Lake ride"
+        let store = ActivityStore(activities: [activity, ActivityStoreSelectionTests.activity(2)])
+        store.replaceSelection(with: [1, 2])
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        picker.showDetail(1, store: store, motion: .none)
+        let resizing = MapResultsResizeState()
+        let size = CGSize(width: 375, height: 812)
+        let heights = MapResultsDetent.allCases.map {
+            MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: $0).contentHeight
+        }
+        let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store, size: size,
+            topInset: 0, bottomInset: 0, largeText: false, resizing: resizing).ignoresSafeArea(), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(250))
+        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
+        let before = pager.view.bounds.height
+        resizing.height = resizing.drag.update(translation: -90, currentHeight: heights[1], heights: heights)
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(picker.detent == .medium && resizing.drag.isDragging)
+        #expect(abs(pager.view.bounds.height - before - 90) < 2, "The detail viewport grows with the finger before release")
+        #expect(abs((resizing.presentedHeight ?? 0) - heights[1] - 90) < 2)
+        try host.save(host.snapshot(), name: "map-sheet-live-resize")
+        _ = resizing.drag.finish(translation: -90, prediction: -90, heights: heights)
+        picker.detent = .compact
+        try await Task.sleep(for: .milliseconds(60))
+        let progress = try #require(resizing.presentedHeight)
+        #expect(progress > heights[0] + 1 && progress < heights[1] + 90,
+                "Collapse interpolates the panel height instead of jumping layout and fading multiple contents")
+        let image = host.snapshot()
+        try host.save(image, name: "map-sheet-settling")
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(text.components(separatedBy: "Lake ride").count == 2, "One detail heading during settling: \(text)")
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(abs((resizing.presentedHeight ?? 0) - heights[0]) < 2)
+        #expect(picker.detailID == 1 && store.activeActivityID == 1 && store.selectedActivityIDs == [1, 2])
+        #expect(store.mapContext.pendingRequest == nil, "A resize must not request a route fit")
+        try host.save(host.snapshot(), name: "map-sheet-collapsed")
+    }
+
     @Test(arguments: [ColorScheme.light, .dark])
     func mapResultsCaptionsAreReadableOverMaterial(scheme: ColorScheme) async throws {
         let activity = try StoredModelMapper.activity(Fixtures.activity([

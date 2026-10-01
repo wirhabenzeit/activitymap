@@ -29,14 +29,14 @@ struct BrowseContent: View {
                     .opacity(store.selectedTab == .map ? 1 : 0)
                     .allowsHitTesting(store.selectedTab == .map)
                     .accessibilityHidden(store.selectedTab != .map)
-                if store.selectedTab == .map, let empty = presentation.empty {
-                    BrowsingEmptyView(state: empty, recover: recover)
+                if store.selectedTab == .map, let empty = mapEmptyState {
+                    BrowsingEmptyView(state: empty, recover: recover, scrolls: false)
                         .frame(maxWidth: min(560, max(0, geometry.size.width - 32)))
-                        .frame(maxHeight: max(0, min(480, geometry.size.height - 196)))
                         .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .padding(.top, 16)
                 }
+
             }
         }
         .confirmationDialog("This activity is hidden by filters", isPresented: Binding(
@@ -56,6 +56,14 @@ struct BrowseContent: View {
         } message: {
             Text(store.mapContext.navigationError ?? "")
         }
+    }
+
+    // Sync/loading/auth information belongs in Settings. Only map-specific
+    // filtering and missing-route context uses an inline, content-sized notice.
+    private var mapEmptyState: BrowsingPresentation.EmptyState? {
+        guard let empty = presentation.empty,
+              empty.kind == .noMatches || empty.kind == .noRoutes else { return nil }
+        return empty
     }
 
     private var presentation: BrowsingPresentation {

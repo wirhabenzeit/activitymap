@@ -43,7 +43,6 @@ struct MapScreen: View {
                         .position(layout.creditCenter)
                         .allowsHitTesting(false)
                 }
-                let layout = resultsLayout(in: geometry)
                 let showingResults = picker.isPresented
                 // Controls are anchored to the viewport, independent of
                 // results visibility, destination or detent.
@@ -54,9 +53,9 @@ struct MapScreen: View {
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
                 if showingResults {
-                    RoutePickerSheet(picker: picker, store: store, isSidePanel: layout.isSidePanel, bottomInset: layout.isSidePanel ? 0 : geometry.safeAreaInsets.bottom)
-                        .frame(width: layout.frame.width, height: layout.frame.height)
-                        .position(x: layout.frame.midX, y: layout.frame.midY)
+                    MapResultsContainer(picker: picker, store: store, size: geometry.size,
+                                        topInset: max(topOcclusion, geometry.safeAreaInsets.top),
+                                        bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize)
                 } else {
                     VStack {
                         Spacer()

@@ -7,6 +7,7 @@ enum MapResultsDetent: Int, CaseIterable {
 
 struct MapResultsLayout {
     let isSidePanel: Bool
+    let contentHeight: CGFloat
     let frame: CGRect
     let bottomOcclusion: CGFloat
     let leadingOcclusion: CGFloat
@@ -16,7 +17,7 @@ struct MapResultsLayout {
     }
 
     init(size: CGSize, topInset: CGFloat, bottomInset: CGFloat, detent: MapResultsDetent,
-         largeText: Bool = false) {
+         largeText: Bool = false, heightOverride: CGFloat? = nil) {
         isSidePanel = size.width >= 650 || size.width > size.height
         let width = isSidePanel ? min(380, size.width * 0.42) : max(0, size.width - 8)
         // Leave navigation and a horizontal map-controls row above expanded
@@ -30,9 +31,10 @@ struct MapResultsLayout {
         case .medium: height = min(available, max(compact + 120, size.height * 0.46))
         case .expanded: height = available
         }
-        frame = CGRect(x: isSidePanel ? 16 : 4, y: isSidePanel ? top : size.height - height,
-                       width: width, height: height + (isSidePanel ? 0 : bottomInset))
-        bottomOcclusion = isSidePanel ? 0 : height + bottomInset
+        contentHeight = min(available, max(compact, heightOverride ?? height))
+        frame = CGRect(x: isSidePanel ? 16 : 4, y: isSidePanel ? top : size.height - contentHeight,
+                       width: width, height: contentHeight + (isSidePanel ? 0 : bottomInset))
+        bottomOcclusion = isSidePanel ? 0 : contentHeight + bottomInset
         leadingOcclusion = isSidePanel ? frame.maxX + 12 : 0
     }
 }
