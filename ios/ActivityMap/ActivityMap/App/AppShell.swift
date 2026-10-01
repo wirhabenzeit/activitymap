@@ -17,7 +17,7 @@ struct AppShell: View {
         NavigationStack {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle("ActivityMap")
+                .navigationTitle(store.selectedTab == .list ? "Activities" : "ActivityMap")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
                 .task {

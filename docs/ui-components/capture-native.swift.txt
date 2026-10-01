@@ -44,8 +44,13 @@ extension RenderedRoutePickingTests {
                     .environment(\.horizontalSizeClass, regular ? .regular : .compact)),
                     size: size, name: "\(suffix)-\(name)", dark: scheme == .dark)
             }
+            store.selectedTab = .list
+            store.dismissInspection()
             try await present(AnyView(NavigationStack { ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline) }), suffix: "list")
-            try await present(AnyView(ActivityDetailView(store: store, activityID: 101)), suffix: "detail")
+            store.inspect(101)
+            try await present(AnyView(NavigationStack { ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline) }), suffix: "detail")
+            store.dismissInspection()
+            store.selectedTab = .map
             try await present(AnyView(NavigationStack { SharedStatsExample().navigationTitle("Stats") }), suffix: "stats")
             try await present(AnyView(MapScreen(store: store).environment(\.mapStyleOverride, style)), suffix: "map")
             try await present(AnyView(AppShell(activities: activities).environment(\.mapStyleOverride, style)), suffix: "shell")

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Sheet wrapper only. The panel is also embedded in the wide list expansion.
+/// Native List navigation destination. Wide List and Map host the same panel.
 struct ActivityDetailView: View {
     @Bindable var store: ActivityStore
     let activityID: Int
@@ -8,16 +8,15 @@ struct ActivityDetailView: View {
 
     var body: some View {
         ActivityDetailPanel(store: store, activityID: activityID)
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(AppTheme.surface)
-            // The content's activity name is the sheet heading. Keep the
-            // native escape gesture available without duplicating a toolbar.
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            // The activity name remains the content heading. Native Back and
+            // swipe-back return to the retained List without a second title.
             .accessibilityAction(.escape) { dismiss() }
     }
 }
 
-/// Resolve by identity on every update, never retain the sheet's initial snapshot.
+/// Resolve by identity on every update, never retain the destination's initial snapshot.
 /// The action bar is outside the scroll view so long content cannot bury actions.
 struct ActivityDetailPanel: View {
     @Environment(\.activityDetailOverMap) private var overMap

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shared by inline List expansion and Map/List sheets. Each headline owns
+/// Shared by List navigation, wide List detail and the Map results panel. Each headline owns
 /// related recorded context, like the web card, without deriving missing data.
 struct ActivityDetailContent<Profile: View, Photos: View>: View {
     let activity: Activity
