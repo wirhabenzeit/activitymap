@@ -21,11 +21,12 @@ struct RenderedMapAttributionTests {
         // Inline source metadata exercises the same SDK credit collection as
         // vector TileJSON and raster overlays, without loading remote tiles.
         let style = ##"{"version":8,"sources":{"swiss":{"type":"vector","tiles":[],"attribution":"BASE_CREDIT"},"duplicate":{"type":"vector","tiles":[],"attribution":"BASE_CREDIT"},"overlay":{"type":"raster","tiles":[],"attribution":"© NVE"}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##.replacingOccurrences(of: "BASE_CREDIT", with: kind == "raster" ? "© NVE" : "© swisstopo")
+        let picker = RoutePicker()
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let oldWindow = scene.keyWindow
         let window = UIWindow(windowScene: scene)
         window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
-        let host = UIHostingController(rootView: MapScreen(store: store)
+        let host = UIHostingController(rootView: MapScreen(store: store, picker: picker)
             .environment(\.mapStyleOverride, MapStyle(json: style)))
         window.rootViewController = host
         window.makeKeyAndVisible()
@@ -55,6 +56,17 @@ struct RenderedMapAttributionTests {
         try await Task.sleep(for: .milliseconds(350))
         _ = try snapshot(window, name: "map-sources-\(kind)")
         menu.dismiss(animated: false)
+        let logoFrame = map.ornaments.logoView.convert(map.ornaments.logoView.bounds, to: window)
+        let infoFrame = map.ornaments.attributionButton.convert(map.ornaments.attributionButton.bounds, to: window)
+        store.replaceSelection(with: [1])
+        picker.reviewSelection(store: store)
+        for detent in MapResultsDetent.allCases {
+            picker.detent = detent
+            try await Task.sleep(for: .milliseconds(100))
+            #expect(map.ornaments.logoView.convert(map.ornaments.logoView.bounds, to: window) == logoFrame)
+            #expect(map.ornaments.attributionButton.convert(map.ornaments.attributionButton.bounds, to: window) == infoFrame,
+                    "Info stays behind results at its original map position")
+        }
     }
 
     private func descendants<T: UIView>(_ type: T.Type, in view: UIView) -> [T] {

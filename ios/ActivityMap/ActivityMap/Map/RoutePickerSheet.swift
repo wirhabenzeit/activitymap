@@ -56,6 +56,21 @@ struct RoutePickerSheet: View {
         }
         // One continuous detail surface; only the outer host owns corners.
         .padding(.bottom, bottomInset)
+        .overlay(alignment: .top) {
+            MapResultsHandle(changed: { dragChanged?($0) }, ended: { dragEnded?($0, $1) },
+                             cancelled: { dragCancelled?() })
+                .frame(width: 80, height: 44)
+                .onTapGesture { resize(to: collapsed ? .medium : .compact) }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Resize results")
+                .accessibilityValue(collapsed ? "Collapsed" : "Expanded")
+                .accessibilityAdjustableAction { direction in
+                    let change = direction == .increment ? 1 : -1
+                    resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)
+                }
+                .accessibilityAction(named: "Expand results fully") { resize(to: .expanded) }
+                .accessibilityAction(named: "Collapse results") { resize(to: .compact) }
+        }
         .background(.regularMaterial)
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: isSidePanel ? 20 : 28,
             bottomLeadingRadius: isSidePanel ? 20 : 0, bottomTrailingRadius: isSidePanel ? 20 : 0,
@@ -87,17 +102,9 @@ struct RoutePickerSheet: View {
 
     private var header: some View {
         VStack(spacing: 0) {
-            if !isSidePanel {
-                MapResultsHandle(changed: { dragChanged?($0) }, ended: { dragEnded?($0, $1) },
-                                 cancelled: { dragCancelled?() })
-                    .frame(height: 44)
-                    .overlay(alignment: .trailing) {
-                        if singleDetail { collapseButton.padding(.trailing, 16) }
-                    }
-            }
-            if isSidePanel && singleDetail {
-                HStack { Spacer(); collapseButton }.padding(.trailing, 16)
-            }
+            // Visual grabber clearance only. The 44pt native touch target
+            // overlays the surface instead of reserving an empty row.
+            Color.clear.frame(height: 13).allowsHitTesting(false)
             if !singleDetail {
                 let layout = typeSize.isAccessibilitySize
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
@@ -118,31 +125,12 @@ struct RoutePickerSheet: View {
                     } else {
                         selectionSummary
                     }
-                    HStack(spacing: 4) {
-                        if detail == nil { selectionActions }
-                        collapseButton
-                    }
+                    if detail == nil { selectionActions }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 4)
             }
         }
-        .contentShape(Rectangle())
-        // A stable UIKit recognizer owns the grabber. SwiftUI content updates
-        // cannot reset its gesture state or race an onEnded cancellation.
-        .accessibilityAdjustableAction { direction in
-            let change = direction == .increment ? 1 : -1
-            resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)
-        }
-        .accessibilityAction(named: "Expand results fully") { resize(to: .expanded) }
-    }
-
-    private var collapseButton: some View {
-        Button { resize(to: collapsed ? .medium : .compact) } label: {
-            Image(systemName: collapsed ? "chevron.up" : "chevron.down")
-                .font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
-        }
-        .accessibilityLabel(collapsed ? "Expand results" : "Collapse results")
     }
 
     private func resize(to detent: MapResultsDetent) {

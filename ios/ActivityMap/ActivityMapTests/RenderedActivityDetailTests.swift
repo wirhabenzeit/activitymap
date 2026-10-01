@@ -156,6 +156,9 @@ extension RenderedRoutePickingTests {
         #expect(grabber.bounds.height == 44)
         #expect(grabber.hitTest(CGPoint(x: grabber.bounds.midX, y: 32), with: nil) === grabber,
                 "The space below the tiny visible indicator must accept the drag")
+        let windowPoint = grabber.convert(CGPoint(x: grabber.bounds.midX, y: 32), to: host.window)
+        #expect(host.window.hitTest(windowPoint, with: nil) === grabber,
+                "The overlay target receives actual window hit testing without a blank handle row")
         #expect(grabber.pan.view === grabber && grabber.pan.isEnabled)
         let pager = try #require(host.controllers(of: UIPageViewController.self).first)
         let coordinator = try #require(pager.delegate as? MapActivityPager.Coordinator)

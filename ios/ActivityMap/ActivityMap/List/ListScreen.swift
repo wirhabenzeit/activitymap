@@ -38,9 +38,6 @@ struct ListScreen: View {
 
     private var activityList: some View {
         List {
-            if store.listPresentation.settings.summaryMode != .off {
-                ActivitySummaryView(store: store)
-            }
             ForEach(store.listedActivities) { activity in
                 ActivityRowView(store: store, activity: activity)
                     .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
@@ -66,12 +63,13 @@ struct ListScreen: View {
                 }
             }
             .padding(.horizontal, AppTheme.Spacing.small)
-            .background(.bar, ignoresSafeAreaEdges: [])
+            .background(.thinMaterial, ignoresSafeAreaEdges: [])
+            .accessibilityIdentifier("list-browse-toolbar")
         }
     }
 
     @ViewBuilder private var detailColumn: some View {
-        if let id = store.inspectedActivity?.id {
+        if let id = store.inspectedActivityID {
             ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: 44)
                 .overlay(alignment: .topTrailing) {
                     Button { store.dismissInspection() } label: {
@@ -91,7 +89,7 @@ struct ListScreen: View {
 
     private func inspectionID(sideBySide: Bool) -> Binding<Int?> {
         Binding(
-            get: { (!sideBySide || hasPushedDetail) && store.selectedTab == .list ? store.inspectedActivity?.id : nil },
+            get: { (!sideBySide || hasPushedDetail) && store.selectedTab == .list ? store.inspectedActivityID : nil },
             set: { id in
                 // Keep an already-pushed detail open through width changes.
                 // Tab changes retain inspection; native Back clears it in List.
@@ -112,7 +110,7 @@ private struct SelectionBar: View {
     private var selectedCount: Int { store.selectedActivityIDs.count }
 
     private var summary: String {
-        let filteredCount = store.filteredActivities.count
+        let filteredCount = store.selection.visibleIDs.count
         let visibleCount = selectedCount - store.hiddenSelectedCount
         let hidden = store.hiddenSelectedCount
         let scope = "\(visibleCount) of \(filteredCount) filtered activities selected"
@@ -121,13 +119,13 @@ private struct SelectionBar: View {
 
     private var visibleSummary: String {
         let count = selectedCount - store.hiddenSelectedCount
-        let scope = selectedCount == 0 ? "\(store.filteredActivities.count) activities" : "\(count)/\(store.filteredActivities.count) selected"
+        let scope = selectedCount == 0 ? "\(store.selection.visibleIDs.count) activities" : "\(count)/\(store.selection.visibleIDs.count) selected"
         return store.hiddenSelectedCount > 0 ? "\(scope) · \(store.hiddenSelectedCount) hidden" : scope
     }
 
     private var allFilteredSelected: Bool {
         let count = selectedCount - store.hiddenSelectedCount
-        return count > 0 && count == store.filteredActivities.count
+        return count > 0 && count == store.selection.visibleIDs.count
     }
 
     var body: some View {
@@ -138,12 +136,12 @@ private struct SelectionBar: View {
                 if allFilteredSelected { store.deselectAllFiltered() }
                 else { store.selectAllFiltered() }
             }
-            .disabled(store.filteredActivities.isEmpty)
+            .disabled(store.selection.visibleIDs.isEmpty)
             Menu {
                 Button("Select All Filtered Activities") {
                     store.selectAllFiltered()
                 }
-                .disabled(store.filteredActivities.isEmpty)
+                .disabled(store.selection.visibleIDs.isEmpty)
                 Button("Deselect All Filtered Activities") {
                     store.deselectAllFiltered()
                 }

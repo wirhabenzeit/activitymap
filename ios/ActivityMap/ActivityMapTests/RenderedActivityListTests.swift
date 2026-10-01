@@ -105,6 +105,40 @@ extension RenderedRoutePickingTests {
         #expect(store.selectedActivityIDs == selection)
     }
 
+    @Test func largeListNavigationReusesBrowsingSnapshots() async throws {
+        let presentation = ActivityListPresentation(defaults: nil)
+        // Persisted totals preferences cannot reinsert the removed summary UI.
+        presentation.settings.summaryMode = .filtered
+        let store = ActivityStore(activities: (1...4575).map { ActivityStoreSelectionTests.activity($0) },
+                                  listPresentation: presentation)
+        store.selectedTab = .list
+        let host = try ListHarness(root: NavigationStack {
+            ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
+        }.environment(\.horizontalSizeClass, .compact), size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
+        let list = try #require(host.descendants(of: UICollectionView.self).first)
+        #expect((0..<list.numberOfSections).reduce(0) { $0 + list.numberOfItems(inSection: $1) } == 4575,
+                "The List contains activities only, even with a saved summary preference")
+        list.setContentOffset(CGPoint(x: 0, y: 617), animated: false)
+        try await Task.sleep(for: .milliseconds(100))
+        let offset = list.contentOffset
+        let filters = store.filterBuildCount, sorts = store.sortBuildCount
+        let navigation = try #require(host.controllers(of: UINavigationController.self).first)
+        for id in [4567, 4566, 4565] {
+            store.inspect(id)
+            try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+            #expect(navigation.interactivePopGestureRecognizer?.isEnabled == true)
+            navigation.popViewController(animated: true)
+            try await listWait { store.inspectedActivityID == nil && navigation.transitionCoordinator == nil }
+            #expect(host.descendants(of: UICollectionView.self).contains { $0 === list })
+            #expect(list.contentOffset == offset)
+            #expect(store.filterBuildCount == filters && store.sortBuildCount == sorts,
+                    "Native push/pop uses warm browsing snapshots instead of sorting all 4,575 activities")
+        }
+        try host.save("list-glass-no-summary")
+    }
+
     @Test func listPushedDetailSurvivesWindowResizing() async throws {
         let store = ActivityStore(activities: (1...20).map { ActivityStoreSelectionTests.activity($0) })
         store.selectedTab = .list

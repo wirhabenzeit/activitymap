@@ -7,13 +7,13 @@ import UIKit
 struct MapAttributionLayout {
     let ornamentOptions: OrnamentOptions
 
-    init(bottomInset: CGFloat, bottomOcclusion: CGFloat = 0, leadingOcclusion: CGFloat = 0) {
-        // Retain 18pt beneath the footer for the home indicator and keep both
-        // ornaments clear of bottom results and wider hosts' side panels.
-        let bottom = 18 - bottomInset + bottomOcclusion
+    init(bottomInset: CGFloat) {
+        // Stay at the map's normal bottom edge, including while a results
+        // panel covers these background ornaments.
+        let bottom = 18 - bottomInset
         ornamentOptions = OrnamentOptions(
             logo: LogoViewOptions(position: .bottomLeft,
-                                  margins: CGPoint(x: leadingOcclusion + 8, y: bottom)),
+                                  margins: CGPoint(x: 8, y: bottom)),
             attributionButton: AttributionButtonOptions(position: .bottomRight,
                                                         margins: CGPoint(x: 8, y: bottom))
         )

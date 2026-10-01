@@ -30,11 +30,10 @@ struct MapScreen: View {
                     mapView(proxy: proxy, geometry: geometry)
                 }
                 let showingResults = picker.isPresented
-                // Controls are anchored to the viewport, independent of
-                // results visibility, destination or detent.
+                // Map chrome stays at its original bottom edge. Results cover
+                // it naturally; resizing does not move controls or ornaments.
                 mapControls(horizontal: true)
-                    .position(MapResultsLayout.controlsCenter(size: geometry.size,
-                        topInset: max(topOcclusion, geometry.safeAreaInsets.top)))
+                    .position(MapResultsLayout.controlsCenter(size: geometry.size))
                     .accessibilityIdentifier("map-controls")
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
@@ -174,8 +173,8 @@ struct MapScreen: View {
             store: store, map: map, size: size,
             safeArea: UIEdgeInsets(top: safeArea.top, left: safeArea.leading,
                                   bottom: safeArea.bottom, right: safeArea.trailing),
-            // Include the tools and attribution row above a bottom panel.
-            sheetHeight: showingResults && !layout.isSidePanel ? layout.bottomOcclusion + 104 : 0, topOcclusion: topOcclusion,
+            // Fit above the panel; background controls and credits add no occlusion.
+            sheetHeight: showingResults && !layout.isSidePanel ? layout.bottomOcclusion : 0, topOcclusion: topOcclusion,
             leadingOcclusion: showingResults && layout.isSidePanel ? layout.leadingOcclusion + safeArea.leading : 0
         ) else { return }
         withViewportAnimation(.default(maxDuration: 0.5)) {
@@ -184,11 +183,7 @@ struct MapScreen: View {
     }
 
     private func attributionLayout(in geometry: GeometryProxy) -> MapAttributionLayout {
-        let layout = resultsLayout(in: geometry)
-        let showingResults = picker.isPresented
-        return MapAttributionLayout(bottomInset: geometry.safeAreaInsets.bottom,
-                                    bottomOcclusion: showingResults ? layout.bottomOcclusion : 0,
-                                    leadingOcclusion: showingResults ? layout.leadingOcclusion : 0)
+        MapAttributionLayout(bottomInset: geometry.safeAreaInsets.bottom)
     }
 
     private func resultsLayout(in geometry: GeometryProxy) -> MapResultsLayout {
