@@ -36,56 +36,6 @@ struct BrowsingEmptyView: View {
 
 }
 
-/// A compact status is reachable on both map and list without replacing the
-/// retained browsing surfaces. Full dates/errors are one accessible tap away.
-struct BrowsingStatusBar: View {
-    let presentation: BrowsingPresentation
-    let failureMessage: String?
-    let recover: (BrowsingPresentation.Recovery) -> Void
-    @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var showsDetails = false
-
-    var body: some View {
-        HStack(spacing: 8) {
-            if presentation.isSyncing { ProgressView().accessibilityLabel("Activity sync in progress") }
-            Text(presentation.statusTitle)
-                .font(.caption)
-                .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if let action = presentation.recovery {
-                Button {
-                    recover(action)
-                } label: {
-                    Image(systemName: action == .cancelSync ? "pause.fill" : action == .account ? "person.crop.circle" : "arrow.clockwise")
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .accessibilityLabel(action.title)
-            }
-            Button {
-                showsDetails = true
-            } label: {
-                Image(systemName: "info.circle").frame(minWidth: 44, minHeight: 44)
-            }
-            .accessibilityLabel("Sync details, last successful sync and Strava reconciliation")
-        }
-        .padding(.horizontal)
-        .background(.regularMaterial, ignoresSafeAreaEdges: [])
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("browsing-sync-status")
-        .sheet(isPresented: $showsDetails) {
-            NavigationStack {
-                BrowsingSyncDetails(presentation: presentation, failureMessage: failureMessage, recover: recover)
-                    .navigationTitle("Sync Details")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) { Button("Done") { showsDetails = false } }
-                    }
-            }
-            .presentationDetents([.medium, .large])
-        }
-    }
-}
-
 struct BrowsingSyncDetails: View {
     let presentation: BrowsingPresentation
     let failureMessage: String?

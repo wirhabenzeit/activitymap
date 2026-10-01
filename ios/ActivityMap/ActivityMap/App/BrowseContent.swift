@@ -39,13 +39,6 @@ struct BrowseContent: View {
                 }
             }
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if sync != nil {
-                TimelineView(.periodic(from: .now, by: 5)) { _ in
-                    BrowsingStatusBar(presentation: presentation, failureMessage: failureMessage, recover: recover)
-                }
-            }
-        }
         .confirmationDialog("This activity is hidden by filters", isPresented: Binding(
             get: { store.mapContext.hiddenTargetID != nil },
             set: { if !$0 { store.mapContext.hiddenTargetID = nil } }
@@ -67,11 +60,6 @@ struct BrowseContent: View {
 
     private var presentation: BrowsingPresentation {
         BrowsingPresentation(store: store, sync: sync, isSigningIn: isSigningIn)
-    }
-
-    private var failureMessage: String? {
-        if case .failed(let message) = sync?.status { return message }
-        return nil
     }
 
     private func recover(_ action: BrowsingPresentation.Recovery) {

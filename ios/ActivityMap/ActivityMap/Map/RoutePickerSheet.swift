@@ -50,7 +50,6 @@ struct RoutePickerSheet: View {
             topTrailingRadius: isSidePanel ? 20 : 28))
         .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
         .accessibilityIdentifier("map-results-panel")
-
     }
 
     @ViewBuilder private var results: some View {
@@ -138,9 +137,9 @@ struct RoutePickerSheet: View {
         VStack(alignment: .leading, spacing: 2) {
             Text("\(store.selectedActivityIDs.count) selected").font(.headline)
             if store.hiddenSelectedCount > 0 {
-                Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption).foregroundStyle(.secondary)
+                Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption).foregroundStyle(AppTheme.secondaryText)
             } else if picker.isAdding {
-                Text("Tap routes to add").font(.caption).foregroundStyle(.secondary)
+                Text("Tap routes to add").font(.caption).foregroundStyle(AppTheme.secondaryText)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -181,11 +180,11 @@ struct RoutePickerSheet: View {
                 if let activity = detail ?? (candidates.count == 1 ? candidates.first : nil) {
                     Text(activity.name).font(.subheadline.weight(.semibold)).lineLimit(2)
                     Text("\(Formatters.distance(activity.distance))  ·  \(Formatters.duration(activity.elapsedTime))  ·  \(Formatters.elevation(activity.totalElevationGain)) ↑")
-                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        .font(.caption).foregroundStyle(AppTheme.secondaryText).lineLimit(2)
                 } else {
                     Text(candidates.isEmpty ? "Hidden by filters" : "\(candidates.count) activities to explore")
                         .font(.subheadline.weight(.semibold))
-                    Text("Expand to review your selection").font(.caption).foregroundStyle(.secondary)
+                    Text("Expand to review your selection").font(.caption).foregroundStyle(AppTheme.secondaryText)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -197,14 +196,14 @@ struct RoutePickerSheet: View {
 
     private func detailNavigation(_ activity: Activity) -> some View {
         HStack(spacing: 4) {
-            Button { picker.step(-1, store: store) } label: {
+            Button { if !picker.isPaging { picker.step(-1, store: store) } } label: {
                 Image(systemName: "chevron.left").frame(width: 44, height: 44)
-            }.disabled(picker.isPaging).accessibilityLabel("Previous activity")
+            }.accessibilityLabel("Previous activity")
             Text("\((picker.candidateIDs.firstIndex(of: activity.id) ?? 0) + 1) of \(candidates.count)")
-                .font(.caption).monospacedDigit().foregroundStyle(.secondary).fixedSize()
-            Button { picker.step(1, store: store) } label: {
+                .font(.caption).monospacedDigit().foregroundStyle(AppTheme.secondaryText).fixedSize()
+            Button { if !picker.isPaging { picker.step(1, store: store) } } label: {
                 Image(systemName: "chevron.right").frame(width: 44, height: 44)
-            }.disabled(picker.isPaging).accessibilityLabel("Next activity")
+            }.accessibilityLabel("Next activity")
         }
         .font(.system(size: 18, weight: .semibold))
     }
@@ -219,12 +218,19 @@ struct RoutePickerSheet: View {
                         .foregroundStyle(activity.category.color).frame(width: 24)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(activity.name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                        Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text("\(Formatters.distance(activity.distance)) · \(Formatters.duration(activity.elapsedTime))")
-                            .font(.caption).foregroundStyle(.secondary)
+                        Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
+                            .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                        let metrics = typeSize.isAccessibilitySize
+                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                            : AnyLayout(HStackLayout(spacing: 8))
+                        metrics {
+                            BrowseInlineMetric(title: "Distance", value: Formatters.distance(activity.distance), systemImage: "ruler")
+                            BrowseInlineMetric(title: "Elapsed time", value: Formatters.duration(activity.elapsedTime), systemImage: "clock")
+                            BrowseInlineMetric(title: "Elevation gain", value: Formatters.elevation(activity.totalElevationGain), systemImage: "mountain.2")
+                        }
+                        .foregroundStyle(AppTheme.secondaryText)
                         if activity.coordinates.isEmpty {
-                            Label("No GPS route", systemImage: "map.slash").font(.caption).foregroundStyle(.secondary)
+                            Label("No GPS route", systemImage: "map.slash").font(.caption).foregroundStyle(AppTheme.secondaryText)
                         }
                         if store.activeActivityID == activity.id {
                             Label(activity.coordinates.isEmpty ? "Active activity" : "Active route", systemImage: "location.fill").font(.caption).foregroundStyle(.blue)
@@ -236,12 +242,12 @@ struct RoutePickerSheet: View {
                 .contentShape(Rectangle())
             }.buttonStyle(.plain)
             Button { store.removeFromSelection([activity.id]) } label: {
-                Image(systemName: "minus.circle").foregroundStyle(.secondary).frame(width: 44, height: 44)
+                Image(systemName: "minus.circle").foregroundStyle(AppTheme.secondaryText).frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Deselect \(activity.name)")
         }
-        .padding(.leading, 20).padding(.trailing, 8).padding(.vertical, 12)
+        .padding(.leading, 20).padding(.trailing, 8).padding(.vertical, 8)
         .background(store.activeActivityID == activity.id ? Color.blue.opacity(0.06) : .clear)
     }
 }

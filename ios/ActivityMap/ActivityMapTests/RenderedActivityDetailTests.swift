@@ -1,6 +1,7 @@
 import SwiftUI
 import Testing
 import UIKit
+import Vision
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
@@ -58,6 +59,36 @@ extension RenderedRoutePickingTests {
         try host.save(host.snapshot(), name: "map-flow-results-return")
     }
 
+    @Test(arguments: [ColorScheme.light, .dark])
+    func mapResultsCaptionsAreReadableOverMaterial(scheme: ColorScheme) async throws {
+        let activity = try StoredModelMapper.activity(Fixtures.activity([
+            "id": "1", "name": "Riverside ride", "sport_type": "Ride", "distance": 31200,
+            "elapsed_time": 4476, "total_elevation_gain": 820,
+        ]))
+        let store = ActivityStore(activities: [activity, ActivityStoreSelectionTests.activity(2)])
+        store.replaceSelection(with: [1, 2])
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: false)
+            .environment(\.colorScheme, scheme), size: CGSize(width: 375, height: 500))
+        defer { host.close() }
+        host.host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
+        try await Task.sleep(for: .milliseconds(200))
+        let image = host.snapshot()
+        try host.save(image, name: scheme == .dark ? "map-results-readable-dark" : "map-results-readable-light")
+        // Inspect visible pixels, not accessibility labels: the regression was
+        // present in the view tree but unreadable on the frosted surface.
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false
+        request.recognitionLanguages = ["en-US"]
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(text.contains("Ride") && text.contains("2023"), "Sport and date are visibly rendered: \(text)")
+        #expect(text.contains("31.2") && text.contains("1h 14m") && text.contains("820"),
+                "Distance, elapsed time and elevation are visibly rendered: \(text)")
+    }
+
     @Test(arguments: [2, 60]) func nativeMapPagerDragsBeforeCommittingAndCancelsWithoutChangingFocus(count: Int) async throws {
         let store = ActivityStore(activities: (1...count).map { ActivityStoreSelectionTests.activity($0) })
         store.replaceSelection(with: Array(1...count))
@@ -82,8 +113,12 @@ extension RenderedRoutePickingTests {
         scroll.setContentOffset(initialOffset, animated: false)
         let initial = try #require(pager.viewControllers?.first)
         let next = try #require(pager.dataSource?.pageViewController(pager, viewControllerAfter: initial))
+        let headerBefore = host.snapshotRegion(CGRect(x: 0, y: 18, width: 375, height: 52))
         pager.delegate?.pageViewController?(pager, willTransitionTo: [next])
         #expect(picker.isPaging)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(host.snapshotRegion(CGRect(x: 0, y: 18, width: 375, height: 52)) == headerBefore,
+                "Paging arrows keep their appearance during a native drag")
         pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [initial], transitionCompleted: false)
         #expect(!picker.isPaging && picker.detailID == start && store.activeActivityID == start)
         pager.delegate?.pageViewController?(pager, willTransitionTo: [next])
@@ -166,6 +201,11 @@ private final class DetailHarness<Content: View> {
         return UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
             host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
         }
+    }
+    func snapshotRegion(_ rect: CGRect) -> Data? {
+        let image = snapshot()
+        let pixels = rect.applying(CGAffineTransform(scaleX: image.scale, y: image.scale))
+        return image.cgImage?.cropping(to: pixels).flatMap { UIImage(cgImage: $0).pngData() }
     }
     func save(_ image: UIImage, name: String) throws {
         let directory = URL(fileURLWithPath: "/tmp/activitymap-detail-preview")

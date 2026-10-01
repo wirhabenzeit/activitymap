@@ -59,6 +59,13 @@ extension RenderedRoutePickingTests {
         #expect(store.selectedActivityIDs == [1])
         #expect(!sync.canRefresh && sync.status != .expired)
         try host.save(name: "\(layout)-server-wait-map")
+        // Routine sync status now belongs in Settings while the retained
+        // browsing surfaces keep their context and empty-state recovery.
+        let settings = try BrowsingHarness(root: AccountSheet(destination: .settings, auth: AuthController(), sync: sync, refresh: {}),
+                                           size: layout == "tablet" ? CGSize(width: 768, height: 1024) : CGSize(width: 390, height: 844))
+        defer { settings.close() }
+        try await Task.sleep(for: .milliseconds(150))
+        try settings.save(name: "\(layout)-sync-settings")
     }
 
     @Test(arguments: ["phone", "accessibility", "tablet"])
@@ -75,9 +82,6 @@ extension RenderedRoutePickingTests {
             let state = try #require(presentation.empty)
             let root = NavigationStack {
                 ListScreen(store: ActivityStore(), emptyState: state)
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        BrowsingStatusBar(presentation: presentation, failureMessage: nil, recover: { _ in })
-                    }
                     .navigationTitle("Activities")
             }.environment(\.dynamicTypeSize, layout == "accessibility" ? .accessibility2 : .large)
             let host = try BrowsingHarness(root: root, size: size)

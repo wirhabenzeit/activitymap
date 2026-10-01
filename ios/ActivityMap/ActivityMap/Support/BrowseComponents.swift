@@ -114,7 +114,7 @@ struct BrowseInlineMetric: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            Image(systemName: systemImage).font(.system(size: 10)).foregroundStyle(.secondary)
+            Image(systemName: systemImage).font(.system(size: 10)).foregroundStyle(AppTheme.secondaryText)
             Text(value).font(.caption).monospacedDigit()
         }
         .fixedSize(horizontal: false, vertical: true)
