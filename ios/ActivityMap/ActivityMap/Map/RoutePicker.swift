@@ -11,6 +11,8 @@ final class RoutePicker {
     var isAdding = false
     var isPresented = false
     var detent = MapResultsDetent.medium
+    enum NavigationMotion { case forward, backward, none }
+    private(set) var navigationMotion = NavigationMotion.none
     var detailID: Int?
     var errorMessage: String?
     private(set) var candidateIDs: [Int] = []
@@ -69,6 +71,7 @@ final class RoutePicker {
         var seen = Set<Int>()
         let hits = ids.filter { eligible.contains($0) && seen.insert($0).inserted }
         errorMessage = nil
+        navigationMotion = .none
         detailID = nil
         if hits.isEmpty {
             // Explicit contract: empty-map taps clear, including in Add mode.
@@ -94,6 +97,7 @@ final class RoutePicker {
         candidateIDs = candidateIDs.filter(visible.contains)
             + visible.subtracting(candidateIDs).sorted(by: >)
         if let detailID, detailID != store.activeActivityID {
+            navigationMotion = .none
             self.detailID = store.activeActivityID
         }
         if store.selectedActivityIDs.isEmpty {
@@ -105,6 +109,7 @@ final class RoutePicker {
     }
 
     func reviewSelection(store: ActivityStore) {
+        navigationMotion = .none
         reconcile(with: store)
         if candidateIDs.count == 1, let id = candidateIDs.first { store.activate(id) }
         detailID = store.activeActivityID
@@ -113,6 +118,7 @@ final class RoutePicker {
 
     /// Back changes presentation only: retain selection, active route and camera.
     func showResults() {
+        navigationMotion = .backward
         detailID = nil
     }
 
@@ -121,11 +127,21 @@ final class RoutePicker {
         guard !candidateIDs.isEmpty else { return }
         let index = detailID.flatMap { candidateIDs.firstIndex(of: $0) } ?? 0
         let next = (index + offset + candidateIDs.count) % candidateIDs.count
-        showDetail(candidateIDs[next], store: store)
+        showDetail(candidateIDs[next], store: store, motion: offset < 0 ? .backward : .forward)
     }
 
-    func showDetail(_ id: Int, store: ActivityStore) {
+    /// Horizontal detail paging shares the arrow action, while vertical and
+    /// diagonal drags remain ordinary content scrolling / panel resizing.
+    func swipe(_ translation: CGSize, store: ActivityStore) {
+        guard detailID != nil, candidateIDs.count > 1,
+              abs(translation.width) >= 50,
+              abs(translation.width) > abs(translation.height) * 1.5 else { return }
+        step(translation.width < 0 ? 1 : -1, store: store)
+    }
+
+    func showDetail(_ id: Int, store: ActivityStore, motion: NavigationMotion = .forward) {
         guard store.selectedActivityIDs.contains(id), store.selection.visibleIDs.contains(id) else { return }
+        navigationMotion = motion
         store.activate(id)
         detailID = id
         isPresented = true

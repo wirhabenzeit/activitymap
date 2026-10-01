@@ -14,6 +14,14 @@ struct RoutePickerSheet: View {
     }
     private var detail: Activity? { candidates.first { $0.id == picker.detailID } }
 
+    private var singleDetail: Bool { detail != nil && candidates.count == 1 && picker.detent != .compact }
+    private var detailTransition: AnyTransition {
+        guard !reduceMotion, picker.navigationMotion != .none else { return .opacity }
+        let backwards = picker.navigationMotion == .backward
+        return .asymmetric(insertion: .move(edge: backwards ? .leading : .trailing),
+                           removal: .move(edge: backwards ? .trailing : .leading))
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -26,12 +34,18 @@ struct RoutePickerSheet: View {
                     .allowsHitTesting(detail == nil)
                     .accessibilityHidden(detail != nil)
                 if let activity = detail {
-                    ActivityDetailPanel(store: store, activityID: activity.id) { id in
+                    ActivityDetailPanel(store: store, activityID: activity.id, headerTrailingInset: singleDetail ? 44 : 0) { id in
                         picker.detent = .compact
                         store.showOnMap(id)
                     }
+                    .overlay(alignment: .topTrailing) {
+                        if singleDetail {
+                            collapseButton.padding(.trailing, 16).padding(.top, 4)
+                        }
+                    }
+                    .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
                     .id(activity.id)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(detailTransition)
                 }
             }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: picker.detailID)
@@ -45,6 +59,9 @@ struct RoutePickerSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: isSidePanel ? 20 : 32, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
         .accessibilityIdentifier("map-results-panel")
+        .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { drag in
+            picker.swipe(drag.translation, store: store)
+        })
     }
 
     @ViewBuilder private var results: some View {
@@ -73,42 +90,39 @@ struct RoutePickerSheet: View {
             if !isSidePanel {
                 Capsule().fill(.secondary.opacity(0.4)).frame(width: 32, height: 4).padding(.top, 9)
             }
-            let layout = typeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                : AnyLayout(HStackLayout(spacing: 4))
-            layout {
-                if let activity = detail, picker.detent != .compact {
-                    if candidates.count > 1 {
-                        Button { picker.showResults() } label: {
-                            Label("Results", systemImage: "chevron.left")
-                                .font(.subheadline.weight(.medium))
-                                .frame(minHeight: 44)
+            if !singleDetail {
+                let layout = typeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                    : AnyLayout(HStackLayout(spacing: 4))
+                layout {
+                    if let activity = detail, picker.detent != .compact {
+                        if candidates.count > 1 {
+                            Button { picker.showResults() } label: {
+                                Label("Results", systemImage: "chevron.left")
+                                    .font(.subheadline.weight(.medium))
+                                    .frame(minHeight: 44)
+                            }
+                            .accessibilityLabel("Back to selected activities")
+                            .accessibilityIdentifier("map-results-back")
                         }
-                        .accessibilityLabel("Back to selected activities")
-                        .accessibilityIdentifier("map-results-back")
+                        if !typeSize.isAccessibilitySize { Spacer(minLength: 0) }
+                        if candidates.count > 1 { detailNavigation(activity) }
+                    } else {
+                        selectionSummary
                     }
-                    if !typeSize.isAccessibilitySize { Spacer(minLength: 0) }
-                    if candidates.count > 1 { detailNavigation(activity) }
-                } else {
-                    selectionSummary
-                }
-                HStack(spacing: 4) {
-                    if detail == nil || picker.detent == .compact { selectionActions }
-                    Button {
-                        resize(to: picker.detent == .compact ? .medium : .compact)
-                    } label: {
-                        Image(systemName: picker.detent == .compact ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
+                    HStack(spacing: 4) {
+                        if detail == nil || picker.detent == .compact { selectionActions }
+                        collapseButton
                     }
-                    .accessibilityLabel(picker.detent == .compact ? "Expand results" : "Collapse results")
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 4)
         }
         .contentShape(Rectangle())
         // Header drag resizes this one container; content scrolling never does.
         .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { drag in
+            guard abs(drag.translation.height) > abs(drag.translation.width) * 1.5 else { return }
             let change = drag.translation.height < -30 ? 1 : drag.translation.height > 30 ? -1 : 0
             resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)
         })
@@ -117,6 +131,14 @@ struct RoutePickerSheet: View {
             resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)
         }
         .accessibilityAction(named: "Expand results fully") { resize(to: .expanded) }
+    }
+
+    private var collapseButton: some View {
+        Button { resize(to: picker.detent == .compact ? .medium : .compact) } label: {
+            Image(systemName: picker.detent == .compact ? "chevron.up" : "chevron.down")
+                .font(.system(size: 18, weight: .semibold)).frame(width: 44, height: 44)
+        }
+        .accessibilityLabel(picker.detent == .compact ? "Expand results" : "Collapse results")
     }
 
     private func resize(to detent: MapResultsDetent) {

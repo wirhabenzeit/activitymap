@@ -48,6 +48,7 @@ extension RenderedRoutePickingTests {
             try await present(AnyView(ActivityDetailView(store: store, activityID: 101)), suffix: "detail")
             try await present(AnyView(NavigationStack { SharedStatsExample().navigationTitle("Stats") }), suffix: "stats")
             try await present(AnyView(MapScreen(store: store).environment(\.mapStyleOverride, style)), suffix: "map")
+            try await present(AnyView(AppShell(activities: activities).environment(\.mapStyleOverride, style)), suffix: "shell")
         }
     }
 

@@ -22,6 +22,7 @@ struct ActivityDetailView: View {
 struct ActivityDetailPanel: View {
     @Bindable var store: ActivityStore
     let activityID: Int
+    var headerTrailingInset: CGFloat = 0
     var showOnMap: ((Int) -> Void)? = nil
 
     private var activity: Activity? { store.activities.first { $0.id == activityID } }
@@ -30,7 +31,7 @@ struct ActivityDetailPanel: View {
         Group {
             if let activity {
                 ScrollView {
-                    ActivityDetailContent(activity: activity)
+                    ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset)
                 }
                 .accessibilityIdentifier("activity-detail-scroll")
                 .safeAreaInset(edge: .bottom, spacing: 0) {

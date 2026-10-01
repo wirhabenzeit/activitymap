@@ -141,6 +141,32 @@ struct RoutePickerTests {
         #expect(!picker.isPresented && picker.detailID == nil)
     }
 
+    @Test func horizontalSwipesMatchArrowsAndIgnoreScrollGestures() {
+        let store = store(), picker = RoutePicker()
+        picker.apply(ids: [3, 2, 1], adding: false, request: picker.invalidateQuery(), store: store)
+        picker.showDetail(2, store: store)
+        let selection = store.selectedActivityIDs
+        picker.swipe(CGSize(width: -100, height: 5), store: store)
+        #expect(picker.detailID == 1 && picker.navigationMotion == .forward)
+        picker.step(-1, store: store)
+        #expect(picker.detailID == 2 && picker.navigationMotion == .backward)
+        picker.swipe(CGSize(width: 100, height: 5), store: store)
+        #expect(picker.detailID == 3 && picker.navigationMotion == .backward)
+        picker.step(1, store: store)
+        #expect(picker.detailID == 2 && picker.navigationMotion == .forward)
+        for drag in [CGSize(width: 10, height: -100), CGSize(width: 80, height: 80), CGSize(width: 49, height: 0)] {
+            picker.swipe(drag, store: store)
+            #expect(picker.detailID == 2, "Vertical, diagonal and short gestures do not page")
+        }
+        #expect(store.selectedActivityIDs == selection && store.activeActivityID == 2 && store.mapContext.pendingRequest == nil)
+        picker.showResults()
+        picker.swipe(CGSize(width: -100, height: 0), store: store)
+        #expect(picker.detailID == nil && picker.navigationMotion == .backward, "Results do not accept detail paging")
+        picker.apply(ids: [1], adding: false, request: picker.invalidateQuery(), store: store)
+        picker.swipe(CGSize(width: -100, height: 0), store: store)
+        #expect(picker.detailID == 1 && picker.navigationMotion == .none, "A single result does not page")
+    }
+
     @Test func selectionAndFiltersNeverRebuildLibraryGeometry() {
         let store = ActivityStore(activities: (1...2_000).map { ActivityStoreSelectionTests.activity($0) })
         let cache = store.routeGeometry

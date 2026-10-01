@@ -11,6 +11,10 @@ struct MapResultsLayout {
     let bottomOcclusion: CGFloat
     let leadingOcclusion: CGFloat
 
+    static func controlsCenter(size: CGSize, topInset: CGFloat) -> CGPoint {
+        CGPoint(x: max(71, size.width - 83), y: topInset + 40)
+    }
+
     init(size: CGSize, topInset: CGFloat, bottomInset: CGFloat, detent: MapResultsDetent,
          largeText: Bool = false) {
         isSidePanel = size.width >= 650 || size.width > size.height

@@ -45,10 +45,12 @@ struct MapScreen: View {
                 }
                 let layout = resultsLayout(in: geometry)
                 let showingResults = picker.isPresented
-                let horizontalTools = showingResults && !layout.isSidePanel
-                mapControls(horizontal: horizontalTools)
-                    .position(x: geometry.size.width - (horizontalTools ? 96 : 42),
-                              y: horizontalTools ? layout.frame.minY - 96 : geometry.size.height - 112)
+                // Controls are anchored to the viewport, independent of
+                // results visibility, destination or detent.
+                mapControls(horizontal: true)
+                    .position(MapResultsLayout.controlsCenter(size: geometry.size,
+                        topInset: max(topOcclusion, geometry.safeAreaInsets.top)))
+                    .accessibilityIdentifier("map-controls")
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
                 if showingResults {
@@ -155,7 +157,13 @@ struct MapScreen: View {
     }
 
     private func applyNavigation(proxy: MapProxy, geometry: GeometryProxy) {
-        guard acceptsCameraEvents, store.selectedTab == .map, let map = proxy.map else { return }
+        guard store.selectedTab == .map, let map = proxy.map else { return }
+        if !acceptsCameraEvents {
+            // A cached style may already be ready before SwiftUI observes its
+            // load/idle event. An explicit fit must not wait for another idle.
+            guard context.pendingRequest != nil, map.isStyleLoaded else { return }
+            acceptsCameraEvents = true
+        }
         if case let .activity(id) = context.pendingRequest?.action,
            store.selection.visibleSelectedIDs.contains(id) {
             // Do not activate a different remaining result if filters/deletion

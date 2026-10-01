@@ -153,7 +153,7 @@ struct AppShell: View {
             }
         }
         .padding(3)
-        .modifier(MapChromeSurface())
+        .glassEffect(.regular, in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("View")
     }

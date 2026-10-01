@@ -4,6 +4,7 @@ import SwiftUI
 /// related recorded context, like the web card, without deriving missing data.
 struct ActivityDetailContent<Profile: View, Photos: View>: View {
     let activity: Activity
+    var headerTrailingInset: CGFloat = 0
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -35,6 +36,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .padding(.trailing, headerTrailingInset)
             if activity.isPrivate == true || activity.commute == true || activity.trainer == true || activity.flagged == true {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) { badges }
@@ -125,7 +127,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
 }
 
 extension ActivityDetailContent where Profile == EmptyView, Photos == EmptyView {
-    init(activity: Activity) {
-        self.init(activity: activity, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
+    init(activity: Activity, headerTrailingInset: CGFloat = 0) {
+        self.init(activity: activity, headerTrailingInset: headerTrailingInset, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
     }
 }
