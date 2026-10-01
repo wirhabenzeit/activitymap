@@ -20,6 +20,7 @@ struct ActivityDetailView: View {
 /// Resolve by identity on every update, never retain the sheet's initial snapshot.
 /// The action bar is outside the scroll view so long content cannot bury actions.
 struct ActivityDetailPanel: View {
+    @Environment(\.activityDetailOverMap) private var overMap
     @Bindable var store: ActivityStore
     let activityID: Int
     var headerTrailingInset: CGFloat = 0
@@ -30,11 +31,12 @@ struct ActivityDetailPanel: View {
     var body: some View {
         Group {
             if let activity {
-                ScrollView {
-                    ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset)
-                }
-                .accessibilityIdentifier("activity-detail-scroll")
-                .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    ScrollView {
+                        ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset)
+                    }
+                    .accessibilityIdentifier("activity-detail-scroll")
+                    .clipped()
                     ActivityDetailActions(activity: activity) { id in
                         if let showOnMap { showOnMap(id) }
                         else { store.showOnMap(id) }
@@ -45,13 +47,14 @@ struct ActivityDetailPanel: View {
                                        description: Text("This activity is no longer in your library."))
             }
         }
-        .background(AppTheme.surface)
+        .background { if !overMap { AppTheme.surface } }
     }
 }
 
 /// Single integration point for real edit/refresh/share actions (#220–#222).
 /// Until those land, the menu explicitly identifies them as unavailable.
 private struct ActivityDetailActions: View {
+    @Environment(\.activityDetailOverMap) private var overMap
     let activity: Activity
     let showOnMap: (Int) -> Void
 
@@ -87,11 +90,11 @@ private struct ActivityDetailActions: View {
                 .accessibilityHint("Editing, refresh, GPX sharing and Strava links are not available yet")
             }
             if !hasRoute {
-                Text("No GPS route recorded").font(.caption).foregroundStyle(.secondary)
+                Text("No GPS route recorded").font(.caption).foregroundStyle(AppTheme.secondaryText)
             }
         }
         .padding(.horizontal, AppTheme.Spacing.large)
         .padding(.vertical, AppTheme.Spacing.small)
-        .background(AppTheme.surface)
+        .background { if !overMap { AppTheme.surface } }
     }
 }

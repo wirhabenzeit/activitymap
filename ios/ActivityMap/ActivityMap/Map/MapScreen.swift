@@ -54,7 +54,7 @@ struct MapScreen: View {
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
                 if showingResults {
-                    RoutePickerSheet(picker: picker, store: store, isSidePanel: layout.isSidePanel)
+                    RoutePickerSheet(picker: picker, store: store, isSidePanel: layout.isSidePanel, bottomInset: layout.isSidePanel ? 0 : geometry.safeAreaInsets.bottom)
                         .frame(width: layout.frame.width, height: layout.frame.height)
                         .position(x: layout.frame.midX, y: layout.frame.midY)
                 } else {

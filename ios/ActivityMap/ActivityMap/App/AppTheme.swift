@@ -29,6 +29,7 @@ enum AppTheme {
             : UIColor(red: 0.18, green: 0.42, blue: 0.79, alpha: 1)
     })
     static let contentBackground = Color(uiColor: .systemGroupedBackground)
+    static let secondaryText = Color(uiColor: .secondaryLabel)
     static let surface = Color(uiColor: .secondarySystemGroupedBackground)
     static let separator = Color(uiColor: .separator)
     static let cornerRadius: CGFloat = 10
@@ -82,5 +83,16 @@ struct MapChromeButtonStyle: ButtonStyle {
                 in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius)
             )
             .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
+/// List retains an opaque reading surface; Map supplies one frosted host.
+private struct ActivityDetailOverMapKey: EnvironmentKey {
+    static let defaultValue = false
+}
+extension EnvironmentValues {
+    var activityDetailOverMap: Bool {
+        get { self[ActivityDetailOverMapKey.self] }
+        set { self[ActivityDetailOverMapKey.self] = newValue }
     }
 }

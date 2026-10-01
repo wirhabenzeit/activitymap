@@ -5,6 +5,7 @@ struct RoutePickerSheet: View {
     @Bindable var picker: RoutePicker
     @Bindable var store: ActivityStore
     let isSidePanel: Bool
+    var bottomInset: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -15,13 +16,6 @@ struct RoutePickerSheet: View {
     private var detail: Activity? { candidates.first { $0.id == picker.detailID } }
 
     private var singleDetail: Bool { detail != nil && candidates.count == 1 && picker.detent != .compact }
-    private var detailTransition: AnyTransition {
-        guard !reduceMotion, picker.navigationMotion != .none else { return .opacity }
-        let backwards = picker.navigationMotion == .backward
-        return .asymmetric(insertion: .move(edge: backwards ? .leading : .trailing),
-                           removal: .move(edge: backwards ? .trailing : .leading))
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -33,35 +27,30 @@ struct RoutePickerSheet: View {
                     .opacity(detail == nil ? 1 : 0)
                     .allowsHitTesting(detail == nil)
                     .accessibilityHidden(detail != nil)
-                if let activity = detail {
-                    ActivityDetailPanel(store: store, activityID: activity.id, headerTrailingInset: singleDetail ? 44 : 0) { id in
-                        picker.detent = .compact
-                        store.showOnMap(id)
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if singleDetail {
-                            collapseButton.padding(.trailing, 16).padding(.top, 4)
+                if detail != nil {
+                    MapActivityPager(store: store, picker: picker, singleDetail: singleDetail)
+                        .overlay(alignment: .topTrailing) {
+                            if singleDetail { collapseButton.padding(.trailing, 16).padding(.top, 4) }
                         }
-                    }
-                    .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
-                    .id(activity.id)
-                    .transition(detailTransition)
+                        .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
+                        .transition(reduceMotion ? .opacity : .move(edge: .trailing))
                 }
             }
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: picker.detailID)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: detail != nil)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .frame(height: picker.detent == .compact ? 0 : nil)
             .clipped()
             .accessibilityHidden(picker.detent == .compact)
         }
         // One continuous detail surface; only the outer host owns corners.
-        .background(AppTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: isSidePanel ? 20 : 32, style: .continuous))
+        .padding(.bottom, bottomInset)
+        .background(.regularMaterial)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: isSidePanel ? 20 : 28,
+            bottomLeadingRadius: isSidePanel ? 20 : 0, bottomTrailingRadius: isSidePanel ? 20 : 0,
+            topTrailingRadius: isSidePanel ? 20 : 28))
         .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
         .accessibilityIdentifier("map-results-panel")
-        .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { drag in
-            picker.swipe(drag.translation, store: store)
-        })
+
     }
 
     @ViewBuilder private var results: some View {
@@ -210,12 +199,12 @@ struct RoutePickerSheet: View {
         HStack(spacing: 4) {
             Button { picker.step(-1, store: store) } label: {
                 Image(systemName: "chevron.left").frame(width: 44, height: 44)
-            }.accessibilityLabel("Previous activity")
+            }.disabled(picker.isPaging).accessibilityLabel("Previous activity")
             Text("\((picker.candidateIDs.firstIndex(of: activity.id) ?? 0) + 1) of \(candidates.count)")
                 .font(.caption).monospacedDigit().foregroundStyle(.secondary).fixedSize()
             Button { picker.step(1, store: store) } label: {
                 Image(systemName: "chevron.right").frame(width: 44, height: 44)
-            }.accessibilityLabel("Next activity")
+            }.disabled(picker.isPaging).accessibilityLabel("Next activity")
         }
         .font(.system(size: 18, weight: .semibold))
     }

@@ -79,7 +79,7 @@ struct BrowseBadge: View {
     var body: some View {
         Label(title, systemImage: systemImage)
             .font(AppTheme.Typography.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(AppTheme.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
     }
 }
@@ -146,10 +146,10 @@ struct BrowseMetricValue: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
             if valueFirst { Text(value).font(valueFont).monospacedDigit() }
-            Text(title).font(AppTheme.Typography.caption).foregroundStyle(.secondary)
+            Text(title).font(AppTheme.Typography.caption).foregroundStyle(AppTheme.secondaryText)
             if !valueFirst { Text(value).font(valueFont).monospacedDigit() }
             if let context {
-                Text(context).font(valueFirst ? .caption2 : AppTheme.Typography.caption).foregroundStyle(.secondary)
+                Text(context).font(valueFirst ? .caption2 : AppTheme.Typography.caption).foregroundStyle(AppTheme.secondaryText)
             }
         }
         .fixedSize(horizontal: false, vertical: true)

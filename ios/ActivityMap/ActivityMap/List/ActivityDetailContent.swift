@@ -4,6 +4,7 @@ import SwiftUI
 /// related recorded context, like the web card, without deriving missing data.
 struct ActivityDetailContent<Profile: View, Photos: View>: View {
     let activity: Activity
+    @Environment(\.activityDetailOverMap) private var overMap
     var headerTrailingInset: CGFloat = 0
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
@@ -32,7 +33,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                         .accessibilityAddTraits(.isHeader)
                         .accessibilityIdentifier("activity-detail-name")
                     Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(AppTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -71,12 +72,12 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                     ForEach(rows.filter { !["date", "distance", "movingTime", "elapsedTime", "elevationGain"].contains($0.id) }) { metric in
                         ViewThatFits(in: .horizontal) {
                             HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
-                                Text(metric.title).foregroundStyle(.secondary).fixedSize()
+                                Text(metric.title).foregroundStyle(AppTheme.secondaryText).fixedSize()
                                 Spacer(minLength: 4)
                                 Text(metric.value).fontWeight(.medium).monospacedDigit().fixedSize()
                             }
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(metric.title).foregroundStyle(.secondary)
+                                Text(metric.title).foregroundStyle(AppTheme.secondaryText)
                                 Text(metric.value).fontWeight(.medium).monospacedDigit()
                             }
                         }
@@ -96,7 +97,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(AppTheme.Spacing.large)
-        .background(AppTheme.surface)
+        .background { if !overMap { AppTheme.surface } }
     }
 
     private var elevationGain: String {

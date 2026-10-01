@@ -69,7 +69,7 @@ struct BrowsingStatusBar: View {
             .accessibilityLabel("Sync details, last successful sync and Strava reconciliation")
         }
         .padding(.horizontal)
-        .background(.bar)
+        .background(.regularMaterial, ignoresSafeAreaEdges: [])
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("browsing-sync-status")
         .sheet(isPresented: $showsDetails) {

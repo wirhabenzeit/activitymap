@@ -58,6 +58,49 @@ extension RenderedRoutePickingTests {
         try host.save(host.snapshot(), name: "map-flow-results-return")
     }
 
+    @Test(arguments: [2, 60]) func nativeMapPagerDragsBeforeCommittingAndCancelsWithoutChangingFocus(count: Int) async throws {
+        let store = ActivityStore(activities: (1...count).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: Array(1...count))
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let start = min(30, count)
+        picker.showDetail(start, store: store, motion: .none)
+        let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: false), size: CGSize(width: 375, height: 500))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(300))
+        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
+        #expect(pager.transitionStyle == .scroll && pager.navigationOrientation == .horizontal)
+        let scroll = try #require(host.descendants(of: UIScrollView.self).first { $0.contentSize.width > $0.bounds.width * 1.5 })
+        #expect(scroll.panGestureRecognizer.isEnabled)
+        let initialOffset = scroll.contentOffset
+        let before = host.snapshot()
+        scroll.setContentOffset(CGPoint(x: initialOffset.x + 30, y: initialOffset.y), animated: false)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(before.pngData() != host.snapshot().pngData(), "Native page content moves before the drag is committed")
+        #expect(picker.detailID == start && store.activeActivityID == start)
+        try host.save(host.snapshot(), name: "map-native-page-drag")
+        scroll.setContentOffset(initialOffset, animated: false)
+        let initial = try #require(pager.viewControllers?.first)
+        let next = try #require(pager.dataSource?.pageViewController(pager, viewControllerAfter: initial))
+        pager.delegate?.pageViewController?(pager, willTransitionTo: [next])
+        #expect(picker.isPaging)
+        pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [initial], transitionCompleted: false)
+        #expect(!picker.isPaging && picker.detailID == start && store.activeActivityID == start)
+        pager.delegate?.pageViewController?(pager, willTransitionTo: [next])
+        pager.setViewControllers([next], direction: .forward, animated: false)
+        pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [initial], transitionCompleted: true)
+        #expect(picker.detailID == start - 1 && store.activeActivityID == start - 1)
+        let coordinator = try #require(pager.delegate as? MapActivityPager.Coordinator)
+        for _ in 0..<20 {
+            let current = try #require(pager.viewControllers?.first)
+            let following = try #require(pager.dataSource?.pageViewController(pager, viewControllerAfter: current))
+            pager.setViewControllers([following], direction: .forward, animated: false)
+            pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [current], transitionCompleted: true)
+            #expect(coordinator.pages.count <= 3, "Large selections retain only current/adjacent hosted pages")
+        }
+        #expect(store.selectedActivityIDs.count == count && store.mapContext.pendingRequest == nil)
+    }
+
     @Test(arguments: ["phone", "accessibility", "tablet", "landscape", "no-gps"])
     func detailAdaptivePresentation(scenario: String) async throws {
         let tablet = scenario == "tablet"
@@ -134,6 +177,12 @@ private final class DetailHarness<Content: View> {
             ((view as? T).map { [$0] } ?? []) + view.subviews.flatMap(visit)
         }
         return visit(host.view)
+    }
+    func controllers<T: UIViewController>(of type: T.Type) -> [T] {
+        func visit(_ controller: UIViewController) -> [T] {
+            ((controller as? T).map { [$0] } ?? []) + controller.children.flatMap(visit)
+        }
+        return visit(host)
     }
     func close() { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
 }

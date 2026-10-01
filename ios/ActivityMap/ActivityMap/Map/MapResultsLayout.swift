@@ -18,7 +18,7 @@ struct MapResultsLayout {
     init(size: CGSize, topInset: CGFloat, bottomInset: CGFloat, detent: MapResultsDetent,
          largeText: Bool = false) {
         isSidePanel = size.width >= 650 || size.width > size.height
-        let width = isSidePanel ? min(380, size.width * 0.42) : max(0, size.width - 24)
+        let width = isSidePanel ? min(380, size.width * 0.42) : max(0, size.width - 8)
         // Leave navigation and a horizontal map-controls row above expanded
         // phone results. Wider layouts leave those controls beside the panel.
         let top = topInset + (isSidePanel ? 12 : 140)
@@ -30,9 +30,9 @@ struct MapResultsLayout {
         case .medium: height = min(available, max(compact + 120, size.height * 0.46))
         case .expanded: height = available
         }
-        frame = CGRect(x: isSidePanel ? 16 : 12, y: isSidePanel ? top : size.height - height - 12,
-                       width: width, height: height)
-        bottomOcclusion = isSidePanel ? 0 : height + 12 + bottomInset
+        frame = CGRect(x: isSidePanel ? 16 : 4, y: isSidePanel ? top : size.height - height,
+                       width: width, height: height + (isSidePanel ? 0 : bottomInset))
+        bottomOcclusion = isSidePanel ? 0 : height + bottomInset
         leadingOcclusion = isSidePanel ? frame.maxX + 12 : 0
     }
 }

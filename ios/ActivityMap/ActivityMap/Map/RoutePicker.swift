@@ -13,6 +13,7 @@ final class RoutePicker {
     var detent = MapResultsDetent.medium
     enum NavigationMotion { case forward, backward, none }
     private(set) var navigationMotion = NavigationMotion.none
+    var isPaging = false
     var detailID: Int?
     var errorMessage: String?
     private(set) var candidateIDs: [Int] = []
@@ -128,15 +129,6 @@ final class RoutePicker {
         let index = detailID.flatMap { candidateIDs.firstIndex(of: $0) } ?? 0
         let next = (index + offset + candidateIDs.count) % candidateIDs.count
         showDetail(candidateIDs[next], store: store, motion: offset < 0 ? .backward : .forward)
-    }
-
-    /// Horizontal detail paging shares the arrow action, while vertical and
-    /// diagonal drags remain ordinary content scrolling / panel resizing.
-    func swipe(_ translation: CGSize, store: ActivityStore) {
-        guard detailID != nil, candidateIDs.count > 1,
-              abs(translation.width) >= 50,
-              abs(translation.width) > abs(translation.height) * 1.5 else { return }
-        step(translation.width < 0 ? 1 : -1, store: store)
     }
 
     func showDetail(_ id: Int, store: ActivityStore, motion: NavigationMotion = .forward) {

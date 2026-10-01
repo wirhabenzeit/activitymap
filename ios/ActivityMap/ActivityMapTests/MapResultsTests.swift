@@ -75,8 +75,8 @@ struct MapResultsTests {
     func detentsLeaveNavigationAndMapControlsAvailable(size: CGSize) {
         for detent in MapResultsDetent.allCases {
             let layout = MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: detent)
-            #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height)
-            #expect(layout.frame.minX >= 12 && layout.frame.maxX <= size.width)
+            #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height + (layout.isSidePanel ? 0 : 34))
+            #expect(layout.frame.minX >= (layout.isSidePanel ? 12 : 4) && layout.frame.maxX <= size.width)
             if layout.isSidePanel {
                 #expect(layout.leadingOcclusion + 16 < size.width / 2)
                 #expect(layout.bottomOcclusion == 0)
