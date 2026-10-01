@@ -22,26 +22,12 @@ struct MapScreen: View {
     }
 
     @State private var picker: RoutePicker
-    @ScaledMetric(relativeTo: .caption2) private var attributionFontSize: CGFloat = 11
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             GeometryReader { geometry in
                 MapReader { proxy in
                     mapView(proxy: proxy, geometry: geometry)
-                }
-                if let attribution {
-                    let layout = attributionLayout(in: geometry)
-                    Text(attribution)
-                        .font(.system(size: attributionFontSize))
-                        .foregroundStyle(Color.primary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .frame(width: layout.creditSize.width, height: layout.creditSize.height)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
-                        .position(layout.creditCenter)
-                        .allowsHitTesting(false)
                 }
                 let showingResults = picker.isPresented
                 // Controls are anchored to the viewport, independent of
@@ -200,8 +186,7 @@ struct MapScreen: View {
     private func attributionLayout(in geometry: GeometryProxy) -> MapAttributionLayout {
         let layout = resultsLayout(in: geometry)
         let showingResults = picker.isPresented
-        return MapAttributionLayout(size: geometry.size, bottomInset: geometry.safeAreaInsets.bottom,
-                                    credit: attribution, fontSize: attributionFontSize,
+        return MapAttributionLayout(bottomInset: geometry.safeAreaInsets.bottom,
                                     bottomOcclusion: showingResults ? layout.bottomOcclusion : 0,
                                     leadingOcclusion: showingResults ? layout.leadingOcclusion : 0)
     }
@@ -360,17 +345,6 @@ struct MapScreen: View {
         }
 
         return .standard(lightPreset: colorScheme == .dark ? .night : .day)
-    }
-
-    private var attribution: String? {
-        var providers = context.activeOverlays.compactMap(\.attribution)
-
-        if let baseAttribution = context.baseStyle.attribution {
-            providers.append(baseAttribution)
-        }
-
-        let uniqueProviders = Array(Set(providers)).sorted()
-        return uniqueProviders.isEmpty ? nil : uniqueProviders.joined(separator: "  •  ")
     }
 
     private func toggleOverlay(_ overlay: SharedRasterOverlayDefinition) {
