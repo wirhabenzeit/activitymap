@@ -102,6 +102,24 @@ extension RenderedRoutePickingTests {
         #expect(picker.detailID == 1 && store.activeActivityID == 1 && store.selectedActivityIDs == [1, 2])
         #expect(store.mapContext.pendingRequest == nil, "A resize must not request a route fit")
         try host.save(host.snapshot(), name: "map-sheet-collapsed")
+        var headingOffsets: [CGFloat] = []
+        for fraction: CGFloat in [0, 0.15, 0.5, 1] {
+            resizing.height = heights[0] + (heights[1] - heights[0]) * fraction
+            try await Task.sleep(for: .milliseconds(80))
+            let frame = host.snapshot()
+            try host.save(frame, name: "map-detail-reveal-\(Int(fraction * 100))")
+            let recognition = VNRecognizeTextRequest()
+            recognition.recognitionLevel = .accurate
+            try VNImageRequestHandler(cgImage: try #require(frame.cgImage)).perform([recognition])
+            let headings = (recognition.results ?? []).filter { $0.topCandidates(1).first?.string == "Lake ride" }
+            #expect(headings.count == 1, "Exactly one persistent heading at reveal progress \(fraction)")
+            let heading = try #require(headings.first)
+            let top = (1 - heading.boundingBox.maxY) * size.height
+            let sheetTop = size.height - (resizing.height ?? 0)
+            headingOffsets.append(top - sheetTop)
+        }
+        #expect((headingOffsets.max() ?? 0) - (headingOffsets.min() ?? 0) < 3,
+                "The identity remains at the same position within the sheet through the reveal")
     }
 
     @Test(arguments: [ColorScheme.light, .dark])

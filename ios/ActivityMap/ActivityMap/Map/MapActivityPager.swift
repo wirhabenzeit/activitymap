@@ -7,6 +7,7 @@ struct MapActivityPager: UIViewControllerRepresentable {
     let store: ActivityStore
     let picker: RoutePicker
     let singleDetail: Bool
+    var expansion: CGFloat = 1
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -55,7 +56,7 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
         func update(_ next: MapActivityPager) {
             let appearanceChanged = parent.colorScheme != next.colorScheme || parent.typeSize != next.typeSize
-                || parent.sizeClass != next.sizeClass || parent.singleDetail != next.singleDetail
+                || parent.sizeClass != next.sizeClass || parent.singleDetail != next.singleDetail || parent.expansion != next.expansion
             parent = next
             guard let controller else { return }
             controller.dataSource = next.picker.candidateIDs.count > 1 ? self : nil
@@ -80,7 +81,7 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
         private func content(_ id: Int) -> AnyView {
             AnyView(ActivityDetailPanel(store: parent.store, activityID: id,
-                headerTrailingInset: parent.singleDetail ? 44 : 0) { [weak self] id in
+                headerTrailingInset: parent.singleDetail ? 44 : 0, mapExpansion: parent.expansion) { [weak self] id in
                     guard let self else { return }
                     self.parent.picker.detent = .compact
                     self.parent.store.showOnMap(id)

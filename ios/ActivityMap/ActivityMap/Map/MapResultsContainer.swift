@@ -83,7 +83,7 @@ struct MapResultsContainer: View {
 }
 
 /// A single animatable height drives the actual layout on every settle frame.
-/// Content mode switches only at the compact boundary, with no competing fade.
+/// The same progress drives summary/detail reveal as the panel grows.
 private struct MapResultsPresentation: View, Animatable {
     let picker: RoutePicker
     let store: ActivityStore
@@ -106,9 +106,14 @@ private struct MapResultsPresentation: View, Animatable {
                                       detent: picker.detent, largeText: largeText, heightOverride: height)
         let compact = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
                                        detent: .compact, largeText: largeText).contentHeight
+        let medium = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
+                                      detent: .medium, largeText: largeText).contentHeight
+        let progress = medium > compact
+            ? min(1, max(0, (layout.contentHeight - compact) / (medium - compact)))
+            : (picker.detent == .compact ? CGFloat(0) : CGFloat(1))
         RoutePickerSheet(picker: picker, store: store, isSidePanel: layout.isSidePanel,
                          bottomInset: layout.isSidePanel ? 0 : bottomInset,
-                         collapsedOverride: layout.contentHeight <= compact + 1,
+                         collapsedOverride: progress <= 0.001, expansionProgress: progress,
                          resizeAction: resize, dragChanged: dragChanged, dragEnded: dragEnded, dragCancelled: dragCancelled)
             .transaction { $0.animation = nil }
             .frame(width: layout.frame.width, height: layout.frame.height)

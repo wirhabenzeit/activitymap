@@ -24,6 +24,7 @@ struct ActivityDetailPanel: View {
     @Bindable var store: ActivityStore
     let activityID: Int
     var headerTrailingInset: CGFloat = 0
+    var mapExpansion: CGFloat? = nil
     var showOnMap: ((Int) -> Void)? = nil
 
     private var activity: Activity? { store.activities.first { $0.id == activityID } }
@@ -31,15 +32,23 @@ struct ActivityDetailPanel: View {
     var body: some View {
         Group {
             if let activity {
-                VStack(spacing: 0) {
-                    ScrollView {
-                        ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset)
-                    }
-                    .accessibilityIdentifier("activity-detail-scroll")
-                    .clipped()
-                    ActivityDetailActions(activity: activity) { id in
+                if let mapExpansion {
+                    MapActivityDetailReveal(activity: activity, progress: mapExpansion,
+                                            trailingInset: headerTrailingInset) { id in
                         if let showOnMap { showOnMap(id) }
                         else { store.showOnMap(id) }
+                    }
+                } else {
+                    VStack(spacing: 0) {
+                        ScrollView {
+                            ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset)
+                        }
+                        .accessibilityIdentifier("activity-detail-scroll")
+                        .clipped()
+                        ActivityDetailActions(activity: activity) { id in
+                            if let showOnMap { showOnMap(id) }
+                            else { store.showOnMap(id) }
+                        }
                     }
                 }
             } else {
@@ -48,6 +57,52 @@ struct ActivityDetailPanel: View {
             }
         }
         .background { if !overMap { AppTheme.surface } }
+    }
+}
+
+/// The heading is one persistent element. Compact metrics fade out before
+/// full metrics appear below it; there are never two activity-title layers.
+private struct MapActivityDetailReveal: View {
+    let activity: Activity
+    let progress: CGFloat
+    let trailingInset: CGFloat
+    let showOnMap: (Int) -> Void
+    @State private var summaryHeight: CGFloat = 20
+    @State private var actionHeight: CGFloat = 64
+    private var reveal: CGFloat { min(1, max(0, (progress - 0.25) / 0.75)) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ActivityDetailIdentity(activity: activity, trailingInset: trailingInset)
+                .padding(.horizontal, AppTheme.Spacing.large)
+                .padding(.vertical, AppTheme.Spacing.small)
+            Text("\(Formatters.distance(activity.distance))  ·  \(Formatters.duration(activity.elapsedTime))  ·  \(Formatters.elevation(activity.totalElevationGain)) ↑")
+                .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, AppTheme.Spacing.large)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { summaryHeight = $0 }
+                .opacity(max(0, 1 - progress * 4))
+                .frame(height: summaryHeight * (1 - progress), alignment: .top)
+                .clipped()
+                .accessibilityHidden(progress > 0.25)
+            ScrollView {
+                ActivityDetailContent(activity: activity, showsHeading: false)
+            }
+            .accessibilityIdentifier("activity-detail-scroll")
+            .opacity(reveal)
+            .clipped()
+            .allowsHitTesting(progress > 0.8)
+            .accessibilityHidden(progress < 0.8)
+            ActivityDetailActions(activity: activity, showOnMap: showOnMap)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { actionHeight = $0 }
+                .opacity(reveal)
+                .frame(height: actionHeight * reveal, alignment: .bottom)
+                .clipped()
+                .allowsHitTesting(progress > 0.8)
+                .accessibilityHidden(progress < 0.8)
+        }
     }
 }
 

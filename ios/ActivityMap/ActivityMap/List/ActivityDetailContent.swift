@@ -6,6 +6,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     let activity: Activity
     @Environment(\.activityDetailOverMap) private var overMap
     var headerTrailingInset: CGFloat = 0
+    var showsHeading = true
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -25,19 +26,9 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.large) {
-            HStack(alignment: .top, spacing: AppTheme.Spacing.small) {
-                BrowseSportSymbol(category: activity.category)
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
-                    Text(activity.name).font(.headline)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityIdentifier("activity-detail-name")
-                    Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
-                        .font(.caption).foregroundStyle(AppTheme.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            if showsHeading {
+                ActivityDetailIdentity(activity: activity, trailingInset: headerTrailingInset)
             }
-            .padding(.trailing, headerTrailingInset)
             if activity.isPrivate == true || activity.commute == true || activity.trainer == true || activity.flagged == true {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) { badges }
@@ -127,8 +118,31 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     }
 }
 
+/// Shared identity stays in one place while Map summary grows into detail.
+struct ActivityDetailIdentity: View {
+    let activity: Activity
+    var trailingInset: CGFloat = 0
+
+    var body: some View {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.small) {
+            BrowseSportSymbol(category: activity.category)
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
+                Text(activity.name).font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("activity-detail-name")
+                Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
+                    .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.trailing, trailingInset)
+    }
+}
+
 extension ActivityDetailContent where Profile == EmptyView, Photos == EmptyView {
-    init(activity: Activity, headerTrailingInset: CGFloat = 0) {
-        self.init(activity: activity, headerTrailingInset: headerTrailingInset, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
+    init(activity: Activity, headerTrailingInset: CGFloat = 0, showsHeading: Bool = true) {
+        self.init(activity: activity, headerTrailingInset: headerTrailingInset, showsHeading: showsHeading, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
     }
 }

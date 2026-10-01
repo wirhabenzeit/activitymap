@@ -7,6 +7,9 @@ struct RoutePickerSheet: View {
     let isSidePanel: Bool
     var bottomInset: CGFloat = 0
     var collapsedOverride: Bool? = nil
+    var expansionProgress: CGFloat? = nil
+    private var expansion: CGFloat { expansionProgress ?? (collapsed ? 0 : 1) }
+    private var contentReveal: CGFloat { min(1, max(0, (expansion - 0.25) / 0.75)) }
     var resizeAction: ((MapResultsDetent) -> Void)? = nil
     var dragChanged: ((CGFloat) -> Void)? = nil
     var dragEnded: ((CGFloat, CGFloat) -> Void)? = nil
@@ -22,20 +25,27 @@ struct RoutePickerSheet: View {
     }
     private var detail: Activity? { candidates.first { $0.id == picker.detailID } }
 
-    private var singleDetail: Bool { detail != nil && candidates.count == 1 && !collapsed }
+    private var singleDetail: Bool { detail != nil && candidates.count == 1 }
     var body: some View {
         VStack(spacing: 0) {
             header
-            if collapsed { compactSummary }
+            if detail == nil {
+                compactSummary
+                    .opacity(max(0, 1 - expansion * 4))
+                    .frame(height: (typeSize.isAccessibilitySize ? 130 : 80) * (1 - expansion), alignment: .top)
+                    .clipped()
+                    .allowsHitTesting(collapsed)
+                    .accessibilityHidden(!collapsed)
+            }
             // Keep results mounted through detail and detent changes. Back
             // restores the exact scroll position, without a second overlay.
             ZStack {
                 results
-                    .opacity(detail == nil ? 1 : 0)
-                    .allowsHitTesting(detail == nil)
-                    .accessibilityHidden(detail != nil)
+                    .opacity(detail == nil ? contentReveal : 0)
+                    .allowsHitTesting(detail == nil && expansion > 0.8)
+                    .accessibilityHidden(detail != nil || expansion < 0.8)
                 if detail != nil {
-                    MapActivityPager(store: store, picker: picker, singleDetail: singleDetail)
+                    MapActivityPager(store: store, picker: picker, singleDetail: singleDetail, expansion: expansion)
                         .overlay(alignment: .topTrailing) {
                             if singleDetail { collapseButton.padding(.trailing, 16).padding(.top, 4) }
                         }
@@ -45,9 +55,9 @@ struct RoutePickerSheet: View {
             }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: detail != nil)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .frame(height: collapsed ? 0 : nil)
+            .frame(height: collapsed && detail == nil ? 0 : nil)
             .clipped()
-            .accessibilityHidden(collapsed)
+            .accessibilityHidden(collapsed && detail == nil)
         }
         // One continuous detail surface; only the outer host owns corners.
         .padding(.bottom, bottomInset)
@@ -90,7 +100,7 @@ struct RoutePickerSheet: View {
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
                     : AnyLayout(HStackLayout(spacing: 4))
                 layout {
-                    if let activity = detail, !collapsed {
+                    if let activity = detail {
                         if candidates.count > 1 {
                             Button { picker.showResults() } label: {
                                 Label("Results", systemImage: "chevron.left")
@@ -106,7 +116,7 @@ struct RoutePickerSheet: View {
                         selectionSummary
                     }
                     HStack(spacing: 4) {
-                        if detail == nil || collapsed { selectionActions }
+                        if detail == nil { selectionActions }
                         collapseButton
                     }
                 }
