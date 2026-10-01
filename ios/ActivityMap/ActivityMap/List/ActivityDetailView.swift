@@ -7,17 +7,12 @@ struct ActivityDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            ActivityDetailPanel(store: store, activityID: activityID)
-                .navigationTitle("Activity")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") { dismiss() }
-                    }
-                }
-        }
-        .presentationDetents([.medium, .large])
+        ActivityDetailPanel(store: store, activityID: activityID)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            // The content's activity name is the sheet heading. Keep the
+            // native escape gesture available without duplicating a toolbar.
+            .accessibilityAction(.escape) { dismiss() }
     }
 }
 
