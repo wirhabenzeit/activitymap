@@ -6,6 +6,27 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
+    @Test(arguments: [375.0, 390.0, 402.0])
+    func compactMetricPairsRetainTableColumns(width: Double) async throws {
+        let presentation = ActivityListPresentation(defaults: nil)
+        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
+        presentation.settings.visibleMetrics = [.distance, .averageSpeed]
+        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities, listPresentation: presentation)
+        store.selectedTab = .list
+        let host = try ListHarness(root: NavigationStack { ListScreen(store: store) },
+                                  size: CGSize(width: width, height: 844))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(300))
+        try host.save("list-distance-speed-\(Int(width))")
+        presentation.settings.visibleMetrics = [.distance, .elapsedTime, .elevationGain, .averageSpeed]
+        #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
+        presentation.settings.visibleMetrics = [.distance, .averageSpeed]
+        #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .accessibility3, availableWidth: width))
+        presentation.settings.width = .scrollingMetrics
+        #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
+    }
+
     @Test func listDisplaySheetSurvivesColumnLayoutChanges() async throws {
         let presentation = ActivityListPresentation(defaults: nil)
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)], listPresentation: presentation)

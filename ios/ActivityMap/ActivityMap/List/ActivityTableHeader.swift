@@ -6,10 +6,10 @@ enum ActivityTableLayout {
                          availableWidth: CGFloat = 390) -> Bool {
         guard !typeSize.isAccessibilitySize, settings.width == .fitWidth,
               !settings.visibleMetrics.isEmpty else { return false }
-        if settings.visibleMetrics.isSubset(of: [.distance, .elapsedTime, .elevationGain]) { return true }
         // Preserve every configured metric. Fall back to the adaptive grid when
         // aligned columns would squeeze the activity name or clip their values.
-        return availableWidth >= 104 + 180 + settings.orderedMetrics.reduce(CGFloat(0)) {
+        let nameWidth: CGFloat = availableWidth >= 700 ? 180 : 104
+        return availableWidth >= 104 + nameWidth + settings.orderedMetrics.reduce(CGFloat(0)) {
             $0 + width($1, availableWidth: availableWidth)
         }
     }
@@ -17,7 +17,8 @@ enum ActivityTableLayout {
     static func width(_ metric: ActivityListMetric, availableWidth: CGFloat = 390) -> CGFloat {
         switch metric {
         case .distance, .elevationGain: availableWidth >= 700 ? 90 : 50
-        case .elapsedTime: availableWidth >= 700 ? 90 : 62
+        case .elapsedTime, .movingTime: availableWidth >= 700 ? 90 : 62
+        case .averageSpeed, .maxSpeed: availableWidth >= 700 ? 110 : 80
         default: 110
         }
     }
@@ -31,6 +32,9 @@ enum ActivityTableLayout {
         switch metric {
         case .distance: "km"
         case .elapsedTime: "Time"
+        case .movingTime: "Moving"
+        case .averageSpeed: "Avg km/h"
+        case .maxSpeed: "Max km/h"
         case .elevationGain: "↑ m"
         default: metric.title
         }
@@ -41,6 +45,7 @@ enum ActivityTableLayout {
         switch metric {
         case .distance: return value.replacingOccurrences(of: " km", with: "")
         case .elevationGain: return value.replacingOccurrences(of: " m", with: "")
+        case .averageSpeed, .maxSpeed: return value.replacingOccurrences(of: " km/h", with: "")
         default: return value
         }
     }
