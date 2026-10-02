@@ -1,6 +1,9 @@
 import SwiftUI
 
 enum AppTheme {
+    /// Shared with the web navigation brand colour (#1976d2).
+    static let navigationBlue = Color(red: 25 / 255, green: 118 / 255, blue: 210 / 255)
+
     // Semantic roles shared by browsing and Stats. System text/surfaces adapt
     // to appearance and increased contrast; sport hues remain catalogue-owned.
     enum Spacing {

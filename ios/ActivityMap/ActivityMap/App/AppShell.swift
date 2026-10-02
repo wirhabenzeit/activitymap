@@ -51,7 +51,9 @@ struct AppShell: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .navigationTitle(store.selectedTab == .list ? "Activities" : "ActivityMap")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+                .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
+                .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
                 .task {
                     guard let localStore else { return } // Xcode previews stay offline.
                     if sync == nil {
@@ -96,9 +98,9 @@ struct AppShell: View {
                         } label: {
                             Image(systemName: "person.crop.circle")
                                 .font(.body.weight(.semibold))
-                                .foregroundStyle(Color.primary)
+                                .foregroundStyle(Color.white)
                                 .frame(width: 44, height: 44)
-                                .modifier(MapChromeSurface())
+
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Account and Settings")
@@ -119,7 +121,9 @@ struct AppShell: View {
                                 ? "line.3.horizontal.decrease"
                                 : "line.3.horizontal.decrease.circle.fill")
                         }
-                        .buttonStyle(MapChromeButtonStyle(isSelected: store.activeFilterCount > 0))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
                         .accessibilityLabel(filterButtonLabel)
                     }
                     .sharedBackgroundVisibility(.hidden)
@@ -173,12 +177,12 @@ struct AppShell: View {
                     Text(tab.title)
                         .font(.subheadline)
                         .fontWeight(store.selectedTab == tab ? .semibold : .regular)
-                        .foregroundStyle(Color.primary)
+                        .foregroundStyle(Color.white)
                         .frame(minWidth: 54)
                         .padding(.horizontal, 8)
                         .frame(minHeight: 44)
                         .background(
-                            store.selectedTab == tab ? Color.primary.opacity(0.12) : .clear,
+                            store.selectedTab == tab ? Color.white.opacity(0.22) : .clear,
                             in: Capsule()
                         )
                 }
@@ -187,7 +191,7 @@ struct AppShell: View {
             }
         }
         .padding(3)
-        .glassEffect(.regular, in: Capsule())
+        .background(Color.white.opacity(0.08), in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("View")
     }

@@ -92,7 +92,8 @@ struct ListScreen: View {
                     }
                 }
                 .padding(.horizontal, AppTheme.Spacing.small)
-                .background(.thinMaterial, ignoresSafeAreaEdges: [])
+                .background(Color(uiColor: .systemBackground))
+                .overlay(alignment: .bottom) { Divider() }
                 .accessibilityIdentifier("list-browse-toolbar")
             }
         }
