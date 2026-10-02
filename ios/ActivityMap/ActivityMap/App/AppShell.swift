@@ -47,6 +47,7 @@ struct AppShell: View {
                         Divider()
                     }
                     content.environment(\.filterSidebarVisible, sidebarAvailable && sidebarVisible)
+                        .environment(\.mapResultsSheetSuspended, showsFilters || accountDestination != nil)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .navigationTitle(store.selectedTab == .list ? "Activities" : "ActivityMap")

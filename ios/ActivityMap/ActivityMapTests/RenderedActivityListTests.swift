@@ -6,6 +6,42 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
+    @Test func nativeMapSheetUsesContentHeightAndRetainsPaging() async throws {
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities)
+        store.selectedTab = .map
+        store.replaceSelection(with: Array(store.activities.prefix(2).map(\.id)))
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let host = try ListHarness(root: MapResultsContainer(picker: picker, store: store,
+            size: CGSize(width: 390, height: 844), topInset: 0, bottomInset: 34, largeText: false),
+            size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.host.presentedViewController?.sheetPresentationController != nil }
+        let controller = try #require(host.host.presentedViewController)
+        let sheet = try #require(controller.sheetPresentationController)
+        try await Task.sleep(for: .milliseconds(400))
+        let image = UIGraphicsImageRenderer(bounds: host.window.bounds).image { _ in
+            host.window.drawHierarchy(in: host.window.bounds, afterScreenUpdates: true)
+        }
+        try image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/native-map-two-routes.png"))
+        #expect(sheet.detents.count == 3)
+        #expect(sheet.largestUndimmedDetentIdentifier != nil, "Map remains interactive behind the sheet")
+        #expect(NativeMapResultsSizing.openingHeight(count: 2, detail: false, height: 844, largeText: false)
+                < NativeMapResultsSizing.openingHeight(count: 20, detail: false, height: 844, largeText: false))
+        picker.detent = .expanded
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(sheet.selectedDetentIdentifier == .large)
+        let first = try #require(picker.candidateIDs.first)
+        picker.showDetail(first, store: store)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(host.host.presentedViewController === controller)
+        #expect(sheet.selectedDetentIdentifier == .large, "Inspection respects manual expansion")
+        picker.showResults()
+        store.selectedTab = .list
+        try await listWait { host.host.presentedViewController == nil }
+        #expect(picker.isPresented, "Tab changes retain the map selection")
+    }
+
     @Test(arguments: [375.0, 390.0, 402.0])
     func compactMetricPairsRetainTableColumns(width: Double) async throws {
         let presentation = ActivityListPresentation(defaults: nil)

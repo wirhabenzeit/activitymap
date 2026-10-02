@@ -31,6 +31,14 @@ struct MapResultsContainer: View {
     private var heights: [CGFloat] { MapResultsDetent.allCases.map { layout($0).contentHeight } }
 
     var body: some View {
+        if layout(picker.detent).isSidePanel {
+            customPanel
+        } else {
+            NativeMapResultsSheet(picker: picker, store: store, size: size, largeText: largeText)
+        }
+    }
+
+    private var customPanel: some View {
         MapResultsPresentation(picker: picker, store: store, size: size, topInset: topInset,
                                bottomInset: bottomInset, largeText: largeText,
                                height: resizing.height ?? layout(picker.detent).contentHeight,
@@ -162,5 +170,62 @@ struct MapResultsDrag {
 
     private func clamp(_ height: CGFloat, heights: [CGFloat]) -> CGFloat {
         min(heights.max() ?? height, max(heights.min() ?? height, height))
+    }
+}
+
+private struct MapResultsSheetSuspendedKey: EnvironmentKey {
+    static let defaultValue = false
+}
+extension EnvironmentValues {
+    var mapResultsSheetSuspended: Bool {
+        get { self[MapResultsSheetSuspendedKey.self] }
+        set { self[MapResultsSheetSuspendedKey.self] = newValue }
+    }
+}
+
+/// Native iPhone sheet owns scrolling/drag arbitration; iPad retains its panel.
+private struct NativeMapResultsSheet: View {
+    @Bindable var picker: RoutePicker
+    let store: ActivityStore
+    let size: CGSize
+    let largeText: Bool
+    @Environment(\.mapResultsSheetSuspended) private var suspended
+    @State private var selected: PresentationDetent = .large
+    private var openingHeight: CGFloat {
+        NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.selection.visibleIDs.contains).count,
+                                            detail: picker.detailID != nil, height: size.height, largeText: largeText)
+    }
+    private var compact: PresentationDetent { .height(largeText ? 240 : 156) }
+    private var opening: PresentationDetent { .height(openingHeight) }
+    private var detents: Set<PresentationDetent> { [compact, opening, .large] }
+    var body: some View {
+        Color.clear.allowsHitTesting(false)
+            .sheet(isPresented: Binding(get: { picker.isPresented && store.selectedTab == .map && !suspended }, set: { _ in })) {
+                RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
+                                 collapsedOverride: selected == compact, expansionProgress: selected == compact ? 0 : 1,
+                                 nativePresentation: true)
+                    .presentationDetents(detents, selection: $selected)
+                    .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .large))
+                    .presentationContentInteraction(.resizes)
+                    .interactiveDismissDisabled()
+                    .onAppear { selectModelDetent() }
+                    .onChange(of: picker.detent) { _, _ in selectModelDetent() }
+                    .onChange(of: openingHeight) { _, _ in selectModelDetent() }
+                    .onChange(of: selected) { _, value in
+                        picker.detent = value == compact ? .compact : value == .large ? .expanded : .medium
+                    }
+            }
+    }
+    private func selectModelDetent() {
+        selected = picker.detent == .compact ? compact : picker.detent == .expanded ? .large : opening
+    }
+}
+
+enum NativeMapResultsSizing {
+    static func openingHeight(count: Int, detail: Bool, height: CGFloat, largeText: Bool) -> CGFloat {
+        let minimum: CGFloat = largeText ? 300 : 220
+        let content: CGFloat = detail ? (largeText ? 420 : 300) : 76 + CGFloat(max(1, min(count, 5))) * (largeText ? 160 : 64)
+        return max(minimum, min(content, height * 0.5))
     }
 }

@@ -179,7 +179,8 @@ struct MapScreen: View {
             safeArea: UIEdgeInsets(top: safeArea.top, left: safeArea.leading,
                                   bottom: safeArea.bottom, right: safeArea.trailing),
             // Fit above the panel; background controls and credits add no occlusion.
-            sheetHeight: showingResults && !layout.isSidePanel ? layout.bottomOcclusion : 0, topOcclusion: topOcclusion,
+            sheetHeight: showingResults && !layout.isSidePanel
+                ? max(layout.bottomOcclusion, NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.count, detail: picker.detailID != nil, height: geometry.size.height, largeText: typeSize.isAccessibilitySize) + safeArea.bottom) : 0, topOcclusion: topOcclusion,
             leadingOcclusion: showingResults && layout.isSidePanel ? layout.leadingOcclusion + safeArea.leading : 0
         ) else { return }
         let padding = camera.padding ?? context.camera.padding

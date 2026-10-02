@@ -14,6 +14,7 @@ struct RoutePickerSheet: View {
     var dragChanged: ((CGFloat) -> Void)? = nil
     var dragEnded: ((CGFloat, CGFloat) -> Void)? = nil
     var dragCancelled: (() -> Void)? = nil
+    var nativePresentation = false
     private var collapsed: Bool { collapsedOverride ?? (picker.detent == .compact) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -57,6 +58,7 @@ struct RoutePickerSheet: View {
         // One continuous detail surface; only the outer host owns corners.
         .padding(.bottom, bottomInset)
         .overlay(alignment: .top) {
+            if !nativePresentation {
             MapResultsHandle(changed: { dragChanged?($0) }, ended: { dragEnded?($0, $1) },
                              cancelled: { dragCancelled?() })
                 .frame(width: 80, height: 44)
@@ -70,12 +72,13 @@ struct RoutePickerSheet: View {
                 }
                 .accessibilityAction(named: "Expand results fully") { resize(to: .expanded) }
                 .accessibilityAction(named: "Collapse results") { resize(to: .compact) }
+            }
         }
-        .background(.regularMaterial)
+        .background { if !nativePresentation { Rectangle().fill(.regularMaterial) } }
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: isSidePanel ? 20 : 28,
             bottomLeadingRadius: isSidePanel ? 20 : 0, bottomTrailingRadius: isSidePanel ? 20 : 0,
             topTrailingRadius: isSidePanel ? 20 : 28))
-        .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
+        .shadow(color: .black.opacity(nativePresentation ? 0 : 0.12), radius: 16, y: 4)
         .accessibilityIdentifier("map-results-panel")
     }
 

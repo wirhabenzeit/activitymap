@@ -69,7 +69,7 @@ extension RenderedRoutePickingTests {
         picker.reviewSelection(store: store)
         picker.showDetail(1, store: store, motion: .none)
         let resizing = MapResultsResizeState()
-        let size = CGSize(width: 375, height: 812)
+        let size = CGSize(width: 820, height: 1180)
         let heights = MapResultsDetent.allCases.map {
             MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: $0).contentHeight
         }
@@ -122,7 +122,7 @@ extension RenderedRoutePickingTests {
             #expect(headings.count == 1, "Exactly one persistent heading at reveal progress \(fraction)")
             let heading = try #require(headings.first)
             let top = (1 - heading.boundingBox.maxY) * size.height
-            let sheetTop = size.height - (resizing.height ?? 0)
+            let sheetTop = MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: picker.detent, heightOverride: resizing.height).frame.minY
             headingOffsets.append(top - sheetTop)
         }
         #expect((headingOffsets.max() ?? 0) - (headingOffsets.min() ?? 0) < 3,
@@ -144,7 +144,7 @@ extension RenderedRoutePickingTests {
         picker.reviewSelection(store: store)
         picker.showDetail(1, store: store, motion: .none)
         let resizing = MapResultsResizeState()
-        let size = CGSize(width: 375, height: 812)
+        let size = CGSize(width: 820, height: 1180)
         let heights = MapResultsDetent.allCases.map {
             MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: $0).contentHeight
         }
