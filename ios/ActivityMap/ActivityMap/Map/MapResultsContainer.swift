@@ -190,7 +190,6 @@ private struct NativeMapResultsSheet: View {
     let size: CGSize
     let largeText: Bool
     @Environment(\.mapResultsSheetSuspended) private var suspended
-    @State private var selected: PresentationDetent = .large
     private var openingHeight: CGFloat {
         NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.selection.visibleIDs.contains).count,
                                             detail: picker.detailID != nil, height: size.height, largeText: largeText)
@@ -198,27 +197,29 @@ private struct NativeMapResultsSheet: View {
     private var compact: PresentationDetent { .height(largeText ? 240 : 156) }
     private var opening: PresentationDetent { .height(openingHeight) }
     private var detents: Set<PresentationDetent> { [compact, opening, .large] }
+    // Resolve the initial detent before UIKit starts presenting. A default
+    // .large followed by onAppear adjustment visibly shrinks during entrance.
+    private var selected: PresentationDetent {
+        picker.detent == .compact ? compact : picker.detent == .expanded ? .large : opening
+    }
+    private var selection: Binding<PresentationDetent> {
+        Binding(get: { selected }, set: { value in
+            picker.detent = value == compact ? .compact : value == .large ? .expanded : .medium
+        })
+    }
     var body: some View {
         Color.clear.allowsHitTesting(false)
             .sheet(isPresented: Binding(get: { picker.isPresented && store.selectedTab == .map && !suspended }, set: { _ in })) {
                 RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
                                  collapsedOverride: selected == compact, expansionProgress: selected == compact ? 0 : 1,
                                  nativePresentation: true)
-                    .presentationDetents(detents, selection: $selected)
+                    .presentationDetents(detents, selection: selection)
                     .presentationDragIndicator(.visible)
                     .presentationBackgroundInteraction(.enabled(upThrough: .large))
                     .presentationContentInteraction(.resizes)
                     .interactiveDismissDisabled()
-                    .onAppear { selectModelDetent() }
-                    .onChange(of: picker.detent) { _, _ in selectModelDetent() }
-                    .onChange(of: openingHeight) { _, _ in selectModelDetent() }
-                    .onChange(of: selected) { _, value in
-                        picker.detent = value == compact ? .compact : value == .large ? .expanded : .medium
-                    }
+
             }
-    }
-    private func selectModelDetent() {
-        selected = picker.detent == .compact ? compact : picker.detent == .expanded ? .large : opening
     }
 }
 

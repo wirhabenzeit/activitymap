@@ -19,6 +19,13 @@ extension RenderedRoutePickingTests {
         try await listWait { host.host.presentedViewController?.sheetPresentationController != nil }
         let controller = try #require(host.host.presentedViewController)
         let sheet = try #require(controller.sheetPresentationController)
+        #expect(sheet.selectedDetentIdentifier != .large, "Initial presentation must start at its content height")
+        for _ in 0..<8 {
+            let height = controller.presentationController?.presentedView?.layer.presentation()?.bounds.height
+                ?? controller.view.bounds.height
+            #expect(height < 360, "Two-route entrance must not animate down from full height: \(height)")
+            try await Task.sleep(for: .milliseconds(30))
+        }
         try await Task.sleep(for: .milliseconds(400))
         let image = UIGraphicsImageRenderer(bounds: host.window.bounds).image { _ in
             host.window.drawHierarchy(in: host.window.bounds, afterScreenUpdates: true)
