@@ -6,6 +6,37 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
+    @Test func filtersReplaceNativeMapSheetAndRestoreSelection() async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities)
+        store.selectedTab = .map
+        store.replaceSelection(with: Array(store.activities.prefix(2).map(\.id)))
+        let picker = RoutePicker()
+        let sheets = BrowseSheetPresentation()
+        let host = try ListHarness(root: AppShell(store: store, mapPicker: picker, sheets: sheets)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)),
+            size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(200))
+        picker.reviewSelection(store: store)
+        try await listWait { sheets.mapResultsPresented }
+        let selection = store.selectedActivityIDs
+        sheets.showsFilters = true
+        try await listWait { sheets.shellSheetPresented && !sheets.mapResultsPresented }
+        #expect(sheets.showsFilters, "The filter request must survive dismissal of map selection")
+        store.searchText = "Ride"
+        sheets.showsFilters = false
+        try await listWait { sheets.mapResultsPresented && !sheets.shellSheetPresented }
+        #expect(store.selectedActivityIDs == selection && picker.isPresented)
+        sheets.accountDestination = .about
+        try await listWait { sheets.shellSheetPresented && !sheets.mapResultsPresented }
+        sheets.accountDestination = nil
+        try await listWait { sheets.mapResultsPresented && !sheets.shellSheetPresented }
+    }
+
     @Test func nativeMapSheetUsesContentHeightAndRetainsPaging() async throws {
         let store = ActivityStore(activities: try GalleryLibrary.load().activities)
         store.selectedTab = .map

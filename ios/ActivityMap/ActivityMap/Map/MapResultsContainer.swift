@@ -173,10 +173,17 @@ struct MapResultsDrag {
     }
 }
 
+private struct MapResultsPresentationChangedKey: EnvironmentKey {
+    static let defaultValue: (Bool) -> Void = { _ in }
+}
 private struct MapResultsSheetSuspendedKey: EnvironmentKey {
     static let defaultValue = false
 }
 extension EnvironmentValues {
+    var mapResultsPresentationChanged: (Bool) -> Void {
+        get { self[MapResultsPresentationChangedKey.self] }
+        set { self[MapResultsPresentationChangedKey.self] = newValue }
+    }
     var mapResultsSheetSuspended: Bool {
         get { self[MapResultsSheetSuspendedKey.self] }
         set { self[MapResultsSheetSuspendedKey.self] = newValue }
@@ -190,6 +197,7 @@ private struct NativeMapResultsSheet: View {
     let size: CGSize
     let largeText: Bool
     @Environment(\.mapResultsSheetSuspended) private var suspended
+    @Environment(\.mapResultsPresentationChanged) private var presentationChanged
     private var openingHeight: CGFloat {
         NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.selection.visibleIDs.contains).count,
                                             detail: picker.detailID != nil, height: size.height, largeText: largeText)
@@ -209,7 +217,7 @@ private struct NativeMapResultsSheet: View {
     }
     var body: some View {
         Color.clear.allowsHitTesting(false)
-            .sheet(isPresented: Binding(get: { picker.isPresented && store.selectedTab == .map && !suspended }, set: { _ in })) {
+            .sheet(isPresented: Binding(get: { picker.isPresented && store.selectedTab == .map && !suspended }, set: { _ in }), onDismiss: { presentationChanged(false) }) {
                 RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
                                  collapsedOverride: selected == compact, expansionProgress: selected == compact ? 0 : 1,
                                  nativePresentation: true)
@@ -218,6 +226,7 @@ private struct NativeMapResultsSheet: View {
                     .presentationBackgroundInteraction(.enabled(upThrough: .large))
                     .presentationContentInteraction(.resizes)
                     .interactiveDismissDisabled()
+                    .onAppear { presentationChanged(true) }
 
             }
     }
