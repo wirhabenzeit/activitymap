@@ -295,6 +295,9 @@ importers:
       pg:
         specifier: ^8.23.0
         version: 8.23.0
+      playwright-core:
+        specifier: ^1.63.0
+        version: 1.63.0
       postcss:
         specifier: ^8.5.28
         version: 8.5.28

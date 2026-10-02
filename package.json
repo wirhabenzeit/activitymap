@@ -140,6 +140,7 @@
     "eslint-plugin-drizzle": "^0.2.3",
     "eslint-plugin-react-compiler": "19.1.0-rc.2",
     "pg": "^8.23.0",
+    "playwright-core": "^1.63.0",
     "postcss": "^8.5.28",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",

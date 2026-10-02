@@ -9,8 +9,17 @@ struct AppShell: View {
     @State private var showsFilters = false
     @State private var accountDestination: AccountDestination?
 
+    // Retained for review captures: the gallery stages map results inside the
+    // production shell.
+    private let mapPicker: RoutePicker?
+
     init(activities: [Activity] = []) {
-        _store = State(initialValue: ActivityStore(activities: activities))
+        self.init(store: ActivityStore(activities: activities))
+    }
+
+    init(store: ActivityStore, mapPicker: RoutePicker? = nil) {
+        _store = State(initialValue: store)
+        self.mapPicker = mapPicker
     }
 
     var body: some View {
@@ -108,7 +117,7 @@ struct AppShell: View {
 
     private var content: some View {
         BrowseContent(store: store, refresh: refresh, sync: sync, isSigningIn: auth.status == .signingIn,
-                      openAccount: { accountDestination = .profile })
+                      openAccount: { accountDestination = .profile }, mapPicker: mapPicker)
     }
 
     private func refresh() async {

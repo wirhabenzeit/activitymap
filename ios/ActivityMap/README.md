@@ -98,6 +98,19 @@ node --env-file=.env scripts/verify-ios-sync-local.mjs <simulator-udid>
 
 This opt-in test uses an existing connected account in the local database. It creates and removes a temporary 30-minute local session, verifies bootstrap, delta catch-up, disk reload and offline UI loading, and prints only counts. It rejects non-local database targets. Normal CI skips this test and uses deterministic HTTP/page fixtures.
 
+## Screenshot gallery
+
+`ScreenshotGalleryTests` renders the production shell and screens (Map, results, detail, List, Filters, Settings, Stats components) in phone, dark, small large-text and tablet variants. It is review material, not a pass/fail check, and is skipped unless enabled:
+
+```sh
+scripts/ios-gallery.sh                       # run named after the current branch
+scripts/ios-gallery.sh after --baseline before  # side by side with an earlier run
+```
+
+Runs land in `/tmp/activitymap-gallery/<run>/index.html`. Set `NEXT_PUBLIC_MAPBOX_TOKEN` (for example `set -a; source .env`) to render the real basemap instead of a plain offline style.
+
+Activities come from `ActivityMapTests/Gallery/gallery-activities.json` when present: a curated set exported with `node --env-file=.env scripts/export-gallery-library.mjs` (route ends trimmed by 500 m). Without it, a deterministic synthetic set is used. `export-gallery-library.mjs --all` writes the full local library to `~/Library/Caches/ActivityMapGallery/library.json` (never into the repository); render it with `--full-library`.
+
 ## Map route selection
 
 Tap within 22 points of a visible route to select it. A normal tap replaces selection with all nearby routes; a single hit opens detail, while overlapping hits open a chooser ordered by screen distance, then numeric activity ID descending. The results panel has separate deselection and detail controls. List inspection stays independent.
