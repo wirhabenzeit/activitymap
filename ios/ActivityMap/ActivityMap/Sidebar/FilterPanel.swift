@@ -3,6 +3,7 @@ import SwiftUI
 struct FilterPanel: View {
     @Bindable var store: ActivityStore
     @State private var editingCustomDates = false
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var startDate = Date()
     @State private var endDate = Date()
 
@@ -29,9 +30,9 @@ struct FilterPanel: View {
                 }
             }
             searchSection
-            metricsSection.id(store.filterResetRevision)
-            dateSection
             activitySection
+            dateSection
+            metricsSection.id(store.filterResetRevision)
             binarySection
         }
         .onChange(of: store.filterResetRevision) { _, _ in
@@ -55,46 +56,86 @@ struct FilterPanel: View {
 
     private var activitySection: some View {
         Section {
-            Button("Select All Sports") { store.showAllCategories() }
-            Button("Deselect All Sports") { store.activeSportTypes = [] }
-            ForEach(ActivityCategory.allCases) { category in
-                DisclosureGroup {
-                    Button("Only \(category.name)") { store.isolateCategory(category) }
-                    ForEach(category.sportTypes) { sport in
-                        Toggle(sport.rawValue, isOn: Binding(
-                            get: { store.activeSportTypes.contains(sport) },
-                            set: { selected in
-                                if selected { store.activeSportTypes.insert(sport) }
-                                else { store.activeSportTypes.remove(sport) }
-                            }
-                        ))
-                        .accessibilityIdentifier("sport-\(sport.rawValue)")
-                    }
-                } label: {
-                    Button {
-                        store.toggleCategory(category)
+            HStack {
+                Button("All") { store.showAllCategories() }
+                    .disabled(store.activeSportTypes.count == SportType.allCases.count)
+                    .accessibilityLabel("Select all sports")
+                Button("None") { store.activeSportTypes = [] }
+                    .disabled(store.activeSportTypes.isEmpty)
+                    .accessibilityLabel("Deselect all sports")
+                Spacer()
+                Text("\(store.activeSportTypes.count)/\(SportType.allCases.count)")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityLabel("\(store.activeSportTypes.count) of \(SportType.allCases.count) sport types selected")
+            }
+            .buttonStyle(.borderless)
+            .frame(minHeight: 44)
+            VStack(spacing: 8) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: typeSize.isAccessibilitySize ? 1 : 2), spacing: 8) {
+                    ForEach(ActivityCategory.allCases.filter { $0 != .misc }) { sportChip($0) }
+                }
+                sportChip(.misc)
+            }
+            .listRowSeparator(.hidden)
+            DisclosureGroup("Specific sport types") {
+                ForEach(ActivityCategory.allCases) { category in
+                    DisclosureGroup {
+                        Button("Only \(category.name)") { store.isolateCategory(category) }
+                            .buttonStyle(.borderless)
+                            .frame(minHeight: 44)
+                        ForEach(category.sportTypes) { sport in
+                            Toggle(sport.rawValue, isOn: Binding(
+                                get: { store.activeSportTypes.contains(sport) },
+                                set: { selected in
+                                    if selected { store.activeSportTypes.insert(sport) }
+                                    else { store.activeSportTypes.remove(sport) }
+                                }
+                            ))
+                            .accessibilityIdentifier("sport-\(sport.rawValue)")
+                        }
                     } label: {
                         HStack {
-                            Label {
-                                Text(category.name).foregroundStyle(.primary)
-                            } icon: {
-                                BrowseSportSymbol(category: category)
-                            }
+                            Text(category.name)
                             Spacer()
-                            Image(systemName: store.categorySelection(category).symbolName)
-                                .foregroundStyle(.tint)
+                            Text("\(store.activeSportTypes.intersection(category.sportTypes).count)/\(category.sportTypes.count)")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(category.name)
-                    .accessibilityValue(store.categorySelection(category).label)
-                    .accessibilityHint("Toggle all sports in this group. Expand to choose individual sports.")
                 }
             }
         } header: {
-            Text("Sports · \(store.activeSportTypes.count) of \(SportType.allCases.count) selected")
+            Text("Sports")
+        }
+    }
+
+    private func sportChip(_ category: ActivityCategory) -> some View {
+        let state = store.categorySelection(category)
+        return Button { store.toggleCategory(category) } label: {
+            HStack(spacing: 4) {
+                BrowseSportSymbol(category: category).frame(width: 24)
+                    .opacity(state == .none ? 0.45 : 1)
+                Text(category.name)
+                    .font(.caption.weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: state.symbolName).font(.caption2)
+                    .foregroundStyle(state == .none ? Color.secondary : category.color)
+            }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .frame(minHeight: 44)
+            .foregroundStyle(.primary)
+            .background(category.color.opacity(state == .all ? 0.12 : 0.03), in: RoundedRectangle(cornerRadius: 10))
+            .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(state == .none ? Color.secondary.opacity(0.2) : category.color.opacity(0.65)) }
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(category.name)
+        .accessibilityValue(state.label)
+        .accessibilityHint("Toggle this group. Use Specific sport types for individual choices.")
+        .accessibilityAddTraits(state == .all ? .isSelected : [])
+        .accessibilityIdentifier("sport-group-\(category.rawValue)")
+        .contextMenu {
+            Button("Only \(category.name)") { store.isolateCategory(category) }
         }
     }
 
