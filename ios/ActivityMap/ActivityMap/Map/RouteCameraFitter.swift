@@ -62,12 +62,13 @@ enum RouteCameraFitter {
         try map.setProjection(StyleProjection(name: .mercator))
         let fitted = try map.camera(
             for: extent.corners,
-            camera: CameraOptions(center: extent.center, padding: .zero, zoom: 0,
+            camera: CameraOptions(center: extent.center, padding: padding, zoom: 0,
                                   bearing: current.bearing, pitch: current.pitch),
-            coordinatesPadding: padding, maxZoom: 16, offset: nil
+            coordinatesPadding: .zero, maxZoom: 16, offset: nil
         )
-        // The first SDK fit can clip the near edge of a pitched route behind
-        // asymmetric padding. Refine against the actual unobscured screen rect.
+        // Keep the projection's principal point inside the visible rectangle.
+        // Coordinate-only padding leaves it at the physical map center, where
+        // the SDK's pitched refinement fails when a sheet covers that point.
         var refined = map.camera(for: extent.corners, camera: fitted,
                                  rect: CGRect(origin: .zero, size: size).inset(by: padding))
         refined.zoom = min(refined.zoom ?? fitted.zoom ?? 16, fitted.zoom ?? 16, 16)
@@ -94,10 +95,10 @@ enum MapNavigation {
                                  bearing: initial.bearing, pitch: initial.pitch)
         case .resetBearing:
             context.consume(request)
-            return CameraOptions(center: current.center, zoom: current.zoom, bearing: 0, pitch: current.pitch)
+            return CameraOptions(center: current.center, padding: current.padding, zoom: current.zoom, bearing: 0, pitch: current.pitch)
         case let .pitch(pitch):
             context.consume(request)
-            return CameraOptions(center: current.center, zoom: current.zoom, bearing: current.bearing, pitch: pitch)
+            return CameraOptions(center: current.center, padding: current.padding, zoom: current.zoom, bearing: current.bearing, pitch: pitch)
         default: break
         }
         let activities: [Activity]
@@ -123,12 +124,10 @@ enum MapNavigation {
         }
         let padding = RouteCameraFitter.padding(safeArea: safeArea, sheetHeight: sheetHeight, topOcclusion: topOcclusion,
                                                 leadingOcclusion: leadingOcclusion)
-        // Wait for a large sheet to shrink/dismiss instead of fitting into a
-        // sliver or consuming a request before usable map space exists.
+        // Wait if the remaining viewport is unusable. The visible rectangle
+        // may sit entirely above the physical map center (e.g. a medium sheet).
         guard size.width - padding.left - padding.right >= 80,
-              size.height - padding.top - padding.bottom >= 80,
-              CGRect(origin: .zero, size: size).inset(by: padding)
-                .contains(CGPoint(x: size.width / 2, y: size.height / 2)) else { return nil }
+              size.height - padding.top - padding.bottom >= 80 else { return nil }
         do {
             let camera = try RouteCameraFitter.camera(extent: extent, map: map, padding: padding, size: size, current: current)
             guard camera.center != nil, let zoom = camera.zoom, zoom.isFinite else { throw CameraError.invalidFit }

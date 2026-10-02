@@ -37,6 +37,9 @@ struct MapResultsContainer: View {
                                resize: settle, dragChanged: changed, dragEnded: ended, dragCancelled: cancelled)
             .onPreferenceChange(MapResultsHeightKey.self) { resizing.presentedHeight = $0 }
             .onChange(of: picker.detent) { _, detent in
+                // A fit may have collapsed the panel earlier in this update.
+                // Do not let a stale expansion callback write the old detent back.
+                guard detent == picker.detent else { return }
                 if !resizing.drag.isDragging, resizing.height != layout(detent).contentHeight { settle(detent) }
             }
             .onChange(of: size) { _, _ in resetGeometry() }

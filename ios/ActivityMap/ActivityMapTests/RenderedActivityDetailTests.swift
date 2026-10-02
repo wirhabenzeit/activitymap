@@ -232,7 +232,9 @@ extension RenderedRoutePickingTests {
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
         #expect(text.contains("2023"), "Date remains visibly rendered beside the sport badge and title: \(text)")
-        #expect(text.contains("31.2") && text.contains("1h 14m") && text.contains("820"),
+        // Vision may split a number into adjacent text observations ("3 1.2").
+        let compactText = text.filter { !$0.isWhitespace }
+        #expect(compactText.contains("31.2") && compactText.contains("1h14m") && compactText.contains("820"),
                 "Distance, elapsed time and elevation are visibly rendered: \(text)")
     }
 

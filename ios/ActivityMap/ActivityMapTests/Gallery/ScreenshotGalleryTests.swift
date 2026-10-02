@@ -22,7 +22,7 @@ struct ScreenshotGalleryTests {
             let staged = try scene.stage(library.activities, scenario: scenario)
             let window = try GalleryWindow(root: staged.root, variant: variant)
             defer { window.close() }
-            try await window.settle(map: staged.usesMap, prepare: staged.prepare, reveal: staged.reveal)
+            try await window.settle(map: staged.usesMap, prepare: staged.prepare, reveal: staged.reveal, ready: staged.ready)
             try window.save(scene: scene, variant: variant, library: library.source, scenario: scenario)
         }
     }
@@ -63,6 +63,7 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
         var usesMap = false
         var reveal: @MainActor () -> Void = {}
         var prepare: @MainActor () -> Void = {}
+        var ready: @MainActor () -> Bool = { true }
     }
 
     @MainActor func stage(_ activities: [Activity], scenario: GalleryManifest.Scenario) throws -> Staged {
@@ -77,25 +78,25 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
             return Staged(root: shell(.map), usesMap: true)
         case .mapResults:
             let ids = scenario.selectedIDs
-            return Staged(root: shell(.map), usesMap: true, reveal: { picker.detent = .medium }) {
+            return Staged(root: shell(.map), usesMap: true, reveal: { picker.detent = .medium }, prepare: {
                 store.replaceSelection(with: ids)
                 picker.reviewSelection(store: store)
                 store.mapContext.request(.fitSelection)
-            }
+            }, ready: { store.mapContext.pendingRequest == nil })
         case .mapDetail:
             let id = try #require(scenario.detailID)
-            return Staged(root: shell(.map), usesMap: true, reveal: { picker.detent = .medium }) {
+            return Staged(root: shell(.map), usesMap: true, reveal: { picker.detent = .medium }, prepare: {
                 store.replaceSelection(with: [id])
                 picker.reviewSelection(store: store)
                 store.mapContext.request(.fitSelection)
-            }
+            }, ready: { store.mapContext.pendingRequest == nil })
         case .list:
             store.replaceSelection(with: scenario.selectedIDs)
             return Staged(root: shell(.list))
         case .listDetail:
             let id = try #require(scenario.detailID)
             let root = shell(.list)
-            return Staged(root: root) { store.inspect(id) }
+            return Staged(root: root, prepare: { store.inspect(id) })
         case .filters:
             // The shell presents this as an inspector/sheet; render its content.
             store.searchText = scenario.search ?? ""
@@ -153,7 +154,7 @@ private final class GalleryWindow {
         MapboxOptions.accessToken = previousToken
     }
 
-    func settle(map usesMap: Bool, prepare: @MainActor () -> Void, reveal: @MainActor () -> Void) async throws {
+    func settle(map usesMap: Bool, prepare: @MainActor () -> Void, reveal: @MainActor () -> Void, ready: @MainActor () -> Bool) async throws {
         try await Task.sleep(for: .milliseconds(400))
         guard usesMap else {
             prepare()
@@ -163,11 +164,17 @@ private final class GalleryWindow {
         try await wait(seconds: 15) { self.mapView(in: self.host.view)?.mapboxMap.isStyleLoaded == true }
         prepare()
         let map = try #require(mapView(in: host.view))
+        try await wait(seconds: 15, ready)
         // Wait for the camera fit and tiles; a remote basemap may take longer.
         var idle = false
         let token = map.mapboxMap.onMapIdle.observe { _ in idle = true }
         defer { token.cancel() }
         try await Task.sleep(for: .milliseconds(600))
+        let settled = try await poll(seconds: 15) {
+            if case .state = map.viewport.status { return true }
+            return false
+        }
+        try #require(settled, "Viewport: \(map.viewport.status); camera: \(map.mapboxMap.cameraState)")
         // Best effort: an offline style may never report idle after a fit.
         _ = try await poll(seconds: GalleryEnvironment.mapboxToken == nil ? 2 : 5) { idle }
         // Production fitting collapses the panel. This scenario reviews the
