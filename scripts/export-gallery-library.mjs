@@ -79,7 +79,9 @@ try {
 
 /** Summary geometry only, without the first/last trimMeters of the route. */
 function trimmed(activity) {
-  const { map_polyline: _detailed, last_detailed_fetched_at: _fetched, ...rest } = activity;
+  const rest = { ...activity };
+  delete rest.map_polyline;
+  delete rest.last_detailed_fetched_at;
   rest.geometry_state = 'summary';
   delete rest.start_latlng;
   delete rest.end_latlng;
