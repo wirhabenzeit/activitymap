@@ -7,6 +7,9 @@ struct AppShell: View {
     @Environment(\.localStore) private var localStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var showsFilters = false
+    @AppStorage("browse.filterSidebarVisible") private var sidebarVisible = true
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var accountDestination: AccountDestination?
 
     // Retained for review captures: the gallery stages map results inside the
@@ -24,7 +27,27 @@ struct AppShell: View {
 
     var body: some View {
         NavigationStack {
-            content
+            GeometryReader { geometry in
+                let sidebarAvailable = sizeClass == .regular && geometry.size.width >= 760 && !typeSize.isAccessibilitySize
+                HStack(spacing: 0) {
+                    if sidebarAvailable && sidebarVisible {
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text("Filters").font(.headline)
+                                Spacer()
+                                Button { sidebarVisible = false } label: {
+                                    Image(systemName: "sidebar.left").frame(width: 44, height: 44)
+                                }.accessibilityLabel("Hide filter sidebar")
+                            }.padding(.horizontal, 16)
+                            FilterPanel(store: store)
+                        }
+                        .frame(width: 320)
+                        .background(Color(uiColor: .secondarySystemBackground))
+                        .accessibilityIdentifier("filter-sidebar")
+                        Divider()
+                    }
+                    content.environment(\.filterSidebarVisible, sidebarAvailable && sidebarVisible)
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .navigationTitle(store.selectedTab == .list ? "Activities" : "ActivityMap")
                 .navigationBarTitleDisplayMode(.inline)
@@ -89,7 +112,8 @@ struct AppShell: View {
 
                     ToolbarItem(placement: .primaryAction) {
                         Button {
-                            showsFilters.toggle()
+                            if sidebarAvailable { sidebarVisible.toggle() }
+                            else { showsFilters.toggle() }
                         } label: {
                             Image(systemName: store.activeFilterCount == 0
                                 ? "line.3.horizontal.decrease"
@@ -100,7 +124,7 @@ struct AppShell: View {
                     }
                     .sharedBackgroundVisibility(.hidden)
                 }
-                .inspector(isPresented: $showsFilters) {
+                .inspector(isPresented: Binding(get: { showsFilters && !sidebarAvailable }, set: { showsFilters = $0 })) {
                     NavigationStack {
                         FilterPanel(store: store)
                             .navigationTitle("Filters")
@@ -113,6 +137,7 @@ struct AppShell: View {
                     AccountSheet(destination: destination, auth: auth, sync: sync, refresh: refresh)
                 }
             }
+        }
     }
 
     private var content: some View {

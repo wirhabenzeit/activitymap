@@ -7,10 +7,12 @@ struct ListScreen: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var hasPushedDetail = false
+    @Environment(\.filterSidebarVisible) private var filterSidebarVisible
 
     var body: some View {
         GeometryReader { geometry in
             let sideBySide = sizeClass == .regular && geometry.size.width >= 760 && !typeSize.isAccessibilitySize
+            let usesOverlay = filterSidebarVisible && !sideBySide && !hasPushedDetail
             let showsDetail = sideBySide && store.inspectedActivityID != nil && !hasPushedDetail
             let detailWidth = min(420, max(340, geometry.size.width * 0.42))
             let listWidth = showsDetail ? geometry.size.width - detailWidth - 1 : geometry.size.width
@@ -26,15 +28,33 @@ struct ListScreen: View {
             }
             // Inspecting is ordinary navigation. Back only clears inspection;
             // the retained list and selection/camera owners remain unchanged.
-            .navigationDestination(item: inspectionID(sideBySide: sideBySide)) { id in
+            .navigationDestination(item: inspectionID(sideBySide: sideBySide || usesOverlay)) { id in
                 ActivityDetailView(store: store, activityID: id)
+            }
+            .sheet(isPresented: Binding(
+                get: { usesOverlay && store.selectedTab == .list && store.inspectedActivityID != nil },
+                set: { if !$0, usesOverlay, store.selectedTab == .list { store.dismissInspection() } }
+            )) {
+                if let id = store.inspectedActivityID {
+                    NavigationStack {
+                        ActivityDetailPanel(store: store, activityID: id)
+                            .navigationTitle("Activity").navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .confirmationAction) {
+                                    Button("Done") { store.dismissInspection() }
+                                }
+                            }
+                    }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                }
             }
             .onChange(of: store.inspectedActivityID, initial: true) { _, id in
                 if id == nil { hasPushedDetail = false }
-                else if !sideBySide { hasPushedDetail = true }
+                else if !sideBySide && !usesOverlay { hasPushedDetail = true }
             }
             .onChange(of: sideBySide) { _, wide in
-                if !wide, store.inspectedActivityID != nil { hasPushedDetail = true }
+                if !wide, !filterSidebarVisible, store.inspectedActivityID != nil { hasPushedDetail = true }
             }
         }
     }

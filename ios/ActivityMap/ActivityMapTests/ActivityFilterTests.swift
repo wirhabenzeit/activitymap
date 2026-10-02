@@ -4,6 +4,23 @@ import Testing
 
 @MainActor
 struct ActivityFilterTests {
+    @Test func inclusiveRangesPreserveZeroUnknownAndResetSemantics() {
+        var activities = (1...5).map { ActivityStoreSelectionTests.activity($0) }
+        for (index, value) in [nil, 0.0, 1000.0, 2000.0, 3000.0].enumerated() { activities[index].distance = value }
+        let store = ActivityStore(activities: activities)
+        store.distanceFilter = NumericFilter(value: 1000, upperLimit: 2000)
+        #expect(Set(store.filteredActivities.map(\.id)) == [3, 4])
+        #expect(store.activeFilterCount == 1)
+        store.distanceFilter = NumericFilter(value: 0, upperLimit: 0)
+        #expect(store.filteredActivities.map(\.id) == [2])
+        store.distanceFilter = NumericFilter(value: 2000, upperLimit: 1000)
+        #expect(store.filteredActivities.isEmpty)
+        store.distanceFilter = NumericFilter(value: 0, upperLimit: .infinity)
+        #expect(store.filteredActivities.isEmpty)
+        store.resetFilters()
+        #expect(store.filteredActivities.count == 5)
+    }
+
     static let fixtureURL = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent()

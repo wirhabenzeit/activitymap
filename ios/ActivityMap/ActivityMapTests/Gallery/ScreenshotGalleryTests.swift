@@ -187,8 +187,8 @@ private final class GalleryWindow {
         host.view.layoutIfNeeded()
         let format = UIGraphicsImageRendererFormat()
         format.scale = 2
-        let image = UIGraphicsImageRenderer(bounds: host.view.bounds, format: format).image { _ in
-            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+        let image = UIGraphicsImageRenderer(bounds: window.bounds, format: format).image { _ in
+            window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
         }
         let directory = GalleryEnvironment.output
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

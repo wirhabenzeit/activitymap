@@ -9,20 +9,29 @@ struct FilterPanel: View {
     var body: some View {
         Form {
             Section {
-                Text("\(store.filteredActivities.count) of \(store.activities.count) activities")
-                    .font(.headline)
-                    .accessibilityIdentifier("filter-result-count")
-                Text(store.activeFilterCount == 0 ? "No active restrictions" : "\(store.activeFilterCount) active restrictions")
-                    .foregroundStyle(.secondary)
-                Button("Reset All Filters", role: .destructive) {
-                    store.resetFilters()
-                    editingCustomDates = false
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(store.filteredActivities.count) of \(store.activities.count) activities")
+                            .font(.subheadline.weight(.semibold))
+                            .accessibilityIdentifier("filter-result-count")
+                        if store.activeFilterCount > 0 {
+                            Text("\(store.activeFilterCount) active filters").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Button("Reset") {
+                        store.resetFilters()
+                        editingCustomDates = false
+                    }
+                    .font(.caption).frame(minHeight: 44)
+                    .disabled(store.activeFilterCount == 0)
+                    .accessibilityLabel("Reset all filters")
                 }
             }
             searchSection
-            activitySection
-            dateSection
             metricsSection.id(store.filterResetRevision)
+            dateSection
+            activitySection
             binarySection
         }
         .onChange(of: store.filterResetRevision) { _, _ in
@@ -130,10 +139,14 @@ struct FilterPanel: View {
     }
 
     private var metricsSection: some View {
-        Section("Measurements") {
-            NumericFilterRow(title: "Distance", icon: "ruler", unit: "km", scale: 1_000, filter: $store.distanceFilter)
-            NumericFilterRow(title: "Elapsed Duration", icon: "stopwatch", unit: "h", scale: 3_600, filter: $store.durationFilter)
-            NumericFilterRow(title: "Elevation Gain", icon: "mountain.2", unit: "m", scale: 1, filter: $store.elevationFilter)
+        Section {
+            NumericFilterRow(title: "Distance", icon: "ruler", unit: "km", scale: 1_000, filter: $store.distanceFilter, suggestedMaximum: max(100, (store.activities.compactMap(\.distance).max() ?? 0) / 1000))
+            NumericFilterRow(title: "Elapsed Duration", icon: "stopwatch", unit: "h", scale: 3_600, filter: $store.durationFilter, suggestedMaximum: max(12, Double(store.activities.compactMap(\.elapsedTime).max() ?? 0) / 3600), step: 0.25)
+            NumericFilterRow(title: "Elevation Gain", icon: "mountain.2", unit: "m", scale: 1, filter: $store.elevationFilter, suggestedMaximum: max(3000, store.activities.compactMap(\.totalElevationGain).max() ?? 0), step: 50)
+        } header: {
+            Text("Measurements")
+        } footer: {
+            Text("Any leaves that end open. Active ranges exclude activities without a recorded measurement.")
         }
     }
 

@@ -21,6 +21,10 @@ enum FilterOperator: String {
 struct NumericFilter: Equatable {
     var operatorType: FilterOperator = .gte
     var value: Double = 0
+    var upperLimit: Double? = nil
+
+    var minimum: Double? { operatorType == .gte ? value : nil }
+    var maximum: Double? { operatorType == .lte ? value : upperLimit }
 }
 
 @Observable
@@ -215,10 +219,11 @@ final class ActivityStore {
 
     private func matches(_ filter: NumericFilter, _ value: Double?) -> Bool {
         guard let value, value.isFinite, filter.value.isFinite else { return false }
-        switch filter.operatorType {
-        case .gte: return value >= filter.value
-        case .lte: return value <= filter.value
+        if let minimum = filter.minimum, value < minimum { return false }
+        if let maximum = filter.maximum {
+            guard maximum.isFinite, maximum >= (filter.minimum ?? 0), value <= maximum else { return false }
         }
+        return true
     }
 
     private static func normalizedSearch(_ text: String) -> String {

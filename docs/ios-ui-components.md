@@ -79,3 +79,11 @@ Camera padding is retained across navigation and applied once (automatic SDK saf
 List uses the available window width until an activity is inspected. At regular widths of at least 760pt, standard text opens an adjacent 340–420pt detail pane while retaining at least 400pt for browsing. Closing detail restores the full list width. Narrower windows and accessibility text use the existing detail navigation; an already-pushed detail stays open through window changes. The native List instance, selection, sort and inspection owners remain unchanged.
 
 Wide rows share aligned metric columns and a separate sortable local-date column where space permits. Additional configured metrics use columns when the activity name and all values fit; otherwise the existing adaptive grid or user-selected scrolling-metrics layout retains every configured field. Opening detail never changes the saved metric settings.
+
+## Filter sidebar draft
+
+Regular windows at least 760pt wide show a collapsible 320pt leading filter sidebar, shared by Map and List. Its visibility is saved independently of inspection. With insufficient remaining width for adjacent List detail, inspection uses a native modal sheet over the existing layout; a wide landscape window retains all three columns. Compact windows and accessibility text retain the adaptive filter inspector.
+
+Measurement editors support inclusive lower/upper bounds, open ends and exact decimal entry. Thumb drags maintain local drafts and commit on release, avoiding repeated library filtering during movement. VoiceOver can adjust each endpoint. The track uses unfiltered library extents with practical minimum ranges; entering a larger exact bound expands the track. An untouched endpoint means no limit, while an explicitly entered zero remains a real constraint. Active ranges exclude missing measurements. Invalid drafts leave the applied filter unchanged; Reset clears both bounds. Existing one-sided predicates remain supported.
+
+Validation: 61 rendered navigation cases and 20 filter cases passed for this draft, plus three iPad gallery scenes. Captures include portrait detail overlay, landscape filters/list/detail, precise units and accessibility text. Touch feel and physical-device VoiceOver remain review work.
