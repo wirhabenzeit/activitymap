@@ -1,9 +1,9 @@
 // Build index.html for a gallery run, optionally beside a baseline run:
 // node scripts/build-gallery-index.mjs <run-dir> [baseline-dir]
 // Captures are review material only: there is no pass/fail. Images are
-// embedded, so index.html opens anywhere (Finder, previews, attachments).
+// referenced and lazy loaded by default; set ACTIVITYMAP_GALLERY_EMBED=1 for a portable HTML export.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, join, relative } from 'node:path';
 
 const [runDir, baselineDir] = process.argv.slice(2);
 if (!runDir) throw new Error('Pass a gallery run directory');
@@ -25,19 +25,17 @@ const baseline = baselineDir && existsSync(baselineDir) ? new Map(read(baselineD
 const variantOrder = ['phone', 'phone-dark', 'small-large-text', 'tablet', 'desktop'];
 const variants = [...new Set(shots.map((s) => s.variant))].sort((a, b) => variantOrder.indexOf(a) - variantOrder.indexOf(b));
 // Web screens join the native scene they correspond to; others get their own section.
-const pairs = { stats: 'stats-components' };
-const sceneOf = (s) => (s.platform === 'web' && shots.some((n) => n.platform === 'ios' && n.scene === (pairs[s.scene] ?? s.scene))
-  ? pairs[s.scene] ?? s.scene : `${s.platform}:${s.scene}`);
+const sceneOf = (s) => s.scene;
 const native = shots.filter((s) => s.platform === 'ios').sort((a, b) => a.order - b.order);
 const titles = new Map(native.map((s) => [sceneOf(s), s.title]));
-for (const s of shots.filter((s) => s.platform === 'web')) if (!titles.has(sceneOf(s))) titles.set(sceneOf(s), `${s.title} (web only)`);
+for (const s of shots.filter((s) => s.platform === 'web')) if (!titles.has(sceneOf(s))) titles.set(sceneOf(s), s.title);
 const scenes = [...titles];
 const escape = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const meta = native[0] ?? shots[0] ?? {};
 const web = shots.find((s) => s.platform === 'web');
 
 const image = (shot, label, extra = '') =>
-  `<div class="shot"><img class="${extra}" src="${embed(shot)}" alt="${escape(`${shot.title}, ${shot.variant}, ${label}`)}"><span>${label}</span></div>`;
+  `<div class="shot ${extra}"><img loading="lazy" decoding="async" class="${extra}" src="${process.env.ACTIVITYMAP_GALLERY_EMBED === '1' ? embed(shot) : relative(runDir, join(shot.dir, shot.image)).split('/').map(encodeURIComponent).join('/')}" alt="${escape(`${shot.title}, ${shot.variant}, ${label}`)}"><span>${label}</span></div>`;
 const figure = (scene, variant) => {
   const group = shots.filter((s) => sceneOf(s) === scene && s.variant === variant);
   if (!group.length) return '';
@@ -45,9 +43,14 @@ const figure = (scene, variant) => {
   const old = ios && baseline?.get(ios.stem);
   const webShot = group.find((s) => s.platform === 'web');
   const size = (ios ?? webShot);
-  return `<figure data-variant="${escape(variant)}"><div class="pair">${old ? image(old, 'iOS baseline', 'baseline') : ''}${
-    ios ? image(ios, 'iOS') : ''}${webShot ? image(webShot, 'web') : ''}</div>
-    <figcaption>${escape(variant)} · ${size.width}×${size.height}</figcaption></figure>`;
+  const warning = ios && webShot && (!ios.fixtureHash || !webShot.fixtureHash
+    ? 'Legacy captures: shared fixture/state not verified'
+    : ios.fixtureHash !== webShot.fixtureHash || JSON.stringify(ios.selectedIDs) !== JSON.stringify(webShot.selectedIDs) || (ios.detailID ?? null) !== (webShot.detailID ?? null) || (ios.search ?? '') !== (webShot.search ?? '')
+      ? 'Not comparable: fixture or scenario state differs' : 'Shared fixture and activity state');
+  const missing = (label) => `<div class="missing">${label}: no capture for this scenario</div>`;
+  return `<figure data-variant="${escape(variant)}"${variant !== variants[0] ? ' hidden' : ''}><div class="pair">${old ? image(old, 'iOS baseline', 'baseline') : ''}${
+    ios ? image(ios, 'iOS') : missing('iOS')}${webShot ? image(webShot, 'Web') : missing('Web')}</div>
+    <figcaption>${escape(variant)} · ${size.width}×${size.height}${warning ? ` · ${escape(warning)}` : ''}${variant === 'small-large-text' ? ' · iOS Dynamic Type / web 150% text (different scaling systems)' : ''}</figcaption></figure>`;
 };
 
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -61,6 +64,10 @@ header { position: sticky; top: 0; background: var(--bg); padding: 8px 0 12px; z
 h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 32px 0 12px; }
 .meta, figcaption { color: var(--muted); font-size: 12px; }
 nav label { margin-right: 12px; user-select: none; }
+[hidden] { display: none !important; }
+.missing { width: 260px; padding: 24px; background: var(--card); color: var(--muted); }
+.shot.baseline { display: none; }
+body.baselines .shot.baseline { display: block; }
 .row { display: flex; gap: 20px; overflow-x: auto; align-items: flex-start; padding-bottom: 8px; }
 figure { margin: 0; flex: none; }
 .pair { display: flex; gap: 6px; align-items: flex-start; }
@@ -71,7 +78,7 @@ img.zoom { position: fixed; inset: 2vh 0 0; margin: auto; max-height: 96vh; max-
 </style></head><body>
 <header><h1>ActivityMap gallery · ${escape(basename(runDir))}${baseline ? ` <span class="meta">vs ${escape(basename(baselineDir))} (dashed = baseline)</span>` : ''}</h1>
 <div class="meta">iOS library: ${escape(meta.library ?? '?')} · basemap: ${escape(meta.basemap ?? '?')}${web ? ` · web: ${escape(web.library)}` : ''} · generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')}</div>
-<nav>${variants.map((v) => `<label><input type="checkbox" checked data-toggle="${escape(v)}"> ${escape(v)}</label>`).join('')}
+<nav><label>Viewport <select id="variant">${variants.map((v) => `<option value="${escape(v)}">${escape(v)}</option>`).join('')}</select></label>${baseline ? '<label><input type="checkbox" id="baseline"> Show iOS baseline</label>' : ''}
 <label>size <input type="range" min="240" max="900" value="560" id="size"></label></nav></header>
 ${scenes
   .map(([scene, title]) => `<section><h2>${escape(title)}</h2><div class="row">${variants
@@ -79,8 +86,12 @@ ${scenes
     .join('')}</div></section>`)
   .join('')}
 <script>
-document.querySelectorAll('[data-toggle]').forEach((box) => box.addEventListener('change', () =>
-  document.querySelectorAll('figure[data-variant="' + box.dataset.toggle + '"]').forEach((f) => f.hidden = !box.checked)));
+document.getElementById('variant').addEventListener('change', (e) => {
+  document.querySelectorAll('figure').forEach((f) => f.hidden = f.dataset.variant !== e.target.value);
+  document.querySelectorAll('section').forEach((s) => s.hidden = !s.querySelector('figure:not([hidden])'));
+});
+document.getElementById('variant').dispatchEvent(new Event('change'));
+document.getElementById('baseline')?.addEventListener('change', (e) => document.body.classList.toggle('baselines', e.target.checked));
 document.getElementById('size').addEventListener('input', (e) => document.body.style.setProperty('--h', e.target.value + 'px'));
 document.addEventListener('click', (e) => { if (e.target.tagName === 'IMG') e.target.classList.toggle('zoom'); });
 </script></body></html>`;

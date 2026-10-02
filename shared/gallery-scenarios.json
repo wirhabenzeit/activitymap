@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "scenarios": [
+    {
+      "id": "map",
+      "title": "Map \u00b7 no selection",
+      "webPath": "/map",
+      "selectedIDs": []
+    },
+    {
+      "id": "map-results",
+      "title": "Map \u00b7 four selected routes",
+      "webPath": "/map",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ]
+    },
+    {
+      "id": "map-detail",
+      "title": "Map \u00b7 activity detail",
+      "webPath": "/map",
+      "selectedIDs": [
+        20279947341
+      ],
+      "detailID": 20279947341
+    },
+    {
+      "id": "list",
+      "title": "List \u00b7 two selected activities",
+      "webPath": "/list",
+      "selectedIDs": [
+        20279947341,
+        20270725942
+      ]
+    },
+    {
+      "id": "list-detail",
+      "title": "List \u00b7 activity detail",
+      "webPath": "/list",
+      "selectedIDs": [],
+      "detailID": 20279947341
+    },
+    {
+      "id": "filters",
+      "title": "Filters \u00b7 search for ride",
+      "webPath": "/list",
+      "selectedIDs": [],
+      "search": "ride"
+    },
+    {
+      "id": "settings",
+      "title": "Settings \u00b7 signed out",
+      "selectedIDs": []
+    }
+  ],
+  "variants": [
+    {
+      "name": "phone",
+      "width": 402,
+      "height": 874,
+      "dark": false,
+      "largeText": false
+    },
+    {
+      "name": "phone-dark",
+      "width": 402,
+      "height": 874,
+      "dark": true,
+      "largeText": false
+    },
+    {
+      "name": "small-large-text",
+      "width": 375,
+      "height": 667,
+      "dark": false,
+      "largeText": true
+    },
+    {
+      "name": "tablet",
+      "width": 820,
+      "height": 1180,
+      "dark": false,
+      "largeText": false
+    }
+  ]
+}

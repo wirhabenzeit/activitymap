@@ -231,7 +231,7 @@ extension RenderedRoutePickingTests {
         request.recognitionLanguages = ["en-US"]
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(text.contains("Ride") && text.contains("2023"), "Sport and date are visibly rendered: \(text)")
+        #expect(text.contains("2023"), "Date remains visibly rendered beside the sport badge and title: \(text)")
         #expect(text.contains("31.2") && text.contains("1h 14m") && text.contains("820"),
                 "Distance, elapsed time and elevation are visibly rendered: \(text)")
     }

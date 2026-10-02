@@ -100,16 +100,25 @@ This opt-in test uses an existing connected account in the local database. It cr
 
 ## Screenshot gallery
 
-`ScreenshotGalleryTests` renders the production shell and screens (Map, results, detail, List, Filters, Settings, Stats components) in phone, dark, small large-text and tablet variants. It is review material, not a pass/fail check, and is skipped unless enabled:
+`shared/gallery-scenarios.json` defines the scenario IDs, selected/detail activity IDs and viewport variants consumed by both capture harnesses. Six scenes have matching web captures: Map, selection results, map detail, List, list detail and Filters. Settings remains native-only and shows an explicit missing-web placeholder. Stats is excluded until the iOS dashboard is implemented.
 
 ```sh
-scripts/ios-gallery.sh                       # run named after the current branch
-scripts/ios-gallery.sh after --baseline before  # side by side with an earlier run
+scripts/ios-gallery.sh review --web                       # native + running local pnpm dev
+scripts/ios-gallery.sh quick --scene list --variant phone # incremental native build
+scripts/ios-gallery.sh quick2 --scene list --variant phone --reuse-build --web
+scripts/ios-gallery.sh web-check --web-only --scene list,list-detail --variant phone
+scripts/ios-gallery.sh review --index-only                # regenerate HTML; no captures/build
+scripts/ios-gallery.sh after --baseline review --web      # optional native baseline
+node --test scripts/gallery.test.mjs
 ```
 
-Runs land in `/tmp/activitymap-gallery/<run>/index.html`. Set `NEXT_PUBLIC_MAPBOX_TOKEN` (for example `set -a; source .env`) to render the real basemap instead of a plain offline style.
+Runs default to timestamped names under `/tmp/activitymap-gallery`; existing runs are never deleted or overwritten by the runner. `run.json` records the commit, dirty state, fixture hash and selected matrix. Capture metadata records the selected IDs and fixture hash; the viewer flags mismatches or unverifiable legacy captures. Choose one viewport in the viewer to compare iOS and web side by side. Images are lazy-loaded from the run folder; keep that folder together. For a single portable HTML export, use `ACTIVITYMAP_GALLERY_EMBED=1 scripts/ios-gallery.sh review --index-only`.
 
-Activities come from `ActivityMapTests/Gallery/gallery-activities.json` when present: a curated set exported with `node --env-file=.env scripts/export-gallery-library.mjs` (route ends trimmed by 500 m). Without it, a deterministic synthetic set is used. `export-gallery-library.mjs --all` writes the full local library to `~/Library/Caches/ActivityMapGallery/library.json` (never into the repository); render it with `--full-library`.
+The runner uses stable per-checkout DerivedData for incremental builds. `--reuse-build` runs `test-without-building` only if the Swift/project source fingerprint, simulator name and Xcode version match the last successful build. Scene/variant filters and fixture changes do not require recompilation. `--web-only` and `--index-only` never invoke Xcode. Web capture waits for mounted fixture content, fonts and map/tile readiness instead of fixed multi-second sleeps. Failures stop the run and retain diagnostics.
+
+Both clients load `ActivityMapTests/Gallery/gallery-activities.json`, the curated 20-activity fixture with trimmed route ends. `export-gallery-library.mjs --all` writes a full local export to `~/Library/Caches/ActivityMapGallery/library.json`; `--full-library` uses that exact file on both platforms. Missing files or scenario IDs fail validation before building. The runner does not silently fall back to unrelated synthetic activities.
+
+Web fixture injection is enabled only in a development build, using the production routes/components and DTO mapper with an in-memory query cache. It needs no temporary session or database writes, uses signed-out account chrome, and excludes live photos/streams. Start `pnpm dev` from this checkout. Set `ACTIVITYMAP_GALLERY_WEB_URL` for a different local port. Set `NEXT_PUBLIC_MAPBOX_TOKEN` in the runner environment for native remote tiles; web uses the dev server's token. Offline native basemaps and platform-specific map styles are not pixel-equivalent. Both use Europe/Zurich and de-CH presentation; web 150% text is an accessibility stress case, not an exact Dynamic Type equivalent. Captures are visual review evidence, not automated visual approval.
 
 ## Map route selection
 

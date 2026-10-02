@@ -16,7 +16,7 @@ enum GalleryLibrary {
         let environment = ProcessInfo.processInfo.environment["ACTIVITYMAP_GALLERY_LIBRARY"]
             .flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
         let curated = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("gallery-activities.json")
-        for (url, source) in [(environment, "local export"), (curated, "curated")] {
+        for (url, source) in [(environment, environment?.standardizedFileURL == curated.standardizedFileURL ? "curated" : "local export"), (curated, "curated")] {
             guard let url, FileManager.default.fileExists(atPath: url.path) else { continue }
             return Loaded(source: source, activities: try decode(Data(contentsOf: url)))
         }

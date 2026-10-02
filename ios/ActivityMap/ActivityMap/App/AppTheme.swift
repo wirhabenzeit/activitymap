@@ -38,22 +38,6 @@ enum AppTheme {
     static let minimumInlineMetricColumnWidth: CGFloat = 72
     static let minimumDetailColumnWidth: CGFloat = 180
 
-    /// Small glyphs need more contrast than route strokes or chart fills. Keep
-    /// the catalogue hue, but use readable tones for light/dark foregrounds.
-    static func sportSymbolColor(_ category: ActivityCategory) -> Color {
-        let light: String
-        let dark: String
-        switch category {
-        case .bcXcSki: (light, dark) = ("176B9E", "57B4EB")
-        case .trailHike: (light, dark) = ("C5343A", "FF8589")
-        case .run: (light, dark) = ("826200", "FFCA3A")
-        case .ride: (light, dark) = ("4A6F13", "8AC926")
-        case .misc: (light, dark) = ("6A4C93", "BDA0E4")
-        }
-        return Color(uiColor: UIColor { traits in
-            UIColor(Color(hex: traits.userInterfaceStyle == .dark ? dark : light))
-        })
-    }
     static let headerBackground = Color(hex: "2E6BC9")
     static let headerForeground = Color.white
     static let sidebarBackground = Color(uiColor: .secondarySystemBackground)

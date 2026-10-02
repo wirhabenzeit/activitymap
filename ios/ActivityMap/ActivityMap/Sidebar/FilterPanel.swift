@@ -69,7 +69,7 @@ struct FilterPanel: View {
                             Label {
                                 Text(category.name).foregroundStyle(.primary)
                             } icon: {
-                                Image(systemName: category.symbolName).foregroundStyle(category.color)
+                                BrowseSportSymbol(category: category)
                             }
                             Spacer()
                             Image(systemName: store.categorySelection(category).symbolName)

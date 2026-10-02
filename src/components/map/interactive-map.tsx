@@ -528,6 +528,9 @@ export default function InteractiveMap() {
         }}
         onLoad={() => {
           tryAutoCenterOnLatestActivity();
+          if (process.env.NODE_ENV === 'development' && window.__ACTIVITYMAP_GALLERY__) {
+            window.__ACTIVITYMAP_GALLERY_MAP__ = mapRefLoc.current?.getMap();
+          }
         }}
         projection={'globe'}
         mapStyle={

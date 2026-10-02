@@ -2,15 +2,13 @@ import SwiftUI
 
 struct ListControls: View {
     @Bindable var presentation: ActivityListPresentation
+    var iconOnly = false
     @State private var sortOpen = false
     @State private var displayOpen = false
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        let layout = typeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-            : AnyLayout(HStackLayout(spacing: AppTheme.Spacing.small))
-        layout { controls }
+        controls
         .font(.caption)
         .foregroundStyle(.primary)
         .buttonStyle(.plain)
@@ -64,7 +62,7 @@ struct ListControls: View {
                             presentation.settings.width = .fitWidth
                         }
                     } header: { Text("Visible metrics") }
-                    footer: { Text("Name, sport and local date always stay visible. Open Details to inspect all available information, including hidden metrics.") }
+                    footer: { Text("Name, sport and local date always stay visible. Distance, elapsed time and elevation use table columns in Fit Width. Additional metrics and accessibility text use stacked rows. Open Details to inspect hidden metrics.") }
                 }
                 .navigationTitle("List display")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { displayOpen = false } } }
@@ -72,20 +70,30 @@ struct ListControls: View {
         }
     }
 
-    @ViewBuilder private var controls: some View {
-        Button { sortOpen = true } label: {
-            Label("Sort", systemImage: "arrow.up.arrow.down")
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+    private var controls: some View {
+        Menu {
+            Button { sortOpen = true } label: {
+                Label("Sort activities", systemImage: "arrow.up.arrow.down")
+            }
+            .accessibilityValue("\(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
+            .accessibilityIdentifier("list-sort-control")
+            Button { displayOpen = true } label: {
+                Label("Columns and layout", systemImage: "rectangle.split.3x1")
+            }
+            .accessibilityIdentifier("list-display-control")
+        } label: {
+            Group {
+                if iconOnly || typeSize.isAccessibilitySize {
+                    Image(systemName: "slider.horizontal.3")
+                } else {
+                    Label("View", systemImage: "slider.horizontal.3")
+                }
+            }
+            .foregroundStyle(AppTheme.accent)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
-        .accessibilityLabel("Sort activities")
-        .accessibilityValue("\(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
-        .accessibilityIdentifier("list-sort-control")
-        Button { displayOpen = true } label: {
-            Label("Columns", systemImage: "rectangle.split.3x1")
-                .frame(minWidth: 44, minHeight: 44)
-        }
-        .accessibilityLabel("Columns and list layout")
-        .accessibilityIdentifier("list-display-control")
+        .accessibilityLabel("List view options")
+        .accessibilityValue("Sorted by \(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
     }
 }

@@ -1,4 +1,3 @@
-import Charts
 import MapboxMaps
 import SwiftUI
 import Testing
@@ -12,13 +11,19 @@ import UIKit
 struct ScreenshotGalleryTests {
     @Test(arguments: GalleryScene.allCases)
     func capture(scene: GalleryScene) async throws {
+        let manifest = try GalleryManifest.load()
+        guard GalleryEnvironment.includes(scene.rawValue, key: "SCENES") else { return }
+        let scenario = try #require(manifest.scenarios.first { $0.id == scene.rawValue })
         let library = try GalleryLibrary.load()
-        for variant in GalleryVariant.all {
-            let staged = try scene.stage(library.activities)
+        let available = Set(library.activities.map(\.id))
+        try #require(Set(scenario.selectedIDs + [scenario.detailID].compactMap { $0 }).isSubset(of: available), "Scenario IDs missing from gallery library")
+        for spec in manifest.variants where GalleryEnvironment.includes(spec.name, key: "VARIANTS") {
+            let variant = spec.variant
+            let staged = try scene.stage(library.activities, scenario: scenario)
             let window = try GalleryWindow(root: staged.root, variant: variant)
             defer { window.close() }
-            try await window.settle(map: staged.usesMap, prepare: staged.prepare)
-            try window.save(scene: scene, variant: variant, library: library.source)
+            try await window.settle(map: staged.usesMap, prepare: staged.prepare, reveal: staged.reveal)
+            try window.save(scene: scene, variant: variant, library: library.source, scenario: scenario)
         }
     }
 }
@@ -26,6 +31,10 @@ struct ScreenshotGalleryTests {
 nonisolated enum GalleryEnvironment {
     static let values = ProcessInfo.processInfo.environment
     static var isEnabled: Bool { values["ACTIVITYMAP_GALLERY"] == "1" }
+    static func includes(_ value: String, key: String) -> Bool {
+        guard let filter = values["ACTIVITYMAP_GALLERY_" + key], !filter.isEmpty else { return true }
+        return filter.split(separator: ",").contains(Substring(value))
+    }
     static var output: URL {
         URL(fileURLWithPath: values["ACTIVITYMAP_GALLERY_OUTPUT"] ?? "/tmp/activitymap-gallery/latest")
     }
@@ -40,97 +49,64 @@ struct GalleryVariant {
     let contentSize: UIContentSizeCategory
     let regular: Bool
 
-    static let all = [
-        GalleryVariant(name: "phone", size: CGSize(width: 402, height: 874), dark: false, contentSize: .large, regular: false),
-        GalleryVariant(name: "phone-dark", size: CGSize(width: 402, height: 874), dark: true, contentSize: .large, regular: false),
-        GalleryVariant(name: "small-large-text", size: CGSize(width: 375, height: 667), dark: false, contentSize: .accessibilityExtraLarge, regular: false),
-        GalleryVariant(name: "tablet", size: CGSize(width: 820, height: 1180), dark: false, contentSize: .large, regular: true),
-    ]
-
     var dynamicTypeSize: DynamicTypeSize { DynamicTypeSize(contentSize) ?? .large }
 }
 
 enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
     case map, mapResults = "map-results", mapDetail = "map-detail", list, listDetail = "list-detail"
-    case filters, settings, statsComponents = "stats-components"
+    case filters, settings
 
     var testDescription: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .map: "Map"
-        case .mapResults: "Map · selection results"
-        case .mapDetail: "Map · activity detail"
-        case .list: "List"
-        case .listDetail: "List · activity detail"
-        case .filters: "Filters"
-        case .settings: "Settings (signed out)"
-        case .statsComponents: "Stats components (synthetic fixture, not the dashboard)"
-        }
-    }
 
     struct Staged {
         let root: AnyView
         var usesMap = false
+        var reveal: @MainActor () -> Void = {}
         var prepare: @MainActor () -> Void = {}
     }
 
-    @MainActor func stage(_ activities: [Activity]) throws -> Staged {
+    @MainActor func stage(_ activities: [Activity], scenario: GalleryManifest.Scenario) throws -> Staged {
         let store = ActivityStore(activities: activities, listPresentation: ActivityListPresentation(defaults: nil))
         let picker = RoutePicker()
         func shell(_ tab: AppTab) -> AnyView {
             store.selectedTab = tab
             return AnyView(AppShell(store: store, mapPicker: picker).galleryMapStyle())
         }
-        let routed = activities.filter { !$0.coordinates.isEmpty }
         switch self {
         case .map:
             return Staged(root: shell(.map), usesMap: true)
         case .mapResults:
-            let ids = routed.prefix(4).map(\.id)
-            return Staged(root: shell(.map), usesMap: true) {
+            let ids = scenario.selectedIDs
+            return Staged(root: shell(.map), usesMap: true, reveal: { picker.detent = .medium }) {
                 store.replaceSelection(with: ids)
                 picker.reviewSelection(store: store)
                 store.mapContext.request(.fitSelection)
             }
         case .mapDetail:
-            let id = try #require(Self.richest(routed)).id
-            return Staged(root: shell(.map), usesMap: true) {
+            let id = try #require(scenario.detailID)
+            return Staged(root: shell(.map), usesMap: true, reveal: { picker.detent = .medium }) {
                 store.replaceSelection(with: [id])
                 picker.reviewSelection(store: store)
                 store.mapContext.request(.fitSelection)
             }
         case .list:
-            store.replaceSelection(with: routed.prefix(2).map(\.id))
+            store.replaceSelection(with: scenario.selectedIDs)
             return Staged(root: shell(.list))
         case .listDetail:
-            let id = try #require(Self.richest(activities)).id
+            let id = try #require(scenario.detailID)
             let root = shell(.list)
             return Staged(root: root) { store.inspect(id) }
         case .filters:
             // The shell presents this as an inspector/sheet; render its content.
-            store.searchText = "ride"
+            store.searchText = scenario.search ?? ""
             return Staged(root: AnyView(NavigationStack {
                 FilterPanel(store: store).navigationTitle("Filters").navigationBarTitleDisplayMode(.inline)
             }))
         case .settings:
             return Staged(root: AnyView(AccountSheet(destination: .settings, auth: AuthController())))
-        case .statsComponents:
-            return Staged(root: AnyView(NavigationStack { GalleryStatsFixture().navigationTitle("Stats") }))
         }
     }
 
-    /// The detail scene should exercise as many metric groups as possible.
-    private static func richest(_ activities: [Activity]) -> Activity? {
-        activities.max { score($0) < score($1) }
-    }
-
-    private static func score(_ activity: Activity) -> Int {
-        let fields: [Any?] = [activity.distance, activity.movingTime, activity.totalElevationGain, activity.averageSpeed,
-                              activity.averageHeartrate, activity.averageWatts, activity.weightedAverageWatts,
-                              activity.elevHigh, activity.description]
-        return fields.compactMap { $0 }.count
-    }
 }
 
 private extension View {
@@ -161,6 +137,8 @@ private final class GalleryWindow {
         window.traitOverrides.preferredContentSizeCategory = variant.contentSize
         window.traitOverrides.horizontalSizeClass = variant.regular ? .regular : .compact
         host = UIHostingController(rootView: AnyView(root
+            .environment(\.locale, Locale(identifier: "de_CH"))
+            .environment(\.timeZone, TimeZone(identifier: "Europe/Zurich")!)
             .environment(\.colorScheme, variant.dark ? .dark : .light)
             .environment(\.dynamicTypeSize, variant.dynamicTypeSize)
             .environment(\.horizontalSizeClass, variant.regular ? .regular : .compact)))
@@ -175,7 +153,7 @@ private final class GalleryWindow {
         MapboxOptions.accessToken = previousToken
     }
 
-    func settle(map usesMap: Bool, prepare: @MainActor () -> Void) async throws {
+    func settle(map usesMap: Bool, prepare: @MainActor () -> Void, reveal: @MainActor () -> Void) async throws {
         try await Task.sleep(for: .milliseconds(400))
         guard usesMap else {
             prepare()
@@ -190,13 +168,15 @@ private final class GalleryWindow {
         let token = map.mapboxMap.onMapIdle.observe { _ in idle = true }
         defer { token.cancel() }
         try await Task.sleep(for: .milliseconds(600))
-        idle = false
         // Best effort: an offline style may never report idle after a fit.
         _ = try await poll(seconds: GalleryEnvironment.mapboxToken == nil ? 2 : 5) { idle }
+        // Production fitting collapses the panel. This scenario reviews the
+        // revealed results/detail after the user expands it again.
+        reveal()
         try await Task.sleep(for: .milliseconds(500))
     }
 
-    func save(scene: GalleryScene, variant: GalleryVariant, library: String) throws {
+    func save(scene: GalleryScene, variant: GalleryVariant, library: String, scenario: GalleryManifest.Scenario) throws {
         host.view.layoutIfNeeded()
         let format = UIGraphicsImageRendererFormat()
         format.scale = 2
@@ -209,7 +189,10 @@ private final class GalleryWindow {
         // JPEG keeps runs small enough to embed in one self-contained index.
         try #require(image.jpegData(compressionQuality: 0.82)).write(to: directory.appendingPathComponent("\(name).jpg"))
         let metadata: [String: Any] = [
-            "scene": scene.rawValue, "title": scene.title, "order": GalleryScene.allCases.firstIndex(of: scene) ?? 0,
+            "scene": scene.rawValue, "title": scenario.title,
+            "selectedIDs": scenario.selectedIDs, "search": scenario.search ?? "", "detailID": scenario.detailID as Any? ?? NSNull(),
+            "fixtureHash": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_FIXTURE_HASH"] ?? "unknown",
+            "commit": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_COMMIT"] ?? "unknown", "order": GalleryScene.allCases.firstIndex(of: scene) ?? 0,
             "variant": variant.name, "width": variant.size.width, "height": variant.size.height,
             "dark": variant.dark, "contentSize": variant.contentSize.rawValue, "library": library,
             "basemap": GalleryEnvironment.mapboxToken == nil ? "offline" : "mapbox",
@@ -234,51 +217,30 @@ private final class GalleryWindow {
     }
 }
 
-/// Synthetic component review fixture until the Stats dashboard lands (#263).
-private struct GalleryStatsFixture: View {
-    @State private var metric = StatsMetric.distance
-    @State private var range = "Week"
-    private let days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    // Known zero is distinct from an unavailable future period.
-    private let values: [Double?] = [6, 0, 8.8, nil, nil, nil, nil]
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
-                BrowseSectionHeading(title: "Now", isStatsGroup: true)
-                StatsTileSurface(title: "This week", period: "Week to date · 30 Sep", expand: {}) {
-                    StatsMetricPicker(metrics: [.distance, .time, .elevation], selection: $metric)
-                } content: {
-                    BrowseMetricValue(title: "Distance", value: "14.8 km", emphasis: .headline)
-                    StatsComparison(value: "12%", context: "vs same point last week", direction: .higher)
-                    StatsChartSurface(title: "Daily distance, kilometres, week to date") {
-                        Chart {
-                            ForEach(days.indices, id: \.self) { index in
-                                if let value = values[index] {
-                                    BarMark(x: .value("Day", days[index]), y: .value("Distance, km", value))
-                                        .foregroundStyle(StatsChartPalette.current)
-                                }
-                            }
-                        }
-                        .chartXScale(domain: days)
-                    } dataRows: {
-                        ForEach(days.indices, id: \.self) { index in
-                            Text("\(days[index]): \(values[index].map { String(format: "%.1f km", $0) } ?? "Future, unavailable")")
-                                .font(AppTheme.Typography.caption)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                }
-                BrowseSectionHeading(title: "Patterns", isStatsGroup: true)
-                StatsTileSurface(title: "Sport mix", period: "All recorded activities") {
-                    EmptyView()
-                } content: {
-                    StatsSportLegend(categories: ActivityCategory.allCases, includesMixedSports: true)
-                }
-                StatsRangePicker(title: "Period", ranges: ["Week", "Month", "Year"], selection: $range, label: { $0 })
-            }
-            .padding(AppTheme.Spacing.large)
+struct GalleryManifest: Decodable {
+    struct Scenario: Decodable {
+        let id: String
+        let title: String
+        let selectedIDs: [Int]
+        let detailID: Int?
+        let search: String?
+    }
+    struct Variant: Decodable {
+        let name: String
+        let width: Double
+        let height: Double
+        let dark: Bool
+        let largeText: Bool
+        var variant: GalleryVariant {
+            GalleryVariant(name: name, size: CGSize(width: width, height: height), dark: dark,
+                           contentSize: largeText ? .accessibilityExtraLarge : .large, regular: width >= 768)
         }
-        .background(AppTheme.contentBackground)
+    }
+    let scenarios: [Scenario]
+    let variants: [Variant]
+    static func load() throws -> Self {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../../../shared/gallery-scenarios.json").standardized
+        return try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
     }
 }
