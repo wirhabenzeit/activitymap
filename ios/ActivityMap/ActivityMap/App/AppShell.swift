@@ -74,7 +74,7 @@ struct AppShell: View {
                     }
                 }
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Section(auth.currentUser?.name ?? "Account") {
                                 Button {
@@ -96,11 +96,21 @@ struct AppShell: View {
                                 Label("About ActivityMap", systemImage: "info.circle")
                             }
                         } label: {
-                            Image(systemName: "person.crop.circle")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(Color.white)
-                                .frame(width: 44, height: 44)
-
+                            AsyncImage(url: auth.currentUser?.image.flatMap(URL.init(string:))) { phase in
+                                if let image = phase.image {
+                                    image.resizable().scaledToFill()
+                                        .frame(width: 32, height: 32)
+                                        .clipShape(Circle())
+                                        .overlay { Circle().strokeBorder(.white.opacity(0.65), lineWidth: 1) }
+                                } else {
+                                    Image(systemName: "person.crop.circle")
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                            .accessibilityHidden(true)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Account and Settings")
@@ -112,7 +122,7 @@ struct AppShell: View {
                     }
                     .sharedBackgroundVisibility(.hidden)
 
-                    ToolbarItem(placement: .primaryAction) {
+                    ToolbarItem(placement: .topBarLeading) {
                         Button {
                             if sidebarAvailable { sidebarVisible.toggle() }
                             else { showsFilters.toggle() }
