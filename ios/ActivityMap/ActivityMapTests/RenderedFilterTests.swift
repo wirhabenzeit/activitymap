@@ -67,12 +67,12 @@ struct RenderedFilterTests {
         let host = try FilterHarness(root: root, size: CGSize(width: 390, height: 844))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(200))
-        let field = try #require(host.descendants(of: UITextField.self).last)
-        #expect(field.text == "1.25", "Editor must convert metres to displayed kilometres")
+        #expect(host.descendants(of: UITextField.self).isEmpty, "Compact ranges do not expose text entry")
+        let applied = host.snapshot()
         try host.save(host.snapshot(), name: "numeric-\(scenario)-applied")
         store.distanceFilter = nil
         try await Task.sleep(for: .milliseconds(200))
-        #expect(field.text == "", "External reset clears the displayed threshold")
+        #expect(applied.pngData() != host.snapshot().pngData(), "External reset must redraw the range and summary")
         try host.save(host.snapshot(), name: "numeric-\(scenario)-reset")
     }
 }

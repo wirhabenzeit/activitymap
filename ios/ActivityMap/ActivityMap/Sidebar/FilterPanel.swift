@@ -182,12 +182,12 @@ struct FilterPanel: View {
     private var metricsSection: some View {
         Section {
             NumericFilterRow(title: "Distance", icon: "ruler", unit: "km", scale: 1_000, filter: $store.distanceFilter, suggestedMaximum: max(100, (store.activities.compactMap(\.distance).max() ?? 0) / 1000))
-            NumericFilterRow(title: "Elapsed Duration", icon: "stopwatch", unit: "h", scale: 3_600, filter: $store.durationFilter, suggestedMaximum: max(12, Double(store.activities.compactMap(\.elapsedTime).max() ?? 0) / 3600), step: 0.25)
-            NumericFilterRow(title: "Elevation Gain", icon: "mountain.2", unit: "m", scale: 1, filter: $store.elevationFilter, suggestedMaximum: max(3000, store.activities.compactMap(\.totalElevationGain).max() ?? 0), step: 50)
+            NumericFilterRow(title: "Duration", icon: "stopwatch", unit: "h", scale: 3_600, filter: $store.durationFilter, suggestedMaximum: max(12, Double(store.activities.compactMap(\.elapsedTime).max() ?? 0) / 3600), step: 0.25)
+            NumericFilterRow(title: "Elevation", icon: "mountain.2", unit: "m", scale: 1, filter: $store.elevationFilter, suggestedMaximum: max(3000, store.activities.compactMap(\.totalElevationGain).max() ?? 0), step: 50)
         } header: {
             Text("Measurements")
         } footer: {
-            Text("Any leaves that end open. Active ranges exclude activities without a recorded measurement.")
+            Text("Drag to an outer edge to leave that end unlimited. Active ranges exclude activities without a recorded measurement.")
         }
     }
 

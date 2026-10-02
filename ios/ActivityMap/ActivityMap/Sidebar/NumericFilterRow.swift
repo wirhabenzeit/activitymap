@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Draft locally while scrubbing; commit on release so large libraries are not
-/// filtered on every touch frame. Text entry preserves exact/open-ended bounds.
+/// filtered on every touch frame. Endpoints keep the range open-ended.
 struct NumericFilterRow: View {
     let title: String
     let icon: String
@@ -10,38 +10,48 @@ struct NumericFilterRow: View {
     @Binding var filter: NumericFilter?
     var suggestedMaximum: Double = 100
     var step: Double = 1
-    @State private var minimumText = ""
-    @State private var maximumText = ""
+    @State private var minimum: Double?
+    @State private var maximum: Double?
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var ceiling: Double {
-        [suggestedMaximum, (filter?.maximum ?? 0) / scale, (filter?.minimum ?? 0) / scale, step]
-            .filter { $0.isFinite && $0 > 0 }.max() ?? 100
+        let extent = max(suggestedMaximum, (filter?.maximum ?? 0) / scale, (filter?.minimum ?? 0) / scale, step)
+        let quarter = extent / 4
+        let magnitude = pow(10, floor(log10(quarter)))
+        let rounded = [1.0, 2, 2.5, 5, 10].first { $0 * magnitude >= quarter } ?? 10
+        return rounded * magnitude * 4
     }
-    private var dirty: Bool {
-        minimumText != (filter?.minimum.map { format($0 / scale) } ?? "")
-            || maximumText != (filter?.maximum.map { format($0 / scale) } ?? "")
-    }
-    private func number(_ text: String) -> Double? {
-        if case .valid(let value) = NumericFilterInput.parse(text, scale: 1) { return value }
-        return nil
-    }
-    private var lower: Double { min(ceiling, number(minimumText) ?? 0) }
-    private var upper: Double { min(ceiling, number(maximumText) ?? ceiling) }
-    private var valid: Bool {
-        for text in [minimumText, maximumText] {
-            if case .invalid = NumericFilterInput.parse(text, scale: scale) { return false }
+    private var lower: Double { min(ceiling, minimum ?? 0) }
+    private var upper: Double { min(ceiling, maximum ?? ceiling) }
+    private var summary: String {
+        switch (minimum, maximum) {
+        case let (.some(low), .some(high)): "\(format(low))–\(format(high)) \(unit)"
+        case let (.some(low), nil): "≥\(format(low)) \(unit)"
+        case let (nil, .some(high)): "≤\(format(high)) \(unit)"
+        case (nil, nil): "Any"
         }
-        return (number(minimumText) ?? 0) <= (number(maximumText) ?? .infinity)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(title, systemImage: icon).font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(unit).font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2)) : AnyLayout(HStackLayout())
+                layout {
+                    Label(title, systemImage: icon).font(.subheadline.weight(.semibold))
+                    if !typeSize.isAccessibilitySize { Spacer(minLength: 4) }
+                    Text(summary).font(.subheadline).foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                if filter != nil {
+                    Button { filter = nil; loadApplied() } label: {
+                        Image(systemName: "arrow.counterclockwise").font(.caption)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Clear \(title.lowercased()) range")
+                }
             }
+            .frame(minHeight: 44)
             GeometryReader { geometry in
                 let width = max(1, geometry.size.width - 44)
                 ZStack(alignment: .leading) {
@@ -56,40 +66,26 @@ struct NumericFilterRow: View {
                 .coordinateSpace(name: title)
             }
             .frame(height: 44)
-            let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading)) : AnyLayout(HStackLayout(spacing: 12))
-            layout {
-                field("From", text: $minimumText)
-                field("To", text: $maximumText)
+            GeometryReader { geometry in
+                let width = max(1, geometry.size.width - 44)
+                ForEach(0..<5) { index in
+                    if !typeSize.isAccessibilitySize || index.isMultiple(of: 2) {
+                        Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 4)
+                            .offset(x: 22 + CGFloat(index) / 4 * width)
+                        let labelWidth = geometry.size.width / (typeSize.isAccessibilitySize ? 3 : 5)
+                        Text(format(ceiling * Double(index) / 4) + (index == 4 ? " \(unit)" : ""))
+                            .font(.caption2).foregroundStyle(.secondary)
+                            .lineLimit(1).minimumScaleFactor(0.75)
+                            .frame(width: labelWidth, alignment: index == 0 ? .leading : index == 4 ? .trailing : .center)
+                            .offset(x: CGFloat(index) / 4 * (geometry.size.width - labelWidth), y: 6)
+                    }
+                }
             }
-            HStack {
-                Button("Clear") { filter = nil; loadApplied() }
-                    .disabled(filter == nil && !dirty)
-                    .accessibilityLabel("Clear \(title.lowercased()) range")
-                Spacer()
-                Button("Apply") { apply() }.disabled(!valid || !dirty)
-                    .accessibilityLabel("Apply \(title.lowercased()) range")
-            }
-            .font(.caption).buttonStyle(.borderless)
-            .frame(minHeight: 44)
-            if !valid {
-                Text("Enter a valid range with From no greater than To. The applied range is unchanged.")
-                    .font(.caption).foregroundStyle(.red)
-            }
+            .frame(height: typeSize.isAccessibilitySize ? 40 : 22)
+            .accessibilityHidden(true)
         }
         .onAppear { loadApplied() }
         .onChange(of: filter) { _, _ in loadApplied() }
-    }
-
-    private func field(_ label: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            TextField("Any", text: text)
-                .keyboardType(.decimalPad)
-                .textFieldStyle(.roundedBorder)
-                .frame(minHeight: 44)
-                .accessibilityLabel("\(title) \(label.lowercased()) in \(unit)")
-                .onSubmit { apply() }
-        }
     }
 
     private func thumb(minimum: Bool, width: CGFloat) -> some View {
@@ -104,7 +100,7 @@ struct NumericFilterRow: View {
                 .onEnded { _ in apply() })
             .accessibilityElement()
             .accessibilityLabel("\(title) \(minimum ? "minimum" : "maximum")")
-            .accessibilityValue((minimum ? minimumText : maximumText).isEmpty ? "No limit" : "\(format(value)) \(unit)")
+            .accessibilityValue((minimum ? self.minimum : maximum) == nil ? "No limit" : "\(format(value)) \(unit)")
             .accessibilityAdjustableAction { direction in
                 update(minimum: minimum, value: value + (direction == .increment ? step : -step))
                 apply()
@@ -115,25 +111,24 @@ struct NumericFilterRow: View {
         let snapped = min(ceiling, max(0, (value / step).rounded() * step))
         if minimum {
             let bounded = min(snapped, upper)
-            minimumText = bounded == 0 ? "" : format(bounded)
+            self.minimum = bounded == 0 ? nil : bounded
         } else {
             let bounded = max(snapped, lower)
-            maximumText = bounded == ceiling ? "" : format(bounded)
+            maximum = bounded == ceiling ? nil : bounded
         }
     }
     private func format(_ value: Double) -> String {
         value.formatted(.number.grouping(.never).precision(.fractionLength(0...12)))
     }
     private func apply() {
-        guard valid else { return }
-        if let low = number(minimumText) {
-            filter = NumericFilter(value: low * scale, upperLimit: number(maximumText).map { $0 * scale })
-        } else if let high = number(maximumText) {
+        if let low = minimum {
+            filter = NumericFilter(value: low * scale, upperLimit: maximum.map { $0 * scale })
+        } else if let high = maximum {
             filter = NumericFilter(operatorType: .lte, value: high * scale)
         } else { filter = nil }
     }
     private func loadApplied() {
-        minimumText = filter?.minimum.map { format($0 / scale) } ?? ""
-        maximumText = filter?.maximum.map { format($0 / scale) } ?? ""
+        minimum = filter?.minimum.map { $0 / scale }
+        maximum = filter?.maximum.map { $0 / scale }
     }
 }
