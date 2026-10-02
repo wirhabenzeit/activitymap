@@ -4,30 +4,43 @@ struct ActivityRowView: View {
     @Bindable var store: ActivityStore
     let activity: Activity
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var isSelected: Bool { store.selectedActivityIDs.contains(activity.id) }
     private var isActive: Bool { store.activeActivityID == activity.id }
     private var hasGeometry: Bool { !activity.coordinates.isEmpty }
     private var settings: ActivityListSettings { store.listPresentation.settings }
 
+    private var usesTable: Bool { ActivityTableLayout.supports(settings, typeSize: typeSize) }
+
     var body: some View {
         HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 0) {
-            BrowseSelectionButton(title: "\(isSelected ? "Deselect" : "Select") \(activity.name)", isSelected: isSelected) {
-                store.toggleSelection(activity.id)
+            Button { store.toggleSelection(activity.id) } label: {
+                BrowseSportSymbol(category: activity.category, isSelected: isSelected)
+                    .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
+                    .contentShape(Rectangle())
             }
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
-                if sizeClass == .regular && !typeSize.isAccessibilitySize && settings.width == .fitWidth {
-                    HStack(spacing: AppTheme.Spacing.large) {
-                        identification.frame(maxWidth: .infinity, alignment: .leading)
-                        metrics.frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(isSelected ? "Deselect" : "Select") \(activity.name)")
+            .accessibilityValue("\(activity.sportType.rawValue), \(isSelected ? "Selected" : "Not selected")")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            Button(action: inspect) {
+                Group {
+                    if usesTable {
+                        tableContent
+                    } else {
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
+                            BrowseActivityHeading(activity: activity, isActive: isActive, comfortable: settings.density == .comfortable)
+                            metrics
+                        }
                     }
-                } else {
-                    identification
-                    metrics
                 }
+                .frame(maxWidth: .infinity, minHeight: AppTheme.minimumTarget, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Details for \(activity.name)")
+            .accessibilityValue(accessibleDetails)
+            .accessibilityHint("Inspect activity without changing selection")
             actions
         }
         .padding(.vertical, settings.density == .compact ? 0 : AppTheme.Spacing.tight)
@@ -35,34 +48,29 @@ struct ActivityRowView: View {
         .accessibilityIdentifier("activity-list-row-\(activity.id)")
     }
 
-    private var identification: some View {
-        Button(action: inspect) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
+    private var tableContent: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 2) {
                     Text(activity.name)
-                        .font(.subheadline.weight(isActive ? .semibold : .medium))
-                        .lineLimit(typeSize.isAccessibilitySize ? nil : settings.density == .compact ? 1 : 2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(settings.density == .compact ? 1 : 2)
                     if isActive {
-                        Image(systemName: "location.fill").font(.system(size: 10))
-                            .foregroundStyle(AppTheme.accent)
+                        Image(systemName: "location.fill").font(.caption2).foregroundStyle(AppTheme.accent)
                     }
                 }
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Image(systemName: activity.category.symbolName)
-                        .font(.system(size: 11)).foregroundStyle(AppTheme.sportSymbolColor(activity.category))
-                    Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
-                        .font(.caption2).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
+                    .font(.caption2).foregroundStyle(AppTheme.secondaryText)
             }
-            .frame(maxWidth: .infinity, minHeight: AppTheme.minimumTarget, alignment: .leading)
-            .contentShape(Rectangle())
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.trailing, 6)
+            ForEach(settings.orderedMetrics) { metric in
+                Text(ActivityTableLayout.value(metric, activity: activity))
+                    .font(.caption).monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.85)
+                    .frame(width: ActivityTableLayout.width(metric), alignment: .trailing)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Details for \(activity.name)")
-        .accessibilityValue("\(activity.sportType.rawValue), \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))\(isActive ? ", active on map" : "")")
-        .accessibilityHint("Inspect activity without changing selection")
     }
 
     @ViewBuilder private var metrics: some View {
@@ -103,6 +111,14 @@ struct ActivityRowView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Actions for \(activity.name)")
         .accessibilityHint(hasGeometry ? "Details or show on map" : "No GPS route; details remain available")
+    }
+
+    private var accessibleDetails: String {
+        ([activity.sportType.rawValue, Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt)]
+            + settings.orderedMetrics.map { metric in
+                let value = metric.value(for: activity)
+                return "\(metric.title): \(value == Formatters.unknown ? "Not recorded" : value)"
+            } + (isActive ? ["Active on map"] : [])).joined(separator: ". ")
     }
 
     private func inspect() {

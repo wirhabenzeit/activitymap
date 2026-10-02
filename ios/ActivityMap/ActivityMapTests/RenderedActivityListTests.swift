@@ -165,7 +165,7 @@ extension RenderedRoutePickingTests {
     }
 
     @Test(arguments: ["phone", "tablet"])
-    func defaultListDensityFitsAtLeastSixRows(scenario: String) async throws {
+    func defaultListDensityFitsAtLeastNineRows(scenario: String) async throws {
         let tablet = scenario == "tablet"
         let activities = try (1...20).map { id in
             try StoredModelMapper.activity(Fixtures.activity([
@@ -183,8 +183,8 @@ extension RenderedRoutePickingTests {
         defer { host.close() }
         try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
         let list = try #require(host.descendants(of: UICollectionView.self).first)
-        #expect(list.visibleCells.count >= 6, "A default phone List should show at least six activities, not three spacious cards")
-        #expect(list.visibleCells.allSatisfy { $0.bounds.height <= 90 }, "Default rows keep the name, local date/sport and three metrics within 90pt; measured heights: \(list.visibleCells.map { $0.bounds.height })")
+        #expect(list.visibleCells.count >= 9, "Default rows should preserve browsing density even with longer activity names")
+        #expect(list.visibleCells.allSatisfy { $0.bounds.height <= 76 }, "Default rows keep the name, local date, sport badge and three metrics within 76pt; measured heights: \(list.visibleCells.map { $0.bounds.height })")
         #expect(store.selectedActivityIDs == [19])
         try host.save("list-dense-\(scenario)")
     }

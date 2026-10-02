@@ -22,12 +22,12 @@ struct BrowseSportSymbol: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Image(systemName: category.symbolName)
-                .font(AppTheme.Typography.icon)
-                .foregroundStyle(AppTheme.sportSymbolColor(category))
-                .frame(width: 28, height: 28)
-                .background(RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(isSelected ? AppTheme.accent : AppTheme.separator, lineWidth: 1))
+            Image(category.assetName)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(category.color)
+                .frame(width: 20, height: 20)
+                .frame(width: 30, height: 30)
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11)).foregroundStyle(AppTheme.accent)
@@ -196,5 +196,42 @@ struct BrowseStatusLine: View {
                     .frame(minWidth: AppTheme.minimumTarget, minHeight: AppTheme.minimumTarget)
             }
         }
+    }
+}
+
+/// Shared identification for List rows and map results. Compact rows keep the
+/// local date beside the title; accessibility sizes retain full sport/time text.
+struct BrowseActivityHeading: View {
+    let activity: Activity
+    var isActive = false
+    var comfortable = true
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+        layout {
+            HStack(spacing: 4) {
+                Text(activity.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : comfortable ? 2 : 1)
+                if isActive {
+                    Image(systemName: "location.fill").font(.caption2).foregroundStyle(AppTheme.accent)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if typeSize.isAccessibilitySize {
+                Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
+                    .font(.caption).foregroundStyle(AppTheme.secondaryText)
+            } else {
+                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
+                    .font(.caption2).foregroundStyle(AppTheme.secondaryText).fixedSize()
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(activity.name)
+        .accessibilityValue("\(activity.sportType.rawValue), \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))\(isActive ? ", active on map" : "")")
     }
 }

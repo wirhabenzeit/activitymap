@@ -6,6 +6,7 @@ struct BrowseContent: View {
     var sync: SyncController? = nil
     var isSigningIn = false
     var openAccount: () -> Void = {}
+    var mapPicker: RoutePicker? = nil
 
     var body: some View {
         GeometryReader { geometry in
@@ -23,7 +24,7 @@ struct BrowseContent: View {
                     .accessibilityHidden(store.selectedTab != .list)
                 // Keep the loaded style, GeoJSON source and rendered route tiles
                 // alive too; saving only the camera causes routes to pop in later.
-                MapScreen(store: store, topOcclusion: geometry.safeAreaInsets.top)
+                MapScreen(store: store, topOcclusion: geometry.safeAreaInsets.top, picker: mapPicker)
                     .id(store.mapContext.scopeRevision)
                     .ignoresSafeArea(edges: .top)
                     .opacity(store.selectedTab == .map ? 1 : 0)

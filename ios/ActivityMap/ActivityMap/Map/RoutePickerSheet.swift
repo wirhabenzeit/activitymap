@@ -219,12 +219,9 @@ struct RoutePickerSheet: View {
                 picker.showDetail(activity.id, store: store)
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: activity.category.symbolName)
-                        .foregroundStyle(activity.category.color).frame(width: 24)
+                    BrowseSportSymbol(category: activity.category)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(activity.name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                        Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
-                            .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                        BrowseActivityHeading(activity: activity, isActive: store.activeActivityID == activity.id)
                         let metrics = typeSize.isAccessibilitySize
                             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
                             : AnyLayout(HStackLayout(spacing: 8))
@@ -243,7 +240,7 @@ struct RoutePickerSheet: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(minHeight: 60)
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }.buttonStyle(.plain)
             Button { store.removeFromSelection([activity.id]) } label: {
@@ -252,7 +249,7 @@ struct RoutePickerSheet: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Deselect \(activity.name)")
         }
-        .padding(.leading, 20).padding(.trailing, 8).padding(.vertical, 8)
+        .padding(.leading, 12).padding(.trailing, 8).padding(.vertical, 4)
         .background(store.activeActivityID == activity.id ? Color.blue.opacity(0.06) : .clear)
     }
 }
