@@ -11,21 +11,26 @@ extension RenderedRoutePickingTests {
         store.selectedTab = .map
         store.replaceSelection(with: Array(store.activities.prefix(2).map(\.id)))
         let picker = RoutePicker()
-        picker.reviewSelection(store: store)
         let host = try ListHarness(root: MapResultsContainer(picker: picker, store: store,
             size: CGSize(width: 390, height: 844), topInset: 0, bottomInset: 34, largeText: false),
             size: CGSize(width: 390, height: 844))
         defer { host.close() }
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(host.host.presentedViewController == nil)
+        picker.reviewSelection(store: store)
         try await listWait { host.host.presentedViewController?.sheetPresentationController != nil }
         let controller = try #require(host.host.presentedViewController)
         let sheet = try #require(controller.sheetPresentationController)
         #expect(sheet.selectedDetentIdentifier != .large, "Initial presentation must start at its content height")
+        var animatedEntrance = controller.transitionCoordinator?.isAnimated == true
         for _ in 0..<8 {
+            animatedEntrance = animatedEntrance || controller.transitionCoordinator?.isAnimated == true
             let height = controller.presentationController?.presentedView?.layer.presentation()?.bounds.height
                 ?? controller.view.bounds.height
             #expect(height < 360, "Two-route entrance must not animate down from full height: \(height)")
             try await Task.sleep(for: .milliseconds(30))
         }
+        #expect(animatedEntrance, "Opening selection must use an animated native presentation")
         try await Task.sleep(for: .milliseconds(400))
         let image = UIGraphicsImageRenderer(bounds: host.window.bounds).image { _ in
             host.window.drawHierarchy(in: host.window.bounds, afterScreenUpdates: true)

@@ -37,11 +37,12 @@ struct MapScreen: View {
                     .accessibilityIdentifier("map-controls")
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
-                if showingResults {
-                    MapResultsContainer(picker: picker, store: store, size: geometry.size,
+                // Keep the native presenter mounted before selection changes,
+                // so UIKit receives a normal false-to-true presentation event.
+                MapResultsContainer(picker: picker, store: store, size: geometry.size,
                                         topInset: max(topOcclusion, geometry.safeAreaInsets.top),
                                         bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize)
-                } else {
+                if !showingResults {
                     VStack {
                         Spacer()
                         HStack { selectionMenu; Spacer(minLength: 132) }

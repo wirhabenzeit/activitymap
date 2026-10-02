@@ -32,7 +32,7 @@ struct MapResultsContainer: View {
 
     var body: some View {
         if layout(picker.detent).isSidePanel {
-            customPanel
+            if picker.isPresented { customPanel }
         } else {
             NativeMapResultsSheet(picker: picker, store: store, size: size, largeText: largeText)
         }
