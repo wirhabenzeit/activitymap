@@ -73,3 +73,9 @@ The shared detail keeps distance, moving time, elevation and weighted power as p
 The fixed bottom action is “Show on map” from List and “Fit route” from Map. Map fitting collapses detail but reserves the medium panel footprint so reopening normal detail does not cover the fitted route. Arbitrary panel drags do not initiate camera fits. Fully expanded detail can cover the route; collapse or use Fit route to restore the map. Future working edit/refresh/share actions belong beside this action; inert menu entries are omitted.
 
 Camera padding is retained across navigation and applied once (automatic SDK safe-area padding is disabled). Explicit route fits apply directly because the animated SDK transition can cancel during projection/panel updates; pitch, bearing and reset controls retain their animation. Gallery captures wait for the request and viewport to settle, and List-detail staging explicitly opens detail before capture.
+
+## Adaptive tablet List
+
+List uses the available window width until an activity is inspected. At regular widths of at least 760pt, standard text opens an adjacent 340–420pt detail pane while retaining at least 400pt for browsing. Closing detail restores the full list width. Narrower windows and accessibility text use the existing detail navigation; an already-pushed detail stays open through window changes. The native List instance, selection, sort and inspection owners remain unchanged.
+
+Wide rows share aligned metric columns and a separate sortable local-date column where space permits. Additional configured metrics use columns when the activity name and all values fit; otherwise the existing adaptive grid or user-selected scrolling-metrics layout retains every configured field. Opening detail never changes the saved metric settings.

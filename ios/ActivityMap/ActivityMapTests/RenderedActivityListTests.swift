@@ -46,9 +46,17 @@ extension RenderedRoutePickingTests {
         try host.save("list-tablet-retained-inspection")
     }
 
-    @Test(arguments: ["phone", "large-text", "tablet"])
+    @Test(arguments: ["phone", "large-text", "tablet", "tablet-landscape", "split-window", "tablet-large-text"])
     func listDetailUsesNavigationAndBackRetainsContext(scenario: String) async throws {
-        let tablet = scenario == "tablet"
+        let regular = scenario.hasPrefix("tablet") || scenario == "split-window"
+        let largeText = scenario.contains("large-text")
+        let size: CGSize = switch scenario {
+        case "tablet-landscape": CGSize(width: 1180, height: 820)
+        case "tablet", "tablet-large-text": CGSize(width: 820, height: 1180)
+        case "split-window": CGSize(width: 650, height: 1000)
+        default: CGSize(width: 390, height: 844)
+        }
+        let tablet = regular && size.width >= 760 && !largeText
         let presentation = ActivityListPresentation(defaults: nil)
         presentation.settings.sort = .init(field: .id, direction: .ascending)
         let store = ActivityStore(activities: (1...200).map { ActivityStoreSelectionTests.activity($0) }, listPresentation: presentation)
@@ -58,12 +66,14 @@ extension RenderedRoutePickingTests {
         let host = try ListHarness(root: NavigationStack {
             ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
         }
-        .environment(\.horizontalSizeClass, tablet ? .regular : .compact)
-        .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility3 : .large),
-        size: tablet ? CGSize(width: 820, height: 1180) : CGSize(width: 390, height: 844))
+        .environment(\.horizontalSizeClass, regular ? .regular : .compact)
+        .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large),
+        size: size)
         defer { host.close() }
         try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
         let list = try #require(host.descendants(of: UICollectionView.self).first)
+        let browsingWidth = list.bounds.width
+        #expect(browsingWidth >= size.width - 40, "Without inspection, browsing must use the window width")
         list.setContentOffset(CGPoint(x: 0, y: 617), animated: false)
         try await Task.sleep(for: .milliseconds(150))
         let offset = list.contentOffset
@@ -81,6 +91,8 @@ extension RenderedRoutePickingTests {
             try await Task.sleep(for: .milliseconds(250))
             #expect(navigation.viewControllers.count == 1, "Wide List shows adjacent detail without pushing")
             #expect(list.contentOffset == offset)
+            #expect(list.bounds.width >= 400 && list.bounds.width <= browsingWidth - 340,
+                    "Inspection must leave usable list and detail columns")
         } else {
             try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
             #expect(host.host.presentedViewController == nil, "Phone detail is a navigation destination, not a modal sheet")
@@ -93,6 +105,7 @@ extension RenderedRoutePickingTests {
         else { navigation.popViewController(animated: false) }
         try await listWait { store.inspectedActivityID == nil && navigation.viewControllers.count == 1 }
         #expect(host.descendants(of: UICollectionView.self).contains { $0 === list }, "Back returns to the same retained native List")
+        try await listWait { abs(list.bounds.width - browsingWidth) < 1 }
         #expect(abs(list.contentOffset.y - offset.y) < 1, "Back restores the exact scroll offset")
         #expect(presentation.settings == settings && store.selectedActivityIDs == selection && store.activeActivityID == 3)
         #expect(cameraValues() == camera && store.mapContext.pendingRequest == request)

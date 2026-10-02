@@ -3,6 +3,7 @@ import SwiftUI
 struct ActivityRowView: View {
     @Bindable var store: ActivityStore
     let activity: Activity
+    var availableWidth: CGFloat = 390
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var isSelected: Bool { store.selectedActivityIDs.contains(activity.id) }
@@ -10,7 +11,7 @@ struct ActivityRowView: View {
     private var hasGeometry: Bool { !activity.coordinates.isEmpty }
     private var settings: ActivityListSettings { store.listPresentation.settings }
 
-    private var usesTable: Bool { ActivityTableLayout.supports(settings, typeSize: typeSize) }
+    private var usesTable: Bool { ActivityTableLayout.supports(settings, typeSize: typeSize, availableWidth: availableWidth) }
 
     var body: some View {
         HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 0) {
@@ -59,16 +60,23 @@ struct ActivityRowView: View {
                         Image(systemName: "location.fill").font(.caption2).foregroundStyle(AppTheme.accent)
                     }
                 }
-                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
-                    .font(.caption2).foregroundStyle(AppTheme.secondaryText)
+                if !ActivityTableLayout.showsDate(settings, availableWidth: availableWidth) {
+                    Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
+                        .font(.caption2).foregroundStyle(AppTheme.secondaryText)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.trailing, 6)
+            if ActivityTableLayout.showsDate(settings, availableWidth: availableWidth) {
+                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
+                    .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    .frame(width: 120, alignment: .leading)
+            }
             ForEach(settings.orderedMetrics) { metric in
                 Text(ActivityTableLayout.value(metric, activity: activity))
                     .font(.caption).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.85)
-                    .frame(width: ActivityTableLayout.width(metric), alignment: .trailing)
+                    .frame(width: ActivityTableLayout.width(metric, availableWidth: availableWidth), alignment: .trailing)
             }
         }
     }
