@@ -2,34 +2,60 @@ import SwiftUI
 
 /// The header and every row share widths, so values stay comparable vertically.
 enum ActivityTableLayout {
-    static func supports(_ settings: ActivityListSettings, typeSize: DynamicTypeSize) -> Bool {
-        !typeSize.isAccessibilitySize && settings.width == .fitWidth
-            && !settings.visibleMetrics.isEmpty
-            && settings.visibleMetrics.isSubset(of: [.distance, .elapsedTime, .elevationGain])
+    static func supports(_ settings: ActivityListSettings, typeSize: DynamicTypeSize,
+                         availableWidth: CGFloat = 390) -> Bool {
+        guard !typeSize.isAccessibilitySize, settings.width == .fitWidth,
+              !settings.visibleMetrics.isEmpty else { return false }
+        // Preserve every configured metric. Fall back to the adaptive grid when
+        // aligned columns would squeeze the activity name or clip their values.
+        let nameWidth: CGFloat = availableWidth >= 700 ? 180 : 104
+        return availableWidth >= 104 + nameWidth + settings.orderedMetrics.reduce(CGFloat(0)) {
+            $0 + width($1, availableWidth: availableWidth)
+        }
     }
 
-    static func width(_ metric: ActivityListMetric) -> CGFloat {
-        metric == .elapsedTime ? 62 : 50
+    static func width(_ metric: ActivityListMetric, availableWidth: CGFloat = 390) -> CGFloat {
+        switch metric {
+        case .distance, .elevationGain: availableWidth >= 700 ? 90 : 50
+        case .elapsedTime, .movingTime: availableWidth >= 700 ? 90 : 62
+        case .averageSpeed, .maxSpeed: availableWidth >= 700 ? 110 : 80
+        default: 110
+        }
+    }
+
+    static func showsDate(_ settings: ActivityListSettings, availableWidth: CGFloat) -> Bool {
+        availableWidth >= 700 && availableWidth >= 104 + 180 + 120
+            + settings.orderedMetrics.reduce(CGFloat(0)) { $0 + width($1, availableWidth: availableWidth) }
     }
 
     static func title(_ metric: ActivityListMetric) -> String {
         switch metric {
         case .distance: "km"
         case .elapsedTime: "Time"
+        case .movingTime: "Moving"
+        case .averageSpeed: "Avg km/h"
+        case .maxSpeed: "Max km/h"
         case .elevationGain: "↑ m"
         default: metric.title
         }
     }
 
     static func value(_ metric: ActivityListMetric, activity: Activity) -> String {
-        metric.value(for: activity)
-            .replacingOccurrences(of: " km", with: "")
-            .replacingOccurrences(of: " m", with: "")
+        let value = metric.value(for: activity)
+        switch metric {
+        case .distance: return value.replacingOccurrences(of: " km", with: "")
+        case .elevationGain: return value.replacingOccurrences(of: " m", with: "")
+        case .averageSpeed, .maxSpeed: return value.replacingOccurrences(of: " km/h", with: "")
+        default: return value
+        }
     }
 }
 
 struct ActivityTableHeader: View {
     @Bindable var store: ActivityStore
+    var availableWidth: CGFloat = 390
+    @Binding var sortOpen: Bool
+    @Binding var displayOpen: Bool
     private var presentation: ActivityListPresentation { store.listPresentation }
 
     var body: some View {
@@ -51,19 +77,30 @@ struct ActivityTableHeader: View {
                 .contentShape(Rectangle())
             }
             .accessibilityLabel("Sort activities by name or date")
+            if ActivityTableLayout.showsDate(presentation.settings, availableWidth: availableWidth) {
+                Button { sort(.localDate) } label: {
+                    HStack(spacing: 2) {
+                        Text("Date")
+                        if presentation.settings.sort.field == .localDate { arrow }
+                    }
+                    .frame(width: 120, height: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Sort by date")
+            }
             ForEach(presentation.settings.orderedMetrics) { metric in
                 Button { sort(metric.field) } label: {
                     HStack(spacing: 2) {
                         Text(ActivityTableLayout.title(metric))
                         if presentation.settings.sort.field == metric.field { arrow }
                     }
-                    .frame(width: ActivityTableLayout.width(metric), height: 44, alignment: .trailing)
+                    .frame(width: ActivityTableLayout.width(metric, availableWidth: availableWidth), height: 44, alignment: .trailing)
                     .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Sort by \(metric.title)")
                 .accessibilityValue(presentation.settings.sort.field == metric.field ? presentation.settings.sort.direction.title : "Not sorted")
             }
-            ListControls(presentation: presentation, iconOnly: true).frame(width: 44)
+            ListControls(presentation: presentation, iconOnly: true, sortOpen: $sortOpen, displayOpen: $displayOpen).frame(width: 44)
         }
         .font(.caption2.weight(.semibold))
         .foregroundStyle(AppTheme.secondaryText)

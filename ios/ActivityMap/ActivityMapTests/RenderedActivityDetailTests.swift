@@ -69,7 +69,7 @@ extension RenderedRoutePickingTests {
         picker.reviewSelection(store: store)
         picker.showDetail(1, store: store, motion: .none)
         let resizing = MapResultsResizeState()
-        let size = CGSize(width: 375, height: 812)
+        let size = CGSize(width: 820, height: 1180)
         let heights = MapResultsDetent.allCases.map {
             MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: $0).contentHeight
         }
@@ -122,7 +122,7 @@ extension RenderedRoutePickingTests {
             #expect(headings.count == 1, "Exactly one persistent heading at reveal progress \(fraction)")
             let heading = try #require(headings.first)
             let top = (1 - heading.boundingBox.maxY) * size.height
-            let sheetTop = size.height - (resizing.height ?? 0)
+            let sheetTop = MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: picker.detent, heightOverride: resizing.height).frame.minY
             headingOffsets.append(top - sheetTop)
         }
         #expect((headingOffsets.max() ?? 0) - (headingOffsets.min() ?? 0) < 3,
@@ -144,7 +144,7 @@ extension RenderedRoutePickingTests {
         picker.reviewSelection(store: store)
         picker.showDetail(1, store: store, motion: .none)
         let resizing = MapResultsResizeState()
-        let size = CGSize(width: 375, height: 812)
+        let size = CGSize(width: 820, height: 1180)
         let heights = MapResultsDetent.allCases.map {
             MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: $0).contentHeight
         }
@@ -232,7 +232,9 @@ extension RenderedRoutePickingTests {
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
         #expect(text.contains("2023"), "Date remains visibly rendered beside the sport badge and title: \(text)")
-        #expect(text.contains("31.2") && text.contains("1h 14m") && text.contains("820"),
+        // Vision may split a number into adjacent text observations ("3 1.2").
+        let compactText = text.filter { !$0.isWhitespace }
+        #expect(compactText.contains("31.2") && compactText.contains("1h14m") && compactText.contains("820"),
                 "Distance, elapsed time and elevation are visibly rendered: \(text)")
     }
 

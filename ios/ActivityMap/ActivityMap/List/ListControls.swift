@@ -3,8 +3,8 @@ import SwiftUI
 struct ListControls: View {
     @Bindable var presentation: ActivityListPresentation
     var iconOnly = false
-    @State private var sortOpen = false
-    @State private var displayOpen = false
+    @Binding var sortOpen: Bool
+    @Binding var displayOpen: Bool
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
@@ -12,6 +12,44 @@ struct ListControls: View {
         .font(.caption)
         .foregroundStyle(.primary)
         .buttonStyle(.plain)
+    }
+
+    private var controls: some View {
+        Menu {
+            Button { sortOpen = true } label: {
+                Label("Sort activities", systemImage: "arrow.up.arrow.down")
+            }
+            .accessibilityValue("\(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
+            .accessibilityIdentifier("list-sort-control")
+            Button { displayOpen = true } label: {
+                Label("Columns and layout", systemImage: "rectangle.split.3x1")
+            }
+            .accessibilityIdentifier("list-display-control")
+        } label: {
+            Group {
+                if iconOnly || typeSize.isAccessibilitySize {
+                    Image(systemName: "slider.horizontal.3")
+                } else {
+                    Label("View", systemImage: "slider.horizontal.3")
+                }
+            }
+            .foregroundStyle(AppTheme.accent)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel("List view options")
+        .accessibilityValue("Sorted by \(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
+    }
+}
+
+/// Owned by the retained list, never by an adaptive header branch.
+struct ListOptionsSheets: ViewModifier {
+    @Bindable var presentation: ActivityListPresentation
+    @Binding var sortOpen: Bool
+    @Binding var displayOpen: Bool
+
+    func body(content: Content) -> some View {
+        content
         .sheet(isPresented: $sortOpen) {
             NavigationStack {
                 Form {
@@ -62,38 +100,11 @@ struct ListControls: View {
                             presentation.settings.width = .fitWidth
                         }
                     } header: { Text("Visible metrics") }
-                    footer: { Text("Name, sport and local date always stay visible. Distance, elapsed time and elevation use table columns in Fit Width. Additional metrics and accessibility text use stacked rows. Open Details to inspect hidden metrics.") }
+                    footer: { Text("Name, sport and local date always stay visible. Fit Width shows aligned columns when the chosen metrics fit. Adding more metrics can switch to stacked rows and remove the column headings, especially on iPhone. Scroll Metrics uses horizontally scrolling values in each row. Accessibility text uses stacked rows. Open Details to inspect hidden metrics.") }
                 }
                 .navigationTitle("List display")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { displayOpen = false } } }
             }
         }
-    }
-
-    private var controls: some View {
-        Menu {
-            Button { sortOpen = true } label: {
-                Label("Sort activities", systemImage: "arrow.up.arrow.down")
-            }
-            .accessibilityValue("\(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
-            .accessibilityIdentifier("list-sort-control")
-            Button { displayOpen = true } label: {
-                Label("Columns and layout", systemImage: "rectangle.split.3x1")
-            }
-            .accessibilityIdentifier("list-display-control")
-        } label: {
-            Group {
-                if iconOnly || typeSize.isAccessibilitySize {
-                    Image(systemName: "slider.horizontal.3")
-                } else {
-                    Label("View", systemImage: "slider.horizontal.3")
-                }
-            }
-            .foregroundStyle(AppTheme.accent)
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .accessibilityLabel("List view options")
-        .accessibilityValue("Sorted by \(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
     }
 }

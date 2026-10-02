@@ -7,40 +7,64 @@ struct ListScreen: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var hasPushedDetail = false
+    @State var sortOpen = false
+    @State var displayOpen = false
+    @Environment(\.filterSidebarVisible) private var filterSidebarVisible
 
     var body: some View {
         GeometryReader { geometry in
-            let sideBySide = sizeClass == .regular && geometry.size.width >= 650
+            let sideBySide = sizeClass == .regular && geometry.size.width >= 760 && !typeSize.isAccessibilitySize
+            let usesOverlay = filterSidebarVisible && !sideBySide && !hasPushedDetail
+            let showsDetail = sideBySide && store.inspectedActivityID != nil && !hasPushedDetail
+            let detailWidth = min(420, max(340, geometry.size.width * 0.42))
+            let listWidth = showsDetail ? geometry.size.width - detailWidth - 1 : geometry.size.width
             HStack(spacing: 0) {
-                activityList
-                    .frame(width: sideBySide ? min(400, max(360, geometry.size.width * 0.45)) : nil)
-                    // The list column has phone-like width even on a wide host.
-                    .environment(\.horizontalSizeClass, sideBySide ? .compact : sizeClass)
-                if sideBySide {
+                activityList(width: listWidth)
+                    .frame(width: listWidth)
+                if showsDetail {
                     Divider()
                     detailColumn
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(width: detailWidth)
+                        .frame(maxHeight: .infinity)
                 }
             }
             // Inspecting is ordinary navigation. Back only clears inspection;
             // the retained list and selection/camera owners remain unchanged.
-            .navigationDestination(item: inspectionID(sideBySide: sideBySide)) { id in
+            .navigationDestination(item: inspectionID(sideBySide: sideBySide || usesOverlay)) { id in
                 ActivityDetailView(store: store, activityID: id)
+            }
+            .sheet(isPresented: Binding(
+                get: { usesOverlay && store.selectedTab == .list && store.inspectedActivityID != nil },
+                set: { if !$0, usesOverlay, store.selectedTab == .list { store.dismissInspection() } }
+            )) {
+                if let id = store.inspectedActivityID {
+                    NavigationStack {
+                        ActivityDetailPanel(store: store, activityID: id)
+                            .navigationTitle("Activity").navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .confirmationAction) {
+                                    Button("Done") { store.dismissInspection() }
+                                }
+                            }
+                    }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                }
             }
             .onChange(of: store.inspectedActivityID, initial: true) { _, id in
                 if id == nil { hasPushedDetail = false }
-                else if !sideBySide { hasPushedDetail = true }
+                else if !sideBySide && !usesOverlay { hasPushedDetail = true }
             }
             .onChange(of: sideBySide) { _, wide in
-                if !wide, store.inspectedActivityID != nil { hasPushedDetail = true }
+                if !wide, !filterSidebarVisible, store.inspectedActivityID != nil { hasPushedDetail = true }
             }
         }
     }
 
-    private var activityList: some View {
+    private func activityList(width: CGFloat) -> some View {
         List {
             ForEach(store.listedActivities) { activity in
-                ActivityRowView(store: store, activity: activity)
+                ActivityRowView(store: store, activity: activity, availableWidth: width)
                     .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 44 }
                     .listRowBackground(store.selectedActivityIDs.contains(activity.id) ? AppTheme.accent.opacity(0.07) : Color(uiColor: .systemBackground))
@@ -53,25 +77,27 @@ struct ListScreen: View {
         }
         .listStyle(.plain)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize) {
-                ActivityTableHeader(store: store)
+            if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize, availableWidth: width) {
+                ActivityTableHeader(store: store, availableWidth: width, sortOpen: $sortOpen, displayOpen: $displayOpen)
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: AppTheme.Spacing.small) {
                         SelectionBar(store: store)
                         Spacer(minLength: 0)
-                        ListControls(presentation: store.listPresentation)
+                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen)
                     }
                     VStack(alignment: .leading, spacing: 0) {
                         SelectionBar(store: store)
-                        ListControls(presentation: store.listPresentation).padding(.leading, 44)
+                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen).padding(.leading, 44)
                     }
                 }
                 .padding(.horizontal, AppTheme.Spacing.small)
-                .background(.thinMaterial, ignoresSafeAreaEdges: [])
+                .background(Color(uiColor: .systemBackground))
+                .overlay(alignment: .bottom) { Divider() }
                 .accessibilityIdentifier("list-browse-toolbar")
             }
         }
+        .modifier(ListOptionsSheets(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen))
     }
 
     @ViewBuilder private var detailColumn: some View {
@@ -87,9 +113,6 @@ struct ListScreen: View {
                     .padding(.top, AppTheme.Spacing.small)
                     .accessibilityLabel("Close activity details")
                 }
-        } else {
-            ContentUnavailableView("Choose an activity", systemImage: "figure.run",
-                                   description: Text("Open an activity from the list to see its details."))
         }
     }
 

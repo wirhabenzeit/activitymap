@@ -110,7 +110,7 @@ private struct MapActivityDetailReveal: View {
 }
 
 /// Single integration point for real edit/refresh/share actions (#220–#222).
-/// Until those land, the menu explicitly identifies them as unavailable.
+/// Add those actions when implemented; the current surface contains only working actions.
 private struct ActivityDetailActions: View {
     @Environment(\.activityDetailOverMap) private var overMap
     let activity: Activity
@@ -123,35 +123,25 @@ private struct ActivityDetailActions: View {
                 Button {
                     showOnMap(activity.id)
                 } label: {
-                    Label("Show on map", systemImage: "map")
+                    Label(overMap ? "Fit route" : "Show on map", systemImage: overMap ? "arrow.up.left.and.arrow.down.right" : "map")
                         .font(.subheadline.weight(.medium))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(AppTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(AppTheme.accent)
                 .disabled(!hasRoute)
                 .accessibilityIdentifier("activity-show-on-map")
-                .accessibilityHint(hasRoute ? "Select this activity and frame its route" : "This activity has no GPS route")
-                Menu {
-                    Section("Not available yet") {
-                        Button("Edit activity", systemImage: "pencil") {}.disabled(true)
-                        Button("Refresh from Strava", systemImage: "arrow.clockwise") {}.disabled(true)
-                        Button("Share GPX", systemImage: "square.and.arrow.up") {}.disabled(true)
-                        Button("Open in Strava", systemImage: "arrow.up.right.square") {}.disabled(true)
-                    }
-                } label: {
-                    BrowseIconLabel(systemImage: "ellipsis")
-                }
-                .accessibilityLabel("More activity actions")
-                .accessibilityHint("Editing, refresh, GPX sharing and Strava links are not available yet")
+                .accessibilityHint(hasRoute ? (overMap ? "Collapse detail and frame this route, leaving room to reopen detail" : "Select this activity and frame its route") : "This activity has no GPS route")
+                Spacer(minLength: 0)
             }
             if !hasRoute {
                 Text("No GPS route recorded").font(.caption).foregroundStyle(AppTheme.secondaryText)
             }
         }
         .padding(.horizontal, AppTheme.Spacing.large)
-        .padding(.vertical, AppTheme.Spacing.small)
+        .padding(.vertical, AppTheme.Spacing.tight)
         .background { if !overMap { AppTheme.surface } }
+        .overlay(alignment: .top) { Divider() }
     }
 }

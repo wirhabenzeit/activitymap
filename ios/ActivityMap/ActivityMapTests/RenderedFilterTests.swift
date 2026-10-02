@@ -5,6 +5,31 @@ import UIKit
 
 @MainActor @Suite(.serialized)
 struct RenderedFilterTests {
+    @Test func landscapeSidebarKeepsFiltersWhileInspecting() async throws {
+        let key = "browse.filterSidebarVisible"
+        let previous = UserDefaults.standard.object(forKey: key)
+        UserDefaults.standard.set(true, forKey: key)
+        defer {
+            if let previous { UserDefaults.standard.set(previous, forKey: key) }
+            else { UserDefaults.standard.removeObject(forKey: key) }
+        }
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities,
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        store.distanceFilter = NumericFilter(value: 10000, upperLimit: 80000)
+        let root = AppShell(store: store).environment(\.horizontalSizeClass, .regular)
+        let host = try FilterHarness(root: root, size: CGSize(width: 1180, height: 820))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(600))
+        let selection = store.selectedActivityIDs
+        store.inspect(20279947341)
+        try await Task.sleep(for: .milliseconds(600))
+        #expect(store.distanceFilter == NumericFilter(value: 10000, upperLimit: 80000))
+        #expect(store.selectedActivityIDs == selection)
+        #expect(host.host.presentedViewController == nil, "A wide window fits filters, list and detail together")
+        try host.save(host.snapshot(), name: "sidebar-landscape-detail")
+    }
+
     @Test(arguments: ["phone", "accessibility", "tablet"])
     func panelRedrawsCountsAndAppliedFilters(scenario: String) async throws {
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1), ActivityStoreSelectionTests.activity(2, sport: .ride)])
@@ -42,12 +67,12 @@ struct RenderedFilterTests {
         let host = try FilterHarness(root: root, size: CGSize(width: 390, height: 844))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(200))
-        let field = try #require(host.descendants(of: UITextField.self).first)
-        #expect(field.text == "1.25", "Editor must convert metres to displayed kilometres")
+        #expect(host.descendants(of: UITextField.self).isEmpty, "Compact ranges do not expose text entry")
+        let applied = host.snapshot()
         try host.save(host.snapshot(), name: "numeric-\(scenario)-applied")
         store.distanceFilter = nil
         try await Task.sleep(for: .milliseconds(200))
-        #expect(field.text == "", "External reset clears the displayed threshold")
+        #expect(applied.pngData() != host.snapshot().pngData(), "External reset must redraw the range and summary")
         try host.save(host.snapshot(), name: "numeric-\(scenario)-reset")
     }
 }

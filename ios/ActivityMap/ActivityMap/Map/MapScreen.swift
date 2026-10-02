@@ -37,11 +37,12 @@ struct MapScreen: View {
                     .accessibilityIdentifier("map-controls")
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
-                if showingResults {
-                    MapResultsContainer(picker: picker, store: store, size: geometry.size,
+                // Keep the native presenter mounted before selection changes,
+                // so UIKit receives a normal false-to-true presentation event.
+                MapResultsContainer(picker: picker, store: store, size: geometry.size,
                                         topInset: max(topOcclusion, geometry.safeAreaInsets.top),
                                         bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize)
-                } else {
+                if !showingResults {
                     VStack {
                         Spacer()
                         HStack { selectionMenu; Spacer(minLength: 132) }
@@ -102,6 +103,8 @@ struct MapScreen: View {
                 return true
             }
         }
+        // Fitted and restored camera padding already includes safe areas.
+        .usesSafeAreaInsetsAsPadding(false)
         .mapStyle(mapStyle)
         .ornamentOptions(attributionLayout(in: geometry).ornamentOptions)
         .gestureHandlers(MapGestureHandlers(onBegin: { gesture in
@@ -112,7 +115,7 @@ struct MapScreen: View {
             if acceptsCameraEvents, store.selectedTab == .map { context.record(event.cameraState) }
         }
         .onStyleLoaded { _ in
-            viewport = context.camera.viewport
+            if !acceptsCameraEvents { viewport = context.camera.viewport }
             acceptsCameraEvents = true
             applyNavigation(proxy: proxy, geometry: geometry)
         }
@@ -161,7 +164,9 @@ struct MapScreen: View {
             // Explicit fits leave enough map space for the route and chrome.
             picker.detent = .compact
         }
-        let layout = resultsLayout(in: geometry)
+        let layout = MapResultsLayout.framing(size: geometry.size,
+            topInset: max(topOcclusion, geometry.safeAreaInsets.top), bottomInset: geometry.safeAreaInsets.bottom,
+            detent: picker.detent, largeText: typeSize.isAccessibilitySize)
         let showingResults = picker.isPresented
         let safeArea = geometry.safeAreaInsets
         // The map extends under navigation; retain its original occluded height
@@ -169,27 +174,32 @@ struct MapScreen: View {
         // Map ignores safe areas; camera fitting uses its full physical size.
         let size = CGSize(width: geometry.size.width + safeArea.leading + safeArea.trailing,
                           height: geometry.size.height + safeArea.bottom)
+        let action = context.pendingRequest?.action
         guard let camera = MapNavigation.resolve(
             store: store, map: map, size: size,
             safeArea: UIEdgeInsets(top: safeArea.top, left: safeArea.leading,
                                   bottom: safeArea.bottom, right: safeArea.trailing),
             // Fit above the panel; background controls and credits add no occlusion.
-            sheetHeight: showingResults && !layout.isSidePanel ? layout.bottomOcclusion : 0, topOcclusion: topOcclusion,
+            sheetHeight: showingResults && !layout.isSidePanel
+                ? max(layout.bottomOcclusion, NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.count, detail: picker.detailID != nil, height: geometry.size.height, largeText: typeSize.isAccessibilitySize) + safeArea.bottom) : 0, topOcclusion: topOcclusion,
             leadingOcclusion: showingResults && layout.isSidePanel ? layout.leadingOcclusion + safeArea.leading : 0
         ) else { return }
-        withViewportAnimation(.default(maxDuration: 0.5)) {
-            viewport = .camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
+        let padding = camera.padding ?? context.camera.padding
+        let target = Viewport.camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
+            .padding(EdgeInsets(top: padding.top, leading: padding.left, bottom: padding.bottom, trailing: padding.right))
+        switch action {
+        case .activity, .fitSelection, .fitFiltered:
+            // A fit can also change projection and panel layout. The SDK's
+            // animated transition can cancel during those updates, leaving the
+            // initial camera after the request has already been consumed.
+            viewport = target
+        default:
+            withViewportAnimation(.default(maxDuration: 0.5)) { viewport = target }
         }
     }
 
     private func attributionLayout(in geometry: GeometryProxy) -> MapAttributionLayout {
         MapAttributionLayout(bottomInset: geometry.safeAreaInsets.bottom)
-    }
-
-    private func resultsLayout(in geometry: GeometryProxy) -> MapResultsLayout {
-        MapResultsLayout(size: geometry.size, topInset: max(topOcclusion, geometry.safeAreaInsets.top),
-                         bottomInset: geometry.safeAreaInsets.bottom, detent: picker.detent,
-                         largeText: typeSize.isAccessibilitySize)
     }
 
     private func routeInteraction(proxy: MapProxy) -> TapInteraction {

@@ -1,107 +1,134 @@
 import SwiftUI
 
-/// A single editor for the active filter panel. Drafts apply only when valid;
-/// invalid or unfinished input never changes the last applied restriction.
+/// Draft locally while scrubbing; commit on release so large libraries are not
+/// filtered on every touch frame. Endpoints keep the range open-ended.
 struct NumericFilterRow: View {
     let title: String
     let icon: String
     let unit: String
     let scale: Double
     @Binding var filter: NumericFilter?
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    var suggestedMaximum: Double = 100
+    var step: Double = 1
+    @State private var minimum: Double?
+    @State private var maximum: Double?
+    @Environment(\.dynamicTypeSize) private var typeSize
 
-    @State private var input = ""
-    @State private var operatorType: FilterOperator = .gte
-
-    private var parsed: NumericFilterInput { NumericFilterInput.parse(input, scale: scale) }
-    private var invalid: Bool {
-        if case .invalid = parsed { return true }
-        return false
+    private var ceiling: Double {
+        let extent = max(suggestedMaximum, (filter?.maximum ?? 0) / scale, (filter?.minimum ?? 0) / scale, step)
+        let quarter = extent / 4
+        let magnitude = pow(10, floor(log10(quarter)))
+        let rounded = [1.0, 2, 2.5, 5, 10].first { $0 * magnitude >= quarter } ?? 10
+        return rounded * magnitude * 4
     }
-    private var appliedLabel: String {
-        guard let filter else { return "Any" }
-        let number = (filter.value / scale).formatted(.number.grouping(.never).precision(.fractionLength(0...12)))
-        return "\(filter.operatorType.rawValue) \(number) \(unit)"
+    private var lower: Double { min(ceiling, minimum ?? 0) }
+    private var upper: Double { min(ceiling, maximum ?? ceiling) }
+    private var summary: String {
+        switch (minimum, maximum) {
+        case let (.some(low), .some(high)): "\(format(low))–\(format(high)) \(unit)"
+        case let (.some(low), nil): "≥\(format(low)) \(unit)"
+        case let (nil, .some(high)): "≤\(format(high)) \(unit)"
+        case (nil, nil): "Any"
+        }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: icon)
-            if dynamicTypeSize.isAccessibilitySize {
-                comparison
-                valueField
-                appliedStatus
-                actions
-            } else {
-                HStack { comparison; valueField }
-                HStack { appliedStatus; Spacer(); actions }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2)) : AnyLayout(HStackLayout())
+                layout {
+                    Label(title, systemImage: icon).font(.subheadline.weight(.semibold))
+                    if !typeSize.isAccessibilitySize { Spacer(minLength: 4) }
+                    Text(summary).font(.subheadline).foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                if filter != nil {
+                    Button { filter = nil; loadApplied() } label: {
+                        Image(systemName: "arrow.counterclockwise").font(.caption)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Clear \(title.lowercased()) range")
+                }
             }
-            if invalid {
-                Text("Enter a nonnegative decimal in \(unit), or clear this filter. The applied filter is unchanged.")
-                    .font(.caption)
-                    .foregroundStyle(.red)
+            .frame(minHeight: 44)
+            GeometryReader { geometry in
+                let width = max(1, geometry.size.width - 44)
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.secondary.opacity(0.2)).frame(height: 4)
+                        .padding(.horizontal, 22)
+                    Capsule().fill(Color.accentColor).frame(width: max(0, (upper - lower) / ceiling * width), height: 4)
+                        .offset(x: 22 + lower / ceiling * width)
+                    thumb(minimum: true, width: width)
+                    thumb(minimum: false, width: width)
+                }
+                .frame(height: 44)
+                .coordinateSpace(name: title)
             }
+            .frame(height: 44)
+            GeometryReader { geometry in
+                let width = max(1, geometry.size.width - 44)
+                ForEach(0..<5) { index in
+                    if !typeSize.isAccessibilitySize || index.isMultiple(of: 2) {
+                        Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 4)
+                            .offset(x: 22 + CGFloat(index) / 4 * width)
+                        let labelWidth = geometry.size.width / (typeSize.isAccessibilitySize ? 3 : 5)
+                        Text(format(ceiling * Double(index) / 4) + (index == 4 ? " \(unit)" : ""))
+                            .font(.caption2).foregroundStyle(.secondary)
+                            .lineLimit(1).minimumScaleFactor(0.75)
+                            .frame(width: labelWidth, alignment: index == 0 ? .leading : index == 4 ? .trailing : .center)
+                            .offset(x: CGFloat(index) / 4 * (geometry.size.width - labelWidth), y: 6)
+                    }
+                }
+            }
+            .frame(height: typeSize.isAccessibilitySize ? 40 : 22)
+            .accessibilityHidden(true)
         }
         .onAppear { loadApplied() }
         .onChange(of: filter) { _, _ in loadApplied() }
     }
 
-    private var appliedStatus: some View {
-        Text("Applied: \(appliedLabel)")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-    }
-
-    private var actions: some View {
-        HStack(spacing: 16) {
-            Button("Apply") { apply() }
-                .frame(minHeight: 44)
-                .disabled(invalid)
-                .accessibilityLabel("Apply \(title.lowercased()) filter")
-            Button("Clear") {
-                filter = nil
-                input = ""
-                operatorType = .gte
+    private func thumb(minimum: Bool, width: CGFloat) -> some View {
+        let value = minimum ? lower : upper
+        return Circle().fill(.background).shadow(color: .black.opacity(0.18), radius: 2, y: 1)
+            .overlay { Circle().stroke(Color.accentColor, lineWidth: 2) }
+            .frame(width: 24, height: 24)
+            .frame(width: 44, height: 44).contentShape(Rectangle())
+            .offset(x: value / ceiling * width)
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named(title))
+                .onChanged { event in update(minimum: minimum, value: (event.location.x - 22) / width * ceiling) }
+                .onEnded { _ in apply() })
+            .accessibilityElement()
+            .accessibilityLabel("\(title) \(minimum ? "minimum" : "maximum")")
+            .accessibilityValue((minimum ? self.minimum : maximum) == nil ? "No limit" : "\(format(value)) \(unit)")
+            .accessibilityAdjustableAction { direction in
+                update(minimum: minimum, value: value + (direction == .increment ? step : -step))
+                apply()
             }
-            .frame(minHeight: 44)
-            .accessibilityLabel("Clear \(title.lowercased()) filter")
-        }
     }
 
-    private var comparison: some View {
-        Picker("\(title) comparison", selection: $operatorType) {
-            Text("≥").tag(FilterOperator.gte)
-            Text("≤").tag(FilterOperator.lte)
-        }
-        .pickerStyle(.segmented)
-        .frame(minWidth: 100, maxWidth: 160, minHeight: 44)
-        .accessibilityHint("Inclusive minimum or maximum")
-    }
-
-    private var valueField: some View {
-        HStack {
-            TextField("Any", text: $input)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .frame(minHeight: 44)
-                .accessibilityLabel("\(title) in \(unit)")
-                .onSubmit { if !invalid { apply() } }
-            Text(unit).foregroundStyle(.secondary)
+    private func update(minimum: Bool, value: Double) {
+        let snapped = min(ceiling, max(0, (value / step).rounded() * step))
+        if minimum {
+            let bounded = min(snapped, upper)
+            self.minimum = bounded == 0 ? nil : bounded
+        } else {
+            let bounded = max(snapped, lower)
+            maximum = bounded == ceiling ? nil : bounded
         }
     }
-
+    private func format(_ value: Double) -> String {
+        value.formatted(.number.grouping(.never).precision(.fractionLength(0...12)))
+    }
     private func apply() {
-        switch parsed {
-        case .empty: filter = nil
-        case .valid(let value): filter = NumericFilter(operatorType: operatorType, value: value)
-        case .invalid: break
-        }
+        if let low = minimum {
+            filter = NumericFilter(value: low * scale, upperLimit: maximum.map { $0 * scale })
+        } else if let high = maximum {
+            filter = NumericFilter(operatorType: .lte, value: high * scale)
+        } else { filter = nil }
     }
-
     private func loadApplied() {
-        operatorType = filter?.operatorType ?? .gte
-        input = filter.map {
-            ($0.value / scale).formatted(.number.grouping(.never).precision(.fractionLength(0...12)))
-        } ?? ""
+        minimum = filter?.minimum.map { $0 / scale }
+        maximum = filter?.maximum.map { $0 / scale }
     }
 }

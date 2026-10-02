@@ -25,7 +25,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.large) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
             if showsHeading {
                 ActivityDetailIdentity(activity: activity, trailingInset: headerTrailingInset)
             }
@@ -35,7 +35,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                     VStack(alignment: .leading, spacing: 4) { badges }
                 }
             }
-            LazyVGrid(columns: columns, alignment: .leading, spacing: AppTheme.Spacing.large) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: AppTheme.Spacing.medium) {
                 highlight("Distance", value: Formatters.distance(activity.distance),
                           context: context([("averageSpeed", "avg"), ("maxSpeed", "max")]))
                 highlight("Moving time", value: Formatters.duration(activity.movingTime),
@@ -46,9 +46,14 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                     highlight("Weighted power", value: power.value,
                               context: context([("averageWatts", "avg"), ("maxWatts", "max")]))
                 }
-                ForEach(supplementary) { metric in
-                    highlight(metric.title, value: metric.value)
-                        .accessibilityIdentifier("activity-metric-\(metric.id)")
+            }
+            if !supplementary.isEmpty {
+                Divider()
+                LazyVGrid(columns: columns, alignment: .leading, spacing: AppTheme.Spacing.small) {
+                    ForEach(supplementary) { metric in
+                        BrowseMetricValue(title: metric.title, value: metric.value, valueFirst: true)
+                            .accessibilityIdentifier("activity-metric-\(metric.id)")
+                    }
                 }
             }
             profile(activity)
@@ -87,7 +92,8 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(AppTheme.Spacing.large)
+        .padding(.horizontal, AppTheme.Spacing.large)
+        .padding(.vertical, AppTheme.Spacing.small)
         .background { if !overMap { AppTheme.surface } }
     }
 

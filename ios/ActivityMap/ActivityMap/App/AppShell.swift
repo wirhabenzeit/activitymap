@@ -6,8 +6,10 @@ struct AppShell: View {
     @State private var sync: SyncController?
     @Environment(\.localStore) private var localStore
     @Environment(\.scenePhase) private var scenePhase
-    @State private var showsFilters = false
-    @State private var accountDestination: AccountDestination?
+    @State private var sheets: BrowseSheetPresentation
+    @AppStorage("browse.filterSidebarVisible") private var sidebarVisible = true
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     // Retained for review captures: the gallery stages map results inside the
     // production shell.
@@ -17,18 +19,43 @@ struct AppShell: View {
         self.init(store: ActivityStore(activities: activities))
     }
 
-    init(store: ActivityStore, mapPicker: RoutePicker? = nil) {
+    init(store: ActivityStore, mapPicker: RoutePicker? = nil, sheets: BrowseSheetPresentation = BrowseSheetPresentation()) {
+        _sheets = State(initialValue: sheets)
         _store = State(initialValue: store)
         self.mapPicker = mapPicker
     }
 
     var body: some View {
         NavigationStack {
-            content
+            GeometryReader { geometry in
+                let sidebarAvailable = sizeClass == .regular && geometry.size.width >= 760 && !typeSize.isAccessibilitySize
+                HStack(spacing: 0) {
+                    if sidebarAvailable && sidebarVisible {
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text("Filters").font(.headline)
+                                Spacer()
+                                Button { sidebarVisible = false } label: {
+                                    Image(systemName: "sidebar.left").frame(width: 44, height: 44)
+                                }.accessibilityLabel("Hide filter sidebar")
+                            }.padding(.horizontal, 16)
+                            FilterPanel(store: store)
+                        }
+                        .frame(width: 320)
+                        .background(Color(uiColor: .secondarySystemBackground))
+                        .accessibilityIdentifier("filter-sidebar")
+                        Divider()
+                    }
+                    content.environment(\.filterSidebarVisible, sidebarAvailable && sidebarVisible)
+                        .environment(\.mapResultsSheetSuspended, sheets.showsFilters || sheets.accountDestination != nil || sheets.shellSheetPresented)
+                        .environment(\.mapResultsPresentationChanged, { sheets.mapResultsPresented = $0 })
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .navigationTitle(store.selectedTab == .list ? "Activities" : "ActivityMap")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+                .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
+                .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
                 .task {
                     guard let localStore else { return } // Xcode previews stay offline.
                     if sync == nil {
@@ -49,33 +76,43 @@ struct AppShell: View {
                     }
                 }
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Section(auth.currentUser?.name ?? "Account") {
                                 Button {
-                                    accountDestination = .profile
+                                    sheets.accountDestination = .profile
                                 } label: {
                                     Label("Profile", systemImage: "person")
                                 }
                             }
 
                             Button {
-                                accountDestination = .settings
+                                sheets.accountDestination = .settings
                             } label: {
                                 Label("Settings", systemImage: "gearshape")
                             }
 
                             Button {
-                                accountDestination = .about
+                                sheets.accountDestination = .about
                             } label: {
                                 Label("About ActivityMap", systemImage: "info.circle")
                             }
                         } label: {
-                            Image(systemName: "person.crop.circle")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(Color.primary)
-                                .frame(width: 44, height: 44)
-                                .modifier(MapChromeSurface())
+                            AsyncImage(url: auth.currentUser?.image.flatMap(URL.init(string:))) { phase in
+                                if let image = phase.image {
+                                    image.resizable().scaledToFill()
+                                        .frame(width: 32, height: 32)
+                                        .clipShape(Circle())
+                                        .overlay { Circle().strokeBorder(.white.opacity(0.65), lineWidth: 1) }
+                                } else {
+                                    Image(systemName: "person.crop.circle")
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                            .accessibilityHidden(true)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Account and Settings")
@@ -87,37 +124,53 @@ struct AppShell: View {
                     }
                     .sharedBackgroundVisibility(.hidden)
 
-                    ToolbarItem(placement: .primaryAction) {
+                    ToolbarItem(placement: .topBarLeading) {
                         Button {
-                            showsFilters.toggle()
+                            if sidebarAvailable { sidebarVisible.toggle() }
+                            else { sheets.showsFilters.toggle() }
                         } label: {
                             Image(systemName: store.activeFilterCount == 0
                                 ? "line.3.horizontal.decrease"
                                 : "line.3.horizontal.decrease.circle.fill")
                         }
-                        .buttonStyle(MapChromeButtonStyle(isSelected: store.activeFilterCount > 0))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
                         .accessibilityLabel(filterButtonLabel)
                     }
                     .sharedBackgroundVisibility(.hidden)
                 }
-                .inspector(isPresented: $showsFilters) {
-                    NavigationStack {
-                        FilterPanel(store: store)
-                            .navigationTitle("Filters")
-                            .navigationBarTitleDisplayMode(.inline)
+                .sheet(item: Binding(
+                    get: { sheets.mapResultsPresented ? nil : (sheets.showsFilters && !sidebarAvailable ? ShellSheet.filters : sheets.accountDestination.map(ShellSheet.account)) },
+                    set: { value in
+                        guard !sheets.mapResultsPresented, value == nil else { return }
+                        sheets.showsFilters = false
+                        sheets.accountDestination = nil
                     }
-                    .inspectorColumnWidth(min: 300, ideal: 340, max: 400)
-                    .presentationDetents([.medium, .large])
-                }
-                .sheet(item: $accountDestination) { destination in
-                    AccountSheet(destination: destination, auth: auth, sync: sync, refresh: refresh)
+                ), onDismiss: { sheets.shellSheetPresented = false }) { destination in
+                    Group {
+                        switch destination {
+                        case .filters:
+                            NavigationStack {
+                                FilterPanel(store: store)
+                                    .navigationTitle("Filters")
+                                    .navigationBarTitleDisplayMode(.inline)
+                            }
+                            .presentationDetents([.medium, .large])
+                            .presentationDragIndicator(.visible)
+                        case .account(let account):
+                            AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
+                        }
+                    }
+                    .onAppear { sheets.shellSheetPresented = true }
                 }
             }
+        }
     }
 
     private var content: some View {
         BrowseContent(store: store, refresh: refresh, sync: sync, isSigningIn: auth.status == .signingIn,
-                      openAccount: { accountDestination = .profile }, mapPicker: mapPicker)
+                      openAccount: { sheets.accountDestination = .profile }, mapPicker: mapPicker)
     }
 
     private func refresh() async {
@@ -148,12 +201,12 @@ struct AppShell: View {
                     Text(tab.title)
                         .font(.subheadline)
                         .fontWeight(store.selectedTab == tab ? .semibold : .regular)
-                        .foregroundStyle(Color.primary)
+                        .foregroundStyle(Color.white)
                         .frame(minWidth: 54)
                         .padding(.horizontal, 8)
                         .frame(minHeight: 44)
                         .background(
-                            store.selectedTab == tab ? Color.primary.opacity(0.12) : .clear,
+                            store.selectedTab == tab ? Color.white.opacity(0.22) : .clear,
                             in: Capsule()
                         )
                 }
@@ -162,7 +215,7 @@ struct AppShell: View {
             }
         }
         .padding(3)
-        .glassEffect(.regular, in: Capsule())
+        .background(Color.white.opacity(0.08), in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("View")
     }
@@ -178,4 +231,24 @@ enum AccountDestination: String, Identifiable {
 
 #Preview {
     AppShell(activities: SampleData.activities)
+}
+
+private enum ShellSheet: Identifiable {
+    case filters
+    case account(AccountDestination)
+    var id: String {
+        switch self {
+        case .filters: "filters"
+        case .account(let destination): "account-\(destination.rawValue)"
+        }
+    }
+}
+
+/// Separate requests from completed presentations so sheets never compete.
+@MainActor @Observable
+final class BrowseSheetPresentation {
+    var showsFilters = false
+    var accountDestination: AccountDestination?
+    var mapResultsPresented = false
+    var shellSheetPresented = false
 }

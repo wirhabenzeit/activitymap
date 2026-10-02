@@ -21,7 +21,7 @@ extension RenderedRoutePickingTests {
         ]
         for coordinates in routes {
             let extent = try #require(RouteExtent(coordinates: coordinates))
-            for sheet: CGFloat in [0, 340, tablet ? 478 : 388] {
+            for sheet: CGFloat in [0, 340, tablet ? 478 : 500] {
                 for pitch: CGFloat in [0, 40] {
                     var current = MapCamera.initial
                     current.pitch = pitch
@@ -49,6 +49,30 @@ extension RenderedRoutePickingTests {
         }
     }
 
+    @Test func compactFitLeavesRoomForMediumDetailWithoutRefitting() async throws {
+        let size = CGSize(width: 402, height: 874)
+        let harness = try await CameraHarness(size: size)
+        defer { harness.close() }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
+        store.replaceSelection(with: [1])
+        let medium = MapResultsLayout(size: size, topInset: 116, bottomInset: 34, detent: .medium)
+        let framing = MapResultsLayout.framing(size: size, topInset: 116, bottomInset: 34,
+                                               detent: .compact, largeText: false)
+        #expect(framing.bottomOcclusion == medium.bottomOcclusion)
+        store.mapContext.request(.fitSelection)
+        let options = try #require(MapNavigation.resolve(store: store, map: harness.map.mapboxMap,
+            size: size, safeArea: UIEdgeInsets(top: 62, left: 0, bottom: 34, right: 0),
+            sheetHeight: framing.bottomOcclusion, topOcclusion: 116))
+        harness.map.mapboxMap.setCamera(to: options)
+        let padding = RouteCameraFitter.padding(safeArea: UIEdgeInsets(top: 62, left: 0, bottom: 34, right: 0),
+                                               sheetHeight: medium.bottomOcclusion, topOcclusion: 116)
+        let visible = CGRect(origin: .zero, size: size).inset(by: padding).insetBy(dx: -2, dy: -2)
+        #expect(harness.map.mapboxMap.points(for: store.activities[0].coordinates).allSatisfy { visible.contains($0) })
+        #expect(MapNavigation.resolve(store: store, map: harness.map.mapboxMap, size: size,
+            safeArea: .zero, sheetHeight: medium.bottomOcclusion) == nil,
+            "Revealing detail must not create another fit after the explicit command is consumed")
+    }
+
     @Test func explicitCameraCommandsAndDeferredOneShotFit() async throws {
         let harness = try await CameraHarness(size: CGSize(width: 390, height: 844))
         defer { harness.close() }
@@ -71,8 +95,8 @@ extension RenderedRoutePickingTests {
         #expect(north.zoom == recorded.zoom && north.pitch == recorded.pitch && north.bearing == 0)
         store.showOnMap(1)
         #expect(resolve(790) == nil && store.mapContext.pendingRequest != nil)
-        #expect(resolve(500) == nil && store.mapContext.pendingRequest != nil)
-        #expect(resolve(330) != nil && store.mapContext.pendingRequest == nil)
+        #expect(resolve(500) != nil && store.mapContext.pendingRequest == nil,
+                "A usable viewport above the map center must still accept an explicit fit")
         #expect(resolve(0) == nil, "Dismissing/resizing sheet must not refit a consumed request")
         store.mapContext.request(.resetView)
         let reset = try #require(resolve())
@@ -174,6 +198,7 @@ extension RenderedRoutePickingTests {
         try await cameraWait { store.mapContext.pendingRequest == nil }
         try await Task.sleep(for: .milliseconds(650))
         firstMap.mapboxMap.setCamera(to: CameraOptions(center: CLLocationCoordinate2D(latitude: 47.1, longitude: 8.7),
+                                                      padding: UIEdgeInsets(top: 132, left: 24, bottom: 400, right: 80),
                                                       zoom: 10, bearing: 25, pitch: 40))
         try await cameraWait { abs(store.mapContext.camera.zoom - 10) < 0.01 }
         store.selectedTab = .list
@@ -189,6 +214,8 @@ extension RenderedRoutePickingTests {
         let restored = secondMap.mapboxMap.cameraState
         #expect(abs(restored.center.latitude - 47.1) < 0.001 && abs(restored.center.longitude - 8.7) < 0.001)
         #expect(abs(restored.zoom - 10) < 0.01 && abs(restored.bearing - 25) < 0.01 && abs(restored.pitch - 40) < 0.01)
+        #expect(restored.padding == UIEdgeInsets(top: 132, left: 24, bottom: 400, right: 80),
+                "Tab restoration must preserve camera padding without adding safe areas again")
         // Exercise the actual SwiftUI intent/viewport adapter from the hidden map.
         store.selectedTab = .list
         try await Task.sleep(for: .milliseconds(100))
