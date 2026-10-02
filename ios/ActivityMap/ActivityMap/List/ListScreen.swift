@@ -7,6 +7,8 @@ struct ListScreen: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var hasPushedDetail = false
+    @State var sortOpen = false
+    @State var displayOpen = false
     @Environment(\.filterSidebarVisible) private var filterSidebarVisible
 
     var body: some View {
@@ -76,17 +78,17 @@ struct ListScreen: View {
         .listStyle(.plain)
         .safeAreaInset(edge: .top, spacing: 0) {
             if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize, availableWidth: width) {
-                ActivityTableHeader(store: store, availableWidth: width)
+                ActivityTableHeader(store: store, availableWidth: width, sortOpen: $sortOpen, displayOpen: $displayOpen)
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: AppTheme.Spacing.small) {
                         SelectionBar(store: store)
                         Spacer(minLength: 0)
-                        ListControls(presentation: store.listPresentation)
+                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen)
                     }
                     VStack(alignment: .leading, spacing: 0) {
                         SelectionBar(store: store)
-                        ListControls(presentation: store.listPresentation).padding(.leading, 44)
+                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen).padding(.leading, 44)
                     }
                 }
                 .padding(.horizontal, AppTheme.Spacing.small)
@@ -94,6 +96,7 @@ struct ListScreen: View {
                 .accessibilityIdentifier("list-browse-toolbar")
             }
         }
+        .modifier(ListOptionsSheets(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen))
     }
 
     @ViewBuilder private var detailColumn: some View {

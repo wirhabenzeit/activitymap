@@ -49,6 +49,8 @@ enum ActivityTableLayout {
 struct ActivityTableHeader: View {
     @Bindable var store: ActivityStore
     var availableWidth: CGFloat = 390
+    @Binding var sortOpen: Bool
+    @Binding var displayOpen: Bool
     private var presentation: ActivityListPresentation { store.listPresentation }
 
     var body: some View {
@@ -93,7 +95,7 @@ struct ActivityTableHeader: View {
                 .accessibilityLabel("Sort by \(metric.title)")
                 .accessibilityValue(presentation.settings.sort.field == metric.field ? presentation.settings.sort.direction.title : "Not sorted")
             }
-            ListControls(presentation: presentation, iconOnly: true).frame(width: 44)
+            ListControls(presentation: presentation, iconOnly: true, sortOpen: $sortOpen, displayOpen: $displayOpen).frame(width: 44)
         }
         .font(.caption2.weight(.semibold))
         .foregroundStyle(AppTheme.secondaryText)

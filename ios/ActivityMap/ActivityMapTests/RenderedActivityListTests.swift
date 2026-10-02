@@ -6,6 +6,33 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
+    @Test func listDisplaySheetSurvivesColumnLayoutChanges() async throws {
+        let presentation = ActivityListPresentation(defaults: nil)
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)], listPresentation: presentation)
+        store.selectedTab = .list
+        let host = try ListHarness(root: NavigationStack {
+            ListScreen(store: store, displayOpen: true)
+        }, size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.host.presentedViewController != nil }
+        let sheet = try #require(host.host.presentedViewController)
+        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large))
+        presentation.settings.visibleMetrics.insert(.maxPower)
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large))
+        #expect(host.host.presentedViewController === sheet, "Changing header branch must retain the open display sheet")
+        presentation.settings.visibleMetrics = []
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(host.host.presentedViewController === sheet)
+        presentation.settings.visibleMetrics = [.distance, .elapsedTime, .elevationGain]
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large))
+        #expect(host.host.presentedViewController === sheet, "Restoring table columns must retain the same sheet")
+        presentation.settings.width = .scrollingMetrics
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(host.host.presentedViewController === sheet)
+    }
+
     @Test func listControlsAndInspectionSurviveMapRoundTripWithLazyLargeResults() async throws {
         let previousToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
