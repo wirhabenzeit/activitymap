@@ -5,6 +5,55 @@ import UIKit
 
 @MainActor @Suite(.serialized)
 struct RenderedFilterTests {
+    @Test func landscapePhoneCanDismissFiltersWithoutChangingContext() async throws {
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities,
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        store.searchText = "ride"
+        store.dateDayRange = ActivityDayRange(start: "2026-01-01", end: "2026-12-31")
+        let filters = StatsFilterScope(store), dates = store.dateDayRange
+        let sheets = BrowseSheetPresentation()
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.verticalSizeClass, .compact), size: CGSize(width: 844, height: 390))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(250))
+        sheets.showsFilters = true
+        let presentationDeadline = Date().addingTimeInterval(3)
+        while (host.host.presentedViewController == nil || host.host.presentedViewController?.isBeingPresented == true)
+            && Date() < presentationDeadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let presented = try #require(host.host.presentedViewController)
+        try await Task.sleep(for: .milliseconds(150))
+        let image = UIGraphicsImageRenderer(bounds: presented.view.bounds).image { _ in
+            presented.view.drawHierarchy(in: presented.view.bounds, afterScreenUpdates: true)
+        }
+        try host.save(image, name: "compact-height-filter-sheet")
+        sheets.showsFilters = false
+        let deadline = Date().addingTimeInterval(3)
+        while host.host.presentedViewController != nil && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(host.host.presentedViewController == nil)
+        #expect(StatsFilterScope(store) == filters && store.dateDayRange == dates)
+        #expect(store.selectedTab == .list)
+    }
+
+    @Test func statsFilterPresentationKeepsBrowsingDates() async throws {
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities)
+        store.dateDayRange = ActivityDayRange(start: "2000-01-01", end: "2000-12-31")
+        #expect(store.filteredActivities.isEmpty && !store.statsActivities.isEmpty)
+        let host = try FilterHarness(root: NavigationStack {
+            FilterPanel(store: store, scope: .stats).navigationTitle("Filters")
+        }, size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(250))
+        try host.save(host.snapshot(), name: "stats-filter-scope")
+        FilterScope.stats.reset(store)
+        #expect(store.dateDayRange != nil && store.activeStatsFilterCount == 0)
+    }
+
     @Test func landscapeSidebarKeepsFiltersWhileInspecting() async throws {
         let key = "browse.filterSidebarVisible"
         let previous = UserDefaults.standard.object(forKey: key)

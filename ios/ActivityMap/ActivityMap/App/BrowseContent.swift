@@ -7,6 +7,7 @@ struct BrowseContent: View {
     var isSigningIn = false
     var openAccount: () -> Void = {}
     var mapPicker: RoutePicker? = nil
+    @Environment(\.browseStatsDestination) private var statsDestination
 
     var body: some View {
         GeometryReader { geometry in
@@ -36,6 +37,14 @@ struct BrowseContent: View {
                         .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .padding(.top, 16)
+                }
+
+                if let statsDestination {
+                    statsDestination.content(store, sync)
+                        .id(store.mapContext.scopeRevision)
+                        .opacity(store.selectedTab == .stats ? 1 : 0)
+                        .allowsHitTesting(store.selectedTab == .stats)
+                        .accessibilityHidden(store.selectedTab != .stats)
                 }
 
             }
@@ -81,5 +90,22 @@ struct BrowseContent: View {
         case .showList: store.selectedTab = .list
         case .cancelSync: sync?.pause()
         }
+    }
+}
+
+/// A real Stats screen registers once at the shell boundary, retaining its
+/// scroll/metric/history state. It uses the shared store and StatsController,
+/// and receives SyncController for truthful history/loading presentation.
+struct BrowseStatsDestination {
+    let content: @MainActor (ActivityStore, SyncController?) -> AnyView
+}
+
+private struct BrowseStatsDestinationKey: EnvironmentKey {
+    static let defaultValue: BrowseStatsDestination? = nil
+}
+extension EnvironmentValues {
+    var browseStatsDestination: BrowseStatsDestination? {
+        get { self[BrowseStatsDestinationKey.self] }
+        set { self[BrowseStatsDestinationKey.self] = newValue }
     }
 }

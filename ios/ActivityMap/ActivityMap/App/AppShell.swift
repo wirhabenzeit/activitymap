@@ -10,19 +10,25 @@ struct AppShell: View {
     @AppStorage("browse.filterSidebarVisible") private var sidebarVisible = true
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     // Retained for review captures: the gallery stages map results inside the
     // production shell.
     private let mapPicker: RoutePicker?
+    // #263 installs the real dashboard here. Until then no Stats control is
+    // exposed. Its content stays mounted with Map/List through tab switches.
+    private let statsContent: BrowseStatsDestination?
 
     init(activities: [Activity] = []) {
         self.init(store: ActivityStore(activities: activities))
     }
 
-    init(store: ActivityStore, mapPicker: RoutePicker? = nil, sheets: BrowseSheetPresentation = BrowseSheetPresentation()) {
+    init(store: ActivityStore, mapPicker: RoutePicker? = nil, sheets: BrowseSheetPresentation = BrowseSheetPresentation(),
+         statsContent: BrowseStatsDestination? = nil) {
         _sheets = State(initialValue: sheets)
         _store = State(initialValue: store)
         self.mapPicker = mapPicker
+        self.statsContent = statsContent
     }
 
     var body: some View {
@@ -39,7 +45,7 @@ struct AppShell: View {
                                     Image(systemName: "sidebar.left").frame(width: 44, height: 44)
                                 }.accessibilityLabel("Hide filter sidebar")
                             }.padding(.horizontal, 16)
-                            FilterPanel(store: store)
+                            FilterPanel(store: store, scope: filterScope)
                         }
                         .frame(width: 320)
                         .background(Color(uiColor: .secondarySystemBackground))
@@ -51,7 +57,7 @@ struct AppShell: View {
                         .environment(\.mapResultsPresentationChanged, { sheets.mapResultsPresented = $0 })
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle(store.selectedTab == .list ? "Activities" : "ActivityMap")
+                .navigationTitle(store.selectedTab == .map ? "ActivityMap" : store.selectedTab == .list ? "Activities" : "Stats")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
                 .toolbarBackgroundVisibility(.visible, for: .navigationBar)
@@ -131,7 +137,7 @@ struct AppShell: View {
                             if sidebarAvailable { sidebarVisible.toggle() }
                             else { sheets.showsFilters.toggle() }
                         } label: {
-                            Image(systemName: store.activeFilterCount == 0
+                            Image(systemName: activeFilterCount == 0
                                 ? "line.3.horizontal.decrease"
                                 : "line.3.horizontal.decrease.circle.fill")
                         }
@@ -154,11 +160,17 @@ struct AppShell: View {
                         switch destination {
                         case .filters:
                             NavigationStack {
-                                FilterPanel(store: store)
+                                FilterPanel(store: store, scope: filterScope)
                                     .navigationTitle("Filters")
                                     .navigationBarTitleDisplayMode(.inline)
+                                    .toolbar {
+                                        ToolbarItem(placement: .confirmationAction) {
+                                            Button("Done") { sheets.showsFilters = false }
+                                                .accessibilityIdentifier("filters-done")
+                                        }
+                                    }
                             }
-                            .presentationDetents([.medium, .large])
+                            .presentationDetents(verticalSizeClass == .compact || typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
                             .presentationDragIndicator(.visible)
                         case .account(let account):
                             AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
@@ -173,6 +185,8 @@ struct AppShell: View {
     private var content: some View {
         BrowseContent(store: store, refresh: refresh, sync: sync, isSigningIn: auth.status == .signingIn,
                       openAccount: { sheets.accountDestination = .profile }, mapPicker: mapPicker)
+            .environment(\.browseStatsDestination, statsContent)
+            .tint(AppTheme.accent)
     }
 
     private func refresh() async {
@@ -189,14 +203,17 @@ struct AppShell: View {
     }
 
     private var filterButtonLabel: String {
-        store.activeFilterCount == 0
+        activeFilterCount == 0
             ? "Filters"
-            : "Filters, \(store.activeFilterCount) active"
+            : "Filters, \(activeFilterCount) active"
     }
+
+    private var filterScope: FilterScope { store.selectedTab == .stats ? .stats : .browsing }
+    private var activeFilterCount: Int { filterScope == .stats ? store.activeStatsFilterCount : store.activeFilterCount }
 
     private var modePicker: some View {
         HStack(spacing: 2) {
-            ForEach(AppTab.allCases, id: \.self) { tab in
+            ForEach(AppTab.available(stats: statsContent != nil), id: \.self) { tab in
                 Button {
                     store.selectedTab = tab
                 } label: {
@@ -214,6 +231,7 @@ struct AppShell: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(store.selectedTab == tab ? .isSelected : [])
+                .accessibilityIdentifier("browse-destination-\(tab.title.lowercased())")
             }
         }
         .padding(3)

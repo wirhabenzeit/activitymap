@@ -1,5 +1,16 @@
 # Shared native UI components
 
+## Navigation, identity and panel update — #254 / #272 / #279
+
+- The single top destination control from #278 remains in use. `AppShell(statsContent:)` registers a real `BrowseStatsDestination` for #263; without it, no Stats button appears. `BrowseContent` retains all registered destinations and resets their identity on account/deployment scope changes.
+- `FilterPanel(scope:)` reuses the same editors for browsing and Stats. Stats uses the engine’s non-date count, excludes browsing dates from active-filter feedback, and routes Reset through `resetStatsActivityFilters`. Its period explanation discloses saved browsing dates without applying them. Search/count/reset share a compact section. The shell supplies a Done button and a full-height presentation for landscape phones and accessibility text.
+- `AccentColor` is the global system tint and explicit selection accent: #1976D2 on light surfaces, #90CAF9 on dark surfaces. The navigation background remains #1976D2. Shared sport badges have 26pt symbols within 34pt softly tinted shapes. Selected List rows add a leading mark and a checkmark; Map results retain a checkmark and separate active-route label. Inspection remains independent.
+- The approved wide-screen behavior is a fixed full-height edge card with explicit collapse/expand, not a draggable panel. Portrait phones retain their system sheet. See Map results and detail below.
+- The unused HeaderBar and FilterSidebar view wrapper are removed. The sidebar environment value remains the List detail-host input.
+
+The original component and capture notes below are historical where explicitly marked. Continuous-drag captures and regressions describe the removed implementation; current evidence is recorded in `docs/ios-navigation-identity-review.md`.
+
+
 Implementation handoff for [#253](https://github.com/wirhabenzeit/activitymap/issues/253), following the [accepted blueprint direction](ios-ui-blueprint.md). The owner requested closer web presentation with sensible native SwiftUI controls, and concrete visual refinement as screens land.
 
 ## Ownership and extension points
@@ -46,7 +57,7 @@ Map results navigate to the same detail panel and fixed actions in one continuou
 Two hosts present this content (`MapResultsContainer`):
 
 - **Phone portrait — native sheet (draft, #278).** `NativeMapResultsSheet` presents `RoutePickerSheet` with system detents (collapsed summary, content-aware opening height, `.large`), a visible drag indicator, background interaction up through large, and interactive dismissal disabled. See [Native phone map sheet draft](#native-phone-map-sheet-draft). The custom handle is not mounted in this host.
-- **Wide/landscape — custom side panel.** Used when the map is ≥650pt wide or landscape. A stable native pan recognizer (`MapResultsHandle`) over a 44pt grab area tracks the finger continuously in window coordinates and settles to the nearest measured detent on release; cancelled/interrupted drags retain a valid presentation. A single animatable panel height drives both layout and reveal: one shared activity identity stays outside the metrics scroll; compact values fade during the first quarter of expansion, then full metrics and measured-height fixed actions appear; reversing a drag reverses this progress immediately. The grab area overlays the panel with 13pt of visible clearance; no empty handle row or collapse chevron remains. Tap, drag and accessible adjustment operate the same detents. Resize frames retain hosting roots, use revision-cached activity lookup and route availability, and update only the small reveal subtree. Pager data-source assignment stays unchanged while resizing. The panel uses one regular-material surface with rounded corners. Keeping this second host is an open decision (#279).
+- **Wide/landscape — fixed edge panel (#279).** Used when the map is ≥650pt wide or landscape. A 44pt button collapses to a header or expands to the full available height. Medium and expanded model detents both mean full height on this host. The custom MapResultsHandle, MapResultsDrag, resize state, interpolation and their obsolete regression tests are removed. Results and detail pages remain mounted, including their scroll/paging context. Camera fits retain the same leading occlusion across collapse/expand, and changing height never emits a camera request. The owner selected this option on 2026-10-03.
 
 Map controls remain anchored at the viewport bottom-right across every results detent, behind the sheet/panel. Map no longer renders a separate provider-credit badge: all source credits use the SDK info menu, alongside its feedback and privacy/telemetry controls. The native Mapbox wordmark stays at bottom-left and the sole info button at bottom-right, at their normal map positions behind results, including wide side panels. Source attribution remains on raster base/overlay sources and is read from vector source metadata. [Mapbox requires the visible wordmark](https://docs.mapbox.com/help/dive-deeper/attribution/), including on third-party maps; [Swisstopo accepts centrally accessible source references](https://www.swisstopo.admin.ch/en/faq-free-geodata). Fully replacing the native info menu requires Mapbox review.
 
@@ -133,7 +144,7 @@ Filters occupy the leading navigation position, aligned with the iPad sidebar, a
 
 ## Native phone map sheet draft
 
-Portrait phone results use system presentation detents with background map interaction enabled. The collapsed summary, content-aware opening detent and large detent replace handle-only custom dragging. Opening height uses selected-route count with a half-height cap; detail starts around 300pt (larger for accessibility text). Manual compact/large choices survive content changes. Filters/account presentations temporarily suppress the map sheet, and changing tabs retains selection. Wide/landscape layouts retain the custom side panel. Native gesture feel and map/paging interaction still require device review.
+Portrait phone results use system presentation detents with background map interaction enabled. The collapsed summary, content-aware opening detent and large detent replace handle-only custom dragging. Opening height uses selected-route count with a half-height cap; detail starts around 300pt (larger for accessibility text). Manual compact/large choices survive content changes. Filters/account presentations temporarily suppress the map sheet, and changing tabs retains selection. Wide/landscape layouts use the fixed edge panel described above. Native gesture feel and map/paging interaction still require device review.
 
 ## Shell sheet handoff
 

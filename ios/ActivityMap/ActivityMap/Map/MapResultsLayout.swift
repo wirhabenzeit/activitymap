@@ -26,21 +26,21 @@ struct MapResultsLayout {
     }
 
     init(size: CGSize, topInset: CGFloat, bottomInset: CGFloat, detent: MapResultsDetent,
-         largeText: Bool = false, heightOverride: CGFloat? = nil) {
+         largeText: Bool = false) {
         isSidePanel = size.width >= 650 || size.width > size.height
         let width = isSidePanel ? min(380, size.width * 0.42) : max(0, size.width - 8)
         // Keep navigation clear. Map controls and credits remain at the map's
         // bottom edge behind this panel instead of reserving another top row.
         let top = topInset + 12
         let available = max(120, size.height - top - 12)
-        let compact = min(available, largeText ? 240 : 156)
+        let compact = min(available, isSidePanel ? (largeText ? 116 : 64) : (largeText ? 240 : 156))
         let height: CGFloat
         switch detent {
         case .compact: height = compact
-        case .medium: height = min(available, max(compact + 120, size.height * 0.46))
+        case .medium: height = isSidePanel ? available : min(available, max(compact + 120, size.height * 0.46))
         case .expanded: height = available
         }
-        contentHeight = min(available, max(compact, heightOverride ?? height))
+        contentHeight = height
         frame = CGRect(x: isSidePanel ? 16 : 4, y: isSidePanel ? top : size.height - contentHeight,
                        width: width, height: contentHeight + (isSidePanel ? 0 : bottomInset))
         bottomOcclusion = isSidePanel ? 0 : contentHeight + bottomInset

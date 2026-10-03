@@ -178,13 +178,18 @@ extension RenderedRoutePickingTests {
         let window = UIWindow(windowScene: scene)
         let store = ActivityStore(activities: (1...200).map { ActivityStoreSelectionTests.activity($0) })
         store.selectedTab = .list
-        let host = UIHostingController(rootView: NavigationStack { BrowseContent(store: store) }
+        let stats = BrowseStatsDestination { _, _ in
+            AnyView(ScrollView {
+                VStack { ForEach(0..<100) { Text("Stats fixture \($0)").frame(height: 80) } }
+            }.accessibilityIdentifier("stats-context-probe"))
+        }
+        let host = UIHostingController(rootView: AppShell(store: store, statsContent: stats)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)))
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
-        try await cameraWait { descendants(host.view, of: UIScrollView.self).contains { $0.contentSize.height > $0.bounds.height * 2 } }
-        let list = try #require(descendants(host.view, of: UIScrollView.self).first { $0.contentSize.height > $0.bounds.height * 2 })
+        try await cameraWait { descendants(host.view, of: UICollectionView.self).contains { $0.contentSize.height > $0.bounds.height * 2 } }
+        let list = try #require(descendants(host.view, of: UICollectionView.self).first { $0.contentSize.height > $0.bounds.height * 2 })
         list.setContentOffset(CGPoint(x: 0, y: 1200), animated: false)
         let offset = list.contentOffset.y
         store.selectedTab = .map
@@ -201,6 +206,12 @@ extension RenderedRoutePickingTests {
                                                       padding: UIEdgeInsets(top: 132, left: 24, bottom: 400, right: 80),
                                                       zoom: 10, bearing: 25, pitch: 40))
         try await cameraWait { abs(store.mapContext.camera.zoom - 10) < 0.01 }
+        store.selectedTab = .stats
+        try await Task.sleep(for: .milliseconds(200))
+        let statsScroll = try #require(descendants(host.view, of: UIScrollView.self).first {
+            !($0 is UICollectionView) && $0.contentSize.height > 7000
+        })
+        statsScroll.setContentOffset(CGPoint(x: 0, y: 800), animated: false)
         store.selectedTab = .list
         try await Task.sleep(for: .milliseconds(100))
         #expect(abs(list.contentOffset.y - offset) < 1)
@@ -216,6 +227,10 @@ extension RenderedRoutePickingTests {
         #expect(abs(restored.zoom - 10) < 0.01 && abs(restored.bearing - 25) < 0.01 && abs(restored.pitch - 40) < 0.01)
         #expect(restored.padding == UIEdgeInsets(top: 132, left: 24, bottom: 400, right: 80),
                 "Tab restoration must preserve camera padding without adding safe areas again")
+        store.selectedTab = .stats
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(descendants(host.view, of: UIScrollView.self).contains { $0 === statsScroll })
+        #expect(abs(statsScroll.contentOffset.y - 800) < 1, "Stats retains its mounted scroll context")
         // Exercise the actual SwiftUI intent/viewport adapter from the hidden map.
         store.selectedTab = .list
         try await Task.sleep(for: .milliseconds(100))
@@ -240,6 +255,57 @@ extension RenderedRoutePickingTests {
         store.selectedTab = .list
         try await Task.sleep(for: .milliseconds(100))
         #expect(abs(list.contentOffset.y - offset) < 1)
+    }
+
+    @Test func fixedPanelFitsBesideRoutesInTheWideShell() async throws {
+        let oldToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = oldToken }
+        let key = "browse.filterSidebarVisible"
+        let oldPreference = UserDefaults.standard.object(forKey: key)
+        UserDefaults.standard.set(true, forKey: key)
+        defer {
+            if let oldPreference { UserDefaults.standard.set(oldPreference, forKey: key) }
+            else { UserDefaults.standard.removeObject(forKey: key) }
+        }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let oldWindow = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 1180, height: 820)
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities)
+        let picker = RoutePicker()
+        let host = UIHostingController(rootView: AppShell(store: store, mapPicker: picker)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        host.view.frame = window.bounds
+        defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
+        try await cameraWait { descendants(host.view, of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
+        let map = try #require(descendants(host.view, of: MapView.self).first)
+        #expect(map.bounds.width >= 650)
+        store.replaceSelection(with: [20279947341, 20270725942, 20244330171])
+        picker.reviewSelection(store: store)
+        picker.detent = .expanded
+        store.mapContext.request(.fitSelection)
+        try await cameraWait { store.mapContext.pendingRequest == nil }
+        try await Task.sleep(for: .milliseconds(500))
+        let camera = map.mapboxMap.cameraState
+        #expect(camera.padding.left > 300, "Framing reserves the actual edge panel")
+        #expect(host.presentedViewController == nil, "Wide results remain at the map edge")
+        let directory = URL(fileURLWithPath: "/tmp/activitymap-navigation-preview")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for detent in [MapResultsDetent.expanded, .compact, .expanded] {
+            picker.detent = detent
+            try await Task.sleep(for: .milliseconds(150))
+            #expect(store.mapContext.pendingRequest == nil)
+            #expect(abs(map.mapboxMap.cameraState.zoom - camera.zoom) < 0.001)
+            #expect(map.mapboxMap.cameraState.padding == camera.padding)
+            let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
+                host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+            }
+            try image.pngData()?.write(to: directory.appendingPathComponent("wide-shell-\(detent == .compact ? "collapsed" : "expanded").png"))
+        }
     }
 }
 

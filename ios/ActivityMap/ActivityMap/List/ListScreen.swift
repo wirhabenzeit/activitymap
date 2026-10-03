@@ -67,7 +67,7 @@ struct ListScreen: View {
                 ActivityRowView(store: store, activity: activity, availableWidth: width)
                     .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 44 }
-                    .listRowBackground(store.selectedActivityIDs.contains(activity.id) ? AppTheme.accent.opacity(0.07) : Color(uiColor: .systemBackground))
+                    .listRowBackground(store.selectedActivityIDs.contains(activity.id) ? AppTheme.selectionBackground : Color(uiColor: .systemBackground))
             }
             if let emptyState {
                 BrowsingEmptyView(state: emptyState, recover: recover, scrolls: false)

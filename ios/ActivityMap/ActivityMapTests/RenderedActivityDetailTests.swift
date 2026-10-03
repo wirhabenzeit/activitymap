@@ -60,150 +60,40 @@ extension RenderedRoutePickingTests {
         try host.save(host.snapshot(), name: "map-flow-results-return")
     }
 
-    @Test func mapSheetTracksDragBeforeReleaseAndKeepsOneContentDuringSettling() async throws {
-        var activity = ActivityStoreSelectionTests.activity(1)
-        activity.name = "Lake ride"
-        let store = ActivityStore(activities: [activity, ActivityStoreSelectionTests.activity(2)])
-        store.replaceSelection(with: [1, 2])
+    @Test(arguments: ["tablet", "landscape", "large-text"])
+    func fixedEdgePanelRetainsDetailAndSelectionAcrossCollapse(scenario: String) async throws {
+        let store = ActivityStore(activities: (1...60).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: Array(1...60))
         let picker = RoutePicker()
         picker.reviewSelection(store: store)
         picker.showDetail(1, store: store, motion: .none)
-        let resizing = MapResultsResizeState()
-        let size = CGSize(width: 820, height: 1180)
-        let heights = MapResultsDetent.allCases.map {
-            MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: $0).contentHeight
-        }
+        let size = scenario == "landscape" ? CGSize(width: 844, height: 390) : CGSize(width: 820, height: 1180)
+        let largeText = scenario == "large-text"
         let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store, size: size,
-            topInset: 0, bottomInset: 0, largeText: false, resizing: resizing).ignoresSafeArea(), size: size)
+            topInset: 44, bottomInset: 0, largeText: largeText)
+            .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large).ignoresSafeArea(), size: size)
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(250))
         let pager = try #require(host.controllers(of: UIPageViewController.self).first)
+        let page = try #require(pager.viewControllers?.first)
         let before = pager.view.bounds.height
-        resizing.height = resizing.drag.update(translation: -90, currentHeight: heights[1], heights: heights)
-        try await Task.sleep(for: .milliseconds(80))
-        #expect(picker.detent == .medium && resizing.drag.isDragging)
-        #expect(abs(pager.view.bounds.height - before - 90) < 2, "The detail viewport grows with the finger before release")
-        #expect(abs((resizing.presentedHeight ?? 0) - heights[1] - 90) < 2)
-        try host.save(host.snapshot(), name: "map-sheet-live-resize")
-        _ = resizing.drag.finish(translation: -90, prediction: -90, heights: heights)
+        let selection = store.selectedActivityIDs
+        try host.save(host.snapshot(), name: "fixed-panel-\(scenario)-expanded")
         picker.detent = .compact
-        // Sample the first interpolated frame rather than assuming Simulator
-        // schedules one at exactly 60ms while the full suite is running.
-        let frameDeadline = Date().addingTimeInterval(0.3)
-        while (resizing.presentedHeight ?? heights[1] + 90) >= heights[1] + 89,
-              Date() < frameDeadline {
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        let progress = try #require(resizing.presentedHeight)
-        #expect(progress > heights[0] + 1 && progress < heights[1] + 90,
-                "Collapse interpolates the panel height instead of jumping layout and fading multiple contents")
-        let image = host.snapshot()
-        try host.save(image, name: "map-sheet-settling")
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
-        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(text.components(separatedBy: "Lake ride").count == 2, "One detail heading during settling: \(text)")
-        try await Task.sleep(for: .milliseconds(500))
-        #expect(abs((resizing.presentedHeight ?? 0) - heights[0]) < 2)
-        #expect(picker.detailID == 1 && store.activeActivityID == 1 && store.selectedActivityIDs == [1, 2])
-        #expect(store.mapContext.pendingRequest == nil, "A resize must not request a route fit")
-        try host.save(host.snapshot(), name: "map-sheet-collapsed")
-        var headingOffsets: [CGFloat] = []
-        for fraction: CGFloat in [0, 0.15, 0.5, 1] {
-            resizing.height = heights[0] + (heights[1] - heights[0]) * fraction
-            try await Task.sleep(for: .milliseconds(80))
-            let frame = host.snapshot()
-            try host.save(frame, name: "map-detail-reveal-\(Int(fraction * 100))")
-            let recognition = VNRecognizeTextRequest()
-            recognition.recognitionLevel = .accurate
-            try VNImageRequestHandler(cgImage: try #require(frame.cgImage)).perform([recognition])
-            let headings = (recognition.results ?? []).filter { $0.topCandidates(1).first?.string == "Lake ride" }
-            #expect(headings.count == 1, "Exactly one persistent heading at reveal progress \(fraction)")
-            let heading = try #require(headings.first)
-            let top = (1 - heading.boundingBox.maxY) * size.height
-            let sheetTop = MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: picker.detent, heightOverride: resizing.height).frame.minY
-            headingOffsets.append(top - sheetTop)
-        }
-        #expect((headingOffsets.max() ?? 0) - (headingOffsets.min() ?? 0) < 3,
-                "The identity remains at the same position within the sheet through the reveal")
-    }
-
-    @Test(arguments: [1, 3])
-    func mapGrabberKeepsLivePagesDuringLargeLibraryResize(selectedCount: Int) async throws {
-        var activities = (1...4574).map { ActivityStoreSelectionTests.activity($0) }
-        // Realistic long GPS recordings expose repeated route-bound sorting.
-        let route = (0..<24000).map { index in
-            CLLocationCoordinate2D(latitude: 46 + Double(index) / 100000,
-                                  longitude: 8 + Double(index) / 100000)
-        }
-        for index in 0..<selectedCount { activities[index].coordinates = route }
-        let store = ActivityStore(activities: activities)
-        store.replaceSelection(with: Array(1...selectedCount))
-        let picker = RoutePicker()
-        picker.reviewSelection(store: store)
-        picker.showDetail(1, store: store, motion: .none)
-        let resizing = MapResultsResizeState()
-        let size = CGSize(width: 820, height: 1180)
-        let heights = MapResultsDetent.allCases.map {
-            MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: $0).contentHeight
-        }
-        let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store, size: size,
-            topInset: 0, bottomInset: 0, largeText: false, resizing: resizing).ignoresSafeArea(), size: size)
-        defer { host.close() }
         try await Task.sleep(for: .milliseconds(200))
-        let grabber = try #require(host.descendants(of: MapResultsHandleView.self).first)
-        #expect(grabber.bounds.height == 44)
-        #expect(grabber.hitTest(CGPoint(x: grabber.bounds.midX, y: 32), with: nil) === grabber,
-                "The space below the tiny visible indicator must accept the drag")
-        let windowPoint = grabber.convert(CGPoint(x: grabber.bounds.midX, y: 32), to: host.window)
-        #expect(host.window.hitTest(windowPoint, with: nil) === grabber,
-                "The overlay target receives actual window hit testing without a blank handle row")
-        #expect(grabber.pan.view === grabber && grabber.pan.isEnabled)
-        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
-        let coordinator = try #require(pager.delegate as? MapActivityPager.Coordinator)
-        let page = try #require(pager.viewControllers?.first as? MapActivityPager.Page)
-        let updates = page.contentUpdateCount
-        let pan = ResultsTestPan()
-        pan.phase = .began
-        grabber.handlePan(pan)
-        for step in 1...30 {
-            pan.phase = .changed
-            pan.delta = -CGFloat(step * 4)
-            grabber.handlePan(pan)
-            try await Task.sleep(for: .milliseconds(16))
-            #expect(host.descendants(of: MapResultsHandleView.self).first === grabber)
-            #expect(pager.viewControllers?.first === page)
-            #expect(page.contentUpdateCount == updates, "Drag frames must not replace the hosted content")
-            #expect(abs((resizing.presentedHeight ?? 0) - heights[1] - CGFloat(step * 4)) < 2)
-        }
-        #expect(coordinator.pages.count <= 3)
-        pan.phase = .ended
-        grabber.handlePan(pan)
-        try await Task.sleep(for: .milliseconds(500))
-        #expect(!resizing.drag.isDragging)
-        #expect(page.contentUpdateCount == updates)
-        picker.detent = .compact
-        try await Task.sleep(for: .milliseconds(500))
-        #expect(abs((resizing.presentedHeight ?? 0) - heights[0]) < 2)
-        #expect(page.contentUpdateCount == updates, "Chevron-style settling retains hosted content too")
-        pan.phase = .began
-        pan.delta = 0
-        grabber.handlePan(pan)
-        pan.phase = .changed
-        pan.delta = -40
-        grabber.handlePan(pan)
-        pan.phase = .cancelled
-        grabber.handlePan(pan)
-        try await Task.sleep(for: .milliseconds(500))
-        #expect(!resizing.drag.isDragging && picker.detent == .compact)
-        #expect(picker.detailID == 1 && store.activeActivityID == 1)
-        #expect(store.selectedActivityIDs == Set(1...selectedCount) && store.mapContext.pendingRequest == nil)
-        // Live identity lookup must still invalidate when sync replaces data.
-        store.activities[0].name = "Updated while resizing"
-        #expect(store.activity(id: 1)?.name == "Updated while resizing")
-        store.activities.removeFirst()
-        #expect(store.activity(id: 1) == nil)
+        #expect(host.controllers(of: UIPageViewController.self).first === pager)
+        #expect(pager.viewControllers?.first === page)
+        #expect(picker.detailID == 1 && store.selectedActivityIDs == selection)
+        #expect(store.mapContext.pendingRequest == nil)
+        try host.save(host.snapshot(), name: "fixed-panel-\(scenario)-collapsed")
+        picker.detent = .expanded
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(abs(pager.view.bounds.height - before) < 2, "Medium and expanded both use the full edge height")
+        #expect(pager.viewControllers?.first === page)
+        #expect(store.mapContext.pendingRequest == nil, "Expansion never requests an unsolicited fit")
+        picker.showResults()
+        try await Task.sleep(for: .milliseconds(200))
+        try host.save(host.snapshot(), name: "fixed-panel-\(scenario)-results")
     }
 
     @Test(arguments: [ColorScheme.light, .dark])
@@ -374,15 +264,4 @@ private final class DetailHarness<Content: View> {
         return visit(host)
     }
     func close() { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
-}
-
-/// Exercise the installed recognizer's event bridge in window coordinates;
-/// physical finger/velocity feel remains a device check.
-@MainActor
-private final class ResultsTestPan: UIPanGestureRecognizer {
-    var phase: UIGestureRecognizer.State = .possible
-    var delta: CGFloat = 0
-    override var state: UIGestureRecognizer.State { get { phase } set { phase = newValue } }
-    override func translation(in view: UIView?) -> CGPoint { CGPoint(x: 0, y: delta) }
-    override func velocity(in view: UIView?) -> CGPoint { .zero }
 }

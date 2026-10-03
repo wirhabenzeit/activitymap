@@ -7,13 +7,8 @@ struct RoutePickerSheet: View {
     let isSidePanel: Bool
     var bottomInset: CGFloat = 0
     var collapsedOverride: Bool? = nil
-    var expansionProgress: CGFloat? = nil
-    private var expansion: CGFloat { expansionProgress ?? (collapsed ? 0 : 1) }
-    private var contentReveal: CGFloat { min(1, max(0, (expansion - 0.25) / 0.75)) }
-    var resizeAction: ((MapResultsDetent) -> Void)? = nil
-    var dragChanged: ((CGFloat) -> Void)? = nil
-    var dragEnded: ((CGFloat, CGFloat) -> Void)? = nil
-    var dragCancelled: (() -> Void)? = nil
+    private var expansion: CGFloat { collapsed ? 0 : 1 }
+    private var contentReveal: CGFloat { expansion }
     var nativePresentation = false
     private var collapsed: Bool { collapsedOverride ?? (picker.detent == .compact) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -27,8 +22,8 @@ struct RoutePickerSheet: View {
     private var singleDetail: Bool { detail != nil && candidates.count == 1 }
     var body: some View {
         VStack(spacing: 0) {
-            header
-            if detail == nil {
+            if isSidePanel { sidePanelHeader } else { header }
+            if detail == nil && !isSidePanel {
                 compactSummary
                     .opacity(max(0, 1 - expansion * 4))
                     .frame(height: (typeSize.isAccessibilitySize ? 130 : 80) * (1 - expansion), alignment: .top)
@@ -51,29 +46,12 @@ struct RoutePickerSheet: View {
             }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: detail != nil)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .frame(height: collapsed && detail == nil ? 0 : nil)
+            .frame(height: collapsed && (isSidePanel || detail == nil) ? 0 : nil)
             .clipped()
-            .accessibilityHidden(collapsed && detail == nil)
+            .accessibilityHidden(collapsed && (isSidePanel || detail == nil))
         }
         // One continuous detail surface; only the outer host owns corners.
         .padding(.bottom, bottomInset)
-        .overlay(alignment: .top) {
-            if !nativePresentation {
-            MapResultsHandle(changed: { dragChanged?($0) }, ended: { dragEnded?($0, $1) },
-                             cancelled: { dragCancelled?() })
-                .frame(width: 80, height: 44)
-                .onTapGesture { resize(to: collapsed ? .medium : .compact) }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Resize results")
-                .accessibilityValue(collapsed ? "Collapsed" : "Expanded")
-                .accessibilityAdjustableAction { direction in
-                    let change = direction == .increment ? 1 : -1
-                    resize(to: MapResultsDetent(rawValue: min(2, max(0, picker.detent.rawValue + change))) ?? .medium)
-                }
-                .accessibilityAction(named: "Expand results fully") { resize(to: .expanded) }
-                .accessibilityAction(named: "Collapse results") { resize(to: .compact) }
-            }
-        }
         .background { if !nativePresentation { Rectangle().fill(.regularMaterial) } }
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: isSidePanel ? 20 : 28,
             bottomLeadingRadius: isSidePanel ? 20 : 0, bottomTrailingRadius: isSidePanel ? 20 : 0,
@@ -101,6 +79,41 @@ struct RoutePickerSheet: View {
             }
             .accessibilityIdentifier("map-results-scroll")
         }
+    }
+
+    private var sidePanelHeader: some View {
+        HStack(spacing: 4) {
+            if detail != nil && candidates.count > 1 && !collapsed {
+                Button { picker.showResults() } label: {
+                    Image(systemName: "chevron.left").frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Back to selected activities")
+                .accessibilityIdentifier("map-results-back")
+            }
+            if collapsed, let detail {
+                Text(detail.name).font(.subheadline.weight(.semibold))
+                    .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+            } else if detail == nil {
+                selectionSummary
+            } else {
+                Spacer(minLength: 0)
+                if candidates.count > 1, let detail { detailNavigation(detail) }
+            }
+            Button { resize(to: collapsed ? .expanded : .compact) } label: {
+                Image(systemName: collapsed ? "chevron.down" : "chevron.up")
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(collapsed ? "Expand results" : "Collapse results")
+            .accessibilityValue(collapsed ? "Collapsed" : "Expanded")
+            .accessibilityIdentifier("map-results-toggle")
+            .accessibilityAction(named: "Expand results") { resize(to: .expanded) }
+            .accessibilityAction(named: "Collapse results") { resize(to: .compact) }
+            if detail == nil && !collapsed { selectionActions }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var header: some View {
@@ -137,8 +150,7 @@ struct RoutePickerSheet: View {
     }
 
     private func resize(to detent: MapResultsDetent) {
-        if let resizeAction { resizeAction(detent) }
-        else { picker.detent = detent }
+        picker.detent = detent
     }
 
     private var selectionSummary: some View {
@@ -222,7 +234,7 @@ struct RoutePickerSheet: View {
                 picker.showDetail(activity.id, store: store)
             } label: {
                 HStack(spacing: 12) {
-                    BrowseSportSymbol(category: activity.category)
+                    BrowseSportSymbol(category: activity.category, isSelected: true)
                     VStack(alignment: .leading, spacing: 4) {
                         BrowseActivityHeading(activity: activity, isActive: store.activeActivityID == activity.id)
                         let metrics = typeSize.isAccessibilitySize
@@ -238,7 +250,7 @@ struct RoutePickerSheet: View {
                             Label("No GPS route", systemImage: "map.slash").font(.caption).foregroundStyle(AppTheme.secondaryText)
                         }
                         if store.activeActivityID == activity.id {
-                            Label(activity.coordinates.isEmpty ? "Active activity" : "Active route", systemImage: "location.fill").font(.caption).foregroundStyle(.blue)
+                            Label(activity.coordinates.isEmpty ? "Active activity" : "Active route", systemImage: "location.fill").font(.caption).foregroundStyle(AppTheme.accent)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -253,6 +265,6 @@ struct RoutePickerSheet: View {
             .accessibilityLabel("Deselect \(activity.name)")
         }
         .padding(.leading, 12).padding(.trailing, 8).padding(.vertical, 4)
-        .background(store.activeActivityID == activity.id ? Color.blue.opacity(0.06) : .clear)
+        .background(AppTheme.selectionBackground.opacity(store.activeActivityID == activity.id ? 1 : 0.5))
     }
 }

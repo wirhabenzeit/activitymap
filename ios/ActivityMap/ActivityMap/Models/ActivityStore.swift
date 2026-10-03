@@ -3,12 +3,15 @@ import Foundation
 import Observation
 
 enum AppTab: CaseIterable, Hashable {
-    case map, list
+    case map, list, stats
+
+    static func available(stats: Bool) -> [AppTab] { stats ? [.map, .list, .stats] : [.map, .list] }
 
     var title: String {
         switch self {
         case .map: "Map"
         case .list: "List"
+        case .stats: "Stats"
         }
     }
 }
@@ -144,7 +147,6 @@ final class ActivityStore {
 
     /// Switching tabs never changes selection, focus or list inspection.
     var selectedTab: AppTab = .map
-    var sidebarExpanded = false
 
     /// Mutate only through the operations below so the parity invariants hold.
     private(set) var selection = SelectionState()
@@ -226,6 +228,8 @@ final class ActivityStore {
         count += flaggedFilter == nil ? 0 : 1
         return count
     }
+
+    var activeStatsFilterCount: Int { activeFilterCount - (dateDayRange == nil ? 0 : 1) }
 
     private func matches(_ filter: NumericFilter, _ value: Double?) -> Bool {
         guard let value, value.isFinite, filter.value.isFinite else { return false }

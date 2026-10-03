@@ -159,7 +159,24 @@ extension RenderedRoutePickingTests {
         let bottom = try #require(list.indexPathsForVisibleItems.max())
         #expect(bottom.item == list.numberOfItems(inSection: lastSection) - 1)
         store.inspect(2000)
-        try await Task.sleep(for: .milliseconds(200))
+        // Opening the adjacent detail changes the width and therefore the
+        // estimated heights of 2,000 lazy rows. Capture the browsing position
+        // after that layout settles, not during its asynchronous correction.
+        try await listWait { list.bounds.width < 500 }
+        let layoutDeadline = Date().addingTimeInterval(3)
+        var previousSize = list.contentSize
+        var previousOffset = list.contentOffset
+        var stableSamples = 0
+        while stableSamples < 5 && Date() < layoutDeadline {
+            try await Task.sleep(for: .milliseconds(100))
+            list.layoutIfNeeded()
+            if list.contentSize == previousSize && list.contentOffset == previousOffset {
+                stableSamples += 1
+            } else { stableSamples = 0 }
+            previousSize = list.contentSize
+            previousOffset = list.contentOffset
+        }
+        try #require(stableSamples == 5, "The inspected list must settle before testing a tab round trip")
         let offset = list.contentOffset.y
         let settings = presentation.settings
         store.selectedTab = .map

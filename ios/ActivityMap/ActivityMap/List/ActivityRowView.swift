@@ -46,6 +46,13 @@ struct ActivityRowView: View {
         }
         .padding(.vertical, settings.density == .compact ? 0 : AppTheme.Spacing.tight)
         .contentShape(Rectangle())
+        .overlay(alignment: .leading) {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 2).fill(AppTheme.accent)
+                    .frame(width: 3).padding(.vertical, 5)
+                    .allowsHitTesting(false).accessibilityHidden(true)
+            }
+        }
         .accessibilityIdentifier("activity-list-row-\(activity.id)")
     }
 
