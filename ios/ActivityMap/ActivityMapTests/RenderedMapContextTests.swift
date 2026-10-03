@@ -257,7 +257,8 @@ extension RenderedRoutePickingTests {
         #expect(abs(list.contentOffset.y - offset) < 1)
     }
 
-    @Test func fixedPanelFitsBesideRoutesInTheWideShell() async throws {
+    @Test(arguments: [false, true])
+    func fixedPanelFitsBesideRoutesInTheWideShell(single: Bool) async throws {
         let oldToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = oldToken }
@@ -284,14 +285,14 @@ extension RenderedRoutePickingTests {
         try await cameraWait { descendants(host.view, of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
         let map = try #require(descendants(host.view, of: MapView.self).first)
         #expect(map.bounds.width >= 650)
-        store.replaceSelection(with: [20279947341, 20270725942, 20244330171])
+        store.replaceSelection(with: single ? [20279947341] : [20279947341, 20270725942, 20244330171])
         picker.reviewSelection(store: store)
         picker.detent = .expanded
         store.mapContext.request(.fitSelection)
         try await cameraWait { store.mapContext.pendingRequest == nil }
         try await Task.sleep(for: .milliseconds(500))
         let camera = map.mapboxMap.cameraState
-        #expect(camera.padding.left > 300, "Framing reserves the actual edge panel")
+        #expect(camera.padding.right > 300, "Framing reserves the actual edge panel")
         #expect(host.presentedViewController == nil, "Wide results remain at the map edge")
         let directory = URL(fileURLWithPath: "/tmp/activitymap-navigation-preview")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -304,7 +305,7 @@ extension RenderedRoutePickingTests {
             let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
                 host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
             }
-            try image.pngData()?.write(to: directory.appendingPathComponent("wide-shell-\(detent == .compact ? "collapsed" : "expanded").png"))
+            try image.pngData()?.write(to: directory.appendingPathComponent("wide-shell-\(single ? "single-" : "")\(detent == .compact ? "collapsed" : "expanded").png"))
         }
     }
 }

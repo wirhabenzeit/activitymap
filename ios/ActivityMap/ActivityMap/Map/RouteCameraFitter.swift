@@ -50,9 +50,9 @@ struct RouteExtent {
 
 enum RouteCameraFitter {
     static func padding(safeArea: UIEdgeInsets, sheetHeight: CGFloat, topOcclusion: CGFloat = 0,
-                        leadingOcclusion: CGFloat = 0) -> UIEdgeInsets {
+                        leadingOcclusion: CGFloat = 0, trailingOcclusion: CGFloat = 0) -> UIEdgeInsets {
         UIEdgeInsets(top: max(safeArea.top + 64, topOcclusion + 16), left: max(safeArea.left + 24, leadingOcclusion + 16),
-                     bottom: max(safeArea.bottom + 80, sheetHeight + 24), right: safeArea.right + 80)
+                     bottom: max(safeArea.bottom + 80, sheetHeight + 24), right: max(safeArea.right + 80, trailingOcclusion + 16))
     }
 
     static func camera(extent: RouteExtent, map: MapboxMap, padding: UIEdgeInsets, size: CGSize,
@@ -82,7 +82,7 @@ enum RouteCameraFitter {
 enum MapNavigation {
     static func resolve(store: ActivityStore, map: MapboxMap, size: CGSize,
                         safeArea: UIEdgeInsets, sheetHeight: CGFloat, topOcclusion: CGFloat = 0,
-                        leadingOcclusion: CGFloat = 0) -> CameraOptions? {
+                        leadingOcclusion: CGFloat = 0, trailingOcclusion: CGFloat = 0) -> CameraOptions? {
         let context = store.mapContext
         guard let request = context.pendingRequest, map.isStyleLoaded,
               size.width > 0, size.height > 0 else { return nil }
@@ -123,7 +123,7 @@ enum MapNavigation {
             context.consume(request); return nil
         }
         let padding = RouteCameraFitter.padding(safeArea: safeArea, sheetHeight: sheetHeight, topOcclusion: topOcclusion,
-                                                leadingOcclusion: leadingOcclusion)
+                                                leadingOcclusion: leadingOcclusion, trailingOcclusion: trailingOcclusion)
         // Wait if the remaining viewport is unusable. The visible rectangle
         // may sit entirely above the physical map center (e.g. a medium sheet).
         guard size.width - padding.left - padding.right >= 80,

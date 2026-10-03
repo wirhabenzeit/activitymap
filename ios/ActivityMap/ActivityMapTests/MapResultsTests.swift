@@ -43,6 +43,16 @@ struct MapResultsTests {
         #expect(!picker.isPresented && picker.detailID == nil && picker.candidateIDs.isEmpty)
     }
 
+    @Test func dragSnapsFromBothRestingPositionsAndClampsOvershoot() {
+        #expect(MapResultsSnap.height(start: 108, translation: 500, compact: 108, expanded: 700) == 108)
+        #expect(MapResultsSnap.height(start: 700, translation: -500, compact: 108, expanded: 700) == 700)
+        #expect(MapResultsSnap.height(start: 700, translation: 100, compact: 108, expanded: 700) == 600)
+        #expect(MapResultsSnap.target(start: 108, predictedTranslation: -450, compact: 108, expanded: 700) == .expanded)
+        #expect(MapResultsSnap.target(start: 700, predictedTranslation: 450, compact: 108, expanded: 700) == .compact)
+        #expect(MapResultsSnap.target(start: 700, predictedTranslation: 40, compact: 108, expanded: 700) == .expanded)
+        #expect(MapResultsSnap.target(start: 108, predictedTranslation: -40, compact: 108, expanded: 700) == .compact)
+    }
+
     @Test func hiddenSelectionIsDisclosedWithoutReactivatingAfterFilterReset() {
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, sport: .ride)])
         let picker = RoutePicker()
@@ -67,7 +77,8 @@ struct MapResultsTests {
                 }
                 #expect(layouts[0].contentHeight < layouts[1].contentHeight)
                 #expect(layouts[1].frame == layouts[2].frame)
-                #expect(layouts.allSatisfy { $0.bottomOcclusion == 0 && $0.leadingOcclusion == layouts[0].leadingOcclusion })
+                #expect(layouts.allSatisfy { abs($0.frame.maxX - (size.width - 16)) < 0.01 })
+                #expect(layouts.allSatisfy { $0.bottomOcclusion == 0 && $0.trailingOcclusion == layouts[0].trailingOcclusion })
                 #expect(layouts.allSatisfy { $0.frame.maxY == size.height + 21 }, "Both states meet the physical bottom edge through the safe area")
                 #expect(layouts[0].frame.minY > layouts[1].frame.minY, "Expansion moves the top edge upward")
                 let fit = MapResultsLayout.framing(size: size, topInset: 44, bottomInset: 21, detent: .compact, largeText: largeText)
@@ -96,11 +107,11 @@ struct MapResultsTests {
             #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height + 34)
             #expect(layout.frame.minX >= (layout.isSidePanel ? 12 : 4) && layout.frame.maxX <= size.width)
             if layout.isSidePanel {
-                #expect(layout.leadingOcclusion + 16 < size.width / 2)
+                #expect(layout.trailingOcclusion + 16 < size.width / 2)
                 #expect(layout.bottomOcclusion == 0)
             } else {
                 #expect(layout.frame.minY >= 118, "Expanded results leave navigation clear")
-                #expect(layout.leadingOcclusion == 0)
+                #expect(layout.trailingOcclusion == 0)
             }
         }
     }

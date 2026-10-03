@@ -7,6 +7,7 @@ struct RoutePickerSheet: View {
     let isSidePanel: Bool
     var bottomInset: CGFloat = 0
     var collapsedOverride: Bool? = nil
+    var panelHandle: AnyView? = nil
     private var expansion: CGFloat { collapsed ? 0 : 1 }
     private var contentReveal: CGFloat { expansion }
     var nativePresentation = false
@@ -22,7 +23,10 @@ struct RoutePickerSheet: View {
     private var singleDetail: Bool { detail != nil && candidates.count == 1 }
     var body: some View {
         VStack(spacing: 0) {
-            if isSidePanel { sidePanelHeader } else { header }
+            if isSidePanel {
+                panelHandle
+                if !singleDetail || collapsed { sidePanelHeader }
+            } else { header }
             if detail == nil && !isSidePanel {
                 compactSummary
                     .opacity(max(0, 1 - expansion * 4))
@@ -52,6 +56,7 @@ struct RoutePickerSheet: View {
         }
         // One continuous detail surface; only the outer host owns corners.
         .padding(.bottom, bottomInset)
+        .frame(maxHeight: .infinity, alignment: .top)
         .background { if !nativePresentation { Rectangle().fill(.regularMaterial) } }
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: isSidePanel ? 20 : 28,
             bottomLeadingRadius: 0, bottomTrailingRadius: 0,
@@ -99,17 +104,6 @@ struct RoutePickerSheet: View {
                 Spacer(minLength: 0)
                 if candidates.count > 1, let detail { detailNavigation(detail) }
             }
-            Button { resize(to: collapsed ? .expanded : .compact) } label: {
-                Image(systemName: collapsed ? "chevron.up" : "chevron.down")
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(collapsed ? "Expand results" : "Collapse results")
-            .accessibilityValue(collapsed ? "Collapsed" : "Expanded")
-            .accessibilityIdentifier("map-results-toggle")
-            .accessibilityAction(named: "Expand results") { resize(to: .expanded) }
-            .accessibilityAction(named: "Collapse results") { resize(to: .compact) }
             if detail == nil && !collapsed { selectionActions }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
