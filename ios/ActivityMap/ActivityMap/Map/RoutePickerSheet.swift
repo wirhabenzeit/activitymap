@@ -16,7 +16,7 @@ struct RoutePickerSheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var candidates: [Activity] {
-        picker.candidateIDs.filter(store.selection.visibleIDs.contains).compactMap { store.activity(id: $0) }
+        picker.candidateIDs.filter(store.visibleActivityIDs.contains).compactMap { store.activity(id: $0) }
     }
     private var detail: Activity? { candidates.first { $0.id == picker.detailID } }
 

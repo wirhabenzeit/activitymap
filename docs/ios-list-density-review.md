@@ -26,3 +26,13 @@ With the bottom status bar and full-width columns, targeted simulator suites pas
 Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.03_21-57-23-+0200.xcresult`. The earlier iteration also passed the full suite (218 tests, 348 runs); current screenshots and targeted results supersede that iteration's phone layout. Simulator evidence does not replace physical-device touch/VoiceOver acceptance.
 
 Reproduce: `scripts/ios-gallery.sh list-density-review --scene list,list-detail --variant phone,phone-dark,small-large-text,tablet`.
+
+## Device interaction performance follow-up
+
+A user reported jumpy row swipes and lag during detail dismissal. The installed development build used Debug (`-Onone`); the comparison build now uses Release optimization, without changing gestures or layout.
+
+A regression test reproduced unnecessary invalidation: changing only the inspected activity notified observers of selected IDs, active route and hidden-selection counts. Those observers include the retained map, whose route layer body constructs sorted ID filters. The store now publishes a separate selection snapshot only when selected, visible or active IDs change. Rendering callers read that snapshot; inspection still uses the existing reducer. Row context menus no longer read inspection merely to change their Details label.
+
+The new observation test failed before the fix and passes after it. Full suite: 219 tests passed (348 runs), zero failures, two opt-in skips. Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.03_22-14-09-+0200.xcresult`.
+
+A macOS duration-formatting microbenchmark showed only a small benefit from formatter reuse (150.5 versus 131.6 ms over 10,000 calls), so no formatter change was made. This is not an iPhone animation measurement. A requested 30-second Time Profiler recording could not attach to the iPhone (device readiness timeout). The unnecessary notifications are verified fixed; reduction of visible row-swipe/detail animation hitches still needs an on-device comparison or successful trace.

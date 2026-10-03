@@ -93,7 +93,7 @@ private struct NativeMapResultsSheet: View {
     @Environment(\.mapResultsSheetSuspended) private var suspended
     @Environment(\.mapResultsPresentationChanged) private var presentationChanged
     private var openingHeight: CGFloat {
-        NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.selection.visibleIDs.contains).count,
+        NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.visibleActivityIDs.contains).count,
                                             detail: picker.detailID != nil, height: size.height, largeText: largeText)
     }
     private var compact: PresentationDetent { .height(largeText ? 240 : 156) }

@@ -60,7 +60,7 @@ struct MapScreen: View {
         } message: {
             Text(picker.errorMessage ?? "")
         }
-        .onChange(of: store.selection.visibleIDs) { _, _ in picker.reconcile(with: store) }
+        .onChange(of: store.visibleActivityIDs) { _, _ in picker.reconcile(with: store) }
         .onChange(of: store.activeActivityID) { _, _ in picker.reconcile(with: store) }
         .onChange(of: store.selectedActivityIDs) { _, ids in
             picker.reconcile(with: store)
@@ -94,7 +94,7 @@ struct MapScreen: View {
     private func mapView(proxy: MapProxy, geometry: GeometryProxy) -> some View {
         Map(viewport: $viewport) {
             baseContent
-            RouteLayers(data: store.routeGeometry.data, visibleIDs: store.selection.visibleIDs,
+            RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
                         selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
 
             routeInteraction(proxy: proxy)
@@ -152,7 +152,7 @@ struct MapScreen: View {
             acceptsCameraEvents = true
         }
         if case let .activity(id) = context.pendingRequest?.action,
-           store.selection.visibleSelectedIDs.contains(id) {
+           store.visibleSelectedActivityIDs.contains(id) {
             // Do not activate a different remaining result if filters/deletion
             // invalidate a queued Show on map target before the renderer is ready.
             picker.reconcile(with: store)

@@ -136,7 +136,7 @@ struct SelectionBar: View {
     private var selectedCount: Int { store.selectedActivityIDs.count }
 
     private var summary: String {
-        let filteredCount = store.selection.visibleIDs.count
+        let filteredCount = store.visibleActivityIDs.count
         let visibleCount = selectedCount - store.hiddenSelectedCount
         let hidden = store.hiddenSelectedCount
         let scope = "\(visibleCount) of \(filteredCount) filtered activities selected"
@@ -145,7 +145,7 @@ struct SelectionBar: View {
 
     private var visibleSummary: String {
         let count = selectedCount - store.hiddenSelectedCount
-        let total = store.selection.visibleIDs.count
+        let total = store.visibleActivityIDs.count
         let scope = selectedCount == 0 ? "\(total) activities"
             : includesTotal ? "\(count) selected · \(total) activities" : "\(count) selected"
         return store.hiddenSelectedCount > 0 ? "\(scope) · \(store.hiddenSelectedCount) hidden" : scope
@@ -159,7 +159,7 @@ struct SelectionBar: View {
                 Button("Select All Filtered Activities") {
                     store.selectAllFiltered()
                 }
-                .disabled(store.selection.visibleIDs.isEmpty)
+                .disabled(store.visibleActivityIDs.isEmpty)
                 Button("Deselect All Filtered Activities") {
                     store.deselectAllFiltered()
                 }

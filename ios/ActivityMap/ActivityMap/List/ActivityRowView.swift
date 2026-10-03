@@ -132,7 +132,7 @@ struct ActivityRowView: View {
     }
 
     @ViewBuilder private var actionItems: some View {
-        Button(store.inspectedActivityID == activity.id ? "Close details" : "Details", systemImage: "info.circle", action: inspect)
+        Button("Details", systemImage: "info.circle") { store.inspect(activity.id) }
         Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
             .disabled(!hasGeometry)
     }

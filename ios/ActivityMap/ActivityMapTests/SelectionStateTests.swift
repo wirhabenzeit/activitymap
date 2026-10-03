@@ -1,6 +1,8 @@
 import CoreLocation
 import Foundation
 import Testing
+import Observation
+import Synchronization
 @testable import ActivityMap
 
 /// Runs the shared parity vectors through the production reducer rather than
@@ -160,6 +162,30 @@ struct ActivityStoreSelectionTests {
         #expect(store.inspectedActivityID == nil)
         store.resetFilters()
         #expect(store.activeActivityID == nil, "restoring a filter must not reopen focus")
+    }
+
+    @Test func inspectionDoesNotInvalidateSelectionObservers() {
+        let store = ActivityStore(activities: [Self.activity(1), Self.activity(2)])
+        store.replaceSelection(with: [1])
+        let selectionChanges = Mutex(0)
+        let inspectionChanges = Mutex(0)
+        withObservationTracking {
+            _ = store.selectedActivityIDs
+            _ = store.activeActivityID
+            _ = store.hiddenSelectedCount
+            _ = store.visibleActivityIDs
+        } onChange: { selectionChanges.withLock { $0 += 1 } }
+        withObservationTracking {
+            _ = store.inspectedActivityID
+        } onChange: { inspectionChanges.withLock { $0 += 1 } }
+        store.inspect(2)
+        store.dismissInspection()
+        #expect(inspectionChanges.withLock { $0 } == 1)
+        #expect(selectionChanges.withLock { $0 } == 0,
+                "Opening/closing list details must not redraw selected rows or the retained map")
+        store.addToSelection([2])
+        #expect(selectionChanges.withLock { $0 } == 1,
+                "Actual selection changes must still notify observers")
     }
 
     @Test func inspectionNeverChangesSelectionOrFocus() {

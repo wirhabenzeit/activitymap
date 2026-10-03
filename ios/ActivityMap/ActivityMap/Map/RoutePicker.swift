@@ -36,7 +36,7 @@ final class RoutePicker {
             errorMessage = Self.unavailableMessage
             return
         }
-        let visibleIDs = store.selection.visibleIDs
+        let visibleIDs = store.visibleActivityIDs
         let adding = isAdding
         let rect = CGRect(x: point.x - RouteHitTesting.radius, y: point.y - RouteHitTesting.radius,
                           width: RouteHitTesting.radius * 2, height: RouteHitTesting.radius * 2)
@@ -49,7 +49,7 @@ final class RoutePicker {
             guard let self, let map, let store,
                   request == self.generation,
                   revision == store.activitiesRevision,
-                  visibleIDs == store.selection.visibleIDs else { return }
+                  visibleIDs == store.visibleActivityIDs else { return }
             self.pendingQuery = nil
             switch result {
             case let .success(features):
@@ -94,7 +94,7 @@ final class RoutePicker {
 
     func reconcile(with store: ActivityStore) {
         invalidateQuery()
-        let visible = store.selection.visibleSelectedIDs
+        let visible = store.visibleSelectedActivityIDs
         candidateIDs = candidateIDs.filter(visible.contains)
             + visible.subtracting(candidateIDs).sorted(by: >)
         if let detailID, detailID != store.activeActivityID {
@@ -132,7 +132,7 @@ final class RoutePicker {
     }
 
     func showDetail(_ id: Int, store: ActivityStore, motion: NavigationMotion = .forward) {
-        guard store.selectedActivityIDs.contains(id), store.selection.visibleIDs.contains(id) else { return }
+        guard store.selectedActivityIDs.contains(id), store.visibleActivityIDs.contains(id) else { return }
         navigationMotion = motion
         store.activate(id)
         detailID = id
