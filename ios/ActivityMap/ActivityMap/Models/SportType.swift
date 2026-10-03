@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum ActivityCategory: String, CaseIterable, Identifiable {
+nonisolated enum ActivityCategory: String, CaseIterable, Identifiable, Sendable {
     case bcXcSki
     case trailHike
     case run
@@ -21,14 +21,14 @@ enum ActivityCategory: String, CaseIterable, Identifiable {
 
     // Generated from the web category catalogue by scripts/sync-ios-sport-assets.ts.
     var assetName: String { "Sport-\(rawValue)" }
-    var color: Color { Color(assetName) }
+    @MainActor var color: Color { Color(assetName) }
 
     var sportTypes: [SportType] {
         SportType.allCases.filter { $0.category == self }
     }
 }
 
-enum SportType: String, CaseIterable, Identifiable {
+nonisolated enum SportType: String, CaseIterable, Identifiable, Sendable {
     case backcountrySki = "BackcountrySki"
     case nordicSki = "NordicSki"
     case rollerSki = "RollerSki"

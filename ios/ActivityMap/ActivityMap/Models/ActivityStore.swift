@@ -13,12 +13,12 @@ enum AppTab: CaseIterable, Hashable {
     }
 }
 
-enum FilterOperator: String {
+nonisolated enum FilterOperator: String, Hashable, Sendable {
     case gte = ">="
     case lte = "<="
 }
 
-struct NumericFilter: Equatable {
+nonisolated struct NumericFilter: Hashable, Sendable {
     var operatorType: FilterOperator = .gte
     var value: Double = 0
     var upperLimit: Double? = nil
@@ -47,6 +47,7 @@ final class ActivityStore {
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
     @ObservationIgnored let summaryCache = ActivitySummaryCache()
+    let stats: StatsController
     @ObservationIgnored private var activityLookupRevision: Int?
     @ObservationIgnored private var activityLookup: [Int: Activity] = [:]
 
@@ -80,7 +81,8 @@ final class ActivityStore {
     let mapContext = MapContext()
     let listPresentation: ActivityListPresentation
 
-    init(activities: [Activity] = [], listPresentation: ActivityListPresentation = ActivityListPresentation()) {
+    init(activities: [Activity] = [], listPresentation: ActivityListPresentation = ActivityListPresentation(), stats: StatsController = StatsController()) {
+        self.stats = stats
         self.listPresentation = listPresentation
         self.activities = activities
         selection.setVisible(Set(filteredActivities.map(\.id)))
@@ -165,25 +167,33 @@ final class ActivityStore {
         let data = activitiesRevision, filters = filterRevision
         if let cached = filteredSnapshot, cached.data == data, cached.filters == filters { return cached.activities }
         let query = Self.normalizedSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
-        let result = activities.filter { activity in
-            if !query.isEmpty, !Self.normalizedSearch(activity.name).contains(query) { return false }
-            guard activeSportTypes.contains(activity.sportType) else { return false }
-
-            if let dateDayRange, !dateDayRange.contains(activity.localDayKey) { return false }
-
-            if let distanceFilter, !matches(distanceFilter, activity.distance) { return false }
-            if let elevationFilter, !matches(elevationFilter, activity.totalElevationGain) { return false }
-            if let durationFilter, !matches(durationFilter, activity.elapsedTime.map(Double.init)) { return false }
-
-            if let commuteOnly, activity.commute != commuteOnly { return false }
-            if let privateFilter, activity.isPrivate != privateFilter { return false }
-            if let flaggedFilter, activity.flagged != flaggedFilter { return false }
-
-            return true
-        }
+        let result = activities.filter { matchesFilters($0, query: query, includeDate: true) }
         filteredSnapshot = (data, filters, result)
         filterBuildCount += 1
         return result
+    }
+
+    /// Full authorized metadata; map/list dates and selection never narrow Stats.
+    var statsActivities: [Activity] {
+        let query = Self.normalizedSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
+        return activities.filter { matchesFilters($0, query: query, includeDate: false) }
+    }
+
+    private func matchesFilters(_ activity: Activity, query: String, includeDate: Bool) -> Bool {
+        if !query.isEmpty, !Self.normalizedSearch(activity.name).contains(query) { return false }
+        guard activeSportTypes.contains(activity.sportType) else { return false }
+
+        if includeDate, let dateDayRange, !dateDayRange.contains(activity.localDayKey) { return false }
+
+        if let distanceFilter, !matches(distanceFilter, activity.distance) { return false }
+        if let elevationFilter, !matches(elevationFilter, activity.totalElevationGain) { return false }
+        if let durationFilter, !matches(durationFilter, activity.elapsedTime.map(Double.init)) { return false }
+
+        if let commuteOnly, activity.commute != commuteOnly { return false }
+        if let privateFilter, activity.isPrivate != privateFilter { return false }
+        if let flaggedFilter, activity.flagged != flaggedFilter { return false }
+
+        return true
     }
 
     /// Sort is a list presentation concern; shared filter order stays intact.
@@ -254,10 +264,15 @@ final class ActivityStore {
     private(set) var filterResetRevision = 0
 
     func resetFilters() {
+        dateDayRange = nil
+        resetStatsActivityFilters()
+    }
+
+    /// Preserve saved browsing dates, selected IDs, camera and list context.
+    func resetStatsActivityFilters() {
         filterResetRevision &+= 1
         searchText = ""
         activeSportTypes = Set(SportType.allCases)
-        dateDayRange = nil
         distanceFilter = nil
         elevationFilter = nil
         durationFilter = nil
@@ -341,6 +356,7 @@ final class ActivityStore {
 
     /// Logout, account or deployment transition.
     func clearScope() {
+        stats.clearScope()
         summaryCache.clear()
         filteredSnapshot = nil
         listedSnapshot = nil

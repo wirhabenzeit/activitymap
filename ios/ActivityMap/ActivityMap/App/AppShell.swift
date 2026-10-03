@@ -69,9 +69,11 @@ struct AppShell: View {
                 }
                 .task(id: scenePhase) {
                     guard scenePhase == .active else { sync?.pause(); return }
+                    store.stats.refreshToday()
                     if sync != nil { await refresh() }
                     while !Task.isCancelled {
                         do { try await Task.sleep(for: .seconds(60)) } catch { return }
+                        store.stats.refreshToday()
                         await refresh()
                     }
                 }
