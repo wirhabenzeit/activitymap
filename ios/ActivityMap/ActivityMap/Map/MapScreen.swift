@@ -182,7 +182,7 @@ struct MapScreen: View {
             // Fit above the panel; background controls and credits add no occlusion.
             sheetHeight: showingResults && !layout.isSidePanel
                 ? max(layout.bottomOcclusion, NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.count, detail: picker.detailID != nil, height: geometry.size.height, largeText: typeSize.isAccessibilitySize) + safeArea.bottom) : 0, topOcclusion: topOcclusion,
-            leadingOcclusion: showingResults && layout.isSidePanel ? layout.leadingOcclusion + safeArea.leading : 0
+            trailingOcclusion: showingResults && layout.isSidePanel ? layout.trailingOcclusion + safeArea.trailing : 0
         ) else { return }
         let padding = camera.padding ?? context.camera.padding
         let target = Viewport.camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)

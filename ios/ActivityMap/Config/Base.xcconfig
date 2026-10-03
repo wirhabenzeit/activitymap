@@ -1,6 +1,9 @@
 // The token is public at runtime but must be supplied outside version control.
 MAPBOX_ACCESS_TOKEN =
 
+// Shared by system controls and the explicit browsing selection treatment.
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+
 // xcconfig treats "//" as the start of a comment, so URL separators have to be
 // composed from $(SLASH) instead of written literally.
 SLASH = /

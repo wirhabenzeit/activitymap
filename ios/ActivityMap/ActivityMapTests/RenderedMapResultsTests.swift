@@ -87,7 +87,7 @@ extension RenderedRoutePickingTests {
             let points = map.mapboxMap.points(for: activities[0].coordinates)
             let layout = MapResultsLayout(size: host.view.bounds.size, topInset: 62, bottomInset: host.view.safeAreaInsets.bottom, detent: .compact)
             if layout.isSidePanel {
-                #expect(points.allSatisfy { $0.x > layout.frame.maxX })
+                #expect(points.allSatisfy { $0.x < layout.frame.minX }, "Fit must leave routes to the left of the right-hand panel")
             } else {
                 #expect(points.allSatisfy { $0.y < layout.frame.minY - 16 }, "Fit must leave routes above the panel")
             }

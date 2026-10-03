@@ -43,6 +43,16 @@ struct MapResultsTests {
         #expect(!picker.isPresented && picker.detailID == nil && picker.candidateIDs.isEmpty)
     }
 
+    @Test func dragSnapsFromBothRestingPositionsAndClampsOvershoot() {
+        #expect(MapResultsSnap.height(start: 108, translation: 500, compact: 108, expanded: 700) == 108)
+        #expect(MapResultsSnap.height(start: 700, translation: -500, compact: 108, expanded: 700) == 700)
+        #expect(MapResultsSnap.height(start: 700, translation: 100, compact: 108, expanded: 700) == 600)
+        #expect(MapResultsSnap.target(start: 108, predictedTranslation: -450, compact: 108, expanded: 700) == .expanded)
+        #expect(MapResultsSnap.target(start: 700, predictedTranslation: 450, compact: 108, expanded: 700) == .compact)
+        #expect(MapResultsSnap.target(start: 700, predictedTranslation: 40, compact: 108, expanded: 700) == .expanded)
+        #expect(MapResultsSnap.target(start: 108, predictedTranslation: -40, compact: 108, expanded: 700) == .compact)
+    }
+
     @Test func hiddenSelectionIsDisclosedWithoutReactivatingAfterFilterReset() {
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, sport: .ride)])
         let picker = RoutePicker()
@@ -59,28 +69,21 @@ struct MapResultsTests {
         #expect(!picker.isPresented)
     }
 
-    @Test func draggingTracksTotalTranslationClampsAndSettlesToMeasuredHeights() {
-        let sizes = [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)]
-        for size in sizes {
-            let heights = MapResultsDetent.allCases.map {
-                MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: $0).contentHeight
+    @Test func widePanelHasOnlyCollapsedAndFullHeightWithStableCameraOcclusion() {
+        for size in [CGSize(width: 820, height: 1180), CGSize(width: 844, height: 390)] {
+            for largeText in [false, true] {
+                let layouts = MapResultsDetent.allCases.map {
+                    MapResultsLayout(size: size, topInset: 44, bottomInset: 21, detent: $0, largeText: largeText)
+                }
+                #expect(layouts[0].contentHeight < layouts[1].contentHeight)
+                #expect(layouts[1].frame == layouts[2].frame)
+                #expect(layouts.allSatisfy { abs($0.frame.maxX - (size.width - 16)) < 0.01 })
+                #expect(layouts.allSatisfy { $0.bottomOcclusion == 0 && $0.trailingOcclusion == layouts[0].trailingOcclusion })
+                #expect(layouts.allSatisfy { $0.frame.maxY == size.height + 21 }, "Both states meet the physical bottom edge through the safe area")
+                #expect(layouts[0].frame.minY > layouts[1].frame.minY, "Expansion moves the top edge upward")
+                let fit = MapResultsLayout.framing(size: size, topInset: 44, bottomInset: 21, detent: .compact, largeText: largeText)
+                #expect(fit.frame == layouts[1].frame, "Explicit fits reserve the full edge footprint")
             }
-            let medium = heights[1]
-            var drag = MapResultsDrag()
-            #expect(drag.update(translation: -20, currentHeight: medium, heights: heights) == min(heights[2], medium + 20))
-            #expect(drag.update(translation: -40, currentHeight: medium + 20, heights: heights) == min(heights[2], medium + 40),
-                    "Moving the handle must not feed its changing position back into the total drag")
-            #expect(drag.update(translation: -10000, currentHeight: medium, heights: heights) == heights[2])
-            #expect(drag.update(translation: 10000, currentHeight: medium, heights: heights) == heights[0])
-            #expect(drag.finish(translation: 10000, prediction: 10000, heights: heights) == .compact)
-            #expect(!drag.isDragging)
-            let midway = (heights[1] + heights[2]) / 2
-            #expect(drag.update(translation: 0, currentHeight: midway, heights: heights) == midway,
-                    "A new drag starts from the visible height while a spring is settling")
-            #expect(drag.finish(translation: -10, prediction: -10, heights: heights) == (heights[2] > heights[1] ? .expanded : .medium))
-            let layout = MapResultsLayout(size: size, topInset: 106, bottomInset: 34,
-                                          detent: .medium, heightOverride: midway)
-            if !layout.isSidePanel { #expect(layout.frame.maxY == size.height + 34) }
         }
     }
 
@@ -101,14 +104,14 @@ struct MapResultsTests {
     func detentsLeaveNavigationAvailable(size: CGSize) {
         for detent in MapResultsDetent.allCases {
             let layout = MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: detent)
-            #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height + (layout.isSidePanel ? 0 : 34))
+            #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height + 34)
             #expect(layout.frame.minX >= (layout.isSidePanel ? 12 : 4) && layout.frame.maxX <= size.width)
             if layout.isSidePanel {
-                #expect(layout.leadingOcclusion + 16 < size.width / 2)
+                #expect(layout.trailingOcclusion + 16 < size.width / 2)
                 #expect(layout.bottomOcclusion == 0)
             } else {
                 #expect(layout.frame.minY >= 118, "Expanded results leave navigation clear")
-                #expect(layout.leadingOcclusion == 0)
+                #expect(layout.trailingOcclusion == 0)
             }
         }
     }

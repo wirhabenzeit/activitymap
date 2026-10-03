@@ -26,11 +26,10 @@ enum AppTheme {
         static let icon = Font.system(size: 18)
     }
 
-    static let accent = Color(uiColor: UIColor { traits in
-        traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.44, green: 0.65, blue: 0.95, alpha: 1)
-            : UIColor(red: 0.18, green: 0.42, blue: 0.79, alpha: 1)
-    })
+    // One brand hue, with a lighter foreground variant on dark surfaces.
+    // The asset also covers system controls using Color.accentColor.
+    static let accent = Color("AccentColor")
+    static let selectionBackground = accent.opacity(0.12)
     static let contentBackground = Color(uiColor: .systemGroupedBackground)
     static let secondaryText = Color(uiColor: .secondaryLabel)
     static let surface = Color(uiColor: .secondarySystemGroupedBackground)
@@ -39,14 +38,9 @@ enum AppTheme {
     static let minimumTarget: CGFloat = 44
     static let minimumMetricColumnWidth: CGFloat = 100
     static let minimumInlineMetricColumnWidth: CGFloat = 72
-    static let minimumDetailColumnWidth: CGFloat = 180
+    static let minimumDetailColumnWidth: CGFloat = 150
 
-    static let headerBackground = Color(hex: "2E6BC9")
-    static let headerForeground = Color.white
-    static let sidebarBackground = Color(uiColor: .secondarySystemBackground)
-
-    static let sidebarCollapsedWidth: CGFloat = 56
-    static let sidebarExpandedWidth: CGFloat = 260
+    static let headerBackground = navigationBlue
 }
 
 /// Regular glass provides contrast over detailed maps; clear glass does not.

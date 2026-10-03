@@ -1,11 +1,6 @@
 import SwiftUI
 
-/// The older sidebar uses the same complete editor as the current sheet.
-struct FilterSidebar: View {
-    @Bindable var store: ActivityStore
-    var body: some View { FilterPanel(store: store) }
-}
-
+/// The shell owns sidebar visibility; List uses it to choose its detail host.
 private struct FilterSidebarVisibleKey: EnvironmentKey {
     static let defaultValue = false
 }

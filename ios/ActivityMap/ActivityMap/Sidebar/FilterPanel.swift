@@ -2,54 +2,66 @@ import SwiftUI
 
 struct FilterPanel: View {
     @Bindable var store: ActivityStore
+    var scope: FilterScope = .browsing
     @State private var editingCustomDates = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var startDate = Date()
     @State private var endDate = Date()
+
+    private var count: Int { scope == .stats ? store.stats.matchingActivityCount(for: store) : store.filteredActivities.count }
+    private var activeCount: Int { scope == .stats ? store.activeStatsFilterCount : store.activeFilterCount }
 
     var body: some View {
         Form {
             Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(store.filteredActivities.count) of \(store.activities.count) activities")
+                        Text("\(count) of \(store.activities.count) activities")
                             .font(.subheadline.weight(.semibold))
                             .accessibilityIdentifier("filter-result-count")
-                        if store.activeFilterCount > 0 {
-                            Text("\(store.activeFilterCount) active filters").font(.caption).foregroundStyle(.secondary)
+                        if activeCount > 0 {
+                            Text("\(activeCount) active filters").font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     Spacer()
                     Button("Reset") {
-                        store.resetFilters()
+                        scope.reset(store)
                         editingCustomDates = false
                     }
                     .font(.caption).frame(minHeight: 44)
-                    .disabled(store.activeFilterCount == 0)
-                    .accessibilityLabel("Reset all filters")
+                    .disabled(activeCount == 0)
+                    .accessibilityLabel(scope == .stats ? "Reset Stats activity filters" : "Reset all filters")
                 }
+                searchField
             }
-            searchSection
             activitySection
-            dateSection
+            if scope == .stats { statsPeriodSection } else { dateSection }
             metricsSection.id(store.filterResetRevision)
             binarySection
         }
+        .listSectionSpacing(.compact)
+        .contentMargins(.top, 8, for: .scrollContent)
+        .scrollDismissesKeyboard(.interactively)
         .onChange(of: store.filterResetRevision) { _, _ in
             editingCustomDates = false
             loadDateDraft()
         }
     }
 
-    private var searchSection: some View {
-        Section("Name Search") {
+    private var searchField: some View {
+        HStack {
             TextField("Search activity names", text: $store.searchText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
                 .accessibilityIdentifier("activity-name-search")
+                .accessibilityLabel("Search activity names")
             if !store.searchText.isEmpty {
-                Button("Clear Search") { store.searchText = "" }
+                Button { store.searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.borderless).accessibilityLabel("Clear Search")
             }
         }
     }
@@ -112,7 +124,7 @@ struct FilterPanel: View {
         let state = store.categorySelection(category)
         return Button { store.toggleCategory(category) } label: {
             HStack(spacing: 4) {
-                BrowseSportSymbol(category: category).frame(width: 24)
+                BrowseSportSymbol(category: category)
                     .opacity(state == .none ? 0.45 : 1)
                 Text(category.name)
                     .font(.caption.weight(.medium))
@@ -179,6 +191,18 @@ struct FilterPanel: View {
         .onChange(of: store.dateDayRange) { _, _ in loadDateDraft() }
     }
 
+    private var statsPeriodSection: some View {
+        Section("Stats periods") {
+            Text("Each chart uses its own reporting period. Activity filters apply across comparison history.")
+                .font(.subheadline)
+            if let range = store.dateDayRange {
+                Text("Saved for Map and List: \(range.start) through \(range.end). This date range does not restrict Stats.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityIdentifier("stats-period-explanation")
+    }
+
     private var metricsSection: some View {
         Section {
             NumericFilterRow(title: "Distance", icon: "ruler", unit: "km", scale: 1_000, filter: $store.distanceFilter, suggestedMaximum: max(100, (store.activities.compactMap(\.distance).max() ?? 0) / 1000))
@@ -237,5 +261,14 @@ struct FilterPanel: View {
             endDate = Date()
             startDate = ActivityDayRange.calendar(timeZone: .current).date(byAdding: .year, value: -1, to: endDate) ?? endDate
         }
+    }
+}
+
+enum FilterScope {
+    case browsing, stats
+
+    @MainActor func reset(_ store: ActivityStore) {
+        if self == .stats { store.resetStatsActivityFilters() }
+        else { store.resetFilters() }
     }
 }

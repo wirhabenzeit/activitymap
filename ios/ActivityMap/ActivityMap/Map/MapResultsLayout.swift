@@ -10,7 +10,7 @@ struct MapResultsLayout {
     let contentHeight: CGFloat
     let frame: CGRect
     let bottomOcclusion: CGFloat
-    let leadingOcclusion: CGFloat
+    let trailingOcclusion: CGFloat
 
     /// Explicit fits leave room to reveal normal detail after a compact fit.
     /// Resizing itself never changes the camera or queues another fit.
@@ -26,24 +26,38 @@ struct MapResultsLayout {
     }
 
     init(size: CGSize, topInset: CGFloat, bottomInset: CGFloat, detent: MapResultsDetent,
-         largeText: Bool = false, heightOverride: CGFloat? = nil) {
+         largeText: Bool = false) {
         isSidePanel = size.width >= 650 || size.width > size.height
         let width = isSidePanel ? min(380, size.width * 0.42) : max(0, size.width - 8)
         // Keep navigation clear. Map controls and credits remain at the map's
         // bottom edge behind this panel instead of reserving another top row.
         let top = topInset + 12
-        let available = max(120, size.height - top - 12)
-        let compact = min(available, largeText ? 240 : 156)
+        let available = max(120, size.height - top - (isSidePanel ? 0 : 12))
+        let compact = min(available, isSidePanel ? (largeText ? 160 : 108) : (largeText ? 240 : 156))
         let height: CGFloat
         switch detent {
         case .compact: height = compact
-        case .medium: height = min(available, max(compact + 120, size.height * 0.46))
+        case .medium: height = isSidePanel ? available : min(available, max(compact + 120, size.height * 0.46))
         case .expanded: height = available
         }
-        contentHeight = min(available, max(compact, heightOverride ?? height))
-        frame = CGRect(x: isSidePanel ? 16 : 4, y: isSidePanel ? top : size.height - contentHeight,
-                       width: width, height: contentHeight + (isSidePanel ? 0 : bottomInset))
+        contentHeight = height
+        // Both hosts rise from the bottom. On wide maps the lower edge stays
+        // anchored while the header moves upward to reveal the results.
+        frame = CGRect(x: isSidePanel ? max(0, size.width - width - 16) : 4, y: size.height - contentHeight,
+                       width: width, height: contentHeight + bottomInset)
         bottomOcclusion = isSidePanel ? 0 : contentHeight + bottomInset
-        leadingOcclusion = isSidePanel ? frame.maxX + 12 : 0
+        trailingOcclusion = isSidePanel ? size.width - frame.minX + 12 : 0
+    }
+}
+
+/// Drag distance is measured from the current resting height, including when
+/// starting expanded. Predicted movement lets a short flick reach a snap point.
+enum MapResultsSnap {
+    static func height(start: CGFloat, translation: CGFloat, compact: CGFloat, expanded: CGFloat) -> CGFloat {
+        min(expanded, max(compact, start - translation))
+    }
+    static func target(start: CGFloat, predictedTranslation: CGFloat, compact: CGFloat, expanded: CGFloat) -> MapResultsDetent {
+        height(start: start, translation: predictedTranslation, compact: compact, expanded: expanded)
+            < (compact + expanded) / 2 ? .compact : .expanded
     }
 }

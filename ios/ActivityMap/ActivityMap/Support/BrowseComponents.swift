@@ -26,11 +26,12 @@ struct BrowseSportSymbol: View {
                 .resizable()
                 .scaledToFit()
                 .foregroundStyle(category.color)
-                .frame(width: 20, height: 20)
-                .frame(width: 30, height: 30)
+                .frame(width: 26, height: 26)
+                .frame(width: 34, height: 34)
+                .background(category.color.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 11)).foregroundStyle(AppTheme.accent)
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.accent)
                     .background(.background, in: Circle())
             }
         }
