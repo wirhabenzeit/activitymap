@@ -11,6 +11,8 @@ struct ActivityRowView: View {
     private var hasGeometry: Bool { !activity.coordinates.isEmpty }
     private var settings: ActivityListSettings { store.listPresentation.settings }
 
+    private var primaryMetricsOnly: Bool { settings.visibleMetrics.isSubset(of: [.distance, .elapsedTime, .elevationGain]) }
+
     private var usesTable: Bool { ActivityTableLayout.supports(settings, typeSize: typeSize, availableWidth: availableWidth) }
 
     var body: some View {
@@ -29,7 +31,7 @@ struct ActivityRowView: View {
                     if usesTable {
                         tableContent
                     } else {
-                        VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
+                        VStack(alignment: .leading, spacing: 2) {
                             BrowseActivityHeading(activity: activity, isActive: isActive, comfortable: settings.density == .comfortable)
                             metrics
                         }
@@ -42,10 +44,23 @@ struct ActivityRowView: View {
             .accessibilityLabel("Details for \(activity.name)")
             .accessibilityValue(accessibleDetails)
             .accessibilityHint("Inspect activity without changing selection")
-            actions
+            .contextMenu { actionItems }
+            .accessibilityActions {
+                if hasGeometry {
+                    Button("Show on map") { store.showOnMap(activity.id) }
+                }
+            }
+            if usesTable { actions }
         }
-        .padding(.vertical, settings.density == .compact ? 0 : AppTheme.Spacing.tight)
+        .padding(.vertical, settings.density == .compact ? 0 : 2)
         .contentShape(Rectangle())
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if hasGeometry && settings.width == .fitWidth {
+                Button { store.showOnMap(activity.id) } label: {
+                    Label("Show on map", systemImage: "map")
+                }.tint(AppTheme.accent)
+            }
+        }
         .overlay(alignment: .leading) {
             if isSelected {
                 RoundedRectangle(cornerRadius: 2).fill(AppTheme.accent)
@@ -102,7 +117,9 @@ struct ActivityRowView: View {
             } else {
                 LazyVGrid(columns: typeSize.isAccessibilitySize
                           ? [GridItem(.flexible(), alignment: .leading)]
-                          : [GridItem(.adaptive(minimum: metricColumnWidth), alignment: .leading)],
+                          : primaryMetricsOnly
+                            ? Array(repeating: GridItem(.flexible(), alignment: .leading), count: settings.orderedMetrics.count)
+                            : [GridItem(.adaptive(minimum: metricColumnWidth), alignment: .leading)],
                           alignment: .leading, spacing: AppTheme.Spacing.tight) {
                     ForEach(settings.orderedMetrics) { metricView($0) }
                 }
@@ -115,11 +132,15 @@ struct ActivityRowView: View {
             ? AppTheme.minimumInlineMetricColumnWidth : AppTheme.minimumMetricColumnWidth
     }
 
+    @ViewBuilder private var actionItems: some View {
+        Button(store.inspectedActivityID == activity.id ? "Close details" : "Details", systemImage: "info.circle", action: inspect)
+        Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
+            .disabled(!hasGeometry)
+    }
+
     private var actions: some View {
         Menu {
-            Button(store.inspectedActivityID == activity.id ? "Close details" : "Details", systemImage: "info.circle", action: inspect)
-            Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
-                .disabled(!hasGeometry)
+            actionItems
         } label: {
             BrowseIconLabel(systemImage: "ellipsis")
         }
@@ -142,14 +163,12 @@ struct ActivityRowView: View {
     }
 
     @ViewBuilder private func metricView(_ metric: ActivityListMetric) -> some View {
-        let symbol: String? = switch metric {
-        case .distance: "ruler"
-        case .elapsedTime: "clock"
-        case .elevationGain: "mountain.2"
-        default: nil
-        }
-        if let symbol, !typeSize.isAccessibilitySize {
-            BrowseInlineMetric(title: metric.title, value: metric.value(for: activity), systemImage: symbol)
+        if primaryMetricsOnly && !typeSize.isAccessibilitySize {
+            Text(metric.value(for: activity))
+                .font(.caption).monospacedDigit()
+                .foregroundStyle(AppTheme.secondaryText)
+                .lineLimit(1).minimumScaleFactor(0.85)
+                .accessibilityLabel("\(metric.title): \(metric.value(for: activity))")
         } else {
             BrowseMetricValue(title: metric.title, value: metric.value(for: activity))
         }
