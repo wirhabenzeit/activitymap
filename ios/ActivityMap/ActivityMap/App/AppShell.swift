@@ -38,13 +38,9 @@ struct AppShell: View {
                 HStack(spacing: 0) {
                     if sidebarAvailable && sidebarVisible {
                         VStack(spacing: 0) {
-                            HStack {
-                                Text("Filters").font(.headline)
-                                Spacer()
-                                Button { sidebarVisible = false } label: {
-                                    Image(systemName: "sidebar.left").frame(width: 44, height: 44)
-                                }.accessibilityLabel("Hide filter sidebar")
-                            }.padding(.horizontal, 16)
+                            Text("Filters").font(.headline)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .padding(.horizontal, 16)
                             FilterPanel(store: store, scope: filterScope)
                         }
                         .frame(width: 320)
@@ -133,6 +129,7 @@ struct AppShell: View {
                     .sharedBackgroundVisibility(.hidden)
 
                     ToolbarItem(placement: .topBarLeading) {
+                        let filtersOpen = sidebarAvailable ? sidebarVisible : sheets.showsFilters
                         Button {
                             if sidebarAvailable { sidebarVisible.toggle() }
                             else { sheets.showsFilters.toggle() }
@@ -140,11 +137,17 @@ struct AppShell: View {
                             Image(systemName: activeFilterCount == 0
                                 ? "line.3.horizontal.decrease"
                                 : "line.3.horizontal.decrease.circle.fill")
+                                .rotationEffect(.degrees(90))
+                                .frame(width: 44, height: 44)
+                                .background(filtersOpen ? Color.white.opacity(0.2) : .clear,
+                                            in: RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
                         .accessibilityLabel(filterButtonLabel)
+                        .accessibilityValue(filtersOpen ? "Expanded" : "Collapsed")
+                        .accessibilityAddTraits(filtersOpen ? .isSelected : [])
                     }
                     .sharedBackgroundVisibility(.hidden)
                 }

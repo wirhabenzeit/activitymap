@@ -15,3 +15,9 @@ The next feature-menu extension should be photo visibility under Layers, impleme
 | ![Collapsed](ios-map-controls/after-collapsed.png) | ![Single activity](ios-map-controls/after-single.png) |
 
 Simulator/offline-style captures. Focused geometry and rendered-map validation: 37 tests passed (80 parameterized runs), zero failures. `git diff --check` passed. Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.03_09-12-20-+0200.xcresult`.
+
+## Filter toggle polish
+
+Removed the duplicate hide button from the Filters sidebar. The single toolbar button uses a 90-degree-rotated filter icon and a highlighted background while filters are expanded; its accessibility value and selected trait expose that state. Active filter criteria retain their existing filled-icon indication. Five rendered filter tests passed (eight parameterized runs), and the integrated wide-shell test passed for single and multiple selections.
+
+![Active filter toolbar toggle](ios-map-controls/filters-toolbar.png)
