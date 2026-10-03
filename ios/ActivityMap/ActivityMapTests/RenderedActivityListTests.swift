@@ -86,13 +86,11 @@ extension RenderedRoutePickingTests {
     }
 
     @Test(arguments: [375.0, 390.0, 402.0])
-    func phoneMetricChoicesUseRowsAndWideListsKeepColumns(width: Double) async throws {
+    func compactMetricPairsRetainTableColumns(width: Double) async throws {
         let presentation = ActivityListPresentation(defaults: nil)
-        #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
-        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: 820))
+        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
         presentation.settings.visibleMetrics = [.distance, .averageSpeed]
-        #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
-        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: 820))
+        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
         let store = ActivityStore(activities: try GalleryLibrary.load().activities, listPresentation: presentation)
         store.selectedTab = .list
         let host = try ListHarness(root: NavigationStack { ListScreen(store: store) },
@@ -108,28 +106,27 @@ extension RenderedRoutePickingTests {
         #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
     }
 
-    @Test(arguments: [390.0, 820.0])
-    func listDisplaySheetSurvivesColumnLayoutChanges(width: Double) async throws {
+    @Test func listDisplaySheetSurvivesColumnLayoutChanges() async throws {
         let presentation = ActivityListPresentation(defaults: nil)
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)], listPresentation: presentation)
         store.selectedTab = .list
         let host = try ListHarness(root: NavigationStack {
             ListScreen(store: store, displayOpen: true)
-        }, size: CGSize(width: width, height: 844))
+        }, size: CGSize(width: 390, height: 844))
         defer { host.close() }
         try await listWait { host.host.presentedViewController != nil }
         let sheet = try #require(host.host.presentedViewController)
-        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width) == (width >= 600))
-        presentation.settings.visibleMetrics = Set(ActivityListMetric.allCases)
+        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large))
+        presentation.settings.visibleMetrics.insert(.maxPower)
         try await Task.sleep(for: .milliseconds(400))
-        #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
+        #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large))
         #expect(host.host.presentedViewController === sheet, "Changing header branch must retain the open display sheet")
         presentation.settings.visibleMetrics = []
         try await Task.sleep(for: .milliseconds(200))
         #expect(host.host.presentedViewController === sheet)
         presentation.settings.visibleMetrics = [.distance, .elapsedTime, .elevationGain]
         try await Task.sleep(for: .milliseconds(200))
-        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width) == (width >= 600))
+        #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large))
         #expect(host.host.presentedViewController === sheet, "Restoring table columns must retain the same sheet")
         presentation.settings.width = .scrollingMetrics
         try await Task.sleep(for: .milliseconds(200))

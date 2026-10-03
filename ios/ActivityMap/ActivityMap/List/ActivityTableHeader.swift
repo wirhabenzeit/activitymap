@@ -4,7 +4,7 @@ import SwiftUI
 enum ActivityTableLayout {
     static func supports(_ settings: ActivityListSettings, typeSize: DynamicTypeSize,
                          availableWidth: CGFloat = 390) -> Bool {
-        guard availableWidth >= 600, !typeSize.isAccessibilitySize, settings.width == .fitWidth,
+        guard !typeSize.isAccessibilitySize, settings.width == .fitWidth,
               !settings.visibleMetrics.isEmpty else { return false }
         // Preserve every configured metric. Fall back to the adaptive grid when
         // aligned columns would squeeze the activity name or clip their values.

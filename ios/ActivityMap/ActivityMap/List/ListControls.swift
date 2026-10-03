@@ -100,7 +100,7 @@ struct ListOptionsSheets: ViewModifier {
                             presentation.settings.width = .fitWidth
                         }
                     } header: { Text("Visible metrics") }
-                    footer: { Text("Name, sport and local date always stay visible. Fit Width uses compact name/date and metric rows on phones, and aligned columns on wider lists when the chosen metrics fit. Adding more metrics can switch to stacked rows. Scroll Metrics uses horizontally scrolling values in each row. Accessibility text uses stacked rows. Open Details to inspect hidden metrics.") }
+                    footer: { Text("Name, sport and local date always stay visible. Fit Width shows aligned sortable columns whenever the chosen metrics fit, including on phones. Adding more metrics can switch to stacked rows and remove the column headings. Scroll Metrics uses horizontally scrolling values in each row. Accessibility text uses stacked rows. Open Details to inspect hidden metrics.") }
                 }
                 .navigationTitle("List display")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { displayOpen = false } } }
