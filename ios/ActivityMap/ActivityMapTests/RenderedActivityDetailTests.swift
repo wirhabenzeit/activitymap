@@ -1,6 +1,8 @@
 import SwiftUI
+import CoreLocation
 import Testing
 import UIKit
+import Vision
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
@@ -29,6 +31,260 @@ extension RenderedRoutePickingTests {
         try host.save(removed, name: "detail-deleted")
     }
 
+    @Test func mapResultsBackRetainsScrollAndBrowsingContext() async throws {
+        let store = ActivityStore(activities: (1...60).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: Array(1...60))
+        store.inspect(5)
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: false), size: CGSize(width: 375, height: 500))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(200))
+        let results = try #require(host.descendants(of: UIScrollView.self).first { $0.contentSize.height > $0.bounds.height + 100 })
+        results.setContentOffset(CGPoint(x: 0, y: 900), animated: false)
+        try await Task.sleep(for: .milliseconds(100))
+        let offset = results.contentOffset
+        let selection = store.selectedActivityIDs
+        let request = store.mapContext.pendingRequest
+        picker.showDetail(20, store: store)
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(host.descendants(of: UIScrollView.self).contains { $0 === results }, "Results remain mounted behind the detail destination")
+        #expect(picker.detailID == 20 && store.activeActivityID == 20)
+        try host.save(host.snapshot(), name: "map-flow-detail")
+        picker.showResults()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(results.contentOffset == offset, "Back restores the exact results scroll position")
+        #expect(picker.detailID == nil && picker.isPresented)
+        #expect(store.selectedActivityIDs == selection && store.activeActivityID == 20 && store.inspectedActivityID == 5)
+        #expect(store.mapContext.pendingRequest == request, "Moving between results and detail does not request a map refit")
+        try host.save(host.snapshot(), name: "map-flow-results-return")
+    }
+
+    @Test func mapSheetTracksDragBeforeReleaseAndKeepsOneContentDuringSettling() async throws {
+        var activity = ActivityStoreSelectionTests.activity(1)
+        activity.name = "Lake ride"
+        let store = ActivityStore(activities: [activity, ActivityStoreSelectionTests.activity(2)])
+        store.replaceSelection(with: [1, 2])
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        picker.showDetail(1, store: store, motion: .none)
+        let resizing = MapResultsResizeState()
+        let size = CGSize(width: 820, height: 1180)
+        let heights = MapResultsDetent.allCases.map {
+            MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: $0).contentHeight
+        }
+        let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store, size: size,
+            topInset: 0, bottomInset: 0, largeText: false, resizing: resizing).ignoresSafeArea(), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(250))
+        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
+        let before = pager.view.bounds.height
+        resizing.height = resizing.drag.update(translation: -90, currentHeight: heights[1], heights: heights)
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(picker.detent == .medium && resizing.drag.isDragging)
+        #expect(abs(pager.view.bounds.height - before - 90) < 2, "The detail viewport grows with the finger before release")
+        #expect(abs((resizing.presentedHeight ?? 0) - heights[1] - 90) < 2)
+        try host.save(host.snapshot(), name: "map-sheet-live-resize")
+        _ = resizing.drag.finish(translation: -90, prediction: -90, heights: heights)
+        picker.detent = .compact
+        // Sample the first interpolated frame rather than assuming Simulator
+        // schedules one at exactly 60ms while the full suite is running.
+        let frameDeadline = Date().addingTimeInterval(0.3)
+        while (resizing.presentedHeight ?? heights[1] + 90) >= heights[1] + 89,
+              Date() < frameDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let progress = try #require(resizing.presentedHeight)
+        #expect(progress > heights[0] + 1 && progress < heights[1] + 90,
+                "Collapse interpolates the panel height instead of jumping layout and fading multiple contents")
+        let image = host.snapshot()
+        try host.save(image, name: "map-sheet-settling")
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(text.components(separatedBy: "Lake ride").count == 2, "One detail heading during settling: \(text)")
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(abs((resizing.presentedHeight ?? 0) - heights[0]) < 2)
+        #expect(picker.detailID == 1 && store.activeActivityID == 1 && store.selectedActivityIDs == [1, 2])
+        #expect(store.mapContext.pendingRequest == nil, "A resize must not request a route fit")
+        try host.save(host.snapshot(), name: "map-sheet-collapsed")
+        var headingOffsets: [CGFloat] = []
+        for fraction: CGFloat in [0, 0.15, 0.5, 1] {
+            resizing.height = heights[0] + (heights[1] - heights[0]) * fraction
+            try await Task.sleep(for: .milliseconds(80))
+            let frame = host.snapshot()
+            try host.save(frame, name: "map-detail-reveal-\(Int(fraction * 100))")
+            let recognition = VNRecognizeTextRequest()
+            recognition.recognitionLevel = .accurate
+            try VNImageRequestHandler(cgImage: try #require(frame.cgImage)).perform([recognition])
+            let headings = (recognition.results ?? []).filter { $0.topCandidates(1).first?.string == "Lake ride" }
+            #expect(headings.count == 1, "Exactly one persistent heading at reveal progress \(fraction)")
+            let heading = try #require(headings.first)
+            let top = (1 - heading.boundingBox.maxY) * size.height
+            let sheetTop = MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: picker.detent, heightOverride: resizing.height).frame.minY
+            headingOffsets.append(top - sheetTop)
+        }
+        #expect((headingOffsets.max() ?? 0) - (headingOffsets.min() ?? 0) < 3,
+                "The identity remains at the same position within the sheet through the reveal")
+    }
+
+    @Test(arguments: [1, 3])
+    func mapGrabberKeepsLivePagesDuringLargeLibraryResize(selectedCount: Int) async throws {
+        var activities = (1...4574).map { ActivityStoreSelectionTests.activity($0) }
+        // Realistic long GPS recordings expose repeated route-bound sorting.
+        let route = (0..<24000).map { index in
+            CLLocationCoordinate2D(latitude: 46 + Double(index) / 100000,
+                                  longitude: 8 + Double(index) / 100000)
+        }
+        for index in 0..<selectedCount { activities[index].coordinates = route }
+        let store = ActivityStore(activities: activities)
+        store.replaceSelection(with: Array(1...selectedCount))
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        picker.showDetail(1, store: store, motion: .none)
+        let resizing = MapResultsResizeState()
+        let size = CGSize(width: 820, height: 1180)
+        let heights = MapResultsDetent.allCases.map {
+            MapResultsLayout(size: size, topInset: 0, bottomInset: 0, detent: $0).contentHeight
+        }
+        let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store, size: size,
+            topInset: 0, bottomInset: 0, largeText: false, resizing: resizing).ignoresSafeArea(), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(200))
+        let grabber = try #require(host.descendants(of: MapResultsHandleView.self).first)
+        #expect(grabber.bounds.height == 44)
+        #expect(grabber.hitTest(CGPoint(x: grabber.bounds.midX, y: 32), with: nil) === grabber,
+                "The space below the tiny visible indicator must accept the drag")
+        let windowPoint = grabber.convert(CGPoint(x: grabber.bounds.midX, y: 32), to: host.window)
+        #expect(host.window.hitTest(windowPoint, with: nil) === grabber,
+                "The overlay target receives actual window hit testing without a blank handle row")
+        #expect(grabber.pan.view === grabber && grabber.pan.isEnabled)
+        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
+        let coordinator = try #require(pager.delegate as? MapActivityPager.Coordinator)
+        let page = try #require(pager.viewControllers?.first as? MapActivityPager.Page)
+        let updates = page.contentUpdateCount
+        let pan = ResultsTestPan()
+        pan.phase = .began
+        grabber.handlePan(pan)
+        for step in 1...30 {
+            pan.phase = .changed
+            pan.delta = -CGFloat(step * 4)
+            grabber.handlePan(pan)
+            try await Task.sleep(for: .milliseconds(16))
+            #expect(host.descendants(of: MapResultsHandleView.self).first === grabber)
+            #expect(pager.viewControllers?.first === page)
+            #expect(page.contentUpdateCount == updates, "Drag frames must not replace the hosted content")
+            #expect(abs((resizing.presentedHeight ?? 0) - heights[1] - CGFloat(step * 4)) < 2)
+        }
+        #expect(coordinator.pages.count <= 3)
+        pan.phase = .ended
+        grabber.handlePan(pan)
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(!resizing.drag.isDragging)
+        #expect(page.contentUpdateCount == updates)
+        picker.detent = .compact
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(abs((resizing.presentedHeight ?? 0) - heights[0]) < 2)
+        #expect(page.contentUpdateCount == updates, "Chevron-style settling retains hosted content too")
+        pan.phase = .began
+        pan.delta = 0
+        grabber.handlePan(pan)
+        pan.phase = .changed
+        pan.delta = -40
+        grabber.handlePan(pan)
+        pan.phase = .cancelled
+        grabber.handlePan(pan)
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(!resizing.drag.isDragging && picker.detent == .compact)
+        #expect(picker.detailID == 1 && store.activeActivityID == 1)
+        #expect(store.selectedActivityIDs == Set(1...selectedCount) && store.mapContext.pendingRequest == nil)
+        // Live identity lookup must still invalidate when sync replaces data.
+        store.activities[0].name = "Updated while resizing"
+        #expect(store.activity(id: 1)?.name == "Updated while resizing")
+        store.activities.removeFirst()
+        #expect(store.activity(id: 1) == nil)
+    }
+
+    @Test(arguments: [ColorScheme.light, .dark])
+    func mapResultsCaptionsAreReadableOverMaterial(scheme: ColorScheme) async throws {
+        let activity = try StoredModelMapper.activity(Fixtures.activity([
+            "id": "1", "name": "Riverside ride", "sport_type": "Ride", "distance": 31200,
+            "elapsed_time": 4476, "total_elevation_gain": 820,
+        ]))
+        let store = ActivityStore(activities: [activity, ActivityStoreSelectionTests.activity(2)])
+        store.replaceSelection(with: [1, 2])
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: false)
+            .environment(\.colorScheme, scheme), size: CGSize(width: 375, height: 500))
+        defer { host.close() }
+        host.host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
+        try await Task.sleep(for: .milliseconds(200))
+        let image = host.snapshot()
+        try host.save(image, name: scheme == .dark ? "map-results-readable-dark" : "map-results-readable-light")
+        // Inspect visible pixels, not accessibility labels: the regression was
+        // present in the view tree but unreadable on the frosted surface.
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false
+        request.recognitionLanguages = ["en-US"]
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(text.contains("2023"), "Date remains visibly rendered beside the sport badge and title: \(text)")
+        // Vision may split a number into adjacent text observations ("3 1.2").
+        let compactText = text.filter { !$0.isWhitespace }
+        #expect(compactText.contains("31.2") && compactText.contains("1h14m") && compactText.contains("820"),
+                "Distance, elapsed time and elevation are visibly rendered: \(text)")
+    }
+
+    @Test(arguments: [2, 60]) func nativeMapPagerDragsBeforeCommittingAndCancelsWithoutChangingFocus(count: Int) async throws {
+        let store = ActivityStore(activities: (1...count).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: Array(1...count))
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let start = min(30, count)
+        picker.showDetail(start, store: store, motion: .none)
+        let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: false), size: CGSize(width: 375, height: 500))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(300))
+        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
+        #expect(pager.transitionStyle == .scroll && pager.navigationOrientation == .horizontal)
+        let scroll = try #require(host.descendants(of: UIScrollView.self).first { $0.contentSize.width > $0.bounds.width * 1.5 })
+        #expect(scroll.panGestureRecognizer.isEnabled)
+        let initialOffset = scroll.contentOffset
+        let before = host.snapshot()
+        scroll.setContentOffset(CGPoint(x: initialOffset.x + 30, y: initialOffset.y), animated: false)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(before.pngData() != host.snapshot().pngData(), "Native page content moves before the drag is committed")
+        #expect(picker.detailID == start && store.activeActivityID == start)
+        try host.save(host.snapshot(), name: "map-native-page-drag")
+        scroll.setContentOffset(initialOffset, animated: false)
+        let initial = try #require(pager.viewControllers?.first)
+        let next = try #require(pager.dataSource?.pageViewController(pager, viewControllerAfter: initial))
+        let headerBefore = host.snapshotRegion(CGRect(x: 0, y: 18, width: 375, height: 52))
+        pager.delegate?.pageViewController?(pager, willTransitionTo: [next])
+        #expect(picker.isPaging)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(host.snapshotRegion(CGRect(x: 0, y: 18, width: 375, height: 52)) == headerBefore,
+                "Paging arrows keep their appearance during a native drag")
+        pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [initial], transitionCompleted: false)
+        #expect(!picker.isPaging && picker.detailID == start && store.activeActivityID == start)
+        pager.delegate?.pageViewController?(pager, willTransitionTo: [next])
+        pager.setViewControllers([next], direction: .forward, animated: false)
+        pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [initial], transitionCompleted: true)
+        #expect(picker.detailID == start - 1 && store.activeActivityID == start - 1)
+        let coordinator = try #require(pager.delegate as? MapActivityPager.Coordinator)
+        for _ in 0..<20 {
+            let current = try #require(pager.viewControllers?.first)
+            let following = try #require(pager.dataSource?.pageViewController(pager, viewControllerAfter: current))
+            pager.setViewControllers([following], direction: .forward, animated: false)
+            pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [current], transitionCompleted: true)
+            #expect(coordinator.pages.count <= 3, "Large selections retain only current/adjacent hosted pages")
+        }
+        #expect(store.selectedActivityIDs.count == count && store.mapContext.pendingRequest == nil)
+    }
+
     @Test(arguments: ["phone", "accessibility", "tablet", "landscape", "no-gps"])
     func detailAdaptivePresentation(scenario: String) async throws {
         let tablet = scenario == "tablet"
@@ -37,7 +293,9 @@ extension RenderedRoutePickingTests {
         let size = tablet ? CGSize(width: 768, height: 1024) : landscape ? CGSize(width: 844, height: 390) : CGSize(width: 390, height: 844)
         var activity = try StoredModelMapper.activity(Fixtures.activity([
             "sport_type": "Ride", "name": "A long ride through the hills and home along the river",
-            "description": String(repeating: "Quiet roads, a steep climb, and a stop by the lake.\n", count: 20),
+            // Keep this genuinely overflowing now that default details are
+            // denser; the test still exercises scroll reachability in all hosts.
+            "description": String(repeating: "Quiet roads, a steep climb, and a stop by the lake.\n", count: 40),
             "distance": 31200, "elapsed_time": 4476, "total_elevation_gain": 820,
             "moving_time": 4000, "average_speed": 7.8, "max_speed": 16,
             "elev_high": NSNull(), "elev_low": -12, "average_heartrate": 124, "max_heartrate": NSNull(),
@@ -66,6 +324,7 @@ extension RenderedRoutePickingTests {
         let detailScroll = try #require(scrolls.first { $0.contentSize.height > $0.bounds.height + 100 })
         detailScroll.setContentOffset(CGPoint(x: 0, y: detailScroll.contentSize.height - detailScroll.bounds.height), animated: false)
         try await Task.sleep(for: .milliseconds(100))
+        #expect(detailScroll.contentOffset.y > 0, "Long detail content remains reachable by scrolling")
         try host.save(host.snapshot(), name: "detail-\(scenario)-scrolled")
     }
 }
@@ -92,6 +351,11 @@ private final class DetailHarness<Content: View> {
             host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
         }
     }
+    func snapshotRegion(_ rect: CGRect) -> Data? {
+        let image = snapshot()
+        let pixels = rect.applying(CGAffineTransform(scaleX: image.scale, y: image.scale))
+        return image.cgImage?.cropping(to: pixels).flatMap { UIImage(cgImage: $0).pngData() }
+    }
     func save(_ image: UIImage, name: String) throws {
         let directory = URL(fileURLWithPath: "/tmp/activitymap-detail-preview")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -103,5 +367,22 @@ private final class DetailHarness<Content: View> {
         }
         return visit(host.view)
     }
+    func controllers<T: UIViewController>(of type: T.Type) -> [T] {
+        func visit(_ controller: UIViewController) -> [T] {
+            ((controller as? T).map { [$0] } ?? []) + controller.children.flatMap(visit)
+        }
+        return visit(host)
+    }
     func close() { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
+}
+
+/// Exercise the installed recognizer's event bridge in window coordinates;
+/// physical finger/velocity feel remains a device check.
+@MainActor
+private final class ResultsTestPan: UIPanGestureRecognizer {
+    var phase: UIGestureRecognizer.State = .possible
+    var delta: CGFloat = 0
+    override var state: UIGestureRecognizer.State { get { phase } set { phase = newValue } }
+    override func translation(in view: UIView?) -> CGPoint { CGPoint(x: 0, y: delta) }
+    override func velocity(in view: UIView?) -> CGPoint { .zero }
 }

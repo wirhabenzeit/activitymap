@@ -2,9 +2,51 @@ import MapboxMaps
 import SwiftUI
 import Testing
 import UIKit
+import Vision
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
+    @Test func firstSyncKeepsMapClearWhileProgressIsAvailableInSettings() async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let source = GatedSyncSource()
+        let store = ActivityStore()
+        let sync = SyncController(activities: store, source: { _ in source }, invalidate: { _ in })
+        sync.setSession(SyncFixtures.session(), storage: storage)
+        await source.waitForRequest()
+        defer {
+            sync.pause()
+            Task { await source.release(SyncFixtures.activities([])) }
+        }
+        #expect(sync.status == .syncing && !sync.hasCompletedCache)
+        let root = NavigationStack { BrowseContent(store: store, sync: sync).navigationTitle("ActivityMap") }
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style))
+        let host = try BrowsingHarness(root: root, size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await browsingWait { host.descendants(of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
+        try await Task.sleep(for: .milliseconds(150))
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(host.snapshot().cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(!text.contains("Loading your activity library") && !text.contains("Pause Sync"),
+                "Initial sync does not cover the map with a progress popup")
+        try host.save(name: "map-first-sync-clear")
+        let settings = try BrowsingHarness(root: AccountSheet(destination: .settings, auth: AuthController(), sync: sync, refresh: {}),
+                                           size: CGSize(width: 390, height: 844))
+        defer { settings.close() }
+        try await Task.sleep(for: .milliseconds(150))
+        let settingsRequest = VNRecognizeTextRequest()
+        settingsRequest.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(settings.snapshot().cgImage)).perform([settingsRequest])
+        let settingsText = (settingsRequest.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(settingsText.contains("Syncing activities") && settingsText.contains("Pause Sync"),
+                "Progress and pause remain reachable in Settings: \(settingsText)")
+        try settings.save(name: "settings-first-sync-progress")
+    }
+
     @Test(arguments: ["phone", "accessibility", "tablet"])
     func browsingCachedStatesKeepMapAndListMounted(layout: String) async throws {
         let token = MapboxOptions.accessToken
@@ -59,6 +101,13 @@ extension RenderedRoutePickingTests {
         #expect(store.selectedActivityIDs == [1])
         #expect(!sync.canRefresh && sync.status != .expired)
         try host.save(name: "\(layout)-server-wait-map")
+        // Routine sync status now belongs in Settings while the retained
+        // browsing surfaces keep their context and empty-state recovery.
+        let settings = try BrowsingHarness(root: AccountSheet(destination: .settings, auth: AuthController(), sync: sync, refresh: {}),
+                                           size: layout == "tablet" ? CGSize(width: 768, height: 1024) : CGSize(width: 390, height: 844))
+        defer { settings.close() }
+        try await Task.sleep(for: .milliseconds(150))
+        try settings.save(name: "\(layout)-sync-settings")
     }
 
     @Test(arguments: ["phone", "accessibility", "tablet"])
@@ -75,9 +124,6 @@ extension RenderedRoutePickingTests {
             let state = try #require(presentation.empty)
             let root = NavigationStack {
                 ListScreen(store: ActivityStore(), emptyState: state)
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        BrowsingStatusBar(presentation: presentation, failureMessage: nil, recover: { _ in })
-                    }
                     .navigationTitle("Activities")
             }.environment(\.dynamicTypeSize, layout == "accessibility" ? .accessibility2 : .large)
             let host = try BrowsingHarness(root: root, size: size)
@@ -114,9 +160,12 @@ private final class BrowsingHarness<Content: View> {
         host.view.frame = window.bounds
         host.view.layoutIfNeeded()
     }
-    func save(name: String) throws {
+    func snapshot() -> UIImage {
         host.view.layoutIfNeeded()
-        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
+        return UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
+    }
+    func save(name: String) throws {
+        let image = snapshot()
         let directory = URL(fileURLWithPath: "/tmp/activitymap-browsing-preview")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try image.pngData()?.write(to: directory.appendingPathComponent("\(name).png"))

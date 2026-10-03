@@ -7,10 +7,14 @@ struct MapCamera {
     var zoom: CGFloat
     var bearing: Double
     var pitch: CGFloat
+    var padding: UIEdgeInsets = .zero
 
     static let initial = MapCamera(center: CLLocationCoordinate2D(latitude: 46.95, longitude: 9.1),
                                    zoom: 6.5, bearing: 0, pitch: 0)
-    var viewport: Viewport { .camera(center: center, zoom: zoom, bearing: bearing, pitch: pitch) }
+    var viewport: Viewport {
+        .camera(center: center, zoom: zoom, bearing: bearing, pitch: pitch)
+            .padding(EdgeInsets(top: padding.top, leading: padding.left, bottom: padding.bottom, trailing: padding.right))
+    }
 }
 
 /// Survives MapScreen recreation. Actual camera updates are not observable:
@@ -35,7 +39,7 @@ final class MapContext {
     }
 
     func record(_ state: CameraState) {
-        camera = MapCamera(center: state.center, zoom: state.zoom, bearing: state.bearing, pitch: state.pitch)
+        camera = MapCamera(center: state.center, zoom: state.zoom, bearing: state.bearing, pitch: state.pitch, padding: state.padding)
         let pitched = state.pitch > 1
         if isPitched != pitched { isPitched = pitched }
     }

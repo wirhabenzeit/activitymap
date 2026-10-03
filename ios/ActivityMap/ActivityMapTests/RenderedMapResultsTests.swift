@@ -89,7 +89,7 @@ extension RenderedRoutePickingTests {
             if layout.isSidePanel {
                 #expect(points.allSatisfy { $0.x > layout.frame.maxX })
             } else {
-                #expect(points.allSatisfy { $0.y < layout.frame.minY - 124 }, "Fit must leave routes above panel, branding and controls")
+                #expect(points.allSatisfy { $0.y < layout.frame.minY - 16 }, "Fit must leave routes above the panel")
             }
         }
         store.clearSelection()

@@ -19,25 +19,9 @@ nonisolated enum ActivityCategory: String, CaseIterable, Identifiable, Sendable 
         }
     }
 
-    @MainActor var color: Color {
-        switch self {
-        case .bcXcSki: return Color(hex: "1982C4")
-        case .trailHike: return Color(hex: "FF595E")
-        case .run: return Color(hex: "FFCA3A")
-        case .ride: return Color(hex: "8AC926")
-        case .misc: return Color(hex: "6A4C93")
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .bcXcSki: return "figure.skiing.crosscountry"
-        case .trailHike: return "figure.hiking"
-        case .run: return "figure.run"
-        case .ride: return "figure.outdoor.cycle"
-        case .misc: return "figure.mixed.cardio"
-        }
-    }
+    // Generated from the web category catalogue by scripts/sync-ios-sport-assets.ts.
+    var assetName: String { "Sport-\(rawValue)" }
+    @MainActor var color: Color { Color(assetName) }
 
     var sportTypes: [SportType] {
         SportType.allCases.filter { $0.category == self }

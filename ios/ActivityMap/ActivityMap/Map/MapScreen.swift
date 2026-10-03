@@ -22,7 +22,6 @@ struct MapScreen: View {
     }
 
     @State private var picker: RoutePicker
-    @ScaledMetric(relativeTo: .caption2) private var attributionFontSize: CGFloat = 11
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -30,32 +29,20 @@ struct MapScreen: View {
                 MapReader { proxy in
                     mapView(proxy: proxy, geometry: geometry)
                 }
-                if let attribution {
-                    let layout = attributionLayout(in: geometry)
-                    Text(attribution)
-                        .font(.system(size: attributionFontSize))
-                        .foregroundStyle(Color.primary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .frame(width: layout.creditSize.width, height: layout.creditSize.height)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
-                        .position(layout.creditCenter)
-                        .allowsHitTesting(false)
-                }
-                let layout = resultsLayout(in: geometry)
                 let showingResults = picker.isPresented
-                let horizontalTools = showingResults && !layout.isSidePanel
-                mapControls(horizontal: horizontalTools)
-                    .position(x: geometry.size.width - (horizontalTools ? 96 : 42),
-                              y: horizontalTools ? layout.frame.minY - 96 : geometry.size.height - 112)
+                // Map chrome stays at its original bottom edge. Results cover
+                // it naturally; resizing does not move controls or ornaments.
+                mapControls(horizontal: true)
+                    .position(MapResultsLayout.controlsCenter(size: geometry.size))
+                    .accessibilityIdentifier("map-controls")
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
-                if showingResults {
-                    RoutePickerSheet(picker: picker, store: store, isSidePanel: layout.isSidePanel)
-                        .frame(width: layout.frame.width, height: layout.frame.height)
-                        .position(x: layout.frame.midX, y: layout.frame.midY)
-                } else {
+                // Keep the native presenter mounted before selection changes,
+                // so UIKit receives a normal false-to-true presentation event.
+                MapResultsContainer(picker: picker, store: store, size: geometry.size,
+                                        topInset: max(topOcclusion, geometry.safeAreaInsets.top),
+                                        bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize)
+                if !showingResults {
                     VStack {
                         Spacer()
                         HStack { selectionMenu; Spacer(minLength: 132) }
@@ -116,6 +103,8 @@ struct MapScreen: View {
                 return true
             }
         }
+        // Fitted and restored camera padding already includes safe areas.
+        .usesSafeAreaInsetsAsPadding(false)
         .mapStyle(mapStyle)
         .ornamentOptions(attributionLayout(in: geometry).ornamentOptions)
         .gestureHandlers(MapGestureHandlers(onBegin: { gesture in
@@ -126,7 +115,7 @@ struct MapScreen: View {
             if acceptsCameraEvents, store.selectedTab == .map { context.record(event.cameraState) }
         }
         .onStyleLoaded { _ in
-            viewport = context.camera.viewport
+            if !acceptsCameraEvents { viewport = context.camera.viewport }
             acceptsCameraEvents = true
             applyNavigation(proxy: proxy, geometry: geometry)
         }
@@ -155,7 +144,13 @@ struct MapScreen: View {
     }
 
     private func applyNavigation(proxy: MapProxy, geometry: GeometryProxy) {
-        guard acceptsCameraEvents, store.selectedTab == .map, let map = proxy.map else { return }
+        guard store.selectedTab == .map, let map = proxy.map else { return }
+        if !acceptsCameraEvents {
+            // A cached style may already be ready before SwiftUI observes its
+            // load/idle event. An explicit fit must not wait for another idle.
+            guard context.pendingRequest != nil, map.isStyleLoaded else { return }
+            acceptsCameraEvents = true
+        }
         if case let .activity(id) = context.pendingRequest?.action,
            store.selection.visibleSelectedIDs.contains(id) {
             // Do not activate a different remaining result if filters/deletion
@@ -169,7 +164,9 @@ struct MapScreen: View {
             // Explicit fits leave enough map space for the route and chrome.
             picker.detent = .compact
         }
-        let layout = resultsLayout(in: geometry)
+        let layout = MapResultsLayout.framing(size: geometry.size,
+            topInset: max(topOcclusion, geometry.safeAreaInsets.top), bottomInset: geometry.safeAreaInsets.bottom,
+            detent: picker.detent, largeText: typeSize.isAccessibilitySize)
         let showingResults = picker.isPresented
         let safeArea = geometry.safeAreaInsets
         // The map extends under navigation; retain its original occluded height
@@ -177,32 +174,32 @@ struct MapScreen: View {
         // Map ignores safe areas; camera fitting uses its full physical size.
         let size = CGSize(width: geometry.size.width + safeArea.leading + safeArea.trailing,
                           height: geometry.size.height + safeArea.bottom)
+        let action = context.pendingRequest?.action
         guard let camera = MapNavigation.resolve(
             store: store, map: map, size: size,
             safeArea: UIEdgeInsets(top: safeArea.top, left: safeArea.leading,
                                   bottom: safeArea.bottom, right: safeArea.trailing),
-            // Include the tools and attribution row above a bottom panel.
-            sheetHeight: showingResults && !layout.isSidePanel ? layout.bottomOcclusion + 104 : 0, topOcclusion: topOcclusion,
+            // Fit above the panel; background controls and credits add no occlusion.
+            sheetHeight: showingResults && !layout.isSidePanel
+                ? max(layout.bottomOcclusion, NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.count, detail: picker.detailID != nil, height: geometry.size.height, largeText: typeSize.isAccessibilitySize) + safeArea.bottom) : 0, topOcclusion: topOcclusion,
             leadingOcclusion: showingResults && layout.isSidePanel ? layout.leadingOcclusion + safeArea.leading : 0
         ) else { return }
-        withViewportAnimation(.default(maxDuration: 0.5)) {
-            viewport = .camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
+        let padding = camera.padding ?? context.camera.padding
+        let target = Viewport.camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
+            .padding(EdgeInsets(top: padding.top, leading: padding.left, bottom: padding.bottom, trailing: padding.right))
+        switch action {
+        case .activity, .fitSelection, .fitFiltered:
+            // A fit can also change projection and panel layout. The SDK's
+            // animated transition can cancel during those updates, leaving the
+            // initial camera after the request has already been consumed.
+            viewport = target
+        default:
+            withViewportAnimation(.default(maxDuration: 0.5)) { viewport = target }
         }
     }
 
     private func attributionLayout(in geometry: GeometryProxy) -> MapAttributionLayout {
-        let layout = resultsLayout(in: geometry)
-        let showingResults = picker.isPresented
-        return MapAttributionLayout(size: geometry.size, bottomInset: geometry.safeAreaInsets.bottom,
-                                    credit: attribution, fontSize: attributionFontSize,
-                                    bottomOcclusion: showingResults ? layout.bottomOcclusion : 0,
-                                    leadingOcclusion: showingResults ? layout.leadingOcclusion : 0)
-    }
-
-    private func resultsLayout(in geometry: GeometryProxy) -> MapResultsLayout {
-        MapResultsLayout(size: geometry.size, topInset: max(topOcclusion, geometry.safeAreaInsets.top),
-                         bottomInset: geometry.safeAreaInsets.bottom, detent: picker.detent,
-                         largeText: typeSize.isAccessibilitySize)
+        MapAttributionLayout(bottomInset: geometry.safeAreaInsets.bottom)
     }
 
     private func routeInteraction(proxy: MapProxy) -> TapInteraction {
@@ -303,7 +300,7 @@ struct MapScreen: View {
                     }
                 }
             } label: {
-                Image(systemName: "square.3.layers.3d")
+                BrowseIconLabel(systemImage: "square.3.layers.3d")
                     .frame(width: 44, height: 48)
             }
             .accessibilityLabel("Map layers")
@@ -313,8 +310,7 @@ struct MapScreen: View {
             Button {
                 context.request(.pitch(context.isPitched ? 0 : 50))
             } label: {
-                Image(systemName: "view.3d")
-                    .foregroundStyle(context.isPitched ? Color.blue : Color.primary)
+                BrowseIconLabel(systemImage: "view.3d", isSelected: context.isPitched)
                     .frame(width: 44, height: 48)
             }
             .accessibilityLabel("3D map")
@@ -333,13 +329,13 @@ struct MapScreen: View {
                 Button("Reset bearing", systemImage: "location.north") { context.request(.resetBearing) }
                 Button("Reset map view", systemImage: "arrow.counterclockwise") { context.request(.resetView) }
             } label: {
-                Image(systemName: "scope")
+                BrowseIconLabel(systemImage: "scope")
                     .frame(width: 44, height: 48)
             }
             .accessibilityLabel("Map camera")
         }
         .buttonStyle(.plain)
-        .font(.system(size: 18, weight: .semibold))
+        .font(.body)
         .foregroundStyle(Color.primary)
         .padding(4)
         .modifier(MapChromeSurface())
@@ -354,17 +350,6 @@ struct MapScreen: View {
         }
 
         return .standard(lightPreset: colorScheme == .dark ? .night : .day)
-    }
-
-    private var attribution: String? {
-        var providers = context.activeOverlays.compactMap(\.attribution)
-
-        if let baseAttribution = context.baseStyle.attribution {
-            providers.append(baseAttribution)
-        }
-
-        let uniqueProviders = Array(Set(providers)).sorted()
-        return uniqueProviders.isEmpty ? nil : uniqueProviders.joined(separator: "  •  ")
     }
 
     private func toggleOverlay(_ overlay: SharedRasterOverlayDefinition) {

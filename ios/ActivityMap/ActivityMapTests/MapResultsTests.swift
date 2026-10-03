@@ -59,17 +59,55 @@ struct MapResultsTests {
         #expect(!picker.isPresented)
     }
 
+    @Test func draggingTracksTotalTranslationClampsAndSettlesToMeasuredHeights() {
+        let sizes = [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)]
+        for size in sizes {
+            let heights = MapResultsDetent.allCases.map {
+                MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: $0).contentHeight
+            }
+            let medium = heights[1]
+            var drag = MapResultsDrag()
+            #expect(drag.update(translation: -20, currentHeight: medium, heights: heights) == min(heights[2], medium + 20))
+            #expect(drag.update(translation: -40, currentHeight: medium + 20, heights: heights) == min(heights[2], medium + 40),
+                    "Moving the handle must not feed its changing position back into the total drag")
+            #expect(drag.update(translation: -10000, currentHeight: medium, heights: heights) == heights[2])
+            #expect(drag.update(translation: 10000, currentHeight: medium, heights: heights) == heights[0])
+            #expect(drag.finish(translation: 10000, prediction: 10000, heights: heights) == .compact)
+            #expect(!drag.isDragging)
+            let midway = (heights[1] + heights[2]) / 2
+            #expect(drag.update(translation: 0, currentHeight: midway, heights: heights) == midway,
+                    "A new drag starts from the visible height while a spring is settling")
+            #expect(drag.finish(translation: -10, prediction: -10, heights: heights) == (heights[2] > heights[1] ? .expanded : .medium))
+            let layout = MapResultsLayout(size: size, topInset: 106, bottomInset: 34,
+                                          detent: .medium, heightOverride: midway)
+            if !layout.isSidePanel { #expect(layout.frame.maxY == size.height + 34) }
+        }
+    }
+
     @Test(arguments: [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)])
-    func detentsLeaveNavigationAndMapControlsAvailable(size: CGSize) {
+    func controlsStayAtBottomBehindResults(size: CGSize) {
+        let center = MapResultsLayout.controlsCenter(size: size)
+        // Live controls: three 44pt targets, two 1pt dividers and 4pt insets.
+        let controls = CGRect(x: center.x - 71, y: center.y - 28, width: 142, height: 56)
+        #expect(CGRect(origin: .zero, size: size).contains(controls) && controls.minY >= 118)
+        for detent in MapResultsDetent.allCases {
+            let panel = MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: detent)
+            #expect(center.y == size.height - 92, "Detents cannot move background controls")
+            if !panel.isSidePanel { #expect(panel.frame.intersects(controls), "Results cover the bottom controls") }
+        }
+    }
+
+    @Test(arguments: [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)])
+    func detentsLeaveNavigationAvailable(size: CGSize) {
         for detent in MapResultsDetent.allCases {
             let layout = MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: detent)
-            #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height)
-            #expect(layout.frame.minX >= 12 && layout.frame.maxX <= size.width)
+            #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height + (layout.isSidePanel ? 0 : 34))
+            #expect(layout.frame.minX >= (layout.isSidePanel ? 12 : 4) && layout.frame.maxX <= size.width)
             if layout.isSidePanel {
                 #expect(layout.leadingOcclusion + 16 < size.width / 2)
                 #expect(layout.bottomOcclusion == 0)
             } else {
-                #expect(layout.frame.minY - 124 >= 118, "Expanded results leave a map-controls row above them")
+                #expect(layout.frame.minY >= 118, "Expanded results leave navigation clear")
                 #expect(layout.leadingOcclusion == 0)
             }
         }

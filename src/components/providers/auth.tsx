@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { prepareGallery } from '~/lib/gallery-fixture';
 import { useSearchParams } from 'next/navigation';
 import { useShallowStore } from '~/store';
 import type { InitialAuth } from '~/store/auth';
@@ -13,6 +15,7 @@ export function AuthProvider({
   children: React.ReactNode;
 }) {
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const {
     initializeAuth,
     isInitialized,
@@ -23,6 +26,7 @@ export function AuthProvider({
 
   useEffect(() => {
     if (!isInitialized) {
+      if (process.env.NODE_ENV === 'development' && prepareGallery(queryClient)) return;
       // Handle guest mode from search params
       const userParam = searchParams.get('user');
       const activitiesParam = searchParams.get('activities');
@@ -50,6 +54,7 @@ export function AuthProvider({
     }
   }, [
     searchParams,
+    queryClient,
     initialAuth,
     isInitialized,
     initializeAuth,

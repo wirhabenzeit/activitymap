@@ -5,68 +5,141 @@ struct ListScreen: View {
     var emptyState: BrowsingPresentation.EmptyState? = nil
     var recover: (BrowsingPresentation.Recovery) -> Void = { _ in }
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var hasPushedDetail = false
+    @State var sortOpen = false
+    @State var displayOpen = false
+    @Environment(\.filterSidebarVisible) private var filterSidebarVisible
 
     var body: some View {
         GeometryReader { geometry in
-            List {
-                if store.listPresentation.settings.summaryMode != .off {
-                    ActivitySummaryView(store: store)
+            let sideBySide = sizeClass == .regular && geometry.size.width >= 760 && !typeSize.isAccessibilitySize
+            let usesOverlay = filterSidebarVisible && !sideBySide && !hasPushedDetail
+            let showsDetail = sideBySide && store.inspectedActivityID != nil && !hasPushedDetail
+            let detailWidth = min(420, max(340, geometry.size.width * 0.42))
+            let listWidth = showsDetail ? geometry.size.width - detailWidth - 1 : geometry.size.width
+            HStack(spacing: 0) {
+                activityList(width: listWidth)
+                    .frame(width: listWidth)
+                if showsDetail {
+                    Divider()
+                    detailColumn
+                        .frame(width: detailWidth)
+                        .frame(maxHeight: .infinity)
                 }
-                ForEach(store.listedActivities) { activity in
-                    ActivityRowView(store: store, activity: activity)
-                    if sizeClass == .regular, store.inspectedActivityID == activity.id {
-                        VStack(spacing: 0) {
-                            HStack {
-                                Text("Activity details").font(.headline)
-                                Spacer()
-                                Button("Close") { store.dismissInspection() }
-                                    .frame(minWidth: 44, minHeight: 44)
-                                    .accessibilityLabel("Close activity details")
+            }
+            // Inspecting is ordinary navigation. Back only clears inspection;
+            // the retained list and selection/camera owners remain unchanged.
+            .navigationDestination(item: inspectionID(sideBySide: sideBySide || usesOverlay)) { id in
+                ActivityDetailView(store: store, activityID: id)
+            }
+            .sheet(isPresented: Binding(
+                get: { usesOverlay && store.selectedTab == .list && store.inspectedActivityID != nil },
+                set: { if !$0, usesOverlay, store.selectedTab == .list { store.dismissInspection() } }
+            )) {
+                if let id = store.inspectedActivityID {
+                    NavigationStack {
+                        ActivityDetailPanel(store: store, activityID: id)
+                            .navigationTitle("Activity").navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .confirmationAction) {
+                                    Button("Done") { store.dismissInspection() }
+                                }
                             }
-                            .padding(.horizontal, 20)
-                            ActivityDetailPanel(store: store, activityID: activity.id)
-                                .frame(height: max(220, min(560, geometry.size.height - 160)))
-                        }
-                        .listRowInsets(EdgeInsets())
                     }
-                }
-                if let emptyState {
-                    BrowsingEmptyView(state: emptyState, recover: recover, scrolls: false)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
                 }
             }
-            .listStyle(.plain)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                VStack(spacing: 0) {
-                    ListControls(presentation: store.listPresentation)
-                    SelectionBar(store: store)
-                }
+            .onChange(of: store.inspectedActivityID, initial: true) { _, id in
+                if id == nil { hasPushedDetail = false }
+                else if !sideBySide && !usesOverlay { hasPushedDetail = true }
             }
-        }
-        // List inspection is independent of selection and the active route.
-        .sheet(item: inspectedActivity) { activity in
-            ActivityDetailView(store: store, activityID: activity.id)
+            .onChange(of: sideBySide) { _, wide in
+                if !wide, !filterSidebarVisible, store.inspectedActivityID != nil { hasPushedDetail = true }
+            }
         }
     }
 
-    private var inspectedActivity: Binding<Activity?> {
+    private func activityList(width: CGFloat) -> some View {
+        List {
+            ForEach(store.listedActivities) { activity in
+                ActivityRowView(store: store, activity: activity, availableWidth: width)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 44 }
+                    .listRowBackground(store.selectedActivityIDs.contains(activity.id) ? AppTheme.accent.opacity(0.07) : Color(uiColor: .systemBackground))
+            }
+            if let emptyState {
+                BrowsingEmptyView(state: emptyState, recover: recover, scrolls: false)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+        }
+        .listStyle(.plain)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize, availableWidth: width) {
+                ActivityTableHeader(store: store, availableWidth: width, sortOpen: $sortOpen, displayOpen: $displayOpen)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: AppTheme.Spacing.small) {
+                        SelectionBar(store: store)
+                        Spacer(minLength: 0)
+                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen)
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        SelectionBar(store: store)
+                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen).padding(.leading, 44)
+                    }
+                }
+                .padding(.horizontal, AppTheme.Spacing.small)
+                .background(Color(uiColor: .systemBackground))
+                .overlay(alignment: .bottom) { Divider() }
+                .accessibilityIdentifier("list-browse-toolbar")
+            }
+        }
+        .modifier(ListOptionsSheets(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen))
+    }
+
+    @ViewBuilder private var detailColumn: some View {
+        if let id = store.inspectedActivityID {
+            ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: 44)
+                .overlay(alignment: .topTrailing) {
+                    Button { store.dismissInspection() } label: {
+                        Image(systemName: "xmark")
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, AppTheme.Spacing.large)
+                    .padding(.top, AppTheme.Spacing.small)
+                    .accessibilityLabel("Close activity details")
+                }
+        }
+    }
+
+    private func inspectionID(sideBySide: Bool) -> Binding<Int?> {
         Binding(
-            get: { sizeClass != .regular && store.selectedTab == .list ? store.inspectedActivity : nil },
-            set: { if $0 == nil, sizeClass != .regular, store.selectedTab == .list { store.dismissInspection() } }
+            get: { (!sideBySide || hasPushedDetail) && store.selectedTab == .list ? store.inspectedActivityID : nil },
+            set: { id in
+                // Keep an already-pushed detail open through width changes.
+                // Tab changes retain inspection; native Back clears it in List.
+                if id == nil, (!sideBySide || hasPushedDetail), store.selectedTab == .list {
+                    store.dismissInspection()
+                    hasPushedDetail = false
+                }
+            }
         )
     }
 }
 
 /// Selection count and scoped bulk actions for the list.
-private struct SelectionBar: View {
+struct SelectionBar: View {
     @Bindable var store: ActivityStore
-    @Environment(\.dynamicTypeSize) private var typeSize
+    var iconOnly = false
 
     private var selectedCount: Int { store.selectedActivityIDs.count }
 
     private var summary: String {
-        let filteredCount = store.filteredActivities.count
+        let filteredCount = store.selection.visibleIDs.count
         let visibleCount = selectedCount - store.hiddenSelectedCount
         let hidden = store.hiddenSelectedCount
         let scope = "\(visibleCount) of \(filteredCount) filtered activities selected"
@@ -74,30 +147,20 @@ private struct SelectionBar: View {
     }
 
     private var visibleSummary: String {
-        guard typeSize.isAccessibilitySize else { return summary }
         let count = selectedCount - store.hiddenSelectedCount
-        let scope = "\(count)/\(store.filteredActivities.count) selected"
+        let scope = selectedCount == 0 ? "\(store.selection.visibleIDs.count) activities" : "\(count) selected"
         return store.hiddenSelectedCount > 0 ? "\(scope) · \(store.hiddenSelectedCount) hidden" : scope
     }
 
-    private var selectionSymbol: String {
-        let count = selectedCount - store.hiddenSelectedCount
-        if count == 0 { return "square" }
-        return count == store.filteredActivities.count ? "checkmark.square.fill" : "minus.square.fill"
-    }
-
     var body: some View {
-        HStack {
-            Text(visibleSummary)
-                .accessibilityLabel(summary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
+        HStack(spacing: 0) {
             Menu {
+                Text(visibleSummary)
+                Divider()
                 Button("Select All Filtered Activities") {
                     store.selectAllFiltered()
                 }
-                .disabled(store.filteredActivities.isEmpty)
+                .disabled(store.selection.visibleIDs.isEmpty)
                 Button("Deselect All Filtered Activities") {
                     store.deselectAllFiltered()
                 }
@@ -107,14 +170,29 @@ private struct SelectionBar: View {
                 }
                 .disabled(selectedCount == 0)
             } label: {
-                Label("Selection", systemImage: selectionSymbol)
-                    .labelStyle(.iconOnly)
-                    .frame(minWidth: 44, minHeight: 44)
+                Group {
+                    if iconOnly {
+                        Image(systemName: selectedCount > 0 ? "checkmark.square.fill" : "square")
+                            .font(.body)
+                            .foregroundStyle(selectedCount > 0 ? AppTheme.accent : Color.secondary)
+                            .frame(width: 44, height: 44)
+                    } else {
+                        HStack(spacing: 4) {
+                            Image(systemName: selectedCount > 0 ? "checkmark.circle.fill" : "checklist")
+                                .foregroundStyle(selectedCount > 0 ? AppTheme.accent : Color.secondary)
+                            Text(visibleSummary).font(.caption.weight(.medium))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Image(systemName: "chevron.down").font(.system(size: 9))
+                        }
+                        .foregroundStyle(.secondary)
+                        .frame(minHeight: 44)
+                    }
+                }
+                .contentShape(Rectangle())
             }
             .accessibilityLabel("Selection actions for all filtered activities")
             .accessibilityValue(summary)
         }
-        .padding(.horizontal)
-        .background(.bar, ignoresSafeAreaEdges: [])
+        .buttonStyle(.plain)
     }
 }

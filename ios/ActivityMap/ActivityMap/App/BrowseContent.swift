@@ -6,6 +6,7 @@ struct BrowseContent: View {
     var sync: SyncController? = nil
     var isSigningIn = false
     var openAccount: () -> Void = {}
+    var mapPicker: RoutePicker? = nil
 
     var body: some View {
         GeometryReader { geometry in
@@ -23,27 +24,20 @@ struct BrowseContent: View {
                     .accessibilityHidden(store.selectedTab != .list)
                 // Keep the loaded style, GeoJSON source and rendered route tiles
                 // alive too; saving only the camera causes routes to pop in later.
-                MapScreen(store: store, topOcclusion: geometry.safeAreaInsets.top)
+                MapScreen(store: store, topOcclusion: geometry.safeAreaInsets.top, picker: mapPicker)
                     .id(store.mapContext.scopeRevision)
                     .ignoresSafeArea(edges: .top)
                     .opacity(store.selectedTab == .map ? 1 : 0)
                     .allowsHitTesting(store.selectedTab == .map)
                     .accessibilityHidden(store.selectedTab != .map)
-                if store.selectedTab == .map, let empty = presentation.empty {
-                    BrowsingEmptyView(state: empty, recover: recover)
+                if store.selectedTab == .map, let empty = mapEmptyState {
+                    BrowsingEmptyView(state: empty, recover: recover, scrolls: false)
                         .frame(maxWidth: min(560, max(0, geometry.size.width - 32)))
-                        .frame(maxHeight: max(0, min(480, geometry.size.height - 196)))
                         .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .padding(.top, 16)
                 }
-            }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if sync != nil {
-                TimelineView(.periodic(from: .now, by: 5)) { _ in
-                    BrowsingStatusBar(presentation: presentation, failureMessage: failureMessage, recover: recover)
-                }
+
             }
         }
         .confirmationDialog("This activity is hidden by filters", isPresented: Binding(
@@ -65,13 +59,16 @@ struct BrowseContent: View {
         }
     }
 
-    private var presentation: BrowsingPresentation {
-        BrowsingPresentation(store: store, sync: sync, isSigningIn: isSigningIn)
+    // Sync/loading/auth information belongs in Settings. Only map-specific
+    // filtering and missing-route context uses an inline, content-sized notice.
+    private var mapEmptyState: BrowsingPresentation.EmptyState? {
+        guard let empty = presentation.empty,
+              empty.kind == .noMatches || empty.kind == .noRoutes else { return nil }
+        return empty
     }
 
-    private var failureMessage: String? {
-        if case .failed(let message) = sync?.status { return message }
-        return nil
+    private var presentation: BrowsingPresentation {
+        BrowsingPresentation(store: store, sync: sync, isSigningIn: isSigningIn)
     }
 
     private func recover(_ action: BrowsingPresentation.Recovery) {

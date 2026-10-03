@@ -21,6 +21,10 @@ nonisolated enum FilterOperator: String, Hashable, Sendable {
 nonisolated struct NumericFilter: Hashable, Sendable {
     var operatorType: FilterOperator = .gte
     var value: Double = 0
+    var upperLimit: Double? = nil
+
+    var minimum: Double? { operatorType == .gte ? value : nil }
+    var maximum: Double? { operatorType == .lte ? value : upperLimit }
 }
 
 @Observable
@@ -35,10 +39,27 @@ final class ActivityStore {
     /// Bumped on every `activities` assignment so views can rebuild derived
     /// data (e.g. the map's route source) only when the activities change.
     private(set) var activitiesRevision = 0
+    private var filterRevision = 0
+    @ObservationIgnored private var filteredSnapshot: (data: Int, filters: Int, activities: [Activity])?
+    @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, activities: [Activity])?
+    @ObservationIgnored private(set) var filterBuildCount = 0
+    @ObservationIgnored private(set) var sortBuildCount = 0
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
     @ObservationIgnored let summaryCache = ActivitySummaryCache()
     let stats: StatsController
+    @ObservationIgnored private var activityLookupRevision: Int?
+    @ObservationIgnored private var activityLookup: [Int: Activity] = [:]
+
+    /// Identity lookup does not filter or scan the library during sheet frames.
+    /// Read the observable revision even on a cache hit so open details stay live.
+    func activity(id: Int) -> Activity? {
+        if activityLookupRevision != activitiesRevision {
+            activityLookup = Dictionary(uniqueKeysWithValues: activities.map { ($0.id, $0) })
+            activityLookupRevision = activitiesRevision
+        }
+        return activityLookup[id]
+    }
     @ObservationIgnored private var routeAvailabilityRevision: Int?
     @ObservationIgnored private var routeAvailabilityIDs: Set<Int> = []
 
@@ -137,36 +158,55 @@ final class ActivityStore {
 
     var inspectedActivity: Activity? {
         guard let id = selection.inspectedID else { return nil }
-        return activities.first { $0.id == id }
+        return activity(id: id)
     }
 
-    var filteredActivities: [Activity] { filterActivities(includeDate: true) }
+    var filteredActivities: [Activity] {
+        // Read observable keys on cache hits too. Inspection/selection changes
+        // do not invalidate this snapshot; all filter setters bump the key.
+        let data = activitiesRevision, filters = filterRevision
+        if let cached = filteredSnapshot, cached.data == data, cached.filters == filters { return cached.activities }
+        let query = Self.normalizedSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
+        let result = activities.filter { matchesFilters($0, query: query, includeDate: true) }
+        filteredSnapshot = (data, filters, result)
+        filterBuildCount += 1
+        return result
+    }
 
     /// Full authorized metadata; map/list dates and selection never narrow Stats.
-    var statsActivities: [Activity] { filterActivities(includeDate: false) }
-
-    private func filterActivities(includeDate: Bool) -> [Activity] {
+    var statsActivities: [Activity] {
         let query = Self.normalizedSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
-        return activities.filter { activity in
-            if !query.isEmpty, !Self.normalizedSearch(activity.name).contains(query) { return false }
-            guard activeSportTypes.contains(activity.sportType) else { return false }
+        return activities.filter { matchesFilters($0, query: query, includeDate: false) }
+    }
 
-            if includeDate, let dateDayRange, !dateDayRange.contains(activity.localDayKey) { return false }
+    private func matchesFilters(_ activity: Activity, query: String, includeDate: Bool) -> Bool {
+        if !query.isEmpty, !Self.normalizedSearch(activity.name).contains(query) { return false }
+        guard activeSportTypes.contains(activity.sportType) else { return false }
 
-            if let distanceFilter, !matches(distanceFilter, activity.distance) { return false }
-            if let elevationFilter, !matches(elevationFilter, activity.totalElevationGain) { return false }
-            if let durationFilter, !matches(durationFilter, activity.elapsedTime.map(Double.init)) { return false }
+        if includeDate, let dateDayRange, !dateDayRange.contains(activity.localDayKey) { return false }
 
-            if let commuteOnly, activity.commute != commuteOnly { return false }
-            if let privateFilter, activity.isPrivate != privateFilter { return false }
-            if let flaggedFilter, activity.flagged != flaggedFilter { return false }
+        if let distanceFilter, !matches(distanceFilter, activity.distance) { return false }
+        if let elevationFilter, !matches(elevationFilter, activity.totalElevationGain) { return false }
+        if let durationFilter, !matches(durationFilter, activity.elapsedTime.map(Double.init)) { return false }
 
-            return true
-        }
+        if let commuteOnly, activity.commute != commuteOnly { return false }
+        if let privateFilter, activity.isPrivate != privateFilter { return false }
+        if let flaggedFilter, activity.flagged != flaggedFilter { return false }
+
+        return true
     }
 
     /// Sort is a list presentation concern; shared filter order stays intact.
-    var listedActivities: [Activity] { listPresentation.settings.sort.sorted(filteredActivities) }
+    var listedActivities: [Activity] {
+        let data = activitiesRevision, filters = filterRevision, sort = listPresentation.settings.sort
+        if let cached = listedSnapshot, cached.data == data, cached.filters == filters, cached.sort == sort {
+            return cached.activities
+        }
+        let result = sort.sorted(filteredActivities)
+        listedSnapshot = (data, filters, sort, result)
+        sortBuildCount += 1
+        return result
+    }
 
     var activitySummary: ActivitySummary? {
         let mode = listPresentation.settings.summaryMode
@@ -189,10 +229,11 @@ final class ActivityStore {
 
     private func matches(_ filter: NumericFilter, _ value: Double?) -> Bool {
         guard let value, value.isFinite, filter.value.isFinite else { return false }
-        switch filter.operatorType {
-        case .gte: return value >= filter.value
-        case .lte: return value <= filter.value
+        if let minimum = filter.minimum, value < minimum { return false }
+        if let maximum = filter.maximum {
+            guard maximum.isFinite, maximum >= (filter.minimum ?? 0), value <= maximum else { return false }
         }
+        return true
     }
 
     private static func normalizedSearch(_ text: String) -> String {
@@ -317,6 +358,10 @@ final class ActivityStore {
     func clearScope() {
         stats.clearScope()
         summaryCache.clear()
+        filteredSnapshot = nil
+        listedSnapshot = nil
+        activityLookup = [:]
+        activityLookupRevision = nil
         activities = []
         routeGeometry.update(activities: [], revision: activitiesRevision)
         selection.clearScope()
@@ -331,6 +376,7 @@ final class ActivityStore {
     }
 
     private func reconcileSelectionVisibility() {
+        filterRevision &+= 1
         selection.setVisible(Set(filteredActivities.map(\.id)))
     }
 

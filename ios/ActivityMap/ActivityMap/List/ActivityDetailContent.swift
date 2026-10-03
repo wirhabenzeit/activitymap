@@ -1,136 +1,154 @@
 import SwiftUI
 
-/// Presentation-only content shared by list expansion and map/list sheets.
-/// Future profile and photo consumers plug in here without duplicating metrics.
+/// Shared by List navigation, wide List detail and the Map results panel. Each headline owns
+/// related recorded context, like the web card, without deriving missing data.
 struct ActivityDetailContent<Profile: View, Photos: View>: View {
     let activity: Activity
+    @Environment(\.activityDetailOverMap) private var overMap
+    var headerTrailingInset: CGFloat = 0
+    var showsHeading = true
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var rows: [ActivityMetricRow] { ActivityMetricRow.rows(for: activity) }
+    private var columns: [GridItem] {
+        if typeSize.isAccessibilitySize { return [GridItem(.flexible(), alignment: .leading)] }
+        if sizeClass == .regular { return [GridItem(.adaptive(minimum: AppTheme.minimumDetailColumnWidth), alignment: .leading)] }
+        return [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)]
+    }
+    private var supplementary: [ActivityMetricRow] {
+        let ids = ["averageHeartrate", "maxHeartrate", "calories", "kilojoules"]
+            + (rows.contains { $0.id == "weightedAverageWatts" } ? [] : ["averageWatts", "maxWatts"])
+        return rows.filter { ids.contains($0.id) }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 8) {
-                Label(activity.sportType.rawValue.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression), systemImage: activity.category.symbolName)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(activity.name)
-                    .font(.title2.bold())
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("activity-detail-name")
-                Text(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if activity.isPrivate == true || activity.commute == true || activity.trainer == true || activity.flagged == true {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) { badges }
-                        VStack(alignment: .leading, spacing: 8) { badges }
-                    }
-                    .font(.caption)
-                }
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
+            if showsHeading {
+                ActivityDetailIdentity(activity: activity, trailingInset: headerTrailingInset)
             }
-
-            if typeSize.isAccessibilitySize {
-                VStack(spacing: 12) { highlights }
-            } else {
+            if activity.isPrivate == true || activity.commute == true || activity.trainer == true || activity.flagged == true {
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 12) { highlights }.fixedSize(horizontal: true, vertical: false)
-                    VStack(spacing: 12) { highlights }
+                    HStack(spacing: 12) { badges }
+                    VStack(alignment: .leading, spacing: 4) { badges }
                 }
             }
-
+            LazyVGrid(columns: columns, alignment: .leading, spacing: AppTheme.Spacing.medium) {
+                highlight("Distance", value: Formatters.distance(activity.distance),
+                          context: context([("averageSpeed", "avg"), ("maxSpeed", "max")]))
+                highlight("Moving time", value: Formatters.duration(activity.movingTime),
+                          context: context([("elapsedTime", "elapsed")]))
+                highlight("Elevation gain", value: elevationGain,
+                          context: context([("elevLow", "min"), ("elevHigh", "max")]))
+                if let power = rows.first(where: { $0.id == "weightedAverageWatts" }) {
+                    highlight("Weighted power", value: power.value,
+                              context: context([("averageWatts", "avg"), ("maxWatts", "max")]))
+                }
+            }
+            if !supplementary.isEmpty {
+                Divider()
+                LazyVGrid(columns: columns, alignment: .leading, spacing: AppTheme.Spacing.small) {
+                    ForEach(supplementary) { metric in
+                        BrowseMetricValue(title: metric.title, value: metric.value, valueFirst: true)
+                            .accessibilityIdentifier("activity-metric-\(metric.id)")
+                    }
+                }
+            }
             profile(activity)
-            metricSection("Time & speed", ids: ["movingTime", "averageSpeed", "maxSpeed"])
-            metricSection("Elevation", ids: ["elevHigh", "elevLow"])
-            metricSection("Heart rate", ids: ["averageHeartrate", "maxHeartrate"])
-            metricSection("Power & energy", ids: ["averageWatts", "weightedAverageWatts", "maxWatts", "calories", "kilojoules"])
-            metricSection("Activity information", ids: ["id", "geometry", "photos", "kudos", "achievements", "comments",
-                                                         "commute", "privacy", "flagged", "trainer", "manual"])
             photos(activity)
-
             if let description = activity.description, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionTitle("Description")
-                    Text(description)
-                        .font(.body)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                }
+                Text(description).font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-    }
-
-    @ViewBuilder private var badges: some View {
-        if activity.isPrivate == true { Label("Private", systemImage: "lock") }
-        if activity.commute == true { Label("Commute", systemImage: "arrow.left.arrow.right") }
-        if activity.trainer == true { Label("Indoor", systemImage: "house") }
-        if activity.flagged == true { Label("Flagged", systemImage: "flag") }
-    }
-
-    @ViewBuilder private var highlights: some View {
-        highlight("Distance", value: Formatters.distance(activity.distance))
-        highlight("Elapsed time", value: Formatters.duration(activity.elapsedTime))
-        highlight("Elevation gain", value: Formatters.elevation(activity.totalElevationGain))
-    }
-
-    private func highlight(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title3.weight(.semibold)).monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .accessibilityValue(value == Formatters.unknown ? "Not recorded" : value)
-    }
-
-    @ViewBuilder private func metricSection(_ title: String, ids: [String]) -> some View {
-        let metrics = ids.compactMap { id in rows.first { $0.id == id } }
-        if !metrics.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(title)
+            DisclosureGroup {
                 VStack(spacing: 0) {
-                    ForEach(metrics) { metric in
+                    ForEach(rows.filter { !["date", "distance", "movingTime", "elapsedTime", "elevationGain"].contains($0.id) }) { metric in
                         ViewThatFits(in: .horizontal) {
-                            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                                Text(metric.title).foregroundStyle(.secondary).fixedSize()
-                                Spacer(minLength: 12)
-                                Text(metric.value).fontWeight(.semibold).monospacedDigit().fixedSize()
+                            HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
+                                Text(metric.title).foregroundStyle(AppTheme.secondaryText).fixedSize()
+                                Spacer(minLength: 4)
+                                Text(metric.value).fontWeight(.medium).monospacedDigit().fixedSize()
                             }
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(metric.title).foregroundStyle(.secondary)
-                                Text(metric.value).fontWeight(.semibold).monospacedDigit()
+                                Text(metric.title).foregroundStyle(AppTheme.secondaryText)
+                                Text(metric.value).fontWeight(.medium).monospacedDigit()
                             }
                         }
+                        .font(.caption)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, AppTheme.Spacing.small)
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel(metric.title)
                         .accessibilityValue(metric.value)
                         .accessibilityIdentifier("activity-metric-\(metric.id)")
-                        if metric.id != metrics.last?.id { Divider() }
                     }
                 }
-                .padding(.horizontal, 16)
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+            } label: {
+                Text("All recorded details").font(.subheadline)
+                    .frame(minHeight: AppTheme.minimumTarget, alignment: .leading)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, AppTheme.Spacing.large)
+        .padding(.vertical, AppTheme.Spacing.small)
+        .background { if !overMap { AppTheme.surface } }
     }
 
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+    private var elevationGain: String {
+        let value = Formatters.elevation(activity.totalElevationGain)
+        guard value != Formatters.unknown, let gain = activity.totalElevationGain, gain >= 0 else { return value }
+        return "+\(value)"
+    }
+
+    // Each sibling contributes independently. A measured maximum or zero must
+    // survive even when its average/minimum/primary measurement is missing.
+    private func context(_ fields: [(String, String)]) -> String? {
+        let parts = fields.compactMap { id, suffix in
+            rows.first { $0.id == id }.map { "\($0.value) \(suffix)" }
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func highlight(_ title: String, value: String, context: String? = nil) -> some View {
+        BrowseMetricValue(title: title, value: value, emphasis: .detail, context: context, valueFirst: true)
+    }
+
+    @ViewBuilder private var badges: some View {
+        if activity.isPrivate == true { BrowseBadge(title: "Private", systemImage: "lock") }
+        if activity.commute == true { BrowseBadge(title: "Commute", systemImage: "arrow.left.arrow.right") }
+        if activity.trainer == true { BrowseBadge(title: "Indoor", systemImage: "house") }
+        if activity.flagged == true { BrowseBadge(title: "Flagged", systemImage: "flag") }
+    }
+}
+
+/// Shared identity stays in one place while Map summary grows into detail.
+struct ActivityDetailIdentity: View {
+    let activity: Activity
+    var trailingInset: CGFloat = 0
+
+    var body: some View {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.small) {
+            BrowseSportSymbol(category: activity.category)
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
+                Text(activity.name).font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("activity-detail-name")
+                Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
+                    .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.trailing, trailingInset)
     }
 }
 
 extension ActivityDetailContent where Profile == EmptyView, Photos == EmptyView {
-    init(activity: Activity) {
-        self.init(activity: activity, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
+    init(activity: Activity, headerTrailingInset: CGFloat = 0, showsHeading: Bool = true) {
+        self.init(activity: activity, headerTrailingInset: headerTrailingInset, showsHeading: showsHeading, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
     }
 }

@@ -141,6 +141,18 @@ struct RoutePickerTests {
         #expect(!picker.isPresented && picker.detailID == nil)
     }
 
+    @Test func pagingArrowsKeepDirectionSelectionAndCameraContext() {
+        let store = store(), picker = RoutePicker()
+        picker.apply(ids: [3, 2, 1], adding: false, request: picker.invalidateQuery(), store: store)
+        picker.showDetail(2, store: store)
+        let selection = store.selectedActivityIDs
+        picker.step(1, store: store)
+        #expect(picker.detailID == 1 && picker.navigationMotion == .forward)
+        picker.step(-1, store: store)
+        #expect(picker.detailID == 2 && picker.navigationMotion == .backward)
+        #expect(store.selectedActivityIDs == selection && store.activeActivityID == 2 && store.mapContext.pendingRequest == nil)
+    }
+
     @Test func selectionAndFiltersNeverRebuildLibraryGeometry() {
         let store = ActivityStore(activities: (1...2_000).map { ActivityStoreSelectionTests.activity($0) })
         let cache = store.routeGeometry

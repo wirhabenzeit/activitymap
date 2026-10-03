@@ -13,6 +13,7 @@ import ReactMapGL, {
   type MapRef,
 } from 'react-map-gl/mapbox';
 import type { SharedActivityDTO } from '~/contracts/share/activity';
+import { formatLocalDateTime } from '~/lib/local-date-time';
 import { buildSharedRouteCollection } from '~/lib/sharing/shared-map';
 import { categorySettings, colorMap, iconMap } from '~/settings/category';
 import { baseMaps, defaultMapPosition } from '~/settings/map';
@@ -102,7 +103,7 @@ function ActivityDetails({
           <h1 className="truncate text-lg font-semibold">{activity.name}</h1>
           <p className="text-xs text-muted-foreground">
             {activity.sport_type} ·{' '}
-            {new Date(activity.start_date_local).toLocaleString()}
+            {formatLocalDateTime(activity.start_date_local)}
           </p>
         </div>
       </div>

@@ -4,7 +4,7 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
-    @Test func renderedSummaryRemainsWholeScopeAcrossLazyScrollingDetailAndSorting() async throws {
+    @Test func removedListSummaryDoesNotRestoreFromSavedPreferences() async throws {
         let preferences = ActivityListPresentation(defaults: nil)
         preferences.settings.summaryMode = .filtered
         let models = (1...2000).map { id in
@@ -22,6 +22,8 @@ extension RenderedRoutePickingTests {
         let original = try #require(store.activitySummary)
         #expect(original.activityCount == 2000 && original[.distance].value == 2_001_000)
         #expect(list.visibleCells.count < 100)
+        #expect((0..<list.numberOfSections).reduce(0) { $0 + list.numberOfItems(inSection: $1) } == 2000,
+                "Saved filtered totals do not add a summary row to the List")
         try host.save("summary-tablet-filtered")
         list.setContentOffset(CGPoint(x: 0, y: 2400), animated: false)
         try await Task.sleep(for: .milliseconds(120))
@@ -63,15 +65,8 @@ extension RenderedRoutePickingTests {
         }
         let tablet = scenario == "tablet-expanded"
         let size = tablet ? CGSize(width: 768, height: 1024) : CGSize(width: 320, height: 700)
-        let root = Group {
-            if tablet {
-                ScrollView { ActivitySummaryView(store: store, allMetricsExpanded: true).padding() }
-            } else {
-                ListScreen(store: store,
-                    emptyState: scenario == "selected-hidden" || scenario == "empty-filtered"
-                        ? BrowsingPresentation(store: store, sync: nil).empty : nil,
-                    recover: { if $0 == .clearFilters { store.resetFilters() } })
-            }
+        let root = ScrollView {
+            ActivitySummaryView(store: store, allMetricsExpanded: tablet || scenario == "large-text").padding()
         }
         .environment(\.horizontalSizeClass, tablet ? .regular : .compact)
         .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility3 : .large)
