@@ -50,8 +50,6 @@ struct ActivityRowView: View {
                     Button("Show on map") { store.showOnMap(activity.id) }
                 }
             }
-            // Match the header's display-control column without repeating a row menu.
-            if usesTable { Color.clear.frame(width: AppTheme.minimumTarget).accessibilityHidden(true) }
         }
         .padding(.vertical, settings.density == .compact ? 0 : 2)
         .contentShape(Rectangle())

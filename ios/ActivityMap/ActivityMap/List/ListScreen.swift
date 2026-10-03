@@ -78,24 +78,20 @@ struct ListScreen: View {
         .listStyle(.plain)
         .safeAreaInset(edge: .top, spacing: 0) {
             if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize, availableWidth: width) {
-                ActivityTableHeader(store: store, availableWidth: width, sortOpen: $sortOpen, displayOpen: $displayOpen)
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: AppTheme.Spacing.small) {
-                        SelectionBar(store: store)
-                        Spacer(minLength: 0)
-                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen)
-                    }
-                    VStack(alignment: .leading, spacing: 0) {
-                        SelectionBar(store: store)
-                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen).padding(.leading, 44)
-                    }
-                }
-                .padding(.horizontal, AppTheme.Spacing.small)
-                .background(Color(uiColor: .systemBackground))
-                .overlay(alignment: .bottom) { Divider() }
-                .accessibilityIdentifier("list-browse-toolbar")
+                ActivityTableHeader(store: store, availableWidth: width)
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack(spacing: AppTheme.Spacing.small) {
+                SelectionBar(store: store, includesTotal: true)
+                Spacer(minLength: 8)
+                ListControls(presentation: store.listPresentation, iconOnly: true,
+                             sortOpen: $sortOpen, displayOpen: $displayOpen)
+            }
+            .padding(.horizontal, AppTheme.Spacing.small)
+            .background(.bar)
+            .overlay(alignment: .top) { Color(uiColor: .separator).frame(height: 0.5) }
+            .accessibilityIdentifier("list-status-bar")
         }
         .modifier(ListOptionsSheets(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen))
     }
@@ -135,6 +131,7 @@ struct ListScreen: View {
 struct SelectionBar: View {
     @Bindable var store: ActivityStore
     var iconOnly = false
+    var includesTotal = false
 
     private var selectedCount: Int { store.selectedActivityIDs.count }
 
@@ -148,7 +145,9 @@ struct SelectionBar: View {
 
     private var visibleSummary: String {
         let count = selectedCount - store.hiddenSelectedCount
-        let scope = selectedCount == 0 ? "\(store.selection.visibleIDs.count) activities" : "\(count) selected"
+        let total = store.selection.visibleIDs.count
+        let scope = selectedCount == 0 ? "\(total) activities"
+            : includesTotal ? "\(count) selected · \(total) activities" : "\(count) selected"
         return store.hiddenSelectedCount > 0 ? "\(scope) · \(store.hiddenSelectedCount) hidden" : scope
     }
 

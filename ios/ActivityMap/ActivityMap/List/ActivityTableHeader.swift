@@ -9,7 +9,7 @@ enum ActivityTableLayout {
         // Preserve every configured metric. Fall back to the adaptive grid when
         // aligned columns would squeeze the activity name or clip their values.
         let nameWidth: CGFloat = availableWidth >= 700 ? 180 : 104
-        return availableWidth >= 104 + nameWidth + settings.orderedMetrics.reduce(CGFloat(0)) {
+        return availableWidth >= 60 + nameWidth + settings.orderedMetrics.reduce(CGFloat(0)) {
             $0 + width($1, availableWidth: availableWidth)
         }
     }
@@ -24,7 +24,7 @@ enum ActivityTableLayout {
     }
 
     static func showsDate(_ settings: ActivityListSettings, availableWidth: CGFloat) -> Bool {
-        availableWidth >= 700 && availableWidth >= 104 + 180 + 120
+        availableWidth >= 700 && availableWidth >= 60 + 180 + 120
             + settings.orderedMetrics.reduce(CGFloat(0)) { $0 + width($1, availableWidth: availableWidth) }
     }
 
@@ -54,8 +54,6 @@ enum ActivityTableLayout {
 struct ActivityTableHeader: View {
     @Bindable var store: ActivityStore
     var availableWidth: CGFloat = 390
-    @Binding var sortOpen: Bool
-    @Binding var displayOpen: Bool
     private var presentation: ActivityListPresentation { store.listPresentation }
 
     var body: some View {
@@ -100,7 +98,6 @@ struct ActivityTableHeader: View {
                 .accessibilityLabel("Sort by \(metric.title)")
                 .accessibilityValue(presentation.settings.sort.field == metric.field ? presentation.settings.sort.direction.title : "Not sorted")
             }
-            ListControls(presentation: presentation, iconOnly: true, sortOpen: $sortOpen, displayOpen: $displayOpen).frame(width: 44)
         }
         .font(.caption2.weight(.semibold))
         .foregroundStyle(AppTheme.secondaryText)
