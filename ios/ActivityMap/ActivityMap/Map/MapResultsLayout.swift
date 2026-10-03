@@ -21,16 +21,17 @@ struct MapResultsLayout {
                                 detent: target, largeText: largeText)
     }
 
-    static func controlsCenter(size: CGSize) -> CGPoint {
-        CGPoint(x: max(71, size.width - 83), y: max(28, size.height - 92))
+    static func controlsCenter(size: CGSize, topInset: CGFloat = 0) -> CGPoint {
+        // Three 44×48 targets, two dividers and 4pt padding: 52×154.
+        CGPoint(x: max(26, size.width - 16 - 26), y: topInset + 12 + 77)
     }
 
     init(size: CGSize, topInset: CGFloat, bottomInset: CGFloat, detent: MapResultsDetent,
          largeText: Bool = false) {
         isSidePanel = size.width >= 650 || size.width > size.height
         let width = isSidePanel ? min(380, size.width * 0.42) : max(0, size.width - 8)
-        // Keep navigation clear. Map controls and credits remain at the map's
-        // bottom edge behind this panel instead of reserving another top row.
+        // Keep navigation clear. Results overlay the top-right controls when
+        // expanded; no empty control lane is reserved beside the panel.
         let top = topInset + 12
         let available = max(120, size.height - top - (isSidePanel ? 0 : 12))
         let compact = min(available, isSidePanel ? (largeText ? 160 : 108) : (largeText ? 240 : 156))

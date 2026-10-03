@@ -88,15 +88,19 @@ struct MapResultsTests {
     }
 
     @Test(arguments: [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)])
-    func controlsStayAtBottomBehindResults(size: CGSize) {
-        let center = MapResultsLayout.controlsCenter(size: size)
-        // Live controls: three 44pt targets, two 1pt dividers and 4pt insets.
-        let controls = CGRect(x: center.x - 71, y: center.y - 28, width: 142, height: 56)
-        #expect(CGRect(origin: .zero, size: size).contains(controls) && controls.minY >= 118)
+    func controlsStayAtTopRightBehindExpandedResults(size: CGSize) {
+        let center = MapResultsLayout.controlsCenter(size: size, topInset: 106)
+        let controls = CGRect(x: center.x - 26, y: center.y - 77, width: 52, height: 154)
+        #expect(CGRect(origin: .zero, size: size).contains(controls))
+        #expect(controls.minY == 118 && controls.maxX == size.width - 16)
         for detent in MapResultsDetent.allCases {
             let panel = MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: detent)
-            #expect(center.y == size.height - 92, "Detents cannot move background controls")
-            if !panel.isSidePanel { #expect(panel.frame.intersects(controls), "Results cover the bottom controls") }
+            if panel.isSidePanel {
+                #expect(panel.frame.maxX == controls.maxX)
+                if detent == .expanded {
+                    #expect(panel.frame.contains(controls), "Expanded results intentionally cover the controls")
+                }
+            }
         }
     }
 
@@ -107,7 +111,7 @@ struct MapResultsTests {
             #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height + 34)
             #expect(layout.frame.minX >= (layout.isSidePanel ? 12 : 4) && layout.frame.maxX <= size.width)
             if layout.isSidePanel {
-                #expect(layout.trailingOcclusion + 16 < size.width / 2)
+                #expect(size.width - layout.trailingOcclusion - 16 >= 160)
                 #expect(layout.bottomOcclusion == 0)
             } else {
                 #expect(layout.frame.minY >= 118, "Expanded results leave navigation clear")
