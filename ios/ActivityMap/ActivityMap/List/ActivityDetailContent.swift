@@ -10,13 +10,13 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var rows: [ActivityMetricRow] { ActivityMetricRow.rows(for: activity) }
     private var columns: [GridItem] {
         if typeSize.isAccessibilitySize { return [GridItem(.flexible(), alignment: .leading)] }
-        if sizeClass == .regular { return [GridItem(.adaptive(minimum: AppTheme.minimumDetailColumnWidth), alignment: .leading)] }
-        return [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)]
+        // Use the content width, including inside a narrow iPad map panel,
+        // rather than inheriting the size class of the entire window.
+        return [GridItem(.adaptive(minimum: AppTheme.minimumDetailColumnWidth), alignment: .leading)]
     }
     private var supplementary: [ActivityMetricRow] {
         let ids = ["averageHeartrate", "maxHeartrate", "calories", "kilojoules"]

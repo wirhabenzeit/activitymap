@@ -48,7 +48,7 @@ Phone List pushes a native detail destination with Back and swipe-back. Its wrap
 
 ### Shared detail
 
-The shared `ActivityDetailContent` follows the web card's compact grouping: headline numbers with labels and related context beneath, without separate padded cards for each measurement. Moving time carries elapsed time; elevation gain carries independently recorded min/max; weighted power carries average/max; distance carries recorded speed context. HR/energy and power without a recorded weighted value stay independently visible. Full recorded metadata is reachable through a native disclosure. Phone metrics use two columns, wide hosts adapt, and accessibility text stacks. The bottom action stays reachable with a quieter treatment and is host-specific (see [Detail and framing follow-up](#detail-and-framing-follow-up)).
+The shared `ActivityDetailContent` follows the web card's compact grouping: headline numbers with labels and related context beneath, without separate padded cards for each measurement. Moving time carries elapsed time; elevation gain carries independently recorded min/max; weighted power carries average/max; distance carries recorded speed context. HR/energy and power without a recorded weighted value stay independently visible. Full recorded metadata is reachable through a native disclosure. Metric columns adapt to their actual content width (150pt minimum): phone and narrow iPad panels fit two columns, wider hosts can fit more, and accessibility text stacks. The bottom action stays reachable with a quieter treatment and is host-specific (see [Detail and framing follow-up](#detail-and-framing-follow-up)).
 
 ### Map results and detail
 

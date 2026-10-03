@@ -38,7 +38,7 @@ enum AppTheme {
     static let minimumTarget: CGFloat = 44
     static let minimumMetricColumnWidth: CGFloat = 100
     static let minimumInlineMetricColumnWidth: CGFloat = 72
-    static let minimumDetailColumnWidth: CGFloat = 180
+    static let minimumDetailColumnWidth: CGFloat = 150
 
     static let headerBackground = navigationBlue
 }

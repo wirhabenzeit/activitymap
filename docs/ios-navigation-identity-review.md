@@ -43,11 +43,11 @@ The 1180×820 production shell with Filters open leaves an 860pt map and uses th
 | --- | --- |
 | ![Wide shell expanded](ios-navigation-identity/wide-shell-expanded.png) | ![Wide shell collapsed](ios-navigation-identity/wide-shell-collapsed.png) |
 
-Local complete galleries: `/tmp/activitymap-gallery/navigation-identity-before/index.html` and `/tmp/activitymap-gallery/navigation-right-handle/index.html`, 20 captures each. The after index includes baseline comparison. Build hashes are respectively `ad333735af39617b0f1b6421d91ef01387f4d9fdd3559d0605b7699c3237e338` and `a7d3ff0bf81422be0e53b04df75c25286288abb7ab9d60788c25690a192e42e9`.
+Local complete galleries: `/tmp/activitymap-gallery/navigation-identity-before/index.html` and `/tmp/activitymap-gallery/navigation-stats-grid/index.html`, 20 captures each. The after index includes baseline comparison. Build hashes are respectively `ad333735af39617b0f1b6421d91ef01387f4d9fdd3559d0605b7699c3237e338` and `ab565d0175e756796a86d7627310ed6f21377a4a2a20277d8859993958cff4b0`.
 
 ## Validation
 
-Final run: **218 tests passed (347 parameterized runs), zero failures, two opt-in tests skipped** on iPhone 18 Pro / iOS 27.0 Simulator. Result bundle: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.03_08-35-57-+0200.xcresult`. Both 20-capture galleries validated successfully. `git diff --check` passes.
+Full suite before the stats-grid follow-up: **218 tests passed (347 parameterized runs), zero failures, two opt-in tests skipped** on iPhone 18 Pro / iOS 27.0 Simulator. Result bundle: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.03_08-35-57-+0200.xcresult`. Both 20-capture galleries validated successfully. `git diff --check` passes.
 
 Run the complete simulator suite:
 
@@ -68,3 +68,9 @@ scripts/ios-gallery.sh navigation-review \
   --scene list,list-detail,filters,map-results,map-detail \
   --variant phone,phone-dark,small-large-text,tablet
 ```
+
+## Stats-grid follow-up
+
+Stats columns now adapt to the available content width with a 150pt minimum instead of inheriting the window size class. The phone and narrow iPad panel use two columns at normal text sizes; accessibility text uses one column. Panel heights and snap behavior are unchanged. Refreshed single-activity screenshots show this layout.
+
+Focused rendered detail/map validation: 30 tests passed, 69 parameterized runs, zero failures. Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.03_08-45-06-+0200.xcresult`.
