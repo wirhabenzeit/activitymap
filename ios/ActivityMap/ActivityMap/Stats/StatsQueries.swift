@@ -12,7 +12,7 @@ nonisolated enum StatsQuery: Hashable, Sendable {
     case volumeHistory(StatsMetric, StatsHistoryRange, page: Int)
 }
 nonisolated enum StatsResult: Sendable {
-    case thisWeek(StatsThisWeek), volume(starts: [Int], values: [Double]), comparison(StatsComparison)
+    case thisWeek(StatsThisWeek), volume(starts: [Int], values: [Double]), comparison(StatsPeriodComparison)
     case pace(StatsPace), totals(StatsTotals), records(StatsRecords), bestDays(StatsBestDays)
     case calendar([Int: StatsCalendarDay]), months([StatsCalendarMonth])
     case consistency(StatsConsistency, weeks: [StatsWeek]), sportMix([StatsShare], breakdown: [ActivityCategory: StatsTotals])

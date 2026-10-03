@@ -41,7 +41,7 @@ import Testing
     static func totals(_ totals: StatsTotals) -> [String: Any] {
         Dictionary(uniqueKeysWithValues: StatsMetric.allCases.map { ($0.rawValue, totals[$0]) })
     }
-    static func comparison(_ value: StatsComparison) -> [String: Any] { ["current": value.current, "previous": value.previous] }
+    static func comparison(_ value: StatsPeriodComparison) -> [String: Any] { ["current": value.current, "previous": value.previous] }
     static func records(_ value: StatsRecords, identities: Bool = true) -> [String: Any] {
         var output: [String: Any] = [:]
         for (metric, record) in value.activities {

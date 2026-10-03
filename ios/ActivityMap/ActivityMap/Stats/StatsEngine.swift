@@ -65,7 +65,7 @@ nonisolated struct StatsTotals: Equatable, Sendable {
         for metric in StatsMetric.allCases { self[metric] += activity.value(metric) }
     }
 }
-nonisolated struct StatsComparison: Equatable, Sendable {
+nonisolated struct StatsPeriodComparison: Equatable, Sendable {
     let current: Double
     let previous: Double
     /// A zero baseline has no percentage comparison. Preserve raw totals.
@@ -163,12 +163,12 @@ nonisolated struct StatsEngine: Sendable {
         return totals
     }
     func totals(today: Int) -> StatsTotals { totals(first: StatsDates.start(year: StatsDates.parts(today).year!), last: today) }
-    func yearToDate(today: Int, metric: StatsMetric) -> StatsComparison {
+    func yearToDate(today: Int, metric: StatsMetric) -> StatsPeriodComparison {
         let year = StatsDates.parts(today).year!
         return .init(current: sum(metric, first: StatsDates.start(year: year), last: today),
                      previous: sum(metric, first: StatsDates.start(year: year - 1), last: StatsDates.previousYear(today)))
     }
-    func monthComparison(today: Int, metric: StatsMetric, offset: Int = 0) -> StatsComparison {
+    func monthComparison(today: Int, metric: StatsMetric, offset: Int = 0) -> StatsPeriodComparison {
         let offset = max(0, offset)
         let c = StatsDates.parts(today), first = StatsDates.start(year: c.year!, month: c.month! - max(0, offset))
         let next = StatsDates.start(year: c.year!, month: c.month! - max(0, offset) + 1)
@@ -177,14 +177,14 @@ nonisolated struct StatsEngine: Sendable {
         let previousLast = offset == 0 ? min(previous + c.day! - 1, first - 1) : first - 1
         return .init(current: sum(metric, first: first, last: last), previous: sum(metric, first: previous, last: previousLast))
     }
-    func yearComparison(today: Int, metric: StatsMetric, offset: Int = 0) -> StatsComparison {
+    func yearComparison(today: Int, metric: StatsMetric, offset: Int = 0) -> StatsPeriodComparison {
         let offset = max(0, offset)
         if offset == 0 { return yearToDate(today: today, metric: metric) }
         let year = StatsDates.parts(today).year! - max(0, offset), first = StatsDates.start(year: year)
         return .init(current: sum(metric, first: first, last: StatsDates.start(year: year + 1) - 1),
                      previous: sum(metric, first: StatsDates.start(year: year - 1), last: first - 1))
     }
-    func fourWeekVolume(today: Int, metric: StatsMetric) -> StatsComparison {
+    func fourWeekVolume(today: Int, metric: StatsMetric) -> StatsPeriodComparison {
         .init(current: sum(metric, first: today - 27, last: today), previous: sum(metric, first: today - 55, last: today - 28))
     }
     func thisWeek(today: Int, metric: StatsMetric) -> StatsThisWeek {

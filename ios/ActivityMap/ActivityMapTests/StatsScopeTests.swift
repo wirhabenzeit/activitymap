@@ -196,8 +196,8 @@ actor GatedStatsBuild {
         #expect(engine.calendarDays(first: today, last: today)[today]?.activities.map(\.name) == ["two", "nine", "anonymous first", "anonymous last"])
         #expect(engine.hilliestActivities(today: today).map { $0.activity.name } == ["anonymous first", "nine", "two", "anonymous last"])
         #expect(engine.hillPoints(first: today, last: today).map { $0.activity.name } == ["anonymous first", "nine", "two", "anonymous last"])
-        #expect(StatsComparison(current: 1, previous: 0).percentageChange == nil)
-        #expect(StatsComparison(current: 3, previous: 2).percentageChange == 50)
+        #expect(StatsPeriodComparison(current: 1, previous: 0).percentageChange == nil)
+        #expect(StatsPeriodComparison(current: 3, previous: 2).percentageChange == 50)
     }
     @Test func binaryUnknownsDoNotMatchNoAndElapsedFiltersDoNotChangeMovingTime() async throws {
         var unknown = ActivityStoreSelectionTests.activity(1), known = ActivityStoreSelectionTests.activity(2)
