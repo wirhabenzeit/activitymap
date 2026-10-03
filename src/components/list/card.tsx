@@ -34,6 +34,7 @@ import { activityFields } from '~/settings/activity';
 import { EditActivity } from './edit';
 import { useState } from 'react';
 import { cn } from '~/lib/utils';
+import { formatLocalDate, formatLocalTime } from '~/lib/local-date-time';
 import { LngLatBounds } from 'mapbox-gl';
 import { useShallowStore } from '~/store';
 import { PhotoLightbox } from './photo';
@@ -267,13 +268,13 @@ export function ActivityCardContent({
                 {row.getValue('name')}
               </CardTitle>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {date.toLocaleDateString(undefined, {
+                {formatLocalDate(date, {
                   day: 'numeric',
                   month: 'short',
                   year: 'numeric',
                 })}{' '}
                 ·{' '}
-                {date.toLocaleTimeString(undefined, {
+                {formatLocalTime(date, {
                   hour: '2-digit',
                   minute: '2-digit',
                 })}

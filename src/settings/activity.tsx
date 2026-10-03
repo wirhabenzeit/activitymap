@@ -1,6 +1,7 @@
 import { Calendar, Clock, Heart, Mountain, Zap } from 'lucide-react';
 import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
 import { type Activity } from '~/server/db/schema';
+import { formatLocalDate } from '~/lib/local-date-time';
 import * as d3 from 'd3';
 import { type ComponentType } from 'react';
 
@@ -76,21 +77,29 @@ export const activityFields = {
   date: {
     accessorFn: (act: Activity) => act.start_date_local,
     formatter: (date: Date) =>
-      date.toLocaleDateString('en-US', {
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-      }),
+      formatLocalDate(
+        date,
+        {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit',
+        },
+        'en-US',
+      ),
     Icon: Calendar,
     title: 'Date',
     summary: (v: Date[]) => {
       const dates = new Set(
         v.map((d) =>
-          d.toLocaleDateString('en-US', {
-            month: '2-digit',
-            year: '2-digit',
-            day: '2-digit',
-          }),
+          formatLocalDate(
+            d,
+            {
+              month: '2-digit',
+              year: '2-digit',
+              day: '2-digit',
+            },
+            'en-US',
+          ),
         ),
       );
       return `${dates.size}d`;

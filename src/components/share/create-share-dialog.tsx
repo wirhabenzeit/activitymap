@@ -24,6 +24,7 @@ import {
 import { ScrollArea } from '~/components/ui/scroll-area';
 import { useToast } from '~/hooks/use-toast';
 import { useActivities } from '~/hooks/use-activities';
+import { formatLocalDate } from '~/lib/local-date-time';
 import { useShallowStore } from '~/store';
 import {
   DEFAULT_SHARE_LINK_FIELD_OPTIONS,
@@ -157,7 +158,7 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
                 {selectedActivities.map((activity) => (
                   <li key={activity.id} className="truncate text-muted-foreground">
                     {activity.name} -{' '}
-                    {new Date(activity.start_date_local).toLocaleDateString()}
+                    {formatLocalDate(activity.start_date_local)}
                   </li>
                 ))}
               </ul>
