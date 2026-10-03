@@ -32,7 +32,7 @@ struct MapResultsLayout {
         // Keep navigation clear. Map controls and credits remain at the map's
         // bottom edge behind this panel instead of reserving another top row.
         let top = topInset + 12
-        let available = max(120, size.height - top - 12)
+        let available = max(120, size.height - top - (isSidePanel ? 0 : 12))
         let compact = min(available, isSidePanel ? (largeText ? 116 : 64) : (largeText ? 240 : 156))
         let height: CGFloat
         switch detent {
@@ -41,8 +41,10 @@ struct MapResultsLayout {
         case .expanded: height = available
         }
         contentHeight = height
-        frame = CGRect(x: isSidePanel ? 16 : 4, y: isSidePanel ? top : size.height - contentHeight,
-                       width: width, height: contentHeight + (isSidePanel ? 0 : bottomInset))
+        // Both hosts rise from the bottom. On wide maps the lower edge stays
+        // anchored while the header moves upward to reveal the results.
+        frame = CGRect(x: isSidePanel ? 16 : 4, y: size.height - contentHeight,
+                       width: width, height: contentHeight + bottomInset)
         bottomOcclusion = isSidePanel ? 0 : contentHeight + bottomInset
         leadingOcclusion = isSidePanel ? frame.maxX + 12 : 0
     }

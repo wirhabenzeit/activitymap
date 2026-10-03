@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Phones use the native sheet. Wide windows use a fixed edge card; expanding
+/// Phones use the native sheet. Wide windows use a bottom-leading card; expanding
 /// the card never changes selection, scroll context or the map camera.
 struct MapResultsContainer: View {
     @Bindable var picker: RoutePicker
@@ -9,15 +9,17 @@ struct MapResultsContainer: View {
     let topInset: CGFloat
     let bottomInset: CGFloat
     let largeText: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let layout = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
                                       detent: picker.detent, largeText: largeText)
         if layout.isSidePanel {
             if picker.isPresented {
-                RoutePickerSheet(picker: picker, store: store, isSidePanel: true)
+                RoutePickerSheet(picker: picker, store: store, isSidePanel: true, bottomInset: bottomInset)
                     .frame(width: layout.frame.width, height: layout.frame.height)
                     .position(x: layout.frame.midX, y: layout.frame.midY)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: picker.detent)
             }
         } else {
             NativeMapResultsSheet(picker: picker, store: store, size: size, largeText: largeText)

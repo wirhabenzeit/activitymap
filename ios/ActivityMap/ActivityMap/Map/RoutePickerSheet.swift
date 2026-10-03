@@ -54,7 +54,7 @@ struct RoutePickerSheet: View {
         .padding(.bottom, bottomInset)
         .background { if !nativePresentation { Rectangle().fill(.regularMaterial) } }
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: isSidePanel ? 20 : 28,
-            bottomLeadingRadius: isSidePanel ? 20 : 0, bottomTrailingRadius: isSidePanel ? 20 : 0,
+            bottomLeadingRadius: 0, bottomTrailingRadius: 0,
             topTrailingRadius: isSidePanel ? 20 : 28))
         .shadow(color: .black.opacity(nativePresentation ? 0 : 0.12), radius: 16, y: 4)
         .accessibilityIdentifier("map-results-panel")
@@ -100,7 +100,7 @@ struct RoutePickerSheet: View {
                 if candidates.count > 1, let detail { detailNavigation(detail) }
             }
             Button { resize(to: collapsed ? .expanded : .compact) } label: {
-                Image(systemName: collapsed ? "chevron.down" : "chevron.up")
+                Image(systemName: collapsed ? "chevron.up" : "chevron.down")
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }

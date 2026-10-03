@@ -297,7 +297,7 @@ extension RenderedRoutePickingTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for detent in [MapResultsDetent.expanded, .compact, .expanded] {
             picker.detent = detent
-            try await Task.sleep(for: .milliseconds(150))
+            try await Task.sleep(for: .milliseconds(350))
             #expect(store.mapContext.pendingRequest == nil)
             #expect(abs(map.mapboxMap.cameraState.zoom - camera.zoom) < 0.001)
             #expect(map.mapboxMap.cameraState.padding == camera.padding)
