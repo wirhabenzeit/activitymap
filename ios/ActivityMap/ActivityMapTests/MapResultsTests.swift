@@ -77,7 +77,7 @@ struct MapResultsTests {
                 }
                 #expect(layouts[0].contentHeight < layouts[1].contentHeight)
                 #expect(layouts[1].frame == layouts[2].frame)
-                #expect(layouts.allSatisfy { abs($0.frame.maxX - (size.width - 16)) < 0.01 })
+                #expect(layouts.allSatisfy { abs($0.frame.maxX - (size.width - 80)) < 0.01 })
                 #expect(layouts.allSatisfy { $0.bottomOcclusion == 0 && $0.trailingOcclusion == layouts[0].trailingOcclusion })
                 #expect(layouts.allSatisfy { $0.frame.maxY == size.height + 21 }, "Both states meet the physical bottom edge through the safe area")
                 #expect(layouts[0].frame.minY > layouts[1].frame.minY, "Expansion moves the top edge upward")
@@ -88,15 +88,17 @@ struct MapResultsTests {
     }
 
     @Test(arguments: [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)])
-    func controlsStayAtBottomBehindResults(size: CGSize) {
-        let center = MapResultsLayout.controlsCenter(size: size)
-        // Live controls: three 44pt targets, two 1pt dividers and 4pt insets.
-        let controls = CGRect(x: center.x - 71, y: center.y - 28, width: 142, height: 56)
-        #expect(CGRect(origin: .zero, size: size).contains(controls) && controls.minY >= 118)
+    func controlsStayAtTopRightBesideWideResults(size: CGSize) {
+        let center = MapResultsLayout.controlsCenter(size: size, topInset: 106)
+        let controls = CGRect(x: center.x - 26, y: center.y - 77, width: 52, height: 154)
+        #expect(CGRect(origin: .zero, size: size).contains(controls))
+        #expect(controls.minY == 118 && controls.maxX == size.width - 16)
         for detent in MapResultsDetent.allCases {
             let panel = MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: detent)
-            #expect(center.y == size.height - 92, "Detents cannot move background controls")
-            if !panel.isSidePanel { #expect(panel.frame.intersects(controls), "Results cover the bottom controls") }
+            if panel.isSidePanel {
+                #expect(!panel.frame.intersects(controls), "Wide results must leave the tool lane accessible")
+                #expect(panel.frame.maxX + 12 == controls.minX)
+            }
         }
     }
 
@@ -107,7 +109,7 @@ struct MapResultsTests {
             #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height + 34)
             #expect(layout.frame.minX >= (layout.isSidePanel ? 12 : 4) && layout.frame.maxX <= size.width)
             if layout.isSidePanel {
-                #expect(layout.trailingOcclusion + 16 < size.width / 2)
+                #expect(size.width - layout.trailingOcclusion - 16 >= 160)
                 #expect(layout.bottomOcclusion == 0)
             } else {
                 #expect(layout.frame.minY >= 118, "Expanded results leave navigation clear")

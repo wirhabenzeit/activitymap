@@ -30,10 +30,10 @@ struct MapScreen: View {
                     mapView(proxy: proxy, geometry: geometry)
                 }
                 let showingResults = picker.isPresented
-                // Map chrome stays at its original bottom edge. Results cover
-                // it naturally; resizing does not move controls or ornaments.
-                mapControls(horizontal: true)
-                    .position(MapResultsLayout.controlsCenter(size: geometry.size))
+                // Keep the map tools anchored below navigation as results resize.
+                mapControls
+                    .position(MapResultsLayout.controlsCenter(size: geometry.size,
+                        topInset: max(topOcclusion, geometry.safeAreaInsets.top)))
                     .accessibilityIdentifier("map-controls")
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
@@ -273,9 +273,8 @@ struct MapScreen: View {
         }
     }
 
-    private func mapControls(horizontal: Bool) -> some View {
-        let layout = horizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
-        return layout {
+    private var mapControls: some View {
+        VStack(spacing: 0) {
             Menu {
                 Section("Base Map") {
                     Picker("Base Map", selection: $context.baseStyle) {
@@ -305,7 +304,7 @@ struct MapScreen: View {
             }
             .accessibilityLabel("Map layers")
 
-            Divider().frame(width: horizontal ? 1 : 24, height: horizontal ? 24 : 1)
+            Divider().frame(width: 24, height: 1)
 
             Button {
                 context.request(.pitch(context.isPitched ? 0 : 50))
@@ -316,7 +315,7 @@ struct MapScreen: View {
             .accessibilityLabel("3D map")
             .accessibilityValue(context.isPitched ? "On" : "Off")
 
-            Divider().frame(width: horizontal ? 1 : 24, height: horizontal ? 24 : 1)
+            Divider().frame(width: 24, height: 1)
 
             Menu {
                 Button("Fit selection", systemImage: "selection.pin.in.out") { context.request(.fitSelection) }

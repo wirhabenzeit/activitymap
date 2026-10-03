@@ -21,16 +21,17 @@ struct MapResultsLayout {
                                 detent: target, largeText: largeText)
     }
 
-    static func controlsCenter(size: CGSize) -> CGPoint {
-        CGPoint(x: max(71, size.width - 83), y: max(28, size.height - 92))
+    static func controlsCenter(size: CGSize, topInset: CGFloat = 0) -> CGPoint {
+        // Three 44×48 targets, two dividers and 4pt padding: 52×154.
+        CGPoint(x: max(26, size.width - 16 - 26), y: topInset + 12 + 77)
     }
 
     init(size: CGSize, topInset: CGFloat, bottomInset: CGFloat, detent: MapResultsDetent,
          largeText: Bool = false) {
         isSidePanel = size.width >= 650 || size.width > size.height
         let width = isSidePanel ? min(380, size.width * 0.42) : max(0, size.width - 8)
-        // Keep navigation clear. Map controls and credits remain at the map's
-        // bottom edge behind this panel instead of reserving another top row.
+        // Keep navigation clear and reserve a 64pt lane for the vertical tools
+        // beside wide results. Panel heights and snap behavior stay unchanged.
         let top = topInset + 12
         let available = max(120, size.height - top - (isSidePanel ? 0 : 12))
         let compact = min(available, isSidePanel ? (largeText ? 160 : 108) : (largeText ? 240 : 156))
@@ -43,7 +44,7 @@ struct MapResultsLayout {
         contentHeight = height
         // Both hosts rise from the bottom. On wide maps the lower edge stays
         // anchored while the header moves upward to reveal the results.
-        frame = CGRect(x: isSidePanel ? max(0, size.width - width - 16) : 4, y: size.height - contentHeight,
+        frame = CGRect(x: isSidePanel ? max(0, size.width - width - 80) : 4, y: size.height - contentHeight,
                        width: width, height: contentHeight + bottomInset)
         bottomOcclusion = isSidePanel ? 0 : contentHeight + bottomInset
         trailingOcclusion = isSidePanel ? size.width - frame.minX + 12 : 0
