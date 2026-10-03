@@ -50,11 +50,12 @@ struct ActivityRowView: View {
                     Button("Show on map") { store.showOnMap(activity.id) }
                 }
             }
-            if usesTable { actions }
+            // Match the header's display-control column without repeating a row menu.
+            if usesTable { Color.clear.frame(width: AppTheme.minimumTarget).accessibilityHidden(true) }
         }
         .padding(.vertical, settings.density == .compact ? 0 : 2)
         .contentShape(Rectangle())
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
             if hasGeometry && settings.width == .fitWidth {
                 Button { store.showOnMap(activity.id) } label: {
                     Label("Show on map", systemImage: "map")
@@ -136,17 +137,6 @@ struct ActivityRowView: View {
         Button(store.inspectedActivityID == activity.id ? "Close details" : "Details", systemImage: "info.circle", action: inspect)
         Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
             .disabled(!hasGeometry)
-    }
-
-    private var actions: some View {
-        Menu {
-            actionItems
-        } label: {
-            BrowseIconLabel(systemImage: "ellipsis")
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Actions for \(activity.name)")
-        .accessibilityHint(hasGeometry ? "Details or show on map" : "No GPS route; details remain available")
     }
 
     private var accessibleDetails: String {

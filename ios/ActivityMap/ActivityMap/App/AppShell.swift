@@ -137,7 +137,7 @@ struct AppShell: View {
                             Image(systemName: activeFilterCount == 0
                                 ? "line.3.horizontal.decrease"
                                 : "line.3.horizontal.decrease.circle.fill")
-                                .rotationEffect(.degrees(90))
+                                .rotationEffect(.degrees(sidebarAvailable ? 90 : 0))
                                 .frame(width: 44, height: 44)
                                 .background(filtersOpen ? Color.white.opacity(0.2) : .clear,
                                             in: RoundedRectangle(cornerRadius: 12))
