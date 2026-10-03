@@ -77,7 +77,7 @@ struct MapResultsTests {
                 }
                 #expect(layouts[0].contentHeight < layouts[1].contentHeight)
                 #expect(layouts[1].frame == layouts[2].frame)
-                #expect(layouts.allSatisfy { abs($0.frame.maxX - (size.width - 80)) < 0.01 })
+                #expect(layouts.allSatisfy { abs($0.frame.maxX - (size.width - 16)) < 0.01 })
                 #expect(layouts.allSatisfy { $0.bottomOcclusion == 0 && $0.trailingOcclusion == layouts[0].trailingOcclusion })
                 #expect(layouts.allSatisfy { $0.frame.maxY == size.height + 21 }, "Both states meet the physical bottom edge through the safe area")
                 #expect(layouts[0].frame.minY > layouts[1].frame.minY, "Expansion moves the top edge upward")
@@ -88,7 +88,7 @@ struct MapResultsTests {
     }
 
     @Test(arguments: [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)])
-    func controlsStayAtTopRightBesideWideResults(size: CGSize) {
+    func controlsStayAtTopRightBehindExpandedResults(size: CGSize) {
         let center = MapResultsLayout.controlsCenter(size: size, topInset: 106)
         let controls = CGRect(x: center.x - 26, y: center.y - 77, width: 52, height: 154)
         #expect(CGRect(origin: .zero, size: size).contains(controls))
@@ -96,8 +96,10 @@ struct MapResultsTests {
         for detent in MapResultsDetent.allCases {
             let panel = MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: detent)
             if panel.isSidePanel {
-                #expect(!panel.frame.intersects(controls), "Wide results must leave the tool lane accessible")
-                #expect(panel.frame.maxX + 12 == controls.minX)
+                #expect(panel.frame.maxX == controls.maxX)
+                if detent == .expanded {
+                    #expect(panel.frame.contains(controls), "Expanded results intentionally cover the controls")
+                }
             }
         }
     }

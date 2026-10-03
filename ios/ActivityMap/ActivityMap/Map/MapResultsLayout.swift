@@ -30,8 +30,8 @@ struct MapResultsLayout {
          largeText: Bool = false) {
         isSidePanel = size.width >= 650 || size.width > size.height
         let width = isSidePanel ? min(380, size.width * 0.42) : max(0, size.width - 8)
-        // Keep navigation clear and reserve a 64pt lane for the vertical tools
-        // beside wide results. Panel heights and snap behavior stay unchanged.
+        // Keep navigation clear. Results overlay the top-right controls when
+        // expanded; no empty control lane is reserved beside the panel.
         let top = topInset + 12
         let available = max(120, size.height - top - (isSidePanel ? 0 : 12))
         let compact = min(available, isSidePanel ? (largeText ? 160 : 108) : (largeText ? 240 : 156))
@@ -44,7 +44,7 @@ struct MapResultsLayout {
         contentHeight = height
         // Both hosts rise from the bottom. On wide maps the lower edge stays
         // anchored while the header moves upward to reveal the results.
-        frame = CGRect(x: isSidePanel ? max(0, size.width - width - 80) : 4, y: size.height - contentHeight,
+        frame = CGRect(x: isSidePanel ? max(0, size.width - width - 16) : 4, y: size.height - contentHeight,
                        width: width, height: contentHeight + bottomInset)
         bottomOcclusion = isSidePanel ? 0 : contentHeight + bottomInset
         trailingOcclusion = isSidePanel ? size.width - frame.minX + 12 : 0
