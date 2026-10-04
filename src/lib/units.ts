@@ -33,5 +33,9 @@ export function formatMeasurement(
   units: UnitSystem,
 ): string {
   if (value == null || !Number.isFinite(value)) return '—';
-  return `${displayMeasurement(value, kind, units).toFixed(kind === 'elevation' ? 0 : 1)} ${measurementUnit(kind, units)}`;
+  const text = displayMeasurement(value, kind, units).toFixed(
+    kind === 'elevation' ? 0 : 1,
+  );
+  // toFixed keeps the sign of values that round to zero ("-0").
+  return `${/^-0(\.0+)?$/.test(text) ? text.slice(1) : text} ${measurementUnit(kind, units)}`;
 }

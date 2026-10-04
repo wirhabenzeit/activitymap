@@ -7,6 +7,7 @@ import {
 import { type ColumnDef, type Table } from '@tanstack/react-table';
 import { Checkbox } from '~/components/ui/checkbox';
 
+import { isMissing } from '~/lib/activity-presentation';
 import { type Activity, type Photo } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
 
@@ -23,6 +24,22 @@ import { PhotoLightbox } from './photo';
 import { type Features } from './table-extensions';
 import { getWidthMode, setWidthMode, widthModes } from './width-mode';
 
+/** Rows the summary row describes; none when the summary row is off. */
+function summaryRows(table: Table<Features, Activity>) {
+  const scope = table.store.state.summaryRow;
+  return scope == null
+    ? []
+    : scope === 'page'
+      ? table.getRowModel().rows
+      : scope === 'all'
+        ? table.getFilteredRowModel().rows
+        : table.getSelectedRowModel().rows;
+}
+
+const summarized = Object.entries(activityFields)
+  .filter(([, spec]) => 'reducer' in spec || 'summary' in spec)
+  .map(([id]) => id);
+
 function columnFromField<K extends ActivityValueType>(
   id: keyof typeof activityFields,
   spec: ActivityField<K>,
@@ -30,14 +47,7 @@ function columnFromField<K extends ActivityValueType>(
   const Footer = ({ table }: { table: Table<Features, Activity> }) => {
     const units = useDisplayUnits();
     const dateFormat = useDateFormat();
-    const rows =
-      table.store.state.summaryRow == null
-        ? []
-        : table.store.state.summaryRow == 'page'
-          ? table.getRowModel().rows
-          : table.store.state.summaryRow == 'all'
-            ? table.getFilteredRowModel().rows
-            : table.getSelectedRowModel().rows;
+    const rows = summaryRows(table);
     const values: K[] = rows.map((row) => row.getValue(id));
     const reducedValue = spec.reducer ? spec.reducer(values) : null;
     const summary = spec.summary
@@ -45,9 +55,7 @@ function columnFromField<K extends ActivityValueType>(
       : reducedValue != null
         ? `${spec.reducerSymbol ?? ''}${spec.formatter(reducedValue, units, dateFormat)}`
         : '—';
-    const known = values.filter(
-      (v) => v != null && (typeof v !== 'number' || Number.isFinite(v)),
-    ).length;
+    const known = values.filter((v) => !isMissing(v)).length;
     return (
       <div
         className="text-right w-full"
@@ -124,12 +132,15 @@ export const columns: ColumnDef<Features, Activity>[] = [
     id: 'name',
     footer: ({ table }) => {
       const scope = table.store.state.summaryRow;
-      const rows =
-        scope === 'page'
-          ? table.getRowModel().rows
-          : scope === 'all'
-            ? table.getFilteredRowModel().rows
-            : table.getSelectedRowModel().rows;
+      const rows = summaryRows(table);
+      const gaps = table
+        .getAllColumns()
+        .some(
+          (column) =>
+            summarized.includes(column.id) &&
+            column.getIsVisible() &&
+            rows.some((row) => isMissing(row.getValue(column.id))),
+        );
       const hidden =
         table.getSelectedRowModel().rows.length -
         table.getFilteredSelectedRowModel().rows.length;
@@ -144,9 +155,11 @@ export const columns: ColumnDef<Features, Activity>[] = [
           {scope === 'selected' && hidden > 0
             ? ` · ${hidden} hidden by filters`
             : ''}
-          <span className="block text-muted-foreground">
-            * = unrecorded values
-          </span>
+          {gaps && (
+            <span className="block text-muted-foreground">
+              * = unrecorded values
+            </span>
+          )}
         </div>
       );
     },
@@ -214,9 +227,7 @@ export const columns: ColumnDef<Features, Activity>[] = [
     ),
     cell: ({ getValue }) => {
       const geometryState = getValue() as Activity['geometryState'];
-      return (
-        <div className="text-right w-full">{geometryState ?? 'Unknown'}</div>
-      );
+      return <div className="text-right w-full">{geometryState ?? 'Unknown'}</div>;
     },
   },
   {

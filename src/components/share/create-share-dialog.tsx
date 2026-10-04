@@ -83,18 +83,14 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
         expiresInMs,
         fields,
       });
-      const url = new URL(
-        `/share/${result.token}`,
-        window.location.origin,
-      ).toString();
+      const url = new URL(`/share/${result.token}`, window.location.origin).toString();
       setCreatedUrl(url);
       setStep('created');
       onCreated?.();
     } catch (error) {
       toast({
         title: 'Could not create share link',
-        description:
-          error instanceof Error ? error.message : 'Please try again.',
+        description: error instanceof Error ? error.message : 'Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -115,29 +111,15 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
         <DialogHeader>
           <DialogTitle>Your share link is ready</DialogTitle>
           <DialogDescription>
-            This is the only time the full link is shown. Save it now - you will
-            not be able to view it again, only revoke it.
+            This is the only time the full link is shown. Save it now - you
+            will not be able to view it again, only revoke it.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="flex items-center space-x-2">
-            <Input
-              id="created-link"
-              value={createdUrl}
-              readOnly
-              className="flex-1"
-            />
-            <Button
-              type="button"
-              size="sm"
-              className="px-3"
-              onClick={handleCopy}
-            >
-              {copied ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
+            <Input id="created-link" value={createdUrl} readOnly className="flex-1" />
+            <Button type="button" size="sm" className="px-3" onClick={handleCopy}>
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               <span className="sr-only">Copy</span>
             </Button>
           </div>
@@ -155,9 +137,9 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
   }
 
   if (step === 'confirm') {
-    const enabledGroups = (
-      Object.keys(fields) as (keyof ShareLinkFieldOptions)[]
-    ).filter((key) => fields[key]);
+    const enabledGroups = (Object.keys(fields) as (keyof ShareLinkFieldOptions)[]).filter(
+      (key) => fields[key],
+    );
     return (
       <>
         <DialogHeader>
@@ -176,10 +158,7 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
             <ScrollArea className="mt-1 h-32 rounded-md border p-2">
               <ul className="space-y-1">
                 {selectedActivities.map((activity) => (
-                  <li
-                    key={activity.id}
-                    className="truncate text-muted-foreground"
-                  >
+                  <li key={activity.id} className="truncate text-muted-foreground">
                     {activity.name} -{' '}
                     {formatPreferredDate(activity.start_date_local, dateFormat)}
                   </li>
@@ -204,8 +183,7 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
           <div>
             <p className="font-medium">Expires</p>
             <p className="text-muted-foreground">
-              {EXPIRY_OPTIONS.find((option) => option.ms === expiresInMs)
-                ?.label ??
+              {EXPIRY_OPTIONS.find((option) => option.ms === expiresInMs)?.label ??
                 `${Math.round(expiresInMs / (60 * 60 * 1000))} hours`}{' '}
               from now, or immediately if you revoke it sooner.
             </p>
@@ -213,18 +191,14 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
           <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-700 dark:text-amber-400">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
-              Anyone who receives this link can view the activities and fields
-              listed above until it expires or you revoke it. Only share it with
-              people you intend to give access to.
+              Anyone who receives this link can view the activities and
+              fields listed above until it expires or you revoke it. Only
+              share it with people you intend to give access to.
             </p>
           </div>
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            variant="ghost"
-            onClick={() => setStep('configure')}
-            disabled={isCreating}
-          >
+          <Button variant="ghost" onClick={() => setStep('configure')} disabled={isCreating}>
             Back
           </Button>
           <Button onClick={handleConfirmCreate} disabled={isCreating}>
@@ -241,15 +215,15 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
         <DialogTitle>Create a share link</DialogTitle>
         <DialogDescription>
           Share a private, expiring link to exactly the activities you have
-          selected. Whole-profile sharing has been retired - select activities
-          on the map or list first.
+          selected. Whole-profile sharing has been retired - select
+          activities on the map or list first.
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4">
         {!hasSelection ? (
           <p className="text-sm text-muted-foreground">
-            Select one or more activities on the map or list, then reopen this
-            dialog.
+            Select one or more activities on the map or list, then reopen
+            this dialog.
           </p>
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -279,28 +253,26 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
 
         <div className="grid gap-3">
           <Label>Additional fields to disclose (off by default)</Label>
-          {(
-            Object.keys(
-              SHARE_LINK_FIELD_GROUP_LABELS,
-            ) as (keyof ShareLinkFieldOptions)[]
-          ).map((key) => (
-            <div key={key} className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium">
-                  {SHARE_LINK_FIELD_GROUP_LABELS[key].label}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {SHARE_LINK_FIELD_GROUP_LABELS[key].description}
-                </p>
+          {(Object.keys(SHARE_LINK_FIELD_GROUP_LABELS) as (keyof ShareLinkFieldOptions)[]).map(
+            (key) => (
+              <div key={key} className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">
+                    {SHARE_LINK_FIELD_GROUP_LABELS[key].label}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {SHARE_LINK_FIELD_GROUP_LABELS[key].description}
+                  </p>
+                </div>
+                <Switch
+                  checked={fields[key]}
+                  onCheckedChange={(checked) =>
+                    setFields((current) => ({ ...current, [key]: checked }))
+                  }
+                />
               </div>
-              <Switch
-                checked={fields[key]}
-                onCheckedChange={(checked) =>
-                  setFields((current) => ({ ...current, [key]: checked }))
-                }
-              />
-            </div>
-          ))}
+            ),
+          )}
         </div>
       </div>
       <DialogFooter>

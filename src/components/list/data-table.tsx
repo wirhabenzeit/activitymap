@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { compareActivities } from '~/lib/activity-presentation';
+import { sortActivities } from '~/lib/activity-presentation';
 import {
   useDisplayUnits,
   useDateFormat,
@@ -130,7 +130,7 @@ export const DataTable = React.memo(function DataTable<
   const units = useDisplayUnits();
   const dateFormat = useDateFormat();
   const sortedData = React.useMemo(
-    () => [...data].sort((a, b) => compareActivities(a, b, sorting)),
+    () => sortActivities(data, sorting),
     [data, sorting],
   );
   const table = useTable({

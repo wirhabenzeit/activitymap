@@ -259,7 +259,8 @@ export function ElevationChart({
   }, [activityId, queryClient, streamMetadata, userId]);
 
   useEffect(() => {
-    const retryAt = query.data?.status === 'paused' ? query.data.retryAt : null;
+    const retryAt =
+      query.data?.status === 'paused' ? query.data.retryAt : null;
     if (retryAt === null) return;
     const now = Date.now();
     const remaining = retryAt - now;

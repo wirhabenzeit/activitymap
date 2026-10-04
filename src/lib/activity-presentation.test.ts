@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   aggregateMetric,
   compareActivities,
+  sortActivities,
   type Reducer,
 } from './activity-presentation';
 import {
@@ -261,4 +262,43 @@ void test('default, date, description and photo sorts use the actual list access
       );
     }
   }
+});
+
+void test('sortActivities matches compareActivities without mutating its input', () => {
+  const rows = [
+    { id: 1, name: 'b', distance: null },
+    { id: 2, name: 'B', distance: 5 },
+    { id: 3, name: '\u{1F600}', distance: NaN },
+    { id: 4, name: '\uFFFD', distance: 5 },
+    { id: 5, name: null, distance: 0 },
+  ];
+  const before = rows.map((row) => row.id);
+  for (const sorting of [
+    [],
+    [{ id: 'name', desc: false }],
+    [{ id: 'name', desc: true }],
+    [{ id: 'distance', desc: false }],
+    [{ id: 'distance', desc: true }],
+  ]) {
+    assert.deepEqual(
+      sortActivities(rows, sorting).map((row) => row.id),
+      [...rows]
+        .sort((a, b) => compareActivities(a, b, sorting))
+        .map((row) => row.id),
+      JSON.stringify(sorting),
+    );
+  }
+  assert.deepEqual(
+    sortActivities(rows, [{ id: 'name', desc: false }]).map((row) => row.id),
+    [2, 1, 4, 3, 5],
+  );
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    before,
+  );
+});
+void test('values that round to zero never display as negative zero', () => {
+  assert.equal(formatMeasurement(-0.2, 'elevation', 'metric'), '0 m');
+  assert.equal(formatMeasurement(-0.01, 'distance', 'imperial'), '0.0 mi');
+  assert.equal(formatMeasurement(-0.6, 'elevation', 'metric'), '-1 m');
 });

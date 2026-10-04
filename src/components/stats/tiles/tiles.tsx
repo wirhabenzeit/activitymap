@@ -301,7 +301,7 @@ const yearToDateView: TileView = {
     };
   },
   face: (context, option, expanded) => {
-    const { formatWithUnit } = statsFormat(context.units);
+    const { formatWithUnit, formatShort } = statsFormat(context.units);
 
     const metric = asMetric(option, 'distance');
     const year = dateOfDay(context.today).getUTCFullYear();
@@ -329,6 +329,7 @@ const yearToDateView: TileView = {
             compact
             endLabels
             valueFormat={(y) => formatWithUnit(y, metric)}
+            axisFormat={(y) => formatShort(y, metric)}
             xLabel={dayOfYearLabel}
           />
         )}
@@ -379,7 +380,7 @@ const weeklyVolumeView: TileView = {
     };
   },
   face: (context, option, expanded) => {
-    const { formatWithUnit } = statsFormat(context.units);
+    const { formatWithUnit, formatShort } = statsFormat(context.units);
 
     const metric = asMetric(option, 'distance');
     const { weekStarts, values } = weeklyVolume(
@@ -407,6 +408,7 @@ const weeklyVolumeView: TileView = {
               height={height}
               palette={context.palette}
               valueFormat={(value) => formatWithUnit(value, metric)}
+              axisFormat={(value) => formatShort(value, metric)}
             />
           )}
         </FillChart>
@@ -510,7 +512,7 @@ const monthVsLastMonthView: TileView = {
     };
   },
   face: (context, option, expanded) => {
-    const { formatWithUnit } = statsFormat(context.units);
+    const { formatWithUnit, formatShort } = statsFormat(context.units);
 
     const metric = asMetric(option, 'distance');
     const band = comparisonBand(
@@ -533,6 +535,7 @@ const monthVsLastMonthView: TileView = {
             detail={expanded}
             compact
             valueFormat={(y) => formatWithUnit(y, metric)}
+            axisFormat={(y) => formatShort(y, metric)}
             xLabel={(x) => `Day ${x}`}
           />
         )}
@@ -780,6 +783,7 @@ const distanceVsElevationView: TileView = {
               valueFormat={(value) =>
                 `${formatHilliness(value)} ${hillinessUnit}`
               }
+              axisFormat={formatHilliness}
             />
           )}
         </FillChart>
@@ -897,7 +901,7 @@ const thisWeekView: TileView = {
     };
   },
   face: (context, option, expanded) => {
-    const { formatWithUnit } = statsFormat(context.units);
+    const { formatWithUnit, formatShort } = statsFormat(context.units);
 
     const metric = asMetric(option, 'distance');
     const { days } = thisWeek(context.activities, context.today, metric);
@@ -919,6 +923,7 @@ const thisWeekView: TileView = {
               ariaLabel="Daily totals, Monday to Sunday; future days have not elapsed"
               palette={context.palette}
               valueFormat={(value) => formatWithUnit(value, metric)}
+              axisFormat={(value) => formatShort(value, metric)}
             />
           )}
         </FillChart>

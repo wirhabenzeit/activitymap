@@ -33,6 +33,7 @@ import {
   useDisplayUnits,
   useDateFormat,
 } from '~/hooks/use-display-preferences';
+import { isMissing } from '~/lib/activity-presentation';
 import { type UnitSystem } from '~/lib/units';
 import { activityFields } from '~/settings/activity';
 
@@ -65,7 +66,7 @@ const formattedValue = (
   row: Row<Features, Activity>,
   units: UnitSystem,
 ) =>
-  row.getValue(key) == null
+  isMissing(row.getValue(key))
     ? null
     : activityFields[key].formatter(row.getValue(key), units);
 

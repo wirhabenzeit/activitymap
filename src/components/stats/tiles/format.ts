@@ -127,6 +127,8 @@ export function statsFormat(units: UnitSystem = 'metric') {
       formatMetric(convert(value, metric), metric),
     formatWithUnit: (value: number, metric: StatsMetric) =>
       `${formatMetric(convert(value, metric), metric)} ${unit[metric]}`,
+    formatShort: (value: number, metric: StatsMetric) =>
+      formatShort(convert(value, metric)),
     formatDailyRate: (value: number, metric: StatsMetric = 'count') =>
       formatDailyRate(convert(value, metric)),
     formatHilliness: (value: number) =>

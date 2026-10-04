@@ -232,6 +232,8 @@ struct StatsPeriodBars: View {
     /// Inspection label, e.g. "Mon, 28 Sep".
     let detailLabel: (StatsChartPoint) -> String
     let valueLabel: (Double) -> String
+    /// Converts a canonical value to display units for the compact y-axis labels.
+    var axisValue: (Double) -> Double = { $0 }
     var base: Color = Color.primary.opacity(0.28)
     /// The incomplete (current) period; lighter by default, as in Training volume.
     var partial: Color = Color.primary.opacity(0.12)
@@ -271,7 +273,7 @@ struct StatsPeriodBars: View {
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
                 AxisGridLine()
-                AxisValueLabel { if let y = value.as(Double.self) { Text(valueLabel(y)).font(.caption2) } }
+                AxisValueLabel { if let y = value.as(Double.self).map(axisValue) { Text(y >= 1000 ? "\(StatsDisplay.number(y / 1000, decimals: y.truncatingRemainder(dividingBy: 1000) == 0 ? 0 : 1))k" : StatsDisplay.number(y)).font(.caption2) } }
             }
         }
         .chartXSelection(value: $selectedKey)

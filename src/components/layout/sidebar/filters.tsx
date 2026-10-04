@@ -265,14 +265,15 @@ export function InequalityFilter({
   name: keyof typeof inequalityFilters;
 }) {
   const units = useDisplayUnits();
-  const kind = name === 'distance' ? 'distance' : 'elevation';
-  const scale = name === 'elapsed_time' ? 3600 : measurementScale(kind, units);
-  const unit = name === 'elapsed_time' ? 'h' : measurementUnit(kind, units);
-  const [draft, setDraft] = useState<{
-    units: string;
-    value: number;
-    text: string;
-  } | null>(null);
+  const spec = inequalityFilters[name];
+  const scale =
+    'measurement' in spec
+      ? measurementScale(spec.measurement, units)
+      : spec.scale;
+  const unit =
+    'measurement' in spec
+      ? measurementUnit(spec.measurement, units)
+      : spec.unit;
   const [filter, setValues, setValueOperator] = useShallowStore((state) => [
     state.values[name],
     state.setValues,
@@ -280,9 +281,12 @@ export function InequalityFilter({
   ]);
   const [pendingOperator, setPendingOperator] = useState<'>=' | '<='>('>=');
   const operator = filter?.operator ?? pendingOperator;
+  // Keep the typed text while it still describes the filter in the current
+  // units; after a unit switch, show the converted physical threshold.
   const input = filter
-    ? draft?.units === units && draft.value === filter.value
-      ? draft.text
+    ? filter.displayValue !== undefined &&
+      Number(filter.displayValue) * scale === filter.value
+      ? filter.displayValue
       : Number((filter.value / scale).toPrecision(12)).toString()
     : '';
 
@@ -298,7 +302,6 @@ export function InequalityFilter({
       return;
     }
     if (parsed.status === 'invalid') return;
-    setDraft({ units, value: parsed.filter.value, text: nextInput });
     setValues((previous) => ({
       ...previous,
       [name]: parsed.filter,

@@ -93,7 +93,7 @@ export function VolumeHistory({
   context: TileContext;
   metric: StatsMetric;
 }) {
-  const { formatWithUnit } = statsFormat(context.units);
+  const { formatWithUnit, formatShort } = statsFormat(context.units);
   const dateLabel = (day: number) =>
     formatPreferredDate(dateOfDay(day), context.dateFormat, undefined, {
       month: 'short',
@@ -182,6 +182,7 @@ export function VolumeHistory({
             trendLabel={averageLabel}
             palette={context.palette}
             valueFormat={(value) => formatWithUnit(value, metric)}
+            axisFormat={(value) => formatShort(value, metric)}
             xTickFormat={(value) =>
               range === 'years'
                 ? label(Number(value))

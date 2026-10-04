@@ -10,10 +10,8 @@ import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
 import { type Features } from './table-extensions';
 
-interface DataTableColumnHeaderProps<
-  TData extends RowData,
-  TValue,
-> extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
+interface DataTableColumnHeaderProps<TData extends RowData, TValue>
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   column: Column<Features, TData, TValue>;
   title?: string;
 }

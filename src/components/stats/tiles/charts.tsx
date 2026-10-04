@@ -31,7 +31,7 @@ import { categorySettings } from '~/settings/category';
 import { sportOrder, type Sport } from '~/lib/stats/tile-data';
 import { dateOfDay, volumeDomain } from '~/lib/stats/tile-series';
 
-import { type TilePalette } from './format';
+import { formatShort, type TilePalette } from './format';
 
 export function Measure({
   className,
@@ -88,6 +88,7 @@ export function CumulativeLines({
   compact = false,
   monthAxisFrom,
   valueFormat,
+  axisFormat = formatShort,
   xLabel,
   endLabels = false,
 }: {
@@ -102,6 +103,8 @@ export function CumulativeLines({
   // Day number of x = 0; the detail axis then shows months.
   monthAxisFrom?: number;
   valueFormat: (y: number) => string;
+  // Axis ticks; compact by default, converted by callers showing units.
+  axisFormat?: (value: number) => string;
   xLabel: (x: number) => string;
   // Name each line at its end, so no legend is needed.
   endLabels?: boolean;
@@ -260,7 +263,7 @@ export function CumulativeLines({
           ]),
         axis:
           detail || compact
-            ? { ticks: { count: detail ? 5 : 3, format: valueFormat } }
+            ? { ticks: { count: detail ? 5 : 3, format: axisFormat } }
             : false,
       },
     },
@@ -362,6 +365,7 @@ export function VolumeArea({
   height,
   palette,
   valueFormat,
+  axisFormat = formatShort,
 }: {
   weeks: WeekPoint[];
   trend?: WeekPoint[];
@@ -374,6 +378,7 @@ export function VolumeArea({
   height: number;
   palette: TilePalette;
   valueFormat: (value: number) => string;
+  axisFormat?: (value: number) => string;
 }) {
   const full = weeks.slice(0, -1);
   const tail = weeks.slice(-2);
@@ -462,7 +467,7 @@ export function VolumeArea({
         scale: d3.scaleLinear().domain([floor, ceiling]),
         axis:
           detail || compact
-            ? { ticks: { count: 3, format: valueFormat } }
+            ? { ticks: { count: 3, format: axisFormat } }
             : false,
       },
     },
@@ -506,6 +511,7 @@ export function SportArea({
   trendLabel = '4-week average',
   palette,
   valueFormat,
+  axisFormat = formatShort,
   xTickFormat,
 }: {
   rows: SportBar[];
@@ -520,6 +526,7 @@ export function SportArea({
   trendLabel?: string;
   palette: TilePalette;
   valueFormat: (value: number) => string;
+  axisFormat?: (value: number) => string;
   xTickFormat?: (x: string) => string;
 }) {
   const xs = Array.from(new Set(rows.map((row) => row.x)));
@@ -604,7 +611,7 @@ export function SportArea({
       y: {
         scale: d3.scaleLinear,
         nice: true,
-        axis: detail ? { ticks: { format: valueFormat } } : false,
+        axis: detail ? { ticks: { format: axisFormat } } : false,
       },
     },
     color: { domain: [...sportOrder], range: sportColors },
@@ -673,6 +680,7 @@ export function PlainBars({
   average,
   palette,
   valueFormat,
+  axisFormat = formatShort,
   xTickFormat,
   xAxisFormat,
   yDomain,
@@ -686,6 +694,7 @@ export function PlainBars({
   average?: number;
   palette: TilePalette;
   valueFormat: (value: number) => string;
+  axisFormat?: (value: number) => string;
   xTickFormat?: (x: string) => string;
   xAxisFormat?: (x: string) => string;
   yDomain?: [number, number];
@@ -763,7 +772,7 @@ export function PlainBars({
                   ...(yDomain
                     ? { values: yDomain }
                     : { count: compact ? 3 : undefined }),
-                  format: valueFormat,
+                  format: axisFormat,
                 },
               }
             : false,
