@@ -173,7 +173,9 @@ extension RenderedRoutePickingTests {
 
     @Test(arguments: ["tablet", "landscape", "large-text"])
     func fixedEdgePanelRetainsDetailAndSelectionAcrossCollapse(scenario: String) async throws {
-        let store = ActivityStore(activities: (1...60).map { ActivityStoreSelectionTests.activity($0) })
+        var activities = (1...60).map { ActivityStoreSelectionTests.activity($0) }
+        activities[0].name = "50k detour due to a 1k construction site => change of plans"
+        let store = ActivityStore(activities: activities)
         store.replaceSelection(with: Array(1...60))
         let picker = RoutePicker()
         picker.reviewSelection(store: store)
@@ -622,8 +624,8 @@ extension RenderedRoutePickingTests {
         let axis = try #require(observations.first { $0.topCandidates(1).first?.string.contains("Distance (km)") == true })
         let stats = try #require(observations.first { $0.topCandidates(1).first?.string.contains("42.7") == true })
         let description = try #require(observations.first { $0.topCandidates(1).first?.string.contains("Riverside climb") == true })
-        #expect(title.boundingBox.minY > description.boundingBox.maxY && description.boundingBox.minY > axis.boundingBox.maxY && axis.boundingBox.minY > stats.boundingBox.maxY,
-                "The visible hierarchy must be title, description, graph, then stats")
+        #expect(title.boundingBox.minY > axis.boundingBox.maxY && axis.boundingBox.minY > description.boundingBox.maxY && description.boundingBox.minY > stats.boundingBox.maxY,
+                "The visible hierarchy must be title, graph, description, then stats")
         #expect(observations.filter { $0.topCandidates(1).first?.string.contains("42.7") == true }.count == 1,
                 "Distance must appear in one stats row only")
         let cursorLayers = map.mapboxMap.allLayerIdentifiers.filter { $0.type == .circle }

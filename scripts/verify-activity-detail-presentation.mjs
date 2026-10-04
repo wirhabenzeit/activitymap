@@ -104,7 +104,8 @@ try {
       assert.ok((await headline.boundingBox()).y >= (await plot.boundingBox()).y + (await plot.boundingBox()).height,'Chart precedes headlines');
       const description = page.getByText('A long ride home through the hills.', {exact:true});
       assert.equal(await description.count(), 1);
-      assert.ok((await description.boundingBox()).y + (await description.boundingBox()).height <= (await plot.boundingBox()).y, 'Description precedes chart');
+      assert.ok((await plot.boundingBox()).y + (await plot.boundingBox()).height <= (await description.boundingBox()).y, 'Chart precedes description');
+      assert.ok((await description.boundingBox()).y + (await description.boundingBox()).height <= (await headline.boundingBox()).y, 'Description precedes headline stats');
       const path=join(directory,`activity-detail-${width}-${theme}.png`);
       await page.screenshot({path,fullPage:true});
       console.log(path);

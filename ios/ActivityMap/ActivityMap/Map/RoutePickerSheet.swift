@@ -114,8 +114,14 @@ struct RoutePickerSheet: View {
                 .accessibilityIdentifier("map-results-back")
             }
             if collapsed, let detail {
-                Text(detail.name).font(.subheadline.weight(.semibold))
-                    .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
+                    Text(detail.name).font(.subheadline.weight(.semibold))
+                        .lineLimit(1).truncationMode(.tail)
+                    Text("\(detail.sportType.rawValue) · \(Formatters.shortDateTime(detail.startDateLocal, timeZone: .gmt))")
+                        .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                        .lineLimit(1).truncationMode(.tail)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else if detail == nil {
                 selectionSummary
             }

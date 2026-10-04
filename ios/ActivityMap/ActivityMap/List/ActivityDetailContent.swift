@@ -21,8 +21,8 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
             if showsHeading {
                 ActivityDetailIdentity(activity: activity, trailingInset: headerTrailingInset)
             }
-            if showsDescription { ActivityDetailDescription(activity: activity) }
             profile(activity)
+            if showsDescription { ActivityDetailDescription(activity: activity) }
             if showsPrimaryMetrics {
                 Divider()
                 ActivityHeadlineStats(activity: activity)
@@ -60,7 +60,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     }
 }
 
-/// Optional prose belongs between identity and the chart on every detail surface.
+/// Optional prose follows the chart on every detail surface.
 struct ActivityDetailDescription: View {
     let activity: Activity
 

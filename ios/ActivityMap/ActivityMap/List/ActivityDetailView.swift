@@ -133,7 +133,7 @@ private struct MapActivityDetailReveal: View {
     private var heading: some View {
         HStack(alignment: .top, spacing: 8) {
             ActivityDetailIdentity(activity: activity, trailingInset: trailingInset,
-                                   titleLineLimit: compactProfile ? 2 : nil)
+                                   titleLineLimit: compactProfile ? (expansion.progress > 0.8 ? 2 : 1) : nil)
             Button { showOnMap(activity.id) } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .frame(width: 44, height: 44)
@@ -161,8 +161,8 @@ private struct MapActivityDetailReveal: View {
             }
             if compactProfile {
                 VStack(spacing: 16) {
-                    ActivityDetailDescription(activity: activity)
                     elevation
+                    ActivityDetailDescription(activity: activity)
                     Divider()
                     ActivityHeadlineStats(activity: activity)
                 }

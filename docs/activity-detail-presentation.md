@@ -5,17 +5,19 @@ Applies to web Map/List cards and iOS Map/List detail panels. Native controls ma
 ## Hierarchy
 
 1. Activity title, sport and activity-local date/time. Keep route/navigation actions in the heading or action bar. On the native map, Fit route sits beside the activity title in portrait, landscape and iPad panels; it must not reserve a footer row.
-2. Activity description, when present, directly below the identity. Preserve line breaks; omit blank descriptions.
-3. Elevation graph when an elevation profile is available, with its axes and units.
+2. Elevation graph when an elevation profile is available, with its axes and units.
+3. Activity description, when present, below the graph. Preserve line breaks; omit blank descriptions.
 4. Exactly three headline measurements: **Distance**, **Moving time**, **Elevation gain**, in that order. Use one row at ordinary phone size; reflow for accessibility text sizes. Values are prominent, labels secondary. Do not repeat elapsed time or min/max as headline captions. Missing primary values show an em dash.
 5. Topic groups containing the remaining recorded fields, each shown once.
 6. Photos, when present.
+
+Collapsed map details use a single-line, tail-truncated title with the sport and activity-local date/time beneath it. The full title remains available in the open detail.
 
 The landscape/iPad custom panel uses a stable scrolling viewport with the heading inside its content; the grabber shares the navigation row. Safe-area spacing belongs inside the scroll content, not a fixed bottom strip. Collapsing the panel cancels chart demand/cursors without discarding a valid decoded profile or the scroll position.
 
 The iPhone medium sheet keeps title, graph and headline row together for short or absent descriptions; longer descriptions remain in the same scroll view while the map stays visible. Details continue below in the same scroll view; enlarging the sheet reveals more content. No “All recorded details” or stats disclosure, no separate preliminary summary row above the graph. The compact sheet detent may summarize the activity when the detail content itself is closed. Explicit Fit route/selection commands use the medium (normal opening) detent: keep the profile/results visible and fit the route into the remaining map space. A fully expanded phone sheet returns to this height, never to the collapsed summary.
 
-On web, keep the description, chart and headline row visible when a table row opens. Everything after the headline row (topic groups and photos) goes inside one **Activity details** disclosure, collapsed by default. This keeps inline Map/List rows compact. Individual topic groups have no additional collapsing. iOS keeps all groups open in the scrolling sheet. Map framing is an icon beside the selection close control, not a separate toolbar row.
+On web, keep the chart, description and headline row visible when a table row opens. Everything after the headline row (topic groups and photos) goes inside one **Activity details** disclosure, collapsed by default. This keeps inline Map/List rows compact. Individual topic groups have no additional collapsing. iOS keeps all groups open in the scrolling sheet. Map framing is an icon beside the selection close control, not a separate toolbar row.
 
 ## Topic groups
 
