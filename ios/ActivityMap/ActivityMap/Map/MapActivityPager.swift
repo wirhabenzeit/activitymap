@@ -8,6 +8,9 @@ struct MapActivityPager: UIViewControllerRepresentable {
     let store: ActivityStore
     let picker: RoutePicker
     var expansion: CGFloat = 1
+    var compactProfile = false
+    var scrollsHeading = false
+    var bottomContentInset: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -26,6 +29,11 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
     func updateUIViewController(_ controller: UIPageViewController, context: Context) {
         context.coordinator.update(self)
+        // The chart owns horizontal drags while scrubbing. Keep UIKit's page
+        // pan from stealing them (SwiftUI gesture priority alone is local).
+        for scroll in controller.view.subviews.compactMap({ $0 as? UIScrollView }) {
+            scroll.isScrollEnabled = store.elevationScrubOwner == nil
+        }
     }
 
     static func dismantleUIViewController(_ controller: UIPageViewController, coordinator: Coordinator) {
@@ -65,7 +73,8 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
         func update(_ next: MapActivityPager) {
             let appearanceChanged = parent.colorScheme != next.colorScheme || parent.typeSize != next.typeSize
-                || parent.sizeClass != next.sizeClass
+                || parent.sizeClass != next.sizeClass || parent.compactProfile != next.compactProfile || parent.scrollsHeading != next.scrollsHeading
+                || parent.bottomContentInset != next.bottomContentInset
             parent = next
             guard let controller else { return }
             if next.picker.candidateIDs.count > 1 {
@@ -97,9 +106,9 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
         private func content(_ id: Int, expansion: MapActivityExpansion) -> AnyView {
             AnyView(ActivityDetailPanel(store: parent.store, activityID: id,
-                mapExpansion: expansion) { [weak self] id in
+                mapExpansion: expansion, compactMapProfile: parent.compactProfile, scrollsMapHeading: parent.scrollsHeading,
+                mapBottomContentInset: parent.bottomContentInset) { [weak self] id in
                     guard let self else { return }
-                    self.parent.picker.detent = .compact
                     self.parent.store.showOnMap(id)
                 }
                 .environment(\.activityDetailOverMap, true)

@@ -38,3 +38,38 @@ struct ActivityMetricRow: Identifiable {
         return rows
     }
 }
+
+/// Each recorded field has one topic; headline measurements and date already
+/// appear above the groups. Short labels get their meaning from the group.
+struct ActivityMetricGroup: Identifiable {
+    let id: String
+    let title: String
+    let icon: String
+    let rows: [ActivityMetricRow]
+
+    static func groups(for activity: Activity) -> [ActivityMetricGroup] {
+        let rows = ActivityMetricRow.rows(for: activity)
+        let definitions: [(String, String, String, [(String, String)])] = [
+            ("time-speed", "Time & speed", "speedometer", [
+                ("elapsedTime", "Elapsed time"), ("averageSpeed", "Average speed"), ("maxSpeed", "Maximum speed")]),
+            ("elevation", "Elevation", "mountain.2", [("elevLow", "Minimum"), ("elevHigh", "Maximum")]),
+            ("power", "Power", "bolt", [("averageWatts", "Average"), ("maxWatts", "Maximum"),
+                ("weightedAverageWatts", "Weighted average"), ("kilojoules", "Work")]),
+            ("heart-rate", "Heart rate", "heart", [("averageHeartrate", "Average"), ("maxHeartrate", "Maximum")]),
+            ("energy", "Energy", "flame", [("calories", "Calories")]),
+            ("social", "Social", "person.2", [("kudos", "Kudos"), ("achievements", "Achievements"),
+                ("comments", "Comments"), ("photos", "Photos")]),
+            ("activity", "Activity", "info.circle", [("commute", "Commute"), ("privacy", "Private"),
+                ("trainer", "Indoor"), ("manual", "Manual"), ("flagged", "Flagged"),
+                ("geometry", "Geometry status")]),
+        ]
+        return definitions.compactMap { id, title, icon, fields in
+            let values = fields.compactMap { field, label in
+                rows.first { $0.id == field }.map {
+                    ActivityMetricRow(id: $0.id, title: label, icon: icon, value: $0.value)
+                }
+            }
+            return values.isEmpty ? nil : ActivityMetricGroup(id: id, title: title, icon: icon, rows: values)
+        }
+    }
+}

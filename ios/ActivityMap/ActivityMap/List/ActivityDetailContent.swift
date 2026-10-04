@@ -1,27 +1,19 @@
 import SwiftUI
 
-/// Shared by List navigation, wide List detail and the Map results panel. Each headline owns
-/// related recorded context, like the web card, without deriving missing data.
+/// Shared hierarchy for Map and List; see docs/activity-detail-presentation.md.
 struct ActivityDetailContent<Profile: View, Photos: View>: View {
     let activity: Activity
     @Environment(\.activityDetailOverMap) private var overMap
     var headerTrailingInset: CGFloat = 0
     var showsHeading = true
+    var showsPrimaryMetrics = true
+    var showsDescription = true
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    private var rows: [ActivityMetricRow] { ActivityMetricRow.rows(for: activity) }
     private var columns: [GridItem] {
-        if typeSize.isAccessibilitySize { return [GridItem(.flexible(), alignment: .leading)] }
-        // Use the content width, including inside a narrow iPad map panel,
-        // rather than inheriting the size class of the entire window.
-        return [GridItem(.adaptive(minimum: AppTheme.minimumDetailColumnWidth), alignment: .leading)]
-    }
-    private var supplementary: [ActivityMetricRow] {
-        let ids = ["averageHeartrate", "maxHeartrate", "calories", "kilojoules"]
-            + (rows.contains { $0.id == "weightedAverageWatts" } ? [] : ["averageWatts", "maxWatts"])
-        return rows.filter { ids.contains($0.id) }
+        Array(repeating: GridItem(.flexible(), alignment: .leading), count: typeSize.isAccessibilitySize ? 1 : 2)
     }
 
     var body: some View {
@@ -29,98 +21,94 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
             if showsHeading {
                 ActivityDetailIdentity(activity: activity, trailingInset: headerTrailingInset)
             }
-            if activity.isPrivate == true || activity.commute == true || activity.trainer == true || activity.flagged == true {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) { badges }
-                    VStack(alignment: .leading, spacing: 4) { badges }
-                }
-            }
-            LazyVGrid(columns: columns, alignment: .leading, spacing: AppTheme.Spacing.medium) {
-                highlight("Distance", value: Formatters.distance(activity.distance),
-                          context: context([("averageSpeed", "avg"), ("maxSpeed", "max")]))
-                highlight("Moving time", value: Formatters.duration(activity.movingTime),
-                          context: context([("elapsedTime", "elapsed")]))
-                highlight("Elevation gain", value: elevationGain,
-                          context: context([("elevLow", "min"), ("elevHigh", "max")]))
-                if let power = rows.first(where: { $0.id == "weightedAverageWatts" }) {
-                    highlight("Weighted power", value: power.value,
-                              context: context([("averageWatts", "avg"), ("maxWatts", "max")]))
-                }
-            }
-            if !supplementary.isEmpty {
-                Divider()
-                LazyVGrid(columns: columns, alignment: .leading, spacing: AppTheme.Spacing.small) {
-                    ForEach(supplementary) { metric in
-                        BrowseMetricValue(title: metric.title, value: metric.value, valueFirst: true)
-                            .accessibilityIdentifier("activity-metric-\(metric.id)")
-                    }
-                }
-            }
             profile(activity)
-            photos(activity)
-            if let description = activity.description, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(description).font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
+            if showsDescription { ActivityDetailDescription(activity: activity) }
+            if showsPrimaryMetrics {
+                Divider()
+                ActivityHeadlineStats(activity: activity)
             }
-            DisclosureGroup {
-                VStack(spacing: 0) {
-                    ForEach(rows.filter { !["date", "distance", "movingTime", "elapsedTime", "elevationGain"].contains($0.id) }) { metric in
-                        ViewThatFits(in: .horizontal) {
-                            HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
-                                Text(metric.title).foregroundStyle(AppTheme.secondaryText).fixedSize()
-                                Spacer(minLength: 4)
-                                Text(metric.value).fontWeight(.medium).monospacedDigit().fixedSize()
+            ForEach(ActivityMetricGroup.groups(for: activity)) { group in
+                VStack(alignment: .leading, spacing: 12) {
+                    Divider()
+                    Label(group.title, systemImage: group.icon)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.secondaryText)
+                        .accessibilityAddTraits(.isHeader)
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+                        ForEach(group.rows) { metric in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(metric.value).font(.subheadline.weight(.medium)).monospacedDigit()
+                                Text(metric.title).font(.caption).foregroundStyle(AppTheme.secondaryText)
                             }
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(metric.title).foregroundStyle(AppTheme.secondaryText)
-                                Text(metric.value).fontWeight(.medium).monospacedDigit()
-                            }
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(group.title), \(metric.title)")
+                            .accessibilityValue(metric.value)
+                            .accessibilityIdentifier("activity-metric-\(metric.id)")
                         }
-                        .font(.caption)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, AppTheme.Spacing.small)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(metric.title)
-                        .accessibilityValue(metric.value)
-                        .accessibilityIdentifier("activity-metric-\(metric.id)")
                     }
                 }
-            } label: {
-                Text("All recorded details").font(.subheadline)
-                    .frame(minHeight: AppTheme.minimumTarget, alignment: .leading)
+                .accessibilityIdentifier("activity-metric-group-\(group.id)")
             }
+            photos(activity)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, AppTheme.Spacing.large)
         .padding(.vertical, AppTheme.Spacing.small)
         .background { if !overMap { AppTheme.surface } }
     }
+}
 
-    private var elevationGain: String {
-        let value = Formatters.elevation(activity.totalElevationGain)
-        guard value != Formatters.unknown, let gain = activity.totalElevationGain, gain >= 0 else { return value }
-        return "+\(value)"
-    }
+/// Optional prose follows the chart on every detail surface.
+struct ActivityDetailDescription: View {
+    let activity: Activity
 
-    // Each sibling contributes independently. A measured maximum or zero must
-    // survive even when its average/minimum/primary measurement is missing.
-    private func context(_ fields: [(String, String)]) -> String? {
-        let parts = fields.compactMap { id, suffix in
-            rows.first { $0.id == id }.map { "\($0.value) \(suffix)" }
+    var body: some View {
+        if let description = activity.description, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Text(description).font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
         }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}
+
+/// The same three actual measurements on every detail surface.
+struct ActivityHeadlineStats: View {
+    let activity: Activity
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 12) { metrics }
+            } else {
+                HStack(alignment: .top, spacing: 8) { metrics }
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("map-activity-stats")
     }
 
-    private func highlight(_ title: String, value: String, context: String? = nil) -> some View {
-        BrowseMetricValue(title: title, value: value, emphasis: .detail, context: context, valueFirst: true)
+    @ViewBuilder private var metrics: some View {
+        metric("Distance", value: Formatters.distance(activity.distance))
+        metric("Moving time", value: Formatters.duration(activity.movingTime))
+        metric("Elevation gain", value: Formatters.elevation(activity.totalElevationGain))
     }
 
-    @ViewBuilder private var badges: some View {
-        if activity.isPrivate == true { BrowseBadge(title: "Private", systemImage: "lock") }
-        if activity.commute == true { BrowseBadge(title: "Commute", systemImage: "arrow.left.arrow.right") }
-        if activity.trainer == true { BrowseBadge(title: "Indoor", systemImage: "house") }
-        if activity.flagged == true { BrowseBadge(title: "Flagged", systemImage: "flag") }
+    private func metric(_ title: String, value: String) -> some View {
+        VStack(alignment: typeSize.isAccessibilitySize ? .leading : .center, spacing: 5) {
+            Text(value).font(.headline).monospacedDigit()
+                .lineLimit(1).minimumScaleFactor(0.7)
+            Text(title).font(.caption).foregroundStyle(AppTheme.secondaryText)
+                .multilineTextAlignment(typeSize.isAccessibilitySize ? .leading : .center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: typeSize.isAccessibilitySize ? .leading : .center)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
     }
 }
 
@@ -136,11 +124,13 @@ struct ActivityDetailIdentity: View {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
                 Text(activity.name).font(.headline)
                     .lineLimit(titleLineLimit)
+                    .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("activity-detail-name")
                 Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
                     .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    .lineLimit(titleLineLimit == 1 ? 1 : nil)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

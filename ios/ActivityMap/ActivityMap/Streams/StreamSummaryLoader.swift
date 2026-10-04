@@ -49,11 +49,14 @@ final class StreamSummaryLoader {
               let cached = cachedSummaries[activityID], cached.isCurrent else { return nil }
         return cached
     }
+    private(set) var sessionRevision = 0
+    var isOffline: Bool { session?.verified == false }
     private var session: SyncSession?
     private var storage: LocalStore?
     private var worker: SummaryRequestWorker?
     private var epoch = 0
     @ObservationIgnored private var requests: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var consumers: [String: Set<UUID>] = [:]
     @ObservationIgnored private var requestVersions: [String: Int] = [:]
     @ObservationIgnored private var observer: Task<Void, Never>?
     @ObservationIgnored private let source: (SyncSession) -> any CompactSummarySource
@@ -88,6 +91,7 @@ final class StreamSummaryLoader {
             return
         }
         if session?.scope == next?.scope, session?.token == next?.token, self.storage === storage {
+            if session != next { sessionRevision &+= 1 }
             session = next
             return
         }
@@ -112,8 +116,10 @@ final class StreamSummaryLoader {
     func state(for activityID: String) -> StreamSummaryState { states[activityID] ?? .notRequested }
     func reset() {
         epoch &+= 1
+        sessionRevision &+= 1
         for task in requests.values { task.cancel() }
         requests.removeAll()
+        consumers.removeAll()
         requestVersions.removeAll()
         observer?.cancel()
         observer = nil
@@ -124,6 +130,7 @@ final class StreamSummaryLoader {
     }
     func pause() { for id in Array(requests.keys) { cancel(activityID: id) } }
     func cancel(activityID: String) {
+        consumers[activityID] = nil
         requests.removeValue(forKey: activityID)?.cancel()
         requestVersions[activityID, default: 0] &+= 1
         switch state(for: activityID) {
@@ -145,7 +152,7 @@ final class StreamSummaryLoader {
             try? await storage.clear(scope: session.scope)
             return
         }
-        if let request = requests[activityID] { await request.value; return }
+        if let request = requests[activityID] { await consume(request, activityID: activityID); return }
         if !refresh, case .failed(let failure) = state(for: activityID), !failure.retryable { return }
         if let deadline = retryDeadline(state(for: activityID)), deadline > now() { return }
         guard let worker else { return }
@@ -164,8 +171,26 @@ final class StreamSummaryLoader {
                                worker: worker, epoch: current, version: version)
         }
         requests[activityID] = request
+        await consume(request, activityID: activityID)
+    }
+
+    /// A departing detail releases only its own demand. A newly visible detail
+    /// can join the same request during a Map/List transition without losing it
+    /// to the old view's asynchronous cancellation handler.
+    private func consume(_ request: Task<Void, Never>, activityID: String) async {
+        let consumer = UUID()
+        consumers[activityID, default: []].insert(consumer)
         await withTaskCancellationHandler { await request.value } onCancel: {
-            Task { @MainActor [weak self] in self?.cancel(activityID: activityID) }
+            Task { @MainActor [weak self] in self?.release(consumer, activityID: activityID, cancelUnused: true) }
+        }
+        release(consumer, activityID: activityID, cancelUnused: Task.isCancelled)
+    }
+
+    private func release(_ consumer: UUID, activityID: String, cancelUnused: Bool) {
+        guard consumers[activityID]?.remove(consumer) != nil else { return }
+        if consumers[activityID]?.isEmpty == true {
+            consumers[activityID] = nil
+            if cancelUnused { cancel(activityID: activityID) }
         }
     }
 

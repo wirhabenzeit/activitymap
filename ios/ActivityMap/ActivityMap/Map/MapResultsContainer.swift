@@ -10,7 +10,7 @@ struct MapResultsContainer: View {
     let bottomInset: CGFloat
     let largeText: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @GestureState private var dragTranslation: CGFloat? = nil
+    @GestureState private var drag: MapResultsDrag? = nil
 
     var body: some View {
         let layout = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
@@ -21,16 +21,16 @@ struct MapResultsContainer: View {
                     detent: .compact, largeText: largeText).contentHeight
                 let expanded = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
                     detent: .expanded, largeText: largeText).contentHeight
-                let height = MapResultsSnap.height(start: layout.contentHeight,
-                    translation: dragTranslation ?? 0, compact: compact, expanded: expanded)
+                let height = drag?.height(compact: compact, expanded: expanded) ?? layout.contentHeight
                 RoutePickerSheet(picker: picker, store: store, isSidePanel: true, bottomInset: bottomInset,
+                    panelExpandedHeight: expanded,
                     collapsedOverride: height <= compact + 1,
                     panelHandle: AnyView(handle(start: layout.contentHeight, compact: compact, expanded: expanded)))
                     .frame(width: layout.frame.width, height: height + bottomInset)
                     .position(x: layout.frame.midX, y: size.height - height / 2 + bottomInset / 2)
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: picker.detent)
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: dragTranslation == nil)
-                    .transaction { if dragTranslation != nil { $0.animation = nil } }
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drag == nil)
+                    .transaction { if drag != nil { $0.animation = nil } }
             }
         } else {
             NativeMapResultsSheet(picker: picker, store: store, size: size, largeText: largeText)
@@ -39,12 +39,18 @@ struct MapResultsContainer: View {
 
     private func handle(start: CGFloat, compact: CGFloat, expanded: CGFloat) -> some View {
         Capsule().fill(.secondary).frame(width: 36, height: 5)
-            .frame(maxWidth: .infinity).frame(height: 44)
+            .frame(width: 60, height: 44)
             .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 3)
-                .updating($dragTranslation) { value, state, _ in state = value.translation.height }
+            // The handle moves with the panel. Local translations feed that
+            // movement back into the next event and make resizing oscillate.
+            .gesture(DragGesture(minimumDistance: 3, coordinateSpace: .global)
+                .updating($drag) { value, state, transaction in
+                    transaction.animation = nil
+                    if state == nil { state = MapResultsDrag(start: start) }
+                    state?.translation = value.translation.height
+                }
                 .onEnded { value in
-                    picker.detent = MapResultsSnap.target(start: start,
+                    picker.detent = MapResultsSnap.target(start: drag?.start ?? start,
                         predictedTranslation: value.predictedEndTranslation.height,
                         compact: compact, expanded: expanded)
                 })
@@ -96,7 +102,7 @@ private struct NativeMapResultsSheet: View {
         NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.visibleActivityIDs.contains).count,
                                             detail: picker.detailID != nil, height: size.height, largeText: largeText)
     }
-    private var compact: PresentationDetent { .height(largeText ? 240 : 156) }
+    private var compact: PresentationDetent { .height(NativeMapResultsSizing.compactHeight(largeText: largeText)) }
     private var opening: PresentationDetent { .height(openingHeight) }
     private var detents: Set<PresentationDetent> { [compact, opening, .large] }
     // Resolve the initial detent before UIKit starts presenting. A default
@@ -112,24 +118,35 @@ private struct NativeMapResultsSheet: View {
     var body: some View {
         Color.clear.allowsHitTesting(false)
             .sheet(isPresented: Binding(get: { picker.isPresented && store.selectedTab == .map && !suspended }, set: { _ in }), onDismiss: { presentationChanged(false) }) {
-                RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
-                                 collapsedOverride: selected == compact,
-                                 nativePresentation: true)
-                    .presentationDetents(detents, selection: selection)
-                    .presentationDragIndicator(.visible)
-                    .presentationBackgroundInteraction(.enabled(upThrough: .large))
-                    .presentationContentInteraction(.resizes)
-                    .interactiveDismissDisabled()
-                    .onAppear { presentationChanged(true) }
+                GeometryReader { geometry in
+                    RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
+                                     bottomInset: geometry.safeAreaInsets.bottom,
+                                     collapsedOverride: selected == compact,
+                                     nativePresentation: true)
+                        .ignoresSafeArea(.container, edges: .bottom)
+                }
+                .presentationDetents(detents, selection: selection)
+                .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled(upThrough: .large))
+                // Only the detail's elevation chart needs drags to reach content
+                // first; the results list keeps swipe-to-resize.
+                .presentationContentInteraction(picker.detailID == nil ? .resizes : .scrolls)
+                .interactiveDismissDisabled()
+                .onAppear { presentationChanged(true) }
 
             }
     }
 }
 
 enum NativeMapResultsSizing {
+    static func compactHeight(largeText: Bool) -> CGFloat { largeText ? 140 : 76 }
+
     static func openingHeight(count: Int, detail: Bool, height: CGFloat, largeText: Bool) -> CGFloat {
-        let minimum: CGFloat = largeText ? 300 : 220
-        let content: CGFloat = detail ? (largeText ? 420 : 300) : 76 + CGFloat(max(1, min(count, 5))) * (largeText ? 160 : 64)
+        // Phone detail opens with its profile visible and the map above it.
+        // The smallest phones still retain a usable map instead of requiring .large.
+        let minimum: CGFloat = detail ? (largeText ? 420 : 340) : (largeText ? 300 : 220)
+        let content: CGFloat = detail ? (largeText ? 480 : (count > 1 ? 412 : 368))
+            : 76 + CGFloat(max(1, min(count, 5))) * (largeText ? 160 : 64)
         return max(minimum, min(content, height * 0.5))
     }
 }

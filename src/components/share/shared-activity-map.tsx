@@ -24,8 +24,6 @@ import { buildSharedRouteCollection } from '~/lib/sharing/shared-map';
 import { categorySettings, colorMap, iconMap } from '~/settings/category';
 import { baseMaps, defaultMapPosition } from '~/settings/map';
 
-import 'mapbox-gl/dist/mapbox-gl.css';
-
 type SharedActivityMapProps = {
   activities: SharedActivityDTO[];
   expiresAt: string;

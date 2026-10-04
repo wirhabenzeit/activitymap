@@ -1,16 +1,9 @@
 'use client';
 
-import { useDisplayUnits } from '~/hooks/use-display-preferences';
-import {
-  measurementScale,
-  measurementUnit,
-  formatMeasurement,
-} from '~/lib/units';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { areaY, defineChart, lineY } from '@tanstack/charts';
-import { Chart } from '@tanstack/charts/react';
-import { scaleLinear } from '@tanstack/charts/scales/linear';
+import { ElevationPlot } from './elevation-plot';
+import { useElevationCursor } from '~/store/elevation-cursor';
 import { Loader2 } from 'lucide-react';
 
 import type { StreamMetadata } from '~/contracts/v1/activity-streams';
@@ -27,7 +20,6 @@ import {
   STREAM_SUMMARY_PREFETCH_CONCURRENCY,
   streamSummaryQueryKey,
   streamSummaryRefetchInterval,
-  type ElevationProfile,
   type StreamSummaryResult,
 } from '~/lib/activity-stream-summary';
 
@@ -116,107 +108,6 @@ export function usePrefetchStreamSummaries(
   }, [selectionIdentity, userId, queryClient]);
 }
 
-function ElevationPlot({
-  profile,
-  height = 118,
-}: {
-  profile: ElevationProfile;
-  height?: number;
-}) {
-  const units = useDisplayUnits();
-  const plot = useMemo(() => {
-    const { altitude, distance } = profile;
-    const start = distance[0]!;
-    const total = distance[distance.length - 1]! - start;
-    const shortMetricProfile = units === 'metric' && total < 1000;
-    const axisUnit = shortMetricProfile
-      ? 'm'
-      : measurementUnit('distance', units);
-    const distanceUnit = shortMetricProfile
-      ? 1
-      : measurementScale('distance', units);
-    const axisTotal = total / distanceUnit;
-    let min = Infinity;
-    let max = -Infinity;
-    for (const value of altitude) {
-      min = Math.min(min, value);
-      max = Math.max(max, value);
-    }
-    const rows = altitude.map((value, index) => ({
-      distance: (distance[index]! - start) / distanceUnit,
-      altitude: value,
-    }));
-    const distanceFormat = new Intl.NumberFormat(undefined, {
-      maximumFractionDigits: 2,
-    });
-    const padding = Math.max((max - min) * 0.08, 1);
-    const definition = defineChart({
-      marks: [
-        areaY(rows, {
-          x: 'distance',
-          y1: min,
-          y2: 'altitude',
-          fill: 'hsl(var(--primary))',
-          fillOpacity: 0.12,
-        }),
-        lineY(rows, {
-          x: 'distance',
-          y: 'altitude',
-          stroke: 'hsl(var(--primary))',
-          strokeWidth: 1.5,
-        }),
-      ],
-      scales: {
-        x: {
-          scale: scaleLinear().domain([0, axisTotal]),
-          axis: {
-            line: false,
-            ticks: {
-              count: 3,
-              size: 4,
-              format: (value: number) =>
-                value === 0
-                  ? '0'
-                  : `${distanceFormat.format(value)} ${axisUnit}`,
-            },
-            tickLabels: { fontSize: 12 },
-          },
-        },
-        y: {
-          scale: scaleLinear().domain([min - padding, max + padding]),
-          grid: { strokeDasharray: '3 4', strokeOpacity: 0.2 },
-          axis: {
-            line: false,
-            ticks: {
-              values: min === max ? [min] : [min, max],
-              size: 0,
-              format: (value: number) =>
-                formatMeasurement(value, 'elevation', units),
-            },
-            tickLabels: { fontSize: 12, thin: false },
-          },
-        },
-      },
-    });
-    return {
-      min,
-      max,
-      total,
-      definition,
-    };
-  }, [profile, units]);
-
-  return (
-    <Chart
-      definition={plot.definition}
-      height={height}
-      initialWidth={304}
-      className="w-full text-muted-foreground"
-      ariaLabel={`Elevation profile from ${formatMeasurement(plot.min, 'elevation', units)} to ${formatMeasurement(plot.max, 'elevation', units)} over ${formatMeasurement(plot.total, 'distance', units)}`}
-    />
-  );
-}
-
 export function ElevationChart({
   activityId,
   userId,
@@ -226,6 +117,7 @@ export function ElevationChart({
   userId: string;
   streamMetadata?: StreamMetadata;
 }) {
+  const owner = useId();
   const queryClient = useQueryClient();
   const [retryClock, setRetryClock] = useState(() => Date.now());
   const queryKey = streamSummaryQueryKey(userId, activityId);
@@ -259,8 +151,7 @@ export function ElevationChart({
   }, [activityId, queryClient, streamMetadata, userId]);
 
   useEffect(() => {
-    const retryAt =
-      query.data?.status === 'paused' ? query.data.retryAt : null;
+    const retryAt = query.data?.status === 'paused' ? query.data.retryAt : null;
     if (retryAt === null) return;
     const now = Date.now();
     const remaining = retryAt - now;
@@ -284,20 +175,39 @@ export function ElevationChart({
       ? toElevationProfile({ metadata: data.metadata, summary: data.summary })
       : null;
   }, [query.data, streamMetadata]);
-  const height = 135;
+  useEffect(
+    () => () => useElevationCursor.getState().clearCursor(owner),
+    [owner, profile, activityId, userId],
+  );
+  const height = 165;
   const canRetry = canManuallyRetryStreamSummary(query.data, retryClock);
 
   return (
-    <section
-      className="border-t pt-3 @2xl:border-t-0 @2xl:pt-0"
-      aria-label="Elevation profile"
-    >
-      <h3 className="mb-2 text-sm font-semibold">Elevation profile</h3>
+    <section aria-label="Elevation profile">
       {/* Every state takes the chart's height so the card never resizes. */}
       <div style={{ height }}>
         {profile ? (
           // Keep showing the last profile while it revalidates in the background.
-          <ElevationPlot profile={profile} height={height} />
+          <ElevationPlot
+            key={`${userId}:${activityId}:${query.data?.metadata?.generation}:${query.data?.metadata?.revision}`}
+            profile={profile}
+            height={height}
+            onSelection={(index) => {
+              const coordinate =
+                index === null ? undefined : profile.latlng?.[index];
+              if (coordinate && query.data) {
+                useElevationCursor.getState().setCursor({
+                  owner,
+                  userId,
+                  activityId,
+                  coordinate,
+                  source: query.data,
+                });
+              } else {
+                useElevationCursor.getState().clearCursor(owner);
+              }
+            }}
+          />
         ) : query.isError ||
           query.data?.status === 'failed' ||
           query.data?.status === 'paused' ? (

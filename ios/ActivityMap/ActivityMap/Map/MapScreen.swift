@@ -97,6 +97,18 @@ struct MapScreen: View {
             RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
                         selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
 
+            if picker.isPresented, picker.detailID == store.activeActivityID,
+               let coordinate = store.elevationCoordinate {
+                CircleAnnotationGroup {
+                    CircleAnnotation(centerCoordinate: coordinate)
+                        .circleRadius(6)
+                        .circleColor(UIColor(AppTheme.accent).resolvedColor(with: UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)))
+                        .circleStrokeColor(.white)
+                        .circleStrokeWidth(2)
+                }
+                .circleEmissiveStrength(1)
+            }
+
             routeInteraction(proxy: proxy)
             TapInteraction { context in
                 if let map = proxy.map { picker.pick(at: context.point, map: map, store: store) }
@@ -157,12 +169,13 @@ struct MapScreen: View {
             // invalidate a queued Show on map target before the renderer is ready.
             picker.reconcile(with: store)
             picker.showDetail(id, store: store)
-            picker.detent = .compact
+            picker.detent = .medium
         }
         if let action = context.pendingRequest?.action,
            action == .fitSelection || action == .fitFiltered {
-            // Explicit fits leave enough map space for the route and chrome.
-            picker.detent = .compact
+            // Keep the profile/results visible while leaving room for the route.
+            // A fully expanded phone sheet returns to its normal opening height.
+            picker.detent = .medium
         }
         let layout = MapResultsLayout.framing(size: geometry.size,
             topInset: max(topOcclusion, geometry.safeAreaInsets.top), bottomInset: geometry.safeAreaInsets.bottom,

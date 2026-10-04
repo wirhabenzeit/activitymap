@@ -83,9 +83,9 @@ extension RenderedRoutePickingTests {
             store.mapContext.request(.fitSelection)
             try await resultsWait { store.mapContext.pendingRequest == nil }
             try await Task.sleep(for: .milliseconds(650))
-            #expect(picker.detent == .compact)
+            #expect(picker.detent == .medium, "Explicit fits keep the results/profile open")
             let points = map.mapboxMap.points(for: activities[0].coordinates)
-            let layout = MapResultsLayout(size: host.view.bounds.size, topInset: 62, bottomInset: host.view.safeAreaInsets.bottom, detent: .compact)
+            let layout = MapResultsLayout(size: host.view.bounds.size, topInset: 62, bottomInset: host.view.safeAreaInsets.bottom, detent: .medium)
             if layout.isSidePanel {
                 #expect(points.allSatisfy { $0.x < layout.frame.minX }, "Fit must leave routes to the left of the right-hand panel")
             } else {

@@ -75,6 +75,7 @@ final class SyncController {
         invalidate: @escaping (String) -> Void
     ) {
         self.summaries = StreamSummaryLoader(source: summarySource, invalidate: invalidate)
+        activities.streamSummaries = self.summaries
         self.activities = activities
         self.now = now
         self.source = source

@@ -35,6 +35,24 @@ struct ActivityPresentationTests {
         #expect(rows.allSatisfy { $0.value != Formatters.unknown })
     }
 
+    @Test func groupedDetailsPreserveEveryRecordedFieldExactlyOnce() throws {
+        let activity = try StoredModelMapper.activity(Fixtures.activity([
+            "moving_time": 22320, "elapsed_time": 25140, "total_elevation_gain": 0,
+            "average_watts": NSNull(), "max_watts": 0, "elev_low": -12, "private": false,
+        ]))
+        let groups = ActivityMetricGroup.groups(for: activity)
+        let rows = groups.flatMap(\.rows)
+        let ids = rows.map(\.id)
+        let expected = Set(ActivityMetricRow.rows(for: activity).map(\.id))
+            .subtracting(["date", "distance", "movingTime", "elevationGain", "id"])
+        #expect(Set(ids) == expected)
+        #expect(Set(ids).count == ids.count)
+        #expect(groups.first { $0.id == "power" }?.rows.contains { $0.id == "maxWatts" && $0.value == Formatters.watts(0) } == true)
+        #expect(groups.first { $0.id == "activity" }?.rows.contains { $0.id == "privacy" && $0.value == "No" } == true)
+        #expect(rows.first { $0.id == "elevLow" }?.value == Formatters.elevation(-12))
+        #expect(!rows.contains { $0.id == "averageWatts" })
+    }
+
     @Test func activeNumericAndBooleanFiltersExcludeUnknownButIncludeZero() throws {
         let unknown = try StoredModelMapper.activity(Fixtures.activity([
             "id": "1", "distance": NSNull(), "elapsed_time": NSNull(), "total_elevation_gain": NSNull(),
