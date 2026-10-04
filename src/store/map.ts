@@ -16,6 +16,7 @@ export type MapState = {
   threeDim: boolean;
   showPhotos: boolean;
   uploadedGeoJson: GeoJSON.FeatureCollection | null;
+  routeFitRequest: { id: string; activityIDs: number[] } | null;
 };
 
 export type MapActions = {
@@ -26,10 +27,15 @@ export type MapActions = {
   setPosition: (position: ViewState, bbox: LngLatBounds) => void;
   hydrateMapState: (
     mapState: Partial<
-      Pick<MapState, 'baseMap' | 'overlayMaps' | 'position' | 'threeDim' | 'showPhotos'>
+      Pick<
+        MapState,
+        'baseMap' | 'overlayMaps' | 'position' | 'threeDim' | 'showPhotos'
+      >
     >,
   ) => void;
   setUploadedGeoJson: (geoJson: GeoJSON.FeatureCollection | null) => void;
+  requestRouteFit: (activityIDs: number[]) => void;
+  completeRouteFit: (id: string) => void;
 };
 
 export type MapSlice = MapState & MapActions;
@@ -41,9 +47,8 @@ export const createMapSlice: StateCreator<
   MapSlice
 > = (set) => ({
   // Initial state
-  baseMap:
-    ((Object.entries(baseMaps).find(([, map]) => map.visible)?.[0] ??
-      Object.keys(baseMaps)[0]) as keyof typeof baseMaps),
+  baseMap: (Object.entries(baseMaps).find(([, map]) => map.visible)?.[0] ??
+    Object.keys(baseMaps)[0]) as keyof typeof baseMaps,
   overlayMaps: Object.entries(overlayMaps)
     .filter(([, map]) => map.visible)
     .map(([_key]) => _key as keyof typeof overlayMaps),
@@ -52,8 +57,20 @@ export const createMapSlice: StateCreator<
   threeDim: false,
   showPhotos: false,
   uploadedGeoJson: null,
+  routeFitRequest: null,
 
   // Actions
+  requestRouteFit: (activityIDs) =>
+    set((state) => {
+      state.routeFitRequest = {
+        id: crypto.randomUUID(),
+        activityIDs: [...activityIDs],
+      };
+    }),
+  completeRouteFit: (id) =>
+    set((state) => {
+      if (state.routeFitRequest?.id === id) state.routeFitRequest = null;
+    }),
   togglePhotos: () =>
     set((state: RootState) => {
       state.showPhotos = !state.showPhotos;

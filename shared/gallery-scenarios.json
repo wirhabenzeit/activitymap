@@ -84,6 +84,13 @@
       "height": 1180,
       "dark": false,
       "largeText": false
+    },
+    {
+      "name": "wide",
+      "width": 1180,
+      "height": 820,
+      "dark": false,
+      "largeText": false
     }
   ]
 }

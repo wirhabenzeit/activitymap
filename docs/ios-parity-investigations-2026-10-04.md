@@ -14,6 +14,8 @@ Verify all five sport colours and ordinary/selected/active states on Standard da
 
 ## #275 — route fit followed by results/detail reveal
 
+Follow-up: [the route-framing review](route-framing-review.md) records the reproduced web defect, production fix, corrected capture readiness, matched screenshots and remaining native real-UI acceptance. The findings below describe the original investigation.
+
 Concrete findings:
 
 - The native gallery considers request consumption plus any viewport `.state` sufficient, ignores its map-idle timeout, then reveals the panel and waits a fixed 500 ms. This does not establish a successful intended fit or settled final geometry. Require navigation success, final panel stability and projected-route containment; surface readiness failures.

@@ -1,0 +1,1212 @@
+{
+  "captured": "2026-10-04",
+  "baseCommit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+  "afterSource": "Working changes in this PR; metadata commit is the base HEAD before committing.",
+  "captures": [
+    {
+      "file": "before-web-detail--phone.png",
+      "sha256": "435cca84ad154c19f12cdbff4db78d66519bf95dd01c5e177e83e7dbfd6073ab",
+      "metadata": {
+        "zoom": 12,
+        "padding": {
+          "top": 0,
+          "bottom": 0,
+          "left": 0,
+          "right": 0
+        },
+        "map": {
+          "x": 48,
+          "y": 56,
+          "width": 354,
+          "height": 818,
+          "top": 56,
+          "right": 402,
+          "bottom": 874,
+          "left": 48
+        },
+        "panel": {
+          "x": 56,
+          "y": 665,
+          "width": 338,
+          "height": 201,
+          "top": 665,
+          "right": 394,
+          "bottom": 866,
+          "left": 56
+        },
+        "total": 324,
+        "visible": 225,
+        "extent": {
+          "left": 97.45385955520636,
+          "right": 256.5461404442107,
+          "top": 95.74380560327373,
+          "bottom": 722.04017785466
+        }
+      }
+    },
+    {
+      "file": "after-web-detail--phone.jpg",
+      "sha256": "04948731e1fe771ad80cf6b6f2b55fff4c634eea32f827006488256addaa2e1a",
+      "metadata": {
+        "platform": "web",
+        "scene": "map-detail",
+        "title": "Map \u00b7 activity detail",
+        "order": 1,
+        "variant": "phone",
+        "width": 402,
+        "height": 874,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341
+        ],
+        "detailID": 20279947341,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "default",
+        "durationMs": 2703,
+        "framing": {
+          "contained": true,
+          "coverage": 0.9986295731772654,
+          "zoom": 11.73245938621818,
+          "padding": {
+            "top": 32,
+            "bottom": 265,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 48,
+            "y": 56,
+            "width": 354,
+            "height": 818,
+            "top": 56,
+            "right": 402,
+            "bottom": 874,
+            "left": 48
+          },
+          "panel": {
+            "x": 56,
+            "y": 633,
+            "width": 338,
+            "height": 233,
+            "top": 633,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "pointCount": 324
+        }
+      }
+    },
+    {
+      "file": "before-web-detail--small-large-text.png",
+      "sha256": "b80047e23418ed34a2f8a4393e8a0822eb34702c0665227c8d1651341acfd6c8",
+      "metadata": {
+        "zoom": 12,
+        "padding": {
+          "top": 0,
+          "bottom": 0,
+          "left": 0,
+          "right": 0
+        },
+        "map": {
+          "x": 72,
+          "y": 84,
+          "width": 303,
+          "height": 583,
+          "top": 84,
+          "right": 375,
+          "bottom": 667,
+          "left": 72
+        },
+        "panel": {
+          "x": 84,
+          "y": 316,
+          "width": 279,
+          "height": 339,
+          "top": 316,
+          "right": 363,
+          "bottom": 655,
+          "left": 84
+        },
+        "total": 324,
+        "visible": 150,
+        "extent": {
+          "left": 71.95385955537367,
+          "right": 231.04614044435368,
+          "top": -21.75619439686142,
+          "bottom": 604.5401778546928
+        }
+      }
+    },
+    {
+      "file": "after-web-detail--small-large-text.jpg",
+      "sha256": "77b10001417406cea4a5fbd7422e0a65d43b7e8d7e5ccbfb8e0a1f59ecf70279",
+      "metadata": {
+        "platform": "web",
+        "scene": "map-detail",
+        "title": "Map \u00b7 activity detail",
+        "order": 1,
+        "variant": "small-large-text",
+        "width": 375,
+        "height": 667,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341
+        ],
+        "detailID": 20279947341,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "150% browser text",
+        "durationMs": 2605,
+        "framing": {
+          "contained": true,
+          "coverage": 0.9986295731770959,
+          "zoom": 9.707319823939677,
+          "padding": {
+            "top": 32,
+            "bottom": 423,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 72,
+            "y": 84,
+            "width": 303,
+            "height": 583,
+            "top": 84,
+            "right": 375,
+            "bottom": 667,
+            "left": 72
+          },
+          "panel": {
+            "x": 84,
+            "y": 268,
+            "width": 279,
+            "height": 387,
+            "top": 268,
+            "right": 363,
+            "bottom": 655,
+            "left": 84
+          },
+          "pointCount": 324
+        }
+      }
+    },
+    {
+      "file": "web-map-results--wide.jpg",
+      "sha256": "fe2cf1965e58f6f9f164042794b92ea48d0e430392da07c26de5f628834af8aa",
+      "metadata": {
+        "platform": "web",
+        "scene": "map-results",
+        "title": "Map \u00b7 four selected routes",
+        "order": 0,
+        "variant": "wide",
+        "width": 1180,
+        "height": 820,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "detailID": null,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "default",
+        "durationMs": 2709,
+        "framing": {
+          "contained": true,
+          "coverage": 0.999778304919499,
+          "zoom": 10.347788985567963,
+          "padding": {
+            "top": 32,
+            "bottom": 300,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 256,
+            "y": 56,
+            "width": 924,
+            "height": 764,
+            "top": 56,
+            "right": 1180,
+            "bottom": 820,
+            "left": 256
+          },
+          "panel": {
+            "x": 392,
+            "y": 544,
+            "width": 768,
+            "height": 256,
+            "top": 544,
+            "right": 1160,
+            "bottom": 800,
+            "left": 392
+          },
+          "pointCount": 1207
+        }
+      }
+    },
+    {
+      "file": "native-map-detail--wide.jpg",
+      "sha256": "0b1bb96ce458f8744507aa5235d6b02efae6e7d56cba84eb067e33577beb664e",
+      "metadata": {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryL",
+        "dark": false,
+        "detailID": 20279947341,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "none",
+          "paddedVisibleRect": "{{16, 56}, {446.60666666666657, 542}}",
+          "routeContained": true,
+          "routePointCount": 324,
+          "zoom": 11.748
+        },
+        "height": 820,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 2,
+        "scene": "map-detail",
+        "search": "",
+        "selectedIDs": [
+          20279947341
+        ],
+        "title": "Map \u00b7 activity detail",
+        "variant": "wide",
+        "width": 1180
+      }
+    },
+    {
+      "file": "native-map-results--small-large-text.jpg",
+      "sha256": "b994708777fc76b1930f392c41b7800f456ed36e9671dd56dac5be7c847413a9",
+      "metadata": {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryAccessibilityXL",
+        "dark": false,
+        "detailID": null,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "{{8, 255.79999999999995}, {359, 287.20000000000005}}",
+          "paddedVisibleRect": "{{16, 56}, {287, 119}}",
+          "routeContained": true,
+          "routePointCount": 1207,
+          "zoom": 8.472
+        },
+        "height": 667,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 1,
+        "scene": "map-results",
+        "search": "",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "title": "Map \u00b7 four selected routes",
+        "variant": "small-large-text",
+        "width": 375
+      }
+    },
+    {
+      "file": "native-map-detail--phone.jpg",
+      "sha256": "e4994f57e9a99bb5fad98d32a46539a5ce8d3c9d0c8c2b940fcf65a9cb64e95a",
+      "metadata": {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryL",
+        "dark": false,
+        "detailID": 20279947341,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "{{8, 429.29353233830852}, {386, 320.70646766169148}}",
+          "paddedVisibleRect": "{{16, 56}, {314, 318.95999999999998}}",
+          "routeContained": true,
+          "routePointCount": 324,
+          "zoom": 10.952
+        },
+        "height": 874,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 2,
+        "scene": "map-detail",
+        "search": "",
+        "selectedIDs": [
+          20279947341
+        ],
+        "title": "Map \u00b7 activity detail",
+        "variant": "phone",
+        "width": 402
+      }
+    }
+  ],
+  "finalMatrices": {
+    "web": [
+      {
+        "platform": "web",
+        "scene": "map-detail",
+        "title": "Map \u00b7 activity detail",
+        "order": 1,
+        "variant": "phone",
+        "width": 402,
+        "height": 874,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341
+        ],
+        "detailID": 20279947341,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "default",
+        "durationMs": 2703,
+        "framing": {
+          "contained": true,
+          "coverage": 0.9986295731772654,
+          "zoom": 11.73245938621818,
+          "padding": {
+            "top": 32,
+            "bottom": 265,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 48,
+            "y": 56,
+            "width": 354,
+            "height": 818,
+            "top": 56,
+            "right": 402,
+            "bottom": 874,
+            "left": 48
+          },
+          "panel": {
+            "x": 56,
+            "y": 633,
+            "width": 338,
+            "height": 233,
+            "top": 633,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "pointCount": 324
+        }
+      },
+      {
+        "platform": "web",
+        "scene": "map-detail",
+        "title": "Map \u00b7 activity detail",
+        "order": 1,
+        "variant": "small-large-text",
+        "width": 375,
+        "height": 667,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341
+        ],
+        "detailID": 20279947341,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "150% browser text",
+        "durationMs": 2605,
+        "framing": {
+          "contained": true,
+          "coverage": 0.9986295731770959,
+          "zoom": 9.707319823939677,
+          "padding": {
+            "top": 32,
+            "bottom": 423,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 72,
+            "y": 84,
+            "width": 303,
+            "height": 583,
+            "top": 84,
+            "right": 375,
+            "bottom": 667,
+            "left": 72
+          },
+          "panel": {
+            "x": 84,
+            "y": 268,
+            "width": 279,
+            "height": 387,
+            "top": 268,
+            "right": 363,
+            "bottom": 655,
+            "left": 84
+          },
+          "pointCount": 324
+        }
+      },
+      {
+        "platform": "web",
+        "scene": "map-detail",
+        "title": "Map \u00b7 activity detail",
+        "order": 1,
+        "variant": "tablet",
+        "width": 820,
+        "height": 1180,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341
+        ],
+        "detailID": 20279947341,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "default",
+        "durationMs": 2717,
+        "framing": {
+          "contained": true,
+          "coverage": 0.9986295731770117,
+          "zoom": 12.399063343110946,
+          "padding": {
+            "top": 32,
+            "bottom": 265,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 256,
+            "y": 56,
+            "width": 564,
+            "height": 1124,
+            "top": 56,
+            "right": 820,
+            "bottom": 1180,
+            "left": 256
+          },
+          "panel": {
+            "x": 264,
+            "y": 939,
+            "width": 548,
+            "height": 233,
+            "top": 939,
+            "right": 812,
+            "bottom": 1172,
+            "left": 264
+          },
+          "pointCount": 324
+        }
+      },
+      {
+        "platform": "web",
+        "scene": "map-detail",
+        "title": "Map \u00b7 activity detail",
+        "order": 1,
+        "variant": "wide",
+        "width": 1180,
+        "height": 820,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341
+        ],
+        "detailID": 20279947341,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "default",
+        "durationMs": 2717,
+        "framing": {
+          "contained": true,
+          "coverage": 0.9986295731771396,
+          "zoom": 11.537042559025734,
+          "padding": {
+            "top": 32,
+            "bottom": 277,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 256,
+            "y": 56,
+            "width": 924,
+            "height": 764,
+            "top": 56,
+            "right": 1180,
+            "bottom": 820,
+            "left": 256
+          },
+          "panel": {
+            "x": 392,
+            "y": 567,
+            "width": 768,
+            "height": 233,
+            "top": 567,
+            "right": 1160,
+            "bottom": 800,
+            "left": 392
+          },
+          "pointCount": 324
+        }
+      },
+      {
+        "platform": "web",
+        "scene": "map-results",
+        "title": "Map \u00b7 four selected routes",
+        "order": 0,
+        "variant": "phone",
+        "width": 402,
+        "height": 874,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "detailID": null,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "default",
+        "durationMs": 3689,
+        "framing": {
+          "contained": true,
+          "coverage": 0.9997783049194775,
+          "zoom": 8.69571228898827,
+          "padding": {
+            "top": 32,
+            "bottom": 248,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 48,
+            "y": 56,
+            "width": 354,
+            "height": 818,
+            "top": 56,
+            "right": 402,
+            "bottom": 874,
+            "left": 48
+          },
+          "panel": {
+            "x": 56,
+            "y": 650,
+            "width": 338,
+            "height": 216,
+            "top": 650,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "pointCount": 1207
+        }
+      },
+      {
+        "platform": "web",
+        "scene": "map-results",
+        "title": "Map \u00b7 four selected routes",
+        "order": 0,
+        "variant": "small-large-text",
+        "width": 375,
+        "height": 667,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "detailID": null,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "150% browser text",
+        "durationMs": 2619,
+        "framing": {
+          "contained": true,
+          "coverage": 0.9997783049194292,
+          "zoom": 8.388622703076539,
+          "padding": {
+            "top": 32,
+            "bottom": 358,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 72,
+            "y": 84,
+            "width": 303,
+            "height": 583,
+            "top": 84,
+            "right": 375,
+            "bottom": 667,
+            "left": 72
+          },
+          "panel": {
+            "x": 84,
+            "y": 333,
+            "width": 279,
+            "height": 322,
+            "top": 333,
+            "right": 363,
+            "bottom": 655,
+            "left": 84
+          },
+          "pointCount": 1207
+        }
+      },
+      {
+        "platform": "web",
+        "scene": "map-results",
+        "title": "Map \u00b7 four selected routes",
+        "order": 0,
+        "variant": "tablet",
+        "width": 820,
+        "height": 1180,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "detailID": null,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "default",
+        "durationMs": 2759,
+        "framing": {
+          "contained": true,
+          "coverage": 0.9997783049194497,
+          "zoom": 9.535247616795024,
+          "padding": {
+            "top": 32,
+            "bottom": 248,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 256,
+            "y": 56,
+            "width": 564,
+            "height": 1124,
+            "top": 56,
+            "right": 820,
+            "bottom": 1180,
+            "left": 256
+          },
+          "panel": {
+            "x": 264,
+            "y": 956,
+            "width": 548,
+            "height": 216,
+            "top": 956,
+            "right": 812,
+            "bottom": 1172,
+            "left": 264
+          },
+          "pointCount": 1207
+        }
+      },
+      {
+        "platform": "web",
+        "scene": "map-results",
+        "title": "Map \u00b7 four selected routes",
+        "order": 0,
+        "variant": "wide",
+        "width": 1180,
+        "height": 820,
+        "dark": false,
+        "library": "/Users/dominik/.codex/worktrees/b65b/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "detailID": null,
+        "search": "",
+        "basemap": "mapbox",
+        "contentSize": "default",
+        "durationMs": 2709,
+        "framing": {
+          "contained": true,
+          "coverage": 0.999778304919499,
+          "zoom": 10.347788985567963,
+          "padding": {
+            "top": 32,
+            "bottom": 300,
+            "left": 24,
+            "right": 64
+          },
+          "map": {
+            "x": 256,
+            "y": 56,
+            "width": 924,
+            "height": 764,
+            "top": 56,
+            "right": 1180,
+            "bottom": 820,
+            "left": 256
+          },
+          "panel": {
+            "x": 392,
+            "y": 544,
+            "width": 768,
+            "height": 256,
+            "top": 544,
+            "right": 1160,
+            "bottom": 800,
+            "left": 392
+          },
+          "pointCount": 1207
+        }
+      }
+    ],
+    "native": [
+      {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryL",
+        "dark": false,
+        "detailID": 20279947341,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "{{8, 429.29353233830852}, {386, 320.70646766169148}}",
+          "paddedVisibleRect": "{{16, 56}, {314, 318.95999999999998}}",
+          "routeContained": true,
+          "routePointCount": 324,
+          "zoom": 10.952
+        },
+        "height": 874,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 2,
+        "scene": "map-detail",
+        "search": "",
+        "selectedIDs": [
+          20279947341
+        ],
+        "title": "Map \u00b7 activity detail",
+        "variant": "phone",
+        "width": 402
+      },
+      {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryAccessibilityXL",
+        "dark": false,
+        "detailID": 20279947341,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "{{8, 255.79999999999995}, {359, 287.20000000000005}}",
+          "paddedVisibleRect": "{{16, 56}, {287, 119}}",
+          "routeContained": true,
+          "routePointCount": 324,
+          "zoom": 9.396
+        },
+        "height": 667,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 2,
+        "scene": "map-detail",
+        "search": "",
+        "selectedIDs": [
+          20279947341
+        ],
+        "title": "Map \u00b7 activity detail",
+        "variant": "small-large-text",
+        "width": 375
+      },
+      {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryL",
+        "dark": false,
+        "detailID": 20279947341,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "{{-180.33333333333331, 730}, {540, 300}}",
+          "paddedVisibleRect": "{{16, 56}, {411.66666666666669, 484.20000000000005}}",
+          "routeContained": true,
+          "routePointCount": 324,
+          "zoom": 11.58
+        },
+        "height": 1180,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 2,
+        "scene": "map-detail",
+        "search": "",
+        "selectedIDs": [
+          20279947341
+        ],
+        "title": "Map \u00b7 activity detail",
+        "variant": "tablet",
+        "width": 820
+      },
+      {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryL",
+        "dark": false,
+        "detailID": 20279947341,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "none",
+          "paddedVisibleRect": "{{16, 56}, {446.60666666666657, 542}}",
+          "routeContained": true,
+          "routePointCount": 324,
+          "zoom": 11.748
+        },
+        "height": 820,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 2,
+        "scene": "map-detail",
+        "search": "",
+        "selectedIDs": [
+          20279947341
+        ],
+        "title": "Map \u00b7 activity detail",
+        "variant": "wide",
+        "width": 1180
+      },
+      {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryL",
+        "dark": false,
+        "detailID": null,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "{{8, 398.56716417910445}, {386, 351.43283582089555}}",
+          "paddedVisibleRect": "{{16, 56}, {314, 318.95999999999998}}",
+          "routeContained": true,
+          "routePointCount": 1207,
+          "zoom": 8.86
+        },
+        "height": 874,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 1,
+        "scene": "map-results",
+        "search": "",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "title": "Map \u00b7 four selected routes",
+        "variant": "phone",
+        "width": 402
+      },
+      {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryAccessibilityXL",
+        "dark": false,
+        "detailID": null,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "{{8, 255.79999999999995}, {359, 287.20000000000005}}",
+          "paddedVisibleRect": "{{16, 56}, {287, 119}}",
+          "routeContained": true,
+          "routePointCount": 1207,
+          "zoom": 8.472
+        },
+        "height": 667,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 1,
+        "scene": "map-results",
+        "search": "",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "title": "Map \u00b7 four selected routes",
+        "variant": "small-large-text",
+        "width": 375
+      },
+      {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryL",
+        "dark": false,
+        "detailID": null,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "{{-180.33333333333331, 698}, {540, 332}}",
+          "paddedVisibleRect": "{{16, 56}, {411.66666666666669, 484.20000000000005}}",
+          "routeContained": true,
+          "routePointCount": 1207,
+          "zoom": 9.27
+        },
+        "height": 1180,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 1,
+        "scene": "map-results",
+        "search": "",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "title": "Map \u00b7 four selected routes",
+        "variant": "tablet",
+        "width": 820
+      },
+      {
+        "basemap": "mapbox",
+        "commit": "30623d3eaa1036e3f8af7833086858e1e3f6d6da",
+        "contentSize": "UICTContentSizeCategoryL",
+        "dark": false,
+        "detailID": null,
+        "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+        "framing": {
+          "cameraSettled": true,
+          "nativePanelFrame": "none",
+          "paddedVisibleRect": "{{16, 56}, {446.60666666666657, 542}}",
+          "routeContained": true,
+          "routePointCount": 1207,
+          "zoom": 9.392
+        },
+        "height": 820,
+        "library": "curated",
+        "listMetrics": "distance,elapsedTime,elevationGain",
+        "listOptions": false,
+        "listView": "columns",
+        "order": 1,
+        "scene": "map-results",
+        "search": "",
+        "selectedIDs": [
+          20279947341,
+          20270725942,
+          20244330171,
+          20265394210
+        ],
+        "title": "Map \u00b7 four selected routes",
+        "variant": "wide",
+        "width": 1180
+      }
+    ]
+  },
+  "webBeforeMetrics": {
+    "phone": {
+      "zoom": 12,
+      "padding": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "map": {
+        "x": 48,
+        "y": 56,
+        "width": 354,
+        "height": 818,
+        "top": 56,
+        "right": 402,
+        "bottom": 874,
+        "left": 48
+      },
+      "panel": {
+        "x": 56,
+        "y": 665,
+        "width": 338,
+        "height": 201,
+        "top": 665,
+        "right": 394,
+        "bottom": 866,
+        "left": 56
+      },
+      "total": 324,
+      "visible": 225,
+      "extent": {
+        "left": 97.45385955520636,
+        "right": 256.5461404442107,
+        "top": 95.74380560327373,
+        "bottom": 722.04017785466
+      }
+    },
+    "small-large-text": {
+      "zoom": 12,
+      "padding": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "map": {
+        "x": 72,
+        "y": 84,
+        "width": 303,
+        "height": 583,
+        "top": 84,
+        "right": 375,
+        "bottom": 667,
+        "left": 72
+      },
+      "panel": {
+        "x": 84,
+        "y": 316,
+        "width": 279,
+        "height": 339,
+        "top": 316,
+        "right": 363,
+        "bottom": 655,
+        "left": 84
+      },
+      "total": 324,
+      "visible": 150,
+      "extent": {
+        "left": 71.95385955537367,
+        "right": 231.04614044435368,
+        "top": -21.75619439686142,
+        "bottom": 604.5401778546928
+      }
+    },
+    "tablet": {
+      "zoom": 12,
+      "padding": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "map": {
+        "x": 256,
+        "y": 56,
+        "width": 564,
+        "height": 1124,
+        "top": 56,
+        "right": 820,
+        "bottom": 1180,
+        "left": 256
+      },
+      "panel": {
+        "x": 264,
+        "y": 971,
+        "width": 548,
+        "height": 201,
+        "top": 971,
+        "right": 812,
+        "bottom": 1172,
+        "left": 264
+      },
+      "total": 324,
+      "visible": 324,
+      "extent": {
+        "left": 202.45385955519805,
+        "right": 361.5461404442363,
+        "top": 248.74380560320043,
+        "bottom": 875.0401778546375
+      }
+    },
+    "wide": {
+      "zoom": 12,
+      "padding": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "map": {
+        "x": 256,
+        "y": 56,
+        "width": 924,
+        "height": 764,
+        "top": 56,
+        "right": 1180,
+        "bottom": 820,
+        "left": 256
+      },
+      "panel": {
+        "x": 392,
+        "y": 599,
+        "width": 768,
+        "height": 201,
+        "top": 599,
+        "right": 1160,
+        "bottom": 800,
+        "left": 392
+      },
+      "total": 324,
+      "visible": 208,
+      "extent": {
+        "left": 382.4538595553676,
+        "right": 541.5461404442163,
+        "top": 68.7438056032071,
+        "bottom": 695.0401778546719
+      }
+    }
+  }
+}

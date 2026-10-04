@@ -49,28 +49,66 @@ try {
       const page = await context.newPage();
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
-      const response = await page.goto(new URL(s.webPath, base).toString(), { waitUntil: 'domcontentloaded', timeout: 120_000 });
+      // Detail follows the real List → Show on map action, including navigation.
+      const response = await page.goto(new URL(s.id === 'map-detail' ? '/list' : s.webPath, base).toString(), { waitUntil: 'domcontentloaded', timeout: 120_000 });
       assert(response?.ok(), `Navigation failed for ${s.id}: ${response?.status()}`);
       await page.waitForFunction(() => window.__ACTIVITYMAP_GALLERY_READY__ === true, undefined, { timeout: 30_000 });
       // Browser text scaling is an accessibility stress case, not an exact
       // equivalent of iOS Dynamic Type. Both are labelled in capture metadata.
       if (v.largeText) await page.addStyleTag({ content: 'html { font-size: 24px !important; }' });
       await page.addStyleTag({ content: 'nextjs-portal, .tsqd-parent-container { display: none !important; }' });
+      let framing;
       if (s.webPath === '/map') {
+        if (s.id === 'map-detail') {
+          const activity = activities.find((a) => Number(a.id) === s.detailID);
+          await page.getByRole('button', { name: `Show ${activity.name} on map`, exact: true }).click();
+        }
         await page.waitForFunction(() => !!window.__ACTIVITYMAP_GALLERY_MAP__, undefined, { timeout: 30_000 });
-        if (s.selectedIDs.length) {
-          const points = activities.filter((a) => s.selectedIDs.includes(Number(a.id)))
-            .flatMap((a) => polyline.decode(a.map_polyline || a.map_summary_polyline || ''));
-          assert(points.length, `No route geometry for ${s.id}`);
-          const lats = points.map((p) => p[0]), lngs = points.map((p) => p[1]);
-          await page.evaluate(({ bounds, height }) => window.__ACTIVITYMAP_GALLERY_MAP__.fitBounds(bounds,
-            { duration: 0, padding: { top: 32, left: 32, right: 32, bottom: Math.round(height * 0.4) } }),
-          { bounds: [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], height: v.height });
+        if (s.id === 'map-results') {
+          await page.getByRole('button', { name: 'Fit selected routes', exact: true }).click();
         }
         await page.waitForFunction(() => {
           const map = window.__ACTIVITYMAP_GALLERY_MAP__;
-          return map?.loaded() && map.areTilesLoaded() && !map.isMoving();
+          return map?.loaded() && map.areTilesLoaded() && !map.isMoving()
+            && !document.querySelector('[data-route-fit="pending"]');
         }, undefined, { timeout: 30_000 });
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+          let previous = '', stableSince = performance.now();
+          const started = performance.now();
+          await new Promise((resolve, reject) => {
+            function check() {
+              const map = window.__ACTIVITYMAP_GALLERY_MAP__;
+              const frame = JSON.stringify([map.getCenter(), map.getZoom(), map.getPadding(),
+                map.getContainer().getBoundingClientRect(), document.querySelector('#map-route-panel')?.getBoundingClientRect()]);
+              if (frame !== previous) { previous = frame; stableSince = performance.now(); }
+              if (performance.now() - stableSince >= 350) resolve();
+              else if (performance.now() - started > 10000) reject(new Error('Map/panel geometry did not settle'));
+              else requestAnimationFrame(check);
+            }
+            check();
+          });
+        });
+        if (s.selectedIDs.length) {
+          const points = activities.filter((a) => s.selectedIDs.includes(Number(a.id)))
+            .flatMap((a) => polyline.decode(a.map_summary_polyline || a.map_polyline || '').map(([lat, lng]) => [lng, lat]));
+          assert(points.length, `No route geometry for ${s.id}`);
+          framing = await page.evaluate((coordinates) => {
+            const map = window.__ACTIVITYMAP_GALLERY_MAP__;
+            const rect = map.getContainer().getBoundingClientRect();
+            const panel = document.querySelector('#map-route-panel').getBoundingClientRect();
+            const projected = coordinates.map((coordinate) => map.project(coordinate));
+            const contained = projected.every((p) => p.x >= 16 && p.x <= rect.width - 16 && p.y >= 16 && p.y <= rect.height - 16
+              && !(p.x + rect.x > panel.left - 16 && p.x + rect.x < panel.right + 16 && p.y + rect.y > panel.top - 16 && p.y + rect.y < panel.bottom + 16));
+            const padding = map.getPadding();
+            const coverage = Math.max(
+              (Math.max(...projected.map(p => p.x)) - Math.min(...projected.map(p => p.x))) / (rect.width - padding.left - padding.right),
+              (Math.max(...projected.map(p => p.y)) - Math.min(...projected.map(p => p.y))) / (rect.height - padding.top - padding.bottom));
+            return { contained, coverage, zoom: map.getZoom(), padding, map: rect.toJSON(), panel: panel.toJSON(), pointCount: projected.length };
+          }, points);
+          assert(framing.contained, `Route is clipped or covered in ${s.id}/${v.name}: ${JSON.stringify(framing)}`);
+          assert(framing.coverage > 0.6 || framing.zoom >= 15.99, `Route was not fitted in ${s.id}/${v.name}: ${JSON.stringify(framing)}`);
+        }
       } else {
         await page.getByRole('button', { name: 'Select row', exact: true }).first().waitFor();
       }
@@ -95,6 +133,7 @@ try {
         fixtureHash, commit, selectedIDs: s.selectedIDs, detailID: s.detailID ?? null, search: s.search ?? '',
         basemap: 'mapbox', contentSize: v.largeText ? '150% browser text' : 'default',
         durationMs: Date.now() - started,
+        framing,
       }, null, 2));
       console.log(`captured ${stem} (${Date.now() - started} ms)`);
     } finally { await context.close(); }

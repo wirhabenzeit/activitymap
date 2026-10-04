@@ -35,12 +35,12 @@ import { EditActivity } from './edit';
 import { useState } from 'react';
 import { cn } from '~/lib/utils';
 import { formatLocalDate, formatLocalTime } from '~/lib/local-date-time';
-import { LngLatBounds } from 'mapbox-gl';
 import { useShallowStore } from '~/store';
 import { PhotoLightbox } from './photo';
 import { ElevationChart } from './elevation-chart';
 import { RouteDetailsContent } from './route-details-content';
 import { useRouter } from 'next/navigation';
+import { routeBounds, routeCoordinates } from '~/lib/route-framing';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -436,44 +436,42 @@ export function ActivityCard({
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { highlighted, setHighlighted, isGuest, setPosition, setSelected } =
-    useShallowStore((state) => ({
-      highlighted: state.highlighted,
-      setHighlighted: state.setHighlighted,
-      isGuest: state.isGuest,
-      setPosition: state.setPosition,
-      setSelected: state.setSelected,
-    }));
+  const {
+    highlighted,
+    setHighlighted,
+    isGuest,
+    requestRouteFit,
+    setSelected,
+    addNotification,
+  } = useShallowStore((state) => ({
+    highlighted: state.highlighted,
+    setHighlighted: state.setHighlighted,
+    isGuest: state.isGuest,
+    requestRouteFit: state.requestRouteFit,
+    setSelected: state.setSelected,
+    addNotification: state.addNotification,
+  }));
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
 
   const handleMapClick = () => {
-    const bbox = row.original.map_bbox;
-    if (!bbox || bbox.length < 4) return;
-    const bounds = new LngLatBounds(
-      [bbox[0], bbox[1]] as [number, number],
-      [bbox[2], bbox[3]] as [number, number],
-    );
-    const center = bounds.getCenter();
-    setPosition(
-      {
-        longitude: center.lng,
-        latitude: center.lat,
-        zoom: 12,
-        bearing: 0,
-        pitch: 0,
-        padding: { top: 0, bottom: 0, left: 0, right: 0 },
-      },
-      bounds,
-    );
+    if (!routeBounds(routeCoordinates(row.original))) {
+      addNotification({
+        type: 'info',
+        title: 'Map camera',
+        message: 'This activity has no GPS route to frame.',
+      });
+      return;
+    }
     setSelected((selected) =>
       selected.includes(row.original.id)
         ? selected
         : [...selected, row.original.id],
     );
     setHighlighted(row.original.id);
+    requestRouteFit([row.original.id]);
     router.push('/map');
   };
 
