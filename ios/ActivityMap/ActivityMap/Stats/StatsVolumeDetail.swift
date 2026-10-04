@@ -30,6 +30,8 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     private var averageLabel: String { "4-\(shownRange.period) average" }
     @ScaledMetric private var height = 240.0
     @ScaledMetric private var compactHeight = 110.0
+    /// Clears the leading y-axis labels for text drawn over the plot.
+    @ScaledMetric(relativeTo: .caption2) private var yAxisInset = 40.0
     private var sports: [ActivityCategory] {
         ActivityCategory.allCases.filter { sport in buckets.contains { ($0.bySport[sport] ?? 0) > 0 } }
     }
@@ -118,8 +120,9 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
             }
             ForEach(Array(trend.enumerated()), id: \.offset) { _, point in
                 if let index = buckets.firstIndex(where: { $0.start == point.x }) {
+                    // Neutral like the web; the collapsed chart names it in its top corner.
                     LineMark(x: .value("Period", Double(index)), y: .value("Average", point.y), series: .value("Line", "Average"))
-                        .foregroundStyle(AppTheme.accent.mix(with: .primary, by: progress)).lineStyle(.init(lineWidth: 1.5, dash: [4, 3]))
+                        .foregroundStyle(Color.secondary.mix(with: .primary, by: progress)).lineStyle(.init(lineWidth: 1.5, dash: [4, 3]))
                         .accessibilityLabel("\(averageLabel), \(label(point.x))")
                         .accessibilityValue(StatsDisplay.measurement(point.y, metric: metric))
                 }
@@ -152,6 +155,12 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
         .chartLegend(.hidden)
         .chartXSelection(value: $selectedX)
         .statsExpansionHeight(expanded: expanded, compact: compactHeight, detail: height)
+        .overlay(alignment: .topLeading) {
+            if !expanded && selected == nil && !trend.isEmpty {
+                Text("4-wk avg").font(.caption2).foregroundStyle(.secondary)
+                    .padding(.leading, yAxisInset).offset(y: -2).accessibilityHidden(true)
+            }
+        }
         .overlay(alignment: .topLeading) {
             if let selected, buckets.indices.contains(selected) {
                 let bucket = buckets[selected]
