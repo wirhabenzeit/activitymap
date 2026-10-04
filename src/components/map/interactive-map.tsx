@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
-import { Camera, Maximize2, Minimize2, Globe, X } from 'lucide-react';
+import { Camera, Maximize2, Minimize2, Globe, X, Scan } from 'lucide-react';
 import { columns } from '~/components/list/columns';
 import {
   ActivityCard,
@@ -28,7 +28,7 @@ import ReactMapGL, {
   type MapRef,
   type ViewState,
 } from 'react-map-gl/mapbox';
-import type { SkyLayer } from 'mapbox-gl';
+import { LngLat, type SkyLayer } from 'mapbox-gl';
 
 import { DataTable } from '~/components/list/data-table';
 
@@ -75,6 +75,11 @@ import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { LegacySharingDisabledNotice } from '~/components/map/legacy-sharing-disabled-notice';
 import { useSearchParams } from 'next/navigation';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
+import {
+  routeBounds,
+  routeCoordinates,
+  routeFitPadding,
+} from '~/lib/route-framing';
 
 type OverlayMapId = keyof typeof overlayMaps;
 
@@ -231,7 +236,8 @@ export default function InteractiveMap() {
   const onMouseLeave = useCallback(() => setCursor('auto'), []);
 
   // Fetch data via hooks
-  const { data: activities = [] } = useActivities();
+  const { data: activities = [], isPending: activitiesPending } =
+    useActivities();
   const { data: photos = [] } = usePhotos();
   const { filterIDs } = useFilteredActivities(activities);
 
@@ -267,6 +273,10 @@ export default function InteractiveMap() {
     isGuest,
     guestModeType,
     summaryUserId,
+    routeFitRequest,
+    requestRouteFit,
+    completeRouteFit,
+    addNotification,
   } = useShallowStore((state) => ({
     selected: state.selected,
     highlighted: state.highlighted,
@@ -285,6 +295,10 @@ export default function InteractiveMap() {
     uploadedGeoJson: state.uploadedGeoJson,
     isGuest: state.isGuest,
     guestModeType: state.guestMode.type,
+    routeFitRequest: state.routeFitRequest,
+    requestRouteFit: state.requestRouteFit,
+    completeRouteFit: state.completeRouteFit,
+    addNotification: state.addNotification,
     // Same conditions under which a route card shows its elevation profile.
     summaryUserId:
       !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
@@ -302,6 +316,8 @@ export default function InteractiveMap() {
   usePrefetchStreamSummaries(selectedSummaryActivities, summaryUserId);
   const { open } = useSidebar();
   const mapRefLoc = useRef<MapRef>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const columnFilters = [{ id: 'id', value: filterIDs }];
   const hydratedFromUrlRef = useRef(false);
 
@@ -316,7 +332,136 @@ export default function InteractiveMap() {
   const [viewport, setViewport] = useState(initialViewport);
   const hasAutoCenteredOnLatest = useRef(false);
   const hasExplicitInitialView =
-    sharedMapState.hasPositionRequest || !isDefaultViewState(mapPosition);
+    !!routeFitRequest ||
+    sharedMapState.hasPositionRequest ||
+    !isDefaultViewState(mapPosition);
+
+  useEffect(() => {
+    if (!routeFitRequest || !mapLoaded || activitiesPending) return;
+    const map = mapRefLoc.current?.getMap();
+    if (!map) return;
+    let frame = 0,
+      lastLayout = '',
+      stableSince = performance.now();
+    const started = performance.now();
+    const finish = (message?: string) => {
+      if (message)
+        addNotification({ type: 'info', title: 'Map camera', message });
+      completeRouteFit(routeFitRequest.id);
+    };
+    // A pending navigation must not override a gesture begun by the user.
+    const cancel = () => {
+      cancelAnimationFrame(frame);
+      finish();
+    };
+    const canvas = map.getCanvasContainer();
+    canvas.addEventListener('pointerdown', cancel, { once: true });
+    const fit = () => {
+      const rect = map.getContainer().getBoundingClientRect();
+      const panel = panelRef.current?.getBoundingClientRect();
+      const layout = JSON.stringify([rect.toJSON(), panel?.toJSON()]);
+      if (layout !== lastLayout) {
+        lastLayout = layout;
+        stableSince = performance.now();
+      }
+      const padding = routeFitPadding(
+        rect,
+        panel?.width && panel.height ? panel : null,
+      );
+      if (
+        !map.isStyleLoaded() ||
+        performance.now() - stableSince < 200 ||
+        !padding
+      ) {
+        if (performance.now() - started > 15000) {
+          finish(
+            'The map is not ready to frame this route. Try Fit routes once it has loaded.',
+          );
+        } else frame = requestAnimationFrame(fit);
+        return;
+      }
+      const targets = routeFitRequest.activityIDs.filter((id) =>
+        filterIDs.includes(id),
+      );
+      const bounds = routeBounds(
+        targets.flatMap((id) =>
+          activityDict[id] ? routeCoordinates(activityDict[id]) : [],
+        ),
+      );
+      if (!bounds) {
+        finish('These activities have no visible GPS route to frame.');
+        return;
+      }
+      // Read the destination geometry after the list-to-map navigation and
+      // panel/sidebar layout have settled. This request is consumed once;
+      // later panel expansion or resizing never moves the user's camera.
+      map.resize();
+      hasAutoCenteredOnLatest.current = true;
+      const camera = map.cameraForBounds(bounds, {
+        padding,
+        maxZoom: 16,
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      });
+      if (
+        !camera?.center ||
+        camera.zoom === undefined ||
+        !Number.isFinite(camera.zoom)
+      ) {
+        finish(
+          'The route could not be framed. Try again once the map has loaded.',
+        );
+        return;
+      }
+      const center = LngLat.convert(camera.center);
+      const target: ViewState = {
+        longitude: center.lng,
+        latitude: center.lat,
+        zoom: camera.zoom,
+        bearing: camera.bearing ?? map.getBearing(),
+        pitch: camera.pitch ?? map.getPitch(),
+        padding,
+      };
+      setViewport(target);
+      const record = () => {
+        // Controlled camera changes do not reliably emit onMoveEnd. Persist
+        // the fitted view only once React has applied it to the actual map.
+        const actual = map.getCenter();
+        const longitudeDelta = Math.abs(
+          ((actual.lng - target.longitude + 540) % 360) - 180,
+        );
+        const bounds = map.getBounds();
+        if (
+          bounds &&
+          Math.abs(map.getZoom() - target.zoom) < 0.0001 &&
+          Math.abs(actual.lat - target.latitude) < 0.0001 &&
+          longitudeDelta < 0.0001
+        ) {
+          setPosition(target, bounds);
+          finish();
+        } else if (performance.now() - started > 15000) {
+          finish(
+            'The camera did not finish framing this route. Please try again.',
+          );
+        } else frame = requestAnimationFrame(record);
+      };
+      frame = requestAnimationFrame(record);
+    };
+    frame = requestAnimationFrame(fit);
+    return () => {
+      cancelAnimationFrame(frame);
+      canvas.removeEventListener('pointerdown', cancel);
+    };
+  }, [
+    routeFitRequest,
+    mapLoaded,
+    activitiesPending,
+    activityDict,
+    filterIDs,
+    addNotification,
+    completeRouteFit,
+    setPosition,
+  ]);
 
   useEffect(() => {
     if (hydratedFromUrlRef.current || !sharedMapState.hasAnyMapParam) {
@@ -509,7 +654,10 @@ export default function InteractiveMap() {
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div
+      className="relative h-full w-full"
+      data-route-fit={routeFitRequest ? 'pending' : 'idle'}
+    >
       <ReactMapGL
         reuseMaps={true}
         ref={mapRefLoc}
@@ -527,8 +675,12 @@ export default function InteractiveMap() {
           }
         }}
         onLoad={() => {
+          setMapLoaded(true);
           tryAutoCenterOnLatestActivity();
-          if (process.env.NODE_ENV === 'development' && window.__ACTIVITYMAP_GALLERY__) {
+          if (
+            process.env.NODE_ENV === 'development' &&
+            window.__ACTIVITYMAP_GALLERY__
+          ) {
             window.__ACTIVITYMAP_GALLERY_MAP__ = mapRefLoc.current?.getMap();
           }
         }}
@@ -629,12 +781,30 @@ export default function InteractiveMap() {
         {showPhotos && <PhotoLayer />}
       </ReactMapGL>
       <div
+        ref={panelRef}
         id="map-route-panel"
         className={cn(
           'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,48rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
           { hidden: rows.length == 0 },
         )}
       >
+        {rows.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="self-end shrink-0"
+            onClick={() => {
+              setPanelExpanded(false);
+              requestRouteFit(selected);
+            }}
+            aria-label={
+              selected.length === 1 ? 'Fit route' : 'Fit selected routes'
+            }
+          >
+            <Scan aria-hidden="true" />
+            {selected.length === 1 ? 'Fit route' : 'Fit selected routes'}
+          </Button>
+        )}
         {selected.length > 1 && (
           <div className="flex items-center gap-1 border-b px-3 py-2 text-xs sm:gap-2">
             <span className="whitespace-nowrap font-semibold">

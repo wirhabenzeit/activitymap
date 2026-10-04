@@ -22,7 +22,7 @@ struct ScreenshotGalleryTests {
             let staged = try scene.stage(library.activities, scenario: scenario)
             let window = try GalleryWindow(root: staged.root, variant: variant)
             defer { window.close() }
-            try await window.settle(map: staged.usesMap, prepare: staged.prepare, reveal: staged.reveal, ready: staged.ready)
+            try await window.settle(staged)
             try window.save(scene: scene, variant: variant, library: library.source, scenario: scenario)
         }
     }
@@ -64,6 +64,8 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
         var reveal: @MainActor () -> Void = {}
         var prepare: @MainActor () -> Void = {}
         var ready: @MainActor () -> Bool = { true }
+        var coordinates: [CLLocationCoordinate2D] = []
+        var navigationError: @MainActor () -> String? = { nil }
     }
 
     @MainActor func stage(_ activities: [Activity], scenario: GalleryManifest.Scenario) throws -> Staged {
@@ -90,14 +92,16 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
                 store.replaceSelection(with: ids)
                 picker.reviewSelection(store: store)
                 store.mapContext.request(.fitSelection)
-            }, ready: { store.mapContext.pendingRequest == nil })
+            }, ready: { store.mapContext.pendingRequest == nil },
+                coordinates: activities.filter { ids.contains($0.id) }.flatMap(\.coordinates),
+                navigationError: { store.mapContext.navigationError })
         case .mapDetail:
             let id = try #require(scenario.detailID)
-            return Staged(root: shell(.map), usesMap: true, reveal: { picker.detent = .medium }, prepare: {
-                store.replaceSelection(with: [id])
-                picker.reviewSelection(store: store)
-                store.mapContext.request(.fitSelection)
-            }, ready: { store.mapContext.pendingRequest == nil })
+            return Staged(root: shell(.list), usesMap: true, reveal: { picker.detent = .medium }, prepare: {
+                store.showOnMap(id)
+            }, ready: { store.mapContext.pendingRequest == nil },
+                coordinates: activities.filter { $0.id == id }.flatMap(\.coordinates),
+                navigationError: { store.mapContext.navigationError })
         case .list:
             store.replaceSelection(with: scenario.selectedIDs)
             if GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LIST_OPTIONS"] == "1" {
@@ -137,6 +141,8 @@ private final class GalleryWindow {
     let oldWindow: UIWindow?
     let host: UIHostingController<AnyView>
     let previousToken: String
+    private var framing: [String: Any] = [:]
+    private var readinessDetail = ""
 
     init(root: AnyView, variant: GalleryVariant) throws {
         previousToken = MapboxOptions.accessToken
@@ -165,33 +171,83 @@ private final class GalleryWindow {
         MapboxOptions.accessToken = previousToken
     }
 
-    func settle(map usesMap: Bool, prepare: @MainActor () -> Void, reveal: @MainActor () -> Void, ready: @MainActor () -> Bool) async throws {
+    func settle(_ staged: GalleryScene.Staged) async throws {
         try await Task.sleep(for: .milliseconds(400))
-        guard usesMap else {
-            prepare()
+        guard staged.usesMap else {
+            staged.prepare()
             try await Task.sleep(for: .milliseconds(900))
             return
         }
         try await wait(seconds: 15) { self.mapView(in: self.host.view)?.mapboxMap.isStyleLoaded == true }
-        prepare()
         let map = try #require(mapView(in: host.view))
-        try await wait(seconds: 15, ready)
-        // Wait for the camera fit and tiles; a remote basemap may take longer.
-        var idle = false
-        let token = map.mapboxMap.onMapIdle.observe { _ in idle = true }
+        var idleCamera: CameraState?
+        let token = map.mapboxMap.onMapIdle.observe { _ in idleCamera = map.mapboxMap.cameraState }
         defer { token.cancel() }
-        try await Task.sleep(for: .milliseconds(600))
-        let settled = try await poll(seconds: 15) {
-            if case .state = map.viewport.status { return true }
-            return false
+        staged.prepare()
+        map.mapboxMap.triggerRepaint()
+        try await wait(seconds: 15, phase: "navigation request", staged.ready)
+        try #require(staged.navigationError() == nil, "Navigation failed: \(staged.navigationError() ?? "")")
+        // Request consumption alone does not prove that SwiftUI applied the
+        // intended camera. Require the route inside that camera's padded rect.
+        try await wait(seconds: 30, phase: "fitted route and map idle") {
+            let camera = map.mapboxMap.cameraState
+            let points = map.mapboxMap.points(for: staged.coordinates)
+            let projected = points.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: CGSize(width: 0.01, height: 0.01))) }
+            self.readinessDetail = "idleCamera=\(String(describing: idleCamera)), projected=\(projected)"
+            guard case .state = map.viewport.status, idleCamera == camera else { return false }
+            guard !staged.coordinates.isEmpty else { return true }
+            guard camera.padding != .zero else { return false }
+            let visible = self.routeViewport(map)
+            return points.allSatisfy { visible.contains($0) }
         }
-        try #require(settled, "Viewport: \(map.viewport.status); camera: \(map.mapboxMap.cameraState)")
-        // Best effort: an offline style may never report idle after a fit.
-        _ = try await poll(seconds: GalleryEnvironment.mapboxToken == nil ? 2 : 5) { idle }
-        // Production fitting collapses the panel. This scenario reviews the
-        // revealed results/detail after the user expands it again.
-        reveal()
-        try await Task.sleep(for: .milliseconds(500))
+        let fitted = map.mapboxMap.cameraState
+        staged.reveal()
+        var lastFrame = "", stableSince = Date()
+        try await wait(seconds: 15, phase: "revealed panel stability") {
+            self.host.view.layoutIfNeeded()
+            let panel = self.host.presentedViewController?.view
+            let frame = panel.map { $0.convert($0.bounds, to: map) } ?? .zero
+            let signature = "\(frame)|\(map.bounds)|\(map.mapboxMap.cameraState)"
+            if signature != lastFrame { lastFrame = signature; stableSince = Date() }
+            return Date().timeIntervalSince(stableSince) >= 0.35
+        }
+        let camera = map.mapboxMap.cameraState
+        try #require(abs(camera.zoom - fitted.zoom) < 0.001 && camera.padding == fitted.padding
+                     && abs(camera.center.latitude - fitted.center.latitude) < 0.00001
+                     && abs(camera.center.longitude - fitted.center.longitude) < 0.00001
+                     && camera.bearing == fitted.bearing && camera.pitch == fitted.pitch,
+                     "Revealing results unexpectedly changed the fitted camera")
+        let points = map.mapboxMap.points(for: staged.coordinates)
+        let visible = routeViewport(map)
+        try #require(points.allSatisfy { visible.contains($0) }, "Route escaped the fitted viewport after reveal")
+        let panel = host.presentedViewController?.view
+        let panelFrame = panel.map { $0.convert($0.bounds, to: map) }
+        if let panelFrame {
+            try #require(points.allSatisfy { !panelFrame.insetBy(dx: -16, dy: -16).contains($0) },
+                         "Revealed native sheet covers the fitted route: \(panelFrame)")
+        } else if !staged.coordinates.isEmpty {
+            // Wide panels live in the map's own hierarchy, rather than a UIKit
+            // presentation controller. Use their production frame, in map points.
+            let safeArea = map.safeAreaInsets
+            let layout = MapResultsLayout(size: CGSize(width: map.bounds.width, height: map.bounds.height - safeArea.bottom),
+                topInset: safeArea.top, bottomInset: safeArea.bottom, detent: .medium)
+            if layout.isSidePanel {
+                try #require(points.allSatisfy { $0.x < layout.frame.minX - 16 },
+                             "Revealed side panel covers the fitted route")
+            }
+        }
+        framing = ["zoom": camera.zoom, "routePointCount": points.count,
+                   "paddedVisibleRect": NSCoder.string(for: visible),
+                   "nativePanelFrame": panelFrame.map { NSCoder.string(for: $0) } ?? "none",
+                   "cameraSettled": true, "routeContained": true]
+    }
+
+    private func routeViewport(_ map: MapView) -> CGRect {
+        // Standard's rendered coordinates can differ a few points from the
+        // fitting API's inset (3.5pt in the wide fixture). Allow 8pt within the
+        // reserved breathing room, then independently check the actual panel.
+        map.bounds.inset(by: map.mapboxMap.cameraState.padding).insetBy(dx: -8, dy: -8)
+            .intersection(map.bounds.insetBy(dx: 16, dy: 16))
     }
 
     func save(scene: GalleryScene, variant: GalleryVariant, library: String, scenario: GalleryManifest.Scenario) throws {
@@ -217,6 +273,7 @@ private final class GalleryWindow {
             "variant": variant.name, "width": variant.size.width, "height": variant.size.height,
             "dark": variant.dark, "contentSize": variant.contentSize.rawValue, "library": library,
             "basemap": GalleryEnvironment.mapboxToken == nil ? "offline" : "mapbox",
+            "framing": framing,
         ]
         try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
             .write(to: directory.appendingPathComponent("\(name).json"))
@@ -227,8 +284,10 @@ private final class GalleryWindow {
         return view.subviews.lazy.compactMap { self.mapView(in: $0) }.first
     }
 
-    private func wait(seconds: Double, _ condition: () -> Bool) async throws {
-        try #require(try await poll(seconds: seconds, condition), "Gallery scene did not settle")
+    private func wait(seconds: Double, phase: String = "style loading", _ condition: () -> Bool) async throws {
+        let settled = try await poll(seconds: seconds, condition)
+        let map = mapView(in: host.view)
+        try #require(settled, "Gallery \(phase) did not settle; viewport=\(String(describing: map?.viewport.status)), camera=\(String(describing: map?.mapboxMap.cameraState)), bounds=\(String(describing: map?.bounds)), \(readinessDetail)")
     }
 
     private func poll(seconds: Double, _ condition: () -> Bool) async throws -> Bool {
