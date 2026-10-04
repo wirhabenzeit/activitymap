@@ -114,14 +114,7 @@ struct RoutePickerSheet: View {
                 .accessibilityIdentifier("map-results-back")
             }
             if collapsed, let detail {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
-                    Text(detail.name).font(.subheadline.weight(.semibold))
-                        .lineLimit(1).truncationMode(.tail)
-                    Text("\(detail.sportType.rawValue) · \(Formatters.shortDateTime(detail.startDateLocal, timeZone: .gmt))")
-                        .font(.caption).foregroundStyle(AppTheme.secondaryText)
-                        .lineLimit(1).truncationMode(.tail)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                ActivityDetailIdentity(activity: detail, titleLineLimit: 1)
             } else if detail == nil {
                 selectionSummary
             }
@@ -140,7 +133,8 @@ struct RoutePickerSheet: View {
             // Always the trailing control, regardless of summary/navigation.
             panelHandle
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, collapsed && detail != nil ? AppTheme.Spacing.large : 12)
+        .padding(.vertical, collapsed && detail != nil ? AppTheme.Spacing.small : 0)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

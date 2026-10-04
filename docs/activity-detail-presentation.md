@@ -11,7 +11,7 @@ Applies to web Map/List cards and iOS Map/List detail panels. Native controls ma
 5. Topic groups containing the remaining recorded fields, each shown once.
 6. Photos, when present.
 
-Collapsed map details use a single-line, tail-truncated title with the sport and activity-local date/time beneath it. The full title remains available in the open detail.
+Collapsed map details reuse the same sport icon, title typography, subtitle spacing and content padding in portrait and landscape. They use a single-line, tail-truncated title with the sport and activity-local date/time beneath it. The full title remains available in the open detail.
 
 The landscape/iPad custom panel uses a stable scrolling viewport with the heading inside its content; the grabber shares the navigation row. Safe-area spacing belongs inside the scroll content, not a fixed bottom strip. Collapsing the panel cancels chart demand/cursors without discarding a valid decoded profile or the scroll position.
 

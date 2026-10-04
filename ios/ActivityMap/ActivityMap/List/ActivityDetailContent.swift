@@ -124,11 +124,13 @@ struct ActivityDetailIdentity: View {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
                 Text(activity.name).font(.headline)
                     .lineLimit(titleLineLimit)
+                    .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("activity-detail-name")
                 Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
                     .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    .lineLimit(titleLineLimit == 1 ? 1 : nil)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
