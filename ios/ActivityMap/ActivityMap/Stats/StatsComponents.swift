@@ -414,3 +414,32 @@ private struct StatsDetailGridLayout: Layout {
         }
     }
 }
+
+/// One row style for every activity a Stats tile lists: sport symbol, name,
+/// a secondary summary and an optional detail line, linked when it can open.
+struct StatsActivityRow: View {
+    let sport: ActivityCategory
+    let name: String
+    let summary: String
+    var detail: String? = nil
+    var open: (() -> Void)? = nil
+
+    var body: some View {
+        if let open {
+            Button(action: open) { row(linked: true) }.buttonStyle(.plain)
+        } else {
+            row(linked: false)
+        }
+    }
+    private func row(linked: Bool) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            BrowseSportSymbol(category: sport)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name.isEmpty ? sport.name : name).font(.subheadline.weight(.medium)).fixedSize(horizontal: false, vertical: true)
+                Text(summary).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if let detail { Text(detail).font(.caption).monospacedDigit() }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            if linked { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
+        }.padding(.vertical, 12).frame(minHeight: 44).contentShape(Rectangle())
+    }
+}

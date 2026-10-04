@@ -30,6 +30,7 @@ import {
   monthStart,
   yearStart,
 } from '~/lib/stats/tile-series';
+import { ActivityRow } from './activity-row';
 import { MonthRows } from './calendar';
 import { Measure, SportBars } from './charts';
 import { formatWithUnit, monthName, shortDate } from './format';
@@ -446,35 +447,25 @@ export function CalendarHistory({
           {selectedActivities.length === 0 ? (
             <p className="text-sm">No matching activities on this day.</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-muted">
               {selectedActivities.map((activity, index) => (
-                <li key={activity.id ?? index} className="rounded border p-3">
-                  {activity.id !== undefined && context.onOpenActivity ? (
-                    <button
-                      className="text-left text-sm font-medium underline underline-offset-2"
-                      onClick={() => {
-                        context.onOpenActivity?.(activity.id!);
-                      }}
-                    >
-                      {activity.name?.trim()
-                        ? activity.name
-                        : 'Untitled activity'}
-                    </button>
-                  ) : (
-                    <p className="text-sm font-medium">
-                      {activity.name?.trim()
-                        ? activity.name
-                        : 'Untitled activity'}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {categorySettings[activity.sport].name} ·{' '}
-                    {(['distance', 'elevation', 'time'] as const)
+                <li key={activity.id ?? index}>
+                  <ActivityRow
+                    sport={activity.sport}
+                    name={activity.name}
+                    summary={`${categorySettings[activity.sport].name} · ${(
+                      ['distance', 'elevation', 'time'] as const
+                    )
                       .map((metric) =>
                         formatWithUnit(metricValue(activity, metric), metric),
                       )
-                      .join(' · ')}
-                  </p>
+                      .join(' · ')}`}
+                    onOpen={
+                      activity.id !== undefined && context.onOpenActivity
+                        ? () => context.onOpenActivity?.(activity.id!)
+                        : undefined
+                    }
+                  />
                 </li>
               ))}
             </ul>

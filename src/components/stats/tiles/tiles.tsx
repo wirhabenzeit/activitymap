@@ -42,6 +42,7 @@ import {
 } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
+import { ActivityRow } from './activity-row';
 import { VolumeHistory, CalendarHistory } from './history';
 import {
   CumulativeLines,
@@ -779,54 +780,28 @@ const distanceVsElevationView: TileView = {
           </p>
         )}
         <ul className="divide-y divide-muted">
-          {hilliest.map((activity, index) => {
-            const content = (
-              <>
-                <span className="flex min-w-0 items-start gap-2">
-                  <span
-                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                    style={{
-                      background: categorySettings[activity.sport].color,
-                    }}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block break-words font-medium">
-                      {activity.name ?? categorySettings[activity.sport].name}
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {shortDate(dateOfDay(activity.day))},{' '}
-                      {dateOfDay(activity.day).getUTCFullYear()} ·{' '}
-                      {formatWithUnit(activity.km, 'distance')} ·{' '}
-                      {formatWithUnit(activity.climb, 'elevation')} climbed
-                    </span>
-                    <span className="mt-1 block text-xs tabular-nums">
-                      {formatHilliness(activity.rate)} m / km
-                    </span>
-                  </span>
-                  {activity.id !== undefined && onOpenActivity && (
-                    <span aria-hidden="true" className="text-muted-foreground">
-                      ›
-                    </span>
-                  )}
-                </span>
-              </>
-            );
-            return (
-              <li key={activity.id ?? index}>
-                {activity.id !== undefined && onOpenActivity ? (
-                  <button
-                    type="button"
-                    className="min-h-11 w-full py-3 text-left text-sm hover:bg-muted/40 focus-visible:outline-2"
-                    onClick={() => onOpenActivity(activity.id!)}
-                  >
-                    {content}
-                  </button>
-                ) : (
-                  <div className="py-3 text-sm">{content}</div>
-                )}
-              </li>
-            );
-          })}
+          {hilliest.map((activity, index) => (
+            <li key={activity.id ?? index}>
+              <ActivityRow
+                sport={activity.sport}
+                name={activity.name}
+                summary={
+                  <>
+                    {shortDate(dateOfDay(activity.day))},{' '}
+                    {dateOfDay(activity.day).getUTCFullYear()} ·{' '}
+                    {formatWithUnit(activity.km, 'distance')} ·{' '}
+                    {formatWithUnit(activity.climb, 'elevation')} climbed
+                  </>
+                }
+                detail={`${formatHilliness(activity.rate)} m / km`}
+                onOpen={
+                  activity.id !== undefined && onOpenActivity
+                    ? () => onOpenActivity(activity.id!)
+                    : undefined
+                }
+              />
+            </li>
+          ))}
         </ul>
       </div>
     );

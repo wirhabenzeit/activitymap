@@ -147,15 +147,14 @@ struct StatsCalendarDetail: View {
             }
             Text("Activities matching your current filters.").font(.caption).foregroundStyle(.secondary)
             if let data = snapshot.days[day] {
-                ForEach(Array(data.activities.enumerated()), id: \.offset) { _, activity in
-                    VStack(alignment: .leading, spacing: 4) {
-                        if let id = activity.id {
-                            Button { openActivity(id) } label: {
-                                Text(activity.name.isEmpty ? "Untitled activity" : activity.name).underline().frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            }.buttonStyle(.plain).accessibilityIdentifier("stats-calendar-activity-\(id)")
-                        } else { Text(activity.name) }
-                        Text("\(activity.sport.name) · \(StatsDisplay.measurement(activity.value(.distance), metric: .distance)) · \(StatsDisplay.measurement(activity.value(.elevation), metric: .elevation)) · \(StatsDisplay.measurement(activity.value(.time), metric: .time))").font(.caption).foregroundStyle(.secondary)
-                    }.font(.subheadline).fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(data.activities.enumerated()), id: \.offset) { index, activity in
+                        if index > 0 { Divider() }
+                        StatsActivityRow(sport: activity.sport, name: activity.name,
+                                         summary: "\(activity.sport.name) · \(StatsDisplay.measurement(activity.value(.distance), metric: .distance)) · \(StatsDisplay.measurement(activity.value(.elevation), metric: .elevation)) · \(StatsDisplay.measurement(activity.value(.time), metric: .time))",
+                                         open: activity.id.map { id in { openActivity(id) } })
+                            .accessibilityIdentifier(activity.id.map { "stats-calendar-activity-\($0)" } ?? "")
+                    }
                 }
             } else { Text("No matching activities on this day.").font(.caption) }
         }

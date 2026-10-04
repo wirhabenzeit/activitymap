@@ -165,25 +165,14 @@ struct StatsDashboardTile: View {
             Text("Hilliest activities (5 km or more)").font(.caption).foregroundStyle(.secondary).padding(.bottom, 8)
             if activities.isEmpty { note("No qualifying activities in the last 12 months.") }
             ForEach(Array(activities.enumerated()), id: \.offset) { _, point in
-                if let id = point.activity.id {
-                    Button { openActivity(id) } label: { hillinessRow(point, linked: true) }.buttonStyle(.plain)
-                        .accessibilityIdentifier("stats-hilliness-activity-\(id)")
-                } else { hillinessRow(point, linked: false) }
+                StatsActivityRow(sport: point.activity.sport, name: point.activity.name,
+                                 summary: "\(StatsDisplay.date(point.activity.day)) · \(StatsDisplay.measurement(point.distance, metric: .distance)) · \(StatsDisplay.measurement(point.elevation, metric: .elevation)) climbed",
+                                 detail: "\(StatsDisplay.number(point.metersPerKm, decimals: 1)) m / km",
+                                 open: point.activity.id.map { id in { openActivity(id) } })
+                    .accessibilityIdentifier(point.activity.id.map { "stats-hilliness-activity-\($0)" } ?? "")
                 Divider()
             }
         }
-    }
-    private func hillinessRow(_ point: StatsHillPoint, linked: Bool) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            BrowseSportSymbol(category: point.activity.sport)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(point.activity.name).font(.subheadline.weight(.medium)).fixedSize(horizontal: false, vertical: true)
-                Text("\(StatsDisplay.date(point.activity.day)) · \(StatsDisplay.measurement(point.distance, metric: .distance)) · \(StatsDisplay.measurement(point.elevation, metric: .elevation)) climbed")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Text("\(StatsDisplay.number(point.metersPerKm, decimals: 1)) m / km").font(.caption).monospacedDigit()
-            }.frame(maxWidth: .infinity, alignment: .leading)
-            if linked { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
-        }.padding(.vertical, 12).frame(minHeight: 44).contentShape(Rectangle())
     }
 
     private func headline(_ value: Double, metric: StatsMetric, suffix: String = "") -> some View {
