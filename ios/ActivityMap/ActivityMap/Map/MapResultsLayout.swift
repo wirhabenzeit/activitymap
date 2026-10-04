@@ -34,7 +34,7 @@ struct MapResultsLayout {
         // expanded; no empty control lane is reserved beside the panel.
         let top = topInset + 12
         let available = max(120, size.height - top - (isSidePanel ? 0 : 12))
-        let compact = min(available, isSidePanel ? (largeText ? 160 : 108) : (largeText ? 240 : 156))
+        let compact = min(available, isSidePanel ? (largeText ? 120 : 64) : (largeText ? 240 : 156))
         let height: CGFloat
         switch detent {
         case .compact: height = compact
@@ -60,5 +60,16 @@ enum MapResultsSnap {
     static func target(start: CGFloat, predictedTranslation: CGFloat, compact: CGFloat, expanded: CGFloat) -> MapResultsDetent {
         height(start: start, translation: predictedTranslation, compact: compact, expanded: expanded)
             < (compact + expanded) / 2 ? .compact : .expanded
+    }
+}
+
+/// Pin the resting height for the entire gesture, including the release event
+/// that changes the model detent before SwiftUI resets the gesture state.
+struct MapResultsDrag: Equatable {
+    let start: CGFloat
+    var translation: CGFloat = 0
+
+    func height(compact: CGFloat, expanded: CGFloat) -> CGFloat {
+        MapResultsSnap.height(start: start, translation: translation, compact: compact, expanded: expanded)
     }
 }

@@ -48,6 +48,8 @@ struct ActivityDetailPanel: View {
     var headerTrailingInset: CGFloat = 0
     var showsHeading = true
     var mapExpansion: MapActivityExpansion? = nil
+    var scrollsMapHeading = false
+    var mapBottomContentInset: CGFloat = 0
     var showOnMap: ((Int) -> Void)? = nil
 
     private var activity: Activity? { store.activity(id: activityID) }
@@ -57,6 +59,8 @@ struct ActivityDetailPanel: View {
             if let activity {
                 if let mapExpansion {
                     MapActivityDetailReveal(activity: activity, expansion: mapExpansion,
+                                            scrollsHeading: scrollsMapHeading,
+                                            bottomContentInset: mapBottomContentInset,
                                             trailingInset: headerTrailingInset, hasRoute: store.routableActivityIDs.contains(activityID),
                                             summary: "\(Formatters.distance(activity.distance))  ·  \(Formatters.duration(activity.elapsedTime))  ·  \(Formatters.elevation(activity.totalElevationGain)) ↑") { id in
                         if let showOnMap { showOnMap(id) }
@@ -90,47 +94,83 @@ struct ActivityDetailPanel: View {
 private struct MapActivityDetailReveal: View {
     let activity: Activity
     let expansion: MapActivityExpansion
+    let scrollsHeading: Bool
+    let bottomContentInset: CGFloat
     private var progress: CGFloat { expansion.progress }
     let trailingInset: CGFloat
     let hasRoute: Bool
     let summary: String
     let showOnMap: (Int) -> Void
     @State private var summaryHeight: CGFloat = 20
-    @State private var actionHeight: CGFloat = 64
     private var reveal: CGFloat { min(1, max(0, (progress - 0.25) / 0.75)) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ActivityDetailIdentity(activity: activity, trailingInset: trailingInset)
-                .padding(.horizontal, AppTheme.Spacing.large)
-                .padding(.vertical, AppTheme.Spacing.small)
-            Text(summary)
-                .font(.caption).foregroundStyle(AppTheme.secondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, AppTheme.Spacing.large)
-                .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { summaryHeight = $0 }
-                .opacity(max(0, 1 - progress * 4))
-                .frame(height: summaryHeight * (1 - progress), alignment: .top)
-                .clipped()
-                .accessibilityHidden(progress > 0.25)
+        // The title and action belong to the scrolling content. Keeping them
+        // fixed can consume the entire viewport in a short landscape window,
+        // especially with accessibility text, leaving an unreachable tail.
+        if scrollsHeading {
             ScrollView {
-                ActivityDetailContent(activity: activity, showsHeading: false)
+                VStack(spacing: 0) {
+                    heading
+                    compactMetrics
+                    fullDetail
+                }
+                .padding(.bottom, bottomContentInset)
             }
             .accessibilityIdentifier("activity-detail-scroll")
+            .clipped()
+        } else {
+            // Preserve the native portrait sheet's fixed summary and separate
+            // detail scroll, including its scroll position across detents.
+            VStack(spacing: 0) {
+                heading
+                compactMetrics
+                ScrollView { fullDetail }
+                    .accessibilityIdentifier("activity-detail-scroll")
+                    .clipped()
+                    .allowsHitTesting(progress > 0.8)
+            }
+        }
+    }
+
+    private var heading: some View {
+        HStack(alignment: .top, spacing: 4) {
+            ActivityDetailIdentity(activity: activity, trailingInset: trailingInset)
+            Button { showOnMap(activity.id) } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.accent)
+            .disabled(!hasRoute)
+            .accessibilityLabel("Fit route")
+            .accessibilityIdentifier("activity-show-on-map")
+            .accessibilityHint(hasRoute ? "Collapse detail and frame this route, leaving room to reopen detail" : "This activity has no GPS route")
+        }
+        .padding(.horizontal, AppTheme.Spacing.large)
+        .padding(.vertical, AppTheme.Spacing.small)
+    }
+
+    private var compactMetrics: some View {
+        Text(summary)
+            .font(.caption).foregroundStyle(AppTheme.secondaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, AppTheme.Spacing.large)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { summaryHeight = $0 }
+            .opacity(max(0, 1 - progress * 4))
+            .frame(height: summaryHeight * (1 - progress), alignment: .top)
+            .clipped()
+            .accessibilityHidden(progress > 0.25)
+    }
+
+    private var fullDetail: some View {
+        ActivityDetailContent(activity: activity, showsHeading: false)
             .opacity(reveal)
             .clipped()
             .allowsHitTesting(progress > 0.8)
             .accessibilityHidden(progress < 0.8)
-            ActivityDetailActions(activity: activity, hasRoute: hasRoute, showOnMap: showOnMap)
-                .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { actionHeight = $0 }
-                .opacity(reveal)
-                .frame(height: actionHeight * reveal, alignment: .bottom)
-                .clipped()
-                .allowsHitTesting(progress > 0.8)
-                .accessibilityHidden(progress < 0.8)
-        }
     }
 }
 

@@ -6,6 +6,7 @@ struct RoutePickerSheet: View {
     @Bindable var store: ActivityStore
     let isSidePanel: Bool
     var bottomInset: CGFloat = 0
+    var panelExpandedHeight: CGFloat? = nil
     var collapsedOverride: Bool? = nil
     var panelHandle: AnyView? = nil
     private var expansion: CGFloat { collapsed ? 0 : 1 }
@@ -14,6 +15,7 @@ struct RoutePickerSheet: View {
     private var collapsed: Bool { collapsedOverride ?? (picker.detent == .compact) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var panelHeaderHeight: CGFloat = 44
 
     private var candidates: [Activity] {
         picker.candidateIDs.filter(store.visibleActivityIDs.contains).compactMap { store.activity(id: $0) }
@@ -24,8 +26,10 @@ struct RoutePickerSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             if isSidePanel {
-                panelHandle
-                if !singleDetail || collapsed { sidePanelHeader }
+                sidePanelHeader
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                        if !collapsed { panelHeaderHeight = $0 }
+                    }
             } else { header }
             if detail == nil && !isSidePanel {
                 compactSummary
@@ -37,25 +41,36 @@ struct RoutePickerSheet: View {
             }
             // Keep results mounted through detail and detent changes. Back
             // restores the exact scroll position, without a second overlay.
-            ZStack {
-                results
-                    .opacity(detail == nil ? contentReveal : 0)
-                    .allowsHitTesting(detail == nil && expansion > 0.8)
-                    .accessibilityHidden(detail != nil || expansion < 0.8)
-                if detail != nil {
-                    MapActivityPager(store: store, picker: picker, expansion: expansion)
-                        .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
-                        .transition(reduceMotion ? .opacity : .move(edge: .trailing))
+            GeometryReader { viewport in
+                ZStack {
+                    results
+                        .opacity(detail == nil ? contentReveal : 0)
+                        .allowsHitTesting(detail == nil && expansion > 0.8)
+                        .accessibilityHidden(detail != nil || expansion < 0.8)
+                    if detail != nil {
+                        MapActivityPager(store: store, picker: picker, expansion: isSidePanel ? 1 : expansion,
+                                         scrollsHeading: isSidePanel, bottomContentInset: bottomInset)
+                            .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
+                            .transition(.opacity)
+                    }
                 }
+                // The two-position custom panel reveals a stable viewport.
+                // Relaying every drag frame into SwiftUI's lazy scroll layout
+                // changes its content estimates and shifts the saved offset.
+                .frame(width: viewport.size.width,
+                       height: panelExpandedHeight.map { max(0, $0 + bottomInset - panelHeaderHeight) } ?? viewport.size.height,
+                       alignment: .top)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: detail != nil)
             }
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: detail != nil)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .frame(height: collapsed && (isSidePanel || detail == nil) ? 0 : nil)
             .clipped()
+            .opacity(isSidePanel && collapsed ? 0 : 1)
+            .contentShape(Rectangle())
+            .allowsHitTesting(!isSidePanel || !collapsed)
             .accessibilityHidden(collapsed && (isSidePanel || detail == nil))
         }
         // One continuous detail surface; only the outer host owns corners.
-        .padding(.bottom, bottomInset)
         .frame(maxHeight: .infinity, alignment: .top)
         .background { if !nativePresentation { Rectangle().fill(.regularMaterial) } }
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: isSidePanel ? 20 : 28,
@@ -81,6 +96,9 @@ struct RoutePickerSheet: View {
                         if activity.id != candidates.last?.id { Divider().padding(.leading, 56) }
                     }
                 }
+                // Keep the final row clear of the home indicator without a
+                // fixed strip masking rows as they scroll past the bottom.
+                .padding(.bottom, bottomInset)
             }
             .accessibilityIdentifier("map-results-scroll")
         }
@@ -100,13 +118,23 @@ struct RoutePickerSheet: View {
                     .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
             } else if detail == nil {
                 selectionSummary
-            } else {
+            }
+            if detail != nil && !collapsed {
                 Spacer(minLength: 0)
+            }
+            if detail != nil && !collapsed {
                 if candidates.count > 1, let detail { detailNavigation(detail) }
             }
-            if detail == nil && !collapsed { selectionActions }
+            if detail == nil {
+                selectionActions
+                    .opacity(collapsed ? 0 : 1)
+                    .allowsHitTesting(!collapsed)
+                    .accessibilityHidden(collapsed)
+            }
+            // Always the trailing control, regardless of summary/navigation.
+            panelHandle
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
+        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

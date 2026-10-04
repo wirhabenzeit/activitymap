@@ -10,7 +10,7 @@ struct MapResultsContainer: View {
     let bottomInset: CGFloat
     let largeText: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @GestureState private var dragTranslation: CGFloat? = nil
+    @GestureState private var drag: MapResultsDrag? = nil
 
     var body: some View {
         let layout = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
@@ -21,16 +21,16 @@ struct MapResultsContainer: View {
                     detent: .compact, largeText: largeText).contentHeight
                 let expanded = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
                     detent: .expanded, largeText: largeText).contentHeight
-                let height = MapResultsSnap.height(start: layout.contentHeight,
-                    translation: dragTranslation ?? 0, compact: compact, expanded: expanded)
+                let height = drag?.height(compact: compact, expanded: expanded) ?? layout.contentHeight
                 RoutePickerSheet(picker: picker, store: store, isSidePanel: true, bottomInset: bottomInset,
+                    panelExpandedHeight: expanded,
                     collapsedOverride: height <= compact + 1,
                     panelHandle: AnyView(handle(start: layout.contentHeight, compact: compact, expanded: expanded)))
                     .frame(width: layout.frame.width, height: height + bottomInset)
                     .position(x: layout.frame.midX, y: size.height - height / 2 + bottomInset / 2)
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: picker.detent)
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: dragTranslation == nil)
-                    .transaction { if dragTranslation != nil { $0.animation = nil } }
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drag == nil)
+                    .transaction { if drag != nil { $0.animation = nil } }
             }
         } else {
             NativeMapResultsSheet(picker: picker, store: store, size: size, largeText: largeText)
@@ -39,12 +39,18 @@ struct MapResultsContainer: View {
 
     private func handle(start: CGFloat, compact: CGFloat, expanded: CGFloat) -> some View {
         Capsule().fill(.secondary).frame(width: 36, height: 5)
-            .frame(maxWidth: .infinity).frame(height: 44)
+            .frame(width: 60, height: 44)
             .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 3)
-                .updating($dragTranslation) { value, state, _ in state = value.translation.height }
+            // The handle moves with the panel. Local translations feed that
+            // movement back into the next event and make resizing oscillate.
+            .gesture(DragGesture(minimumDistance: 3, coordinateSpace: .global)
+                .updating($drag) { value, state, transaction in
+                    transaction.animation = nil
+                    if state == nil { state = MapResultsDrag(start: start) }
+                    state?.translation = value.translation.height
+                }
                 .onEnded { value in
-                    picker.detent = MapResultsSnap.target(start: start,
+                    picker.detent = MapResultsSnap.target(start: drag?.start ?? start,
                         predictedTranslation: value.predictedEndTranslation.height,
                         compact: compact, expanded: expanded)
                 })
