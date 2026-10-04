@@ -561,8 +561,9 @@ const sportMixView: TileView = {
       today,
       (option ?? 'currentYear') as MixRange,
     );
+    // Directly under the headline it explains; spare height goes below.
     return (
-      <div className="mt-auto pt-2">
+      <div className="pt-3">
         <div
           className="flex h-2.5 gap-0.5 overflow-hidden rounded-sm"
           role="img"
@@ -890,7 +891,7 @@ const typicalWeekView: TileView = {
   face: ({ activities, today }) => {
     const week = typicalWeek(activities, today);
     return (
-      <div className="mt-auto grid grid-cols-3 gap-2 border-t pt-2">
+      <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-2">
         <Stat
           label="Distance"
           value={formatMetric(week.distance, 'distance')}
