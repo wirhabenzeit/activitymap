@@ -50,9 +50,16 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
         case .years: String(StatsDates.parts(day).year!)
         }
     }
+    /// Whole periods back from the latest bucket: every fourth week, every
+    /// third month, and about four labels across the years.
     private var ticks: [Int] {
-        let last = max(0, buckets.count - 1)
-        return Array(Set([0, last / 3, last * 2 / 3, last])).sorted()
+        guard !buckets.isEmpty else { return [] }
+        let step = switch shownRange {
+        case .weeks: 4
+        case .months: 3
+        case .years: max(1, Int((Double(buckets.count) / 4).rounded(.up)))
+        }
+        return Array(stride(from: buckets.count - 1, through: 0, by: -step)).reversed()
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -130,7 +137,8 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
         .chartXAxis {
             AxisMarks(values: ticks) { value in
                 if let index = value.as(Int.self), buckets.indices.contains(index) {
-                    AxisValueLabel(anchor: index == buckets.count - 1 ? .topTrailing : index == 0 ? .topLeading : .top) {
+                    // Labels start at their period; the latest one ends at its point.
+                    AxisValueLabel(anchor: index == buckets.count - 1 ? .topTrailing : .topLeading) {
                         switch shownRange {
                         case .weeks: Text(date(buckets[index].start))
                         case .months: Text(StatsDates.date(buckets[index].start).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)))
