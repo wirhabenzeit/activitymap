@@ -19,7 +19,8 @@ struct StatsDashboardTile: View {
     private var year: Int { StatsDates.parts(today).year! }
     private var period: String {
         switch tile.id {
-        case .thisWeek: "This week"
+        // The title already says "This week"; name its dates instead.
+        case .thisWeek: "\(StatsDisplay.shortDate(StatsDates.monday(today))) – \(StatsDisplay.shortDate(StatsDates.monday(today) + 6))"
         case .weeklyVolume: expanded ? "Volume by sport" : "12-week trend"
         case .monthVsLastMonth: "\(comparisonLabels.current) vs \(comparisonLabels.previous)"
         case .yearToDate: "\(year.formatted(.number.grouping(.never))) vs \((year - 1).formatted(.number.grouping(.never)))"
@@ -43,8 +44,7 @@ struct StatsDashboardTile: View {
     }
     private var comparisonContext: String {
         if tile.id == .yearToDate {
-            let date = StatsDates.date(today).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
-            return "vs \(year - 1) by \(date)"
+            return "vs \(year - 1) by \(StatsDisplay.shortDate(today))"
         }
         let date = StatsDates.parts(today)
         let previousLast = StatsDates.start(year: year, month: date.month!) - 1

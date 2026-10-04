@@ -237,6 +237,10 @@ enum StatsDisplay {
     static func date(_ day: Int) -> String {
         StatsDates.date(day).formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, calendar: StatsDates.calendar, timeZone: .gmt))
     }
+    /// Day and month without the year, e.g. "28 Sep".
+    static func shortDate(_ day: Int) -> String {
+        StatsDates.date(day).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
+    }
     /// A whole month, e.g. "Oct 2026", for monthly bars and readouts.
     static func month(_ day: Int) -> String {
         StatsDates.date(day).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).year())

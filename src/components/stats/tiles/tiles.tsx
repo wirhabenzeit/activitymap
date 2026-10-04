@@ -19,6 +19,7 @@ import {
   climbing,
   dayOf,
   fourWeekVolume,
+  mondayOf,
   monthVsLastMonth,
   records,
   sportMix,
@@ -833,7 +834,9 @@ const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const thisWeekView: TileView = {
   expandable: false,
-  period: () => 'This week',
+  // The title already says "This week"; name its dates instead.
+  period: ({ today }) =>
+    `${shortDate(dateOfDay(mondayOf(today)))} – ${shortDate(dateOfDay(mondayOf(today) + 6))}`,
   // Compared with a typical week up to the same weekday, so an early-week
   // total is not held against a full week.
   summary: (context, option) => {

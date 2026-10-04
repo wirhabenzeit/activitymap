@@ -42,12 +42,9 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     private var selected: Int? {
         selectedX.map { min(max(0, Int($0.rounded())), max(0, buckets.count - 1)) }
     }
-    private func date(_ day: Int) -> String {
-        StatsDates.date(day).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
-    }
     private func label(_ day: Int) -> String {
         switch shownRange {
-        case .weeks: "Week of \(date(day))"
+        case .weeks: "Week of \(StatsDisplay.shortDate(day))"
         case .months: StatsDisplay.month(day)
         case .years: String(StatsDates.parts(day).year!)
         }
@@ -143,7 +140,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                     // Labels start at their period; the latest one ends at its point.
                     AxisValueLabel(anchor: index == buckets.count - 1 ? .topTrailing : .topLeading) {
                         switch shownRange {
-                        case .weeks: Text(date(buckets[index].start))
+                        case .weeks: Text(StatsDisplay.shortDate(buckets[index].start))
                         case .months: Text(StatsDates.date(buckets[index].start).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)))
                         case .years: Text(label(buckets[index].start))
                         }
