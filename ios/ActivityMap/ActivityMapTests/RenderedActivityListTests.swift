@@ -290,6 +290,15 @@ extension RenderedRoutePickingTests {
         #expect(navigationTop >= 54, "The native stack starts below the persistent app header")
         store.inspect(90)
         try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        let barFrame = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
+        let contentFrame = navigation.topViewController?.view.frame
+        for _ in 0..<5 {
+            try await Task.sleep(for: .milliseconds(200))
+            #expect(navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view) == barFrame,
+                    "The Back bar must not move after the push transition completes")
+            #expect(navigation.topViewController?.view.frame == contentFrame,
+                    "Detail content must not shift after the push transition completes")
+        }
         #expect(!navigation.isNavigationBarHidden)
         #expect(navigation.interactivePopGestureRecognizer?.isEnabled == true)
         #expect(navigation.view.convert(.zero, to: host.host.view).y == navigationTop)

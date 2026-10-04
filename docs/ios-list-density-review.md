@@ -58,3 +58,11 @@ Phone light/dark, tablet, list and map gallery captures were regenerated. A rend
 Validation: 31 rendered tests passed, zero failures. Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.04_08-53-29-+0200.xcresult`.
 
 ![Persistent header above list details](ios-list-density/persistent-header-detail-phone.jpg)
+
+### Device follow-up: Back-bar settling and simulator sign-in
+
+The List root now declares inline navigation-bar sizing before the first detail push, even though its own bar is hidden. A rendered check samples the Back-bar and destination frames for one second after the transition, guarding against delayed repositioning. Physical-device confirmation of the reported shift is still required.
+
+For interactive simulator sign-in, build with normal signing (omit `CODE_SIGNING_ALLOWED=NO`). The unsigned gallery/test build lacks the simulator application entitlement and produced keychain error -34018. A separate `/tmp/activitymap-ipad-signed-build` build generates `DX96FWY9AX.page.dominik.activitymap` as its simulated application identifier. Gallery builds remain appropriate for offline fixtures, not authentication testing.
+
+The focused `shellHeaderStaysOutsideListDetailNavigation()` test passed (one test, zero failures), including the one-second frame-stability check. Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.04_09-12-55-+0200.xcresult`. Two broader attempts stalled and were terminated; no fresh broad-suite pass is claimed for this follow-up.
