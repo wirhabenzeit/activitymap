@@ -169,39 +169,8 @@ struct AppShell: View {
                 .accessibilityIdentifier("browse-destination-menu")
             }
             Spacer(minLength: 0)
-            Menu {
-                if auth.currentUser == nil {
-                    // Signed out, the account entry starts the connection
-                    // itself rather than leading through Profile (#304).
-                    Section {
-                        Button {
-                            stravaConnect.start()
-                        } label: {
-                            Label("Connect with Strava", systemImage: "link")
-                        }
-                        .disabled(auth.status == .signingIn)
-                    }
-                } else {
-                    Section(auth.currentUser?.name ?? "Account") {
-                        Button {
-                            sheets.accountDestination = .profile
-                        } label: {
-                            Label("Profile", systemImage: "person")
-                        }
-                    }
-                }
-
-                Button {
-                    sheets.accountDestination = .settings
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
-
-                Button {
-                    sheets.accountDestination = .about
-                } label: {
-                    Label("About ActivityMap", systemImage: "info.circle")
-                }
+            Button {
+                sheets.accountDestination = .settings
             } label: {
                 AsyncImage(url: auth.currentUser?.image.flatMap(URL.init(string:))) { phase in
                     if let image = phase.image {
@@ -220,7 +189,8 @@ struct AppShell: View {
                 .accessibilityHidden(true)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Account and Settings")
+            .accessibilityLabel("Settings")
+            .accessibilityIdentifier("open-settings")
 
         }
         .padding(.horizontal, 16)

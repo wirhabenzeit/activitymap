@@ -50,4 +50,40 @@ struct RenderedIngestionStatusTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try image.pngData()?.write(to: directory.appending(path: "\(layout).png"))
     }
+    @Test(arguments: ["account", "about"])
+    func settingsDestinationsKeepTheirNativeFormLayout(page: String) async throws {
+        let settings = AccountSheet(destination: .settings, auth: AuthController())
+        let root = NavigationStack {
+            if page == "account" { settings.accountPage }
+            else { settings.aboutPage }
+        }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let old = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: CGSize(width: 390, height: 844))
+        let host = UIHostingController(rootView: root)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; old?.makeKeyAndVisible() }
+        host.view.frame = window.bounds
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(250))
+        func scrollViews(_ view: UIView) -> [UIScrollView] {
+            ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrollViews)
+        }
+        #expect(!scrollViews(host.view).isEmpty, "Pushed destinations must retain a scrollable native Form")
+        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
+            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+        }
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let expected = page == "account" ? "Not Signed In" : "Version"
+        let content = try #require(request.results?.first { $0.topCandidates(1).first?.string.contains(expected) == true })
+        #expect(content.boundingBox.midY > 0.5, "Form content belongs near the top, not floating in the centre")
+        let directory = URL(fileURLWithPath: "/tmp/activitymap-ingestion-preview")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try image.pngData()?.write(to: directory.appending(path: "settings-\(page).png"))
+    }
+
 }

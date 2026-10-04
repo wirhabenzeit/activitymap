@@ -16,15 +16,13 @@ struct AccountSheet: View {
     var body: some View {
         NavigationStack {
             TimelineView(.periodic(from: .now, by: 5)) { _ in
-                Form {
-                    switch destination {
-                    case .profile:
-                        profileContent
-                    case .settings:
-                        settingsContent
-                    case .about:
-                        aboutContent
-                    }
+                switch destination {
+                case .profile:
+                    accountPage
+                case .settings:
+                    Form { settingsContent }
+                case .about:
+                    aboutPage
                 }
             }
             .navigationTitle(title)
@@ -36,13 +34,27 @@ struct AccountSheet: View {
             }
         }
         .preferredColorScheme(preferences.appearance.colorScheme)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .onAppear {
             if openedForLogin == nil { openedForLogin = destination == .profile && auth.currentUser == nil }
         }
         .onChange(of: auth.status) { _, status in
             if case .signedIn = status, openedForLogin == true { dismiss() }
         }
+    }
+
+    // Section content must be hosted in a Form at each navigation destination.
+    // A bare Group loses the list layout when pushed from Settings.
+    var accountPage: some View {
+        Form { profileContent }
+            .navigationTitle("Account")
+            .navigationBarTitleDisplayMode(.inline)
+    }
+
+    var aboutPage: some View {
+        Form { aboutContent }
+            .navigationTitle("About ActivityMap")
+            .navigationBarTitleDisplayMode(.inline)
     }
 
     @ViewBuilder
@@ -119,19 +131,9 @@ struct AccountSheet: View {
 
             Section("Connected Services") {
                 LabeledContent("Strava", value: user.stravaConnected ? "Connected" : "Not Connected")
-                if let athleteID = user.athleteID {
-                    LabeledContent("Athlete ID", value: athleteID)
-                }
-            }
-
-            if !user.stravaConnected || user.authentication.sessionExpiresAt <= Date() {
-                Section {
-                    StravaConnectControls()
-                        .frame(maxWidth: .infinity)
-                        .listRowBackground(Color.clear)
-                } header: {
-                    Text(user.stravaConnected ? "Sign-in expired" : "Strava is disconnected")
-                }
+                StravaConnectControls()
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
             }
 
             Section {
@@ -190,9 +192,17 @@ struct AccountSheet: View {
 
     private var settingsContent: some View {
         Group {
-            Section("Account / connection") {
-                NavigationLink("Account and Strava connection") { profileContent }
-                Button("Reconnect Strava") { Task { await auth.signIn() } }
+            Section("Account") {
+                NavigationLink { accountPage } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(auth.currentUser?.name ?? "Account")
+                            Text(auth.currentUser == nil ? "Sign in with Strava" : auth.currentUser?.stravaConnected == true ? "Strava connected" : "Reconnect Strava")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: { Image(systemName: "person.crop.circle") }
+                }
+                .accessibilityIdentifier("settings-account")
             }
             if let session = sync?.session { IngestionStatusSection(session: session) }
             syncContent
@@ -217,7 +227,8 @@ struct AccountSheet: View {
                 Text("Distance, elevation and speed use \(preferences.units == .metric ? "kilometres, metres and km/h" : "miles, feet and mph"). Preferences are saved on this device.")
             }
             Section("About") {
-                NavigationLink("About ActivityMap") { aboutContent }
+                NavigationLink("About ActivityMap") { aboutPage }
+                    .accessibilityIdentifier("settings-about")
             }
         }
     }
@@ -288,7 +299,7 @@ struct AccountSheet: View {
 
     private var title: String {
         switch destination {
-        case .profile: "Profile"
+        case .profile: "Account"
         case .settings: "Settings"
         case .about: "About"
         }
