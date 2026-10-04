@@ -21,7 +21,19 @@ export function ElevationPlot({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(304);
-  const [selected, setSelected] = useState<number | null>(null);
+  // A selection belongs to the profile it was made on: the chart clears the
+  // map cursor whenever its profile changes, so the readout clears with it.
+  const [selection, setSelection] = useState<{
+    profile: ElevationProfile;
+    index: number;
+  } | null>(null);
+  const selected = selection?.profile === profile ? selection.index : null;
+  // Last emitted sample, read synchronously so pointer moves within one
+  // sample neither re-render nor republish the map cursor.
+  const emitted = useRef<{
+    profile: ElevationProfile;
+    index: number | null;
+  }>({ profile, index: null });
   useEffect(() => {
     const element = container.current;
     if (!element) return;
@@ -70,7 +82,10 @@ export function ElevationPlot({
     );
   const description = `${elevationDistanceLabel(span, span)}, elevation ${minimum.toLocaleString()} to ${maximum.toLocaleString()} m`;
   const select = (index: number | null) => {
-    setSelected(index);
+    if (emitted.current.profile === profile && emitted.current.index === index)
+      return;
+    emitted.current = { profile, index };
+    setSelection(index === null ? null : { profile, index });
     onSelection(index);
   };
   const selectPointer = (event: PointerEvent<HTMLDivElement>) => {

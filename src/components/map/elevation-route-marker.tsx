@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useMemo } from 'react';
 import { Marker } from 'react-map-gl/mapbox';
 import { useQueryClient } from '@tanstack/react-query';
 import { useElevationCursor } from '~/store/elevation-cursor';
@@ -12,7 +13,9 @@ import {
   streamSummaryQueryKey,
 } from '~/lib/activity-stream-summary';
 
-export function ElevationRouteMarker() {
+// Memoized like RouteLayer: the map re-renders on every camera frame, while
+// this marker only depends on the cursor, selection and filters.
+export const ElevationRouteMarker = memo(function ElevationRouteMarker() {
   const cursor = useElevationCursor((state) => state.cursor);
   const { user, selected, highlighted, isGuest } = useShallowStore((state) => ({
     user: state.user,
@@ -22,6 +25,7 @@ export function ElevationRouteMarker() {
   }));
   const { data: activities = [] } = useActivities();
   const { filterIDs } = useFilteredActivities(activities);
+  const visibleIDs = useMemo(() => new Set(filterIDs), [filterIDs]);
   const queryClient = useQueryClient();
   if (!cursor || isGuest || !user?.stravaConnected || cursor.userId !== user.id)
     return null;
@@ -29,7 +33,7 @@ export function ElevationRouteMarker() {
   const activity = activities.find((activity) => activity.id === id);
   if (
     !activity ||
-    !filterIDs.includes(id) ||
+    !visibleIDs.has(id) ||
     !selected.includes(id) ||
     (selected.length > 1 && highlighted !== id) ||
     !isStreamSummaryCurrent(cursor.source, activityStreamMetadata(activity)) ||
@@ -51,4 +55,4 @@ export function ElevationRouteMarker() {
       />
     </Marker>
   );
-}
+});
