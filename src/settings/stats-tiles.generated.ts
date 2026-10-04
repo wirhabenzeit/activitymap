@@ -68,6 +68,20 @@ export const statsTiles = [
     },
   },
   {
+    id: 'monthVsLastMonth',
+    title: 'This month',
+    window: 'monthToDate',
+    group: 'now',
+    span: {
+      columns: 1,
+      rows: 1,
+    },
+    toggle: {
+      label: 'Metric',
+      options: ['distance', 'time', 'elevation', 'count'],
+    },
+  },
+  {
     id: 'weeklyVolume',
     title: 'Training volume',
     window: 'last12Weeks',
@@ -77,20 +91,6 @@ export const statsTiles = [
       rows: 1,
     },
     primary: true,
-    toggle: {
-      label: 'Metric',
-      options: ['distance', 'time', 'elevation', 'count'],
-    },
-  },
-  {
-    id: 'monthVsLastMonth',
-    title: 'This month',
-    window: 'monthToDate',
-    group: 'now',
-    span: {
-      columns: 1,
-      rows: 1,
-    },
     toggle: {
       label: 'Metric',
       options: ['distance', 'time', 'elevation', 'count'],

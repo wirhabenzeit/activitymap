@@ -4,7 +4,7 @@ import Observation
 /// The visible capability set differs from the generated declaration catalogue.
 /// Compound tile queries occupy one bounded controller-cache entry per tile.
 enum StatsDashboard {
-    static let ids: [StatsTileID] = [.thisWeek, .weeklyVolume, .monthVsLastMonth,
+    static let ids: [StatsTileID] = [.thisWeek, .monthVsLastMonth, .weeklyVolume,
         .yearToDate, .yearPace, .records, .activityCalendar,
         .sportMix, .distanceVsElevation, .typicalWeek]
     static let tiles = ids.compactMap { id in SharedStatsTiles.tiles.first { $0.id == id } }

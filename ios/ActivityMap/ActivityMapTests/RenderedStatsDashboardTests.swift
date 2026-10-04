@@ -74,20 +74,22 @@ import Testing
         }, size: CGSize(width: 820, height: 1180))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(100))
-        let initialMonthWidth = try #require(probe.samples[.monthVsLastMonth]?.last).size.width
-        withAnimation(.linear(duration: 0.4)) { state.toggleExpansion(.weeklyVolume) }
+        // Training volume is the unpaired full-width tile. Expanding This month
+        // pairs it with This week, so its chart narrows during the reflow.
+        let initialVolumeWidth = try #require(probe.samples[.weeklyVolume]?.last).size.width
+        withAnimation(.linear(duration: 0.4)) { state.toggleExpansion(.monthVsLastMonth) }
         try await Task.sleep(for: .milliseconds(500))
-        let narrowedMonthWidth = try #require(probe.samples[.monthVsLastMonth]?.last).size.width
-        #expect(initialMonthWidth - narrowedMonthWidth > 300)
-        #expect(probe.samples[.monthVsLastMonth, default: []].contains {
-            $0.size.width > narrowedMonthWidth + 20 && $0.size.width < initialMonthWidth - 20
+        let narrowedVolumeWidth = try #require(probe.samples[.weeklyVolume]?.last).size.width
+        #expect(initialVolumeWidth - narrowedVolumeWidth > 300)
+        #expect(probe.samples[.weeklyVolume, default: []].contains {
+            $0.size.width > narrowedVolumeWidth + 20 && $0.size.width < initialVolumeWidth - 20
         }, "Neighbor charts receive intermediate widths, not just their destination width")
         // Reverse while in flight, then switch to another expanded card.
-        withAnimation(.linear(duration: 0.4)) { state.toggleExpansion(.weeklyVolume) }
+        withAnimation(.linear(duration: 0.4)) { state.toggleExpansion(.monthVsLastMonth) }
         try await Task.sleep(for: .milliseconds(120))
-        withAnimation(.linear(duration: 0.4)) { state.toggleExpansion(.monthVsLastMonth) }
+        withAnimation(.linear(duration: 0.4)) { state.toggleExpansion(.weeklyVolume) }
         try await Task.sleep(for: .milliseconds(500))
-        withAnimation(.linear(duration: 0.4)) { state.toggleExpansion(.monthVsLastMonth) }
+        withAnimation(.linear(duration: 0.4)) { state.toggleExpansion(.weeklyVolume) }
         try await Task.sleep(for: .milliseconds(500))
         for id in [StatsTileID.weeklyVolume, .monthVsLastMonth] {
             let samples = probe.samples[id, default: []]
@@ -98,7 +100,7 @@ import Testing
                         "Swift Charts height follows the section's presented progress")
             }
         }
-        #expect(abs(try #require(probe.samples[.monthVsLastMonth]?.last).size.width - initialMonthWidth) < 1)
+        #expect(abs(try #require(probe.samples[.weeklyVolume]?.last).size.width - initialVolumeWidth) < 1)
         // No animation transaction (including Reduce Motion) must settle immediately.
         state.toggleExpansion(.monthVsLastMonth)
         try await Task.sleep(for: .milliseconds(80))
@@ -134,12 +136,12 @@ import Testing
         defer { host.close() }
         try await statsWait { probe.frames.count == tiles.count }
         let fullWidth = width - 24
-        #expect(abs(try #require(probe.frames[.monthVsLastMonth]).width - fullWidth) < 1,
+        #expect(abs(try #require(probe.frames[.weeklyVolume]).width - fullWidth) < 1,
                 "The last unpaired compact tile fills the row")
         let mounts = probe.mounts
         let originalTop = try #require(probe.frames[expanded]).minY
         if width >= 760 {
-            #expect(abs(try #require(probe.frames[.thisWeek]).height - #require(probe.frames[.weeklyVolume]).height) < 1,
+            #expect(abs(try #require(probe.frames[.thisWeek]).height - #require(probe.frames[.monthVsLastMonth]).height) < 1,
                     "Compact row surfaces have matching heights")
         }
         try host.capture("flow-collapsed-\(Int(width))")
@@ -153,9 +155,10 @@ import Testing
         #expect(abs(selected.minY - originalTop) < 1, "Expansion starts at the original row without a scroll jump")
         if width >= 760 && expanded == .weeklyVolume {
             let week = try #require(probe.frames[.thisWeek]), month = try #require(probe.frames[.monthVsLastMonth])
-            #expect(week.minY > selected.maxY && abs(week.minY - month.minY) < 1)
+            // Training volume owns its row; the compact pair above it stays put.
+            #expect(week.maxY < selected.minY && abs(week.minY - month.minY) < 1)
             #expect(abs(week.width - (fullWidth - 12) / 2) < 1 && abs(week.height - month.height) < 1,
-                    "Compact neighbors form an equal-height row below the expanded tile")
+                    "Compact neighbors keep an equal-height row above the expanded tile")
         }
         for tile in tiles where tile.id != expanded {
             let other = try #require(probe.frames[tile.id])
@@ -168,7 +171,7 @@ import Testing
         try await Task.sleep(for: .milliseconds(150))
         #expect(probe.mounts == mounts)
         if width >= 760 {
-            let first = try #require(probe.frames[.thisWeek]), second = try #require(probe.frames[.weeklyVolume])
+            let first = try #require(probe.frames[.thisWeek]), second = try #require(probe.frames[.monthVsLastMonth])
             #expect(abs(first.minY - second.minY) < 1 && abs(first.width - (fullWidth - 12) / 2) < 1)
         }
     }

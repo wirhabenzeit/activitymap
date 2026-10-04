@@ -16,8 +16,8 @@ const groupSpans = (group: string) =>
 void test('packs each group of starter tiles on the 4-column grid', () => {
   assert.deepEqual(placeBento(groupSpans('now'), 4), [
     { column: 1, row: 1, columns: 1, rows: 1 }, // this week
-    { column: 2, row: 1, columns: 2, rows: 1 }, // training volume
-    { column: 4, row: 1, columns: 1, rows: 1 }, // this month
+    { column: 2, row: 1, columns: 1, rows: 1 }, // this month
+    { column: 3, row: 1, columns: 2, rows: 1 }, // training volume
   ]);
   assert.deepEqual(placeBento(groupSpans('thisYear'), 4), [
     { column: 1, row: 1, columns: 2, rows: 1 }, // year to date
@@ -38,8 +38,8 @@ void test('packs each group of starter tiles on the 4-column grid', () => {
 void test('clamps spans to the 2-column grid and fills the gaps they leave', () => {
   assert.deepEqual(placeBento(groupSpans('now'), 2), [
     { column: 1, row: 1, columns: 1, rows: 1 },
-    { column: 1, row: 2, columns: 2, rows: 1 },
     { column: 2, row: 1, columns: 1, rows: 1 },
+    { column: 1, row: 2, columns: 2, rows: 1 },
   ]);
   assert.deepEqual(placeBento(groupSpans('thisYear'), 2), [
     { column: 1, row: 1, columns: 2, rows: 1 },

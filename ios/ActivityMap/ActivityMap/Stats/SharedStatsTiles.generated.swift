@@ -2,8 +2,8 @@
 
 enum StatsTileID: String, CaseIterable, Hashable, Sendable {
     case thisWeek
-    case weeklyVolume
     case monthVsLastMonth
+    case weeklyVolume
     case yearToDate
     case yearPace
     case records
@@ -128,22 +128,22 @@ enum SharedStatsTiles {
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation])
         ),
         .init(
-            id: .weeklyVolume,
-            title: "Training volume",
-            window: .last12Weeks,
-            group: .now,
-            isPrimary: true,
-            span: .init(columns: 2, rows: 1),
-            isOptional: false,
-            toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
-        ),
-        .init(
             id: .monthVsLastMonth,
             title: "This month",
             window: .monthToDate,
             group: .now,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            isOptional: false,
+            toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
+        ),
+        .init(
+            id: .weeklyVolume,
+            title: "Training volume",
+            window: .last12Weeks,
+            group: .now,
+            isPrimary: true,
+            span: .init(columns: 2, rows: 1),
             isOptional: false,
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),

@@ -30,23 +30,23 @@
       }
     },
     {
-      "id": "weeklyVolume",
-      "title": "Training volume",
-      "window": "last12Weeks",
+      "id": "monthVsLastMonth",
+      "title": "This month",
+      "window": "monthToDate",
       "group": "now",
-      "span": { "columns": 2, "rows": 1 },
-      "primary": true,
+      "span": { "columns": 1, "rows": 1 },
       "toggle": {
         "label": "Metric",
         "options": ["distance", "time", "elevation", "count"]
       }
     },
     {
-      "id": "monthVsLastMonth",
-      "title": "This month",
-      "window": "monthToDate",
+      "id": "weeklyVolume",
+      "title": "Training volume",
+      "window": "last12Weeks",
       "group": "now",
-      "span": { "columns": 1, "rows": 1 },
+      "span": { "columns": 2, "rows": 1 },
+      "primary": true,
       "toggle": {
         "label": "Metric",
         "options": ["distance", "time", "elevation", "count"]
