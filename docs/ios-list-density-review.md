@@ -66,3 +66,11 @@ The List root now declares inline navigation-bar sizing before the first detail 
 For interactive simulator sign-in, build with normal signing (omit `CODE_SIGNING_ALLOWED=NO`). The unsigned gallery/test build lacks the simulator application entitlement and produced keychain error -34018. A separate `/tmp/activitymap-ipad-signed-build` build generates `DX96FWY9AX.page.dominik.activitymap` as its simulated application identifier. Gallery builds remain appropriate for offline fixtures, not authentication testing.
 
 The focused `shellHeaderStaysOutsideListDetailNavigation()` test passed (one test, zero failures), including the one-second frame-stability check. Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.04_09-12-55-+0200.xcresult`. Two broader attempts stalled and were terminated; no fresh broad-suite pass is claimed for this follow-up.
+
+### Confirmed 10-point opening jump
+
+Device feedback showed that matching inline title modes did not fix the jump. A frame trace reproduced it in the simulator: during the push, the native bar began at y=116 with a 54pt destination top inset; at approximately 0.63s it moved to y=126 and the inset became 64pt. The old stability test started after this change and therefore missed it.
+
+List details now keep the system navigation bar hidden and render a fixed Back row within the sliding content. The existing native navigation stack and interactive-pop recognizer remain in use. A scoped UIKit gesture delegate permits edge-pop while the bar is hidden, guards root/in-flight transitions, and restores the previous delegate and enabled state when the detail disappears. The fixed button retains a 44pt hit target, glass appearance, an explicit accessibility label and the escape action.
+
+The trace now keeps the destination top inset at zero throughout opening. The regression samples 40 frames across the animation, checks native pop eligibility and delegate restoration, and retains the scroll/tab checks. It passed, as did the separate 4,575-row navigation and window-resize checks: three focused tests, zero failures. Results: `Test-ActivityMap-2026.10.04_09-21-37-+0200.xcresult` and `Test-ActivityMap-2026.10.04_09-22-32-+0200.xcresult` in `/tmp/activitymap-navigation-build/Logs/Test/`.

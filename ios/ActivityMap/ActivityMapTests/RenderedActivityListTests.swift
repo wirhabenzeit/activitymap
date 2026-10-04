@@ -289,6 +289,21 @@ extension RenderedRoutePickingTests {
         let navigationTop = navigation.view.convert(.zero, to: host.host.view).y
         #expect(navigationTop >= 54, "The native stack starts below the persistent app header")
         store.inspect(90)
+        var openingFrames: [CGRect] = []
+        var openingInsets: [CGFloat] = []
+        // Include the animation itself: the regression occurred at its end,
+        // before the old post-transition checks started observing the view.
+        for _ in 0..<40 {
+            try await Task.sleep(for: .milliseconds(40))
+            if navigation.viewControllers.count == 2, let destination = navigation.topViewController {
+                openingFrames.append(destination.view.frame)
+                openingInsets.append(destination.view.safeAreaInsets.top)
+                #expect(navigation.isNavigationBarHidden)
+            }
+        }
+        #expect(!openingFrames.isEmpty)
+        #expect(openingFrames.allSatisfy { $0 == openingFrames.first })
+        #expect(openingInsets.allSatisfy { $0 == 0 }, "Native bar insets must not move the fixed Back row during the push")
         try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         let barFrame = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
         let contentFrame = navigation.topViewController?.view.frame
@@ -299,8 +314,12 @@ extension RenderedRoutePickingTests {
             #expect(navigation.topViewController?.view.frame == contentFrame,
                     "Detail content must not shift after the push transition completes")
         }
-        #expect(!navigation.isNavigationBarHidden)
-        #expect(navigation.interactivePopGestureRecognizer?.isEnabled == true)
+        #expect(navigation.isNavigationBarHidden)
+        let popGesture = try #require(navigation.interactivePopGestureRecognizer)
+        #expect(popGesture.isEnabled)
+        #expect(popGesture.delegate?.gestureRecognizerShouldBegin?(popGesture) == true,
+                "The native edge-swipe recognizer must accept a pop with the bar hidden")
+        let detailGestureDelegate = popGesture.delegate
         #expect(navigation.view.convert(.zero, to: host.host.view).y == navigationTop)
         store.selectedTab = .map
         try await Task.sleep(for: .milliseconds(200))
@@ -311,6 +330,7 @@ extension RenderedRoutePickingTests {
         try await listWait { store.inspectedActivityID == nil && navigation.transitionCoordinator == nil }
         #expect(list.contentOffset == offset)
         #expect(store.selectedActivityIDs.isEmpty)
+        #expect(popGesture.delegate !== detailGestureDelegate, "Restore UIKit's gesture delegate after leaving detail")
     }
 
     @Test func largeListNavigationReusesBrowsingSnapshots() async throws {
