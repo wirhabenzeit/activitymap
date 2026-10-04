@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { DisplaySettings } from './display-settings';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Dialog,
@@ -77,6 +78,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 </DialogHeader>
 
                 <div className="grid gap-6 py-4">
+                    <DisplaySettings />
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card>

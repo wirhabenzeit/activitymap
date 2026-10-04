@@ -72,6 +72,8 @@ Owners: #197 and #210. The shared fixture's expected filter IDs preserve input o
 
 ## Sort, metrics and summary scope
 
+The display defaults below describe Metric. The functional Metric/Imperial and date/appearance choices are specified in [Display preferences](display-preferences.md); they change presentation only, not these calculation or ordering rules.
+
 The default remains **canonical numeric activity ID descending**, matching merged web behavior; do not silently substitute timestamp order. A single primary sort is the baseline (current header actions do not expose ordered multi-sort). Sorting returns every filtered result exactly once and is deterministic across pages/scrolling.
 
 For each supported primary key, null/unknown values sort last in **both** directions. Ties break by canonical numeric ID descending. IDs must not be compared lexicographically or cast beyond a platform's safe integer range. Numeric fields use unrounded canonical values. Date/time use the encoded activity-local wall-clock components. Name/description use NFC plus locale-independent lowercase with Unicode scalar lexicographic ordering; accent removal and device-locale collation must not change fixture order. Sport types use canonical identifiers. Photo count uses available metadata count, not decoded images. Geometry status uses the explicit canonical state order `summary` < `detailed` < `refresh_required` in ascending order (reversed in descending order), not localized label collation. The shared geometry sort vectors establish this key for native #211 and the web #199 handoff.

@@ -24,7 +24,8 @@ import {
 import { ScrollArea } from '~/components/ui/scroll-area';
 import { useToast } from '~/hooks/use-toast';
 import { useActivities } from '~/hooks/use-activities';
-import { formatLocalDate } from '~/lib/local-date-time';
+import { formatPreferredDate } from '~/lib/date-preferences';
+import { useDateFormat } from '~/hooks/use-display-preferences';
 import { useShallowStore } from '~/store';
 import {
   DEFAULT_SHARE_LINK_FIELD_OPTIONS,
@@ -53,6 +54,7 @@ type Step = 'configure' | 'confirm' | 'created';
  * revoked. Only that screen's own button actually creates the link.
  */
 export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
+  const dateFormat = useDateFormat();
   const { toast } = useToast();
   const selected = useShallowStore((state) => state.selected);
   const { data: activities = [] } = useActivities();
@@ -158,7 +160,7 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
                 {selectedActivities.map((activity) => (
                   <li key={activity.id} className="truncate text-muted-foreground">
                     {activity.name} -{' '}
-                    {formatLocalDate(activity.start_date_local)}
+                    {formatPreferredDate(activity.start_date_local, dateFormat)}
                   </li>
                 ))}
               </ul>

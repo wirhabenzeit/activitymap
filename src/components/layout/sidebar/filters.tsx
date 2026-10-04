@@ -41,6 +41,8 @@ import { format } from 'date-fns/format';
 import { useState } from 'react';
 import { cn } from '~/lib/utils';
 
+import { useDisplayUnits } from '~/hooks/use-display-preferences';
+import { measurementScale, measurementUnit } from '~/lib/units';
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
 import { type SportType } from '~/server/db/schema';
 import {
@@ -262,6 +264,16 @@ export function InequalityFilter({
 }: {
   name: keyof typeof inequalityFilters;
 }) {
+  const units = useDisplayUnits();
+  const spec = inequalityFilters[name];
+  const scale =
+    'measurement' in spec
+      ? measurementScale(spec.measurement, units)
+      : spec.scale;
+  const unit =
+    'measurement' in spec
+      ? measurementUnit(spec.measurement, units)
+      : spec.unit;
   const [filter, setValues, setValueOperator] = useShallowStore((state) => [
     state.values[name],
     state.setValues,
@@ -269,17 +281,20 @@ export function InequalityFilter({
   ]);
   const [pendingOperator, setPendingOperator] = useState<'>=' | '<='>('>=');
   const operator = filter?.operator ?? pendingOperator;
-  const input =
-    filter?.displayValue ??
-    (filter
-      ? inequalityFilters[name].fromCanonical(filter.value).toString()
-      : '');
+  // Keep the typed text while it still describes the filter in the current
+  // units; after a unit switch, show the converted physical threshold.
+  const input = filter
+    ? filter.displayValue !== undefined &&
+      Number(filter.displayValue) * scale === filter.value
+      ? filter.displayValue
+      : Number((filter.value / scale).toPrecision(12)).toString()
+    : '';
 
   const validateInput = (nextInput: string) => {
     const parsed = parseValueFilterInput(
       nextInput,
       operator,
-      inequalityFilters[name].transform,
+      (value) => value * scale,
     );
     if (parsed.status === 'empty') {
       setPendingOperator(operator);
@@ -305,7 +320,7 @@ export function InequalityFilter({
     <InequalityFilterContent
       operator={operator}
       toggleOperator={toggleOperator}
-      unit={inequalityFilters[name].unit}
+      unit={unit}
       label={inequalityFilters[name].label}
       input={input}
       validateInput={validateInput}

@@ -1,5 +1,10 @@
 'use client';
 
+import {
+  useDisplayUnits,
+  useDateFormat,
+} from '~/hooks/use-display-preferences';
+import { formatMeasurement } from '~/lib/units';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { Gauge, Heart, Mountain, Route, Timer, Zap } from 'lucide-react';
@@ -13,7 +18,8 @@ import ReactMapGL, {
   type MapRef,
 } from 'react-map-gl/mapbox';
 import type { SharedActivityDTO } from '~/contracts/share/activity';
-import { formatLocalDateTime } from '~/lib/local-date-time';
+import { formatPreferredDate } from '~/lib/date-preferences';
+import { formatLocalTime } from '~/lib/local-date-time';
 import { buildSharedRouteCollection } from '~/lib/sharing/shared-map';
 import { categorySettings, colorMap, iconMap } from '~/settings/category';
 import { baseMaps, defaultMapPosition } from '~/settings/map';
@@ -33,10 +39,6 @@ for (const setting of Object.values(categorySettings)) {
 }
 routeColor.push('#6A4C93');
 
-function formatDistance(meters: number | null): string {
-  return meters === null ? '—' : `${(meters / 1000).toFixed(1)} km`;
-}
-
 function formatDuration(seconds: number | null): string {
   if (seconds === null) return '—';
   const hours = Math.floor(seconds / 3600);
@@ -44,16 +46,6 @@ function formatDuration(seconds: number | null): string {
   return hours > 0
     ? `${hours}h ${minutes.toString().padStart(2, '0')}m`
     : `${minutes}m`;
-}
-
-function formatElevation(meters: number | null): string {
-  return meters === null ? '—' : `${Math.round(meters)} m`;
-}
-
-function formatSpeed(metersPerSecond: number | null): string {
-  return metersPerSecond === null
-    ? '—'
-    : `${(metersPerSecond * 3.6).toFixed(1)} km/h`;
 }
 
 function Stat({
@@ -85,6 +77,8 @@ function ActivityDetails({
   activity: SharedActivityDTO;
   expiresAt: string;
 }) {
+  const units = useDisplayUnits();
+  const dateFormat = useDateFormat();
   const sportType = activity.sport_type as keyof typeof iconMap;
   const SportIcon = iconMap[sportType];
   const sportColor = colorMap[sportType] ?? '#6A4C93';
@@ -103,7 +97,12 @@ function ActivityDetails({
           <h1 className="truncate text-lg font-semibold">{activity.name}</h1>
           <p className="text-xs text-muted-foreground">
             {activity.sport_type} ·{' '}
-            {formatLocalDateTime(activity.start_date_local)}
+            {formatPreferredDate(activity.start_date_local, dateFormat) +
+              ' · ' +
+              formatLocalTime(activity.start_date_local, {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
           </p>
         </div>
       </div>
@@ -112,7 +111,7 @@ function ActivityDetails({
         <Stat
           icon={Route}
           label="Distance"
-          value={formatDistance(activity.distance)}
+          value={formatMeasurement(activity.distance, 'distance', units)}
         />
         <Stat
           icon={Timer}
@@ -122,12 +121,16 @@ function ActivityDetails({
         <Stat
           icon={Mountain}
           label="Elevation"
-          value={formatElevation(activity.total_elevation_gain)}
+          value={formatMeasurement(
+            activity.total_elevation_gain,
+            'elevation',
+            units,
+          )}
         />
         <Stat
           icon={Gauge}
           label="Average speed"
-          value={formatSpeed(activity.average_speed)}
+          value={formatMeasurement(activity.average_speed, 'speed', units)}
         />
         {activity.average_heartrate !== undefined && (
           <Stat

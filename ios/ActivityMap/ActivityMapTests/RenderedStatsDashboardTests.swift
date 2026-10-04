@@ -294,6 +294,49 @@ import Testing
         try host.capture("calendar-selected-\(largeText ? "large-text" : "phone")")
     }
 
+    @Test func compactAxesRenderShortWorkoutsAndImperialDistances() async throws {
+        let host = try StatsDashboardHarness(root: VStack(spacing: 24) {
+            Text("Half-hour workout (hours)")
+            StatsPeriodBars(points: [.init(x: 1, value: 0.5, series: "Time", partial: false)],
+                expanded: false, label: { _ in "Mon" }, detailLabel: { _ in "Monday" },
+                valueLabel: { "\($0) h" })
+            Text("Short distance (miles)")
+            StatsPeriodBars(points: [.init(x: 1, value: 0.5, series: "Distance", partial: false)],
+                expanded: false, label: { _ in "Mon" }, detailLabel: { _ in "Monday" },
+                valueLabel: { "\($0 / 1.609344) mi" }, axisValue: { $0 / 1.609344 })
+        }.padding().environment(\.locale, Locale(identifier: "en_US")), size: CGSize(width: 402, height: 440))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(200))
+        try host.capture("fractional-compact-axes")
+    }
+
+    @Test func displayPreferencesRedrawAndSurviveSettingsReopening() async throws {
+        let preferences = DisplayPreferences.shared
+        let oldUnits = preferences.units, oldDate = preferences.dateFormat, oldAppearance = preferences.appearance
+        defer {
+            preferences.units = oldUnits; preferences.dateFormat = oldDate; preferences.appearance = oldAppearance
+        }
+        preferences.units = .metric; preferences.dateFormat = .system; preferences.appearance = .light
+        let auth = AuthController()
+        let initial = try StatsDashboardHarness(root: AccountSheet(destination: .settings, auth: auth),
+                                               size: CGSize(width: 402, height: 874))
+        defer { initial.close() }
+        try await Task.sleep(for: .milliseconds(150))
+        let before = try initial.capture("display-before")
+        preferences.units = .imperial; preferences.dateFormat = .iso; preferences.appearance = .dark
+        try await Task.sleep(for: .milliseconds(150))
+        let after = try initial.capture("display-after")
+        #expect(before.pngData() != after.pngData())
+        initial.close()
+        let reopened = try StatsDashboardHarness(root: AccountSheet(destination: .settings, auth: auth),
+                                                size: CGSize(width: 402, height: 874))
+        defer { reopened.close() }
+        try await Task.sleep(for: .milliseconds(150))
+        try reopened.capture("display-reopened")
+        let restored = DisplayPreferences()
+        #expect(restored.units == .imperial && restored.dateFormat == .iso && restored.appearance == .dark)
+    }
+
     @Test func incompleteVolumeFillStaysBelowItsLine() async throws {
         let start = StatsDates.day("2026-08-31")
         let values = [10_000.0, 5_000, 5_000, 6_000, 7_000]

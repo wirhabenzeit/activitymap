@@ -6,7 +6,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { statsTiles } from '~/settings/stats-tiles.generated';
 import { dayFromISODate, type StatsActivity } from '~/lib/stats/tile-data';
 import { tileView, type TileContext } from './tiles';
-import { tilePalette, formatDailyRate } from './format';
+import { tilePalette, formatDailyRate, statsFormat } from './format';
+import { PlainBars } from './charts';
 import { MonthRows } from './calendar';
 import { statsCapabilitiesSchema } from '../../../../scripts/lib/stats-parity-schema';
 
@@ -427,4 +428,58 @@ void test('Records detail starts in the current year and calendar names minority
   );
   assert.match(calendar, />Run<\/span>/);
   assert.match(calendar, /Striped: multiple sports/);
+});
+
+void test('imperial preferences reach Stats headlines, records and calendar accessibility', () => {
+  const sample: TileContext = {
+    ...context,
+    units: 'imperial',
+    dateFormat: 'iso',
+  };
+  const projection = tileView('yearPace')!.summary(sample, 'distance')!;
+  assert.equal(projection.unit, 'mi projected');
+  const records = renderToStaticMarkup(
+    tileView('records')!.detail!(sample, undefined) as ReactElement,
+  );
+  assert.match(records, /6 mi/);
+  assert.match(records, /328 ft/);
+  assert.match(records, /2026-08-31/);
+  assert.doesNotMatch(records, /10 km|100 m/);
+  const calendar = renderToStaticMarkup(
+    createElement(MonthRows, {
+      today,
+      dominantSport: new Map([[today, 'ride' as const]]),
+      totals: new Map([
+        [today, { count: 1, distance: 10, time: 1, elevation: 100 }],
+      ]),
+      palette: context.palette,
+      colorBy: 'distance',
+      units: 'imperial',
+      dateFormat: 'iso',
+    }),
+  );
+  assert.match(calendar, /2026-09-01: Ride, 6 mi/);
+  assert.doesNotMatch(calendar, /10 km/);
+  const hilliness = tileView('distanceVsElevation')!.summary(
+    sample,
+    undefined,
+  )!;
+  assert.equal(hilliness.unit, 'ft / mi');
+});
+
+void test('short-workout bar axes render a distinct half-hour tick', () => {
+  const fmt = statsFormat('metric');
+  const html = renderToStaticMarkup(
+    createElement(PlainBars, {
+      rows: [{ x: 'Mon', value: 0.5, highlight: true }],
+      width: 400,
+      height: 200,
+      detail: false,
+      compact: true,
+      palette: context.palette,
+      valueFormat: (value) => fmt.formatWithUnit(value, 'time'),
+      axisFormat: (value, step) => fmt.formatShort(value, 'time', step),
+    }),
+  );
+  assert.match(html, />0\.5<\/text>/);
 });

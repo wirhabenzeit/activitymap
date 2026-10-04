@@ -8,23 +8,18 @@ export const inequalityFilters = {
   distance: {
     icon: <RulerHorizontalIcon />,
     label: 'Distance',
-    transform: (value: number) => value * 1000,
-    fromCanonical: (value: number) => value / 1000,
-    unit: 'km',
+    measurement: 'distance',
   },
   total_elevation_gain: {
     icon: <Mountain />,
     label: 'Elevation gain',
-    transform: (value: number) => value,
-    fromCanonical: (value: number) => value,
-    unit: 'm',
+    measurement: 'elevation',
   },
   elapsed_time: {
     icon: <StopwatchIcon />,
     label: 'Elapsed time',
     unit: 'h',
-    transform: (value: number) => value * 3600,
-    fromCanonical: (value: number) => value / 3600,
+    scale: 3600,
   },
 } as const;
 

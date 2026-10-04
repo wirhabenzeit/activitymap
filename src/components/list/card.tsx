@@ -29,12 +29,19 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card';
+import {
+  useDisplayUnits,
+  useDateFormat,
+} from '~/hooks/use-display-preferences';
+import { isMissing } from '~/lib/activity-presentation';
+import { type UnitSystem } from '~/lib/units';
 import { activityFields } from '~/settings/activity';
 
 import { EditActivity } from './edit';
 import { useState } from 'react';
 import { cn } from '~/lib/utils';
-import { formatLocalDate, formatLocalTime } from '~/lib/local-date-time';
+import { formatPreferredDate } from '~/lib/date-preferences';
+import { formatLocalTime } from '~/lib/local-date-time';
 import { useShallowStore } from '~/store';
 import { PhotoLightbox } from './photo';
 import { ElevationChart } from './elevation-chart';
@@ -57,7 +64,11 @@ interface ActivityCardContentProps {
 const formattedValue = (
   key: keyof typeof activityFields,
   row: Row<Features, Activity>,
-) => activityFields[key].formatter(row.getValue(key));
+  units: UnitSystem,
+) =>
+  isMissing(row.getValue(key))
+    ? null
+    : activityFields[key].formatter(row.getValue(key), units);
 
 export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
   const [open, setOpen] = useState(false);
@@ -89,6 +100,8 @@ export function ActivityCardContent({
   onCollapse,
   onClearSelection,
 }: ActivityCardContentProps) {
+  const units = useDisplayUnits();
+  const dateFormat = useDateFormat();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { isGuest, stravaConnected, userId } = useShallowStore((state) => ({
@@ -110,44 +123,47 @@ export function ActivityCardContent({
   const id: number = row.getValue('id');
 
   const date = row.original.start_date_local;
-  const power = formattedValue('weighted_average_watts', row);
-  const gain = formattedValue('total_elevation_gain', row);
-  const elevationLow = formattedValue('elev_low', row);
-  const elevationHigh = formattedValue('elev_high', row);
-  const averagePower = formattedValue('average_watts', row);
-  const maximumPower = formattedValue('max_watts', row);
-  const elapsedTime = formattedValue('elapsed_time', row);
+  const power = formattedValue('weighted_average_watts', row, units);
+  const gain = formattedValue('total_elevation_gain', row, units);
+  const elevationLow = formattedValue('elev_low', row, units);
+  const elevationHigh = formattedValue('elev_high', row, units);
+  const averagePower = formattedValue('average_watts', row, units);
+  const maximumPower = formattedValue('max_watts', row, units);
+  const elapsedTime = formattedValue('elapsed_time', row, units);
   const mapStats = [
     {
       label: 'Distance',
-      value: formattedValue('distance', row) ?? '—',
+      value: formattedValue('distance', row, units) ?? '—',
       detail: undefined,
     },
     {
       label: 'Moving time',
-      value: formattedValue('moving_time', row) ?? '—',
+      value: formattedValue('moving_time', row, units) ?? '—',
       detail: elapsedTime ? `${elapsedTime} elapsed` : undefined,
     },
     {
       label: 'Elevation gain',
       value: gain ? `+${gain}` : '—',
       detail:
-        elevationLow && elevationHigh
-          ? `${elevationLow}–${elevationHigh} elevation`
-          : undefined,
-    },
-    ...(power
-      ? [
-          {
-            label: 'Normalized power',
-            value: power,
-            detail:
-              averagePower && maximumPower
-                ? `${averagePower} avg · ${maximumPower} max`
-                : undefined,
-          },
+        [
+          elevationLow && `${elevationLow} low`,
+          elevationHigh && `${elevationHigh} high`,
         ]
-      : []),
+          .filter(Boolean)
+          .join(' · ') || undefined,
+    },
+    ...(
+      [
+        ['Normalized power', power],
+        ['Average power', averagePower],
+        ['Maximum power', maximumPower],
+        ['Average speed', formattedValue('average_speed', row, units)],
+        ['Average heart rate', formattedValue('average_heartrate', row, units)],
+        ['Maximum heart rate', formattedValue('max_heartrate', row, units)],
+      ] as const
+    ).flatMap(([label, value]) =>
+      value == null ? [] : [{ label, value, detail: undefined }],
+    ),
   ];
 
   const handleRefresh = async () => {
@@ -268,12 +284,7 @@ export function ActivityCardContent({
                 {row.getValue('name')}
               </CardTitle>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {formatLocalDate(date, {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })}{' '}
-                ·{' '}
+                {formatPreferredDate(date, dateFormat)} ·{' '}
                 {formatLocalTime(date, {
                   hour: '2-digit',
                   minute: '2-digit',

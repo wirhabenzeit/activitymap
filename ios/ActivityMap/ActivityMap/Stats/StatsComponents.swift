@@ -61,7 +61,7 @@ struct StatsMetricPicker: View {
 
     var body: some View {
         StatsRangePicker(title: "Metric", ranges: metrics, selection: $selection,
-                         label: { $0 == .count ? "#" : $0.definition.unit },
+                         label: { $0 == .count ? "#" : $0.displayUnit },
                          accessibilityLabel: { $0.definition.label })
             .frame(width: typeSize.isAccessibilitySize ? nil : CGFloat(metrics.count) * AppTheme.minimumTarget)
     }
@@ -225,7 +225,7 @@ struct StatsProjectionSummary: View {
             }.frame(height: 16).accessibilityHidden(true)
             StatsSummaryValues(items: [
                 .init(label: "So far", value: StatsDisplay.measurement(pace.current, metric: metric), color: .primary),
-                .init(label: "Daily average", value: "\(StatsDisplay.dailyRate(pace.perDay)) \(metric.definition.unit) / day"),
+                .init(label: "Daily average", value: "\(StatsDisplay.dailyRate(metric.displayValue(pace.perDay))) \(metric.displayUnit) / day"),
                 .init(label: String(year - 1), value: pace.lastYear > 0 ? StatsDisplay.measurement(pace.lastYear, metric: metric) : "—", color: .orange),
             ])
         }
@@ -291,15 +291,15 @@ struct StatsSportMixVisual: View {
     }
     private var detailTable: some View {
         Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
-            GridRow { ForEach(["Sport", "Share", "Activities", "km", "m", "h"], id: \.self) { Text($0).foregroundStyle(.secondary) } }
+            GridRow { ForEach(["Sport", "Share", "Activities", StatsMetric.distance.displayUnit, StatsMetric.elevation.displayUnit, "h"], id: \.self) { Text($0).foregroundStyle(.secondary) } }
             ForEach(shares, id: \.sport) { share in
                 let totals = breakdown[share.sport] ?? StatsTotals()
                 GridRow {
                     sportLabel(share.sport)
                     Text("\(StatsDisplay.number(share.share * 100))%")
                     Text(StatsDisplay.number(totals.count))
-                    Text(StatsDisplay.number(totals.distance))
-                    Text(StatsDisplay.number(totals.elevation))
+                    Text(StatsDisplay.value(totals.distance, metric: .distance))
+                    Text(StatsDisplay.value(totals.elevation, metric: .elevation))
                     Text(StatsDisplay.number(totals.time, decimals: totals.time < 10 ? 1 : 0))
                 }
             }

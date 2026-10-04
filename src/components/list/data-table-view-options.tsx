@@ -141,8 +141,8 @@ export function DataTableViewOptions<TData extends RowData>({
                       : value === 'page'
                         ? 'This page'
                         : value === 'all'
-                          ? 'All activities'
-                          : 'Selected'}
+                          ? 'Filtered activities'
+                          : 'Selected activities'}
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
