@@ -2,10 +2,10 @@
 
 import {
   Map,
+  Scan,
   Minus,
   Download,
   MoreHorizontal,
-  Pencil,
   ExternalLink,
   X,
 } from 'lucide-react';
@@ -23,13 +23,8 @@ import { ReloadIcon } from '@radix-ui/react-icons';
 import { type Row } from '@tanstack/react-table';
 import { type Features } from './table-extensions';
 
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card';
-import { activityFields } from '~/settings/activity';
+import { Card, CardHeader, CardTitle } from '~/components/ui/card';
+import { ActivityDetailStats } from './activity-detail-stats';
 
 import { EditActivity } from './edit';
 import { useState } from 'react';
@@ -52,12 +47,8 @@ interface ActivityCardContentProps {
   row: Row<Features, Activity>;
   onCollapse?: () => void;
   onClearSelection?: () => void;
+  onFit?: () => void;
 }
-
-const formattedValue = (
-  key: keyof typeof activityFields,
-  row: Row<Features, Activity>,
-) => activityFields[key].formatter(row.getValue(key));
 
 export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
   const [open, setOpen] = useState(false);
@@ -88,6 +79,7 @@ export function ActivityCardContent({
   row,
   onCollapse,
   onClearSelection,
+  onFit,
 }: ActivityCardContentProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -110,46 +102,6 @@ export function ActivityCardContent({
   const id: number = row.getValue('id');
 
   const date = row.original.start_date_local;
-  const power = formattedValue('weighted_average_watts', row);
-  const gain = formattedValue('total_elevation_gain', row);
-  const elevationLow = formattedValue('elev_low', row);
-  const elevationHigh = formattedValue('elev_high', row);
-  const averagePower = formattedValue('average_watts', row);
-  const maximumPower = formattedValue('max_watts', row);
-  const elapsedTime = formattedValue('elapsed_time', row);
-  const mapStats = [
-    {
-      label: 'Distance',
-      value: formattedValue('distance', row) ?? '—',
-      detail: undefined,
-    },
-    {
-      label: 'Moving time',
-      value: formattedValue('moving_time', row) ?? '—',
-      detail: elapsedTime ? `${elapsedTime} elapsed` : undefined,
-    },
-    {
-      label: 'Elevation gain',
-      value: gain ? `+${gain}` : '—',
-      detail:
-        elevationLow && elevationHigh
-          ? `${elevationLow}–${elevationHigh} elevation`
-          : undefined,
-    },
-    ...(power
-      ? [
-          {
-            label: 'Normalized power',
-            value: power,
-            detail:
-              averagePower && maximumPower
-                ? `${averagePower} avg · ${maximumPower} max`
-                : undefined,
-          },
-        ]
-      : []),
-  ];
-
   const handleRefresh = async () => {
     if (!stravaConnected) return;
     setLoading(true);
@@ -268,6 +220,7 @@ export function ActivityCardContent({
                 {row.getValue('name')}
               </CardTitle>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {sport_type} ·{' '}
                 {formatLocalDate(date, {
                   day: 'numeric',
                   month: 'short',
@@ -283,7 +236,7 @@ export function ActivityCardContent({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs @max-2xl:hidden"
+              className="h-7 shrink-0 px-2 text-xs"
               onClick={() => setOpen(true)}
               disabled={isGuest}
             >
@@ -301,14 +254,6 @@ export function ActivityCardContent({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {/* The menu renders in a portal, outside the card's container
-                    query, so Edit stays in it at every width. */}
-                <DropdownMenuItem
-                  onSelect={() => setOpen(true)}
-                  disabled={isGuest}
-                >
-                  <Pencil /> Edit
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => void handleRefresh()}
                   disabled={loading || isGuest || !stravaConnected}
@@ -347,6 +292,18 @@ export function ActivityCardContent({
                 <Minus className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
+            {onFit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={onFit}
+                aria-label="Fit route"
+                title="Fit route"
+              >
+                <Scan className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            )}
             {onClearSelection && (
               <Button
                 variant="ghost"
@@ -360,48 +317,21 @@ export function ActivityCardContent({
               </Button>
             )}
           </div>
-          {row.original.description && (
-            <CardDescription className="whitespace-pre-wrap text-sm">
-              {row.original.description}
-            </CardDescription>
-          )}
         </CardHeader>
-        <RouteDetailsContent key={activityId} elevation={elevationProfile}>
-          <dl className="grid self-start grid-cols-2 gap-x-5 gap-y-2.5">
-            {mapStats.map((stat) => (
-              <div className="min-w-0" key={stat.label}>
-                <dt className="text-xs text-muted-foreground">{stat.label}</dt>
-                <dd
-                  className="truncate text-base font-semibold"
-                  title={stat.value}
-                >
-                  {stat.value}
-                </dd>
-                {stat.detail && (
-                  <dd
-                    className="truncate text-[11px] text-muted-foreground"
-                    title={stat.detail}
-                  >
-                    {stat.detail}
-                  </dd>
-                )}
-              </div>
-            ))}
+        <RouteDetailsContent
+          key={activityId}
+          elevation={elevationProfile}
+          description={row.original.description}
+        >
+          <ActivityDetailStats activity={row.original}>
             {photos.length > 0 && (
-              <div className="min-w-0">
-                <dt className="text-xs text-muted-foreground">
-                  {photos.length === 1 ? 'Photo' : `${photos.length} photos`}
-                </dt>
-                <dd className="mt-0.5">
-                  <PhotoLightbox
-                    photos={photos}
-                    title={row.getValue('name')}
-                    className="h-10"
-                  />
-                </dd>
-              </div>
+              <PhotoLightbox
+                photos={photos}
+                title={row.getValue('name')}
+                className="h-16"
+              />
             )}
-          </dl>
+          </ActivityDetailStats>
         </RouteDetailsContent>
       </Card>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />

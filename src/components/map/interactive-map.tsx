@@ -45,8 +45,6 @@ import { useShallowStore } from '~/store';
 
 import Overlay from '~/components/map/overlay';
 
-import 'mapbox-gl/dist/mapbox-gl.css';
-
 import {
   baseMaps,
   defaultMapPosition,
@@ -62,6 +60,7 @@ import { Selection } from '~/components/map/selection-control';
 import { LayerSwitcher } from '~/components/map/layer-switcher';
 import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import PhotoLayer from '~/components/map/photo';
+import { ElevationRouteMarker } from './elevation-route-marker';
 import { cn, groupBy } from '~/lib/utils';
 
 import {
@@ -778,6 +777,7 @@ export default function InteractiveMap() {
           </Source>
         )}
         <RouteLayer />
+        <ElevationRouteMarker />
         {showPhotos && <PhotoLayer />}
       </ReactMapGL>
       <div
@@ -788,29 +788,25 @@ export default function InteractiveMap() {
           { hidden: rows.length == 0 },
         )}
       >
-        {rows.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="self-end shrink-0"
-            onClick={() => {
-              setPanelExpanded(false);
-              requestRouteFit(selected);
-            }}
-            aria-label={
-              selected.length === 1 ? 'Fit route' : 'Fit selected routes'
-            }
-          >
-            <Scan aria-hidden="true" />
-            {selected.length === 1 ? 'Fit route' : 'Fit selected routes'}
-          </Button>
-        )}
         {selected.length > 1 && (
           <div className="flex items-center gap-1 border-b px-3 py-2 text-xs sm:gap-2">
             <span className="whitespace-nowrap font-semibold">
               {selected.length} routes
             </span>
             <div className="flex-1" />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 shrink-0"
+              aria-label="Fit selected routes"
+              title="Fit selected routes"
+              onClick={() => {
+                setPanelExpanded(false);
+                requestRouteFit(selected);
+              }}
+            >
+              <Scan aria-hidden="true" />
+            </Button>
             <Button
               size="icon"
               variant="ghost"
@@ -870,7 +866,11 @@ export default function InteractiveMap() {
           cellClassName="max-lg:px-2 max-lg:border-r-0"
           {...inlineRouteDetails(highlighted, setHighlighted)}
           renderSingleDetails={(row) => (
-            <ActivityCardContent row={row} onClearSelection={clearSelection} />
+            <ActivityCardContent
+              row={row}
+              onClearSelection={clearSelection}
+              onFit={() => requestRouteFit(selected)}
+            />
           )}
           {...compactList}
           columnVisibility={mapColumnVisibility}

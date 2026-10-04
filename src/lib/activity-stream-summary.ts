@@ -16,7 +16,11 @@ import {
   type CompactStreamSummary,
 } from '~/lib/streams/compact-summary';
 
-export type ElevationProfile = { altitude: number[]; distance: number[] };
+export type ElevationProfile = {
+  altitude: number[];
+  distance: number[];
+  latlng?: [number, number][];
+};
 
 export type StreamSummaryResult = {
   summary: CompactStreamSummary | null;
@@ -100,7 +104,19 @@ export function toElevationProfile({
     distance.every(
       (value, index) => index === 0 || value >= distance[index - 1]!,
     );
-  return forward ? { altitude, distance } : null;
+  const latlng = summary?.latlng;
+  const alignedLocations =
+    latlng?.length === distance.length &&
+    latlng.every(
+      ([lat, lng]) =>
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        Math.abs(lat) <= 90 &&
+        Math.abs(lng) <= 180,
+    );
+  return forward
+    ? { altitude, distance, ...(alignedLocations ? { latlng } : {}) }
+    : null;
 }
 
 /** Parses both delta-seconds and HTTP-date Retry-After forms. */

@@ -57,11 +57,12 @@ nonisolated struct CachedStreamSummary: Hashable, Sendable {
     let storedAt: Date
     var activityID: String { dto.activityID }
     var metadata: ActivityMapAPI.StreamMetadata { dto.metadata }
-    /// Candidate only: #217 must decode and validate aligned altitude, forward
-    /// distance and positive span off-main before rendering a profile.
+    /// Candidate only: ElevationProfile validates aligned altitude, forward
+    /// recorded distance and positive span off-main before rendering. The
+    /// sampling basis may be time, but time values never substitute for distance.
     var hasElevationProfileCandidate: Bool {
         guard let summary = dto.summary else { return false }
-        return codec == "polyline-v1" && algorithmVersion == 1 && summary.basis == .distance
+        return codec == "polyline-v1" && algorithmVersion == 1 && summary.basis != nil
             && summary.count > 1 && summary.distance?.isEmpty == false && summary.altitude?.isEmpty == false
     }
 }

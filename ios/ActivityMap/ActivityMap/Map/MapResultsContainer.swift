@@ -118,7 +118,7 @@ private struct NativeMapResultsSheet: View {
                     .presentationDetents(detents, selection: selection)
                     .presentationDragIndicator(.visible)
                     .presentationBackgroundInteraction(.enabled(upThrough: .large))
-                    .presentationContentInteraction(.resizes)
+                    .presentationContentInteraction(.scrolls)
                     .interactiveDismissDisabled()
                     .onAppear { presentationChanged(true) }
 
@@ -128,8 +128,11 @@ private struct NativeMapResultsSheet: View {
 
 enum NativeMapResultsSizing {
     static func openingHeight(count: Int, detail: Bool, height: CGFloat, largeText: Bool) -> CGFloat {
-        let minimum: CGFloat = largeText ? 300 : 220
-        let content: CGFloat = detail ? (largeText ? 420 : 300) : 76 + CGFloat(max(1, min(count, 5))) * (largeText ? 160 : 64)
+        // Phone detail opens with its profile visible and the map above it.
+        // The smallest phones still retain a usable map instead of requiring .large.
+        let minimum: CGFloat = detail ? (largeText ? 420 : 340) : (largeText ? 300 : 220)
+        let content: CGFloat = detail ? (largeText ? 480 : (count > 1 ? 412 : 368))
+            : 76 + CGFloat(max(1, min(count, 5))) * (largeText ? 160 : 64)
         return max(minimum, min(content, height * 0.5))
     }
 }

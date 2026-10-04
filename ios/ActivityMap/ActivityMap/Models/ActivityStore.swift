@@ -81,6 +81,8 @@ final class ActivityStore {
         }
         return routeAvailabilityIDs
     }
+    var streamSummaries: StreamSummaryLoader?
+    var elevationCursor: ElevationCursor?
     let mapContext = MapContext()
     let listPresentation: ActivityListPresentation
 
@@ -382,6 +384,7 @@ final class ActivityStore {
 
     /// Logout, account or deployment transition.
     func clearScope() {
+        elevationCursor = nil
         stats.clearScope()
         summaryCache.clear()
         filteredSnapshot = nil

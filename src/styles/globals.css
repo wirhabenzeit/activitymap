@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Load map overlay positioning with the root stylesheet, including lazy maps. */
+@import 'mapbox-gl/dist/mapbox-gl.css';
 
 @plugin 'tailwindcss-animate';
 
@@ -54,8 +56,9 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
-  --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
-    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-sans:
+    ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
@@ -109,6 +112,8 @@
 
 @layer base {
   :root {
+    /* Activity profile/cursor hue matches iOS AccentColor. */
+    --activity-accent: #1976d2;
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -148,6 +153,7 @@
     --safe-area-bottom: env(safe-area-inset-bottom);
   }
   .dark {
+    --activity-accent: #90caf9;
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
@@ -188,8 +194,20 @@
     --plot-background: black;
   }
   .mask-fade {
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 10%,
+      black 90%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 10%,
+      black 90%,
+      transparent 100%
+    );
   }
 }
 

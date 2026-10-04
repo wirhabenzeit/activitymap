@@ -72,6 +72,23 @@ nonisolated final class SummaryClock: @unchecked Sendable {
         #expect(try await store.snapshot(scope: Fixtures.scope).activities.count == 1)
     }
 
+
+    @Test func departingConsumerDoesNotCancelAnotherVisibleDetail() async throws {
+        let probe = SummarySourceProbe([], hold: true)
+        let (_, loader, _) = try await setup(probe)
+        let first = Task { await loader.load(activityID: id) }
+        try await waitFor { await probe.calls == 1 }
+        let second = Task { await loader.load(activityID: id) }
+        // Let the second consumer join the in-flight request before leaving.
+        try await Task.sleep(for: .milliseconds(20))
+        first.cancel()
+        try await Task.sleep(for: .milliseconds(20))
+        await probe.resolve(try response())
+        await first.value; await second.value
+        #expect(loader.currentSummary(for: id) != nil)
+        #expect(await probe.calls == 1)
+    }
+
     @Test func pendingPollingHonorsHeaderAndBodyDeadlineAndRefreshOnlyOnce() async throws {
         let clock = SummaryClock()
         let probe = SummarySourceProbe([.success(try response(202, delay: 3, state: "not_fetched")), .success(try response())])

@@ -48,6 +48,7 @@ struct ActivityDetailPanel: View {
     var headerTrailingInset: CGFloat = 0
     var showsHeading = true
     var mapExpansion: MapActivityExpansion? = nil
+    var compactMapProfile = false
     var showOnMap: ((Int) -> Void)? = nil
 
     private var activity: Activity? { store.activity(id: activityID) }
@@ -56,9 +57,9 @@ struct ActivityDetailPanel: View {
         Group {
             if let activity {
                 if let mapExpansion {
-                    MapActivityDetailReveal(activity: activity, expansion: mapExpansion,
+                    MapActivityDetailReveal(store: store, activity: activity, expansion: mapExpansion, compactProfile: compactMapProfile,
                                             trailingInset: headerTrailingInset, hasRoute: store.routableActivityIDs.contains(activityID),
-                                            summary: "\(Formatters.distance(activity.distance))  ·  \(Formatters.duration(activity.elapsedTime))  ·  \(Formatters.elevation(activity.totalElevationGain)) ↑") { id in
+                                            summary: "\(Formatters.distance(activity.distance))  ·  \(Formatters.duration(activity.movingTime))  ·  \(Formatters.elevation(activity.totalElevationGain)) ↑") { id in
                         if let showOnMap { showOnMap(id) }
                         else { store.showOnMap(id) }
                     }
@@ -66,7 +67,11 @@ struct ActivityDetailPanel: View {
                     VStack(spacing: 0) {
                         ScrollView {
                             ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset,
-                                                  showsHeading: showsHeading)
+                                                  showsHeading: showsHeading,
+                                                  profile: { activity in
+                                ElevationProfileView(store: store, activityID: activity.id,
+                                                     isRelevant: store.selectedTab == .list)
+                            }, photos: { _ in EmptyView() })
                         }
                         .accessibilityIdentifier("activity-detail-scroll")
                         .clipped()
@@ -85,52 +90,82 @@ struct ActivityDetailPanel: View {
     }
 }
 
-/// The heading is one persistent element. Compact metrics fade out before
-/// full metrics appear below it; there are never two activity-title layers.
+/// Keep the heading stable across sheet sizes. Phone cards show the profile
+/// followed by one stats row, leaving the route visible above the sheet.
 private struct MapActivityDetailReveal: View {
+    let store: ActivityStore
     let activity: Activity
     let expansion: MapActivityExpansion
+    let compactProfile: Bool
     private var progress: CGFloat { expansion.progress }
     let trailingInset: CGFloat
     let hasRoute: Bool
     let summary: String
     let showOnMap: (Int) -> Void
     @State private var summaryHeight: CGFloat = 20
-    @State private var actionHeight: CGFloat = 64
     private var reveal: CGFloat { min(1, max(0, (progress - 0.25) / 0.75)) }
 
     var body: some View {
         VStack(spacing: 0) {
-            ActivityDetailIdentity(activity: activity, trailingInset: trailingInset)
-                .padding(.horizontal, AppTheme.Spacing.large)
-                .padding(.vertical, AppTheme.Spacing.small)
-            Text(summary)
-                .font(.caption).foregroundStyle(AppTheme.secondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, AppTheme.Spacing.large)
-                .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { summaryHeight = $0 }
-                .opacity(max(0, 1 - progress * 4))
-                .frame(height: summaryHeight * (1 - progress), alignment: .top)
-                .clipped()
-                .accessibilityHidden(progress > 0.25)
+            HStack(alignment: .top, spacing: 8) {
+                ActivityDetailIdentity(activity: activity, trailingInset: trailingInset,
+                                       titleLineLimit: compactProfile ? 2 : nil)
+                Button { showOnMap(activity.id) } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(AppTheme.accent)
+                .disabled(!hasRoute)
+                .accessibilityLabel("Fit route")
+                .accessibilityIdentifier("activity-show-on-map")
+                .accessibilityHint(hasRoute ? "Frame this route while keeping its elevation profile visible" : "This activity has no GPS route")
+            }
+            .padding(.horizontal, AppTheme.Spacing.large)
+            .padding(.vertical, AppTheme.Spacing.small)
+            if !compactProfile {
+                Text(summary)
+                    .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, AppTheme.Spacing.large)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { summaryHeight = $0 }
+                    .opacity(max(0, 1 - progress * 4))
+                    .frame(height: summaryHeight * (1 - progress), alignment: .top)
+                    .clipped()
+                    .accessibilityHidden(progress > 0.25)
+            }
             ScrollView {
-                ActivityDetailContent(activity: activity, showsHeading: false)
+                if compactProfile {
+                    VStack(spacing: 16) {
+                        ActivityDetailDescription(activity: activity)
+                        elevation
+                        Divider()
+                        ActivityHeadlineStats(activity: activity)
+                    }
+                    .padding(.horizontal, AppTheme.Spacing.large)
+                    .padding(.vertical, AppTheme.Spacing.small)
+                    ActivityDetailContent(activity: activity, showsHeading: false, showsPrimaryMetrics: false, showsDescription: false,
+                                          profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
+                } else {
+                    ActivityDetailContent(activity: activity, showsHeading: false, profile: { _ in
+                        elevation
+                    }, photos: { _ in EmptyView() })
+                }
             }
             .accessibilityIdentifier("activity-detail-scroll")
             .opacity(reveal)
             .clipped()
             .allowsHitTesting(progress > 0.8)
             .accessibilityHidden(progress < 0.8)
-            ActivityDetailActions(activity: activity, hasRoute: hasRoute, showOnMap: showOnMap)
-                .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { actionHeight = $0 }
-                .opacity(reveal)
-                .frame(height: actionHeight * reveal, alignment: .bottom)
-                .clipped()
-                .allowsHitTesting(progress > 0.8)
-                .accessibilityHidden(progress < 0.8)
+
         }
+    }
+
+    private var elevation: some View {
+        ElevationProfileView(store: store, activityID: activity.id,
+            isRelevant: progress > 0.8 && store.selectedTab == .map && store.activeActivityID == activity.id,
+            compact: compactProfile)
     }
 }
 
@@ -157,7 +192,7 @@ private struct ActivityDetailActions: View {
                 .foregroundStyle(AppTheme.accent)
                 .disabled(!hasRoute)
                 .accessibilityIdentifier("activity-show-on-map")
-                .accessibilityHint(hasRoute ? (overMap ? "Collapse detail and frame this route, leaving room to reopen detail" : "Select this activity and frame its route") : "This activity has no GPS route")
+                .accessibilityHint(hasRoute ? (overMap ? "Frame this route while keeping its elevation profile visible" : "Select this activity and frame its route") : "This activity has no GPS route")
                 Spacer(minLength: 0)
             }
             if !hasRoute {

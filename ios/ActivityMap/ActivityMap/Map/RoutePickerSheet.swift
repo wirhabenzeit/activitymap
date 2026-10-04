@@ -43,7 +43,7 @@ struct RoutePickerSheet: View {
                     .allowsHitTesting(detail == nil && expansion > 0.8)
                     .accessibilityHidden(detail != nil || expansion < 0.8)
                 if detail != nil {
-                    MapActivityPager(store: store, picker: picker, expansion: expansion)
+                    MapActivityPager(store: store, picker: picker, expansion: expansion, compactProfile: !isSidePanel)
                         .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
                         .transition(reduceMotion ? .opacity : .move(edge: .trailing))
                 }
@@ -165,7 +165,6 @@ struct RoutePickerSheet: View {
             if let activity = detail {
                 Section(activity.name) {
                     Button("Frame route", systemImage: "scope") {
-                        picker.detent = .compact
                         store.showOnMap(activity.id)
                     }.disabled(activity.coordinates.isEmpty)
                     Button("Deselect activity", systemImage: "minus.circle") { store.removeFromSelection([activity.id]) }
@@ -173,7 +172,6 @@ struct RoutePickerSheet: View {
             }
             Toggle("Add routes to selection", isOn: $picker.isAdding)
             Button("Fit selection", systemImage: "scope") {
-                picker.detent = .compact
                 store.mapContext.request(.fitSelection)
             }
             .disabled(!candidates.contains { !$0.coordinates.isEmpty })
