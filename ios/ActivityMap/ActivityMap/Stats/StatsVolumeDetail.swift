@@ -95,10 +95,10 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
         Chart {
             ForEach(sports) { sport in
                 ForEach(Array(buckets.indices.dropLast()), id: \.self) { index in
-                    band(sport: sport, index: index, partial: false)
+                    band(sport: sport, index: index, tail: false)
                 }
                 ForEach(Array(buckets.indices.suffix(2)), id: \.self) { index in
-                    band(sport: sport, index: index, partial: true)
+                    band(sport: sport, index: index, tail: true)
                 }
             }
             ForEach(Array(buckets.indices.dropLast()), id: \.self) { index in
@@ -158,7 +158,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
             if let selected, buckets.indices.contains(selected) {
                 let bucket = buckets[selected]
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("\(label(bucket.start))\(selected == buckets.count - 1 ? " · incomplete" : "")")
+                    Text("\(label(bucket.start))\(bucket.incomplete ? " · incomplete" : "")")
                     Text("Total: \(StatsDisplay.measurement(bucket.total, metric: metric))").bold()
                     if expanded {
                         ForEach(sports) { sport in
@@ -193,7 +193,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                         ForEach(buckets.indices, id: \.self) { index in
                             let bucket = buckets[index]
                             GridRow {
-                                Text(label(bucket.start))
+                                Text("\(label(bucket.start))\(bucket.incomplete ? " · incomplete" : "")")
                                 ForEach(sports) { sport in
                                     Text(StatsDisplay.measurement(bucket.bySport[sport] ?? 0, metric: metric))
                                         .accessibilityLabel("\(sport.name), \(label(bucket.start))")
@@ -201,7 +201,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                                 Text(StatsDisplay.measurement(bucket.total, metric: metric)).fontWeight(.semibold)
                             }
                             .accessibilityElement(children: .combine)
-                            .accessibilityHint(index == buckets.count - 1 ? "Current \(shownRange.period) is incomplete" : "")
+                            .accessibilityHint(bucket.incomplete ? "Incomplete \(shownRange.period)" : "")
                         }
                     }
                     .font(.caption).monospacedDigit().fixedSize(horizontal: true, vertical: false).padding(.vertical, 8)
@@ -214,24 +214,26 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     /// line. Expanded, they become stacked sport bars: periods are discrete,
     /// and a thin sport layer stays visible as its own segment. Both use the
     /// section's expansion progress, so one fades out as the other fades in.
-    @ChartContentBuilder private func band(sport: ActivityCategory, index: Int, partial: Bool) -> some ChartContent {
+    /// `tail` is the lighter collapsed segment into the current period; the
+    /// bars are drawn once per bucket, lighter when the bucket is incomplete.
+    @ChartContentBuilder private func band(sport: ActivityCategory, index: Int, tail: Bool) -> some ChartContent {
         let bucket = buckets[index]
         let low = lower(bucket, sport)
         let value = bucket.bySport[sport] ?? 0
-        let description = "\(sport.name), \(label(bucket.start))\(index == buckets.count - 1 ? ", incomplete" : "")"
+        let description = "\(sport.name), \(label(bucket.start))\(bucket.incomplete ? ", incomplete" : "")"
         // A single year still needs a visible band; two equal endpoints avoid
         // an invisible zero-width area without inventing a second period.
         ForEach(buckets.count == 1 ? [-0.35, 0.35] : [Double(index)], id: \.self) { x in
             AreaMark(x: .value("Period", x),
                      yStart: .value("Lower", low), yEnd: .value("Upper", low + value),
-                     series: .value("Layer", partial ? "\(sport.rawValue)-partial" : sport.rawValue))
-                .foregroundStyle(Color.primary.opacity((partial ? 0.04 : 0.12) * (1 - progress)))
+                     series: .value("Layer", tail ? "\(sport.rawValue)-partial" : sport.rawValue))
+                .foregroundStyle(Color.primary.opacity((tail ? 0.04 : 0.12) * (1 - progress)))
                 .accessibilityHidden(true)
         }
-        if !partial || index == buckets.count - 1, value > 0 {
+        if !tail || index == buckets.count - 1, value > 0 {
             RectangleMark(xStart: .value("Start", Double(index) - 0.35), xEnd: .value("End", Double(index) + 0.35),
                           yStart: .value("Lower", low), yEnd: .value("Upper", low + value))
-                .foregroundStyle(sport.color.opacity((index == buckets.count - 1 ? 0.4 : 1) * progress))
+                .foregroundStyle(sport.color.opacity((bucket.incomplete ? 0.4 : 1) * progress))
                 .accessibilityLabel(description)
                 .accessibilityHidden(!expanded)
                 .accessibilityValue(StatsDisplay.measurement(value, metric: metric))

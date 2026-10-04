@@ -169,7 +169,9 @@ export function VolumeHistory({
             width={width}
             height={height}
             detail
-            partialLast
+            incomplete={buckets.flatMap((bucket) =>
+              bucket.incomplete ? [String(bucket.start)] : [],
+            )}
             trend={trend}
             trendLabel={averageLabel}
             palette={context.palette}
@@ -210,7 +212,7 @@ export function VolumeHistory({
         >
           <table className="w-full text-xs whitespace-nowrap">
             <caption className="sr-only">
-              Period totals by sport, {metric}. Current period is incomplete.
+              Period totals by sport, {metric}. Incomplete periods are marked.
             </caption>
             <thead>
               <tr className="border-b">
@@ -242,6 +244,9 @@ export function VolumeHistory({
                     className="sticky left-0 bg-card py-2 pr-4 text-left font-normal"
                   >
                     {label(bucket.start)}
+                    {bucket.incomplete && (
+                      <span className="text-muted-foreground"> · incomplete</span>
+                    )}
                   </th>
                   {sports.map((sport) => (
                     <td key={sport} className="px-3 text-right font-mono">

@@ -85,7 +85,8 @@ nonisolated struct StatsRecord: Sendable { let value: Double; let day: Int; let 
 nonisolated struct StatsWeekRecord: Sendable { let value: Double; let weekStart: Int }
 nonisolated struct StatsRecords: Sendable { let activities: [StatsMetric: StatsRecord]; let biggestWeek: StatsWeekRecord? }
 nonisolated struct StatsBestDays: Sendable { let total: Double; let start: Int; let end: Int; let current: Double; var hasCompleteWindow: Bool { end - start == 29 } }
-nonisolated struct StatsHistoryBucket: Sendable { let start: Int; let end: Int; let total: Double; let bySport: [ActivityCategory: Double] }
+/// `incomplete`: the current period, or the one in which the history begins partway through.
+nonisolated struct StatsHistoryBucket: Sendable { let start: Int; let end: Int; let total: Double; let bySport: [ActivityCategory: Double]; var incomplete = false }
 nonisolated struct StatsCalendarMonth: Sendable { let start: Int; let length: Int; let first: Int; let last: Int }
 nonisolated struct StatsCalendarDay: Sendable { let activities: [StatsActivity]; let dominantSport: ActivityCategory; let mixed: Bool; let totals: StatsTotals }
 nonisolated struct StatsPoint: Sendable { let x: Int; let y: Double }
@@ -309,10 +310,12 @@ nonisolated struct StatsEngine: Sendable {
             case .years: StatsDates.start(year: firstYear + index - leading)
             }
         }
+        let firstDay = min(orderedDays.first ?? today, today)
         return (0..<count).map { index in
-            let start = starts[index], end = min(today, starts[index + 1] - 1), split = sportBreakdown(first: start, last: end)
+            let start = starts[index], next = starts[index + 1], end = min(today, next - 1), split = sportBreakdown(first: start, last: end)
             return .init(start: start, end: end, total: sum(metric, first: start, last: end),
-                         bySport: Dictionary(uniqueKeysWithValues: ActivityCategory.allCases.map { ($0, split[$0]?[metric] ?? 0) }))
+                         bySport: Dictionary(uniqueKeysWithValues: ActivityCategory.allCases.map { ($0, split[$0]?[metric] ?? 0) }),
+                         incomplete: today < next - 1 || (firstDay > start && firstDay < next))
         }
     }
     func volumeHistoryAverage(today: Int, metric: StatsMetric, range: StatsHistoryRange) -> [StatsPoint] {

@@ -16,6 +16,9 @@ export type HistoryBucket = {
   end: number;
   total: number;
   bySport: Record<Sport, number>;
+  // Not a whole period of data: the current period, or the one in which the
+  // history begins partway through.
+  incomplete: boolean;
 };
 
 export function firstActivityDay(
@@ -53,9 +56,13 @@ export function volumeHistory(
         ? monthStart(year, date.getUTCMonth() + index - 11 - offset - leading)
         : yearStart(firstYear + index - leading),
   );
+  const firstDay = firstActivityDay(activities, today);
   const buckets = starts.slice(0, -1).map((start, index) => ({
     start,
     end: Math.min(today, starts[index + 1]! - 1),
+    incomplete:
+      today < starts[index + 1]! - 1 ||
+      (firstDay > start && firstDay < starts[index + 1]!),
     total: 0,
     bySport: Object.fromEntries(
       sportOrder.map((sport) => [sport, 0]),

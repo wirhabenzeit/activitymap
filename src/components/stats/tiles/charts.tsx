@@ -498,7 +498,7 @@ export function SportBars({
   height,
   detail,
   average,
-  partialLast = false,
+  incomplete = [],
   trend = [],
   trendLabel = '4-week average',
   palette,
@@ -510,8 +510,8 @@ export function SportBars({
   height: number;
   detail: boolean;
   average?: number;
-  // Fade the last bar, a period that is not over yet.
-  partialLast?: boolean;
+  // Periods without a whole period of data, drawn lighter.
+  incomplete?: readonly string[];
   // A line over the bars, such as a rolling average.
   trend?: { x: string; value: number }[];
   trendLabel?: string;
@@ -520,7 +520,7 @@ export function SportBars({
   xTickFormat?: (x: string) => string;
 }) {
   const xs = Array.from(new Set(rows.map((row) => row.x)));
-  const partialX = partialLast ? xs.at(-1) : undefined;
+  const isIncomplete = (x: string) => incomplete.includes(x);
   const bars = (source: SportBar[], fillOpacity: number) =>
     barY(source, {
       x: 'x',
@@ -535,11 +535,11 @@ export function SportBars({
   const definition = defineChart({
     marks: [
       bars(
-        rows.filter((row) => row.x !== partialX),
+        rows.filter((row) => !isIncomplete(row.x)),
         1,
       ),
       bars(
-        rows.filter((row) => row.x === partialX),
+        rows.filter((row) => isIncomplete(row.x)),
         0.4,
       ),
       lineY(trend, {
@@ -592,7 +592,7 @@ export function SportBars({
           id: 'x',
           label: 'When',
           text: (point) =>
-            `${(xTickFormat ?? ((x: string) => x))(point.datum.x)}${point.datum.x === partialX ? ' · incomplete' : ''}`,
+            `${(xTickFormat ?? ((x: string) => x))(point.datum.x)}${isIncomplete(point.datum.x) ? ' · incomplete' : ''}`,
         },
         {
           id: 'value',
