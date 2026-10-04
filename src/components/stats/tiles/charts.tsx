@@ -499,7 +499,6 @@ export function SportBars({
   detail,
   average,
   partialLast = false,
-  shape = 'bars',
   trend = [],
   trendLabel = '4-week average',
   palette,
@@ -513,7 +512,6 @@ export function SportBars({
   average?: number;
   // Fade the last bar, a period that is not over yet.
   partialLast?: boolean;
-  shape?: 'area' | 'bars';
   // A line over the bars, such as a rolling average.
   trend?: { x: string; value: number }[];
   trendLabel?: string;
@@ -532,69 +530,18 @@ export function SportBars({
       inset: 1,
       fillOpacity,
     });
-  const totals = xs.map((x) => ({
-    x,
-    value: rows
-      .filter((row) => row.x === x)
-      .reduce((sum, row) => sum + row.value, 0),
-    kind: 'Total',
-  }));
-  const area = (source: SportBar[], fillOpacity: number) =>
-    areaY(source, {
-      x: 'x',
-      y: 'value',
-      z: 'sport',
-      color: 'sport',
-      fillOpacity,
-      layout: stack({ order: [...sportOrder] }),
-    });
-  const tailXs = xs.slice(-2);
+  // Bars, not a stacked area: periods are discrete, and a thin sport layer
+  // stays visible as its own segment.
   const definition = defineChart({
     marks: [
-      ...(shape === 'area'
-        ? [
-            ...(xs.length === 1
-              ? [bars(rows, partialLast ? 0.3 : 0.8)]
-              : partialLast
-                ? [
-                    area(
-                      rows.filter((row) => row.x !== partialX),
-                      0.8,
-                    ),
-                    area(
-                      rows.filter((row) => tailXs.includes(row.x)),
-                      0.3,
-                    ),
-                  ]
-                : [area(rows, 0.8)]),
-            lineY(partialLast ? totals.slice(0, -1) : totals, {
-              x: 'x',
-              y: 'value',
-              stroke: palette.foreground,
-              strokeWidth: 1,
-            }),
-            ...(partialLast
-              ? [
-                  lineY(totals.slice(-2), {
-                    x: 'x',
-                    y: 'value',
-                    stroke: palette.muted,
-                    strokeWidth: 1,
-                    strokeDasharray: '2 3',
-                  }),
-                ]
-              : []),
-          ]
-        : [
-            bars(
-              rows.filter((row) => row.x !== partialX),
-              1,
-            ),
-            bars(
-              rows.filter((row) => row.x === partialX),
-              0.4,
-            ),
-          ]),
+      bars(
+        rows.filter((row) => row.x !== partialX),
+        1,
+      ),
+      bars(
+        rows.filter((row) => row.x === partialX),
+        0.4,
+      ),
       lineY(trend, {
         x: 'x',
         y: 'value',
@@ -639,9 +586,7 @@ export function SportBars({
           text: (point) =>
             'sport' in point.datum
               ? sportName(point.datum.sport)
-              : 'kind' in point.datum
-                ? String(point.datum.kind)
-                : trendLabel,
+              : trendLabel,
         },
         {
           id: 'x',

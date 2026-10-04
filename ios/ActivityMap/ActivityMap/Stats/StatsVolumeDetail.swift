@@ -103,14 +103,14 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
             }
             ForEach(Array(buckets.indices.dropLast()), id: \.self) { index in
                 LineMark(x: .value("Period", Double(index)), y: .value("Total", buckets[index].total), series: .value("Line", "Total"))
-                    .foregroundStyle(Color.primary.opacity(1 - 0.4 * progress)).lineStyle(.init(lineWidth: 2 - progress))
+                    .foregroundStyle(Color.primary.opacity(1 - progress)).lineStyle(.init(lineWidth: 2))
                     .accessibilityLabel(label(buckets[index].start))
                     .accessibilityValue(StatsDisplay.measurement(buckets[index].total, metric: metric))
                     .accessibilityHidden(expanded)
             }
             ForEach(Array(buckets.indices.suffix(2)), id: \.self) { index in
                 LineMark(x: .value("Period", Double(index)), y: .value("Total", buckets[index].total), series: .value("Line", "Partial total"))
-                    .foregroundStyle(Color.secondary.opacity(1 - 0.5 * progress)).lineStyle(.init(lineWidth: 1, dash: [2, 3]))
+                    .foregroundStyle(Color.secondary.opacity(1 - progress)).lineStyle(.init(lineWidth: 1, dash: [2, 3]))
                     .accessibilityLabel("\(label(buckets[index].start)), incomplete")
                     .accessibilityValue(StatsDisplay.measurement(buckets[index].total, metric: metric))
                     .accessibilityHidden(expanded)
@@ -128,10 +128,6 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                 RuleMark(x: .value("Selected", Double(selected))).foregroundStyle(.secondary)
             }
         }
-        .chartForegroundStyleScale(
-            domain: sports.map(\.rawValue) + sports.map { "\($0.rawValue)-partial" },
-            range: sports.map { Color.primary.opacity(0.12).mix(with: $0.color, by: progress) }
-                + sports.map { Color.primary.opacity(0.04).mix(with: $0.color.opacity(0.35), by: progress) })
         .chartXScale(domain: -0.5...(Double(max(1, buckets.count)) - 0.5))
         .chartYScale(domain: 0...maximum)
         .chartXAxis {
@@ -214,6 +210,10 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
             }.font(.caption)
         }
     }
+    /// Collapsed, the stacked layers form one neutral area under the weekly
+    /// line. Expanded, they become stacked sport bars: periods are discrete,
+    /// and a thin sport layer stays visible as its own segment. Both use the
+    /// section's expansion progress, so one fades out as the other fades in.
     @ChartContentBuilder private func band(sport: ActivityCategory, index: Int, partial: Bool) -> some ChartContent {
         let bucket = buckets[index]
         let low = lower(bucket, sport)
@@ -223,8 +223,15 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
         // an invisible zero-width area without inventing a second period.
         ForEach(buckets.count == 1 ? [-0.35, 0.35] : [Double(index)], id: \.self) { x in
             AreaMark(x: .value("Period", x),
-                     yStart: .value("Lower", low), yEnd: .value("Upper", low + value))
-                .foregroundStyle(by: .value("Sport", partial ? "\(sport.rawValue)-partial" : sport.rawValue))
+                     yStart: .value("Lower", low), yEnd: .value("Upper", low + value),
+                     series: .value("Layer", partial ? "\(sport.rawValue)-partial" : sport.rawValue))
+                .foregroundStyle(Color.primary.opacity((partial ? 0.04 : 0.12) * (1 - progress)))
+                .accessibilityHidden(true)
+        }
+        if !partial || index == buckets.count - 1, value > 0 {
+            RectangleMark(xStart: .value("Start", Double(index) - 0.35), xEnd: .value("End", Double(index) + 0.35),
+                          yStart: .value("Lower", low), yEnd: .value("Upper", low + value))
+                .foregroundStyle(sport.color.opacity((index == buckets.count - 1 ? 0.4 : 1) * progress))
                 .accessibilityLabel(description)
                 .accessibilityHidden(!expanded)
                 .accessibilityValue(StatsDisplay.measurement(value, metric: metric))

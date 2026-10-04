@@ -166,7 +166,6 @@ export function VolumeHistory({
         {({ width, height }) => (
           <SportBars
             rows={rows}
-            shape="area"
             width={width}
             height={height}
             detail
