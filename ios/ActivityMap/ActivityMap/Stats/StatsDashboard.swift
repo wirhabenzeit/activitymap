@@ -223,20 +223,39 @@ enum StatsDisplay {
         }
         return number(value, decimals: 1)
     }
+    /// Explicit ticks let labels use the actual interval after unit conversion.
+    static func axisTicks(maximum: Double, count: Int = 3) -> [Double] {
+        guard maximum.isFinite, maximum > 0, count > 0 else { return [0] }
+        let raw = maximum / Double(count)
+        let power = pow(10, floor(log10(raw)))
+        let error = raw / power
+        let factor = error >= sqrt(50) ? 10.0 : error >= sqrt(10) ? 5.0 : error >= sqrt(2) ? 2.0 : 1.0
+        let step = factor * power
+        return (0...Int(floor(maximum / step))).map { Double($0) * step }
+    }
+    static func compactAxis(_ value: Double, step: Double, locale: Locale = .current) -> String {
+        let scale = abs(value) >= 1000 ? 1000.0 : 1.0
+        let interval = abs(step) / scale
+        let decimals = interval.isFinite && interval > 0 ? min(12, max(0, Int(ceil(-log10(interval))))) : 0
+        let scaled = value / scale
+        let rounded = (scaled * pow(10, Double(decimals))).rounded(.toNearestOrEven)
+        let text = (rounded == 0 ? 0 : scaled).formatted(.number.precision(.fractionLength(0...decimals)).locale(locale))
+        return text + (scale == 1000 ? "k" : "")
+    }
     static func number(_ value: Double, decimals: Int = 0) -> String {
         value.formatted(.number.precision(.fractionLength(decimals)))
     }
     static func value(_ value: Double, metric: StatsMetric) -> String {
-        number(value, decimals: metric == .time && abs(value) < 10 ? 1 : 0)
+        number(metric.displayValue(value), decimals: metric == .time && abs(value) < 10 ? 1 : 0)
     }
     static func measurement(_ value: Double, metric: StatsMetric) -> String {
-        "\(self.value(value, metric: metric)) \(metric == .count ? "activities" : metric.definition.unit)"
+        "\(self.value(value, metric: metric)) \(metric == .count ? "activities" : metric.displayUnit)"
     }
     static func weekday(_ day: Int) -> String {
         ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][day - StatsDates.monday(day)]
     }
     static func date(_ day: Int) -> String {
-        StatsDates.date(day).formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, calendar: StatsDates.calendar, timeZone: .gmt))
+        Formatters.shortDate(StatsDates.date(day), timeZone: .gmt)
     }
     /// Day and month without the year, e.g. "28 Sep".
     static func shortDate(_ day: Int) -> String {

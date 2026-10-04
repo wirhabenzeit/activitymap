@@ -32,7 +32,7 @@ export function DataTablePagination<TData extends RowData>({
       )}
     >
       <span className="text-sm text-muted-foreground">
-        {`${table.getFilteredSelectedRowModel().rows.length}/${table.getFilteredRowModel().rows.length}`}
+        {`${table.getFilteredRowModel().rows.length} filtered · ${table.getSelectedRowModel().rows.length} selected${table.getSelectedRowModel().rows.length > table.getFilteredSelectedRowModel().rows.length ? ` · ${table.getSelectedRowModel().rows.length - table.getFilteredSelectedRowModel().rows.length} hidden by filters` : ''}`}
       </span>
       <DataTableViewOptions table={table} hiddenByFit={hiddenByFit} />
       <div className="flex items-center gap-4">

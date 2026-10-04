@@ -7,8 +7,7 @@ struct AccountSheet: View {
     var refresh: (() async -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
-    @State private var distanceUnit = DistanceUnit.kilometers
-    @State private var appearance = Appearance.system
+    @Bindable private var preferences = DisplayPreferences.shared
 
     var body: some View {
         NavigationStack {
@@ -32,6 +31,7 @@ struct AccountSheet: View {
                 }
             }
         }
+        .preferredColorScheme(preferences.appearance.colorScheme)
         .presentationDetents([.medium, .large])
     }
 
@@ -205,18 +205,24 @@ struct AccountSheet: View {
         Group {
             syncContent
 
-            Section("Display") {
-                Picker("Distance", selection: $distanceUnit) {
-                    ForEach(DistanceUnit.allCases) { unit in
+            Section {
+                Picker("Units", selection: $preferences.units) {
+                    ForEach(UnitSystem.allCases) { unit in
                         Text(unit.title).tag(unit)
                     }
                 }
 
-                Picker("Appearance", selection: $appearance) {
+                Picker("Date format", selection: $preferences.dateFormat) {
+                    ForEach(PreferredDateFormat.allCases) { format in Text(format.title).tag(format) }
+                }
+
+                Picker("Appearance", selection: $preferences.appearance) {
                     ForEach(Appearance.allCases) { appearance in
                         Text(appearance.title).tag(appearance)
                     }
                 }
+            } header: { Text("Display") } footer: {
+                Text("Distance, elevation and speed use \(preferences.units == .metric ? "kilometres, metres and km/h" : "miles, feet and mph"). Preferences are saved on this device.")
             }
         }
     }
@@ -293,36 +299,6 @@ struct AccountSheet: View {
         case .profile: "Profile"
         case .settings: "Settings"
         case .about: "About"
-        }
-    }
-}
-
-private enum DistanceUnit: String, CaseIterable, Identifiable {
-    case kilometers
-    case miles
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .kilometers: "Kilometers"
-        case .miles: "Miles"
-        }
-    }
-}
-
-private enum Appearance: String, CaseIterable, Identifiable {
-    case system
-    case light
-    case dark
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .system: "System"
-        case .light: "Light"
-        case .dark: "Dark"
         }
     }
 }

@@ -1,5 +1,11 @@
 'use client';
 
+import { useDisplayUnits } from '~/hooks/use-display-preferences';
+import {
+  measurementScale,
+  measurementUnit,
+  formatMeasurement,
+} from '~/lib/units';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { areaY, defineChart, lineY } from '@tanstack/charts';
@@ -117,13 +123,19 @@ function ElevationPlot({
   profile: ElevationProfile;
   height?: number;
 }) {
+  const units = useDisplayUnits();
   const plot = useMemo(() => {
     const { altitude, distance } = profile;
     const start = distance[0]!;
     const total = distance[distance.length - 1]! - start;
-    const axisUnit = total < 1000 ? 'm' : 'km';
-    const axisTotal = axisUnit === 'km' ? total / 1000 : total;
-    const distanceUnit = axisUnit === 'km' ? 1000 : 1;
+    const shortMetricProfile = units === 'metric' && total < 1000;
+    const axisUnit = shortMetricProfile
+      ? 'm'
+      : measurementUnit('distance', units);
+    const distanceUnit = shortMetricProfile
+      ? 1
+      : measurementScale('distance', units);
+    const axisTotal = total / distanceUnit;
     let min = Infinity;
     let max = -Infinity;
     for (const value of altitude) {
@@ -134,9 +146,6 @@ function ElevationPlot({
       distance: (distance[index]! - start) / distanceUnit,
       altitude: value,
     }));
-    const metres = new Intl.NumberFormat(undefined, {
-      maximumFractionDigits: 0,
-    });
     const distanceFormat = new Intl.NumberFormat(undefined, {
       maximumFractionDigits: 2,
     });
@@ -181,7 +190,8 @@ function ElevationPlot({
             ticks: {
               values: min === max ? [min] : [min, max],
               size: 0,
-              format: (value: number) => `${metres.format(value)} m`,
+              format: (value: number) =>
+                formatMeasurement(value, 'elevation', units),
             },
             tickLabels: { fontSize: 12, thin: false },
           },
@@ -194,9 +204,7 @@ function ElevationPlot({
       total,
       definition,
     };
-  }, [profile]);
-
-  const metres = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+  }, [profile, units]);
 
   return (
     <Chart
@@ -204,7 +212,7 @@ function ElevationPlot({
       height={height}
       initialWidth={304}
       className="w-full text-muted-foreground"
-      ariaLabel={`Elevation profile from ${metres.format(plot.min)} to ${metres.format(plot.max)} metres over ${(plot.total / 1000).toFixed(1)} kilometres`}
+      ariaLabel={`Elevation profile from ${formatMeasurement(plot.min, 'elevation', units)} to ${formatMeasurement(plot.max, 'elevation', units)} over ${formatMeasurement(plot.total, 'distance', units)}`}
     />
   );
 }
