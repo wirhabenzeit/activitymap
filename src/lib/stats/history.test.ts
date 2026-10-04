@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dayFromISODate, isoDate, type StatsActivity } from './tile-data';
+import {
+  dayFromISODate,
+  isoDate,
+  fourWeekVolume,
+  type StatsActivity,
+} from './tile-data';
 import { volumeHistory, calendarDays } from './history';
 import { calendarMonths } from './tile-series';
 
@@ -181,4 +186,50 @@ void test('rolling volume averages use offscreen history and exclude the incompl
     volumeHistoryAverage([activity('2026-09-21')], today, 'time', 'weeks'),
     [],
   );
+});
+
+void test('current history periods remain incomplete through their final day and complete on rollover', () => {
+  const rows = [activity('2020-01-01')];
+  for (const [date, range] of [
+    ['2026-10-04', 'weeks'],
+    ['2026-09-30', 'months'],
+    ['2024-02-29', 'months'],
+    ['2026-12-31', 'years'],
+  ] as const) {
+    const end = dayFromISODate(date);
+    const current = volumeHistory(rows, end, 'distance', range).at(-1)!;
+    assert.equal(current.incomplete, true, `${range} on ${date}`);
+    const next = volumeHistory(rows, end + 1, 'distance', range);
+    assert.equal(
+      next.find((bucket) => bucket.start === current.start)!.incomplete,
+      false,
+    );
+    assert.equal(next.at(-1)!.incomplete, true);
+  }
+  assert.equal(
+    volumeHistory([activity('2020-10-15')], today, 'distance', 'years')[0]!
+      .incomplete,
+    true,
+  );
+});
+
+void test('volume headline rolls two adjacent 28-day windows including today on every weekday', () => {
+  for (let weekday = 0; weekday < 7; weekday++) {
+    const day = dayFromISODate('2026-09-28') + weekday;
+    const rows = [0, 27, 28, 55, 56, -1].map((offset, id) =>
+      activity(isoDate(day - offset), 'ride', 1, id),
+    );
+    assert.deepEqual(fourWeekVolume(rows, day, 'distance'), {
+      current: 20,
+      previous: 20,
+    });
+    assert.deepEqual(
+      fourWeekVolume(
+        [...rows, activity(isoDate(day), 'ride', 1, 10)],
+        day,
+        'distance',
+      ),
+      { current: 30, previous: 20 },
+    );
+  }
 });

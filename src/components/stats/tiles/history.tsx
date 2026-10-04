@@ -32,7 +32,7 @@ import {
 } from '~/lib/stats/tile-series';
 import { ActivityRow } from './activity-row';
 import { MonthRows } from './calendar';
-import { Measure, SportBars } from './charts';
+import { Measure, SportArea } from './charts';
 import { formatWithUnit, monthName, shortDate } from './format';
 import { type TileContext } from './tiles';
 
@@ -164,7 +164,7 @@ export function VolumeHistory({
       </p>
       <Measure className="w-full" style={{ height: 240 }}>
         {({ width, height }) => (
-          <SportBars
+          <SportArea
             rows={rows}
             width={width}
             height={height}
@@ -245,7 +245,10 @@ export function VolumeHistory({
                   >
                     {label(bucket.start)}
                     {bucket.incomplete && (
-                      <span className="text-muted-foreground"> · incomplete</span>
+                      <span className="text-muted-foreground">
+                        {' '}
+                        · incomplete
+                      </span>
                     )}
                   </th>
                   {sports.map((sport) => (

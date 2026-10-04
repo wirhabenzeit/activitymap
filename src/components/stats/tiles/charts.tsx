@@ -134,7 +134,8 @@ export function CumulativeLines({
   const reference = lastCurrent
     ? past.find((row) => row.day === lastCurrent.day)
     : undefined;
-  const currentMidChart = lastCurrent !== undefined && lastCurrent.day < xMax * 0.85;
+  const currentMidChart =
+    lastCurrent !== undefined && lastCurrent.day < xMax * 0.85;
   const currentAbove = !reference || lastCurrent!.y >= reference.y;
   const labelOverlap =
     !currentMidChart &&
@@ -187,7 +188,9 @@ export function CumulativeLines({
         r: 3.5,
       }),
       text(
-        ends.filter((row) => !currentMidChart || row.key !== currentKey(series)),
+        ends.filter(
+          (row) => !currentMidChart || row.key !== currentKey(series),
+        ),
         {
           x: 'x',
           y: 'y',
@@ -492,7 +495,7 @@ export function VolumeArea({
 
 export type SportBar = { x: string; sport: Sport; value: number };
 
-export function SportBars({
+export function SportArea({
   rows,
   width,
   height,
@@ -512,7 +515,7 @@ export function SportBars({
   average?: number;
   // Periods without a whole period of data, drawn lighter.
   incomplete?: readonly string[];
-  // A line over the bars, such as a rolling average.
+  // A line over the area, such as a rolling average.
   trend?: { x: string; value: number }[];
   trendLabel?: string;
   palette: TilePalette;
@@ -530,18 +533,48 @@ export function SportBars({
       inset: 1,
       fillOpacity,
     });
-  // Bars, not a stacked area: periods are discrete, and a thin sport layer
-  // stays visible as its own segment.
+  const totals = xs.map((x) => ({
+    x,
+    value: rows
+      .filter((row) => row.x === x)
+      .reduce((sum, row) => sum + row.value, 0),
+    kind: 'Total',
+  }));
+  // Separate adjacent segments keep both the opening and current partial
+  // periods light, without dropping their contribution or bridging a gap.
+  const segments = xs.slice(0, -1).map((x, index) => {
+    const ends = [x, xs[index + 1]!];
+    return { ends, incomplete: ends.some(isIncomplete) };
+  });
   const definition = defineChart({
     marks: [
-      bars(
-        rows.filter((row) => !isIncomplete(row.x)),
-        1,
-      ),
-      bars(
-        rows.filter((row) => isIncomplete(row.x)),
-        0.4,
-      ),
+      // A lone year still needs a visible footprint at its single period.
+      ...(xs.length === 1
+        ? [bars(rows, isIncomplete(xs[0]!) ? 0.3 : 0.8)]
+        : []),
+      ...segments.flatMap((segment) => [
+        areaY(
+          rows.filter((row) => segment.ends.includes(row.x)),
+          {
+            x: 'x',
+            y: 'value',
+            z: 'sport',
+            color: 'sport',
+            fillOpacity: segment.incomplete ? 0.3 : 0.8,
+            layout: stack({ order: [...sportOrder] }),
+          },
+        ),
+        lineY(
+          totals.filter((row) => segment.ends.includes(row.x)),
+          {
+            x: 'x',
+            y: 'value',
+            stroke: segment.incomplete ? palette.muted : palette.foreground,
+            strokeWidth: 1,
+            ...(segment.incomplete ? { strokeDasharray: '2 3' } : {}),
+          },
+        ),
+      ]),
       lineY(trend, {
         x: 'x',
         y: 'value',
@@ -586,7 +619,9 @@ export function SportBars({
           text: (point) =>
             'sport' in point.datum
               ? sportName(point.datum.sport)
-              : trendLabel,
+              : 'kind' in point.datum
+                ? String(point.datum.kind)
+                : trendLabel,
         },
         {
           id: 'x',

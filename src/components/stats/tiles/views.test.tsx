@@ -209,7 +209,7 @@ void test('expanded training history exposes bounded presets and period totals',
   assert.match(html, /scope="col"[^>]*>Ride/);
   assert.match(html, /over 12 weeks/);
   assert.equal(view.period(context), '12-week trend');
-  assert.match(view.summary(context, 'distance')!.unit, /last 4 full weeks/);
+  assert.match(view.summary(context, 'distance')!.unit, /last 28 days/);
 });
 
 void test('calendar history supports year selection, and mixed days stay identifiable', () => {

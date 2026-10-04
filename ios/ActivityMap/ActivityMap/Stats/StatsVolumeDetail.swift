@@ -93,27 +93,22 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
 
     private var chart: some View {
         Chart {
-            ForEach(sports) { sport in
-                ForEach(Array(buckets.indices.dropLast()), id: \.self) { index in
-                    band(sport: sport, index: index, tail: false)
+            ForEach(0..<max(1, buckets.count - 1), id: \.self) { segment in
+                ForEach(sports) { sport in
+                    ForEach(segmentIndices(segment), id: \.self) { index in
+                        band(sport: sport, index: index, segment: segment)
+                    }
                 }
-                ForEach(Array(buckets.indices.suffix(2)), id: \.self) { index in
-                    band(sport: sport, index: index, tail: true)
+                ForEach(segmentIndices(segment), id: \.self) { index in
+                    LineMark(x: .value("Period", Double(index)), y: .value("Total", buckets[index].total),
+                             series: .value("Line", "Total-\(segment)"))
+                        .foregroundStyle(segmentIncomplete(segment) ? Color.secondary.opacity(1 - 0.5 * progress) : Color.primary.opacity(1 - 0.4 * progress))
+                        .lineStyle(.init(lineWidth: segmentIncomplete(segment) ? 1 : 2 - progress,
+                                         dash: segmentIncomplete(segment) ? [2, 3] : []))
+                        .accessibilityLabel("\(label(buckets[index].start))\(buckets[index].incomplete ? ", incomplete" : "")")
+                        .accessibilityValue(StatsDisplay.measurement(buckets[index].total, metric: metric))
+                        .accessibilityHidden(expanded)
                 }
-            }
-            ForEach(Array(buckets.indices.dropLast()), id: \.self) { index in
-                LineMark(x: .value("Period", Double(index)), y: .value("Total", buckets[index].total), series: .value("Line", "Total"))
-                    .foregroundStyle(Color.primary.opacity(1 - progress)).lineStyle(.init(lineWidth: 2))
-                    .accessibilityLabel(label(buckets[index].start))
-                    .accessibilityValue(StatsDisplay.measurement(buckets[index].total, metric: metric))
-                    .accessibilityHidden(expanded)
-            }
-            ForEach(Array(buckets.indices.suffix(2)), id: \.self) { index in
-                LineMark(x: .value("Period", Double(index)), y: .value("Total", buckets[index].total), series: .value("Line", "Partial total"))
-                    .foregroundStyle(Color.secondary.opacity(1 - progress)).lineStyle(.init(lineWidth: 1, dash: [2, 3]))
-                    .accessibilityLabel("\(label(buckets[index].start)), incomplete")
-                    .accessibilityValue(StatsDisplay.measurement(buckets[index].total, metric: metric))
-                    .accessibilityHidden(expanded)
             }
             ForEach(Array(trend.enumerated()), id: \.offset) { _, point in
                 if let index = buckets.firstIndex(where: { $0.start == point.x }) {
@@ -210,32 +205,32 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
             }.font(.caption)
         }
     }
-    /// Collapsed, the stacked layers form one neutral area under the weekly
-    /// line. Expanded, they become stacked sport bars: periods are discrete,
-    /// and a thin sport layer stays visible as its own segment. Both use the
-    /// section's expansion progress, so one fades out as the other fades in.
-    /// `tail` is the lighter collapsed segment into the current period; the
-    /// bars are drawn once per bucket, lighter when the bucket is incomplete.
-    @ChartContentBuilder private func band(sport: ActivityCategory, index: Int, tail: Bool) -> some ChartContent {
+    private func segmentIndices(_ segment: Int) -> [Int] {
+        guard !buckets.isEmpty else { return [] }
+        return buckets.count == 1 ? [0] : [segment, segment + 1]
+    }
+    private func segmentIncomplete(_ segment: Int) -> Bool {
+        segmentIndices(segment).contains { buckets[$0].incomplete }
+    }
+
+    // Keep the same area marks throughout expansion. Only their color and
+    // chart geometry change with the shared animation progress.
+    @ChartContentBuilder private func band(sport: ActivityCategory, index: Int, segment: Int) -> some ChartContent {
         let bucket = buckets[index]
         let low = lower(bucket, sport)
         let value = bucket.bySport[sport] ?? 0
+        let partial = segmentIncomplete(segment)
         let description = "\(sport.name), \(label(bucket.start))\(bucket.incomplete ? ", incomplete" : "")"
-        // A single year still needs a visible band; two equal endpoints avoid
-        // an invisible zero-width area without inventing a second period.
+        // A single year still needs a visible band; equal endpoints avoid
+        // inventing a second period while preserving its actual value.
         ForEach(buckets.count == 1 ? [-0.35, 0.35] : [Double(index)], id: \.self) { x in
             AreaMark(x: .value("Period", x),
                      yStart: .value("Lower", low), yEnd: .value("Upper", low + value),
-                     series: .value("Layer", tail ? "\(sport.rawValue)-partial" : sport.rawValue))
-                .foregroundStyle(Color.primary.opacity((tail ? 0.04 : 0.12) * (1 - progress)))
-                .accessibilityHidden(true)
-        }
-        if !tail || index == buckets.count - 1, value > 0 {
-            RectangleMark(xStart: .value("Start", Double(index) - 0.35), xEnd: .value("End", Double(index) + 0.35),
-                          yStart: .value("Lower", low), yEnd: .value("Upper", low + value))
-                .foregroundStyle(sport.color.opacity((bucket.incomplete ? 0.4 : 1) * progress))
+                     series: .value("Layer", "\(sport.rawValue)-\(segment)"))
+                .foregroundStyle(Color.primary.opacity(partial ? 0.04 : 0.12)
+                    .mix(with: sport.color.opacity(partial ? 0.35 : 1), by: progress))
                 .accessibilityLabel(description)
-                .accessibilityHidden(!expanded)
+                .accessibilityHidden(!expanded || (segment > 0 && index == segment))
                 .accessibilityValue(StatsDisplay.measurement(value, metric: metric))
         }
     }

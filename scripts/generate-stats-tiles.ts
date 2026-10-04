@@ -94,6 +94,8 @@ const manifestSchema = z
               .strict(),
             // Primary tiles get the large headline numerals.
             primary: z.boolean().optional(),
+            // Web card minimum in CSS pixels; native layout remains intrinsic.
+            minHeight: z.number().positive().optional(),
             optional: z.boolean().optional(),
             toggle: z
               .object({
@@ -274,6 +276,7 @@ const tileRows = manifest.tiles
             group: .${tile.group},
             isPrimary: ${tile.primary ?? false},
             span: .init(columns: ${tile.span.columns}, rows: ${tile.span.rows}),
+            minHeight: ${tile.minHeight ?? 'nil'},
             isOptional: ${tile.optional ?? false},
             toggle: ${toggle}
         )`;
@@ -336,6 +339,7 @@ struct StatsTileDefinition: Identifiable, Hashable, Sendable {
     let group: StatsTileGroup
     let isPrimary: Bool
     let span: StatsTileSpan
+    let minHeight: Double?
     let isOptional: Bool
     let toggle: StatsTileToggle?
 }

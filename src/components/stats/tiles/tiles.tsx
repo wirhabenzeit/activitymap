@@ -355,13 +355,13 @@ const weeklyVolumeView: TileView = {
     );
     return {
       value: formatMetric(current, metric),
-      unit: `${metricUnit[metric]} · last 4 full weeks`,
+      unit: `${metricUnit[metric]} · last 28 days`,
       sub: (
         <Delta
           current={current}
           previous={previous}
           metric={metric}
-          text="vs the 4 weeks before"
+          text="vs previous 28 days"
         />
       ),
     };

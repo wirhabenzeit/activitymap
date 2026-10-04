@@ -292,3 +292,62 @@ The opt-in `captureExpansionFrames(scenario:)` test now records Training volume 
 ## PR handoff validation — 2026-10-04
 
 The final web revision passes 618 unit tests, 16 Stats UI tests, TypeScript and ESLint. Shared Stats generation, API DTO generation and map catalogue checks pass. The native dashboard/state rendering run passes, including shared animation progress, neighbor widths, reversal, nonanimated updates and mounted state retention; the four opt-in full-library expansion/collapse captures also pass. Stats fixture/scope tests pass separately. The renderer integration now uses the visible catalogue count rather than the superseded eleven-tile constant. The simulator review build is normally signed to preserve Keychain sign-in.
+
+## Review of follow-up commits — 2026-10-04
+
+Scope: `ead2287f..fd37b851` in `activitymap-pr291`, branch `codex/ios-stats-dashboard-263`. This checkout contains **20 follow-up commits**, or 21 including the original dashboard commit relative to main `49224cdf`; the reported additional four commits are not present in this range. Each follow-up diff was reviewed against the accepted design above, alongside the resulting web/native implementations. Most are improvements. Two change the product meaning or an explicitly selected visual, and one introduces a period-boundary defect.
+
+### Commit-by-commit assessment
+
+| Commit | Change | Assessment against the proposal |
+| --- | --- | --- |
+| `c94cde5d` | Centre native bar labels | Keep. Categorical placement aligns weekdays/months with their bars and retains the full weekday domain without inventing future activity. |
+| `6307e6af` | Hilliness month readouts | Keep. A month aggregate should say “Oct 2026”, rather than suggesting the value belongs to 1 October. |
+| `1fbe9e56` | Whole-period volume ticks | Keep. Regular week/month/year intervals make the time axis easier to scan. Automatic collision handling remains necessary at narrow widths. |
+| `b4d621ee` | Neutral decreases | Keep. Lower activity is not inherently bad; neutral decreases and green increases fit the agreed visual language without implying an alarm. |
+| `b417ceef` | Native average line matches web | Keep. Neutral dashes and an explicit average label distinguish context from sport colors. The label yields to the inspection readout. |
+| `0e673460` | This week date range | Keep. The period line now adds actual information instead of repeating the title. |
+| `ffe8e519` | Explicit comparison weekdays | Keep. “vs typical Mon–Tue” explains the elapsed-day comparison more precisely than “by Tue”. |
+| `2246120e` | Plain-language historical bands | Keep, with the exact definitions preserved in help/accessibility. “Typical range” is more approachable, but still means the monthly 5th–95th percentiles, not an average or all historical observations. |
+| `f53b43a0` | Avoid comparison-line label collision | Keep. Choosing the current label position using the comparison value is better than a fixed position. It is a local heuristic, not a guarantee against every crossing or edge collision. |
+| `d264a774` | Specific expanded headings | Keep. “Personal bests”, “Colour by” and “Period” explain the content or control better than “History & details”. |
+| `06d305d9` | Shared activity rows | Keep. Calendar and Hilliness drill-downs gain consistent sport/name/summary/navigation treatment and native touch targets. |
+| `e3533c82` | Headline uses four full weeks | Reconsider. This aligns the time window with the average, but makes the headline ignore all new activity until the next Monday. The previous rolling 28-day window already had a constant duration, so an inherent early-week short-window bias was not present. Also, a four-week total is still four times the weekly average; they are not expected to display the same value. Prefer the rolling 28-day headline for a current/recent-activity overview, or explicitly accept a closed-week baseline as a different product choice. |
+| `8b6331b1` | Expanded volume becomes stacked bars | Reconsider. Bars are good for comparing discrete period totals and sport contributions. However, this reverses the explicit preference for area charts and weakens the compact-to-expanded visual continuity. Based on the accepted proposal, prefer the stacked area expansion. This is a design decision, not a calculation defect. |
+| `37419b55` | Partial first period is incomplete | Useful intent, but fix the boundary condition before accepting as complete. The current bucket becomes “complete” on its final calendar day; see the finding below. The first recorded activity is also only a proxy for coverage: an initially quiet period, especially after sport filtering, is not proof that earlier data is missing. |
+| `c6d99e5e` | Lighter current Hilliness month | Keep. This conveys the partial period without restoring the removed disclaimer and makes chart inspection clearer. |
+| `a7e9f829` | Typical week says “per week” | Keep. Makes the denominator explicit; avoids reading the values as totals over the whole history window. |
+| `81c5f10b` | Record sport/date in overview | Keep. Adds useful provenance and makes records less anonymous; the native adaptive layout accommodates available width. |
+| `37e6719c` | Group content below headlines | Keep. Removing bottom-pushed content improves visual association with its headline and reduces artificial empty space. |
+| `b6628a77` | Two-color calendar stripes | Keep. Showing the two leading sport colors is more informative than a generic mixed marker. Stripes are not proportional shares, and days with three or more sports still need their detail/accessibility listing. |
+| `fd37b851` | Week and month adjacent | Keep. Pairs related current-period comparisons and gives Training volume a natural full-width row on iPad. The web expansion gaps were a separate pre-existing packing issue. |
+
+### Remaining review finding
+
+**P2 — Keep the current period incomplete through its final day.** `src/lib/stats/history.ts:64` and `ios/ActivityMap/ActivityMap/Stats/StatsEngine.swift:327` compare `today < nextStart - 1`. On Sunday, the final day of a month, or 31 December, the expression is false even though the current day is still underway. The chart/readout then treats that period as complete while the moving average continues to exclude it. Reproduced with history beginning in 2020: current weekly 2026-10-04, monthly 2026-09-30, and yearly 2026-12-31 buckets all return `incomplete: false`. The current-period test should compare against the next period's start, with matching web/native boundary regressions. This finding and the two design decisions above are reported, not silently changed during the four requested UI fixes.
+
+### Four requested fixes implemented locally
+
+- Expanded web cards retain a full-width row; remaining standalone row-mates divide their row equally. The regular grid uses twelve CSS subcolumns to represent equal thirds as well as halves/quarters. Rows intersected by the tall calendar preserve its span and fill free space beneath shorter neighbors. Collapsed packing and mounted tile identities remain intact.
+- Optional positive `minHeight` lives on each relevant tile in `shared/stats-tiles.json`, with generated TypeScript/Swift metadata. The web consumes the hints instead of listing tile IDs. Minimum rows may grow for content; native continues using intrinsic heights rather than importing web pixel dimensions.
+- The shared native surface removes the extra title-to-period/control gutter while preserving 44pt controls and a small gap at accessibility text sizes.
+- Initial pending queries now show loading, including the authentication/hydration interval before fetching begins. A successful empty response shows the empty message; cached content remains visible during refresh, and failures retain the error state.
+
+Validation: 621 web unit tests, 18 Stats UI tests, TypeScript, ESLint and generated-manifest checks pass. Native StatsDashboardTests and RenderedStatsDashboardTests pass (26 tests across two suites). Browser review on the PR worktree server, port 3291, confirms two equal 650px neighbors below expanded Training volume and three approximately 429.33px neighbors below the expanded calendar at a 1600px viewport. Temporary viewport overrides were reset. Native phone renders were inspected for the tightened header. These layout captures use deterministic test fixtures; they are not another full-development-library data audit or a physical-device animation certification.
+
+
+## Accepted review corrections — 2026-10-04
+
+The user accepted all three review recommendations. Both platforms now use a stacked area for expanded Training volume, and the compact headline again compares the last 28 days including today against the preceding 28 days. Week/month/year grouping and the four-completed-period average remain available as before; the headline and average intentionally answer different questions.
+
+The native chart keeps the same area marks mounted through expansion and changes color/geometry using the shared animation progress. Adjacent segments touching an incomplete opening or current period are lighter on both platforms. A single available year retains a visible filled footprint without inventing another period. No chart-type picker is introduced.
+
+The P2 finding above is resolved in both engines: a current period remains incomplete on its final day and becomes complete on rollover. New web/native regressions cover Sunday, month-end, leap day and year-end, preserve the partial-opening rule, and check both 28-day boundaries plus same-day activity updates on every weekday. Shared rules, capabilities, contract, headline copy and the original calculation fixture reflect the restored behavior.
+
+Validation: 623 web unit tests, 18 Stats UI tests, and 30 native tests across dashboard, rendered dashboard and shared fixture suites pass. TypeScript, ESLint, generated-manifest checks and diff whitespace checks pass. Browser inspection confirms weekly/yearly area rendering and opening/current partial shading; the native expanded-volume phone render also shows the persistent stacked area. Changes remain local alongside the four UI fixes from the preceding review.
+
+## Refreshed complete gallery — 2026-10-04
+
+The all-tiles gallery at `http://127.0.0.1:8769/index.html` now contains 38 current captures: collapsed web/iOS views of all ten visible tiles, both platforms' seven supported expansions, and Training volume's additional monthly/yearly detail views. The three nonexpandable tiles are explicitly marked. Capture inputs match by SHA-256, reporting date (2026-10-04), activity count (4,578) and logical tile width (378pt/CSS pixels). This uses a fresh export of the full development database rather than the earlier 20-activity fixture. Native captures are 2× PNG; browser crops are 1× JPEG, declared in the gallery instead of being upscaled. The gallery builder verifies actual image dimensions and metadata, derives catalogue order/counts, includes all volume groupings and replaces obsolete parity-gap notes.
+
+Native gallery export passes with the normally signed simulator build. The generated self-contained HTML and full-library images remain local in `/tmp/activitymap-stats-final-20261004`, with the served `index.html` refreshed in `/tmp/activitymap-stats-pilot-v2`. Existing historical comparison pages remain available. The PR preview on port 3291 now uses the full-library export and the same reporting date.

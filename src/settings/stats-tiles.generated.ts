@@ -62,6 +62,7 @@ export const statsTiles = [
       columns: 1,
       rows: 1,
     },
+    minHeight: 280,
     toggle: {
       label: 'Metric',
       options: ['distance', 'time', 'elevation'],
@@ -76,6 +77,7 @@ export const statsTiles = [
       columns: 1,
       rows: 1,
     },
+    minHeight: 300,
     toggle: {
       label: 'Metric',
       options: ['distance', 'time', 'elevation', 'count'],
@@ -91,6 +93,7 @@ export const statsTiles = [
       rows: 1,
     },
     primary: true,
+    minHeight: 280,
     toggle: {
       label: 'Metric',
       options: ['distance', 'time', 'elevation', 'count'],
@@ -106,6 +109,7 @@ export const statsTiles = [
       rows: 1,
     },
     primary: true,
+    minHeight: 300,
     toggle: {
       label: 'Metric',
       options: ['distance', 'time', 'elevation', 'count'],
@@ -120,6 +124,7 @@ export const statsTiles = [
       columns: 1,
       rows: 1,
     },
+    minHeight: 280,
     toggle: {
       label: 'Metric',
       options: ['distance', 'time', 'elevation'],
@@ -187,6 +192,7 @@ export const statsTiles = [
       columns: 1,
       rows: 1,
     },
+    minHeight: 280,
     toggle: {
       label: 'Range',
       options: ['currentYear', 'allTime'],
@@ -201,6 +207,7 @@ export const statsTiles = [
       columns: 2,
       rows: 1,
     },
+    minHeight: 280,
   },
   {
     id: 'typicalWeek',

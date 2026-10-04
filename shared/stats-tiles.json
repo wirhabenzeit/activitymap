@@ -20,6 +20,7 @@
   "tiles": [
     {
       "id": "thisWeek",
+      "minHeight": 280,
       "title": "This week",
       "window": "currentWeek",
       "group": "now",
@@ -31,6 +32,7 @@
     },
     {
       "id": "monthVsLastMonth",
+      "minHeight": 300,
       "title": "This month",
       "window": "monthToDate",
       "group": "now",
@@ -42,6 +44,7 @@
     },
     {
       "id": "weeklyVolume",
+      "minHeight": 280,
       "title": "Training volume",
       "window": "last12Weeks",
       "group": "now",
@@ -54,6 +57,7 @@
     },
     {
       "id": "yearToDate",
+      "minHeight": 300,
       "title": "Year to date",
       "window": "yearToDate",
       "group": "thisYear",
@@ -66,6 +70,7 @@
     },
     {
       "id": "yearPace",
+      "minHeight": 280,
       "title": "Year-end projection",
       "window": "yearToDate",
       "group": "thisYear",
@@ -115,6 +120,7 @@
     },
     {
       "id": "sportMix",
+      "minHeight": 280,
       "title": "Sport mix",
       "window": "currentYear",
       "group": "patterns",
@@ -123,6 +129,7 @@
     },
     {
       "id": "distanceVsElevation",
+      "minHeight": 280,
       "title": "Hilliness",
       "window": "last12Months",
       "group": "patterns",

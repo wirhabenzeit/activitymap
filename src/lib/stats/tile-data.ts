@@ -351,18 +351,15 @@ function activeDaySet(activities: readonly StatsActivity[]): Set<Day> {
   );
 }
 
-// The metric over the last four full weeks and the four before them.
+// The metric over the last 28 days (today included) and the 28 before.
 export function fourWeekVolume(
   activities: readonly StatsActivity[],
   today: Day,
   metric: StatsMetric,
 ): Comparison {
-  // Full weeks only, matching the four-week average line; the current,
-  // partial week would otherwise make every early-week headline look low.
-  const monday = mondayOf(today);
   return {
-    current: sumBetween(activities, metric, monday - 28, monday - 1),
-    previous: sumBetween(activities, metric, monday - 56, monday - 29),
+    current: sumBetween(activities, metric, today - 27, today),
+    previous: sumBetween(activities, metric, today - 55, today - 28),
   };
 }
 

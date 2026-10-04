@@ -14,27 +14,31 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
-            HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
-                BrowseSectionHeading(title: title)
-                Spacer(minLength: 0)
-                if let expand {
-                    BrowseIconButton(title: "\(expanded ? "Collapse" : "Expand") \(title)", systemImage: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", action: expand)
+            // Keep both controls at 44pt while removing the extra vertical
+            // gutter between title and period/picker rows on compact cards.
+            VStack(alignment: .leading, spacing: typeSize.isAccessibilitySize ? AppTheme.Spacing.small : 0) {
+                HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
+                    BrowseSectionHeading(title: title)
+                    Spacer(minLength: 0)
+                    if let expand {
+                        BrowseIconButton(title: "\(expanded ? "Collapse" : "Expand") \(title)", systemImage: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", action: expand)
+                    }
                 }
-            }
-            .frame(minHeight: AppTheme.minimumTarget)
-            if compactHeader && !typeSize.isAccessibilitySize {
-                ViewThatFits(in: .horizontal) {
-                    HStack {
-                        periodLabel.fixedSize()
-                        Spacer(minLength: 8)
+                .frame(minHeight: AppTheme.minimumTarget)
+                if compactHeader && !typeSize.isAccessibilitySize {
+                    ViewThatFits(in: .horizontal) {
+                        HStack {
+                            periodLabel.fixedSize()
+                            Spacer(minLength: 8)
+                            controls()
+                        }
+                        VStack(alignment: .leading, spacing: 4) { periodLabel; controls() }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
+                        periodLabel
                         controls()
                     }
-                    VStack(alignment: .leading, spacing: 4) { periodLabel; controls() }
-                }
-            } else {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                    periodLabel
-                    controls()
                 }
             }
             content()

@@ -61,7 +61,7 @@ export function volumeHistory(
     start,
     end: Math.min(today, starts[index + 1]! - 1),
     incomplete:
-      today < starts[index + 1]! - 1 ||
+      today < starts[index + 1]! ||
       (firstDay > start && firstDay < starts[index + 1]!),
     total: 0,
     bySport: Object.fromEntries(

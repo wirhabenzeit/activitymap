@@ -200,6 +200,36 @@ import Testing
         #expect(state.expandedTile == nil)
     }
 
+    @Test func currentVolumePeriodsStayIncompleteUntilRollover() throws {
+        let row = StatsActivity(id: 1, name: "Baseline", sport: .ride, start: StatsDates.date(StatsDates.day("2020-01-01")), distance: 10_000, movingTime: 3600, elevation: 100)
+        let engine = StatsEngine(activities: [row])
+        let cases: [(String, StatsHistoryRange)] = [("2026-10-04", .weeks), ("2026-09-30", .months), ("2024-02-29", .months), ("2026-12-31", .years)]
+        for (date, range) in cases {
+            let end = StatsDates.day(date)
+            let current = try #require(engine.volumeHistory(today: end, metric: .distance, range: range).last)
+            #expect(current.incomplete)
+            let next = engine.volumeHistory(today: end + 1, metric: .distance, range: range)
+            #expect(next.first { $0.start == current.start }?.incomplete == false)
+            #expect(next.last?.incomplete == true)
+        }
+        let partial = StatsEngine(activities: [.init(id: 2, name: "Opening", sport: .ride, start: StatsDates.date(StatsDates.day("2020-10-15")), distance: 10_000, movingTime: 3600, elevation: 100)])
+        #expect(partial.volumeHistory(today: StatsDates.day("2026-10-04"), metric: .distance, range: .years).first?.incomplete == true)
+    }
+
+    @Test func volumeHeadlineIncludesTodayInRolling28DayWindows() {
+        for weekday in 0..<7 {
+            let today = StatsDates.day("2026-09-28") + weekday
+            func row(_ id: Int, _ offset: Int) -> StatsActivity {
+                .init(id: id, name: "Boundary", sport: .ride, start: StatsDates.date(today - offset), distance: 10_000, movingTime: 3600, elevation: 100)
+            }
+            let rows = [0, 27, 28, 55, 56, -1].enumerated().map { row($0.offset, $0.element) }
+            let comparison = StatsEngine(activities: rows).fourWeekVolume(today: today, metric: .distance)
+            #expect(comparison.current == 20 && comparison.previous == 20)
+            let updated = StatsEngine(activities: rows + [row(10, 0)]).fourWeekVolume(today: today, metric: .distance)
+            #expect(updated.current == 30 && updated.previous == 20)
+        }
+    }
+
     @Test func volumeGroupingsCoverRecentPeriodsAndAllAvailableYears() async throws {
         let dates = ["2024-02-29", "2025-02-01", "2025-12-31", "2026-01-01", "2026-03-03", "2025-07-01"]
         let activities = try StatsFixtureTests.source(dates.enumerated().map { index, date in

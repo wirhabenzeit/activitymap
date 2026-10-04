@@ -116,8 +116,8 @@ struct StatsDashboardTile: View {
             StatsVolumeDetail(history: buckets, averages: averages, metric: metric, range: $volumeRange,
                               expanded: expanded) {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
-                    headline(values.current, metric: metric, suffix: " · last 4 full weeks")
-                    comparison(values, context: "vs the 4 weeks before")
+                    headline(values.current, metric: metric, suffix: " · last 28 days")
+                    comparison(values, context: "vs previous 28 days")
                 }
             }
         case .comparison(let values, let current, let previous, let band):

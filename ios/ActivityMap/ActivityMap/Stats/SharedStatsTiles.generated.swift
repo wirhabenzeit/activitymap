@@ -99,6 +99,7 @@ struct StatsTileDefinition: Identifiable, Hashable, Sendable {
     let group: StatsTileGroup
     let isPrimary: Bool
     let span: StatsTileSpan
+    let minHeight: Double?
     let isOptional: Bool
     let toggle: StatsTileToggle?
 }
@@ -124,6 +125,7 @@ enum SharedStatsTiles {
             group: .now,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            minHeight: 280,
             isOptional: false,
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation])
         ),
@@ -134,6 +136,7 @@ enum SharedStatsTiles {
             group: .now,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            minHeight: 300,
             isOptional: false,
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),
@@ -144,6 +147,7 @@ enum SharedStatsTiles {
             group: .now,
             isPrimary: true,
             span: .init(columns: 2, rows: 1),
+            minHeight: 280,
             isOptional: false,
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),
@@ -154,6 +158,7 @@ enum SharedStatsTiles {
             group: .thisYear,
             isPrimary: true,
             span: .init(columns: 2, rows: 1),
+            minHeight: 300,
             isOptional: false,
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),
@@ -164,6 +169,7 @@ enum SharedStatsTiles {
             group: .thisYear,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            minHeight: 280,
             isOptional: false,
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation])
         ),
@@ -174,6 +180,7 @@ enum SharedStatsTiles {
             group: .thisYear,
             isPrimary: false,
             span: .init(columns: 2, rows: 1),
+            minHeight: nil,
             isOptional: false,
             toggle: nil
         ),
@@ -184,6 +191,7 @@ enum SharedStatsTiles {
             group: .thisYear,
             isPrimary: false,
             span: .init(columns: 2, rows: 1),
+            minHeight: nil,
             isOptional: true,
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),
@@ -194,6 +202,7 @@ enum SharedStatsTiles {
             group: .patterns,
             isPrimary: false,
             span: .init(columns: 2, rows: 2),
+            minHeight: nil,
             isOptional: false,
             toggle: .init(label: "Colour by", options: [.sport, .distance, .time, .elevation])
         ),
@@ -204,6 +213,7 @@ enum SharedStatsTiles {
             group: .patterns,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            minHeight: nil,
             isOptional: false,
             toggle: .init(label: "Range", options: [.last12Weeks, .last52Weeks])
         ),
@@ -214,6 +224,7 @@ enum SharedStatsTiles {
             group: .patterns,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            minHeight: 280,
             isOptional: false,
             toggle: .init(label: "Range", options: [.currentYear, .allTime])
         ),
@@ -224,6 +235,7 @@ enum SharedStatsTiles {
             group: .patterns,
             isPrimary: false,
             span: .init(columns: 2, rows: 1),
+            minHeight: 280,
             isOptional: false,
             toggle: nil
         ),
@@ -234,6 +246,7 @@ enum SharedStatsTiles {
             group: .patterns,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            minHeight: nil,
             isOptional: false,
             toggle: nil
         ),
@@ -244,6 +257,7 @@ enum SharedStatsTiles {
             group: .patterns,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            minHeight: nil,
             isOptional: false,
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation])
         ),
@@ -254,6 +268,7 @@ enum SharedStatsTiles {
             group: .patterns,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            minHeight: nil,
             isOptional: false,
             toggle: nil
         ),
@@ -264,6 +279,7 @@ enum SharedStatsTiles {
             group: .patterns,
             isPrimary: false,
             span: .init(columns: 1, rows: 1),
+            minHeight: nil,
             isOptional: true,
             toggle: .init(label: "Range", options: [.last12Months, .allTime])
         )
