@@ -4,6 +4,27 @@ import Testing
 
 @MainActor
 struct ActivityListTests {
+    @Test func selectionSortTracksSelectionWithoutInspectionInvalidation() {
+        let presentation = ActivityListPresentation(defaults: nil)
+        presentation.settings.sort = ActivityListSort(field: .selection, direction: .descending)
+        let store = ActivityStore(activities: (1...4).map { ActivityStoreSelectionTests.activity($0) }, listPresentation: presentation)
+        store.replaceSelection(with: [1, 3])
+        #expect(store.listedActivities.map(\.id) == [3, 1, 4, 2])
+        let builds = store.sortBuildCount
+        store.inspect(2)
+        store.dismissInspection()
+        #expect(store.listedActivities.map(\.id) == [3, 1, 4, 2])
+        #expect(store.sortBuildCount == builds)
+        store.toggleSelection(4)
+        #expect(store.listedActivities.map(\.id) == [4, 3, 1, 2])
+        #expect(store.sortBuildCount == builds + 1)
+        presentation.settings.sort.direction = .ascending
+        #expect(store.listedActivities.map(\.id) == [2, 4, 3, 1])
+        store.searchText = "Activity 2"
+        #expect(store.listedActivities.map(\.id) == [2])
+        #expect(store.hiddenSelectedCount == 3)
+    }
+
     @Test func browsingSnapshotsReuseWorkAndInvalidateOnlyForTheirInputs() {
         let presentation = ActivityListPresentation(defaults: nil)
         let store = ActivityStore(activities: (1...4575).map { ActivityStoreSelectionTests.activity($0) },
@@ -49,7 +70,7 @@ struct ActivityListTests {
         let activities = try projections.map { projection in
             var fields = projection
             for field in ActivitySortField.allCases where fields[field.rawValue] == nil {
-                if ![.id, .name, .localDate, .sport, .geometry].contains(field) { fields[field.rawValue] = NSNull() }
+                if ![.id, .name, .localDate, .sport, .geometry, .selection].contains(field) { fields[field.rawValue] = NSNull() }
             }
             return try StoredModelMapper.activity(Fixtures.activity(fields))
         }
@@ -85,7 +106,7 @@ struct ActivityListTests {
                                     "flagged": false, "trainer": false, "manual": false]
         for key in unknownKeys where known[key] == nil { known[key] = 0 }
         let models = try [unknown, known].map { try StoredModelMapper.activity(Fixtures.activity($0)) }
-        for field in ActivitySortField.allCases where ![.id, .name, .localDate, .sport, .geometry].contains(field) {
+        for field in ActivitySortField.allCases where ![.id, .name, .localDate, .sport, .geometry, .selection].contains(field) {
             #expect(ActivityListSort(field: field, direction: direction).sorted(models).map(\.id) == [1, 99], "\(field)")
         }
     }

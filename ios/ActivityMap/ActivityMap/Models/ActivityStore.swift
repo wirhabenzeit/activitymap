@@ -44,7 +44,7 @@ final class ActivityStore {
     private(set) var activitiesRevision = 0
     private var filterRevision = 0
     @ObservationIgnored private var filteredSnapshot: (data: Int, filters: Int, activities: [Activity])?
-    @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, activities: [Activity])?
+    @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, selected: Set<Int>?, activities: [Activity])?
     @ObservationIgnored private(set) var filterBuildCount = 0
     @ObservationIgnored private(set) var sortBuildCount = 0
 
@@ -222,11 +222,12 @@ final class ActivityStore {
     /// Sort is a list presentation concern; shared filter order stays intact.
     var listedActivities: [Activity] {
         let data = activitiesRevision, filters = filterRevision, sort = listPresentation.settings.sort
-        if let cached = listedSnapshot, cached.data == data, cached.filters == filters, cached.sort == sort {
+        let selected = sort.field == .selection ? selectedActivityIDs : nil
+        if let cached = listedSnapshot, cached.data == data, cached.filters == filters, cached.sort == sort, cached.selected == selected {
             return cached.activities
         }
-        let result = sort.sorted(filteredActivities)
-        listedSnapshot = (data, filters, sort, result)
+        let result = sort.sorted(filteredActivities, selectedIDs: selected ?? [])
+        listedSnapshot = (data, filters, sort, selected, result)
         sortBuildCount += 1
         return result
     }

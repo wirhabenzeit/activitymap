@@ -36,3 +36,15 @@ A regression test reproduced unnecessary invalidation: changing only the inspect
 The new observation test failed before the fix and passes after it. Full suite: 219 tests passed (348 runs), zero failures, two opt-in skips. Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.03_22-14-09-+0200.xcresult`.
 
 A macOS duration-formatting microbenchmark showed only a small benefit from formatter reuse (150.5 versus 131.6 ms over 10,000 calls), so no formatter change was made. This is not an iPhone animation measurement. A requested 30-second Time Profiler recording could not attach to the iPhone (device readiness timeout). The unnecessary notifications are verified fixed; reduction of visible row-swipe/detail animation hitches still needs an on-device comparison or successful trace.
+
+## Consistent selection controls
+
+Bulk selection actions live in the bottom status bar only. The selection-column header now sorts selected-first or unselected-first; the same sort is available in list settings. Ties retain descending activity ID order. Only selection sorting includes selected IDs in its cache key, so inspection and selection changes still reuse normal metric/date sorts.
+
+Map result rows use their selected sport icon as a 44pt deselection button, matching the List. Tapping the name/metrics continues to open details; the separate trailing minus button is removed.
+
+Validation: targeted sorting, selection and rendered UI suites passed (53 tests, zero failures). Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.04_08-29-42-+0200.xcresult`. The first full-suite attempt stalled before launch and was terminated; the targeted retry completed after a simulator restart.
+
+![List selection sorting](ios-list-density/selection-list-phone.jpg)
+
+![Map icon deselection](ios-list-density/selection-map-results-phone.jpg)

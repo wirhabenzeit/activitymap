@@ -55,7 +55,11 @@ struct ListOptionsSheets: ViewModifier {
                 Form {
                     Section {
                         Picker("Direction", selection: $presentation.settings.sort.direction) {
-                            ForEach(ActivitySortDirection.allCases) { Text($0.title).tag($0) }
+                            ForEach(ActivitySortDirection.allCases) { direction in
+                                Text(presentation.settings.sort.field == .selection
+                                     ? (direction == .descending ? "Selected first" : "Unselected first")
+                                     : direction.title).tag(direction)
+                            }
                         }
                         Button("No sort — use Activity ID descending") {
                             presentation.settings.sort = ActivityListSort()

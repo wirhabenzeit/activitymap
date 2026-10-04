@@ -58,7 +58,17 @@ struct ActivityTableHeader: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            SelectionBar(store: store, iconOnly: true).frame(width: 44)
+            Button { sort(.selection) } label: {
+                HStack(spacing: 2) {
+                    Image(systemName: "checkmark.circle")
+                    if presentation.settings.sort.field == .selection { arrow }
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Sort by selection state")
+            .accessibilityValue(presentation.settings.sort.field == .selection
+                ? (presentation.settings.sort.direction == .descending ? "Selected first" : "Unselected first") : "Not sorted")
             Menu {
                 Button("Sort by name") { sort(.name) }
                 Button("Sort by date") { sort(.localDate) }

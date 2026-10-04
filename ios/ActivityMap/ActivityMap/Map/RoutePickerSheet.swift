@@ -224,11 +224,19 @@ struct RoutePickerSheet: View {
 
     private func resultRow(_ activity: Activity) -> some View {
         HStack(spacing: 8) {
+            Button { store.toggleSelection(activity.id) } label: {
+                BrowseSportSymbol(category: activity.category, isSelected: store.selectedActivityIDs.contains(activity.id))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Deselect \(activity.name)")
+            .accessibilityValue("Selected")
+            .accessibilityAddTraits(.isSelected)
             Button {
                 picker.showDetail(activity.id, store: store)
             } label: {
                 HStack(spacing: 12) {
-                    BrowseSportSymbol(category: activity.category, isSelected: true)
                     VStack(alignment: .leading, spacing: 4) {
                         BrowseActivityHeading(activity: activity, isActive: store.activeActivityID == activity.id)
                         let metrics = typeSize.isAccessibilitySize
@@ -252,11 +260,7 @@ struct RoutePickerSheet: View {
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }.buttonStyle(.plain)
-            Button { store.removeFromSelection([activity.id]) } label: {
-                Image(systemName: "minus.circle").foregroundStyle(AppTheme.secondaryText).frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Deselect \(activity.name)")
+
         }
         .padding(.leading, 12).padding(.trailing, 8).padding(.vertical, 4)
         .background(AppTheme.selectionBackground.opacity(store.activeActivityID == activity.id ? 1 : 0.5))
