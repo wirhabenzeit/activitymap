@@ -185,7 +185,9 @@ nonisolated struct StatsEngine: Sendable {
                      previous: sum(metric, first: StatsDates.start(year: year - 1), last: first - 1))
     }
     func fourWeekVolume(today: Int, metric: StatsMetric) -> StatsPeriodComparison {
-        .init(current: sum(metric, first: today - 27, last: today), previous: sum(metric, first: today - 55, last: today - 28))
+        // Full weeks only, matching the four-week average line.
+        let monday = StatsDates.monday(today)
+        return .init(current: sum(metric, first: monday - 28, last: monday - 1), previous: sum(metric, first: monday - 56, last: monday - 29))
     }
     func thisWeek(today: Int, metric: StatsMetric) -> StatsThisWeek {
         let monday = StatsDates.monday(today), weekday = today - monday

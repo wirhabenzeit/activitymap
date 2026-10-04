@@ -30,7 +30,7 @@
         "count"
       ],
       "defaultOption": "distance",
-      "compact": "Last-28-day headline versus prior 28 days; 12-week trend with four-full-week average.",
+      "compact": "Last-four-full-weeks headline versus the four weeks before; 12-week trend with four-full-week average.",
       "expanded": "By week (last 12 weeks), By month (last 12 months), By year (all available years); stacked area by sport, four-completed-period average including offscreen history, lighter incomplete-period shading, and period totals by sport. No historical-window or chart-type picker.",
       "nativeOwner": 264,
       "uiOwner": 265
