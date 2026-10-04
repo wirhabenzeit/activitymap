@@ -155,7 +155,7 @@ struct ActivitySummaryTests {
         #expect(prefs.settings.summaryMode == .off)
         #expect(prefs.settings.sort.field == .name && prefs.settings.sort.direction == .ascending)
         #expect(prefs.settings.visibleMetrics == [.photos, .maxPower])
-        #expect(prefs.settings.density == .compact && prefs.settings.width == .scrollingMetrics)
+        #expect(prefs.settings.density == .compact && prefs.settings.width == .details)
         prefs.settings.summaryMode = .selected
         #expect(ActivityListPresentation(defaults: defaults).settings == prefs.settings)
         #expect(ActivitySummaryMode.allCases == [.off, .filtered, .selected])

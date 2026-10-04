@@ -225,16 +225,17 @@ enum ActivityListDensity: String, CaseIterable, Codable, Identifiable {
 }
 
 enum ActivityListWidth: String, CaseIterable, Codable, Identifiable {
-    case fitWidth, scrollingMetrics
+    // Retain the stored v1 values so existing device preferences migrate in place.
+    case columns = "fitWidth", details = "scrollingMetrics"
     var id: String { rawValue }
-    var title: String { self == .fitWidth ? "Fit width" : "Scrollable metrics" }
+    var title: String { self == .columns ? "Columns" : "Details" }
 }
 
 struct ActivityListSettings: Codable, Equatable {
     var sort = ActivityListSort()
     var visibleMetrics: Set<ActivityListMetric> = [.distance, .elapsedTime, .elevationGain]
     var density: ActivityListDensity = .comfortable
-    var width: ActivityListWidth = .fitWidth
+    var width: ActivityListWidth = .columns
     var summaryMode: ActivitySummaryMode = .off
 
     init() {}
@@ -245,7 +246,7 @@ struct ActivityListSettings: Codable, Equatable {
         visibleMetrics = try values.decodeIfPresent(Set<ActivityListMetric>.self, forKey: .visibleMetrics)
             ?? [.distance, .elapsedTime, .elevationGain]
         density = try values.decodeIfPresent(ActivityListDensity.self, forKey: .density) ?? .comfortable
-        width = try values.decodeIfPresent(ActivityListWidth.self, forKey: .width) ?? .fitWidth
+        width = try values.decodeIfPresent(ActivityListWidth.self, forKey: .width) ?? .columns
         // Preserve all existing #211 preferences when decoding its v1 payload.
         summaryMode = try values.decodeIfPresent(ActivitySummaryMode.self, forKey: .summaryMode) ?? .off
     }

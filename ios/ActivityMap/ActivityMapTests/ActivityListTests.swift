@@ -37,7 +37,7 @@ struct ActivityListTests {
             store.toggleSelection(id)
             #expect(store.listedActivities.map(\.id) == ids)
         }
-        presentation.settings.width = .scrollingMetrics
+        presentation.settings.width = .details
         presentation.settings.density = .compact
         _ = store.listedActivities
         #expect(store.filterBuildCount == filters && store.sortBuildCount == sorts,
@@ -152,7 +152,7 @@ struct ActivityListTests {
         presentation.settings.sort = .init(field: .distance, direction: .ascending)
         presentation.settings.visibleMetrics = [.maxPower, .photos]
         presentation.settings.density = .compact
-        presentation.settings.width = .scrollingMetrics
+        presentation.settings.width = .details
         #expect(ActivityListPresentation(defaults: defaults).settings == presentation.settings)
         let models = (1...10_000).map { id in
             // Activity IDs are immutable; use a fresh detached model with the

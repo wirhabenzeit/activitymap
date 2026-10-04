@@ -22,7 +22,7 @@ struct ListControls: View {
             .accessibilityValue("\(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
             .accessibilityIdentifier("list-sort-control")
             Button { displayOpen = true } label: {
-                Label("Columns and layout", systemImage: "rectangle.split.3x1")
+                Label("View and metrics", systemImage: "rectangle.split.3x1")
             }
             .accessibilityIdentifier("list-display-control")
         } label: {
@@ -47,6 +47,11 @@ struct ListOptionsSheets: ViewModifier {
     @Bindable var presentation: ActivityListPresentation
     @Binding var sortOpen: Bool
     @Binding var displayOpen: Bool
+    var availableWidth: CGFloat = 390
+
+    private var metricsFitColumns: Bool {
+        ActivityTableLayout.metricsFit(presentation.settings, availableWidth: availableWidth)
+    }
 
     func body(content: Content) -> some View {
         content
@@ -81,12 +86,36 @@ struct ListOptionsSheets: ViewModifier {
         .sheet(isPresented: $displayOpen) {
             NavigationStack {
                 Form {
-                    Section("Layout") {
+                    Section {
+                        HStack(spacing: 2) {
+                            ForEach(ActivityListWidth.allCases) { view in
+                                let disabled = view == .columns && !metricsFitColumns
+                                Button { presentation.settings.width = view } label: {
+                                    Text(view.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(disabled ? .secondary : .primary)
+                                        .frame(maxWidth: .infinity, minHeight: 44)
+                                        .background(presentation.settings.width == view ? AppTheme.surface : .clear,
+                                                    in: RoundedRectangle(cornerRadius: 8))
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(disabled)
+                                .accessibilityAddTraits(presentation.settings.width == view ? .isSelected : [])
+                            }
+                        }
+                        .padding(3)
+                        .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 11))
+                        .accessibilityIdentifier("list-layout-picker")
+                    } header: { Text("View") }
+                    footer: {
+                        Text(metricsFitColumns
+                             ? "Columns aligns values under sortable headers. Details wraps labelled metrics beneath each activity."
+                             : "These metrics need Details at this window width. Choose fewer metrics to use Columns.")
+                    }
+                    Section("Density") {
                         Picker("Density", selection: $presentation.settings.density) {
                             ForEach(ActivityListDensity.allCases) { Text($0.title).tag($0) }
-                        }
-                        Picker("Metrics layout", selection: $presentation.settings.width) {
-                            ForEach(ActivityListWidth.allCases) { Text($0.title).tag($0) }
                         }
                     }
                     Section {
@@ -96,15 +125,18 @@ struct ListOptionsSheets: ViewModifier {
                                 set: { visible in
                                     if visible { presentation.settings.visibleMetrics.insert(metric) }
                                     else { presentation.settings.visibleMetrics.remove(metric) }
+                                    if presentation.settings.width == .columns && !metricsFitColumns {
+                                        presentation.settings.width = .details
+                                    }
                                 }))
                         }
                         Button("Restore default display") {
                             presentation.settings.visibleMetrics = [.distance, .elapsedTime, .elevationGain]
                             presentation.settings.density = .comfortable
-                            presentation.settings.width = .fitWidth
+                            presentation.settings.width = .columns
                         }
-                    } header: { Text("Visible metrics") }
-                    footer: { Text("Name, sport and local date always stay visible. Fit Width shows aligned sortable columns whenever the chosen metrics fit, including on phones. Adding more metrics can switch to stacked rows and remove the column headings. Scroll Metrics uses horizontally scrolling values in each row. Accessibility text uses stacked rows. Open Details to inspect hidden metrics.") }
+                    } header: { Text("Metrics") }
+                    footer: { Text("Your selection is shared by both views. Adding more metrics than Columns can fit switches to Details. Name, sport and local date always stay visible. Larger accessibility text stacks metrics for readability.") }
                 }
                 .navigationTitle("List display")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { displayOpen = false } } }

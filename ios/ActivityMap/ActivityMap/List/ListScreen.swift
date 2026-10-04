@@ -79,6 +79,18 @@ struct ListScreen: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize, availableWidth: width) {
                 ActivityTableHeader(store: store, availableWidth: width)
+            } else if store.listPresentation.settings.width == .columns && !typeSize.isAccessibilitySize {
+                // A resized window or older saved preferences can exceed the
+                // column budget. Keep every metric visible and explain the fallback.
+                HStack {
+                    Text("These metrics need more room.")
+                        .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    Spacer(minLength: 8)
+                    Button("Use Details") { store.listPresentation.settings.width = .details }
+                        .font(.caption.weight(.medium)).frame(minHeight: 44)
+                }
+                .padding(.horizontal, AppTheme.Spacing.small)
+                .background(AppTheme.surface)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -93,7 +105,8 @@ struct ListScreen: View {
             .overlay(alignment: .top) { Color(uiColor: .separator).frame(height: 0.5) }
             .accessibilityIdentifier("list-status-bar")
         }
-        .modifier(ListOptionsSheets(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen))
+        .modifier(ListOptionsSheets(presentation: store.listPresentation, sortOpen: $sortOpen,
+                                    displayOpen: $displayOpen, availableWidth: width))
     }
 
     @ViewBuilder private var detailColumn: some View {

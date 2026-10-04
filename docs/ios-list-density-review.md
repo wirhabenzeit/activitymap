@@ -2,9 +2,9 @@
 
 Baseline: merged main `c1e8e1d`. Default row spacing is reduced while preserving aligned columns and directly sortable column headers on phones and tablets whenever the configured metrics fit. Comfortable density still permits wrapped names, while compact density remains available. The sport badge retains its separate selection action and selected state. No persisted preferences are changed.
 
-Additional metric configurations retain adaptive stacking when columns cannot fit. Fallback rows place name/local date above aligned primary values; accessibility text keeps full sport/date/time information and stacked labelled values. Unknown and recorded-zero formatting remain unchanged.
+The draft follow-up adds explicit Columns and Details views with one shared Metrics selector. Details places labelled values below name/date and wraps whole metric groups at their natural widths. Accessibility text stacks metrics. Unknown and recorded-zero formatting remain unchanged.
 
-Table rows omit the repeated actions menu; the former trailing gutter is removed so names and sortable columns can use the full width. Tap inspects without selecting. Show on map is also available through a non-full-swipe action revealed by swiping right, the native long-press menu and VoiceOver actions; GPS-less activities cannot issue it. Swipe actions are omitted in horizontally scrolling-metric mode to preserve that gesture. A bottom safe-area bar shows filtered activity and selection counts, selection actions, and list settings for sorting, columns and density. It reserves space beneath the list so the last row remains reachable. The top header retains direct column sorting. No placeholder Edit action is shown. The final separator-only styling adjustment was verified by rebuilding and regenerating all eight gallery captures.
+Table rows omit the repeated actions menu; the former trailing gutter is removed so names and sortable columns can use the full width. Tap inspects without selecting. Show on map is also available through a non-full-swipe action revealed by swiping right, the native long-press menu and VoiceOver actions; GPS-less activities cannot issue it. The draft removes horizontal metric scrolling, so both views retain the swipe action. A bottom safe-area bar shows filtered activity and selection counts, selection actions, and list settings for sorting, columns and density. It reserves space beneath the list so the last row remains reachable. The top header retains direct column sorting. No placeholder Edit action is shown. The final separator-only styling adjustment was verified by rebuilding and regenerating all eight gallery captures.
 
 Summaries were deliberately removed by the earlier `b0f5ddf` change. That behavior is preserved rather than reintroducing the stale summary scope in #255. Map-sheet transition work (#284/#285) and the tablet detail-host redesign (#273) remain deferred. List detail navigation now retains the app header and pins the activity identity beside Back, as described below.
 
@@ -80,3 +80,17 @@ The trace now keeps the destination top inset at zero throughout opening. The re
 The pushed List detail combines Back, sport symbol, activity title and date in one fixed header above the scrolling metrics. It removes the duplicate heading from the scroll view, saving a row at normal text size. Long titles use up to two lines in this pinned header; the shared identity remains unrestricted in other detail hosts. Date/type text still wraps with Dynamic Type.
 
 The opening-frame, interactive-pop and scroll-retention regression passed (one test, zero failures): `Test-ActivityMap-2026.10.04_09-31-50-+0200.xcresult`. Light, dark and accessibility-text screenshots were regenerated; a temporary long-title fixture checked the two-line limit at accessibility size. The Release build was installed on the iPhone for review.
+
+### Draft: Columns and wrapping Details
+
+Columns retains aligned sortable headers. Details uses value/label groups with natural widths, wrapping as whole units without nested scroll views or card backgrounds. Both share the saved metric selection and offer swipe-right Show on map. The settings menu now says View and metrics. Existing `fitWidth` and `scrollingMetrics` preferences decode as Columns and Details respectively without resetting other preferences.
+
+Adding a metric that exceeds the column width budget switches the visible view setting to Details. Columns is unavailable until the selected metrics fit again, with an explanation in the settings form. Resizing a window or loading older overfull Columns preferences retains all metrics in a labelled layout with an explicit Use Details prompt. Accessibility text stacks metrics regardless of view.
+
+Validation: 21 targeted tests passed, including preference round trips/legacy decoding, sorting/cache invariants, column fitting, retained settings sheets, and rendered Details with no nested scroll view. Result: `Test-ActivityMap-2026.10.04_09-54-29-+0200.xcresult`. Six-metric light/dark phone, tablet and accessibility galleries were reviewed.
+
+Reproduce Details: `TEST_RUNNER_ACTIVITYMAP_GALLERY_LIST_VIEW=details TEST_RUNNER_ACTIVITYMAP_GALLERY_LIST_METRICS=distance,elapsedTime,elevationGain,averageSpeed,weightedPower,calories scripts/ios-gallery.sh details-review --scene list --variant phone,phone-dark,small-large-text,tablet`. Add `TEST_RUNNER_ACTIVITYMAP_GALLERY_LIST_OPTIONS=1` to capture the settings form.
+
+![Wrapping Details draft](ios-list-density/details-draft-phone.jpg)
+
+![View and Metrics settings](ios-list-density/details-draft-options.jpg)

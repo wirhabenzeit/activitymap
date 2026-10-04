@@ -102,7 +102,7 @@ extension RenderedRoutePickingTests {
         #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
         presentation.settings.visibleMetrics = [.distance, .averageSpeed]
         #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .accessibility3, availableWidth: width))
-        presentation.settings.width = .scrollingMetrics
+        presentation.settings.width = .details
         #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
     }
 
@@ -128,7 +128,7 @@ extension RenderedRoutePickingTests {
         try await Task.sleep(for: .milliseconds(200))
         #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large))
         #expect(host.host.presentedViewController === sheet, "Restoring table columns must retain the same sheet")
-        presentation.settings.width = .scrollingMetrics
+        presentation.settings.width = .details
         try await Task.sleep(for: .milliseconds(200))
         #expect(host.host.presentedViewController === sheet)
     }
@@ -417,15 +417,15 @@ extension RenderedRoutePickingTests {
         try host.save("list-dense-\(scenario)")
     }
 
-    @Test(arguments: ["small-phone", "large-text", "tablet", "scrolling-metrics"])
+    @Test(arguments: ["small-phone", "large-text", "tablet", "details"])
     func listControlsAdaptToDeviceAndDensity(scenario: String) async throws {
         let presentation = ActivityListPresentation(defaults: nil)
         let largeText = scenario == "large-text"
         let tablet = scenario == "tablet"
-        let scrolling = scenario == "scrolling-metrics"
-        if scrolling {
+        let details = scenario == "details"
+        if details {
             presentation.settings.visibleMetrics = Set(ActivityListMetric.allCases)
-            presentation.settings.width = .scrollingMetrics
+            presentation.settings.width = .details
             presentation.settings.density = .compact
         }
         let activity = try StoredModelMapper.activity(Fixtures.activity([
@@ -444,6 +444,10 @@ extension RenderedRoutePickingTests {
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(250))
         #expect(host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false)
+        if details {
+            #expect(host.descendants(of: UIScrollView.self).allSatisfy { $0 is UICollectionView },
+                    "Details metrics must wrap inside the List, without a nested gesture-owning scroll view")
+        }
         try host.save("list-\(scenario)")
     }
 
