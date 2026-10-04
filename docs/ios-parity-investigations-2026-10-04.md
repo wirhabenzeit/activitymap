@@ -4,6 +4,8 @@ Three GPT-6.1-Sol subagents inspected unrelated issues while #263/#254 was imple
 
 ## #286 — dark-mode route colours
 
+Follow-up: the fix and real Standard day/night simulator comparisons are recorded in [the route-color review](ios-route-colors-review.md). The findings below describe the original investigation.
+
 **High-confidence cause:** `MapScreen` selects Mapbox Standard `.night` in dark mode, while all six route line layers in `RouteLayers` omit emissive strength. The installed Mapbox SDK 11.31.0 defaults that property to zero. The fixed sport palette has no dark variants. Mapbox explicitly documents custom layers darkening under night lighting and recommends emissive strength 1 for lines: [official iOS style-layer guide](https://docs.mapbox.com/ios/maps/guides/styles/style-layers/).
 
 Proposed focused patch: add `.lineEmissiveStrength(1)` after `.lineColor(...)` to ordinary, selected casing, selected route, active casing, active halo and active route. Start without changing the palette or SDK.
