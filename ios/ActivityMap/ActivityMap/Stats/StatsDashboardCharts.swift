@@ -88,7 +88,7 @@ struct StatsSeriesChart: View {
                         PointMark(x: .value("Period", point.x), y: .value("Value", point.value ?? 0))
                             .symbolSize(isReference(point) ? 0 : 16)
                             .foregroundStyle(isReference(point) ? Color.secondary : Color.primary)
-                            .annotation(position: .trailing, spacing: 4) {
+                            .annotation(position: labelPosition(point), spacing: 4) {
                                 Text(point.series).font(.caption2)
                                     .foregroundStyle(isReference(point) ? Color.secondary : Color.primary)
                                     .offset(y: endpointLabelsOverlap ? (isReference(point) ? 7 : -7) : 0)
@@ -188,8 +188,19 @@ struct StatsSeriesChart: View {
     private var endpoints: [StatsChartPoint] {
         series.compactMap { name in points.last { $0.series == name && $0.value != nil } }
     }
+    /// Early in a period the current line ends mid-chart, where a trailing
+    /// label would run along the comparison line. Put it above or below the
+    /// end point instead, on the side away from that line.
+    private func labelPosition(_ point: StatsChartPoint) -> AnnotationPosition {
+        guard !isReference(point), Double(point.x) < xDomain.upperBound * 0.85 else { return .trailing }
+        let reference = points.first { isReference($0) && $0.x == point.x }?.value
+        return reference.map { (point.value ?? 0) >= $0 } ?? true ? .top : .bottom
+    }
+    private var currentEndsMidChart: Bool {
+        endpoints.contains { !isReference($0) && Double($0.x) < xDomain.upperBound * 0.85 }
+    }
     private var endpointLabelsOverlap: Bool {
-        guard endpoints.count == 2, let first = endpoints[0].value, let last = endpoints[1].value else { return false }
+        guard !currentEndsMidChart, endpoints.count == 2, let first = endpoints[0].value, let last = endpoints[1].value else { return false }
         return abs(first - last) / maximum < 0.13 && abs(endpoints[0].x - endpoints[1].x) < (axis == .year ? 40 : 4)
     }
     private var comparisonTicks: [Int] {

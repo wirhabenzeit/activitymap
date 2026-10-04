@@ -128,7 +128,16 @@ export function CumulativeLines({
       })
     : [];
 
+  // Early in a period the current line ends mid-chart, where a label to its
+  // right would run along the comparison line. Put it above or below the
+  // end point instead, on the side away from that line.
+  const reference = lastCurrent
+    ? past.find((row) => row.day === lastCurrent.day)
+    : undefined;
+  const currentMidChart = lastCurrent !== undefined && lastCurrent.day < xMax * 0.85;
+  const currentAbove = !reference || lastCurrent!.y >= reference.y;
   const labelOverlap =
+    !currentMidChart &&
     ends.length === 2 &&
     Math.abs(ends[0]!.day - ends[1]!.day) / xMax < 0.13 &&
     Math.abs(ends[0]!.y - ends[1]!.y) /
@@ -177,15 +186,28 @@ export function CumulativeLines({
         color: 'key',
         r: 3.5,
       }),
-      text(ends, {
+      text(
+        ends.filter((row) => !currentMidChart || row.key !== currentKey(series)),
+        {
+          x: 'x',
+          y: 'y',
+          text: 'label',
+          color: 'key',
+          anchor: 'start',
+          dx: 6,
+          dy: (row) =>
+            labelOverlap ? (row.key === currentKey(series) ? -6 : 9) : 3,
+          fontSize: 10,
+          fontWeight: 500,
+        },
+      ),
+      text(currentMidChart && endLabels && lastCurrent ? [lastCurrent] : [], {
         x: 'x',
         y: 'y',
         text: 'label',
         color: 'key',
-        anchor: 'start',
-        dx: 6,
-        dy: (row) =>
-          labelOverlap ? (row.key === currentKey(series) ? -6 : 9) : 3,
+        anchor: 'middle',
+        dy: currentAbove ? -9 : 15,
         fontSize: 10,
         fontWeight: 500,
       }),
