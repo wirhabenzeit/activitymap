@@ -46,7 +46,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     private func label(_ day: Int) -> String {
         switch shownRange {
         case .weeks: "Week of \(date(day))"
-        case .months: StatsDates.date(day).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).year())
+        case .months: StatsDisplay.month(day)
         case .years: String(StatsDates.parts(day).year!)
         }
     }

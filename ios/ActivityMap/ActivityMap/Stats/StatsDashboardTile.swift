@@ -142,7 +142,7 @@ struct StatsDashboardTile: View {
             comparison(.init(current: climb.current, previous: climb.previous), context: "vs the 12 months before", unitless: true)
             StatsPeriodBars(points: climb.months.enumerated().map { .init(x: $0.element.monthStart, value: $0.element.rate / 100, series: "m / km", partial: $0.offset == climb.months.count - 1) }, expanded: expanded,
                             label: { StatsDates.date($0.x).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)) },
-                            detailLabel: { StatsDisplay.date($0.x) },
+                            detailLabel: { StatsDisplay.month($0.x) },
                             valueLabel: { "\(StatsDisplay.number($0, decimals: 1)) m / km" })
             StatsExpansionReveal(expanded: expanded) { hillinessActivities(activities) }
         case .typical(let week):
