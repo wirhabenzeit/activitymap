@@ -74,3 +74,9 @@ Device feedback showed that matching inline title modes did not fix the jump. A 
 List details now keep the system navigation bar hidden and render a fixed Back row within the sliding content. The existing native navigation stack and interactive-pop recognizer remain in use. A scoped UIKit gesture delegate permits edge-pop while the bar is hidden, guards root/in-flight transitions, and restores the previous delegate and enabled state when the detail disappears. The fixed button retains a 44pt hit target, glass appearance, an explicit accessibility label and the escape action.
 
 The trace now keeps the destination top inset at zero throughout opening. The regression samples 40 frames across the animation, checks native pop eligibility and delegate restoration, and retains the scroll/tab checks. It passed, as did the separate 4,575-row navigation and window-resize checks: three focused tests, zero failures. Results: `Test-ActivityMap-2026.10.04_09-21-37-+0200.xcresult` and `Test-ActivityMap-2026.10.04_09-22-32-+0200.xcresult` in `/tmp/activitymap-navigation-build/Logs/Test/`.
+
+### Pinned activity identity beside Back
+
+The pushed List detail combines Back, sport symbol, activity title and date in one fixed header above the scrolling metrics. It removes the duplicate heading from the scroll view, saving a row at normal text size. Long titles use up to two lines in this pinned header; the shared identity remains unrestricted in other detail hosts. Date/type text still wraps with Dynamic Type.
+
+The opening-frame, interactive-pop and scroll-retention regression passed (one test, zero failures): `Test-ActivityMap-2026.10.04_09-31-50-+0200.xcresult`. Light, dark and accessibility-text screenshots were regenerated; a temporary long-title fixture checked the two-line limit at accessibility size. The Release build was installed on the iPhone for review.

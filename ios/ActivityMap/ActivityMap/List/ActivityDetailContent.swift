@@ -128,12 +128,14 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
 struct ActivityDetailIdentity: View {
     let activity: Activity
     var trailingInset: CGFloat = 0
+    var titleLineLimit: Int? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.small) {
             BrowseSportSymbol(category: activity.category)
             VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
                 Text(activity.name).font(.headline)
+                    .lineLimit(titleLineLimit)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("activity-detail-name")

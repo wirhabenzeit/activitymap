@@ -9,7 +9,7 @@ struct ActivityDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .medium))
@@ -20,11 +20,15 @@ struct ActivityDetailView: View {
                 .glassEffect(.regular.interactive(), in: .circle)
                 .accessibilityLabel("Back to activities")
                 .accessibilityIdentifier("list-detail-back")
-                Spacer(minLength: 0)
+                if let activity = store.activity(id: activityID) {
+                    ActivityDetailIdentity(activity: activity, titleLineLimit: 2)
+                } else {
+                    Spacer(minLength: 0)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            ActivityDetailPanel(store: store, activityID: activityID)
+            ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false)
         }
         .background(AppTheme.surface)
         // UIKit adds a late top inset when a hidden bar is shown during a
@@ -42,6 +46,7 @@ struct ActivityDetailPanel: View {
     @Bindable var store: ActivityStore
     let activityID: Int
     var headerTrailingInset: CGFloat = 0
+    var showsHeading = true
     var mapExpansion: MapActivityExpansion? = nil
     var showOnMap: ((Int) -> Void)? = nil
 
@@ -60,7 +65,8 @@ struct ActivityDetailPanel: View {
                 } else {
                     VStack(spacing: 0) {
                         ScrollView {
-                            ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset)
+                            ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset,
+                                                  showsHeading: showsHeading)
                         }
                         .accessibilityIdentifier("activity-detail-scroll")
                         .clipped()
