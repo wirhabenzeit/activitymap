@@ -5,9 +5,9 @@ struct BrowseContent: View {
     var refresh: () async -> Void = {}
     var sync: SyncController? = nil
     var isSigningIn = false
-    var openAccount: () -> Void = {}
     var mapPicker: RoutePicker? = nil
     @Environment(\.browseStatsDestination) private var statsDestination
+    @Environment(\.stravaConnect) private var stravaConnect
 
     var body: some View {
         GeometryReader { geometry in
@@ -74,13 +74,18 @@ struct BrowseContent: View {
         }
     }
 
-    // Sync/loading/auth information belongs in Settings. Only map-specific
-    // filtering and missing-route context uses an inline, content-sized notice.
+    // Sync/loading information belongs in Settings. The map shows inline,
+    // content-sized notices only for filtering, missing routes and the Strava
+    // connection, so a signed-out map never strands anyone (#304).
     private var mapEmptyState: BrowsingPresentation.EmptyState? {
         guard let empty = presentation.empty,
-              empty.kind == .noMatches || empty.kind == .noRoutes else { return nil }
+              Self.mapNoticeKinds.contains(empty.kind) else { return nil }
         return empty
     }
+
+    static let mapNoticeKinds: Set<BrowsingPresentation.EmptyKind> = [
+        .noMatches, .noRoutes, .signedOut, .expired, .disconnected, .signingIn,
+    ]
 
     private var presentation: BrowsingPresentation {
         BrowsingPresentation(store: store, sync: sync, isSigningIn: isSigningIn)
@@ -92,7 +97,7 @@ struct BrowseContent: View {
         case .retry:
             guard sync?.canRefresh == true else { return }
             Task { await refresh() }
-        case .account: openAccount()
+        case .account: stravaConnect.start()
         case .showList: store.selectedTab = .list
         case .cancelSync: sync?.pause()
         }

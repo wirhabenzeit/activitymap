@@ -62,6 +62,12 @@ final class AuthController: NSObject {
     }
 
     private(set) var status: Status = .signedOut
+
+    /// The last sign-in attempt failed; cancelling is not a failure.
+    var signInFailed: Bool {
+        if case .failed = status { return true }
+        return false
+    }
     private(set) var currentUser: ActivityMapAPI.CurrentUser?
     private var revision = 0
     private var restoringToken: String?
@@ -137,6 +143,8 @@ final class AuthController: NSObject {
     /// distinction and gives a transient failure the right retry (itself,
     /// not a fresh `signIn()`).
     func signIn() async {
+        // Repeated taps while the hosted sheet is opening start nothing new.
+        guard status != .signingIn else { return }
         revision += 1
         currentUser = nil
         status = .signingIn

@@ -108,6 +108,15 @@ struct AppShell: View {
                 }
             }
         }
+        .environment(\.stravaConnect, stravaConnect)
+    }
+
+    /// The single connection flow every entry point uses (#304). Starting it
+    /// in place keeps the person on the tab and context they started from.
+    private var stravaConnect: StravaConnect {
+        StravaConnect(start: { Task { await auth.signIn() } },
+                      isConnecting: auth.status == .signingIn,
+                      failed: auth.signInFailed)
     }
 
     // Global destinations stay outside the List's native navigation stack.
@@ -150,11 +159,24 @@ struct AppShell: View {
             }
             Spacer(minLength: 0)
             Menu {
-                Section(auth.currentUser?.name ?? "Account") {
-                    Button {
-                        sheets.accountDestination = .profile
-                    } label: {
-                        Label("Profile", systemImage: "person")
+                if auth.currentUser == nil {
+                    // Signed out, the account entry starts the connection
+                    // itself rather than leading through Profile (#304).
+                    Section {
+                        Button {
+                            stravaConnect.start()
+                        } label: {
+                            Label("Connect with Strava", systemImage: "link")
+                        }
+                        .disabled(auth.status == .signingIn)
+                    }
+                } else {
+                    Section(auth.currentUser?.name ?? "Account") {
+                        Button {
+                            sheets.accountDestination = .profile
+                        } label: {
+                            Label("Profile", systemImage: "person")
+                        }
                     }
                 }
 
@@ -198,9 +220,9 @@ struct AppShell: View {
 
     private var content: some View {
         BrowseContent(store: store, refresh: refresh, sync: sync, isSigningIn: auth.status == .signingIn,
-                      openAccount: { sheets.accountDestination = .profile }, mapPicker: mapPicker)
+                      mapPicker: mapPicker)
             .environment(\.browseStatsDestination, statsContent)
-            .environment(\.statsRecovery, StatsRecovery(refresh: refresh, openAccount: { sheets.accountDestination = .profile }))
+            .environment(\.statsRecovery, StatsRecovery(refresh: refresh))
             .tint(AppTheme.accent)
     }
 

@@ -9,14 +9,14 @@ struct BrowsingPresentation: Equatable {
             switch self {
             case .clearFilters: "Clear Filters"
             case .retry: "Retry Sync"
-            case .account: "Open Sign-In"
+            case .account: "Connect with Strava"
             case .showList: "View Activities in List"
             case .cancelSync: "Pause Sync"
             }
         }
     }
-    enum EmptyKind: Equatable {
-        case preparing, firstSync, emptyLibrary, noMatches, noRoutes
+    enum EmptyKind: Hashable {
+        case preparing, signingIn, firstSync, emptyLibrary, noMatches, noRoutes
         case signedOut, expired, disconnected, offline, failed, paused, waiting
     }
     struct EmptyState: Equatable {
@@ -65,10 +65,10 @@ struct BrowsingPresentation: Equatable {
         let message: String
         let recovery: Recovery?
         if isSigningIn {
-            title = "Signing in…"
-            message = "Complete or cancel the Strava sign-in sheet to continue."
+            title = "Connecting to Strava…"
+            message = "Approve or cancel in the Strava sheet to continue."
             recovery = nil
-            blocking = EmptyState(kind: .preparing, title: title, message: message, symbol: "person.crop.circle", progress: true)
+            blocking = EmptyState(kind: .signingIn, title: title, message: message, symbol: "person.crop.circle", progress: true)
         } else {
             switch status {
             case nil:
@@ -77,18 +77,18 @@ struct BrowsingPresentation: Equatable {
                 recovery = nil
                 if activityCount == 0 { blocking = EmptyState(kind: .preparing, title: title, message: message, symbol: "tray", progress: true) }
             case .signedOut:
-                title = "Sign in to load activities"
-                message = "Connect your ActivityMap account with Strava to load your library."
+                title = "Connect Strava to see your activities"
+                message = StravaConnectCopy.purpose
                 recovery = .account
                 blocking = EmptyState(kind: .signedOut, title: title, message: message, symbol: "person.crop.circle", recovery: recovery)
             case .expired:
                 title = "Your sign-in has expired"
-                message = "Sign in again to restore access to your activities."
+                message = "Connect with Strava again to restore access to your activities."
                 recovery = .account
                 blocking = EmptyState(kind: .expired, title: title, message: message, symbol: "lock", recovery: recovery)
             case .disconnected:
                 title = "Strava is disconnected"
-                message = "Reconnect Strava from your account to load activities again."
+                message = "Connect with Strava again to load your activities."
                 recovery = .account
                 blocking = EmptyState(kind: .disconnected, title: title, message: message, symbol: "link", recovery: recovery)
             case .syncing:

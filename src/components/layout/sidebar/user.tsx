@@ -1,17 +1,21 @@
 'use client';
 
-import {
-  ChevronsUpDown,
-  LogOut,
-  Loader2,
-  Info,
-} from 'lucide-react';
+import { ChevronsUpDown, LogOut, Loader2, Info } from 'lucide-react';
 
-import { signIn, signOut } from '~/lib/auth-client';
+import { signOut } from '~/lib/auth-client';
+import { displayEmail } from '~/lib/auth-return';
 
 import { useShallowStore } from '~/store';
 
-import { SidebarMenuButton, SidebarMenuItem } from '~/components/ui/sidebar';
+import {
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from '~/components/ui/sidebar';
+import {
+  StravaConnectButton,
+  useStravaConnect,
+} from '~/components/auth/strava-connect';
 import {
   DropdownMenu,
   DropdownMenuLabel,
@@ -24,7 +28,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 
 import * as React from 'react';
-import Image from 'next/image';
 import { cn } from '~/lib/utils';
 import {
   checkWebhookStatus,
@@ -36,46 +39,18 @@ import { useIsFetching } from '@tanstack/react-query';
 import { SettingsDialog } from '~/components/settings/settings-dialog';
 
 export function UserSettings() {
-  const { user, isInitialized } = useShallowStore(
-    (state) => ({
-      user: state.user,
-      isInitialized: state.isInitialized,
-    }),
-  );
+  const { user, isInitialized } = useShallowStore((state) => ({
+    user: state.user,
+    isInitialized: state.isInitialized,
+  }));
 
   const isFetchingActivities = useIsFetching({ queryKey: ['activities'] }) > 0;
   const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
   const { toast } = useToast();
 
-  const handleSignIn = async () => {
-    try {
-      const result = await signIn.social({
-        provider: 'strava',
-        callbackURL: '/map',
-      });
-      if (result.error) {
-        toast({
-          title: 'Strava sign-in unavailable',
-          description:
-            result.error.status === 404
-              ? 'Strava sign-in is not enabled for this deployment.'
-              : result.error.message ?? 'Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Strava sign-in failed',
-        description: error instanceof Error ? error.message : 'Please try again.',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const handleCreateWebhook = async () => {
     try {
       const result = await createWebhookSubscription();
-
 
       // Display the result in a toast notification
       toast({
@@ -116,7 +91,6 @@ export function UserSettings() {
   const handleWebhookStatus = async () => {
     try {
       const result = await checkWebhookStatus();
-
 
       // Display the result in a toast notification
       toast({
@@ -160,6 +134,9 @@ export function UserSettings() {
   };
 
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const email = displayEmail(user?.email);
+
+  if (isInitialized && !user) return <SignedOutAccountRow />;
 
   return (
     <SidebarMenuItem>
@@ -168,51 +145,29 @@ export function UserSettings() {
           <SidebarMenuButton
             size="lg"
             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            onClick={
-              !isInitialized || user
-                ? undefined
-                : handleSignIn
-            }
           >
-            {user || !isInitialized ? (
-              <>
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage
-                    src={user?.image ?? undefined}
-                    alt={user?.name ?? ''}
-                  />
-                  <Loader2
-                    className={cn(
-                      'absolute inset-0 m-auto size-8 text-white animate-spin',
-                      {
-                        hidden: !isFetchingActivities,
-                      },
-                    )}
-                  />
-                  <AvatarFallback className="rounded-lg"></AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{user?.name}</span>
-                  <span className="truncate text-xs">{user?.email}</span>
-                </div>
-                <ChevronsUpDown className="ml-auto size-4" />
-              </>
-            ) : (
-              !isFetchingActivities && (
-                <>
-                  <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src="/icon_strava.svg" alt="Strava" />
-                    <AvatarFallback className="rounded-lg">ST</AvatarFallback>
-                  </Avatar>
-                  <Image
-                    src="/btn_strava.svg"
-                    alt="Strava Login Icon"
-                    width={185}
-                    height={40}
-                  />
-                </>
-              )
-            )}
+            <>
+              <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarImage
+                  src={user?.image ?? undefined}
+                  alt={user?.name ?? ''}
+                />
+                <Loader2
+                  className={cn(
+                    'absolute inset-0 m-auto size-8 text-white animate-spin',
+                    {
+                      hidden: !isFetchingActivities,
+                    },
+                  )}
+                />
+                <AvatarFallback className="rounded-lg"></AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">{user?.name}</span>
+                {email && <span className="truncate text-xs">{email}</span>}
+              </div>
+              <ChevronsUpDown className="ml-auto size-4" />
+            </>
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         {user && (
@@ -225,9 +180,11 @@ export function UserSettings() {
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">{user?.name}</p>
-                <p className="text-xs leading-none text-muted-foreground">
-                  {user?.email}
-                </p>
+                {email && (
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {email}
+                  </p>
+                )}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -270,6 +227,42 @@ export function UserSettings() {
       </DropdownMenu>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+    </SidebarMenuItem>
+  );
+}
+
+/**
+ * Signed out: the official Strava button starts the shared connection flow
+ * directly. A collapsed icon-only sidebar keeps an equivalent Strava mark.
+ */
+function SignedOutAccountRow() {
+  const { state, isMobile } = useSidebar();
+  const { connect, pending } = useStravaConnect();
+
+  if (state === 'collapsed' && !isMobile) {
+    return (
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          size="lg"
+          onClick={connect}
+          disabled={pending}
+          tooltip="Connect with Strava"
+          aria-label="Connect with Strava"
+        >
+          <Avatar className="h-8 w-8 rounded-lg">
+            <AvatarImage src="/icon_strava.svg" alt="" />
+            <AvatarFallback className="rounded-lg">ST</AvatarFallback>
+          </Avatar>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  }
+
+  return (
+    // Failure feedback lives on the signed-out panel, which is always visible
+    // beside this row; repeating it here would only duplicate the message.
+    <SidebarMenuItem className="px-1 py-1">
+      <StravaConnectButton className="flex-wrap" />
     </SidebarMenuItem>
   );
 }
