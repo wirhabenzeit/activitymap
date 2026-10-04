@@ -6,7 +6,7 @@ Additional metric configurations retain adaptive stacking when columns cannot fi
 
 Table rows omit the repeated actions menu; the former trailing gutter is removed so names and sortable columns can use the full width. Tap inspects without selecting. Show on map is also available through a non-full-swipe action revealed by swiping right, the native long-press menu and VoiceOver actions; GPS-less activities cannot issue it. Swipe actions are omitted in horizontally scrolling-metric mode to preserve that gesture. A bottom safe-area bar shows filtered activity and selection counts, selection actions, and list settings for sorting, columns and density. It reserves space beneath the list so the last row remains reachable. The top header retains direct column sorting. No placeholder Edit action is shown. The final separator-only styling adjustment was verified by rebuilding and regenerating all eight gallery captures.
 
-Summaries were deliberately removed by the earlier `b0f5ddf` change. That behavior is preserved rather than reintroducing the stale summary scope in #255. No map-sheet transition work (#284/#285), tablet detail-host redesign (#273), or navigation sizing change is included.
+Summaries were deliberately removed by the earlier `b0f5ddf` change. That behavior is preserved rather than reintroducing the stale summary scope in #255. Map-sheet transition work (#284/#285) and the tablet detail-host redesign (#273) remain deferred. List detail navigation now retains the app header and pins the activity identity beside Back, as described below.
 
 ## Matched screenshots
 
@@ -51,7 +51,7 @@ Validation: targeted sorting, selection and rendered UI suites passed (53 tests,
 
 ## Persistent app header during List details
 
-The blue app header now belongs to the persistent shell layout, above the List's own native NavigationStack. Opening an activity slides detail content and its native Back bar into the List area; Map/List, filters and account controls stay visible. Back and swipe-back clear inspection while preserving selection and the retained List. Filter/account sheets retain their existing presentation, and wide list details keep their existing side-by-side or overlay behavior.
+The blue app header now belongs to the persistent shell layout, above the List's own native NavigationStack. Opening an activity slides detail content and its fixed Back/identity header into the List area; Map/List, filters and account controls stay visible. Back and swipe-back clear inspection while preserving selection and the retained List. Filter/account sheets retain their existing presentation, and wide list details keep their existing side-by-side or overlay behavior.
 
 Phone light/dark, tablet, list and map gallery captures were regenerated. A rendered regression checks that the list navigation controller stays below the header, exposes native Back/swipe-back, survives a tab round trip and restores the exact scroll offset.
 
