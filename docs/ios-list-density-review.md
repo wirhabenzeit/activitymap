@@ -48,3 +48,13 @@ Validation: targeted sorting, selection and rendered UI suites passed (53 tests,
 ![List selection sorting](ios-list-density/selection-list-phone.jpg)
 
 ![Map icon deselection](ios-list-density/selection-map-results-phone.jpg)
+
+## Persistent app header during List details
+
+The blue app header now belongs to the persistent shell layout, above the List's own native NavigationStack. Opening an activity slides detail content and its native Back bar into the List area; Map/List, filters and account controls stay visible. Back and swipe-back clear inspection while preserving selection and the retained List. Filter/account sheets retain their existing presentation, and wide list details keep their existing side-by-side or overlay behavior.
+
+Phone light/dark, tablet, list and map gallery captures were regenerated. A rendered regression checks that the list navigation controller stays below the header, exposes native Back/swipe-back, survives a tab round trip and restores the exact scroll offset.
+
+Validation: 31 rendered tests passed, zero failures. Result: `/tmp/activitymap-navigation-build/Logs/Test/Test-ActivityMap-2026.10.04_08-53-29-+0200.xcresult`.
+
+![Persistent header above list details](ios-list-density/persistent-header-detail-phone.jpg)

@@ -268,6 +268,42 @@ extension RenderedRoutePickingTests {
         #expect(store.selectedActivityIDs == selection)
     }
 
+    @Test func shellHeaderStaysOutsideListDetailNavigation() async throws {
+        let previousToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = previousToken }
+        let store = ActivityStore(activities: (1...100).map { ActivityStoreSelectionTests.activity($0) },
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        let host = try ListHarness(root: AppShell(store: store)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)),
+            size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
+        let navigation = try #require(host.controllers(of: UINavigationController.self).first)
+        let list = try #require(host.descendants(of: UICollectionView.self).first)
+        list.setContentOffset(CGPoint(x: 0, y: 200), animated: false)
+        try await Task.sleep(for: .milliseconds(200))
+        let offset = list.contentOffset
+        let navigationTop = navigation.view.convert(.zero, to: host.host.view).y
+        #expect(navigationTop >= 54, "The native stack starts below the persistent app header")
+        store.inspect(90)
+        try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        #expect(!navigation.isNavigationBarHidden)
+        #expect(navigation.interactivePopGestureRecognizer?.isEnabled == true)
+        #expect(navigation.view.convert(.zero, to: host.host.view).y == navigationTop)
+        store.selectedTab = .map
+        try await Task.sleep(for: .milliseconds(200))
+        store.selectedTab = .list
+        try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        #expect(store.inspectedActivityID == 90)
+        navigation.popViewController(animated: true)
+        try await listWait { store.inspectedActivityID == nil && navigation.transitionCoordinator == nil }
+        #expect(list.contentOffset == offset)
+        #expect(store.selectedActivityIDs.isEmpty)
+    }
+
     @Test func largeListNavigationReusesBrowsingSnapshots() async throws {
         let presentation = ActivityListPresentation(defaults: nil)
         // Persisted totals preferences cannot reinsert the removed summary UI.

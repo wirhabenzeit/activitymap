@@ -9,6 +9,10 @@ struct ActivityDetailView: View {
     var body: some View {
         ActivityDetailPanel(store: store, activityID: activityID)
             .navigationTitle("")
+            .toolbar(.visible, for: .navigationBar)
+            .toolbarBackground(AppTheme.surface, for: .navigationBar)
+            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+            .toolbarColorScheme(nil, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             // The activity name remains the content heading. Native Back and
             // swipe-back return to the retained List without a second title.
