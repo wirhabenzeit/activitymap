@@ -38,7 +38,8 @@ import {
   type StatsTileID,
 } from '~/settings/stats-tiles.generated';
 import { type StatsActivity } from '~/lib/stats/tile-data';
-import { placeBento } from '~/lib/stats/bento';
+import { placeExpandedBento, bentoRowMinimums } from '~/lib/stats/bento';
+import { isStatsHistoryLoading } from '~/lib/stats/loading';
 import { localToday } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 
@@ -77,9 +78,7 @@ export default function StatsTiles() {
     (activity) => activity.id === detailId,
   );
   const empty = activities.length === 0;
-  const loading =
-    !query.isError &&
-    (query.isLoading || (empty && (query.isFetching || query.hasNextPage)));
+  const loading = isStatsHistoryLoading(query, empty);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <FilterScope labels={scope.labels} onReset={reset} />
@@ -156,12 +155,15 @@ export function StatsTileGrid({
   singleSport = false,
   onOpenActivity,
   detailsOpen = false,
+  reportingDay,
 }: {
   activities: StatsActivity[];
   filtered?: boolean;
   singleSport?: boolean;
   onOpenActivity?: (id: number) => void;
   detailsOpen?: boolean;
+  // Fixed reporting date for the development gallery; normal dashboards roll over daily.
+  reportingDay?: number;
 }) {
   const { resolvedTheme } = useTheme();
   const [today, setToday] = useState(localToday);
@@ -177,13 +179,21 @@ export function StatsTileGrid({
   const context: TileContext = useMemo(
     () => ({
       activities,
-      today,
+      today: reportingDay ?? today,
       filtered,
       singleSport,
       onOpenActivity,
       palette: tilePalette(resolvedTheme === 'dark'),
     }),
-    [activities, today, resolvedTheme, filtered, singleSport, onOpenActivity],
+    [
+      activities,
+      today,
+      reportingDay,
+      resolvedTheme,
+      filtered,
+      singleSport,
+      onOpenActivity,
+    ],
   );
 
   const [expandedID, setExpandedID] = useState<StatsTileID | null>(null);
@@ -314,57 +324,23 @@ function BentoGroup({
   // A single-column list should stay anchored under the finger while changing
   // height; there is no sideways reflow to animate on narrow screens.
   const animateLayout = !reduceMotion && grid.columns > 1;
-  // Collapsed, tiles pack as the manifest says. An expanded tile spans the
-  // whole section in one content-sized row, starting on the row it was on,
-  // so that row and the ones below move down; the other tiles keep their
-  // size meanwhile.
-  const collapsedPlacements = placeBento(
+  const expandedIndex = tiles.findIndex(({ tile }) => tile.id === expandedID);
+  const placements = placeExpandedBento(
     tiles.map(({ tile }) => tile.span),
     grid.columns,
+    expandedIndex,
   );
-  const expandedIndex = tiles.findIndex(({ tile }) => tile.id === expandedID);
-  const order =
-    expandedIndex < 0
-      ? tiles.map((_, index) => index)
-      : [
-          ...tiles.flatMap((_, index) =>
-            collapsedPlacements[index]!.row <
-            collapsedPlacements[expandedIndex]!.row
-              ? [index]
-              : [],
-          ),
-          expandedIndex,
-          ...tiles.flatMap((_, index) =>
-            index !== expandedIndex &&
-            collapsedPlacements[index]!.row >=
-              collapsedPlacements[expandedIndex]!.row
-              ? [index]
-              : [],
-          ),
-        ];
-  const placements =
-    expandedIndex < 0
-      ? collapsedPlacements
-      : (() => {
-          const placed = placeBento(
-            order.map((index) =>
-              index === expandedIndex
-                ? { columns: grid.columns, rows: 1 }
-                : tiles[index]!.tile.span,
-            ),
-            grid.columns,
-            { fillGaps: false },
-          );
-          const byTile = new Array<(typeof placed)[number]>(tiles.length);
-          order.forEach((index, position) => {
-            byTile[index] = placed[position]!;
-          });
-          return byTile;
-        })();
-  const rowCount = Math.max(
-    0,
-    ...placements.map((placement) => placement.row + placement.rows - 1),
+  const rowMinimums = bentoRowMinimums(
+    tiles.map(({ tile }) => ({
+      minHeight: 'minHeight' in tile ? tile.minHeight : undefined,
+    })),
+    placements,
+    grid.rowHeight,
+    gap,
   );
+  // Twelve CSS subcolumns represent halves, thirds and quarters exactly on
+  // the regular grid. Logical placement still uses the manifest's 4 columns.
+  const subcolumns = grid.columns === 4 ? 3 : 1;
   const expandedRow = expandedIndex < 0 ? null : placements[expandedIndex]!.row;
   if (tiles.length === 0) return null;
 
@@ -380,12 +356,13 @@ function BentoGroup({
         className="grid"
         style={{
           gap,
-          gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
-          // The expanded tile sits in one row sized to its content; every
-          // other row keeps the grid's row height.
-          gridTemplateRows: Array.from({ length: rowCount }, (_, index) =>
-            index + 1 === expandedRow ? 'auto' : `${grid.rowHeight}px`,
-          ).join(' '),
+          gridTemplateColumns: `repeat(${grid.columns * subcolumns}, minmax(0, 1fr))`,
+          // Keep equal row heights, but allow content/large text to grow.
+          gridTemplateRows: rowMinimums
+            .map((minimum, index) =>
+              index + 1 === expandedRow ? 'auto' : `minmax(${minimum}px, auto)`,
+            )
+            .join(' '),
         }}
       >
         {tiles.map(({ tile, view }, index) => {
@@ -402,7 +379,7 @@ function BentoGroup({
               onExpand={() => onExpand(tile.id)}
               onCollapse={onCollapse}
               style={{
-                gridColumn: `${placement.column} / span ${placement.columns}`,
+                gridColumn: `${Math.round((placement.column - 1) * subcolumns) + 1} / span ${Math.round(placement.columns * subcolumns)}`,
                 gridRow: `${placement.row} / span ${placement.rows}`,
               }}
             />
@@ -521,7 +498,9 @@ function TileCard({
         </div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <span className="text-[11px] text-muted-foreground">
-            {hasDetail ? 'History & details' : view.period(context, option)}
+            {expanded && view.expandedPeriod
+              ? view.expandedPeriod
+              : view.period(context, option)}
           </span>
           {toggle && (
             <FaceSwitch
@@ -536,19 +515,13 @@ function TileCard({
           <Headline summary={summary} size={large ? 'large' : 'tile'} />
         )}
         <Activity mode={hasDetail ? 'hidden' : 'visible'}>
-          {view.face(context, option, expanded)}
+          {view.face({ ...context, onExpand }, option, expanded)}
         </Activity>
         {/* Preserve history controls while hidden; Activity suspends their effects. */}
         {view.detail && (
           <Activity mode={hasDetail ? 'visible' : 'hidden'}>
             {view.detail(context, option)}
           </Activity>
-        )}
-        {context.filtered && tile.id === 'consistency' && (
-          <p className="mt-2 shrink-0 text-[11px] leading-snug text-muted-foreground">
-            Filtered view: only matching activities count. Other activity may
-            have occurred.
-          </p>
         )}
         {expanded && !hasDetail && view.more && (
           <motion.div

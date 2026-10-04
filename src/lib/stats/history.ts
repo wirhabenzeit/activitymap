@@ -16,6 +16,9 @@ export type HistoryBucket = {
   end: number;
   total: number;
   bySport: Record<Sport, number>;
+  // Not a whole period of data: the current period, or the one in which the
+  // history begins partway through.
+  incomplete: boolean;
 };
 
 export function firstActivityDay(
@@ -36,24 +39,30 @@ export function volumeHistory(
   metric: StatsMetric,
   range: HistoryRange,
   page = 0,
+  leadingPeriods = 0,
 ): HistoryBucket[] {
   const date = dateOfDay(today);
   const year = date.getUTCFullYear();
   const firstYear = dateOfDay(
     firstActivityDay(activities, today),
   ).getUTCFullYear();
-  const count = range === 'years' ? year - firstYear + 1 : 12;
+  const leading = Math.max(0, Math.floor(leadingPeriods));
+  const count = (range === 'years' ? year - firstYear + 1 : 12) + leading;
   const offset = Math.max(0, Math.floor(page)) * 12;
   const starts = Array.from({ length: count + 1 }, (_, index) =>
     range === 'weeks'
-      ? mondayOf(today) + (index - 11 - offset) * 7
+      ? mondayOf(today) + (index - 11 - offset - leading) * 7
       : range === 'months'
-        ? monthStart(year, date.getUTCMonth() + index - 11 - offset)
-        : yearStart(firstYear + index),
+        ? monthStart(year, date.getUTCMonth() + index - 11 - offset - leading)
+        : yearStart(firstYear + index - leading),
   );
+  const firstDay = firstActivityDay(activities, today);
   const buckets = starts.slice(0, -1).map((start, index) => ({
     start,
     end: Math.min(today, starts[index + 1]! - 1),
+    incomplete:
+      today < starts[index + 1]! ||
+      (firstDay > start && firstDay < starts[index + 1]!),
     total: 0,
     bySport: Object.fromEntries(
       sportOrder.map((sport) => [sport, 0]),
@@ -72,6 +81,30 @@ export function volumeHistory(
   return buckets;
 }
 
+// Use history outside the viewport. Never let the unfinished period lower the
+// trend: at its x position, carry the average of the four preceding full periods.
+export function volumeHistoryAverage(
+  activities: readonly StatsActivity[],
+  today: number,
+  metric: StatsMetric,
+  range: HistoryRange,
+) {
+  const history = volumeHistory(activities, today, metric, range, 0, 4);
+  const firstKnownDay = firstActivityDay(activities, today);
+  return history.slice(4).flatMap((bucket, visibleIndex) => {
+    const index = visibleIndex + 4;
+    const end = index === history.length - 1 ? index - 1 : index;
+    const window = history.slice(end - 3, end + 1);
+    if (!activities.length || window[0]!.end < firstKnownDay) return [];
+    return [
+      {
+        x: String(bucket.start),
+        value: window.reduce((sum, row) => sum + row.total, 0) / 4,
+      },
+    ];
+  });
+}
+
 export function calendarDays(
   activities: readonly StatsActivity[],
   first: number,
@@ -79,6 +112,8 @@ export function calendarDays(
 ) {
   const days = new Map<number, StatsActivity[]>();
   const dominantSport = new Map<number, Sport>();
+  // The runner-up sport of a mixed day, for two-colour stripes.
+  const secondSport = new Map<number, Sport>();
   const mixedDays = new Set<number>();
   for (const activity of activities) {
     const day = dayOf(activity.start_date_local);
@@ -96,14 +131,15 @@ export function calendarDays(
         (times.get(row.sport) ?? 0) + (row.moving_time ?? 0),
       );
     // Match the shared calendar rule even when input order differs.
-    dominantSport.set(
-      day,
-      [...times].sort(
-        (a, b) =>
-          b[1] - a[1] || sportOrder.indexOf(a[0]) - sportOrder.indexOf(b[0]),
-      )[0]![0],
+    const ranked = [...times].sort(
+      (a, b) =>
+        b[1] - a[1] || sportOrder.indexOf(a[0]) - sportOrder.indexOf(b[0]),
     );
-    if (times.size > 1) mixedDays.add(day);
+    dominantSport.set(day, ranked[0]![0]);
+    if (ranked[1]) {
+      mixedDays.add(day);
+      secondSport.set(day, ranked[1][0]);
+    }
   }
-  return { days, dominantSport, mixedDays };
+  return { days, dominantSport, secondSport, mixedDays };
 }

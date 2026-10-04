@@ -35,7 +35,7 @@ struct FilterPanel: View {
                 searchField
             }
             activitySection
-            if scope == .stats { statsPeriodSection } else { dateSection }
+            if scope != .stats { dateSection }
             metricsSection.id(store.filterResetRevision)
             binarySection
         }
@@ -189,18 +189,6 @@ struct FilterPanel: View {
         }
         .onAppear { loadDateDraft() }
         .onChange(of: store.dateDayRange) { _, _ in loadDateDraft() }
-    }
-
-    private var statsPeriodSection: some View {
-        Section("Stats periods") {
-            Text("Each chart uses its own reporting period. Activity filters apply across comparison history.")
-                .font(.subheadline)
-            if let range = store.dateDayRange {
-                Text("Saved for Map and List: \(range.start) through \(range.end). This date range does not restrict Stats.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityIdentifier("stats-period-explanation")
     }
 
     private var metricsSection: some View {

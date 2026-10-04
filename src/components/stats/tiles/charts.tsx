@@ -26,6 +26,7 @@ import { tooltip } from '@tanstack/charts/tooltip';
 import { portal } from '@tanstack/charts/tooltip/portal';
 import { Chart } from '@tanstack/charts/react';
 
+import { type ComparisonBand } from '~/lib/stats/comparison-band';
 import { categorySettings } from '~/settings/category';
 import { sportOrder, type Sport } from '~/lib/stats/tile-data';
 import { dateOfDay, volumeDomain } from '~/lib/stats/tile-series';
@@ -78,22 +79,26 @@ export type LineSeries = {
 
 export function CumulativeLines({
   series,
+  band,
   xMax,
   width,
   height,
   palette,
   detail,
+  compact = false,
   monthAxisFrom,
   valueFormat,
   xLabel,
   endLabels = false,
 }: {
   series: LineSeries[];
+  band?: ComparisonBand;
   xMax: number;
   width: number;
   height: number;
   palette: TilePalette;
   detail: boolean;
+  compact?: boolean;
   // Day number of x = 0; the detail axis then shows months.
   monthAxisFrom?: number;
   valueFormat: (y: number) => string;
@@ -123,15 +128,51 @@ export function CumulativeLines({
       })
     : [];
 
+  // Early in a period the current line ends mid-chart, where a label to its
+  // right would run along the comparison line. Put it above or below the
+  // end point instead, on the side away from that line.
+  const reference = lastCurrent
+    ? past.find((row) => row.day === lastCurrent.day)
+    : undefined;
+  const currentMidChart =
+    lastCurrent !== undefined && lastCurrent.day < xMax * 0.85;
+  const currentAbove = !reference || lastCurrent!.y >= reference.y;
+  const labelOverlap =
+    !currentMidChart &&
+    ends.length === 2 &&
+    Math.abs(ends[0]!.day - ends[1]!.day) / xMax < 0.13 &&
+    Math.abs(ends[0]!.y - ends[1]!.y) /
+      Math.max(1, ...rows.map((row) => row.y)) <
+      0.13;
+  const bandRows =
+    band?.points.map((point) => ({
+      ...point,
+      x: toX(point.x),
+      day: point.x,
+    })) ?? [];
+  // Plain wording on the face; the tooltip and title give the exact
+  // 5th–95th percentile or min–max definition.
+  const bandLabel = band
+    ? band.kind === 'month'
+      ? `Shaded: typical range of ${band.count} past months`
+      : `Shaded: range of ${band.count} past years`
+    : undefined;
   const definition = defineChart({
     marks: [
+      areaY(bandRows, {
+        x: 'x',
+        y1: 'low',
+        y2: 'high',
+        fill: palette.muted,
+        fillOpacity: 0.13,
+      }),
       lineY(past, {
         x: 'x',
         y: 'y',
         z: 'key',
         color: 'key',
         strokeWidth: detail ? 1.5 : 1.25,
-        strokeDasharray: detail ? undefined : '4 3',
+        strokeDasharray: '4 3',
       }),
       lineY(current, {
         x: 'x',
@@ -146,42 +187,81 @@ export function CumulativeLines({
         color: 'key',
         r: 3.5,
       }),
-      text(ends, {
+      text(
+        ends.filter(
+          (row) => !currentMidChart || row.key !== currentKey(series),
+        ),
+        {
+          x: 'x',
+          y: 'y',
+          text: 'label',
+          color: 'key',
+          anchor: 'start',
+          dx: 6,
+          dy: (row) =>
+            labelOverlap ? (row.key === currentKey(series) ? -6 : 9) : 3,
+          fontSize: 10,
+          fontWeight: 500,
+        },
+      ),
+      text(currentMidChart && endLabels && lastCurrent ? [lastCurrent] : [], {
         x: 'x',
         y: 'y',
         text: 'label',
         color: 'key',
-        anchor: 'start',
-        dx: 6,
-        dy: 3,
+        anchor: 'middle',
+        dy: currentAbove ? -9 : 15,
         fontSize: 10,
         fontWeight: 500,
       }),
       crosshair({ marker: true }),
     ],
-    guides: detail,
-    margin: detail
-      ? undefined
-      : { top: 6, right: endLabels ? 34 : 4, bottom: 2, left: 2 },
+    guides: detail || compact,
+    margin: { top: 12, right: endLabels ? 36 : 8, bottom: 22, left: 32 },
     scales: {
       x: {
         scale:
           monthAxisFrom === undefined
             ? d3.scaleLinear().domain([0, xMax])
             : d3.scaleUtc().domain([toX(0), toX(xMax)]),
-        axis: detail
-          ? {
-              ticks: {
-                format: (x: number | Date) =>
-                  x instanceof Date ? d3.utcFormat('%b')(x) : String(x),
-              },
-            }
-          : false,
+        axis:
+          detail || compact
+            ? {
+                ticks: {
+                  values:
+                    monthAxisFrom === undefined
+                      ? [1, 8, 15, 22, 29]
+                      : [0, 3, 6, 9].map(
+                          (month) =>
+                            new Date(
+                              Date.UTC(
+                                dateOfDay(monthAxisFrom).getUTCFullYear(),
+                                month,
+                                1,
+                              ),
+                            ),
+                        ),
+                  format: (x: number | Date) =>
+                    x instanceof Date ? d3.utcFormat('%b')(x) : String(x),
+                },
+              }
+            : false,
       },
       y: {
-        scale: d3.scaleLinear,
-        nice: true,
-        axis: detail ? { ticks: { format: formatShort } } : false,
+        scale: d3
+          .scaleLinear()
+          .domain([
+            0,
+            Math.max(
+              1,
+              ...rows.map((row) => row.y),
+              ...bandRows.map((row) => row.high),
+            ) * 1.08,
+          ]),
+        axis:
+          detail || compact
+            ? { ticks: { count: detail ? 5 : 3, format: formatShort } }
+            : false,
       },
     },
     color: {
@@ -200,10 +280,30 @@ export function CumulativeLines({
       // Tiles clip their content; render the tooltip outside them.
       portal,
       items: [
+        ...(band
+          ? [
+              {
+                id: 'history',
+                label:
+                  band.kind === 'month'
+                    ? 'Historical 5th–95th percentile'
+                    : 'Historical min–max',
+                text: (point: { datum: { day: number } }) => {
+                  const range = band.points.find(
+                    (row) => row.x === point.datum.day,
+                  );
+                  return range
+                    ? `${valueFormat(range.low)}–${valueFormat(range.high)} (${range.count} ${band.kind === 'month' ? 'months' : 'years'})`
+                    : 'Not enough history for this day';
+                },
+              },
+            ]
+          : []),
         {
           channel: 'group',
           label: '',
-          text: (point) => String(point.datum.label),
+          text: (point) =>
+            'label' in point.datum ? point.datum.label : 'Historical range',
         },
         {
           id: 'x',
@@ -213,19 +313,34 @@ export function CumulativeLines({
         {
           id: 'y',
           label: 'Total',
-          text: (point) => valueFormat(point.datum.y),
+          text: (point) =>
+            !('y' in point.datum)
+              ? `${valueFormat(point.datum.low)}–${valueFormat(point.datum.high)}`
+              : valueFormat(point.datum.y),
         },
       ],
     },
   });
 
   return (
-    <Chart
-      definition={definition}
-      width={width}
-      height={height}
-      ariaLabel="Cumulative totals"
-    />
+    <div>
+      <Chart
+        definition={definition}
+        width={width}
+        height={height - 20}
+        ariaLabel={`Cumulative totals${bandLabel ? `; ${bandLabel}` : ''}`}
+      />
+      <p
+        className="mt-1 text-[10px] leading-4 text-muted-foreground"
+        title={
+          band
+            ? `Completed history: ${dateOfDay(band.first).toISOString().slice(0, 10)} to ${dateOfDay(band.last).toISOString().slice(0, 10)}. Current period excluded.`
+            : undefined
+        }
+      >
+        {bandLabel ?? 'Historical band needs 2 completed periods'}
+      </p>
+    </div>
   );
 }
 
@@ -242,6 +357,7 @@ export function VolumeArea({
   trend = [],
   trendLabel = '',
   detail = false,
+  compact = false,
   width,
   height,
   palette,
@@ -253,6 +369,7 @@ export function VolumeArea({
   trendLabel?: string;
   // Axes, for the expanded tile.
   detail?: boolean;
+  compact?: boolean;
   width: number;
   height: number;
   palette: TilePalette;
@@ -262,9 +379,10 @@ export function VolumeArea({
   const tail = weeks.slice(-2);
   // A trend line, not bars: the scale hugs the data so week-to-week change
   // is visible in a short tile, and the area fills down to the scale's floor.
-  const [floor, ceiling] = volumeDomain(
+  const [dataFloor, ceiling] = volumeDomain(
     [...weeks, ...trend].map((week) => week.value),
   );
+  const floor = compact ? 0 : dataFloor;
   const definition = defineChart({
     marks: [
       areaY(full, {
@@ -280,6 +398,13 @@ export function VolumeArea({
         stroke: palette.foreground,
         strokeWidth: 2,
       }),
+      areaY(tail, {
+        x: 'x',
+        y: 'value',
+        y1: floor,
+        fill: palette.foreground,
+        fillOpacity: 0.03,
+      }),
       lineY(tail, {
         x: 'x',
         y: 'value',
@@ -290,14 +415,15 @@ export function VolumeArea({
       lineY(trend, {
         x: 'x',
         y: 'value',
-        stroke: palette.heat,
+        stroke: compact ? palette.muted : palette.heat,
+        strokeDasharray: compact ? '4 3' : undefined,
         strokeWidth: 1.5,
       }),
       text(trend.slice(0, 1), {
         x: 'x',
-        y: 'value',
+        y: compact ? () => ceiling : 'value',
         text: () => trendLabel,
-        fill: palette.heat,
+        fill: compact ? palette.muted : palette.heat,
         anchor: 'start',
         dy: -6,
         fontSize: 10,
@@ -311,20 +437,33 @@ export function VolumeArea({
       }),
       crosshair({ marker: true }),
     ],
-    guides: detail,
-    margin: detail ? { top: 16 } : { top: 16, right: 6, bottom: 2, left: 2 },
+    guides: detail || compact,
+    margin: compact
+      ? { top: 12, right: 8, bottom: 22, left: 30 }
+      : detail
+        ? { top: 16 }
+        : { top: 16, right: 6, bottom: 2, left: 2 },
     scales: {
       x: {
         scale: d3
           .scaleUtc()
           .domain([weeks[0]?.x ?? new Date(0), weeks.at(-1)?.x ?? new Date(0)]),
-        axis: detail
-          ? { ticks: { format: (x: Date) => d3.utcFormat('%b %-d')(x) } }
-          : false,
+        axis:
+          detail || compact
+            ? {
+                ticks: {
+                  count: 3,
+                  format: (x: Date) => d3.utcFormat('%b %-d')(x),
+                },
+              }
+            : false,
       },
       y: {
         scale: d3.scaleLinear().domain([floor, ceiling]),
-        axis: detail ? { ticks: { format: formatShort } } : false,
+        axis:
+          detail || compact
+            ? { ticks: { count: 3, format: formatShort } }
+            : false,
       },
     },
     tooltip: {
@@ -356,14 +495,15 @@ export function VolumeArea({
 
 export type SportBar = { x: string; sport: Sport; value: number };
 
-export function SportBars({
+export function SportArea({
   rows,
   width,
   height,
   detail,
   average,
-  partialLast = false,
+  incomplete = [],
   trend = [],
+  trendLabel = '4-week average',
   palette,
   valueFormat,
   xTickFormat,
@@ -373,16 +513,17 @@ export function SportBars({
   height: number;
   detail: boolean;
   average?: number;
-  // Fade the last bar, a period that is not over yet.
-  partialLast?: boolean;
-  // A line over the bars, such as a rolling average.
+  // Periods without a whole period of data, drawn lighter.
+  incomplete?: readonly string[];
+  // A line over the area, such as a rolling average.
   trend?: { x: string; value: number }[];
+  trendLabel?: string;
   palette: TilePalette;
   valueFormat: (value: number) => string;
   xTickFormat?: (x: string) => string;
 }) {
   const xs = Array.from(new Set(rows.map((row) => row.x)));
-  const partialX = partialLast ? xs.at(-1) : undefined;
+  const isIncomplete = (x: string) => incomplete.includes(x);
   const bars = (source: SportBar[], fillOpacity: number) =>
     barY(source, {
       x: 'x',
@@ -392,22 +533,55 @@ export function SportBars({
       inset: 1,
       fillOpacity,
     });
+  const totals = xs.map((x) => ({
+    x,
+    value: rows
+      .filter((row) => row.x === x)
+      .reduce((sum, row) => sum + row.value, 0),
+    kind: 'Total',
+  }));
+  // Separate adjacent segments keep both the opening and current partial
+  // periods light, without dropping their contribution or bridging a gap.
+  const segments = xs.slice(0, -1).map((x, index) => {
+    const ends = [x, xs[index + 1]!];
+    return { ends, incomplete: ends.some(isIncomplete) };
+  });
   const definition = defineChart({
     marks: [
-      bars(
-        rows.filter((row) => row.x !== partialX),
-        1,
-      ),
-      bars(
-        rows.filter((row) => row.x === partialX),
-        0.4,
-      ),
+      // A lone year still needs a visible footprint at its single period.
+      ...(xs.length === 1
+        ? [bars(rows, isIncomplete(xs[0]!) ? 0.3 : 0.8)]
+        : []),
+      ...segments.flatMap((segment) => [
+        areaY(
+          rows.filter((row) => segment.ends.includes(row.x)),
+          {
+            x: 'x',
+            y: 'value',
+            z: 'sport',
+            color: 'sport',
+            fillOpacity: segment.incomplete ? 0.3 : 0.8,
+            layout: stack({ order: [...sportOrder] }),
+          },
+        ),
+        lineY(
+          totals.filter((row) => segment.ends.includes(row.x)),
+          {
+            x: 'x',
+            y: 'value',
+            stroke: segment.incomplete ? palette.muted : palette.foreground,
+            strokeWidth: 1,
+            ...(segment.incomplete ? { strokeDasharray: '2 3' } : {}),
+          },
+        ),
+      ]),
       lineY(trend, {
         x: 'x',
         y: 'value',
         stroke: palette.foreground,
         strokeWidth: 1.5,
-        strokeOpacity: 0.7,
+        strokeOpacity: 0.9,
+        strokeDasharray: '4 3',
       }),
       ...(average !== undefined && detail
         ? [
@@ -445,17 +619,30 @@ export function SportBars({
           text: (point) =>
             'sport' in point.datum
               ? sportName(point.datum.sport)
-              : 'Rolling average',
+              : 'kind' in point.datum
+                ? String(point.datum.kind)
+                : trendLabel,
         },
         {
           id: 'x',
           label: 'When',
-          text: (point) => (xTickFormat ?? ((x: string) => x))(point.datum.x),
+          text: (point) =>
+            `${(xTickFormat ?? ((x: string) => x))(point.datum.x)}${isIncomplete(point.datum.x) ? ' · incomplete' : ''}`,
         },
         {
           id: 'value',
           label: 'Value',
           text: (point) => valueFormat(point.datum.value),
+        },
+        {
+          id: 'total',
+          label: 'Period total',
+          text: (point) =>
+            valueFormat(
+              rows
+                .filter((row) => row.x === point.datum.x)
+                .reduce((sum, row) => sum + row.value, 0),
+            ),
         },
       ],
     },
@@ -470,17 +657,24 @@ export function SportBars({
   );
 }
 
-export type PlainBar = { x: string; value: number; highlight: boolean };
+export type PlainBar = {
+  x: string;
+  value: number | null;
+  highlight: boolean;
+  partial?: boolean;
+};
 
 export function PlainBars({
   rows,
   width,
   height,
   detail,
+  compact = false,
   average,
   palette,
   valueFormat,
   xTickFormat,
+  xAxisFormat,
   yDomain,
   ariaLabel = 'Bars',
 }: {
@@ -488,21 +682,27 @@ export function PlainBars({
   width: number;
   height: number;
   detail: boolean;
+  compact?: boolean;
   average?: number;
   palette: TilePalette;
   valueFormat: (value: number) => string;
   xTickFormat?: (x: string) => string;
+  xAxisFormat?: (x: string) => string;
   yDomain?: [number, number];
   ariaLabel?: string;
 }) {
   const definition = defineChart({
     marks: [
-      barY(rows, {
-        x: 'x',
-        y: 'value',
-        color: (row) => (row.highlight ? 'current' : 'past'),
-        inset: 1,
-      }),
+      barY(
+        rows.filter((row) => row.value !== null),
+        {
+          x: 'x',
+          y: 'value',
+          color: (row) =>
+            row.partial ? 'partial' : row.highlight ? 'current' : 'past',
+          inset: 1,
+        },
+      ),
       ...(average !== undefined && detail
         ? [
             ruleY([average], {
@@ -512,27 +712,66 @@ export function PlainBars({
           ]
         : []),
     ],
-    guides: detail,
-    margin: detail ? undefined : { top: 2, right: 0, bottom: 0, left: 0 },
+    guides: detail || compact,
+    margin: compact
+      ? { top: 8, right: 4, bottom: 22, left: 30 }
+      : detail
+        ? undefined
+        : { top: 2, right: 0, bottom: 0, left: 0 },
     scales: {
       x: {
         scale: d3
           .scaleBand<string>()
           .domain(rows.map((row) => row.x))
           .padding(0.2),
-        axis: detail
-          ? { ticks: { format: xTickFormat ?? ((x: string) => x) } }
-          : false,
+        axis:
+          detail || compact
+            ? {
+                ticks: {
+                  values: rows
+                    .filter(
+                      (_, index) =>
+                        index %
+                          Math.max(
+                            1,
+                            Math.ceil(rows.length / (detail ? 6 : 4)),
+                          ) ===
+                        0,
+                    )
+                    .map((row) => row.x),
+                  format: xAxisFormat ?? xTickFormat ?? ((x: string) => x),
+                },
+              }
+            : false,
       },
       y: {
-        scale: yDomain ? d3.scaleLinear().domain(yDomain) : d3.scaleLinear,
-        nice: !yDomain,
-        axis: detail ? { ticks: { format: formatShort } } : false,
+        scale: yDomain
+          ? d3.scaleLinear().domain(yDomain)
+          : compact
+            ? d3
+                .scaleLinear()
+                .domain([
+                  0,
+                  Math.max(1, ...rows.map((row) => row.value ?? 0)) * 1.08,
+                ])
+            : d3.scaleLinear,
+        nice: !yDomain && !compact,
+        axis:
+          detail || compact
+            ? {
+                ticks: {
+                  ...(yDomain
+                    ? { values: yDomain }
+                    : { count: compact ? 3 : undefined }),
+                  format: formatShort,
+                },
+              }
+            : false,
       },
     },
     color: {
-      domain: ['current', 'past'],
-      range: [palette.foreground, palette.bar],
+      domain: ['current', 'past', 'partial'],
+      range: [palette.foreground, palette.bar, palette.faint],
     },
     tooltip: {
       use: tooltip,
@@ -542,12 +781,16 @@ export function PlainBars({
         {
           channel: 'group',
           label: '',
-          text: (point) => (xTickFormat ?? ((x: string) => x))(point.datum.x),
+          text: (point) =>
+            `${(xTickFormat ?? ((x: string) => x))(point.datum.x)}${point.datum.partial ? ' · incomplete' : ''}`,
         },
         {
           id: 'value',
           label: 'Value',
-          text: (point) => valueFormat(point.datum.value),
+          text: (point) =>
+            point.datum.value === null
+              ? 'Not yet elapsed'
+              : valueFormat(point.datum.value),
         },
       ],
     },

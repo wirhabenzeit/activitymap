@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dayFromISODate, isoDate, type StatsActivity } from './tile-data';
+import {
+  dayFromISODate,
+  isoDate,
+  fourWeekVolume,
+  type StatsActivity,
+} from './tile-data';
 import { volumeHistory, calendarDays } from './history';
 import { calendarMonths } from './tile-series';
 
@@ -110,4 +115,121 @@ void test('calendar day details retain every activity and distinguish mixed spor
     months.reduce((sum, month) => sum + month.last - month.first + 1, 0),
     366,
   );
+});
+
+void test('rolling volume averages use offscreen history and exclude the incomplete period', async () => {
+  const { volumeHistoryAverage } = await import('./history');
+  const cases = [
+    {
+      range: 'weeks' as const,
+      dates: [
+        '2026-06-15',
+        '2026-06-22',
+        '2026-06-29',
+        '2026-07-06',
+        '2026-08-24',
+        '2026-08-31',
+        '2026-09-07',
+        '2026-09-14',
+        '2026-09-21',
+      ],
+      first: '2026-07-06',
+      last: 6.5,
+    },
+    {
+      range: 'months' as const,
+      dates: [
+        '2025-07-01',
+        '2025-08-01',
+        '2025-09-01',
+        '2025-10-01',
+        '2026-05-01',
+        '2026-06-01',
+        '2026-07-01',
+        '2026-08-01',
+        '2026-09-01',
+      ],
+      first: '2025-10-01',
+      last: 6.5,
+    },
+    {
+      range: 'years' as const,
+      dates: [
+        '2019-01-01',
+        '2020-01-01',
+        '2021-01-01',
+        '2022-01-01',
+        '2023-01-01',
+        '2024-01-01',
+        '2025-01-01',
+        '2026-01-01',
+      ],
+      first: '2022-01-01',
+      last: 5.5,
+    },
+  ];
+  for (const example of cases) {
+    const rows = example.dates.map((date, index) =>
+      activity(
+        date,
+        'ride',
+        index === example.dates.length - 1 ? 100 : index + 1,
+      ),
+    );
+    const trend = volumeHistoryAverage(rows, today, 'time', example.range);
+    assert.equal(isoDate(Number(trend[0]!.x)), example.first);
+    assert.equal(trend[0]!.value, 2.5);
+    assert.equal(trend.at(-1)!.value, example.last);
+  }
+  assert.deepEqual(volumeHistoryAverage([], today, 'time', 'weeks'), []);
+  assert.deepEqual(
+    volumeHistoryAverage([activity('2026-09-21')], today, 'time', 'weeks'),
+    [],
+  );
+});
+
+void test('current history periods remain incomplete through their final day and complete on rollover', () => {
+  const rows = [activity('2020-01-01')];
+  for (const [date, range] of [
+    ['2026-10-04', 'weeks'],
+    ['2026-09-30', 'months'],
+    ['2024-02-29', 'months'],
+    ['2026-12-31', 'years'],
+  ] as const) {
+    const end = dayFromISODate(date);
+    const current = volumeHistory(rows, end, 'distance', range).at(-1)!;
+    assert.equal(current.incomplete, true, `${range} on ${date}`);
+    const next = volumeHistory(rows, end + 1, 'distance', range);
+    assert.equal(
+      next.find((bucket) => bucket.start === current.start)!.incomplete,
+      false,
+    );
+    assert.equal(next.at(-1)!.incomplete, true);
+  }
+  assert.equal(
+    volumeHistory([activity('2020-10-15')], today, 'distance', 'years')[0]!
+      .incomplete,
+    true,
+  );
+});
+
+void test('volume headline rolls two adjacent 28-day windows including today on every weekday', () => {
+  for (let weekday = 0; weekday < 7; weekday++) {
+    const day = dayFromISODate('2026-09-28') + weekday;
+    const rows = [0, 27, 28, 55, 56, -1].map((offset, id) =>
+      activity(isoDate(day - offset), 'ride', 1, id),
+    );
+    assert.deepEqual(fourWeekVolume(rows, day, 'distance'), {
+      current: 20,
+      previous: 20,
+    });
+    assert.deepEqual(
+      fourWeekVolume(
+        [...rows, activity(isoDate(day), 'ride', 1, 10)],
+        day,
+        'distance',
+      ),
+      { current: 30, previous: 20 },
+    );
+  }
 });

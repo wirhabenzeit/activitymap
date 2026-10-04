@@ -30,7 +30,9 @@ export function MonthRows({
   colorBy = 'sport',
   first,
   mixedDays = new Set<number>(),
+  secondSport = new Map<number, Sport>(),
   onSelectDay,
+  selectedDay,
 }: {
   today: number;
   dominantSport: Map<number, Sport>;
@@ -40,7 +42,9 @@ export function MonthRows({
   colorBy?: 'sport' | StatsMetric;
   first?: number;
   mixedDays?: Set<number>;
+  secondSport?: Map<number, Sport>;
   onSelectDay?: (day: number) => void;
+  selectedDay?: number | null;
 }) {
   const [hover, setHover] = useState<string | null>(null);
   const months = calendarMonths(today, first);
@@ -63,6 +67,15 @@ export function MonthRows({
     </div>
   );
 
+  const dayLabel = (day: number) => {
+    const sport = dominantSport.get(day);
+    const dayTotals = totals.get(day);
+    return `${shortDate(dateOfDay(day))}, ${dateOfDay(day).getUTCFullYear()}: ${
+      sport && dayTotals
+        ? `${mixedDays.has(day) ? 'Multiple sports' : categorySettings[sport].name}, ${formatWithUnit(dayTotals[colorBy === 'sport' ? 'time' : colorBy], colorBy === 'sport' ? 'time' : colorBy)}`
+        : 'no matching activities'
+    }`;
+  };
   return (
     <div className="mt-2 flex min-h-0 flex-1 flex-col">
       <div
@@ -89,11 +102,7 @@ export function MonthRows({
                   return <i key={index} />;
                 const sport = dominantSport.get(day);
                 const dayTotals = totals.get(day);
-                const label = `${shortDate(dateOfDay(day))}, ${dateOfDay(day).getUTCFullYear()}: ${
-                  sport && dayTotals
-                    ? `${mixedDays.has(day) ? 'Multiple sports' : categorySettings[sport].name}, ${formatWithUnit(dayTotals[colorBy === 'sport' ? 'time' : colorBy], colorBy === 'sport' ? 'time' : colorBy)}`
-                    : 'no matching activities'
-                }`;
+                const label = dayLabel(day);
                 return (
                   <button
                     type="button"
@@ -108,14 +117,21 @@ export function MonthRows({
                     }}
                     tabIndex={day === focusedDay ? 0 : -1}
                     aria-label={label}
+                    aria-pressed={day === selectedDay}
                     title={label}
                     className="block min-w-0 rounded-[2px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
                     style={{
+                      boxShadow:
+                        day === selectedDay
+                          ? `0 0 0 1px ${palette.empty}, 0 0 0 3px currentColor`
+                          : undefined,
+                      position: 'relative',
+                      zIndex: day === selectedDay ? 1 : undefined,
                       background:
                         colorBy === 'sport'
                           ? sport
                             ? mixedDays.has(day)
-                              ? `repeating-linear-gradient(135deg, ${categorySettings[sport].color} 0 3px, ${palette.empty} 3px 5px)`
+                              ? `repeating-linear-gradient(135deg, ${categorySettings[sport].color} 0 3px, ${secondSport.has(day) ? categorySettings[secondSport.get(day)!].color : palette.empty} 3px 5px)`
                               : categorySettings[sport].color
                             : palette.empty
                           : interpolateRgb(
@@ -161,7 +177,7 @@ export function MonthRows({
         ))}
       </div>
       <div className="mt-1.5 min-h-4 shrink-0 truncate text-[11px] leading-4">
-        {hover ?? '\u00a0'}
+        {selectedDay != null ? dayLabel(selectedDay) : (hover ?? '\u00a0')}
       </div>
       {colorBy === 'sport' ? footer : numericLegend}
     </div>

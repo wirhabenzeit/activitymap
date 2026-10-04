@@ -26,6 +26,17 @@ export function formatMetric(value: number, metric: StatsMetric): string {
     : whole.format(value);
 }
 
+// Hilliness is displayed in metres climbed per kilometre, with one decimal.
+export const formatHilliness = (metersPerKm: number) =>
+  oneDecimal.format(metersPerKm);
+
+export const formatDailyRate = (value: number) =>
+  value !== 0 && Math.abs(value) < 1
+    ? new Intl.NumberFormat('en-US', { maximumSignificantDigits: 2 }).format(
+        value,
+      )
+    : oneDecimal.format(value);
+
 export function formatWithUnit(value: number, metric: StatsMetric): string {
   return `${formatMetric(value, metric)} ${metricUnit[metric]}`;
 }

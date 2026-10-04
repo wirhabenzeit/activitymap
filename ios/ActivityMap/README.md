@@ -43,6 +43,21 @@ The production Vercel project's **Production** environment must set `MOBILE_AUTH
 
 To test the Mac's local backend from an iPhone instead, use an HTTPS tunnel with a stable hostname and override the device setting in the ignored `Config/Local.xcconfig`. Add the tunnel host to Better Auth's `allowedHosts` in `src/lib/auth.ts`, set `BETTER_AUTH_URL` consistently, and register the tunnel callback host in the Strava OAuth application. The local server also needs the variables under **Local sign-in setup** below. Direct `http://<Mac LAN IP>:3000` does not work with this client: `APIConfiguration` rejects non-local HTTP and the app's transport policy only excepts `localhost`.
 
+### Install an interactive simulator build
+
+Build with normal signing for simulator sign-in. Do **not** install an app built with `CODE_SIGNING_ALLOWED=NO` from the gallery/test workflow for interactive review: it lacks the simulator application entitlement required by Keychain and sign-in fails with status **-34018**. Keep interactive builds in separate DerivedData so a later gallery build cannot replace the signed app.
+
+```sh
+xcodebuild build -project ios/ActivityMap/ActivityMap.xcodeproj \
+  -scheme ActivityMap -configuration Debug \
+  -destination 'platform=iOS Simulator,name=iPad Pro 11-inch (M5)' \
+  -derivedDataPath /tmp/activitymap-ipad-signed-build
+xcrun simctl install booted /tmp/activitymap-ipad-signed-build/Build/Products/Debug-iphonesimulator/ActivityMap.app
+xcrun simctl launch --terminate-running-process booted page.dominik.activitymap
+```
+
+Use the intended simulator's UDID instead of `booted` when more than one simulator is running. Reinstalling the signed build fixes this packaging error without deleting app data or resetting the simulator Keychain.
+
 ## Local sign-in setup
 
 Native sign-in works against an explicitly configured local server. Preview sign-in requires the [Preview Strava setup](../../docs/preview-strava-login.md). Native Preview sign-in additionally needs `MOBILE_AUTH_REDIRECT_ALLOWLIST` in the Preview environment.
@@ -119,6 +134,24 @@ The runner uses stable per-checkout DerivedData for incremental builds. `--reuse
 Both clients load `ActivityMapTests/Gallery/gallery-activities.json`, the curated 20-activity fixture with trimmed route ends. `export-gallery-library.mjs --all` writes a full local export to `~/Library/Caches/ActivityMapGallery/library.json`; `--full-library` uses that exact file on both platforms. Missing files or scenario IDs fail validation before building. The runner does not silently fall back to unrelated synthetic activities.
 
 Web fixture injection is enabled only in a development build, using the production routes/components and DTO mapper with an in-memory query cache. It needs no temporary session or database writes, uses signed-out account chrome, and excludes live photos/streams. Start `pnpm dev` from this checkout. Set `ACTIVITYMAP_GALLERY_WEB_URL` for a different local port. Set `NEXT_PUBLIC_MAPBOX_TOKEN` in the runner environment for native remote tiles; web uses the dev server's token. Offline native basemaps and platform-specific map styles are not pixel-equivalent. Both use Europe/Zurich and de-CH presentation; web 150% text is an accessibility stress case, not an exact Dynamic Type equivalent. Captures are visual review evidence, not automated visual approval.
+
+## Stats dashboard
+
+The native shell now exposes Map, List and Stats. Stats retains its scroll position and tile choices while switching destinations, using the fixture-backed engine described in [the calculation handoff](../../docs/native-stats-engine.md). Its ten tiles follow Now → This year → Patterns. Metric/range switches, rolling calendar colours, animated chart expansion, touch inspection and accessible chart values are available. Loading, no history, no matches and cached/error-with-content states use the existing scoped sync presentation.
+
+Stats uses non-date activity filters and tile-owned periods. Reset activity filters preserves the Map/List date range and selection. Normal dashboard entry performs metadata calculations only, without requesting streams, photos or route geometry. Expanded volume grouping, historical calendar navigation, current/prior-period comparison bands, and record/calendar/hilliness activity drill-down are included. Final device/accessibility certification remains #228.
+
+The retired Calendar/Timeline/Progress prototype screens have been removed. See [dashboard review](../../docs/ios-stats-dashboard-review.md) for scope, captures and validation.
+
+For a tile-only web/iOS comparison, start the local web development server and run:
+
+```sh
+bash scripts/stats-tile-gallery.sh /tmp/activitymap-stats-review
+```
+
+This captures all ten production tiles in their default metric, collapsed and (where supported) expanded: collapsed/expanded PNGs plus expanded-volume month/year captures, with metadata and a self-contained `index.html`. Native tiles are hosted individually; web captures target dashboard elements after clicking their actual expansion controls. Both cards are 378 points/CSS pixels wide at 2× resolution, in light mode and de-CH/Europe-Zurich. Web uses a 450px viewport to accommodate its shell padding; native uses the tile width from its 402pt dashboard. Heights remain natural, so density differences are visible. This is tile review, not full-screen or transition validation.
+
+The existing 20-activity gallery fixture and reporting date `2026-09-22` are shared by both platforms. Override `ACTIVITYMAP_GALLERY_LIBRARY`, `ACTIVITYMAP_STATS_GALLERY_DAY`, `ACTIVITYMAP_GALLERY_WEB_URL`, `ACTIVITYMAP_GALLERY_SIMULATOR` or `ACTIVITYMAP_STATS_GALLERY_BUILD` as needed. The report builder verifies fixture hashes, date, option, dimensions and every expected capture before emitting the comparison. Screenshots and HTML stay in the supplied output directory; no deployment or backend writes occur.
 
 ## Map route selection
 

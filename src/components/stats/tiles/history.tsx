@@ -4,11 +4,12 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from '~/components/ui/dialog';
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '~/components/ui/select';
 import { categorySettings } from '~/settings/category';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
 import {
@@ -20,6 +21,7 @@ import {
   calendarDays,
   firstActivityDay,
   volumeHistory,
+  volumeHistoryAverage,
   type HistoryRange,
 } from '~/lib/stats/history';
 import {
@@ -28,8 +30,9 @@ import {
   monthStart,
   yearStart,
 } from '~/lib/stats/tile-series';
+import { ActivityRow } from './activity-row';
 import { MonthRows } from './calendar';
-import { Measure, SportBars } from './charts';
+import { Measure, SportArea } from './charts';
 import { formatWithUnit, monthName, shortDate } from './format';
 import { type TileContext } from './tiles';
 
@@ -93,10 +96,18 @@ export function VolumeHistory({
   metric: StatsMetric;
 }) {
   const [range, setRange] = useState<HistoryRange>('weeks');
-  const [page, setPage] = useState(0);
   const buckets = useMemo(
-    () => volumeHistory(context.activities, context.today, metric, range, page),
-    [context.activities, context.today, metric, range, page],
+    () => volumeHistory(context.activities, context.today, metric, range),
+    [context.activities, context.today, metric, range],
+  );
+  const trend = useMemo(
+    () =>
+      volumeHistoryAverage(context.activities, context.today, metric, range),
+    [context.activities, context.today, metric, range],
+  );
+  const averageLabel = `4-${range === 'weeks' ? 'week' : range === 'months' ? 'month' : 'year'} average`;
+  const sports = sportOrder.filter((sport) =>
+    buckets.some((bucket) => bucket.bySport[sport] > 0),
   );
   const first = buckets[0]!.start;
   const last = buckets.at(-1)!.end;
@@ -115,98 +126,68 @@ export function VolumeHistory({
   );
   return (
     <div className="space-y-3 pt-2">
-      <div
-        role="group"
-        aria-label="Volume history range"
-        className="flex flex-wrap gap-1"
-      >
-        {(
-          [
-            ['weeks', '12 weeks'],
-            ['months', '12 months'],
-            ['years', 'All years'],
-          ] as const
-        ).map(([value, label]) => (
-          <Button
-            key={value}
-            variant={range === value ? 'secondary' : 'ghost'}
-            aria-pressed={range === value}
-            className="h-8 px-2 text-xs"
-            onClick={() => {
-              setRange(value);
-              setPage(0);
-            }}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Select
+          value={range}
+          onValueChange={(value) => setRange(value as HistoryRange)}
+        >
+          <SelectTrigger
+            aria-label="Volume grouping"
+            className="w-auto min-w-32 gap-3 text-xs"
           >
-            {label}
-          </Button>
-        ))}
-      </div>
-      {range !== 'years' ? (
-        <PeriodNavigation
-          label={`${dateLabel(first)} – ${dateLabel(last)}`}
-          previous={first > firstActivityDay(context.activities, context.today)}
-          next={page > 0}
-          onPrevious={() => setPage(page + 1)}
-          onNext={() => setPage(Math.max(0, page - 1))}
-          onReset={() => setPage(0)}
-        />
-      ) : (
-        <p className="text-xs">
+            <SelectValue>
+              {range === 'weeks'
+                ? 'By week'
+                : range === 'months'
+                  ? 'By month'
+                  : 'By year'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="weeks">By week</SelectItem>
+            <SelectItem value="months">By month</SelectItem>
+            <SelectItem value="years">By year</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
           {dateLabel(first)} – {dateLabel(last)}
         </p>
-      )}
-      <div>
-        <p className="text-xs text-muted-foreground">
-          Total across{' '}
-          {range === 'years'
-            ? 'all displayed years'
-            : `the displayed 12 ${range}`}
-          {page === 0 ? ' · current period is incomplete' : ''}
-        </p>
-        <p className="font-mono text-2xl">
-          {formatWithUnit(
-            buckets.reduce((sum, bucket) => sum + bucket.total, 0),
-            metric,
-          )}
-        </p>
       </div>
+      <p className="font-mono text-2xl">
+        {formatWithUnit(
+          buckets.reduce((sum, bucket) => sum + bucket.total, 0),
+          metric,
+        )}{' '}
+        <span className="font-sans text-xs text-muted-foreground">
+          {range === 'years' ? 'over all years' : `over 12 ${range}`}
+        </span>
+      </p>
       <Measure className="w-full" style={{ height: 240 }}>
         {({ width, height }) => (
-          <SportBars
+          <SportArea
             rows={rows}
             width={width}
             height={height}
             detail
-            partialLast={page === 0}
-            trend={
-              range === 'weeks'
-                ? buckets.flatMap((bucket, index) =>
-                    index >= 3 && (page > 0 || index < buckets.length - 1)
-                      ? [
-                          {
-                            x: String(bucket.start),
-                            value:
-                              buckets
-                                .slice(index - 3, index + 1)
-                                .reduce((sum, row) => sum + row.total, 0) / 4,
-                          },
-                        ]
-                      : [],
-                  )
-                : []
-            }
+            incomplete={buckets.flatMap((bucket) =>
+              bucket.incomplete ? [String(bucket.start)] : [],
+            )}
+            trend={trend}
+            trendLabel={averageLabel}
             palette={context.palette}
             valueFormat={(value) => formatWithUnit(value, metric)}
             xTickFormat={(value) =>
               range === 'years'
                 ? label(Number(value))
-                : shortDate(dateOfDay(Number(value)))
+                : range === 'months'
+                  ? monthName(dateOfDay(Number(value)))
+                  : shortDate(dateOfDay(Number(value)))
             }
           />
         )}
       </Measure>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-        {range === 'weeks' && <span>Line: 4-week average</span>}
+        {trend.length > 0 && <span>Dashed: {averageLabel}</span>}
         {sportOrder
           .filter((sport) =>
             buckets.some((bucket) => bucket.bySport[sport] > 0),
@@ -223,30 +204,66 @@ export function VolumeHistory({
       </div>
       <details>
         <summary className="cursor-pointer py-2 text-xs">Period totals</summary>
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b">
-              <th className="py-2 text-left">
-                {range === 'years'
-                  ? 'Year'
-                  : range === 'months'
-                    ? 'Month'
-                    : 'Week'}
-              </th>
-              <th className="text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {buckets.map((bucket) => (
-              <tr key={bucket.start} className="border-b border-muted">
-                <td className="py-2">{label(bucket.start)}</td>
-                <td className="text-right font-mono">
-                  {formatWithUnit(bucket.total, metric)}
-                </td>
+        <div
+          className="overflow-x-auto"
+          tabIndex={0}
+          role="region"
+          aria-label="Period totals by sport"
+        >
+          <table className="w-full text-xs whitespace-nowrap">
+            <caption className="sr-only">
+              Period totals by sport, {metric}. Incomplete periods are marked.
+            </caption>
+            <thead>
+              <tr className="border-b">
+                <th
+                  scope="col"
+                  className="sticky left-0 bg-card py-2 pr-4 text-left"
+                >
+                  {range === 'years'
+                    ? 'Year'
+                    : range === 'months'
+                      ? 'Month'
+                      : 'Week'}
+                </th>
+                {sports.map((sport) => (
+                  <th scope="col" key={sport} className="px-3 text-right">
+                    {categorySettings[sport].name}
+                  </th>
+                ))}
+                <th scope="col" className="pl-3 text-right">
+                  Total
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {buckets.map((bucket) => (
+                <tr key={bucket.start} className="border-b border-muted">
+                  <th
+                    scope="row"
+                    className="sticky left-0 bg-card py-2 pr-4 text-left font-normal"
+                  >
+                    {label(bucket.start)}
+                    {bucket.incomplete && (
+                      <span className="text-muted-foreground">
+                        {' '}
+                        · incomplete
+                      </span>
+                    )}
+                  </th>
+                  {sports.map((sport) => (
+                    <td key={sport} className="px-3 text-right font-mono">
+                      {formatWithUnit(bucket.bySport[sport], metric)}
+                    </td>
+                  ))}
+                  <td className="pl-3 text-right font-mono font-semibold">
+                    {formatWithUnit(bucket.total, metric)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </details>
     </div>
   );
@@ -276,7 +293,7 @@ export function CalendarHistory({
     selectedYear === null
       ? context.today
       : Math.min(context.today, yearStart(selectedYear + 1) - 1);
-  const { days, dominantSport, mixedDays } = useMemo(
+  const { days, dominantSport, secondSport, mixedDays } = useMemo(
     () => calendarDays(context.activities, first, last),
     [context.activities, first, last],
   );
@@ -294,7 +311,7 @@ export function CalendarHistory({
             <Button
               variant="outline"
               size="icon"
-              className="size-8"
+              className="size-11"
               aria-label="Previous calendar year"
               disabled={(year ?? currentYear) <= earliestYear}
               onClick={() => {
@@ -304,22 +321,21 @@ export function CalendarHistory({
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <label className="text-xs">
-              <span className="sr-only">Calendar period</span>
-              <select
+            <Select
+              value={year === null ? 'rolling' : String(year)}
+              onValueChange={(value) => {
+                setYear(value === 'rolling' ? null : Number(value));
+                setSelectedDay(null);
+              }}
+            >
+              <SelectTrigger
                 aria-label="Calendar period"
-                className="h-8 rounded border bg-background px-2"
-                value={year ?? 'rolling'}
-                onChange={(event) => {
-                  setYear(
-                    event.target.value === 'rolling'
-                      ? null
-                      : Number(event.target.value),
-                  );
-                  setSelectedDay(null);
-                }}
+                className="h-11 w-[170px]"
               >
-                <option value="rolling">Last 12 months</option>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rolling">Last 12 months</SelectItem>
                 {Array.from(
                   {
                     length:
@@ -329,16 +345,16 @@ export function CalendarHistory({
                   },
                   (_, i) => currentYear - i,
                 ).map((value) => (
-                  <option key={value} value={value}>
+                  <SelectItem key={value} value={String(value)}>
                     {value}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-            </label>
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="icon"
-              className="size-8"
+              className="size-11"
               aria-label="Next calendar year"
               disabled={year === null || year >= currentYear}
               onClick={() => {
@@ -355,6 +371,22 @@ export function CalendarHistory({
           </p>
         </div>
       )}
+      {!expanded && (
+        <div className="space-y-1">
+          <p>
+            <strong className="font-mono text-[28px] font-medium">
+              {days.size}
+            </strong>
+            <span className="ml-1 text-xs text-muted-foreground">
+              active days
+            </span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {Math.round((days.size / (last - first + 1)) * 100)}% of days in the
+            last 12 months
+          </p>
+        </div>
+      )}
       <div
         className={
           expanded ? 'flex h-[380px] flex-col' : 'flex min-h-0 flex-1 flex-col'
@@ -365,15 +397,27 @@ export function CalendarHistory({
           today={last}
           first={first}
           dominantSport={dominantSport}
+          secondSport={secondSport}
           mixedDays={mixedDays}
           totals={totals}
           palette={context.palette}
           colorBy={colorBy}
-          onSelectDay={setSelectedDay}
+          selectedDay={selectedDay}
+          onSelectDay={(day) => {
+            setSelectedDay(day);
+            if (!expanded) {
+              setYear(null);
+              context.onExpand?.();
+            }
+          }}
           footer={
             <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] leading-4 text-muted-foreground">
               {sportOrder
-                .filter((sport) => [...dominantSport.values()].includes(sport))
+                .filter((sport) =>
+                  [...days.values()].some((activities) =>
+                    activities.some((activity) => activity.sport === sport),
+                  ),
+                )
                 .map((sport) => (
                   <span key={sport} className="flex items-center gap-1">
                     <i
@@ -388,62 +432,54 @@ export function CalendarHistory({
           }
         />
       </div>
-      <Dialog
-        open={selectedDay !== null}
-        onOpenChange={(open) => {
-          if (!open) setSelectedDay(null);
-        }}
-      >
-        <DialogContent
-          className="max-h-[85dvh] w-[calc(100vw-2rem)] max-w-lg overflow-y-auto"
-          onEscapeKeyDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
+      {selectedDay !== null && selectedDay >= first && selectedDay <= last && (
+        <section
+          className="mt-3 space-y-3 border-t pt-3"
+          aria-label="Selected day activities"
+          aria-live="polite"
         >
-          <DialogTitle>
-            {selectedDay === null ? 'Day activities' : dateLabel(selectedDay)}
-          </DialogTitle>
-          <DialogDescription>
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-sm font-medium">{dateLabel(selectedDay)}</h4>
+            <Button
+              variant="ghost"
+              className="h-11"
+              aria-label="Close day details"
+              onClick={() => setSelectedDay(null)}
+            >
+              Close
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
             Activities matching your current filters.
-          </DialogDescription>
+          </p>
           {selectedActivities.length === 0 ? (
             <p className="text-sm">No matching activities on this day.</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-muted">
               {selectedActivities.map((activity, index) => (
-                <li key={activity.id ?? index} className="rounded border p-3">
-                  {activity.id !== undefined && context.onOpenActivity ? (
-                    <button
-                      className="text-left text-sm font-medium underline underline-offset-2"
-                      onClick={() => {
-                        setSelectedDay(null);
-                        context.onOpenActivity?.(activity.id!);
-                      }}
-                    >
-                      {activity.name?.trim()
-                        ? activity.name
-                        : 'Untitled activity'}
-                    </button>
-                  ) : (
-                    <p className="text-sm font-medium">
-                      {activity.name?.trim()
-                        ? activity.name
-                        : 'Untitled activity'}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {categorySettings[activity.sport].name} ·{' '}
-                    {(['distance', 'elevation', 'time'] as const)
+                <li key={activity.id ?? index}>
+                  <ActivityRow
+                    sport={activity.sport}
+                    name={activity.name}
+                    summary={`${categorySettings[activity.sport].name} · ${(
+                      ['distance', 'elevation', 'time'] as const
+                    )
                       .map((metric) =>
                         formatWithUnit(metricValue(activity, metric), metric),
                       )
-                      .join(' · ')}
-                  </p>
+                      .join(' · ')}`}
+                    onOpen={
+                      activity.id !== undefined && context.onOpenActivity
+                        ? () => context.onOpenActivity?.(activity.id!)
+                        : undefined
+                    }
+                  />
                 </li>
               ))}
             </ul>
           )}
-        </DialogContent>
-      </Dialog>
+        </section>
+      )}
     </>
   );
 }

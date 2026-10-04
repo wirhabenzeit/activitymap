@@ -7,7 +7,11 @@
       "group": "now",
       "visibility": "visible",
       "expandable": false,
-      "options": ["distance", "time", "elevation"],
+      "options": [
+        "distance",
+        "time",
+        "elevation"
+      ],
       "defaultOption": "distance",
       "compact": "Monday-first daily values; sum so far versus typical same weekday.",
       "expanded": "No expansion.",
@@ -15,26 +19,36 @@
       "uiOwner": 265
     },
     {
-      "id": "weeklyVolume",
-      "group": "now",
-      "visibility": "visible",
-      "expandable": true,
-      "options": ["distance", "time", "elevation", "count"],
-      "defaultOption": "distance",
-      "compact": "Last-28-day headline versus prior 28 days; 12-week trend with four-full-week average.",
-      "expanded": "12-week/12-month paged history or all years, sport breakdown and period totals.",
-      "nativeOwner": 264,
-      "uiOwner": 265
-    },
-    {
       "id": "monthVsLastMonth",
       "group": "now",
       "visibility": "visible",
       "expandable": true,
-      "options": ["distance", "time", "elevation", "count"],
+      "options": [
+        "distance",
+        "time",
+        "elevation",
+        "count"
+      ],
       "defaultOption": "distance",
-      "compact": "Month-to-date comparison with prior month capped at its last day.",
-      "expanded": "Earlier completed months with previous/next/reset and cumulative curves.",
+      "compact": "Month-to-date comparison with prior month capped at its last day; 5th\u201395th percentile band across completed historical months.",
+      "expanded": "Current month versus previous month, with larger labelled cumulative curves, the same historical percentile band and inspection; no historical navigation.",
+      "nativeOwner": 264,
+      "uiOwner": 265
+    },
+    {
+      "id": "weeklyVolume",
+      "group": "now",
+      "visibility": "visible",
+      "expandable": true,
+      "options": [
+        "distance",
+        "time",
+        "elevation",
+        "count"
+      ],
+      "defaultOption": "distance",
+      "compact": "Last-28-day headline versus prior 28 days; 12-week trend with four-full-week average.",
+      "expanded": "By week (last 12 weeks), By month (last 12 months), By year (all available years); stacked area by sport, four-completed-period average including offscreen history, lighter incomplete-period shading, and period totals by sport. No historical-window or chart-type picker.",
       "nativeOwner": 264,
       "uiOwner": 265
     },
@@ -43,10 +57,15 @@
       "group": "thisYear",
       "visibility": "visible",
       "expandable": true,
-      "options": ["distance", "time", "elevation", "count"],
+      "options": [
+        "distance",
+        "time",
+        "elevation",
+        "count"
+      ],
       "defaultOption": "distance",
-      "compact": "Year-to-date headline versus same date last year; cumulative calendar-aligned curves.",
-      "expanded": "Earlier completed years; up to four additional prior-year curves.",
+      "compact": "Year-to-date headline versus same date last year; cumulative calendar-aligned curves with a min\u2013max band across completed prior years.",
+      "expanded": "Current year versus previous year, with larger calendar-aligned cumulative curves, the same historical min\u2013max band and inspection; no historical navigation or extra comparison curves.",
       "nativeOwner": 264,
       "uiOwner": 265
     },
@@ -55,9 +74,13 @@
       "group": "thisYear",
       "visibility": "visible",
       "expandable": false,
-      "options": ["distance", "time", "elevation"],
+      "options": [
+        "distance",
+        "time",
+        "elevation"
+      ],
       "defaultOption": "distance",
-      "compact": "Projected year-end total; daily mean and whole previous year provide context.",
+      "compact": "Projected year-end total with a labelled current/projection/previous-year reference bar; daily rates preserve small nonzero values.",
       "expanded": "No expansion.",
       "nativeOwner": 263,
       "uiOwner": 265
@@ -69,8 +92,8 @@
       "expandable": true,
       "options": [],
       "defaultOption": null,
-      "compact": "Current-year activity distance/moving-time/elevation records and biggest distance week.",
-      "expanded": "All-time records; Best 30 days for distance/time/elevation and latest-30-day share; activity detail links.",
+      "compact": "Compact 2\u00d72 current-year records: longest distance, longest moving time, biggest climb and biggest distance week.",
+      "expanded": "Starts with current-year detail; explicit This year / All time choice, linked activity names, sport and full dates. Best 30 days stays a labelled current-year secondary section with compact metric rows, dates and latest-30-day share.",
       "nativeOwner": 264,
       "uiOwner": 265
     },
@@ -79,7 +102,12 @@
       "group": "thisYear",
       "visibility": "notRendered",
       "expandable": false,
-      "options": ["distance", "time", "elevation", "count"],
+      "options": [
+        "distance",
+        "time",
+        "elevation",
+        "count"
+      ],
       "defaultOption": "distance",
       "compact": "Not drawn; totals are represented by other tiles.",
       "expanded": "No separate tile.",
@@ -91,23 +119,31 @@
       "group": "patterns",
       "visibility": "visible",
       "expandable": true,
-      "options": ["sport", "distance", "time", "elevation"],
+      "options": [
+        "sport",
+        "distance",
+        "time",
+        "elevation"
+      ],
       "defaultOption": "sport",
-      "compact": "Rolling inclusive year with active-day headline, month rows, visible sport/numeric legend and day details.",
-      "expanded": "Rolling or selected calendar year, previous/next year, mixed-sport cues and activity detail links.",
+      "compact": "Inclusive rolling year with year-qualified month labels, sport or numeric colouring, complete compact legend, striped mixed-sport days and accessible day inspection.",
+      "expanded": "Rolling or selected calendar year with previous/next controls, direct cell inspection with a contrasting selected-day outline and inline activities with detail links. A collapsed-cell selection expands the tile. Keyboard/VoiceOver selection remains available; no separate date picker, popup or duplicate horizontal day strip.",
       "nativeOwner": 264,
       "uiOwner": 265
     },
     {
       "id": "consistency",
       "group": "patterns",
-      "visibility": "visible",
-      "expandable": true,
-      "options": ["last12Weeks", "last52Weeks"],
+      "visibility": "notRendered",
+      "expandable": false,
+      "options": [
+        "last12Weeks",
+        "last52Weeks"
+      ],
       "defaultOption": "last12Weeks",
-      "compact": "Average active days across full weeks; fixed 0\u20137 scale, empty weeks, current-week incomplete marker.",
-      "expanded": "Same 12/52-week switch and weekly-count table; 52-week plot horizontally inspectable on narrow screens.",
-      "nativeOwner": 264,
+      "compact": "Not drawn. Active days per week remains in Typical week; Activity calendar shows the pattern.",
+      "expanded": "No standalone Consistency tile.",
+      "nativeOwner": 263,
       "uiOwner": 265
     },
     {
@@ -115,10 +151,13 @@
       "group": "patterns",
       "visibility": "visible",
       "expandable": true,
-      "options": ["currentYear", "allTime"],
+      "options": [
+        "currentYear",
+        "allTime"
+      ],
       "defaultOption": "currentYear",
-      "compact": "Moving-time shares; single-sport explanation, fixed tile position.",
-      "expanded": "Sport share/count/distance/elevation/moving-time table.",
+      "compact": "Moving-time shares in one stacked bar, complete wrapping sport legend and single-sport explanation.",
+      "expanded": "Sport share, moving time, activity count, distance and climb in phone rows or a wide table.",
       "nativeOwner": 264,
       "uiOwner": 265
     },
@@ -129,8 +168,8 @@
       "expandable": true,
       "options": [],
       "defaultOption": null,
-      "compact": "Hilliness: climbing per 100 km and monthly trend versus preceding rolling year.",
-      "expanded": "Larger monthly chart and five hilliest activities with at least 5 km, linked to detail.",
+      "compact": "Hilliness: m / km, labelled monthly bars and neutral comparison against the preceding rolling year.",
+      "expanded": "Larger monthly chart and five hilliest activities with at least 5 km, in wrapping phone rows linked to detail.",
       "nativeOwner": 264,
       "uiOwner": 265
     },
@@ -141,7 +180,7 @@
       "expandable": false,
       "options": [],
       "defaultOption": null,
-      "compact": "Moving hours, active days and metric means over eleven full weeks.",
+      "compact": "Moving hours and active days to one decimal, plus compact distance/climb/activity means over eleven full weeks.",
       "expanded": "No expansion.",
       "nativeOwner": 263,
       "uiOwner": 265
@@ -151,7 +190,11 @@
       "group": "patterns",
       "visibility": "inRecords",
       "expandable": false,
-      "options": ["distance", "time", "elevation"],
+      "options": [
+        "distance",
+        "time",
+        "elevation"
+      ],
       "defaultOption": "distance",
       "compact": "Not drawn separately; values appear in expanded Records.",
       "expanded": "Before Jan 30 explain no full window, without presenting partial comparison.",
@@ -165,7 +208,7 @@
       "expandable": false,
       "options": [],
       "defaultOption": null,
-      "compact": "Not drawn. The current Consistency view does not show rest-day counts.",
+      "compact": "Not drawn. Activity frequency remains in Typical week and Activity calendar.",
       "expanded": "Calculation remains fixture-backed; not an extra native display requirement.",
       "nativeOwner": 263,
       "uiOwner": 265
@@ -175,7 +218,10 @@
       "group": "patterns",
       "visibility": "unspecified",
       "expandable": false,
-      "options": ["last12Months", "allTime"],
+      "options": [
+        "last12Months",
+        "allTime"
+      ],
       "defaultOption": "last12Months",
       "compact": "Unspecified optional analytics, not drawn.",
       "expanded": "Requires a separately accepted rule/fixture before implementation.",

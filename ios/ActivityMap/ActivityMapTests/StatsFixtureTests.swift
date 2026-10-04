@@ -90,7 +90,7 @@ import Testing
         case "cumulativeByDay": return engine.cumulativeByDay(metric: metric, first: first, last: last)
         case "cumulativeYearPoints": return engine.cumulativeYearPoints(metric: metric, year: args["year"] as! Int, last: last).map { ["x": $0.x, "y": $0.y] as [String: Any] }
         case "volumeHistory": return engine.volumeHistory(today: today, metric: metric, range: StatsHistoryRange(rawValue: args["range"] as? String ?? "weeks") ?? .weeks, page: args["page"] as? Int ?? 0).map {
-            ["start": StatsDates.key($0.start), "end": StatsDates.key($0.end), "total": $0.total, "bySport": Dictionary(uniqueKeysWithValues: $0.bySport.map { ($0.key.rawValue, $0.value) })] as [String: Any]
+            ["start": StatsDates.key($0.start), "end": StatsDates.key($0.end), "total": $0.total, "bySport": Dictionary(uniqueKeysWithValues: $0.bySport.map { ($0.key.rawValue, $0.value) }), "incomplete": $0.incomplete] as [String: Any]
         }
         case "filterActivities": return engine.activities.map { $0.id! }
         case "localToday": return StatsDates.key(StatsDates.localToday(now: try #require(ISO8601DateFormatter().date(from: args["now"] as! String)), timeZone: try #require(TimeZone(identifier: args["timeZone"] as! String))))
