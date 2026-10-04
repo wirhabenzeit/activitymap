@@ -47,7 +47,8 @@ nonisolated struct StatsComparisonBand: Sendable {
     let first: Int
     let last: Int
     let points: [Point]
-    var label: String { "Shaded: \(monthly ? "5–95%" : "min–max") · \(count) \(monthly ? "months" : "years")" }
+    /// Plain wording on the face; inspection and accessibility give the exact definition.
+    var label: String { monthly ? "Shaded: typical range of \(count) past months" : "Shaded: range of \(count) past years" }
 }
 
 nonisolated extension StatsEngine {

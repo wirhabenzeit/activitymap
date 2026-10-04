@@ -140,8 +140,12 @@ export function CumulativeLines({
       x: toX(point.x),
       day: point.x,
     })) ?? [];
+  // Plain wording on the face; the tooltip and title give the exact
+  // 5th–95th percentile or min–max definition.
   const bandLabel = band
-    ? `Shaded: ${band.kind === 'month' ? '5–95%' : 'min–max'} · ${band.count} ${band.kind === 'month' ? 'months' : 'years'}`
+    ? band.kind === 'month'
+      ? `Shaded: typical range of ${band.count} past months`
+      : `Shaded: range of ${band.count} past years`
     : undefined;
   const definition = defineChart({
     marks: [
