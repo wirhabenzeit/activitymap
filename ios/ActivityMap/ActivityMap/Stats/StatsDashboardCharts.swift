@@ -10,7 +10,7 @@ struct StatsChartPoint: Identifiable {
 }
 
 struct StatsSeriesChart: View {
-    enum Axis { case date, day, year, weekday }
+    enum Axis { case date, day, year }
     enum Style { case bars, lines, volume, consistency }
     let points: [StatsChartPoint]
     let metric: StatsMetric
@@ -31,7 +31,7 @@ struct StatsSeriesChart: View {
     private var series: [String] { points.reduce(into: []) { if !$0.contains($1.series) { $0.append($1.series) } } }
     private func label(_ x: Int) -> String {
         switch axis {
-        case .date, .weekday: StatsDisplay.date(x)
+        case .date: StatsDisplay.date(x)
         case .day: "Day \(x)"
         case .year: StatsDates.date(StatsDates.start(year: 2000) + x).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
         }
@@ -49,14 +49,7 @@ struct StatsSeriesChart: View {
                 historicalArea
                 ForEach(points) { point in
                     if let value = point.value {
-                        if axis == .weekday {
-                            RectangleMark(xStart: .value("Start", Double(point.x) - 0.34),
-                                          xEnd: .value("End", Double(point.x) + 0.34),
-                                          yStart: .value("Baseline", 0.0), yEnd: .value("Value", value))
-                                .foregroundStyle(point.partial ? Color.primary : Color.secondary.opacity(0.45))
-                                .accessibilityLabel("\(label(point.x))\(point.partial ? ", incomplete" : "")")
-                                .accessibilityValue(self.value(point))
-                        } else if style == .bars || style == .consistency {
+                        if style == .bars || style == .consistency {
                             BarMark(x: .value("Period", point.x), y: .value("Value", value))
                                 .foregroundStyle(point.partial ? AppTheme.accent : Color.primary.opacity(0.65))
                                 .accessibilityLabel("\(label(point.x))\(point.partial ? ", incomplete" : "")")
@@ -119,12 +112,6 @@ struct StatsSeriesChart: View {
                             }
                         }
                     }
-                } else if axis == .weekday {
-                    AxisMarks(values: points.map(\.x)) { value in
-                        AxisValueLabel {
-                            if let day = value.as(Int.self) { Text(StatsDisplay.weekday(day)).font(.caption2) }
-                        }
-                    }
                 } else if compact && style == .volume {
                     AxisMarks(values: points.filter { $0.series == "Weekly total" }.enumerated().filter { $0.offset % 4 == 0 }.map { $0.element.x }) { value in
                         AxisValueLabel {
@@ -136,7 +123,7 @@ struct StatsSeriesChart: View {
                     AxisTick()
                     AxisValueLabel {
                         if let x = value.as(Int.self) {
-                            Text(axis == .weekday ? StatsDisplay.weekday(x) : axis == .day ? "\(x)" : shortAxisLabel(x)).font(.caption2)
+                            Text(axis == .day ? "\(x)" : shortAxisLabel(x)).font(.caption2)
                         }
                     }
                 }
@@ -212,7 +199,7 @@ struct StatsSeriesChart: View {
         if axis == .year { return 0...365 }
         if axis == .day { return 0...31 }
         let first = points.map(\.x).min() ?? 0, last = points.map(\.x).max() ?? 1
-        return (Double(first) - (axis == .weekday ? 0.5 : 0))...(Double(max(first + 1, last)) + (axis == .weekday ? 0.5 : 0))
+        return Double(first)...Double(max(first + 1, last))
     }
     private func shortAxisLabel(_ x: Int) -> String {
         let day = axis == .year ? StatsDates.start(year: 2000) + x : x
@@ -220,44 +207,50 @@ struct StatsSeriesChart: View {
     }
 }
 
-/// Equal-width calendar buckets keep monthly bars legible at phone widths.
+/// Equal-width bars for calendar periods (days of a week, months of a year).
+/// A categorical x axis centres every label under its bar; numeric axes draw
+/// labels to the trailing side of their ticks.
 struct StatsPeriodBars: View {
     let points: [StatsChartPoint]
     let expanded: Bool
-    @State private var selectedIndex: Int?
+    /// Short axis label, e.g. "Mon" or "Nov".
+    let label: (StatsChartPoint) -> String
+    /// Inspection label, e.g. "Mon, 28 Sep".
+    let detailLabel: (StatsChartPoint) -> String
+    let valueLabel: (Double) -> String
+    var emphasis: Color = Color.primary.opacity(0.85)
+    var base: Color = Color.primary.opacity(0.28)
+    @State private var selectedKey: String?
     @ScaledMetric private var overviewHeight = 110.0
     private var maximum: Double { max(1, points.compactMap(\.value).max() ?? 0) * 1.08 }
-    private var ticks: [Int] {
-        Array(stride(from: 0, to: points.count, by: max(1, Int(ceil(Double(points.count) / (expanded ? 6 : 4))))))
+    private func key(_ index: Int) -> String { String(index) }
+    private var selected: StatsChartPoint? {
+        selectedKey.flatMap(Int.init).flatMap { points.indices.contains($0) ? points[$0] : nil }
     }
-    private func dateLabel(_ index: Int, full: Bool = false) -> String {
-        let date = StatsDates.date(points[index].x)
-        if full { return StatsDisplay.date(points[index].x) }
-        let format = Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)
-        return date.formatted(format)
-    }
-    private func valueLabel(_ value: Double) -> String {
-        "\(StatsDisplay.number(value, decimals: 1)) m / km"
-    }
-    var body: some View { chart }
-    private var chart: some View {
+    var body: some View {
         Chart {
             ForEach(Array(points.enumerated()), id: \.offset) { index, point in
-                RectangleMark(xStart: .value("Start", Double(index) - 0.34), xEnd: .value("End", Double(index) + 0.34),
-                              yStart: .value("Baseline", 0.0), yEnd: .value("Value", point.value ?? 0))
-                    .foregroundStyle(Color.primary.opacity(point.partial ? 0.85 : 0.28))
-                    .accessibilityLabel("\(dateLabel(index, full: true))\(point.partial ? ", incomplete" : "")")
-                    .accessibilityValue(valueLabel(point.value ?? 0))
+                if let value = point.value {
+                    BarMark(x: .value("Period", key(index)), y: .value("Value", value), width: .ratio(0.68))
+                        .foregroundStyle(point.partial ? emphasis : base)
+                        .accessibilityLabel("\(detailLabel(point))\(point.partial ? ", incomplete" : "")")
+                        .accessibilityValue(valueLabel(value))
+                }
             }
-            if let selectedIndex, points.indices.contains(selectedIndex) {
-                RuleMark(x: .value("Selected", selectedIndex)).foregroundStyle(.secondary.opacity(0.5))
+            if let selectedKey, selected != nil {
+                RuleMark(x: .value("Selected", selectedKey)).foregroundStyle(.secondary.opacity(0.5))
             }
         }
-        .chartXScale(domain: -0.5...Double(max(0, points.count - 1)) + 0.5)
+        .chartXScale(domain: points.indices.map(key))
         .chartYScale(domain: 0...maximum)
         .chartXAxis {
-            AxisMarks(values: ticks) { value in
-                AxisValueLabel { if let index = value.as(Int.self), points.indices.contains(index) { Text(dateLabel(index)).font(.caption2) } }
+            // Every bar is labelled; a categorical axis drops labels that collide.
+            AxisMarks(values: points.indices.map(key)) { value in
+                AxisValueLabel {
+                    if let index = value.as(String.self).flatMap(Int.init), points.indices.contains(index) {
+                        Text(label(points[index])).font(.caption2)
+                    }
+                }
             }
         }
         .chartYAxis {
@@ -266,12 +259,11 @@ struct StatsPeriodBars: View {
                 AxisValueLabel { if let y = value.as(Double.self) { Text(y >= 1000 ? "\(StatsDisplay.number(y / 1000, decimals: y.truncatingRemainder(dividingBy: 1000) == 0 ? 0 : 1))k" : StatsDisplay.number(y)).font(.caption2) } }
             }
         }
-        .chartXSelection(value: $selectedIndex)
+        .chartXSelection(value: $selectedKey)
         .statsExpansionHeight(expanded: expanded, compact: overviewHeight, detail: max(240, overviewHeight))
         .overlay(alignment: .topLeading) {
-            if let selectedIndex, points.indices.contains(selectedIndex) {
-                let point = points[selectedIndex]
-                Text("\(dateLabel(selectedIndex, full: true)): \(valueLabel(point.value ?? 0))\(point.partial ? " · incomplete" : "")")
+            if let point = selected {
+                Text("\(detailLabel(point)): \(point.value.map(valueLabel) ?? "Not yet elapsed")\(point.partial ? " · incomplete" : "")")
                     .font(.caption).padding(8).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
                     .allowsHitTesting(false)
             }

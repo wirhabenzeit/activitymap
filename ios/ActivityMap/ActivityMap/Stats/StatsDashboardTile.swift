@@ -103,9 +103,12 @@ struct StatsDashboardTile: View {
         case .week(let week):
             headline(week.current, metric: metric, suffix: " so far")
             comparison(.init(current: week.current, previous: week.typical), context: "vs typical by \(StatsDisplay.weekday(today))")
-            StatsSeriesChart(points: week.days.enumerated().map {
+            StatsPeriodBars(points: week.days.enumerated().map {
                 .init(x: StatsDates.monday(today) + $0.offset, value: $0.element, series: "This week", partial: StatsDates.monday(today) + $0.offset == today)
-            }, metric: metric, expanded: false, axis: .weekday, style: .bars, compact: true)
+            }, expanded: false, label: { StatsDisplay.weekday($0.x) },
+               detailLabel: { "\(StatsDisplay.weekday($0.x)), \(StatsDisplay.date($0.x))" },
+               valueLabel: { StatsDisplay.measurement($0, metric: metric) },
+               emphasis: .primary, base: Color.secondary.opacity(0.45))
         case .volume(let values, _, _, let averages, let buckets):
             StatsVolumeDetail(history: buckets, averages: averages, metric: metric, range: $volumeRange,
                               expanded: expanded) {
@@ -137,7 +140,10 @@ struct StatsDashboardTile: View {
         case .hilliness(let climb, let activities):
             headline(climb.current / 100, unit: "m / km", decimals: 1)
             comparison(.init(current: climb.current, previous: climb.previous), context: "vs the 12 months before", unitless: true)
-            StatsPeriodBars(points: climb.months.enumerated().map { .init(x: $0.element.monthStart, value: $0.element.rate / 100, series: "m / km", partial: $0.offset == climb.months.count - 1) }, expanded: expanded)
+            StatsPeriodBars(points: climb.months.enumerated().map { .init(x: $0.element.monthStart, value: $0.element.rate / 100, series: "m / km", partial: $0.offset == climb.months.count - 1) }, expanded: expanded,
+                            label: { StatsDates.date($0.x).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)) },
+                            detailLabel: { StatsDisplay.date($0.x) },
+                            valueLabel: { "\(StatsDisplay.number($0, decimals: 1)) m / km" })
             StatsExpansionReveal(expanded: expanded) { hillinessActivities(activities) }
         case .typical(let week):
             headline(week.totals.time, unit: "h / week", decimals: 1)
