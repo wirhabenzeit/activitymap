@@ -852,7 +852,11 @@ const thisWeekView: TileView = {
           current={week.current}
           previous={week.typical}
           metric={metric}
-          text={`vs typical by ${weekday}`}
+          text={
+            weekday === 'Mon'
+              ? 'vs a typical Monday'
+              : `vs typical Mon–${weekday}`
+          }
         />
       ),
     };

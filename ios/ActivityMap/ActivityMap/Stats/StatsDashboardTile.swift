@@ -102,7 +102,8 @@ struct StatsDashboardTile: View {
         switch result {
         case .week(let week):
             headline(week.current, metric: metric, suffix: " so far")
-            comparison(.init(current: week.current, previous: week.typical), context: "vs typical by \(StatsDisplay.weekday(today))")
+            comparison(.init(current: week.current, previous: week.typical),
+                       context: today == StatsDates.monday(today) ? "vs a typical Monday" : "vs typical Mon–\(StatsDisplay.weekday(today))")
             StatsPeriodBars(points: week.days.enumerated().map {
                 .init(x: StatsDates.monday(today) + $0.offset, value: $0.element, series: "This week", partial: StatsDates.monday(today) + $0.offset == today)
             }, expanded: false, label: { StatsDisplay.weekday($0.x) },
