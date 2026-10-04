@@ -56,6 +56,7 @@ export function ingestionStatusOptions(
         const status = responseEnvelope(ingestionStatusDTOSchema).parse(
           await response.json(),
         ).data;
+        // eslint-disable-next-line drizzle/enforce-delete-with-where -- This is an in-memory Map, not a database table.
         failures.delete(scope);
         return status;
       } catch (error) {
