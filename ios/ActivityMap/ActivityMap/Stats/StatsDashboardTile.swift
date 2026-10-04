@@ -29,7 +29,7 @@ struct StatsDashboardTile: View {
         // Expanded, the period navigation names the range; label the colour switch instead.
         case .activityCalendar: expanded ? "Colour by" : "Last 12 months"
         case .sportMix: displayedOption == .allTime ? "All time by moving time" : "\(year.formatted(.number.grouping(.never))) by moving time"
-        case .typicalWeek: "Average over 11 full weeks"
+        case .typicalWeek: "Per week · last 11 full weeks"
         default: "Last 12 months"
         }
     }

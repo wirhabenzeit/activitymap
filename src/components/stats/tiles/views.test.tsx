@@ -395,7 +395,7 @@ void test('projection keeps small daily rates and Typical week preserves its ful
   const typical = tileView('typicalWeek')!;
   assert.equal(
     typical.period(context, undefined),
-    'Average over 11 full weeks',
+    'Per week · last 11 full weeks',
   );
   assert.match(typical.summary(context, undefined)!.value, /\d+\.\d$/);
   assert.equal(typical.expandable, false);

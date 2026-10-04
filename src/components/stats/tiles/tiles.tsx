@@ -878,7 +878,7 @@ const decimal = (value: number) => value.toFixed(1);
 
 const typicalWeekView: TileView = {
   expandable: false,
-  period: () => 'Average over 11 full weeks',
+  period: () => 'Per week · last 11 full weeks',
   summary: ({ activities, today }) => {
     const week = typicalWeek(activities, today);
     return {
