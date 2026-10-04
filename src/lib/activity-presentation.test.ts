@@ -13,7 +13,11 @@ import {
   type Measurement,
   type UnitSystem,
 } from './units';
-import { statsFormat } from '~/components/stats/tiles/format';
+import {
+  statsFormat,
+  formatShort,
+  axisTicks,
+} from '~/components/stats/tiles/format';
 
 type Projection = {
   id: string;
@@ -301,4 +305,33 @@ void test('values that round to zero never display as negative zero', () => {
   assert.equal(formatMeasurement(-0.2, 'elevation', 'metric'), '0 m');
   assert.equal(formatMeasurement(-0.01, 'distance', 'imperial'), '0.0 mi');
   assert.equal(formatMeasurement(-0.6, 'elevation', 'metric'), '-1 m');
+});
+
+void test('shared compact-axis fixtures keep adjacent tick labels distinct', () => {
+  const { axisCases } = JSON.parse(
+    readFileSync('shared/parity/display-units.v1.json', 'utf8'),
+  ) as {
+    axisCases: { values: number[]; step: number; labels: string[] }[];
+  };
+  for (const row of axisCases) {
+    assert.deepEqual(
+      row.values.map((value) => formatShort(value, row.step)),
+      row.labels,
+    );
+  }
+  const values = [0, 0.5, 1];
+  for (const units of ['metric', 'imperial'] as const) {
+    const fmt = statsFormat(units);
+    for (const metric of ['time', 'distance'] as const) {
+      const ticks = axisTicks(values, (value, step) =>
+        fmt.formatShort(value, metric, step),
+      );
+      const labels = ticks.values.map(ticks.format);
+      assert.equal(new Set(labels).size, values.length);
+      assert.equal(
+        labels[1],
+        units === 'imperial' && metric === 'distance' ? '0.3' : '0.5',
+      );
+    }
+  }
 });

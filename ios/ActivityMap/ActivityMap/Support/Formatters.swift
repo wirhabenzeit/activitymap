@@ -33,7 +33,9 @@ enum Formatters {
 
     static func number(_ value: Double?, decimals: Int, unit: String, locale: Locale = .current) -> String {
         guard let value, value.isFinite else { return unknown }
-        return value.formatted(.number.precision(.fractionLength(decimals)).locale(locale)) + " " + unit
+        let rounded = (value * pow(10, Double(decimals))).rounded(.toNearestOrEven)
+        let normalized = rounded == 0 ? 0 : value
+        return normalized.formatted(.number.precision(.fractionLength(decimals)).locale(locale)) + " " + unit
     }
 
     static func duration(_ seconds: Int?) -> String {

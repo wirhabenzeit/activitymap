@@ -25,7 +25,7 @@ System dates follow the browser/device locale. Fixed date formats use Gregorian 
 | Speed | km/h | mph | 1 decimal |
 | Stats hilliness | m / km | ft / mi | 1 decimal |
 
-A mile is exactly 1609.344 metres; a foot is exactly 0.3048 metres. Durations, power, heart rate and counts retain their existing units. Stats retains its existing whole-number / daily-rate presentation precision, applying conversion before rounding. Native numeric separators remain locale-aware.
+A mile is exactly 1609.344 metres; a foot is exactly 0.3048 metres. Durations, power, heart rate and counts retain their existing units. Stats retains its existing whole-number / daily-rate presentation precision, applying conversion before rounding. Native numeric separators remain locale-aware. Compact chart-axis precision follows the interval between ticks after unit conversion, preserving fractional labels (for example 0, 0.5, 1 hours) while retaining thousands abbreviations. Measurements that round to zero never display a negative zero on either platform.
 
 Conversion happens only at presentation and numeric-input boundaries. Activity/API/storage values remain metres, metres/second and seconds; Stats calculation values remain kilometres, metres and hours. Filters preserve their physical thresholds when units change: 10 mi becomes 16.09344 km. Charts retain canonical data and convert labels. No new pace metric is introduced. The hilliness minimum distance remains 5 km (displayed as its imperial equivalent).
 

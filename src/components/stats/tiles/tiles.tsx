@@ -329,7 +329,7 @@ const yearToDateView: TileView = {
             compact
             endLabels
             valueFormat={(y) => formatWithUnit(y, metric)}
-            axisFormat={(y) => formatShort(y, metric)}
+            axisFormat={(y, step) => formatShort(y, metric, step)}
             xLabel={dayOfYearLabel}
           />
         )}
@@ -408,7 +408,7 @@ const weeklyVolumeView: TileView = {
               height={height}
               palette={context.palette}
               valueFormat={(value) => formatWithUnit(value, metric)}
-              axisFormat={(value) => formatShort(value, metric)}
+              axisFormat={(value, step) => formatShort(value, metric, step)}
             />
           )}
         </FillChart>
@@ -535,7 +535,7 @@ const monthVsLastMonthView: TileView = {
             detail={expanded}
             compact
             valueFormat={(y) => formatWithUnit(y, metric)}
-            axisFormat={(y) => formatShort(y, metric)}
+            axisFormat={(y, step) => formatShort(y, metric, step)}
             xLabel={(x) => `Day ${x}`}
           />
         )}
@@ -754,7 +754,9 @@ const distanceVsElevationView: TileView = {
     };
   },
   face: (context, _option, expanded) => {
-    const { formatHilliness, hillinessUnit } = statsFormat(context.units);
+    const { formatHilliness, formatHillinessAxis, hillinessUnit } = statsFormat(
+      context.units,
+    );
 
     const { months } = climbing(context.activities, context.today);
     return (
@@ -783,7 +785,7 @@ const distanceVsElevationView: TileView = {
               valueFormat={(value) =>
                 `${formatHilliness(value)} ${hillinessUnit}`
               }
-              axisFormat={formatHilliness}
+              axisFormat={formatHillinessAxis}
             />
           )}
         </FillChart>
@@ -923,7 +925,7 @@ const thisWeekView: TileView = {
               ariaLabel="Daily totals, Monday to Sunday; future days have not elapsed"
               palette={context.palette}
               valueFormat={(value) => formatWithUnit(value, metric)}
-              axisFormat={(value) => formatShort(value, metric)}
+              axisFormat={(value, step) => formatShort(value, metric, step)}
             />
           )}
         </FillChart>

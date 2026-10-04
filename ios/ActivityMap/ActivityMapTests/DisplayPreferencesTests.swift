@@ -45,6 +45,30 @@ import Testing
         }
     }
 
+    @Test func compactAxesPreserveFractionalAndConvertedIntervals() throws {
+        struct Fixture: Decodable {
+            struct Axis: Decodable { let values: [Double]; let step: Double; let labels: [String] }
+            let axisCases: [Axis]
+        }
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "shared/parity/display-units.v1.json")
+        let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: url))
+        let english = Locale(identifier: "en_US")
+        for row in fixture.axisCases {
+            #expect(row.values.map { StatsDisplay.compactAxis($0, step: row.step, locale: english) } == row.labels)
+        }
+        let ticks = StatsDisplay.axisTicks(maximum: 1.08)
+        #expect(ticks == [0, 0.5, 1])
+        for scale in [1.0, 1000 / UnitSystem.imperial.distanceScale] {
+            let labels = ticks.map { StatsDisplay.compactAxis($0 * scale, step: 0.5 * scale, locale: english) }
+            #expect(Set(labels).count == ticks.count)
+        }
+        #expect(StatsDisplay.compactAxis(0.5, step: 0.5, locale: Locale(identifier: "de_DE")) == "0,5")
+        #expect(Formatters.elevation(-0.01, locale: Locale(identifier: "de_DE"), units: .metric) == "0 m")
+    }
+
     @Test func sharedMeasurementFixturesAndCanonicalThresholds() throws {
         struct Fixture: Decodable {
             struct Row: Decodable { let kind: String; let value: Double?; let metric: String; let imperial: String }

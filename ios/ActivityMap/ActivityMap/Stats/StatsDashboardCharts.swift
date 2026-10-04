@@ -240,6 +240,10 @@ struct StatsPeriodBars: View {
     @State private var selectedKey: String?
     @ScaledMetric private var overviewHeight = 110.0
     private var maximum: Double { max(1, points.compactMap(\.value).max() ?? 0) * 1.08 }
+    private var axisTicks: [Double] { StatsDisplay.axisTicks(maximum: maximum) }
+    private var axisStep: Double {
+        axisTicks.count > 1 ? abs(axisValue(axisTicks[1]) - axisValue(axisTicks[0])) : 1
+    }
     private func key(_ index: Int) -> String { String(index) }
     private var selected: StatsChartPoint? {
         selectedKey.flatMap(Int.init).flatMap { points.indices.contains($0) ? points[$0] : nil }
@@ -271,9 +275,13 @@ struct StatsPeriodBars: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+            AxisMarks(position: .leading, values: axisTicks) { value in
                 AxisGridLine()
-                AxisValueLabel { if let y = value.as(Double.self).map(axisValue) { Text(y >= 1000 ? "\(StatsDisplay.number(y / 1000, decimals: y.truncatingRemainder(dividingBy: 1000) == 0 ? 0 : 1))k" : StatsDisplay.number(y)).font(.caption2) } }
+                AxisValueLabel {
+                    if let y = value.as(Double.self).map(axisValue) {
+                        Text(StatsDisplay.compactAxis(y, step: axisStep)).font(.caption2)
+                    }
+                }
             }
         }
         .chartXSelection(value: $selectedKey)

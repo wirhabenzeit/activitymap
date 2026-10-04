@@ -6,7 +6,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { statsTiles } from '~/settings/stats-tiles.generated';
 import { dayFromISODate, type StatsActivity } from '~/lib/stats/tile-data';
 import { tileView, type TileContext } from './tiles';
-import { tilePalette, formatDailyRate } from './format';
+import { tilePalette, formatDailyRate, statsFormat } from './format';
+import { PlainBars } from './charts';
 import { MonthRows } from './calendar';
 import { statsCapabilitiesSchema } from '../../../../scripts/lib/stats-parity-schema';
 
@@ -464,4 +465,21 @@ void test('imperial preferences reach Stats headlines, records and calendar acce
     undefined,
   )!;
   assert.equal(hilliness.unit, 'ft / mi');
+});
+
+void test('short-workout bar axes render a distinct half-hour tick', () => {
+  const fmt = statsFormat('metric');
+  const html = renderToStaticMarkup(
+    createElement(PlainBars, {
+      rows: [{ x: 'Mon', value: 0.5, highlight: true }],
+      width: 400,
+      height: 200,
+      detail: false,
+      compact: true,
+      palette: context.palette,
+      valueFormat: (value) => fmt.formatWithUnit(value, 'time'),
+      axisFormat: (value, step) => fmt.formatShort(value, 'time', step),
+    }),
+  );
+  assert.match(html, />0\.5<\/text>/);
 });

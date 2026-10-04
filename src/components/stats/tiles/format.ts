@@ -42,11 +42,32 @@ export function formatWithUnit(value: number, metric: StatsMetric): string {
   return `${formatMetric(value, metric)} ${metricUnit[metric]}`;
 }
 
-export function formatShort(value: number): string {
-  if (Math.abs(value) >= 10_000) return `${whole.format(value / 1000)}k`;
-  if (Math.abs(value) >= 1000)
-    return `${oneDecimal.format(value / 1000).replace(/\.0$/, '')}k`;
-  return whole.format(value);
+/** Precision follows the spacing of displayed ticks, including after conversion. */
+export function formatShort(value: number, step = 1): string {
+  const scale = Math.abs(value) >= 1000 ? 1000 : 1;
+  const interval = Math.abs(step) / scale;
+  const decimals =
+    Number.isFinite(interval) && interval > 0
+      ? Math.min(12, Math.max(0, Math.ceil(-Math.log10(interval))))
+      : 0;
+  const rounded = Number((value / scale).toFixed(decimals));
+  return (
+    new Intl.NumberFormat('en-US', { maximumFractionDigits: decimals }).format(
+      rounded === 0 ? 0 : rounded,
+    ) + (scale === 1000 ? 'k' : '')
+  );
+}
+
+export function axisTicks(
+  values: number[],
+  format: (value: number, step: number) => string = formatShort,
+) {
+  const gaps = values
+    .slice(1)
+    .map((value, index) => Math.abs(value - values[index]!))
+    .filter((gap) => gap > 0);
+  const step = gaps.length ? Math.min(...gaps) : 1;
+  return { values, format: (value: number) => format(value, step) };
 }
 
 export function percentChange(current: number, previous: number) {
@@ -127,8 +148,13 @@ export function statsFormat(units: UnitSystem = 'metric') {
       formatMetric(convert(value, metric), metric),
     formatWithUnit: (value: number, metric: StatsMetric) =>
       `${formatMetric(convert(value, metric), metric)} ${unit[metric]}`,
-    formatShort: (value: number, metric: StatsMetric) =>
-      formatShort(convert(value, metric)),
+    formatShort: (value: number, metric: StatsMetric, step = 1) =>
+      formatShort(convert(value, metric), convert(step, metric)),
+    formatHillinessAxis: (value: number, step: number) => {
+      const scale =
+        units === 'metric' ? 1 : METRES_PER_MILE / 1000 / METRES_PER_FOOT;
+      return formatShort(value * scale, step * scale);
+    },
     formatDailyRate: (value: number, metric: StatsMetric = 'count') =>
       formatDailyRate(convert(value, metric)),
     formatHilliness: (value: number) =>

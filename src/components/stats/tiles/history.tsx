@@ -182,7 +182,7 @@ export function VolumeHistory({
             trendLabel={averageLabel}
             palette={context.palette}
             valueFormat={(value) => formatWithUnit(value, metric)}
-            axisFormat={(value) => formatShort(value, metric)}
+            axisFormat={(value, step) => formatShort(value, metric, step)}
             xTickFormat={(value) =>
               range === 'years'
                 ? label(Number(value))

@@ -31,7 +31,7 @@ import { categorySettings } from '~/settings/category';
 import { sportOrder, type Sport } from '~/lib/stats/tile-data';
 import { dateOfDay, volumeDomain } from '~/lib/stats/tile-series';
 
-import { formatShort, type TilePalette } from './format';
+import { axisTicks, formatShort, type TilePalette } from './format';
 
 export function Measure({
   className,
@@ -104,7 +104,7 @@ export function CumulativeLines({
   monthAxisFrom?: number;
   valueFormat: (y: number) => string;
   // Axis ticks; compact by default, converted by callers showing units.
-  axisFormat?: (value: number) => string;
+  axisFormat?: (value: number, step: number) => string;
   xLabel: (x: number) => string;
   // Name each line at its end, so no legend is needed.
   endLabels?: boolean;
@@ -263,7 +263,20 @@ export function CumulativeLines({
           ]),
         axis:
           detail || compact
-            ? { ticks: { count: detail ? 5 : 3, format: axisFormat } }
+            ? {
+                ticks: axisTicks(
+                  d3.ticks(
+                    0,
+                    Math.max(
+                      1,
+                      ...rows.map((row) => row.y),
+                      ...bandRows.map((row) => row.high),
+                    ) * 1.08,
+                    detail ? 5 : 3,
+                  ),
+                  axisFormat,
+                ),
+              }
             : false,
       },
     },
@@ -378,7 +391,7 @@ export function VolumeArea({
   height: number;
   palette: TilePalette;
   valueFormat: (value: number) => string;
-  axisFormat?: (value: number) => string;
+  axisFormat?: (value: number, step: number) => string;
 }) {
   const full = weeks.slice(0, -1);
   const tail = weeks.slice(-2);
@@ -467,7 +480,7 @@ export function VolumeArea({
         scale: d3.scaleLinear().domain([floor, ceiling]),
         axis:
           detail || compact
-            ? { ticks: { count: 3, format: axisFormat } }
+            ? { ticks: axisTicks(d3.ticks(floor, ceiling, 3), axisFormat) }
             : false,
       },
     },
@@ -526,7 +539,7 @@ export function SportArea({
   trendLabel?: string;
   palette: TilePalette;
   valueFormat: (value: number) => string;
-  axisFormat?: (value: number) => string;
+  axisFormat?: (value: number, step: number) => string;
   xTickFormat?: (x: string) => string;
 }) {
   const xs = Array.from(new Set(rows.map((row) => row.x)));
@@ -611,7 +624,23 @@ export function SportArea({
       y: {
         scale: d3.scaleLinear,
         nice: true,
-        axis: detail ? { ticks: { format: axisFormat } } : false,
+        axis: detail
+          ? {
+              ticks: axisTicks(
+                d3.ticks(
+                  0,
+                  Math.max(
+                    1,
+                    ...totals.map((row) => row.value),
+                    ...trend.map((row) => row.value),
+                    average ?? 0,
+                  ),
+                  5,
+                ),
+                axisFormat,
+              ),
+            }
+          : false,
       },
     },
     color: { domain: [...sportOrder], range: sportColors },
@@ -694,7 +723,7 @@ export function PlainBars({
   average?: number;
   palette: TilePalette;
   valueFormat: (value: number) => string;
-  axisFormat?: (value: number) => string;
+  axisFormat?: (value: number, step: number) => string;
   xTickFormat?: (x: string) => string;
   xAxisFormat?: (x: string) => string;
   yDomain?: [number, number];
@@ -768,12 +797,19 @@ export function PlainBars({
         axis:
           detail || compact
             ? {
-                ticks: {
-                  ...(yDomain
-                    ? { values: yDomain }
-                    : { count: compact ? 3 : undefined }),
-                  format: axisFormat,
-                },
+                ticks: axisTicks(
+                  yDomain ??
+                    d3.ticks(
+                      0,
+                      Math.max(
+                        1,
+                        ...rows.map((row) => row.value ?? 0),
+                        average ?? 0,
+                      ) * (compact ? 1.08 : 1),
+                      compact ? 3 : 5,
+                    ),
+                  axisFormat,
+                ),
               }
             : false,
       },
