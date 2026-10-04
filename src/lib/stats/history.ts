@@ -112,6 +112,8 @@ export function calendarDays(
 ) {
   const days = new Map<number, StatsActivity[]>();
   const dominantSport = new Map<number, Sport>();
+  // The runner-up sport of a mixed day, for two-colour stripes.
+  const secondSport = new Map<number, Sport>();
   const mixedDays = new Set<number>();
   for (const activity of activities) {
     const day = dayOf(activity.start_date_local);
@@ -129,14 +131,15 @@ export function calendarDays(
         (times.get(row.sport) ?? 0) + (row.moving_time ?? 0),
       );
     // Match the shared calendar rule even when input order differs.
-    dominantSport.set(
-      day,
-      [...times].sort(
-        (a, b) =>
-          b[1] - a[1] || sportOrder.indexOf(a[0]) - sportOrder.indexOf(b[0]),
-      )[0]![0],
+    const ranked = [...times].sort(
+      (a, b) =>
+        b[1] - a[1] || sportOrder.indexOf(a[0]) - sportOrder.indexOf(b[0]),
     );
-    if (times.size > 1) mixedDays.add(day);
+    dominantSport.set(day, ranked[0]![0]);
+    if (ranked[1]) {
+      mixedDays.add(day);
+      secondSport.set(day, ranked[1][0]);
+    }
   }
-  return { days, dominantSport, mixedDays };
+  return { days, dominantSport, secondSport, mixedDays };
 }

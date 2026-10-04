@@ -70,13 +70,15 @@ struct StatsCalendarDetail: View {
                                 let valid = index < month.length && day >= month.first && day <= month.last
                                 RoundedRectangle(cornerRadius: 2).fill(valid ? color(day) : .clear)
                                     .overlay {
-                                        if valid && option == .sport && snapshot.days[day]?.mixed == true {
+                                        if valid && option == .sport, let data = snapshot.days[day], data.mixed {
+                                            // Stripes in the runner-up sport's colour over the dominant one.
+                                            let stripe = data.secondSport?.color ?? .white.opacity(0.85)
                                             Canvas { context, size in
                                                 var path = Path()
                                                 for x in stride(from: -size.height, through: size.width, by: 6) {
                                                     path.move(to: CGPoint(x: x, y: size.height)); path.addLine(to: CGPoint(x: x + size.height, y: 0))
                                                 }
-                                                context.stroke(path, with: .color(.white.opacity(0.85)), lineWidth: 2)
+                                                context.stroke(path, with: .color(stripe), lineWidth: 2.5)
                                             }.clipShape(RoundedRectangle(cornerRadius: 2))
                                         }
                                     }

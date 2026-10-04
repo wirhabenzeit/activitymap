@@ -290,7 +290,7 @@ export function CalendarHistory({
     selectedYear === null
       ? context.today
       : Math.min(context.today, yearStart(selectedYear + 1) - 1);
-  const { days, dominantSport, mixedDays } = useMemo(
+  const { days, dominantSport, secondSport, mixedDays } = useMemo(
     () => calendarDays(context.activities, first, last),
     [context.activities, first, last],
   );
@@ -394,6 +394,7 @@ export function CalendarHistory({
           today={last}
           first={first}
           dominantSport={dominantSport}
+          secondSport={secondSport}
           mixedDays={mixedDays}
           totals={totals}
           palette={context.palette}

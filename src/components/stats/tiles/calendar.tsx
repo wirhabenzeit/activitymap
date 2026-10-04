@@ -30,6 +30,7 @@ export function MonthRows({
   colorBy = 'sport',
   first,
   mixedDays = new Set<number>(),
+  secondSport = new Map<number, Sport>(),
   onSelectDay,
   selectedDay,
 }: {
@@ -41,6 +42,7 @@ export function MonthRows({
   colorBy?: 'sport' | StatsMetric;
   first?: number;
   mixedDays?: Set<number>;
+  secondSport?: Map<number, Sport>;
   onSelectDay?: (day: number) => void;
   selectedDay?: number | null;
 }) {
@@ -129,7 +131,7 @@ export function MonthRows({
                         colorBy === 'sport'
                           ? sport
                             ? mixedDays.has(day)
-                              ? `repeating-linear-gradient(135deg, ${categorySettings[sport].color} 0 3px, ${palette.empty} 3px 5px)`
+                              ? `repeating-linear-gradient(135deg, ${categorySettings[sport].color} 0 3px, ${secondSport.has(day) ? categorySettings[secondSport.get(day)!].color : palette.empty} 3px 5px)`
                               : categorySettings[sport].color
                             : palette.empty
                           : interpolateRgb(

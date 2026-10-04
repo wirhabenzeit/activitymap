@@ -88,7 +88,16 @@ nonisolated struct StatsBestDays: Sendable { let total: Double; let start: Int; 
 /// `incomplete`: the current period, or the one in which the history begins partway through.
 nonisolated struct StatsHistoryBucket: Sendable { let start: Int; let end: Int; let total: Double; let bySport: [ActivityCategory: Double]; var incomplete = false }
 nonisolated struct StatsCalendarMonth: Sendable { let start: Int; let length: Int; let first: Int; let last: Int }
-nonisolated struct StatsCalendarDay: Sendable { let activities: [StatsActivity]; let dominantSport: ActivityCategory; let mixed: Bool; let totals: StatsTotals }
+nonisolated struct StatsCalendarDay: Sendable {
+    let activities: [StatsActivity]; let dominantSport: ActivityCategory; let mixed: Bool; let totals: StatsTotals
+    /// The runner-up sport of a mixed day by moving time, with the dominant sport's tie-break.
+    var secondSport: ActivityCategory? {
+        let times = activities.reduce(into: [ActivityCategory: Double]()) { $0[$1.sport, default: 0] += $1.value(.time) }
+        return times.filter { $0.key != dominantSport }.min { a, b in
+            a.value != b.value ? a.value > b.value : ActivityCategory.allCases.firstIndex(of: a.key)! < ActivityCategory.allCases.firstIndex(of: b.key)!
+        }?.key
+    }
+}
 nonisolated struct StatsPoint: Sendable { let x: Int; let y: Double }
 nonisolated struct StatsHillPoint: Sendable { let activity: StatsActivity; let distance: Double; let elevation: Double; var metersPerKm: Double { elevation / distance } }
 nonisolated struct StatsClimbing: Sendable { let current: Double; let previous: Double; let months: [(monthStart: Int, rate: Double)] }
