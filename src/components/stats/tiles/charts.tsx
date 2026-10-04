@@ -31,7 +31,7 @@ import { categorySettings } from '~/settings/category';
 import { sportOrder, type Sport } from '~/lib/stats/tile-data';
 import { dateOfDay, volumeDomain } from '~/lib/stats/tile-series';
 
-import { formatShort, type TilePalette } from './format';
+import { type TilePalette } from './format';
 
 export function Measure({
   className,
@@ -260,7 +260,7 @@ export function CumulativeLines({
           ]),
         axis:
           detail || compact
-            ? { ticks: { count: detail ? 5 : 3, format: formatShort } }
+            ? { ticks: { count: detail ? 5 : 3, format: valueFormat } }
             : false,
       },
     },
@@ -462,7 +462,7 @@ export function VolumeArea({
         scale: d3.scaleLinear().domain([floor, ceiling]),
         axis:
           detail || compact
-            ? { ticks: { count: 3, format: formatShort } }
+            ? { ticks: { count: 3, format: valueFormat } }
             : false,
       },
     },
@@ -604,7 +604,7 @@ export function SportArea({
       y: {
         scale: d3.scaleLinear,
         nice: true,
-        axis: detail ? { ticks: { format: formatShort } } : false,
+        axis: detail ? { ticks: { format: valueFormat } } : false,
       },
     },
     color: { domain: [...sportOrder], range: sportColors },
@@ -763,7 +763,7 @@ export function PlainBars({
                   ...(yDomain
                     ? { values: yDomain }
                     : { count: compact ? 3 : undefined }),
-                  format: formatShort,
+                  format: valueFormat,
                 },
               }
             : false,

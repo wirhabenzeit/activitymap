@@ -227,16 +227,16 @@ enum StatsDisplay {
         value.formatted(.number.precision(.fractionLength(decimals)))
     }
     static func value(_ value: Double, metric: StatsMetric) -> String {
-        number(value, decimals: metric == .time && abs(value) < 10 ? 1 : 0)
+        number(metric.displayValue(value), decimals: metric == .time && abs(value) < 10 ? 1 : 0)
     }
     static func measurement(_ value: Double, metric: StatsMetric) -> String {
-        "\(self.value(value, metric: metric)) \(metric == .count ? "activities" : metric.definition.unit)"
+        "\(self.value(value, metric: metric)) \(metric == .count ? "activities" : metric.displayUnit)"
     }
     static func weekday(_ day: Int) -> String {
         ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][day - StatsDates.monday(day)]
     }
     static func date(_ day: Int) -> String {
-        StatsDates.date(day).formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, calendar: StatsDates.calendar, timeZone: .gmt))
+        Formatters.shortDate(StatsDates.date(day), timeZone: .gmt)
     }
     /// Day and month without the year, e.g. "28 Sep".
     static func shortDate(_ day: Int) -> String {

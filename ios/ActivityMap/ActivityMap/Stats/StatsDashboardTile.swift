@@ -91,7 +91,7 @@ struct StatsDashboardTile: View {
                         set: { option = $0 }
                     ), label: { value in
                         if let metric = StatsMetric(rawValue: value.rawValue) {
-                            metric == .count ? "#" : metric.definition.unit
+                            metric == .count ? "#" : metric.displayUnit
                         } else { StatsDisplay.option(value) }
                     }, accessibilityLabel: StatsDisplay.option)
                 .frame(width: tile.id == .sportMix && !typeSize.isAccessibilitySize ? 176 : nil)
@@ -141,12 +141,12 @@ struct StatsDashboardTile: View {
                 StatsSportMixVisual(shares: shares, breakdown: breakdown, expanded: expanded)
             } else { note("No moving time yet") }
         case .hilliness(let climb, let activities):
-            headline(climb.current / 100, unit: "m / km", decimals: 1)
+            headline(DisplayPreferences.shared.units.hilliness(climb.current / 100), unit: DisplayPreferences.shared.units.hillinessUnit, decimals: 1)
             comparison(.init(current: climb.current, previous: climb.previous), context: "vs the 12 months before", unitless: true)
             StatsPeriodBars(points: climb.months.enumerated().map { .init(x: $0.element.monthStart, value: $0.element.rate / 100, series: "m / km", partial: $0.offset == climb.months.count - 1) }, expanded: expanded,
                             label: { StatsDates.date($0.x).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)) },
                             detailLabel: { StatsDisplay.month($0.x) },
-                            valueLabel: { "\(StatsDisplay.number($0, decimals: 1)) m / km" })
+                            valueLabel: { "\(StatsDisplay.number(DisplayPreferences.shared.units.hilliness($0), decimals: 1)) \(DisplayPreferences.shared.units.hillinessUnit)" })
             StatsExpansionReveal(expanded: expanded) { hillinessActivities(activities) }
         case .typical(let week):
             headline(week.totals.time, unit: "h / week", decimals: 1)
@@ -163,12 +163,12 @@ struct StatsDashboardTile: View {
 
     private func hillinessActivities(_ activities: [StatsHillPoint]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Hilliest activities (5 km or more)").font(.caption).foregroundStyle(.secondary).padding(.bottom, 8)
+            Text("Hilliest activities (\(Formatters.distance(5000)) or more)").font(.caption).foregroundStyle(.secondary).padding(.bottom, 8)
             if activities.isEmpty { note("No qualifying activities in the last 12 months.") }
             ForEach(Array(activities.enumerated()), id: \.offset) { _, point in
                 StatsActivityRow(sport: point.activity.sport, name: point.activity.name,
                                  summary: "\(StatsDisplay.date(point.activity.day)) · \(StatsDisplay.measurement(point.distance, metric: .distance)) · \(StatsDisplay.measurement(point.elevation, metric: .elevation)) climbed",
-                                 detail: "\(StatsDisplay.number(point.metersPerKm, decimals: 1)) m / km",
+                                 detail: "\(StatsDisplay.number(DisplayPreferences.shared.units.hilliness(point.metersPerKm), decimals: 1)) \(DisplayPreferences.shared.units.hillinessUnit)",
                                  open: point.activity.id.map { id in { openActivity(id) } })
                     .accessibilityIdentifier(point.activity.id.map { "stats-hilliness-activity-\($0)" } ?? "")
                 Divider()
@@ -177,7 +177,7 @@ struct StatsDashboardTile: View {
     }
 
     private func headline(_ value: Double, metric: StatsMetric, suffix: String = "") -> some View {
-        headline(value, unit: (metric == .count ? "activities" : metric.definition.unit) + suffix,
+        headline(metric.displayValue(value), unit: (metric == .count ? "activities" : metric.displayUnit) + suffix,
                  decimals: metric == .time && abs(value) < 10 ? 1 : 0)
     }
     private func headline(_ value: Double, unit: String, decimals: Int = 0) -> some View {

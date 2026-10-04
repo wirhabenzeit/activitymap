@@ -131,7 +131,10 @@ struct StatsSeriesChart: View {
             }
             .chartYAxis {
                 if style == .consistency { AxisMarks(position: .leading, values: [0, 7]) }
-                else { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) }
+                else { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { tick in
+                    AxisGridLine()
+                    AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.value(value, metric: metric)).font(.caption2) } }
+                } }
             }
             .chartLegend(position: .bottom, alignment: .leading)
             .chartLegend(series.count > 1 && !compact ? .visible : .hidden)
@@ -268,7 +271,7 @@ struct StatsPeriodBars: View {
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
                 AxisGridLine()
-                AxisValueLabel { if let y = value.as(Double.self) { Text(y >= 1000 ? "\(StatsDisplay.number(y / 1000, decimals: y.truncatingRemainder(dividingBy: 1000) == 0 ? 0 : 1))k" : StatsDisplay.number(y)).font(.caption2) } }
+                AxisValueLabel { if let y = value.as(Double.self) { Text(valueLabel(y)).font(.caption2) } }
             }
         }
         .chartXSelection(value: $selectedKey)

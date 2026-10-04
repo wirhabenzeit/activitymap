@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "kind": "distance",
+      "value": 1609.344,
+      "metric": "1.6 km",
+      "imperial": "1.0 mi"
+    },
+    {
+      "kind": "elevation",
+      "value": 304.8,
+      "metric": "305 m",
+      "imperial": "1000 ft"
+    },
+    {
+      "kind": "speed",
+      "value": 4.4704,
+      "metric": "16.1 km/h",
+      "imperial": "10.0 mph"
+    },
+    {
+      "kind": "distance",
+      "value": 0,
+      "metric": "0.0 km",
+      "imperial": "0.0 mi"
+    },
+    {
+      "kind": "elevation",
+      "value": -30.48,
+      "metric": "-30 m",
+      "imperial": "-100 ft"
+    },
+    {
+      "kind": "distance",
+      "value": null,
+      "metric": "\u2014",
+      "imperial": "\u2014"
+    },
+    {
+      "kind": "elevation",
+      "value": null,
+      "metric": "\u2014",
+      "imperial": "\u2014"
+    },
+    {
+      "kind": "speed",
+      "value": null,
+      "metric": "\u2014",
+      "imperial": "\u2014"
+    }
+  ],
+  "dateCases": [
+    {
+      "value": "2026-12-31T23:59:00Z",
+      "day-first": "31.12.2026",
+      "month-first": "12/31/2026",
+      "iso": "2026-12-31"
+    },
+    {
+      "value": "2024-02-29T00:01:00Z",
+      "day-first": "29.02.2024",
+      "month-first": "02/29/2024",
+      "iso": "2024-02-29"
+    }
+  ]
+}

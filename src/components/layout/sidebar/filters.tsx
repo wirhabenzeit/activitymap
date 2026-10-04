@@ -41,6 +41,8 @@ import { format } from 'date-fns/format';
 import { useState } from 'react';
 import { cn } from '~/lib/utils';
 
+import { useDisplayUnits } from '~/hooks/use-display-preferences';
+import { measurementScale, measurementUnit } from '~/lib/units';
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
 import { type SportType } from '~/server/db/schema';
 import {
@@ -262,6 +264,15 @@ export function InequalityFilter({
 }: {
   name: keyof typeof inequalityFilters;
 }) {
+  const units = useDisplayUnits();
+  const kind = name === 'distance' ? 'distance' : 'elevation';
+  const scale = name === 'elapsed_time' ? 3600 : measurementScale(kind, units);
+  const unit = name === 'elapsed_time' ? 'h' : measurementUnit(kind, units);
+  const [draft, setDraft] = useState<{
+    units: string;
+    value: number;
+    text: string;
+  } | null>(null);
   const [filter, setValues, setValueOperator] = useShallowStore((state) => [
     state.values[name],
     state.setValues,
@@ -269,17 +280,17 @@ export function InequalityFilter({
   ]);
   const [pendingOperator, setPendingOperator] = useState<'>=' | '<='>('>=');
   const operator = filter?.operator ?? pendingOperator;
-  const input =
-    filter?.displayValue ??
-    (filter
-      ? inequalityFilters[name].fromCanonical(filter.value).toString()
-      : '');
+  const input = filter
+    ? draft?.units === units && draft.value === filter.value
+      ? draft.text
+      : Number((filter.value / scale).toPrecision(12)).toString()
+    : '';
 
   const validateInput = (nextInput: string) => {
     const parsed = parseValueFilterInput(
       nextInput,
       operator,
-      inequalityFilters[name].transform,
+      (value) => value * scale,
     );
     if (parsed.status === 'empty') {
       setPendingOperator(operator);
@@ -287,6 +298,7 @@ export function InequalityFilter({
       return;
     }
     if (parsed.status === 'invalid') return;
+    setDraft({ units, value: parsed.filter.value, text: nextInput });
     setValues((previous) => ({
       ...previous,
       [name]: parsed.filter,
@@ -305,7 +317,7 @@ export function InequalityFilter({
     <InequalityFilterContent
       operator={operator}
       toggleOperator={toggleOperator}
-      unit={inequalityFilters[name].unit}
+      unit={unit}
       label={inequalityFilters[name].label}
       input={input}
       validateInput={validateInput}

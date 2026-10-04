@@ -8,16 +8,19 @@ enum Formatters {
     }()
     static let unknown = "—"
 
-    static func distance(_ meters: Double?, locale: Locale = .current) -> String {
-        number(meters.map { $0 / 1000 }, decimals: 1, unit: "km", locale: locale)
+    static func distance(_ meters: Double?, locale: Locale = .current, units: UnitSystem? = nil) -> String {
+        let units = units ?? DisplayPreferences.shared.units
+        return number(meters.map { $0 / units.distanceScale }, decimals: 1, unit: units.distanceUnit, locale: locale)
     }
 
-    static func elevation(_ meters: Double?, locale: Locale = .current) -> String {
-        number(meters, decimals: 0, unit: "m", locale: locale)
+    static func elevation(_ meters: Double?, locale: Locale = .current, units: UnitSystem? = nil) -> String {
+        let units = units ?? DisplayPreferences.shared.units
+        return number(meters.map { $0 / units.elevationScale }, decimals: 0, unit: units.elevationUnit, locale: locale)
     }
 
-    static func speed(_ metersPerSecond: Double?, locale: Locale = .current) -> String {
-        number(metersPerSecond.map { $0 * 3.6 }, decimals: 1, unit: "km/h", locale: locale)
+    static func speed(_ metersPerSecond: Double?, locale: Locale = .current, units: UnitSystem? = nil) -> String {
+        let units = units ?? DisplayPreferences.shared.units
+        return number(metersPerSecond.map { $0 / units.speedScale }, decimals: 1, unit: units.speedUnit, locale: locale)
     }
 
     static func watts(_ watts: Double?, locale: Locale = .current) -> String {
@@ -44,12 +47,25 @@ enum Formatters {
 
     /// Pass .gmt for the API's encoded activity-local wall time. Locale still
     /// controls date ordering and the user's 12/24-hour display preference.
-    static func shortDate(_ date: Date, timeZone: TimeZone = .current, locale: Locale = .current) -> String {
-        dateString(date, template: "yMd", timeZone: timeZone, locale: locale)
+    static func shortDate(_ date: Date, timeZone: TimeZone = .current, locale: Locale = .current, dateFormat: PreferredDateFormat? = nil) -> String {
+        preferredDate(date, timeZone: timeZone, locale: locale, format: dateFormat ?? DisplayPreferences.shared.dateFormat)
     }
 
     static func shortDateTime(_ date: Date, timeZone: TimeZone = .current, locale: Locale = .current) -> String {
-        dateString(date, template: "yMdjm", timeZone: timeZone, locale: locale)
+        preferredDate(date, timeZone: timeZone, locale: locale, format: DisplayPreferences.shared.dateFormat) + " · " + dateString(date, template: "jm", timeZone: timeZone, locale: locale)
+    }
+
+    private static func preferredDate(_ date: Date, timeZone: TimeZone, locale: Locale, format: PreferredDateFormat) -> String {
+        guard let pattern = format.pattern else { return dateString(date, template: "yMd", timeZone: timeZone, locale: locale) }
+        let key = "fixed|\(timeZone.identifier)|\(pattern)" as NSString
+        if let formatter = dateFormatters.object(forKey: key) { return formatter.string(from: date) }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = timeZone
+        formatter.dateFormat = pattern
+        dateFormatters.setObject(formatter, forKey: key)
+        return formatter.string(from: date)
     }
 
     static func monthYear(_ date: Date) -> String {

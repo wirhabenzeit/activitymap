@@ -10,8 +10,10 @@ import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
 import { type Features } from './table-extensions';
 
-interface DataTableColumnHeaderProps<TData extends RowData, TValue>
-  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
+interface DataTableColumnHeaderProps<
+  TData extends RowData,
+  TValue,
+> extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   column: Column<Features, TData, TValue>;
   title?: string;
 }
@@ -23,7 +25,12 @@ export function DataTableColumnHeader<TData extends RowData, TValue>({
   title,
 }: DataTableColumnHeaderProps<TData, TValue>) {
   if (!column.getCanSort()) {
-    return <div className={cn(className)}>{children}</div>;
+    return (
+      <div className={cn(className)}>
+        {title}
+        {children}
+      </div>
+    );
   }
 
   return (
@@ -36,6 +43,7 @@ export function DataTableColumnHeader<TData extends RowData, TValue>({
         variant="ghost"
         size="sm"
         className="h-8 w-4 px-0 data-[state=open]:bg-accent"
+        aria-label={`Sort by ${title ?? column.columnDef.meta?.title ?? column.id}`}
         onClick={() => column.toggleSorting()}
       >
         {column.getIsSorted() === 'desc' ? (

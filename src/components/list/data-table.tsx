@@ -1,6 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import { compareActivities } from '~/lib/activity-presentation';
+import {
+  useDisplayUnits,
+  useDateFormat,
+} from '~/hooks/use-display-preferences';
 
 import {
   type ColumnDef,
@@ -122,9 +127,17 @@ export const DataTable = React.memo(function DataTable<
   fitWidth = false,
   setFitWidth,
 }: DataTableProps<TData>) {
+  const units = useDisplayUnits();
+  const dateFormat = useDateFormat();
+  const sortedData = React.useMemo(
+    () => [...data].sort((a, b) => compareActivities(a, b, sorting)),
+    [data, sorting],
+  );
   const table = useTable({
+    manualSorting: true,
+    enableMultiSort: false,
     features,
-    data,
+    data: sortedData,
     columns,
     getRowId: (row) => row.id.toString(),
     onSortingChange: setSorting,
@@ -206,7 +219,7 @@ export const DataTable = React.memo(function DataTable<
       JSON.stringify(current) === JSON.stringify(measured) ? current : measured,
     );
     // Summary values (data) and density change what the sizer renders.
-  }, [fitWidth, visibleColumns, data, summaryRow, density]);
+  }, [fitWidth, visibleColumns, data, summaryRow, density, units, dateFormat]);
   const fallbackWidth = (width?: string) =>
     Number(/(\d+)px/.exec(width ?? '')?.[1] ?? 80);
   const widthOf = (column: (typeof visibleColumns)[number]) =>

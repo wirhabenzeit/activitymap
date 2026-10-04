@@ -1,3 +1,4 @@
+import { type UnitSystem, METRES_PER_MILE, METRES_PER_FOOT } from '~/lib/units';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
 
 const whole = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
@@ -103,4 +104,37 @@ export function tilePalette(dark: boolean): TilePalette {
         empty: '#ededeb',
         heat: '#e0452e',
       };
+}
+
+/** Stats calculations use kilometres/metres/hours. Keep that contract unchanged. */
+export function statsFormat(units: UnitSystem = 'metric') {
+  const convert = (value: number, metric: StatsMetric) =>
+    units === 'metric'
+      ? value
+      : metric === 'distance'
+        ? (value * 1000) / METRES_PER_MILE
+        : metric === 'elevation'
+          ? value / METRES_PER_FOOT
+          : value;
+  const unit = {
+    ...metricUnit,
+    distance: units === 'imperial' ? 'mi' : 'km',
+    elevation: units === 'imperial' ? 'ft' : 'm',
+  };
+  return {
+    metricUnit: unit,
+    formatMetric: (value: number, metric: StatsMetric) =>
+      formatMetric(convert(value, metric), metric),
+    formatWithUnit: (value: number, metric: StatsMetric) =>
+      `${formatMetric(convert(value, metric), metric)} ${unit[metric]}`,
+    formatDailyRate: (value: number, metric: StatsMetric = 'count') =>
+      formatDailyRate(convert(value, metric)),
+    formatHilliness: (value: number) =>
+      formatHilliness(
+        units === 'metric'
+          ? value
+          : (value * METRES_PER_MILE) / 1000 / METRES_PER_FOOT,
+      ),
+    hillinessUnit: units === 'imperial' ? 'ft / mi' : 'm / km',
+  };
 }
