@@ -747,7 +747,7 @@ export function PlainBars({
           channel: 'group',
           label: '',
           text: (point) =>
-            `${(xTickFormat ?? ((x: string) => x))(point.datum.x)}${point.datum.partial ? ' · current week, incomplete' : ''}`,
+            `${(xTickFormat ?? ((x: string) => x))(point.datum.x)}${point.datum.partial ? ' · incomplete' : ''}`,
         },
         {
           id: 'value',

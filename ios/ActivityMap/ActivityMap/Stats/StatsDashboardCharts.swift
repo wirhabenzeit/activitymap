@@ -229,8 +229,9 @@ struct StatsPeriodBars: View {
     /// Inspection label, e.g. "Mon, 28 Sep".
     let detailLabel: (StatsChartPoint) -> String
     let valueLabel: (Double) -> String
-    var emphasis: Color = Color.primary.opacity(0.85)
     var base: Color = Color.primary.opacity(0.28)
+    /// The incomplete (current) period; lighter by default, as in Training volume.
+    var partial: Color = Color.primary.opacity(0.12)
     @State private var selectedKey: String?
     @ScaledMetric private var overviewHeight = 110.0
     private var maximum: Double { max(1, points.compactMap(\.value).max() ?? 0) * 1.08 }
@@ -243,7 +244,7 @@ struct StatsPeriodBars: View {
             ForEach(Array(points.enumerated()), id: \.offset) { index, point in
                 if let value = point.value {
                     BarMark(x: .value("Period", key(index)), y: .value("Value", value), width: .ratio(0.68))
-                        .foregroundStyle(point.partial ? emphasis : base)
+                        .foregroundStyle(point.partial ? partial : base)
                         .accessibilityLabel("\(detailLabel(point))\(point.partial ? ", incomplete" : "")")
                         .accessibilityValue(valueLabel(value))
                 }

@@ -110,7 +110,8 @@ struct StatsDashboardTile: View {
             }, expanded: false, label: { StatsDisplay.weekday($0.x) },
                detailLabel: { "\(StatsDisplay.weekday($0.x)), \(StatsDisplay.date($0.x))" },
                valueLabel: { StatsDisplay.measurement($0, metric: metric) },
-               emphasis: .primary, base: Color.secondary.opacity(0.45))
+               // Today is still the emphasised bar of the week.
+               base: Color.secondary.opacity(0.45), partial: .primary)
         case .volume(let values, _, _, let averages, let buckets):
             StatsVolumeDetail(history: buckets, averages: averages, metric: metric, range: $volumeRange,
                               expanded: expanded) {

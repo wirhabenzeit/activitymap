@@ -724,10 +724,12 @@ const distanceVsElevationView: TileView = {
         <FillChart expanded={expanded} pilot>
           {({ width, height }) => (
             <PlainBars
+              // The current month is incomplete: lighter, as in Training volume.
               rows={months.map((month, index) => ({
                 x: String(month.monthStart),
                 value: month.rate / 100,
-                highlight: index === months.length - 1,
+                highlight: false,
+                partial: index === months.length - 1,
               }))}
               width={width}
               height={height}
