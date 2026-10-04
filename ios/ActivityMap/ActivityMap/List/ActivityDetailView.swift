@@ -136,6 +136,14 @@ private struct MapActivityDetailReveal: View {
                     .accessibilityHidden(progress > 0.25)
             }
             ScrollView {
+                // The header's Fit route icon is only disabled; say why.
+                if !hasRoute {
+                    Text("No GPS route recorded")
+                        .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, AppTheme.Spacing.large)
+                        .accessibilityIdentifier("activity-no-route")
+                }
                 if compactProfile {
                     VStack(spacing: 16) {
                         ActivityDetailDescription(activity: activity)

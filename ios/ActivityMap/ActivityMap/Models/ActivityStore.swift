@@ -83,6 +83,9 @@ final class ActivityStore {
     }
     var streamSummaries: StreamSummaryLoader?
     var elevationCursor: ElevationCursor?
+    /// The profile whose chart is being dragged. Only an active drag suspends
+    /// pager paging; an accessibility-adjusted cursor must not.
+    var elevationScrubOwner: UUID?
     let mapContext = MapContext()
     let listPresentation: ActivityListPresentation
 
@@ -385,6 +388,7 @@ final class ActivityStore {
     /// Logout, account or deployment transition.
     func clearScope() {
         elevationCursor = nil
+        elevationScrubOwner = nil
         stats.clearScope()
         summaryCache.clear()
         filteredSnapshot = nil

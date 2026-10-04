@@ -118,7 +118,9 @@ private struct NativeMapResultsSheet: View {
                     .presentationDetents(detents, selection: selection)
                     .presentationDragIndicator(.visible)
                     .presentationBackgroundInteraction(.enabled(upThrough: .large))
-                    .presentationContentInteraction(.scrolls)
+                    // Only the detail's elevation chart needs drags to reach content
+                    // first; the results list keeps swipe-to-resize.
+                    .presentationContentInteraction(picker.detailID == nil ? .resizes : .scrolls)
                     .interactiveDismissDisabled()
                     .onAppear { presentationChanged(true) }
 

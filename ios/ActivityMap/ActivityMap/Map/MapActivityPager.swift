@@ -30,7 +30,7 @@ struct MapActivityPager: UIViewControllerRepresentable {
         // The chart owns horizontal drags while scrubbing. Keep UIKit's page
         // pan from stealing them (SwiftUI gesture priority alone is local).
         for scroll in controller.view.subviews.compactMap({ $0 as? UIScrollView }) {
-            scroll.isScrollEnabled = store.elevationCursor == nil
+            scroll.isScrollEnabled = store.elevationScrubOwner == nil
         }
     }
 

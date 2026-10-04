@@ -339,13 +339,19 @@ extension RenderedRoutePickingTests {
         let scroll = try #require(pager.view.subviews.compactMap { $0 as? UIScrollView }.first)
         #expect(scroll.isScrollEnabled)
         let baseline = host.snapshot()
-        store.elevationCursor = .init(owner: UUID(), activityID: 1, cached: cached, point: profile.points[2])
+        let owner = UUID()
+        store.elevationCursor = .init(owner: owner, activityID: 1, cached: cached, point: profile.points[2])
+        try await Task.sleep(for: .milliseconds(200))
+        // An accessibility-adjusted cursor has no drag to protect; paging stays available.
+        #expect(scroll.isScrollEnabled)
+        store.elevationScrubOwner = owner
         try await Task.sleep(for: .milliseconds(200))
         #expect(!scroll.isScrollEnabled, "UIKit paging must yield to elevation scrubbing")
         #expect(store.elevationCoordinate?.latitude == profile.points[2].latitude)
         let marked = host.snapshot()
         #expect(baseline.pngData() != marked.pngData())
         try host.save(marked, name: "elevation-map-cursor")
+        store.elevationScrubOwner = nil
         store.elevationCursor = nil
         try await Task.sleep(for: .milliseconds(100))
         #expect(scroll.isScrollEnabled)

@@ -25,8 +25,11 @@ struct ElevationProfileView: View {
     }
     private var loader: StreamSummaryLoader? { store.streamSummaries }
     private var cached: CachedStreamSummary? { loader?.currentSummary(for: String(activityID)) }
+    // Relevance gates demand, decoding and the cursor, not presentation: a
+    // profile decoded for this source stays on screen while the map sheet is
+    // dragged through the reveal threshold.
     private var profile: ElevationProfile? {
-        guard isRelevant, decoded?.cached == cached else { return nil }
+        guard decoded?.cached == cached else { return nil }
         return decoded?.profile
     }
 
@@ -35,20 +38,20 @@ struct ElevationProfileView: View {
             Group {
                 if let profile {
                     ElevationPlot(profile: profile, compact: compact, selectedX: $selectedDistance) { point in
-                        guard let cached else { return }
-                        if let point {
-                            let next = ElevationCursor(owner: owner, activityID: activityID, cached: cached, point: point)
-                            if store.elevationCursor != next { store.elevationCursor = next }
-                        } else { clearCursor() }
+                        guard let point else { clearCursor(); return }
+                        guard isRelevant, let cached else { return }
+                        let next = ElevationCursor(owner: owner, activityID: activityID, cached: cached, point: point)
+                        if store.elevationCursor != next { store.elevationCursor = next }
+                    } onDrag: { dragging in
+                        if dragging, isRelevant { store.elevationScrubOwner = owner }
+                        else if store.elevationScrubOwner == owner { store.elevationScrubOwner = nil }
                     }
                     .id(cached)
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
                         if isDecoding { ProgressView("Reading elevation samples…") }
                         else { Text(placeholder).foregroundStyle(AppTheme.secondaryText) }
-                        TimelineView(.periodic(from: .now, by: 1)) { timeline in
-                            status(now: timeline.date)
-                        }
+                        statusTimeline
                     }
                     .font(.caption)
                     .frame(maxWidth: .infinity, minHeight: compact ? reservedHeight * 0.75 : reservedHeight, alignment: .center)
@@ -56,9 +59,7 @@ struct ElevationProfileView: View {
                 }
             }
             if profile != nil && (statusPresentation.canRetry || !statusPresentation.message.isEmpty) {
-                TimelineView(.periodic(from: .now, by: 1)) { timeline in
-                    status(now: timeline.date)
-                }
+                statusTimeline
             }
         }
         .accessibilityIdentifier("elevation-profile")
@@ -70,15 +71,24 @@ struct ElevationProfileView: View {
             await loader.load(activityID: String(activityID), refresh: shouldRefresh)
         }
         .task(id: isRelevant ? cached : nil) {
-            decoded = nil
             clearCursor()
-            guard isRelevant, let cached else { return }
+            // Keep an already decoded source across relevance changes, such as
+            // dragging the map sheet through its reveal threshold.
+            guard isRelevant, let cached, decoded?.cached != cached else { return }
+            decoded = nil
             let worker = Task.detached(priority: .userInitiated) { ElevationProfile.decode(cached) }
             let result = await withTaskCancellationHandler { await worker.value } onCancel: { worker.cancel() }
             guard !Task.isCancelled, self.cached == cached else { return }
             decoded = Decoded(cached: cached, profile: result)
         }
         .onDisappear { clearCursor() }
+    }
+
+    /// Re-render only when a retry deadline passes, not every second.
+    private var statusTimeline: some View {
+        TimelineView(.explicit(statusPresentation.retryAt.map { [$0] } ?? [])) { _ in
+            status(now: .now)
+        }
     }
 
     private var isDecoding: Bool { cached != nil && decoded?.cached != cached }
@@ -122,6 +132,7 @@ struct ElevationProfileView: View {
     private func clearCursor() {
         selectedDistance = nil
         if store.elevationCursor?.owner == owner { store.elevationCursor = nil }
+        if store.elevationScrubOwner == owner { store.elevationScrubOwner = nil }
     }
 }
 
@@ -155,6 +166,7 @@ struct ElevationPlot: View {
     var compact = false
     @Binding var selectedX: Double?
     var onSelection: (ElevationProfile.Point?) -> Void = { _ in }
+    var onDrag: (Bool) -> Void = { _ in }
     @GestureState private var isDragging = false
     @State private var accessibleSampleID: Int?
     @ScaledMetric(relativeTo: .caption) private var chartHeight = 160.0
@@ -233,8 +245,11 @@ struct ElevationPlot: View {
         }
         .frame(minHeight: compact ? reservedHeight * 0.75 : reservedHeight, alignment: .top)
         .onChange(of: selected?.id) { _, _ in onSelection(selected) }
-        .onChange(of: isDragging) { _, dragging in if !dragging { select(nil) } }
-        .onDisappear { select(nil); onSelection(nil) }
+        .onChange(of: isDragging) { _, dragging in
+            onDrag(dragging)
+            if !dragging { select(nil) }
+        }
+        .onDisappear { select(nil); onSelection(nil); onDrag(false) }
     }
     private func select(_ point: ElevationProfile.Point?) {
         accessibleSampleID = point?.id
