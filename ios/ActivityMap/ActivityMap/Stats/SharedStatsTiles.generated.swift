@@ -153,7 +153,7 @@ enum SharedStatsTiles {
             window: .yearToDate,
             group: .thisYear,
             isPrimary: true,
-            span: .init(columns: 2, rows: 2),
+            span: .init(columns: 2, rows: 1),
             isOptional: false,
             toggle: .init(label: "Metric", options: [.distance, .time, .elevation, .count])
         ),

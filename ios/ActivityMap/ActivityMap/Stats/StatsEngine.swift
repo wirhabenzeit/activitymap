@@ -91,7 +91,7 @@ nonisolated struct StatsCalendarDay: Sendable { let activities: [StatsActivity];
 nonisolated struct StatsPoint: Sendable { let x: Int; let y: Double }
 nonisolated struct StatsHillPoint: Sendable { let activity: StatsActivity; let distance: Double; let elevation: Double; var metersPerKm: Double { elevation / distance } }
 nonisolated struct StatsClimbing: Sendable { let current: Double; let previous: Double; let months: [(monthStart: Int, rate: Double)] }
-nonisolated enum StatsHistoryRange: String, Hashable, Sendable { case weeks, months, years }
+nonisolated enum StatsHistoryRange: String, CaseIterable, Hashable, Sendable { case weeks, months, years }
 
 /// One immutable index per authorized metadata/filter revision. Day and sport
 /// aggregates are reused by all metrics/windows. Empty buckets are generated
@@ -296,20 +296,31 @@ nonisolated struct StatsEngine: Sendable {
             return .init(x: StatsDates.start(year: 2000, month: c.month!, date: c.day!) - reference, y: value)
         }
     }
-    func volumeHistory(today: Int, metric: StatsMetric, range: StatsHistoryRange, page: Int = 0) -> [StatsHistoryBucket] {
+    func volumeHistory(today: Int, metric: StatsMetric, range: StatsHistoryRange, page: Int = 0, leadingPeriods: Int = 0) -> [StatsHistoryBucket] {
         let c = StatsDates.parts(today), firstYear = StatsDates.parts(min(orderedDays.first ?? today, today)).year!
-        let count = range == .years ? c.year! - firstYear + 1 : 12, offset = max(0, page) * 12
+        let leading = max(0, leadingPeriods)
+        let count = (range == .years ? c.year! - firstYear + 1 : 12) + leading, offset = max(0, page) * 12
         let starts = (0...count).map { index in
             switch range {
-            case .weeks: StatsDates.monday(today) + (index - 11 - offset) * 7
-            case .months: StatsDates.start(year: c.year!, month: c.month! + index - 11 - offset)
-            case .years: StatsDates.start(year: firstYear + index)
+            case .weeks: StatsDates.monday(today) + (index - 11 - offset - leading) * 7
+            case .months: StatsDates.start(year: c.year!, month: c.month! + index - 11 - offset - leading)
+            case .years: StatsDates.start(year: firstYear + index - leading)
             }
         }
         return (0..<count).map { index in
             let start = starts[index], end = min(today, starts[index + 1] - 1), split = sportBreakdown(first: start, last: end)
             return .init(start: start, end: end, total: sum(metric, first: start, last: end),
                          bySport: Dictionary(uniqueKeysWithValues: ActivityCategory.allCases.map { ($0, split[$0]?[metric] ?? 0) }))
+        }
+    }
+    func volumeHistoryAverage(today: Int, metric: StatsMetric, range: StatsHistoryRange) -> [StatsPoint] {
+        let history = volumeHistory(today: today, metric: metric, range: range, leadingPeriods: 4)
+        guard let firstKnownDay = orderedDays.first, firstKnownDay <= today else { return [] }
+        return (4..<history.count).compactMap { index in
+            let end = index == history.count - 1 ? index - 1 : index
+            let window = history[(end - 3)...end]
+            guard window.first!.end >= firstKnownDay else { return nil }
+            return .init(x: history[index].start, y: window.reduce(0) { $0 + $1.total } / 4)
         }
     }
     func hillPoints(first: Int, last: Int) -> [StatsHillPoint] {

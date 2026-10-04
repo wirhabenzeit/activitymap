@@ -31,6 +31,16 @@ struct StatsPresentation: Equatable {
     let message: String?
     let retryAllowed: Bool
 
+    /// Offline fixture/preview hosts have no sync controller. Production waits
+    /// for its controller instead of flashing an empty completed library.
+    init(store: ActivityStore, preparing: Bool) {
+        historyComplete = !preparing
+        retryAllowed = false
+        hasContent = !preparing && store.stats.matchingActivityCount(for: store) > 0
+        state = preparing ? .loading : store.activities.isEmpty ? .noHistory : hasContent ? .ready : .noMatches
+        message = preparing ? "Loading activity history…" : state == .noHistory ? "No activity history" : state == .noMatches ? "No matching activities" : nil
+    }
+
     init(store: ActivityStore, sync: SyncController) {
         let content = !store.activities.isEmpty
         let filtered = store.stats.matchingActivityCount(for: store) > 0

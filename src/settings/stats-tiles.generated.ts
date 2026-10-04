@@ -103,7 +103,7 @@ export const statsTiles = [
     group: 'thisYear',
     span: {
       columns: 2,
-      rows: 2,
+      rows: 1,
     },
     primary: true,
     toggle: {

@@ -20,9 +20,9 @@ void test('packs each group of starter tiles on the 4-column grid', () => {
     { column: 4, row: 1, columns: 1, rows: 1 }, // this month
   ]);
   assert.deepEqual(placeBento(groupSpans('thisYear'), 4), [
-    { column: 1, row: 1, columns: 2, rows: 2 }, // year to date
+    { column: 1, row: 1, columns: 2, rows: 1 }, // year to date
     { column: 3, row: 1, columns: 2, rows: 1 }, // pace, grown into the gap
-    { column: 3, row: 2, columns: 2, rows: 1 }, // records
+    { column: 1, row: 2, columns: 4, rows: 1 }, // records, grown into the row
   ]);
   assert.deepEqual(placeBento(groupSpans('patterns'), 4), [
     { column: 1, row: 1, columns: 2, rows: 2 }, // activity calendar
@@ -42,9 +42,9 @@ void test('clamps spans to the 2-column grid and fills the gaps they leave', () 
     { column: 2, row: 1, columns: 1, rows: 1 },
   ]);
   assert.deepEqual(placeBento(groupSpans('thisYear'), 2), [
-    { column: 1, row: 1, columns: 2, rows: 2 },
+    { column: 1, row: 1, columns: 2, rows: 1 },
+    { column: 1, row: 2, columns: 2, rows: 1 },
     { column: 1, row: 3, columns: 2, rows: 1 },
-    { column: 1, row: 4, columns: 2, rows: 1 },
   ]);
   assert.deepEqual(placeBento(groupSpans('patterns'), 2), [
     { column: 1, row: 1, columns: 2, rows: 2 },

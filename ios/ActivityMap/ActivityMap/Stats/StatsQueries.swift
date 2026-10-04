@@ -3,6 +3,7 @@ import Foundation
 /// Exact arguments are cacheable; presentation never substitutes a selected
 /// map/list ID set or shared date range for the engine's authorized history.
 nonisolated enum StatsQuery: Hashable, Sendable {
+    case dashboard(StatsTileID, StatsToggleOption?)
     case thisWeek(StatsMetric), weeklyVolume(StatsMetric, weeks: Int), fourWeekVolume(StatsMetric)
     case monthComparison(StatsMetric, offset: Int), yearComparison(StatsMetric, offset: Int)
     case yearPace(StatsMetric), totals, records(StatsWindow), best30Days(StatsMetric)
@@ -12,6 +13,7 @@ nonisolated enum StatsQuery: Hashable, Sendable {
     case volumeHistory(StatsMetric, StatsHistoryRange, page: Int)
 }
 nonisolated enum StatsResult: Sendable {
+    case dashboard(StatsDashboardResult)
     case thisWeek(StatsThisWeek), volume(starts: [Int], values: [Double]), comparison(StatsPeriodComparison)
     case pace(StatsPace), totals(StatsTotals), records(StatsRecords), bestDays(StatsBestDays)
     case calendar([Int: StatsCalendarDay]), months([StatsCalendarMonth])
@@ -23,6 +25,7 @@ nonisolated enum StatsResult: Sendable {
 nonisolated extension StatsEngine {
     func evaluate(_ query: StatsQuery, today: Int) -> StatsResult {
         switch query {
+        case .dashboard(let tile, let option): .dashboard(dashboard(tile, option: option, today: today))
         case .thisWeek(let metric): .thisWeek(thisWeek(today: today, metric: metric))
         case .weeklyVolume(let metric, let weeks): { let v = weeklyVolume(today: today, metric: metric, weeks: weeks); return .volume(starts: v.weekStarts, values: v.values) }()
         case .fourWeekVolume(let metric): .comparison(fourWeekVolume(today: today, metric: metric))

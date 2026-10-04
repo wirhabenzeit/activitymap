@@ -262,6 +262,11 @@ actor GatedStatsBuild {
             _ = await store.stats.result(.volumeHistory(metric, .years, page: 0), for: store)
         }
         _ = await store.stats.result(.hilliness, for: store)
+        for tile in StatsDashboard.tiles {
+            for option in tile.toggle?.options.map(Optional.some) ?? [nil] {
+                _ = await store.stats.result(.dashboard(tile.id, option), for: store)
+            }
+        }
         #expect(await probe.calls == 0)
         #expect(await source.calls == 0)
         #expect(store.routeGeometry.buildCount == builds && store.activitiesRevision == revision)

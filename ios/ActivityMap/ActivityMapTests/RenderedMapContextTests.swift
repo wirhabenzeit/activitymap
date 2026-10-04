@@ -178,10 +178,9 @@ extension RenderedRoutePickingTests {
         let window = UIWindow(windowScene: scene)
         let store = ActivityStore(activities: (1...200).map { ActivityStoreSelectionTests.activity($0) })
         store.selectedTab = .list
-        let stats = BrowseStatsDestination { _, _ in
-            AnyView(ScrollView {
-                VStack { ForEach(0..<100) { Text("Stats fixture \($0)").frame(height: 80) } }
-            }.accessibilityIdentifier("stats-context-probe"))
+        let dashboard = StatsDashboardState()
+        let stats = BrowseStatsDestination { store, sync in
+            AnyView(StatsScreen(store: store, sync: sync, dashboard: dashboard))
         }
         let host = UIHostingController(rootView: AppShell(store: store, statsContent: stats)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)))
@@ -208,8 +207,9 @@ extension RenderedRoutePickingTests {
         try await cameraWait { abs(store.mapContext.camera.zoom - 10) < 0.01 }
         store.selectedTab = .stats
         try await Task.sleep(for: .milliseconds(200))
+        try await cameraWait { dashboard.completedTiles.count == StatsDashboard.tiles.count }
         let statsScroll = try #require(descendants(host.view, of: UIScrollView.self).first {
-            !($0 is UICollectionView) && $0.contentSize.height > 7000
+            !($0 is UICollectionView) && $0.contentSize.height > 1500
         })
         statsScroll.setContentOffset(CGPoint(x: 0, y: 800), animated: false)
         store.selectedTab = .list

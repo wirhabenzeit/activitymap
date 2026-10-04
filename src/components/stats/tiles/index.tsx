@@ -156,12 +156,15 @@ export function StatsTileGrid({
   singleSport = false,
   onOpenActivity,
   detailsOpen = false,
+  reportingDay,
 }: {
   activities: StatsActivity[];
   filtered?: boolean;
   singleSport?: boolean;
   onOpenActivity?: (id: number) => void;
   detailsOpen?: boolean;
+  // Fixed reporting date for the development gallery; normal dashboards roll over daily.
+  reportingDay?: number;
 }) {
   const { resolvedTheme } = useTheme();
   const [today, setToday] = useState(localToday);
@@ -177,13 +180,21 @@ export function StatsTileGrid({
   const context: TileContext = useMemo(
     () => ({
       activities,
-      today,
+      today: reportingDay ?? today,
       filtered,
       singleSport,
       onOpenActivity,
       palette: tilePalette(resolvedTheme === 'dark'),
     }),
-    [activities, today, resolvedTheme, filtered, singleSport, onOpenActivity],
+    [
+      activities,
+      today,
+      reportingDay,
+      resolvedTheme,
+      filtered,
+      singleSport,
+      onOpenActivity,
+    ],
   );
 
   const [expandedID, setExpandedID] = useState<StatsTileID | null>(null);
@@ -384,7 +395,9 @@ function BentoGroup({
           // The expanded tile sits in one row sized to its content; every
           // other row keeps the grid's row height.
           gridTemplateRows: Array.from({ length: rowCount }, (_, index) =>
-            index + 1 === expandedRow ? 'auto' : `${grid.rowHeight}px`,
+            index + 1 === expandedRow
+              ? 'auto'
+              : `${tiles.some(({ tile }, i) => ['thisWeek', 'weeklyVolume', 'monthVsLastMonth', 'yearToDate', 'distanceVsElevation', 'sportMix', 'yearPace'].includes(tile.id) && placements[i]!.row === index + 1) ? Math.max(tiles.some(({ tile }, i) => ['monthVsLastMonth', 'yearToDate'].includes(tile.id) && placements[i]!.row === index + 1) ? 300 : 280, grid.rowHeight) : grid.rowHeight}px`,
           ).join(' '),
         }}
       >
@@ -521,7 +534,11 @@ function TileCard({
         </div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <span className="text-[11px] text-muted-foreground">
-            {hasDetail ? 'History & details' : view.period(context, option)}
+            {hasDetail && tile.id === 'weeklyVolume'
+              ? 'Volume by sport'
+              : hasDetail || (expanded && tile.id === 'activityCalendar')
+                ? 'History & details'
+                : view.period(context, option)}
           </span>
           {toggle && (
             <FaceSwitch
@@ -536,19 +553,13 @@ function TileCard({
           <Headline summary={summary} size={large ? 'large' : 'tile'} />
         )}
         <Activity mode={hasDetail ? 'hidden' : 'visible'}>
-          {view.face(context, option, expanded)}
+          {view.face({ ...context, onExpand }, option, expanded)}
         </Activity>
         {/* Preserve history controls while hidden; Activity suspends their effects. */}
         {view.detail && (
           <Activity mode={hasDetail ? 'visible' : 'hidden'}>
             {view.detail(context, option)}
           </Activity>
-        )}
-        {context.filtered && tile.id === 'consistency' && (
-          <p className="mt-2 shrink-0 text-[11px] leading-snug text-muted-foreground">
-            Filtered view: only matching activities count. Other activity may
-            have occurred.
-          </p>
         )}
         {expanded && !hasDetail && view.more && (
           <motion.div

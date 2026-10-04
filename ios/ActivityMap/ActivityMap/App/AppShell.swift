@@ -15,8 +15,7 @@ struct AppShell: View {
     // Retained for review captures: the gallery stages map results inside the
     // production shell.
     private let mapPicker: RoutePicker?
-    // #263 installs the real dashboard here. Until then no Stats control is
-    // exposed. Its content stays mounted with Map/List through tab switches.
+    // Real dashboard content stays mounted with Map/List through switches.
     private let statsContent: BrowseStatsDestination?
 
     init(activities: [Activity] = []) {
@@ -24,7 +23,7 @@ struct AppShell: View {
     }
 
     init(store: ActivityStore, mapPicker: RoutePicker? = nil, sheets: BrowseSheetPresentation = BrowseSheetPresentation(),
-         statsContent: BrowseStatsDestination? = nil) {
+         statsContent: BrowseStatsDestination? = .dashboard) {
         _sheets = State(initialValue: sheets)
         _store = State(initialValue: store)
         self.mapPicker = mapPicker
@@ -135,7 +134,20 @@ struct AppShell: View {
             .accessibilityAddTraits(filtersOpen ? .isSelected : [])
 
             Spacer(minLength: 0)
-            modePicker
+            ViewThatFits(in: .horizontal) {
+                modePicker.fixedSize(horizontal: true, vertical: false)
+                Menu {
+                    ForEach(AppTab.available(stats: statsContent != nil), id: \.self) { tab in
+                        Button(tab.title) { store.selectedTab = tab }
+                    }
+                } label: {
+                    Label(store.selectedTab.title, systemImage: "chevron.down")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white).frame(minHeight: 44)
+                }
+                .accessibilityLabel("View: \(store.selectedTab.title)")
+                .accessibilityIdentifier("browse-destination-menu")
+            }
             Spacer(minLength: 0)
             Menu {
                 Section(auth.currentUser?.name ?? "Account") {
@@ -188,6 +200,7 @@ struct AppShell: View {
         BrowseContent(store: store, refresh: refresh, sync: sync, isSigningIn: auth.status == .signingIn,
                       openAccount: { sheets.accountDestination = .profile }, mapPicker: mapPicker)
             .environment(\.browseStatsDestination, statsContent)
+            .environment(\.statsRecovery, StatsRecovery(refresh: refresh, openAccount: { sheets.accountDestination = .profile }))
             .tint(AppTheme.accent)
     }
 

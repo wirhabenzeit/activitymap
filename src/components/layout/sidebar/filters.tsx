@@ -335,7 +335,6 @@ export function InequalityFilter({
 }
 
 export function MonthPicker() {
-  const { state } = useSidebar();
   const pathname = usePathname();
   const [dates, setDates] = useShallowStore((state) => [
     state.dateRange,
@@ -357,29 +356,7 @@ export function MonthPicker() {
     (date) => (date ? format(date, 'MMM yyyy') : undefined),
   );
 
-  if (pathname === '/stats/tiles') {
-    const explanation = (
-      <span>
-        Each stats card uses its own period. Your date range is kept for other
-        views.
-      </span>
-    );
-    if (state === 'collapsed') {
-      return (
-        <CollapsedFilter label="Stats date periods" icon={<CalendarIcon />}>
-          <p className="text-sm text-muted-foreground">{explanation}</p>
-        </CollapsedFilter>
-      );
-    }
-    return (
-      <SidebarMenuItem>
-        <div className="flex gap-2 px-2 py-2 text-xs text-muted-foreground">
-          <CalendarIcon className="h-4 w-4 shrink-0" />
-          {explanation}
-        </div>
-      </SidebarMenuItem>
-    );
-  }
+  if (pathname === '/stats/tiles') return null;
 
   return (
     <SidebarMenuItem>

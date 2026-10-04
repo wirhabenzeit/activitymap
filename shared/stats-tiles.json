@@ -57,7 +57,7 @@
       "title": "Year to date",
       "window": "yearToDate",
       "group": "thisYear",
-      "span": { "columns": 2, "rows": 2 },
+      "span": { "columns": 2, "rows": 1 },
       "primary": true,
       "toggle": {
         "label": "Metric",

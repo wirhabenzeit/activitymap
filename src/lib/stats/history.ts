@@ -36,20 +36,22 @@ export function volumeHistory(
   metric: StatsMetric,
   range: HistoryRange,
   page = 0,
+  leadingPeriods = 0,
 ): HistoryBucket[] {
   const date = dateOfDay(today);
   const year = date.getUTCFullYear();
   const firstYear = dateOfDay(
     firstActivityDay(activities, today),
   ).getUTCFullYear();
-  const count = range === 'years' ? year - firstYear + 1 : 12;
+  const leading = Math.max(0, Math.floor(leadingPeriods));
+  const count = (range === 'years' ? year - firstYear + 1 : 12) + leading;
   const offset = Math.max(0, Math.floor(page)) * 12;
   const starts = Array.from({ length: count + 1 }, (_, index) =>
     range === 'weeks'
-      ? mondayOf(today) + (index - 11 - offset) * 7
+      ? mondayOf(today) + (index - 11 - offset - leading) * 7
       : range === 'months'
-        ? monthStart(year, date.getUTCMonth() + index - 11 - offset)
-        : yearStart(firstYear + index),
+        ? monthStart(year, date.getUTCMonth() + index - 11 - offset - leading)
+        : yearStart(firstYear + index - leading),
   );
   const buckets = starts.slice(0, -1).map((start, index) => ({
     start,
@@ -70,6 +72,30 @@ export function volumeHistory(
     bucket.bySport[activity.sport] += value;
   }
   return buckets;
+}
+
+// Use history outside the viewport. Never let the unfinished period lower the
+// trend: at its x position, carry the average of the four preceding full periods.
+export function volumeHistoryAverage(
+  activities: readonly StatsActivity[],
+  today: number,
+  metric: StatsMetric,
+  range: HistoryRange,
+) {
+  const history = volumeHistory(activities, today, metric, range, 0, 4);
+  const firstKnownDay = firstActivityDay(activities, today);
+  return history.slice(4).flatMap((bucket, visibleIndex) => {
+    const index = visibleIndex + 4;
+    const end = index === history.length - 1 ? index - 1 : index;
+    const window = history.slice(end - 3, end + 1);
+    if (!activities.length || window[0]!.end < firstKnownDay) return [];
+    return [
+      {
+        x: String(bucket.start),
+        value: window.reduce((sum, row) => sum + row.total, 0) / 4,
+      },
+    ];
+  });
 }
 
 export function calendarDays(
