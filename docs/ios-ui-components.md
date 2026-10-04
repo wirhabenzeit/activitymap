@@ -40,7 +40,7 @@ This section describes `main` after #270 and #278. Later sections record the #27
 
 ### List
 
-The live `ActivityRowView` uses a separate checkbox, one compact identity/date/sport block, inline metric values and a native actions menu. Tapping the identity inspects; the checkbox selects; Show on map remains an explicit menu action. The tablet list column uses the compact identity-above-metrics layout so captions stay readable beside detail. The single toolbar combines a filtered-scope select-all checkbox, selection count/actions, Sort and Columns. Sort retains its complete field/direction choices and spoken current value; Columns retains all metric/layout/summary preferences. List density, sorting, chosen metrics, horizontal metric scrolling and lazy rendering retain their existing owners.
+The live `ActivityRowView` uses a selectable sport badge and an independent inspection target. Phones and wider lists retain aligned sortable table columns whenever configured metrics fit. Reduced row padding improves density. Fallback rows place name/local date above primary metric values; additional metrics and accessibility text stack with labels. Show on map is available by swiping right, long-press menu and VoiceOver action. Scrolling-metric mode omits row swipes to preserve horizontal scrolling. A bottom safe-area status bar holds selection/count actions and list settings for sort, metrics, width and density. The trailing row/header gutter is removed, while column headings retain direct sorting. No saved preferences change. The previously removed summary UI stays removed. See `docs/ios-list-density-review.md` for matched #255 evidence.
 
 The selection/Sort/Columns toolbar uses an opaque system background matching the table header (#278 replaced the earlier thin-material glass). Totals and the totals display picker are deferred, including for existing saved preferences. Filter and sort snapshots are keyed by data/filter/sort changes, and immutable date formatters are cached by locale/timezone/template. Inspection, selection and native navigation do not re-filter or re-sort the library.
 
@@ -116,7 +116,7 @@ Camera padding is retained across navigation and applied once (automatic SDK saf
 
 List uses the available window width until an activity is inspected. At regular widths of at least 760pt, standard text opens an adjacent 340–420pt detail pane while retaining at least 400pt for browsing. Closing detail restores the full list width. Narrower windows and accessibility text use the existing detail navigation; an already-pushed detail stays open through window changes. The native List instance, selection, sort and inspection owners remain unchanged.
 
-Wide rows share aligned metric columns and a separate sortable local-date column where space permits. Additional configured metrics use columns when the activity name and all values fit; otherwise the existing adaptive grid or user-selected scrolling-metrics layout retains every configured field. Opening detail never changes the saved metric settings.
+Wide rows share aligned metric columns and a separate sortable local-date column where space permits. Additional configured metrics use columns when the activity name and all values fit; Details wraps labelled metric groups beneath the activity heading. Both views share one metric selection and retain swipe-right Show on map. Opening detail never changes the saved metric settings.
 
 ## Filter sidebar draft
 
@@ -132,9 +132,9 @@ Web comparison: web places category rows above search and exposes individual typ
 
 ## List options and column fit
 
-List options presentation is owned by the retained List, independently of table-header and stacked-toolbar branches. Changing visible metrics, restoring defaults or switching metrics layout keeps the same Columns sheet open. Fit Width still falls back to stacked rows when the selected columns cannot fit, as explained in the display settings. A rendered phone regression exercises these transitions while retaining the sheet.
+List options presentation is owned by the retained List, independently of table-header and stacked-toolbar branches. Changing visible metrics, restoring defaults or switching metrics layout keeps the same display sheet open. Adding more metrics than Columns can fit explicitly switches the view setting to Details. An overfull saved selection or narrower window shows a Use Details prompt while retaining every metric. A rendered phone regression exercises these transitions while retaining the sheet.
 
-Column fit uses the same width budget for default and optional metrics: compact windows reserve 104pt for activity identity plus the selection/actions/insets, while wide windows reserve 180pt for identity. Speed columns use compact unit headings and numeric values, so distance plus average speed fits on 375–402pt phones. Truly overfull selections, explicit scrolling metrics and accessibility text retain their alternative layouts.
+Column fit uses the same width budget for default and optional metrics: compact windows reserve 104pt for activity identity plus the selection/actions/insets, while wide windows reserve 180pt for identity. Speed columns use compact unit headings and numeric values, so distance plus average speed fits on 375–402pt phones. Details uses natural-width wrapping metric groups; accessibility text stacks them. Horizontal metric scrolling is removed.
 
 ## Navigation colour draft
 

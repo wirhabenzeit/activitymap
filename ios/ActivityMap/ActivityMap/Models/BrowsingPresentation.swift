@@ -42,7 +42,7 @@ struct BrowsingPresentation: Equatable {
         let filtered = store.filteredActivities
         self.init(tab: store.selectedTab, activityCount: store.activities.count,
                   filteredCount: filtered.count,
-                  routeCount: store.selectedTab == .map && !store.routableActivityIDs.isDisjoint(with: store.selection.visibleIDs) ? 1 : 0,
+                  routeCount: store.selectedTab == .map && !store.routableActivityIDs.isDisjoint(with: store.visibleActivityIDs) ? 1 : 0,
                   status: sync?.status, hasCompletedCache: sync?.hasCompletedCache ?? !store.activities.isEmpty,
                   canRetry: sync?.canRefresh ?? false, isSigningIn: isSigningIn,
                   lastSync: sync?.lastSyncAt, reconciliation: sync?.lastReconciliationAt,

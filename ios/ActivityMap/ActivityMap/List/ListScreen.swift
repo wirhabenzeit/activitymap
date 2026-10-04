@@ -78,26 +78,35 @@ struct ListScreen: View {
         .listStyle(.plain)
         .safeAreaInset(edge: .top, spacing: 0) {
             if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize, availableWidth: width) {
-                ActivityTableHeader(store: store, availableWidth: width, sortOpen: $sortOpen, displayOpen: $displayOpen)
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: AppTheme.Spacing.small) {
-                        SelectionBar(store: store)
-                        Spacer(minLength: 0)
-                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen)
-                    }
-                    VStack(alignment: .leading, spacing: 0) {
-                        SelectionBar(store: store)
-                        ListControls(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen).padding(.leading, 44)
-                    }
+                ActivityTableHeader(store: store, availableWidth: width)
+            } else if store.listPresentation.settings.width == .columns && !typeSize.isAccessibilitySize {
+                // A resized window or older saved preferences can exceed the
+                // column budget. Keep every metric visible and explain the fallback.
+                HStack {
+                    Text("These metrics need more room.")
+                        .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    Spacer(minLength: 8)
+                    Button("Use Details") { store.listPresentation.settings.width = .details }
+                        .font(.caption.weight(.medium)).frame(minHeight: 44)
                 }
                 .padding(.horizontal, AppTheme.Spacing.small)
-                .background(Color(uiColor: .systemBackground))
-                .overlay(alignment: .bottom) { Divider() }
-                .accessibilityIdentifier("list-browse-toolbar")
+                .background(AppTheme.surface)
             }
         }
-        .modifier(ListOptionsSheets(presentation: store.listPresentation, sortOpen: $sortOpen, displayOpen: $displayOpen))
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack(spacing: AppTheme.Spacing.small) {
+                SelectionBar(store: store, includesTotal: true)
+                Spacer(minLength: 8)
+                ListControls(presentation: store.listPresentation, iconOnly: true,
+                             sortOpen: $sortOpen, displayOpen: $displayOpen)
+            }
+            .padding(.horizontal, AppTheme.Spacing.small)
+            .background(.bar)
+            .overlay(alignment: .top) { Color(uiColor: .separator).frame(height: 0.5) }
+            .accessibilityIdentifier("list-status-bar")
+        }
+        .modifier(ListOptionsSheets(presentation: store.listPresentation, sortOpen: $sortOpen,
+                                    displayOpen: $displayOpen, availableWidth: width))
     }
 
     @ViewBuilder private var detailColumn: some View {
@@ -135,11 +144,12 @@ struct ListScreen: View {
 struct SelectionBar: View {
     @Bindable var store: ActivityStore
     var iconOnly = false
+    var includesTotal = false
 
     private var selectedCount: Int { store.selectedActivityIDs.count }
 
     private var summary: String {
-        let filteredCount = store.selection.visibleIDs.count
+        let filteredCount = store.visibleActivityIDs.count
         let visibleCount = selectedCount - store.hiddenSelectedCount
         let hidden = store.hiddenSelectedCount
         let scope = "\(visibleCount) of \(filteredCount) filtered activities selected"
@@ -148,7 +158,9 @@ struct SelectionBar: View {
 
     private var visibleSummary: String {
         let count = selectedCount - store.hiddenSelectedCount
-        let scope = selectedCount == 0 ? "\(store.selection.visibleIDs.count) activities" : "\(count) selected"
+        let total = store.visibleActivityIDs.count
+        let scope = selectedCount == 0 ? "\(total) activities"
+            : includesTotal ? "\(count) selected · \(total) activities" : "\(count) selected"
         return store.hiddenSelectedCount > 0 ? "\(scope) · \(store.hiddenSelectedCount) hidden" : scope
     }
 
@@ -160,7 +172,7 @@ struct SelectionBar: View {
                 Button("Select All Filtered Activities") {
                     store.selectAllFiltered()
                 }
-                .disabled(store.selection.visibleIDs.isEmpty)
+                .disabled(store.visibleActivityIDs.isEmpty)
                 Button("Deselect All Filtered Activities") {
                     store.deselectAllFiltered()
                 }

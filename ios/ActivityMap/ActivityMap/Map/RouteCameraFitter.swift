@@ -107,7 +107,7 @@ enum MapNavigation {
             guard let activity = store.activities.first(where: { $0.id == id }) else {
                 context.consume(request); return nil
             }
-            guard store.selection.visibleIDs.contains(id) else {
+            guard store.visibleActivityIDs.contains(id) else {
                 context.hiddenTargetID = id
                 context.consume(request); return nil
             }

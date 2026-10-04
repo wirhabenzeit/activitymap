@@ -44,7 +44,7 @@ final class ActivityStore {
     private(set) var activitiesRevision = 0
     private var filterRevision = 0
     @ObservationIgnored private var filteredSnapshot: (data: Int, filters: Int, activities: [Activity])?
-    @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, activities: [Activity])?
+    @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, selected: Set<Int>?, activities: [Activity])?
     @ObservationIgnored private(set) var filterBuildCount = 0
     @ObservationIgnored private(set) var sortBuildCount = 0
 
@@ -89,6 +89,7 @@ final class ActivityStore {
         self.listPresentation = listPresentation
         self.activities = activities
         selection.setVisible(Set(filteredActivities.map(\.id)))
+        publishSelectionSnapshot()
     }
 
     /// The sync coordinator will call this after a committed sync pass.
@@ -149,14 +150,34 @@ final class ActivityStore {
     var selectedTab: AppTab = .map
 
     /// Mutate only through the operations below so the parity invariants hold.
-    private(set) var selection = SelectionState()
+    private(set) var selection = SelectionState() {
+        didSet { publishSelectionSnapshot() }
+    }
 
-    var selectedActivityIDs: Set<Int> { selection.selectedIDs }
+    // The reducer includes inspection, but map/row selection observers must not.
+    // Publish only when these three values actually change; otherwise native
+    // detail dismissal also redraws the retained map and its route filters.
+    private struct SelectionSnapshot: Equatable {
+        var selected: Set<Int> = []
+        var visible: Set<Int> = []
+        var active: Int? = nil
+    }
+    private var selectionSnapshot = SelectionSnapshot()
+
+    private func publishSelectionSnapshot() {
+        let snapshot = SelectionSnapshot(selected: selection.selectedIDs,
+                                         visible: selection.visibleIDs, active: selection.activeID)
+        if snapshot != selectionSnapshot { selectionSnapshot = snapshot }
+    }
+
+    var selectedActivityIDs: Set<Int> { selectionSnapshot.selected }
+    var visibleActivityIDs: Set<Int> { selectionSnapshot.visible }
+    var visibleSelectedActivityIDs: Set<Int> { selectedActivityIDs.intersection(visibleActivityIDs) }
     /// The selected, filter-visible activity emphasised on the map.
-    var activeActivityID: Int? { selection.activeID }
+    var activeActivityID: Int? { selectionSnapshot.active }
     /// The list detail opened independently of selection.
     var inspectedActivityID: Int? { selection.inspectedID }
-    var hiddenSelectedCount: Int { selection.hiddenSelectedCount }
+    var hiddenSelectedCount: Int { selectedActivityIDs.subtracting(visibleActivityIDs).count }
 
     var inspectedActivity: Activity? {
         guard let id = selection.inspectedID else { return nil }
@@ -201,11 +222,12 @@ final class ActivityStore {
     /// Sort is a list presentation concern; shared filter order stays intact.
     var listedActivities: [Activity] {
         let data = activitiesRevision, filters = filterRevision, sort = listPresentation.settings.sort
-        if let cached = listedSnapshot, cached.data == data, cached.filters == filters, cached.sort == sort {
+        let selected = sort.field == .selection ? selectedActivityIDs : nil
+        if let cached = listedSnapshot, cached.data == data, cached.filters == filters, cached.sort == sort, cached.selected == selected {
             return cached.activities
         }
-        let result = sort.sorted(filteredActivities)
-        listedSnapshot = (data, filters, sort, result)
+        let result = sort.sorted(filteredActivities, selectedIDs: selected ?? [])
+        listedSnapshot = (data, filters, sort, selected, result)
         sortBuildCount += 1
         return result
     }

@@ -68,6 +68,14 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
 
     @MainActor func stage(_ activities: [Activity], scenario: GalleryManifest.Scenario) throws -> Staged {
         let store = ActivityStore(activities: activities, listPresentation: ActivityListPresentation(defaults: nil))
+        // Optional native list variants share the normal activity fixture.
+        if GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LIST_VIEW"] == "details" {
+            store.listPresentation.settings.width = .details
+        }
+        if let metrics = GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LIST_METRICS"] {
+            store.listPresentation.settings.visibleMetrics = Set(metrics.split(separator: ",")
+                .compactMap { ActivityListMetric(rawValue: String($0)) })
+        }
         let picker = RoutePicker()
         func shell(_ tab: AppTab) -> AnyView {
             store.selectedTab = tab
@@ -92,6 +100,9 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
             }, ready: { store.mapContext.pendingRequest == nil })
         case .list:
             store.replaceSelection(with: scenario.selectedIDs)
+            if GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LIST_OPTIONS"] == "1" {
+                return Staged(root: AnyView(NavigationStack { ListScreen(store: store, displayOpen: true) }))
+            }
             return Staged(root: shell(.list))
         case .listDetail:
             let id = try #require(scenario.detailID)
@@ -197,6 +208,9 @@ private final class GalleryWindow {
         try #require(image.jpegData(compressionQuality: 0.82)).write(to: directory.appendingPathComponent("\(name).jpg"))
         let metadata: [String: Any] = [
             "scene": scene.rawValue, "title": scenario.title,
+            "listView": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LIST_VIEW"] ?? "columns",
+            "listMetrics": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LIST_METRICS"] ?? "distance,elapsedTime,elevationGain",
+            "listOptions": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LIST_OPTIONS"] == "1",
             "selectedIDs": scenario.selectedIDs, "search": scenario.search ?? "", "detailID": scenario.detailID as Any? ?? NSNull(),
             "fixtureHash": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_FIXTURE_HASH"] ?? "unknown",
             "commit": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_COMMIT"] ?? "unknown", "order": GalleryScene.allCases.firstIndex(of: scene) ?? 0,

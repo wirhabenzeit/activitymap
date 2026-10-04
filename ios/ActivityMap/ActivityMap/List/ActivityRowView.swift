@@ -14,7 +14,7 @@ struct ActivityRowView: View {
     private var usesTable: Bool { ActivityTableLayout.supports(settings, typeSize: typeSize, availableWidth: availableWidth) }
 
     var body: some View {
-        HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 0) {
+        HStack(alignment: usesTable ? .center : .top, spacing: 0) {
             Button { store.toggleSelection(activity.id) } label: {
                 BrowseSportSymbol(category: activity.category, isSelected: isSelected)
                     .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
@@ -29,7 +29,7 @@ struct ActivityRowView: View {
                     if usesTable {
                         tableContent
                     } else {
-                        VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
+                        VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
                             BrowseActivityHeading(activity: activity, isActive: isActive, comfortable: settings.density == .comfortable)
                             metrics
                         }
@@ -42,10 +42,22 @@ struct ActivityRowView: View {
             .accessibilityLabel("Details for \(activity.name)")
             .accessibilityValue(accessibleDetails)
             .accessibilityHint("Inspect activity without changing selection")
-            actions
+            .contextMenu { actionItems }
+            .accessibilityActions {
+                if hasGeometry {
+                    Button("Show on map") { store.showOnMap(activity.id) }
+                }
+            }
         }
-        .padding(.vertical, settings.density == .compact ? 0 : AppTheme.Spacing.tight)
+        .padding(.vertical, settings.density == .compact ? 0 : 2)
         .contentShape(Rectangle())
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            if hasGeometry {
+                Button { store.showOnMap(activity.id) } label: {
+                    Label("Show on map", systemImage: "map")
+                }.tint(AppTheme.accent)
+            }
+        }
         .overlay(alignment: .leading) {
             if isSelected {
                 RoundedRectangle(cornerRadius: 2).fill(AppTheme.accent)
@@ -88,44 +100,27 @@ struct ActivityRowView: View {
         }
     }
 
-    @ViewBuilder private var metrics: some View {
-        if !settings.visibleMetrics.isEmpty {
-            if settings.width == .scrollingMetrics && !typeSize.isAccessibilitySize {
-                ScrollView(.horizontal) {
-                    HStack(alignment: .top, spacing: AppTheme.Spacing.large) {
-                        ForEach(settings.orderedMetrics) { metric in
-                            metricView(metric).frame(minWidth: AppTheme.minimumMetricColumnWidth, alignment: .leading)
-                        }
-                    }
+    private var metrics: some View {
+        ActivityMetricFlow(spacing: 16, rowSpacing: 8, stacked: typeSize.isAccessibilitySize) {
+            ForEach(settings.orderedMetrics) { metric in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(metric.value(for: activity))
+                        .font(.subheadline.weight(.medium)).monospacedDigit()
+                    Text(metric.title)
+                        .font(.caption2).foregroundStyle(AppTheme.secondaryText)
                 }
-                .accessibilityLabel("Metrics for \(activity.name)")
-            } else {
-                LazyVGrid(columns: typeSize.isAccessibilitySize
-                          ? [GridItem(.flexible(), alignment: .leading)]
-                          : [GridItem(.adaptive(minimum: metricColumnWidth), alignment: .leading)],
-                          alignment: .leading, spacing: AppTheme.Spacing.tight) {
-                    ForEach(settings.orderedMetrics) { metricView($0) }
-                }
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(metric.title)
+                .accessibilityValue(metric.value(for: activity))
             }
         }
     }
 
-    private var metricColumnWidth: CGFloat {
-        settings.visibleMetrics.isSubset(of: [.distance, .elapsedTime, .elevationGain])
-            ? AppTheme.minimumInlineMetricColumnWidth : AppTheme.minimumMetricColumnWidth
-    }
-
-    private var actions: some View {
-        Menu {
-            Button(store.inspectedActivityID == activity.id ? "Close details" : "Details", systemImage: "info.circle", action: inspect)
-            Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
-                .disabled(!hasGeometry)
-        } label: {
-            BrowseIconLabel(systemImage: "ellipsis")
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Actions for \(activity.name)")
-        .accessibilityHint(hasGeometry ? "Details or show on map" : "No GPS route; details remain available")
+    @ViewBuilder private var actionItems: some View {
+        Button("Details", systemImage: "info.circle") { store.inspect(activity.id) }
+        Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
+            .disabled(!hasGeometry)
     }
 
     private var accessibleDetails: String {
@@ -141,17 +136,44 @@ struct ActivityRowView: View {
         else { store.inspect(activity.id) }
     }
 
-    @ViewBuilder private func metricView(_ metric: ActivityListMetric) -> some View {
-        let symbol: String? = switch metric {
-        case .distance: "ruler"
-        case .elapsedTime: "clock"
-        case .elevationGain: "mountain.2"
-        default: nil
+}
+
+/// Each metric keeps its natural width and wraps as a unit. The outer List
+/// remains the only scroll view, leaving horizontal gestures for row actions.
+struct ActivityMetricFlow: Layout {
+    var spacing: CGFloat = 16
+    var rowSpacing: CGFloat = 8
+    var stacked = false
+
+    private func frames(width: CGFloat, subviews: Subviews) -> [CGRect] {
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        return subviews.map { subview in
+            let ideal = subview.sizeThatFits(.unspecified)
+            let size = subview.sizeThatFits(ProposedViewSize(width: min(width, ideal.width), height: nil))
+            if x > 0 && (stacked || x + size.width > width) {
+                x = 0
+                y += rowHeight + rowSpacing
+                rowHeight = 0
+            }
+            let frame = CGRect(origin: CGPoint(x: x, y: y), size: size)
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            return frame
         }
-        if let symbol, !typeSize.isAccessibilitySize {
-            BrowseInlineMetric(title: metric.title, value: metric.value(for: activity), systemImage: symbol)
-        } else {
-            BrowseMetricValue(title: metric.title, value: metric.value(for: activity))
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = max(0, proposal.width ?? subviews.reduce(CGFloat(0)) {
+            $0 + $1.sizeThatFits(.unspecified).width + spacing
+        })
+        let frames = frames(width: width, subviews: subviews)
+        return CGSize(width: width, height: frames.map(\.maxY).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (subview, frame) in zip(subviews, frames(width: bounds.width, subviews: subviews)) {
+            subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                          anchor: .topLeading, proposal: ProposedViewSize(frame.size))
         }
     }
 }

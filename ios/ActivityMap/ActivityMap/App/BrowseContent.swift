@@ -14,7 +14,13 @@ struct BrowseContent: View {
             ZStack {
                 // Retaining this native List preserves the exact scroll offset,
                 // including partially visible rows. No reconstructed anchor jump.
-                ListScreen(store: store, emptyState: presentation.empty, recover: recover)
+                NavigationStack {
+                    ListScreen(store: store, emptyState: presentation.empty, recover: recover)
+                        // Establish the detail bar's inline metrics before the
+                        // first push, even while the root bar is hidden.
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar(.hidden, for: .navigationBar)
+                }
                     .id(store.mapContext.scopeRevision)
                     .refreshable {
                         guard sync?.canRefresh ?? true else { return }

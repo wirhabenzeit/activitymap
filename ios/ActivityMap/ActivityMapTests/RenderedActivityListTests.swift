@@ -102,7 +102,7 @@ extension RenderedRoutePickingTests {
         #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
         presentation.settings.visibleMetrics = [.distance, .averageSpeed]
         #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .accessibility3, availableWidth: width))
-        presentation.settings.width = .scrollingMetrics
+        presentation.settings.width = .details
         #expect(!ActivityTableLayout.supports(presentation.settings, typeSize: .large, availableWidth: width))
     }
 
@@ -128,7 +128,7 @@ extension RenderedRoutePickingTests {
         try await Task.sleep(for: .milliseconds(200))
         #expect(ActivityTableLayout.supports(presentation.settings, typeSize: .large))
         #expect(host.host.presentedViewController === sheet, "Restoring table columns must retain the same sheet")
-        presentation.settings.width = .scrollingMetrics
+        presentation.settings.width = .details
         try await Task.sleep(for: .milliseconds(200))
         #expect(host.host.presentedViewController === sheet)
     }
@@ -268,6 +268,71 @@ extension RenderedRoutePickingTests {
         #expect(store.selectedActivityIDs == selection)
     }
 
+    @Test func shellHeaderStaysOutsideListDetailNavigation() async throws {
+        let previousToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = previousToken }
+        let store = ActivityStore(activities: (1...100).map { ActivityStoreSelectionTests.activity($0) },
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        let host = try ListHarness(root: AppShell(store: store)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)),
+            size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
+        let navigation = try #require(host.controllers(of: UINavigationController.self).first)
+        let list = try #require(host.descendants(of: UICollectionView.self).first)
+        list.setContentOffset(CGPoint(x: 0, y: 200), animated: false)
+        try await Task.sleep(for: .milliseconds(200))
+        let offset = list.contentOffset
+        let navigationTop = navigation.view.convert(.zero, to: host.host.view).y
+        #expect(navigationTop >= 54, "The native stack starts below the persistent app header")
+        store.inspect(90)
+        var openingFrames: [CGRect] = []
+        var openingInsets: [CGFloat] = []
+        // Include the animation itself: the regression occurred at its end,
+        // before the old post-transition checks started observing the view.
+        for _ in 0..<40 {
+            try await Task.sleep(for: .milliseconds(40))
+            if navigation.viewControllers.count == 2, let destination = navigation.topViewController {
+                openingFrames.append(destination.view.frame)
+                openingInsets.append(destination.view.safeAreaInsets.top)
+                #expect(navigation.isNavigationBarHidden)
+            }
+        }
+        #expect(!openingFrames.isEmpty)
+        #expect(openingFrames.allSatisfy { $0 == openingFrames.first })
+        #expect(openingInsets.allSatisfy { $0 == 0 }, "Native bar insets must not move the fixed Back row during the push")
+        try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        let barFrame = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
+        let contentFrame = navigation.topViewController?.view.frame
+        for _ in 0..<5 {
+            try await Task.sleep(for: .milliseconds(200))
+            #expect(navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view) == barFrame,
+                    "The Back bar must not move after the push transition completes")
+            #expect(navigation.topViewController?.view.frame == contentFrame,
+                    "Detail content must not shift after the push transition completes")
+        }
+        #expect(navigation.isNavigationBarHidden)
+        let popGesture = try #require(navigation.interactivePopGestureRecognizer)
+        #expect(popGesture.isEnabled)
+        #expect(popGesture.delegate?.gestureRecognizerShouldBegin?(popGesture) == true,
+                "The native edge-swipe recognizer must accept a pop with the bar hidden")
+        let detailGestureDelegate = popGesture.delegate
+        #expect(navigation.view.convert(.zero, to: host.host.view).y == navigationTop)
+        store.selectedTab = .map
+        try await Task.sleep(for: .milliseconds(200))
+        store.selectedTab = .list
+        try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        #expect(store.inspectedActivityID == 90)
+        navigation.popViewController(animated: true)
+        try await listWait { store.inspectedActivityID == nil && navigation.transitionCoordinator == nil }
+        #expect(list.contentOffset == offset)
+        #expect(store.selectedActivityIDs.isEmpty)
+        #expect(popGesture.delegate !== detailGestureDelegate, "Restore UIKit's gesture delegate after leaving detail")
+    }
+
     @Test func largeListNavigationReusesBrowsingSnapshots() async throws {
         let presentation = ActivityListPresentation(defaults: nil)
         // Persisted totals preferences cannot reinsert the removed summary UI.
@@ -352,15 +417,15 @@ extension RenderedRoutePickingTests {
         try host.save("list-dense-\(scenario)")
     }
 
-    @Test(arguments: ["small-phone", "large-text", "tablet", "scrolling-metrics"])
+    @Test(arguments: ["small-phone", "large-text", "tablet", "details"])
     func listControlsAdaptToDeviceAndDensity(scenario: String) async throws {
         let presentation = ActivityListPresentation(defaults: nil)
         let largeText = scenario == "large-text"
         let tablet = scenario == "tablet"
-        let scrolling = scenario == "scrolling-metrics"
-        if scrolling {
+        let details = scenario == "details"
+        if details {
             presentation.settings.visibleMetrics = Set(ActivityListMetric.allCases)
-            presentation.settings.width = .scrollingMetrics
+            presentation.settings.width = .details
             presentation.settings.density = .compact
         }
         let activity = try StoredModelMapper.activity(Fixtures.activity([
@@ -379,6 +444,10 @@ extension RenderedRoutePickingTests {
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(250))
         #expect(host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false)
+        if details {
+            #expect(host.descendants(of: UIScrollView.self).allSatisfy { $0 is UICollectionView },
+                    "Details metrics must wrap inside the List, without a nested gesture-owning scroll view")
+        }
         try host.save("list-\(scenario)")
     }
 

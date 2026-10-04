@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Native List navigation destination. Wide List and Map host the same panel.
 struct ActivityDetailView: View {
@@ -7,12 +8,34 @@ struct ActivityDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ActivityDetailPanel(store: store, activityID: activityID)
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            // The activity name remains the content heading. Native Back and
-            // swipe-back return to the retained List without a second title.
-            .accessibilityAction(.escape) { dismiss() }
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .medium))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .glassEffect(.regular.interactive(), in: .circle)
+                .accessibilityLabel("Back to activities")
+                .accessibilityIdentifier("list-detail-back")
+                if let activity = store.activity(id: activityID) {
+                    ActivityDetailIdentity(activity: activity, titleLineLimit: 2)
+                } else {
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false)
+        }
+        .background(AppTheme.surface)
+        // UIKit adds a late top inset when a hidden bar is shown during a
+        // push. Keep chrome in the sliding content so its geometry is fixed.
+        .toolbar(.hidden, for: .navigationBar)
+        .background(ListDetailBackGesture())
+        .accessibilityAction(.escape) { dismiss() }
     }
 }
 
@@ -23,6 +46,7 @@ struct ActivityDetailPanel: View {
     @Bindable var store: ActivityStore
     let activityID: Int
     var headerTrailingInset: CGFloat = 0
+    var showsHeading = true
     var mapExpansion: MapActivityExpansion? = nil
     var showOnMap: ((Int) -> Void)? = nil
 
@@ -41,7 +65,8 @@ struct ActivityDetailPanel: View {
                 } else {
                     VStack(spacing: 0) {
                         ScrollView {
-                            ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset)
+                            ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset,
+                                                  showsHeading: showsHeading)
                         }
                         .accessibilityIdentifier("activity-detail-scroll")
                         .clipped()
@@ -143,5 +168,50 @@ private struct ActivityDetailActions: View {
         .padding(.vertical, AppTheme.Spacing.tight)
         .background { if !overMap { AppTheme.surface } }
         .overlay(alignment: .top) { Divider() }
+    }
+}
+
+/// A hidden navigation bar normally disables UIKit's interactive pop gesture.
+/// Keep the native transition recognizer, with a depth/transition guard, and
+/// restore its original delegate when this detail leaves the hierarchy.
+private struct ListDetailBackGesture: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller, context: Context) {}
+    static func dismantleUIViewController(_ controller: Controller, coordinator: ()) {
+        controller.restore()
+    }
+
+    final class Controller: UIViewController, UIGestureRecognizerDelegate {
+        private weak var gesture: UIGestureRecognizer?
+        private weak var previousDelegate: (any UIGestureRecognizerDelegate)?
+        private var previousEnabled = false
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            guard let recognizer = navigationController?.interactivePopGestureRecognizer else { return }
+            guard recognizer.delegate !== self else { return }
+            gesture = recognizer
+            previousDelegate = recognizer.delegate
+            previousEnabled = recognizer.isEnabled
+            recognizer.delegate = self
+            recognizer.isEnabled = true
+        }
+
+        override func viewDidDisappear(_ animated: Bool) {
+            super.viewDidDisappear(animated)
+            restore()
+        }
+
+        func restore() {
+            guard let gesture, gesture.delegate === self else { return }
+            gesture.delegate = previousDelegate
+            gesture.isEnabled = previousEnabled
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let navigationController else { return false }
+            return navigationController.viewControllers.count > 1
+                && navigationController.transitionCoordinator == nil
+        }
     }
 }

@@ -32,32 +32,30 @@ struct AppShell: View {
     }
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
             GeometryReader { geometry in
                 let sidebarAvailable = sizeClass == .regular && geometry.size.width >= 760 && !typeSize.isAccessibilitySize
-                HStack(spacing: 0) {
-                    if sidebarAvailable && sidebarVisible {
-                        VStack(spacing: 0) {
-                            Text("Filters").font(.headline)
-                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                .padding(.horizontal, 16)
-                            FilterPanel(store: store, scope: filterScope)
+                VStack(spacing: 0) {
+                    shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
+                    HStack(spacing: 0) {
+                        if sidebarAvailable && sidebarVisible {
+                            VStack(spacing: 0) {
+                                Text("Filters").font(.headline)
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .padding(.horizontal, 16)
+                                FilterPanel(store: store, scope: filterScope)
+                            }
+                            .frame(width: 320)
+                            .background(Color(uiColor: .secondarySystemBackground))
+                            .accessibilityIdentifier("filter-sidebar")
+                            Divider()
                         }
-                        .frame(width: 320)
-                        .background(Color(uiColor: .secondarySystemBackground))
-                        .accessibilityIdentifier("filter-sidebar")
-                        Divider()
+                        content.environment(\.filterSidebarVisible, sidebarAvailable && sidebarVisible)
+                            .environment(\.mapResultsSheetSuspended, sheets.showsFilters || sheets.accountDestination != nil || sheets.shellSheetPresented)
+                            .environment(\.mapResultsPresentationChanged, { sheets.mapResultsPresented = $0 })
                     }
-                    content.environment(\.filterSidebarVisible, sidebarAvailable && sidebarVisible)
-                        .environment(\.mapResultsSheetSuspended, sheets.showsFilters || sheets.accountDestination != nil || sheets.shellSheetPresented)
-                        .environment(\.mapResultsPresentationChanged, { sheets.mapResultsPresented = $0 })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle(store.selectedTab == .map ? "ActivityMap" : store.selectedTab == .list ? "Activities" : "Stats")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
-                .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
                 .task {
                     guard let localStore else { return } // Xcode previews stay offline.
                     if sync == nil {
@@ -78,78 +76,6 @@ struct AppShell: View {
                         store.stats.refreshToday()
                         await refresh()
                     }
-                }
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Section(auth.currentUser?.name ?? "Account") {
-                                Button {
-                                    sheets.accountDestination = .profile
-                                } label: {
-                                    Label("Profile", systemImage: "person")
-                                }
-                            }
-
-                            Button {
-                                sheets.accountDestination = .settings
-                            } label: {
-                                Label("Settings", systemImage: "gearshape")
-                            }
-
-                            Button {
-                                sheets.accountDestination = .about
-                            } label: {
-                                Label("About ActivityMap", systemImage: "info.circle")
-                            }
-                        } label: {
-                            AsyncImage(url: auth.currentUser?.image.flatMap(URL.init(string:))) { phase in
-                                if let image = phase.image {
-                                    image.resizable().scaledToFill()
-                                        .frame(width: 32, height: 32)
-                                        .clipShape(Circle())
-                                        .overlay { Circle().strokeBorder(.white.opacity(0.65), lineWidth: 1) }
-                                } else {
-                                    Image(systemName: "person.crop.circle")
-                                        .font(.body.weight(.semibold))
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                            .accessibilityHidden(true)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Account and Settings")
-                    }
-                    .sharedBackgroundVisibility(.hidden)
-
-                    ToolbarItem(placement: .principal) {
-                        modePicker
-                    }
-                    .sharedBackgroundVisibility(.hidden)
-
-                    ToolbarItem(placement: .topBarLeading) {
-                        let filtersOpen = sidebarAvailable ? sidebarVisible : sheets.showsFilters
-                        Button {
-                            if sidebarAvailable { sidebarVisible.toggle() }
-                            else { sheets.showsFilters.toggle() }
-                        } label: {
-                            Image(systemName: activeFilterCount == 0
-                                ? "line.3.horizontal.decrease"
-                                : "line.3.horizontal.decrease.circle.fill")
-                                .rotationEffect(.degrees(90))
-                                .frame(width: 44, height: 44)
-                                .background(filtersOpen ? Color.white.opacity(0.2) : .clear,
-                                            in: RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .accessibilityLabel(filterButtonLabel)
-                        .accessibilityValue(filtersOpen ? "Expanded" : "Collapsed")
-                        .accessibilityAddTraits(filtersOpen ? .isSelected : [])
-                    }
-                    .sharedBackgroundVisibility(.hidden)
                 }
                 .sheet(item: Binding(
                     get: { sheets.mapResultsPresented ? nil : (sheets.showsFilters && !sidebarAvailable ? ShellSheet.filters : sheets.accountDestination.map(ShellSheet.account)) },
@@ -183,6 +109,79 @@ struct AppShell: View {
                 }
             }
         }
+    }
+
+    // Global destinations stay outside the List's native navigation stack.
+    private func shellHeader(sidebarAvailable: Bool) -> some View {
+        HStack(spacing: 8) {
+            let filtersOpen = sidebarAvailable ? sidebarVisible : sheets.showsFilters
+            Button {
+                if sidebarAvailable { sidebarVisible.toggle() }
+                else { sheets.showsFilters.toggle() }
+            } label: {
+                Image(systemName: activeFilterCount == 0
+                    ? "line.3.horizontal.decrease"
+                    : "line.3.horizontal.decrease.circle.fill")
+                    .rotationEffect(.degrees(sidebarAvailable ? 90 : 0))
+                    .frame(width: 44, height: 44)
+                    .background(filtersOpen ? Color.white.opacity(0.2) : .clear,
+                                in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .frame(width: 44, height: 44)
+            .accessibilityLabel(filterButtonLabel)
+            .accessibilityValue(filtersOpen ? "Expanded" : "Collapsed")
+            .accessibilityAddTraits(filtersOpen ? .isSelected : [])
+
+            Spacer(minLength: 0)
+            modePicker
+            Spacer(minLength: 0)
+            Menu {
+                Section(auth.currentUser?.name ?? "Account") {
+                    Button {
+                        sheets.accountDestination = .profile
+                    } label: {
+                        Label("Profile", systemImage: "person")
+                    }
+                }
+
+                Button {
+                    sheets.accountDestination = .settings
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+
+                Button {
+                    sheets.accountDestination = .about
+                } label: {
+                    Label("About ActivityMap", systemImage: "info.circle")
+                }
+            } label: {
+                AsyncImage(url: auth.currentUser?.image.flatMap(URL.init(string:))) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                            .frame(width: 32, height: 32)
+                            .clipShape(Circle())
+                            .overlay { Circle().strokeBorder(.white.opacity(0.65), lineWidth: 1) }
+                    } else {
+                        Image(systemName: "person.crop.circle")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .accessibilityHidden(true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Account and Settings")
+
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 54)
+        .background(AppTheme.navigationBlue.ignoresSafeArea(edges: .top))
+        .accessibilityIdentifier("browse-header")
     }
 
     private var content: some View {

@@ -4,12 +4,14 @@ import SwiftUI
 enum ActivityTableLayout {
     static func supports(_ settings: ActivityListSettings, typeSize: DynamicTypeSize,
                          availableWidth: CGFloat = 390) -> Bool {
-        guard !typeSize.isAccessibilitySize, settings.width == .fitWidth,
-              !settings.visibleMetrics.isEmpty else { return false }
-        // Preserve every configured metric. Fall back to the adaptive grid when
-        // aligned columns would squeeze the activity name or clip their values.
+        !typeSize.isAccessibilitySize && settings.width == .columns
+            && metricsFit(settings, availableWidth: availableWidth)
+    }
+
+    static func metricsFit(_ settings: ActivityListSettings, availableWidth: CGFloat) -> Bool {
+        // Preserve a readable activity name as well as the selected metrics.
         let nameWidth: CGFloat = availableWidth >= 700 ? 180 : 104
-        return availableWidth >= 104 + nameWidth + settings.orderedMetrics.reduce(CGFloat(0)) {
+        return availableWidth >= 60 + nameWidth + settings.orderedMetrics.reduce(CGFloat(0)) {
             $0 + width($1, availableWidth: availableWidth)
         }
     }
@@ -24,7 +26,7 @@ enum ActivityTableLayout {
     }
 
     static func showsDate(_ settings: ActivityListSettings, availableWidth: CGFloat) -> Bool {
-        availableWidth >= 700 && availableWidth >= 104 + 180 + 120
+        availableWidth >= 700 && availableWidth >= 60 + 180 + 120
             + settings.orderedMetrics.reduce(CGFloat(0)) { $0 + width($1, availableWidth: availableWidth) }
     }
 
@@ -54,13 +56,21 @@ enum ActivityTableLayout {
 struct ActivityTableHeader: View {
     @Bindable var store: ActivityStore
     var availableWidth: CGFloat = 390
-    @Binding var sortOpen: Bool
-    @Binding var displayOpen: Bool
     private var presentation: ActivityListPresentation { store.listPresentation }
 
     var body: some View {
         HStack(spacing: 0) {
-            SelectionBar(store: store, iconOnly: true).frame(width: 44)
+            Button { sort(.selection) } label: {
+                HStack(spacing: 2) {
+                    Image(systemName: "checkmark.circle")
+                    if presentation.settings.sort.field == .selection { arrow }
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Sort by selection state")
+            .accessibilityValue(presentation.settings.sort.field == .selection
+                ? (presentation.settings.sort.direction == .descending ? "Selected first" : "Unselected first") : "Not sorted")
             Menu {
                 Button("Sort by name") { sort(.name) }
                 Button("Sort by date") { sort(.localDate) }
@@ -100,7 +110,6 @@ struct ActivityTableHeader: View {
                 .accessibilityLabel("Sort by \(metric.title)")
                 .accessibilityValue(presentation.settings.sort.field == metric.field ? presentation.settings.sort.direction.title : "Not sorted")
             }
-            ListControls(presentation: presentation, iconOnly: true, sortOpen: $sortOpen, displayOpen: $displayOpen).frame(width: 44)
         }
         .font(.caption2.weight(.semibold))
         .foregroundStyle(AppTheme.secondaryText)
