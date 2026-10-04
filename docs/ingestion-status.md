@@ -173,3 +173,34 @@ values.
 
 `pnpm db:test-ingestion-status` checks the eligibility rule, detail backoff,
 outcomes, heartbeats and account isolation against PostgreSQL.
+
+## Settings clients (#300 / #301)
+
+Web Settings and the native Settings form show server history, details, streams
+and photo metadata independently from browser/device downloads. The main
+screen uses compact status rows; detailed counts and run explanations expand
+on web and open native destinations on iOS. Web account, display and about
+settings have separate tabs. The screens do not
+infer server totals from locally loaded activities. Terminal stream failures
+are labelled “Needs attention” even when the server has no runnable work.
+The former web Repair/Photos/Clean table is no longer part of Settings.
+
+Status requests run only while Settings is visible, at least 60 seconds apart,
+with server Retry-After deadlines respected. Both clients retain the observation
+time and label snapshots older than two minutes, or viewed offline, as last
+known state. iOS persists only the typed snapshot and next-check deadline under
+the existing deployment/account scope. Cancellation and account changes fence
+late responses. A missing or incompatible endpoint leaves coverage unknown.
+
+Browser download state comes from OfflineSyncProvider, including the last
+successful persisted sync, safe failures, offline state and a bounded retry.
+iOS continues to use SyncController and its authorized cache and recovery rules;
+pausing/downloading explicitly affects this device only.
+
+`shared/ingestion-client-expectations.v1.json` defines matching web/iOS wording
+for all shared status fixtures. Node presentation tests and native
+`IngestionStatusTests` compare every scenario; native tests also cover cache
+scoping, late responses, rejected sessions and persisted retry deadlines.
+`RenderedIngestionStatusTests` exercises phone, dark, large Dynamic Type and iPad
+layouts with fixture data. Physical-device and manual VoiceOver certification
+remain separate checks; these tests do not certify either.

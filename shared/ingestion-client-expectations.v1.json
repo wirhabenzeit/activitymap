@@ -1,0 +1,332 @@
+{
+  "initial-import-unknown-total": [
+    {
+      "title": "Activity history",
+      "coverage": "In progress",
+      "counts": "800 activities imported · Strava total not yet known",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "Not started",
+      "counts": "0 fetched · 800 awaiting first fetch · 0 awaiting refresh · 0 of these waiting to retry",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "Not started",
+      "counts": "0 with data · 0 with no sensor data · 800 queued · 0 waiting · 0 blocked · 0 failed. 0 chart summaries available.",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "Covered",
+      "counts": "0 of 0 activities with photos checked · 0 awaiting refresh · 0 not checked. 0 photo records; image downloads are separate.",
+      "schedule": "No work pending",
+      "reason": null
+    }
+  ],
+  "partial-import-with-detail-failures": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "1000 activities imported · full history discovered",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "In progress",
+      "counts": "900 fetched · 80 awaiting first fetch · 20 awaiting refresh · 5 of these waiting to retry",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "Needs attention",
+      "counts": "400 with data · 50 with no sensor data · 520 queued · 10 waiting · 0 blocked · 20 failed. 395 chart summaries available.",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "In progress",
+      "counts": "100 of 120 activities with photos checked · 15 awaiting refresh · 5 not checked. 410 photo records; image downloads are separate.",
+      "schedule": "No automatic refresh is scheduled",
+      "reason": null
+    }
+  ],
+  "complete-with-no-gps-and-empty-streams": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "230 activities imported · full history discovered",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "Covered",
+      "counts": "230 fetched · 0 awaiting first fetch · 0 awaiting refresh · 0 of these waiting to retry",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "Covered",
+      "counts": "200 with data · 30 with no sensor data · 0 queued · 0 waiting · 0 blocked · 0 failed. 200 chart summaries available.",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "Covered",
+      "counts": "12 of 12 activities with photos checked · 0 awaiting refresh · 0 not checked. 31 photo records; image downloads are separate.",
+      "schedule": "No work pending",
+      "reason": null
+    }
+  ],
+  "details-waiting-after-failures": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "300 activities imported · full history discovered",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "In progress",
+      "counts": "297 fetched · 3 awaiting first fetch · 0 awaiting refresh · 3 of these waiting to retry",
+      "schedule": "Waiting to retry",
+      "reason": "Some activity details could not be fetched and will be retried"
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "Covered",
+      "counts": "297 with data · 3 with no sensor data · 0 queued · 0 waiting · 0 blocked · 0 failed. 297 chart summaries available.",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "Covered",
+      "counts": "0 of 0 activities with photos checked · 0 awaiting refresh · 0 not checked. 0 photo records; image downloads are separate.",
+      "schedule": "No work pending",
+      "reason": null
+    }
+  ],
+  "account-credentials-rejected": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "500 activities imported · full history discovered",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "In progress",
+      "counts": "450 fetched · 50 awaiting first fetch · 0 awaiting refresh · 0 of these waiting to retry",
+      "schedule": "Reconnect Strava to continue",
+      "reason": "Strava rejected the connection; reconnect Strava"
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "In progress",
+      "counts": "300 with data · 20 with no sensor data · 0 queued · 0 waiting · 180 blocked · 0 failed. 300 chart summaries available.",
+      "schedule": "Reconnect Strava to continue",
+      "reason": "Strava rejected the connection; reconnect Strava"
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "Covered",
+      "counts": "0 of 0 activities with photos checked · 0 awaiting refresh · 0 not checked. 0 photo records; image downloads are separate.",
+      "schedule": "No work pending",
+      "reason": null
+    }
+  ],
+  "reconnected-after-rejection": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "500 activities imported · full history discovered",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "In progress",
+      "counts": "450 fetched · 50 awaiting first fetch · 0 awaiting refresh · 0 of these waiting to retry",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "In progress",
+      "counts": "300 with data · 20 with no sensor data · 180 queued · 0 waiting · 0 blocked · 0 failed. 300 chart summaries available.",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "Covered",
+      "counts": "0 of 0 activities with photos checked · 0 awaiting refresh · 0 not checked. 0 photo records; image downloads are separate.",
+      "schedule": "No work pending",
+      "reason": null
+    }
+  ],
+  "rate-limit-wait": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "700 activities imported · full history discovered",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "Covered",
+      "counts": "700 fetched · 0 awaiting first fetch · 0 awaiting refresh · 0 of these waiting to retry",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "In progress",
+      "counts": "640 with data · 20 with no sensor data · 0 queued · 40 waiting · 0 blocked · 0 failed. 640 chart summaries available.",
+      "schedule": "Waiting to retry",
+      "reason": null
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "Covered",
+      "counts": "0 of 0 activities with photos checked · 0 awaiting refresh · 0 not checked. 0 photo records; image downloads are separate.",
+      "schedule": "No work pending",
+      "reason": null
+    }
+  ],
+  "scheduler-stalled-or-disabled": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "400 activities imported · full history discovered",
+      "schedule": "Background processing has stopped reporting; contact support if this continues",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "In progress",
+      "counts": "380 fetched · 20 awaiting first fetch · 0 awaiting refresh · 0 of these waiting to retry",
+      "schedule": "Background schedule is not yet known",
+      "reason": null
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "Not started",
+      "counts": "0 with data · 0 with no sensor data · 400 queued · 0 waiting · 0 blocked · 0 failed. 0 chart summaries available.",
+      "schedule": "Background processing is disabled on the server",
+      "reason": null
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "Covered",
+      "counts": "0 of 0 activities with photos checked · 0 awaiting refresh · 0 not checked. 0 photo records; image downloads are separate.",
+      "schedule": "No work pending",
+      "reason": null
+    }
+  ],
+  "revoked-account": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "150 activities imported · full history discovered",
+      "schedule": "Reconnect Strava to continue",
+      "reason": "Reconnect Strava to continue"
+    },
+    {
+      "title": "Activity details",
+      "coverage": "In progress",
+      "counts": "140 fetched · 10 awaiting first fetch · 0 awaiting refresh · 0 of these waiting to retry",
+      "schedule": "Reconnect Strava to continue",
+      "reason": "Reconnect Strava to continue"
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "In progress",
+      "counts": "100 with data · 0 with no sensor data · 0 queued · 0 waiting · 50 blocked · 0 failed. 100 chart summaries available.",
+      "schedule": "Reconnect Strava to continue",
+      "reason": "Reconnect Strava to continue"
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "Covered",
+      "counts": "0 of 0 activities with photos checked · 0 awaiting refresh · 0 not checked. 0 photo records; image downloads are separate.",
+      "schedule": "No work pending",
+      "reason": null
+    }
+  ],
+  "photo-only-staleness": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "90 activities imported · full history discovered",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "Covered",
+      "counts": "90 fetched · 0 awaiting first fetch · 0 awaiting refresh · 0 of these waiting to retry",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "Covered",
+      "counts": "90 with data · 0 with no sensor data · 0 queued · 0 waiting · 0 blocked · 0 failed. 90 chart summaries available.",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "In progress",
+      "counts": "6 of 9 activities with photos checked · 3 awaiting refresh · 0 not checked. 20 photo records; image downloads are separate.",
+      "schedule": "No automatic refresh is scheduled",
+      "reason": null
+    }
+  ],
+  "expired-status-snapshot": [
+    {
+      "title": "Activity history",
+      "coverage": "Covered",
+      "counts": "50 activities imported · full history discovered",
+      "schedule": "No work pending",
+      "reason": null
+    },
+    {
+      "title": "Activity details",
+      "coverage": "In progress",
+      "counts": "40 fetched · 10 awaiting first fetch · 0 awaiting refresh · 0 of these waiting to retry",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Streams & charts",
+      "coverage": "In progress",
+      "counts": "40 with data · 0 with no sensor data · 10 queued · 0 waiting · 0 blocked · 0 failed. 40 chart summaries available.",
+      "schedule": "Automatic processing scheduled",
+      "reason": null
+    },
+    {
+      "title": "Photo metadata",
+      "coverage": "Covered",
+      "counts": "0 of 0 activities with photos checked · 0 awaiting refresh · 0 not checked. 0 photo records; image downloads are separate.",
+      "schedule": "No work pending",
+      "reason": null
+    }
+  ]
+}

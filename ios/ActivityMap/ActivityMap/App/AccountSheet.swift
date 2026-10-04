@@ -190,6 +190,11 @@ struct AccountSheet: View {
 
     private var settingsContent: some View {
         Group {
+            Section("Account / connection") {
+                NavigationLink("Account and Strava connection") { profileContent }
+                Button("Reconnect Strava") { Task { await auth.signIn() } }
+            }
+            if let session = sync?.session { IngestionStatusSection(session: session) }
             syncContent
 
             Section {
@@ -211,19 +216,19 @@ struct AccountSheet: View {
             } header: { Text("Display") } footer: {
                 Text("Distance, elevation and speed use \(preferences.units == .metric ? "kilometres, metres and km/h" : "miles, feet and mph"). Preferences are saved on this device.")
             }
+            Section("About") {
+                NavigationLink("About ActivityMap") { aboutContent }
+            }
         }
     }
 
     @ViewBuilder
     private var syncContent: some View {
         if let sync {
-            Section("Activity Data") {
-                Text(sync.status.title)
+            Section {
+                Text(sync.status == .ready ? "Device download complete" : sync.status.title)
                 if let lastSync = sync.checkpoint?.lastSyncAt {
-                    LabeledContent("Last synced") { Text(lastSync, style: .relative) }
-                }
-                if let reconciled = sync.checkpoint?.freshness?.lastSummaryReconciledAt {
-                    LabeledContent("Strava last checked") { Text(reconciled, style: .relative) }
+                    LabeledContent("Last device download") { Text(lastSync, style: .relative) }
                 }
                 if case .failed(let message) = sync.status {
                     Text(message).font(.footnote).foregroundStyle(.secondary)
@@ -231,24 +236,24 @@ struct AccountSheet: View {
                 if let date = sync.retryNotBefore {
                     LabeledContent("Retry after") { Text(date, style: .time) }
                 }
-                NavigationLink("Sync Details") {
+                NavigationLink("Download details") {
                     BrowsingSyncDetails(presentation: BrowsingPresentation(store: sync.activities, sync: sync),
                                         failureMessage: syncFailureMessage, recover: recoverSync)
-                        .navigationTitle("Sync Details")
+                        .navigationTitle("Device download")
                         .navigationBarTitleDisplayMode(.inline)
                 }
                 if sync.status == .syncing {
-                    Button("Pause Sync") { sync.pause() }
+                    Button("Pause device download") { sync.pause() }
                 }
                 if let refresh, sync.session != nil {
                     Button {
                         Task { await refresh() }
                     } label: {
-                        Label("Refresh Activities", systemImage: "arrow.clockwise")
+                        Label("Sync this device", systemImage: "arrow.clockwise")
                     }
                         .disabled(!sync.canRefresh)
                 }
-            }
+            } header: { Text("This device") } footer: { Text("ActivityMap → this device. Server import continues independently.") }
         }
     }
 

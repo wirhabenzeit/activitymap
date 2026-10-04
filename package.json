@@ -27,6 +27,7 @@
     "db:schema:fingerprint": "tsx scripts/database/migrate.ts fingerprint",
     "db:baseline:adopt": "tsx scripts/database/migrate.ts adopt-baseline",
     "test": "tsx --conditions=react-server --test \"src/**/*.test.ts\"",
+    "test:settings-ui": "tsx --test src/hooks/use-ingestion-status.test.tsx",
     "test:stats-ui": "tsx --test src/components/stats/tiles/*.test.tsx",
     "test:sync": "tsx src/scripts/test-sync-activities.ts",
     "openapi:generate": "tsx scripts/generate-openapi.ts",

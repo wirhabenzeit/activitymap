@@ -1,457 +1,339 @@
 'use client';
 
-import * as React from 'react';
-import { DisplaySettings } from './display-settings';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '~/components/ui/dialog';
-import { ScrollArea } from '~/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { Button } from '~/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from '~/components/ui/card';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "~/components/ui/table";
-import { Loader2, RefreshCw, Activity, ImageOff } from 'lucide-react';
-import { syncYear, repairYear } from '~/server/strava/verification';
-import { deleteActivities } from '~/server/strava/actions';
-import { useToast } from '~/hooks/use-toast';
-import { useActivities } from '~/hooks/use-activities';
-import type { Activity as DbActivity } from '~/server/db/schema';
+import { DisplaySettings } from './display-settings';
 import { useShallowStore } from '~/store';
-import { removeStreamSummaryActivity } from '~/lib/activity-stream-summary';
+import {
+  useIngestionStatus,
+  IngestionStatusError,
+} from '~/hooks/use-ingestion-status';
+import {
+  coverageRows,
+  coverageSummaries,
+  outcomeText,
+  snapshotIsStale,
+} from '~/lib/ingestion/presentation';
+import {
+  emptyBrowserStatus,
+  requestBrowserSync,
+  useBrowserSyncStatus,
+} from '~/lib/sync/browser-status';
+import { signIn } from '~/lib/auth-client';
 
-type YearlyStat = {
-    year: number;
-    count: number;
-    incompleteCount: number;
-    missingPhotosCount: number;
-    ids: number[];
-    incompleteIds: number[];
-    missingPhotoIds: number[];
-};
+const date = (value: string) => new Date(value).toLocaleString();
 
-type CheckResult = {
-    stravaCount: number;
-    extraIds: number[];
-};
-
-export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-    const { data: activities = [], isFetching } = useActivities();
-
-    // Compute stats from local activities
-    const stats = React.useMemo(() => {
-        const totalActivities = activities.length;
-        const incompleteActivities = activities.filter(a => a.geometryState !== 'detailed').length;
-        const totalPhotos = 0; // Placeholder
-
-        return {
-            totalActivities,
-            incompleteActivities,
-            totalPhotos,
-        };
-    }, [activities]);
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[75vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                        Settings & Status
-                        {isFetching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                    </DialogTitle>
-                </DialogHeader>
-
-                <div className="grid gap-6 py-4">
-                    <DisplaySettings />
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">
-                                    Total Activities
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats?.totalActivities ?? 0}</div>
-                                <p className="text-xs text-muted-foreground">
-                                    {stats?.incompleteActivities ?? 0} incomplete
-                                </p>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Yearly History */}
-                    <div className="space-y-6">
-                        <YearlyHistory activities={activities ?? []} globalLoading={isFetching} />
-                    </div>
+export function SettingsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { user, isGuest } = useShallowStore((state) => ({
+    user: state.user,
+    isGuest: state.isGuest,
+  }));
+  const userId = isGuest ? undefined : user?.id;
+  const [tab, setTab] = useState('sync');
+  const query = useIngestionStatus(userId, open && tab === 'sync');
+  const browser = useBrowserSyncStatus((state) =>
+    userId ? (state.byUser[userId] ?? emptyBrowserStatus) : emptyBrowserStatus,
+  );
+  const [clock, setClock] = useState(0);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const tick = () => setClock(Date.now());
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [open]);
+  const status = userId ? query.data : undefined;
+  const offline = typeof navigator !== 'undefined' && !navigator.onLine;
+  const stale =
+    !!status &&
+    (offline || query.isError || snapshotIsStale(status.observedAt, clock));
+  const statusRetryAt = Math.max(
+    query.dataUpdatedAt + 60_000,
+    query.errorUpdatedAt + 60_000,
+    query.error instanceof IngestionStatusError ? query.error.retryAt : 0,
+  );
+  const reconnect = async () => {
+    setConnectionError(null);
+    try {
+      const result = await signIn.social({
+        provider: 'strava',
+        callbackURL: '/map',
+      });
+      if (result.error)
+        setConnectionError(
+          result.error.message ??
+            'Could not connect to Strava. Please try again.',
+        );
+    } catch {
+      setConnectionError('Could not connect to Strava. Please try again.');
+    }
+  };
+  const browserTitle = {
+    idle: 'Not yet synced',
+    syncing: 'Downloading changes…',
+    ready: 'Up to date',
+    offline: 'Offline',
+    error: 'Couldn’t sync',
+  }[browser.phase];
+  const rows = status ? coverageRows(status) : [];
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85dvh] overflow-y-auto break-words sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="text-xl">Settings</DialogTitle>
+          <DialogDescription className="sr-only">
+            Account, sync and display preferences.
+          </DialogDescription>
+        </DialogHeader>
+        <Tabs value={tab} onValueChange={setTab} className="min-w-0">
+          <TabsList
+            className="grid h-auto w-full grid-cols-4"
+            aria-label="Settings sections"
+          >
+            {[
+              ['account', 'Account'],
+              ['sync', 'Sync & data'],
+              ['display', 'Display'],
+              ['about', 'About'],
+            ].map(([value, title]) => (
+              <TabsTrigger
+                key={value}
+                value={value!}
+                className="min-w-0 whitespace-normal px-1 text-xs sm:text-sm"
+              >
+                {title}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value="sync" className="space-y-6 pt-4">
+            <section aria-labelledby="server-heading" className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 id="server-heading" className="font-semibold">
+                    Strava import
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Strava → ActivityMap
+                  </p>
                 </div>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function YearlyHistory({ activities, globalLoading }: { activities: DbActivity[]; globalLoading: boolean }) {
-    const { toast } = useToast();
-    const queryClient = useQueryClient();
-    const userId = useShallowStore((state) => state.user?.id);
-
-    const [syncingYear, setSyncingYear] = React.useState<number | null>(null);
-    const [repairingYear, setRepairingYear] = React.useState<number | null>(null);
-    const [deletingYear, setDeletingYear] = React.useState<number | null>(null);
-    const [checkResults, setCheckResults] = React.useState<Record<number, CheckResult>>({});
-    const [confirmDelete, setConfirmDelete] = React.useState<{ year: number, ids: number[] } | null>(null);
-
-    const activitiesToDelete = React.useMemo(() => {
-        if (!confirmDelete) return [];
-        const idsSet = new Set(confirmDelete.ids);
-        return activities.filter(a => idsSet.has(a.id)).sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-    }, [confirmDelete, activities]);
-
-    // Process years
-    const displayYears = React.useMemo(() => {
-        if (!activities.length) {
-            return [{ year: new Date().getFullYear(), count: 0, incompleteCount: 0, missingPhotosCount: 0, ids: [], incompleteIds: [], missingPhotoIds: [] }] satisfies YearlyStat[];
-        }
-
-        // Group by year
-        const statsByYear = new Map<number, Omit<YearlyStat, 'year'>>();
-
-        activities.forEach(act => {
-            const year = new Date(act.start_date).getFullYear();
-            const current = statsByYear.get(year) ?? { count: 0, incompleteCount: 0, missingPhotosCount: 0, ids: [], incompleteIds: [], missingPhotoIds: [] };
-
-            current.count++;
-            current.ids.push(act.id);
-
-            if (act.geometryState !== 'detailed') {
-                current.incompleteCount++;
-                current.incompleteIds.push(act.id);
-
-                // Check if it has photos on Strava but is incomplete (thus missing photos locally)
-                if ((act.total_photo_count ?? 0) > 0) {
-                    current.missingPhotosCount++;
-                    current.missingPhotoIds.push(act.id);
-                }
-            }
-
-            statsByYear.set(year, current);
-        });
-
-        const yearsList = Array.from(statsByYear.keys());
-        const minYear = Math.min(...yearsList);
-        const maxYear = Math.max(...yearsList);
-        const currentYear = new Date().getFullYear();
-
-        const result = new Set<number>();
-
-        for (let y = Math.max(maxYear, currentYear); y >= minYear; y--) {
-            result.add(y);
-        }
-        result.add(minYear - 1);
-
-        const sortedYears = Array.from(result).sort((a, b) => b - a);
-
-        return sortedYears.map(year => {
-            const stat = statsByYear.get(year);
-            return {
-                year,
-                count: stat?.count ?? 0,
-                incompleteCount: stat?.incompleteCount ?? 0,
-                missingPhotosCount: stat?.missingPhotosCount ?? 0,
-                ids: stat?.ids ?? [],
-                incompleteIds: stat?.incompleteIds ?? [],
-                missingPhotoIds: stat?.missingPhotoIds ?? []
-            };
-        });
-    }, [activities]);
-
-
-    const syncYearMutation = useMutation({
-        mutationFn: ({ year }: { year: number }) => syncYear(year),
-        onMutate: ({ year }) => setSyncingYear(year),
-        onSettled: () => setSyncingYear(null),
-        onSuccess: (data) => {
-            if (data.success && data.year && data.stravaIds) {
-                // Client-side computation of extra IDs
-                // Find the local IDs for this year from our current displayYears state
-                const yearStats = displayYears.find(y => y.year === data.year);
-                const localIds = yearStats?.ids ?? [];
-                const stravaIdsSet = new Set(data.stravaIds);
-                const extraIds = localIds.filter(id => !stravaIdsSet.has(id));
-
-                setCheckResults(prev => ({
-                    ...prev,
-                    [data.year]: {
-                        stravaCount: data.stravaIds?.length ?? 0,
-                        extraIds: extraIds
-                    }
-                }));
-
-                const extraCount = extraIds.length;
-
-                toast({
-                    title: `Sync Complete for ${data.year}`,
-                    description: `Synced ${data.stravaIds.length} activities. ${extraCount ? `Found ${extraCount} extra.` : 'All clear.'}`,
-                });
-                void queryClient.invalidateQueries({ queryKey: ['activities'] });
-                void queryClient.invalidateQueries({ queryKey: ['photos'] });
-            } else {
-                toast({
-                    title: 'Sync Failed',
-                    description: data.error ?? 'Unknown sync error.',
-                    variant: 'destructive',
-                });
-            }
-        }
-    });
-
-    const deleteExtraMutation = useMutation({
-        mutationFn: ({ ids, year }: { ids: number[], year: number }) => deleteActivities(ids).then(res => ({ ...res, year })),
-        onMutate: ({ year }) => setDeletingYear(year),
-        onSettled: () => setDeletingYear(null),
-        onSuccess: async (data, variables) => {
-            setConfirmDelete(null); // Close dialog on success
-            if (data.deletedCount > 0) {
-                if (userId) {
-                    for (const id of variables.ids) {
-                        await removeStreamSummaryActivity(queryClient, userId, String(id));
-                    }
-                }
-                toast({
-                    title: 'Cleanup Complete',
-                    description: `Removed ${data.deletedCount} obsolete activities.`,
-                });
-                setCheckResults(prev => {
-                    if (!variables.year) return prev;
-                    return {
-                        ...prev,
-                        [variables.year]: {
-                            ...prev[variables.year]!,
-                            extraIds: []
-                        }
-                    };
-                });
-                void queryClient.invalidateQueries({ queryKey: ['activities'] });
-                void queryClient.invalidateQueries({ queryKey: ['photos'] });
-            } else {
-                toast({
-                    title: 'Cleanup Failed',
-                    description: data.errors.join(', ') || 'Failed to delete.',
-                    variant: 'destructive',
-                });
-            }
-        }
-    });
-
-    const repairMutation = useMutation({
-        mutationFn: ({ year, ids }: { year: number, ids: number[] }) => repairYear(year, ids).then(res => ({ ...res, year })),
-        onMutate: ({ year }) => setRepairingYear(year),
-        onSettled: () => setRepairingYear(null),
-        onSuccess: (data) => {
-            if (data.success) {
-                const problems = [
-                    data.failedIds?.length ? `${data.failedIds.length} failed` : null,
-                    data.notFoundIds?.length ? `${data.notFoundIds.length} no longer on Strava` : null,
-                    data.photoRefreshFailedIds?.length ? `photos not refreshed for ${data.photoRefreshFailedIds.length}` : null,
-                ].filter(Boolean);
-                toast({
-                    title: data.partial ? 'Repair Partly Complete' : 'Repair Complete',
-                    description: `Repaired ${data.count} activities.${problems.length ? ` ${problems.join(', ')}.` : ''}${data.remaining ? ' More remaining.' : ''}`,
-                    ...(data.partial ? { variant: 'destructive' as const } : {}),
-                });
-                void queryClient.invalidateQueries({ queryKey: ['activities'] });
-                void queryClient.invalidateQueries({ queryKey: ['photos'] });
-            } else {
-                toast({
-                    title: 'Repair Failed',
-                    description: data.error,
-                    variant: 'destructive',
-                });
-            }
-        }
-    });
-
-    return (
-        <div className="rounded-md border w-full">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Year</TableHead>
-                        <TableHead className="text-right">ActivityMap</TableHead>
-                        <TableHead className="text-right">Strava</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {displayYears.map((stat) => {
-                        const result = checkResults[stat.year];
-                        const isSyncing = syncingYear === stat.year;
-                        const isRepairing = repairingYear === stat.year;
-                        const isDeleting = deletingYear === stat.year;
-                        const isAnyActionPending = isSyncing || isRepairing || isDeleting || globalLoading;
-
-                        const extraCount = result?.extraIds?.length ?? 0;
-
-                        return (
-                            <TableRow key={stat.year}>
-                                <TableCell className="font-medium">{stat.year}</TableCell>
-                                <TableCell className="text-muted-foreground text-right">
-                                    {stat.count > 0 ? (
-                                        <div className="flex flex-col">
-                                            <span>{stat.count}</span>
-                                            {stat.incompleteCount > 0 && (
-                                                <div className="flex flex-col text-[10px] items-end">
-                                                    <span className="text-amber-500 font-medium">
-                                                        ({stat.incompleteCount} incomplete)
-                                                    </span>
-                                                    {stat.missingPhotosCount > 0 && (
-                                                        <span className="text-blue-500 font-medium flex items-center gap-0.5">
-                                                            ({stat.missingPhotosCount} without photos)
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <span className="text-muted-foreground/30">-</span>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {result ? (
-                                        <div className="flex flex-col items-end">
-                                            <span className="font-mono text-green-500">
-                                                {result.stravaCount}
-                                            </span>
-                                            {extraCount > 0 && (
-                                                <span className="text-[10px] text-red-500 font-medium">
-                                                    (+{extraCount} extra)
-                                                </span>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                            disabled={isAnyActionPending}
-                                            onClick={() => syncYearMutation.mutate({ year: stat.year })}
-                                        >
-                                            {isSyncing ? (
-                                                <Loader2 className="h-3 w-3 animate-spin" />
-                                            ) : (
-                                                <span className="flex items-center gap-1 text-xs">
-                                                    <RefreshCw className="h-3 w-3" />
-                                                </span>
-                                            )}
-                                        </Button>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex justify-end gap-2 flex-wrap">
-                                        {/* Repair */}
-                                        {stat.incompleteCount > 0 && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-7 text-xs border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400"
-                                                disabled={isAnyActionPending}
-                                                onClick={() => repairMutation.mutate({ year: stat.year, ids: stat.incompleteIds })}
-                                            >
-                                                {isRepairing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Activity className="h-3 w-3 mr-1" />}
-                                                Repair
-                                            </Button>
-                                        )}
-
-                                        {/* Sync Photos (Specific Repair) */}
-                                        {stat.missingPhotosCount > 0 && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-7 text-xs border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400"
-                                                disabled={isAnyActionPending}
-                                                onClick={() => repairMutation.mutate({ year: stat.year, ids: stat.missingPhotoIds })}
-                                            >
-                                                {isRepairing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ImageOff className="h-3 w-3 mr-1" />}
-                                                Photos
-                                            </Button>
-                                        )}
-
-                                        {/* Cleanup Extra */}
-                                        {extraCount > 0 && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-7 text-xs border-red-500/50 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
-                                                disabled={isAnyActionPending}
-                                                onClick={() => setConfirmDelete({ year: stat.year, ids: result!.extraIds })}
-                                            >
-                                                {isDeleting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                                                Clean {extraCount}
-                                            </Button>
-                                        )}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        );
-                    })
-                    }
-                </TableBody>
-            </Table>
-
-            <Dialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete {confirmDelete?.ids.length} activities from {confirmDelete?.year}?
-                            These activities exist locally but were not found in the latest Strava sync.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <ScrollArea className="h-[200px] w-full rounded-md border p-4">
-                        <div className="space-y-4">
-                            {activitiesToDelete.map((act) => (
-                                <div key={act.id} className="flex flex-col text-sm">
-                                    <span className="font-medium">{act.name}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                        {new Date(act.start_date).toLocaleDateString()} • {act.sport_type}
-                                    </span>
-                                </div>
-                            ))}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Check server status"
+                  title={
+                    clock < statusRetryAt
+                      ? `Next check after ${date(new Date(statusRetryAt).toISOString())}`
+                      : 'Check server status'
+                  }
+                  disabled={
+                    !userId ||
+                    query.isFetching ||
+                    offline ||
+                    clock < statusRetryAt
+                  }
+                  onClick={() => void query.refetch()}
+                >
+                  <RefreshCw
+                    className={`size-4 ${query.isFetching ? 'animate-spin' : ''}`}
+                  />
+                </Button>
+              </div>
+              {status ? (
+                <div className="divide-y rounded-xl border">
+                  {coverageSummaries(status).map((summary, index) => {
+                    const row = rows[index]!;
+                    return (
+                      <details key={summary.title} className="group">
+                        <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 marker:hidden [&::-webkit-details-marker]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+                          <div className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">
+                              {summary.title}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {summary.count}
+                            </span>
+                          </div>
+                          <span className="max-w-[40%] rounded-md bg-muted px-2 py-1 text-right text-xs">
+                            {summary.status}
+                          </span>
+                          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+                        </summary>
+                        <div className="space-y-2 px-4 pb-4 text-sm text-muted-foreground">
+                          <p>{row.counts}</p>
+                          <p>
+                            {stale ? 'At last check: ' : ''}
+                            {row.schedule}
+                          </p>
+                          {row.reason && <p>{row.reason}</p>}
+                          {row.retryAt && (
+                            <p>Eligible to retry after {date(row.retryAt)}.</p>
+                          )}
+                          {row.outcome && (
+                            <p>
+                              {outcomeText(row.outcome)} ·{' '}
+                              {date(row.outcome.attemptedAt)}
+                              {row.outcome.lastSucceededAt
+                                ? ` · Last success: ${date(row.outcome.lastSucceededAt)}`
+                                : ''}
+                            </p>
+                          )}
+                          {index === 0 && (
+                            <p>
+                              {status.history.reconciliation.lastCompletedAt
+                                ? `History checked: ${date(status.history.reconciliation.lastCompletedAt)} (${status.history.reconciliation.freshness}).`
+                                : 'A full history check has not finished yet.'}
+                            </p>
+                          )}
+                          {index === 2 && (
+                            <p>
+                              Activities without GPS or sensors can be fully
+                              fetched.
+                            </p>
+                          )}
                         </div>
-                    </ScrollArea>
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmDelete(null)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={() => confirmDelete && deleteExtraMutation.mutate({ ids: confirmDelete.ids, year: confirmDelete.year })}
-                            disabled={deleteExtraMutation.isPending}
-                        >
-                            {deleteExtraMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Delete {confirmDelete?.ids.length} Activities
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div>
-    );
+                      </details>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div
+                  role="status"
+                  className="rounded-xl border px-4 py-6 text-sm text-muted-foreground"
+                >
+                  {!userId
+                    ? 'Sign in to see your import status.'
+                    : query.isFetching
+                      ? 'Checking your import…'
+                      : 'Server status unavailable.'}
+                </div>
+              )}
+              <div role="status" className="text-xs text-muted-foreground">
+                {status && (
+                  <p title={date(status.observedAt)}>
+                    {stale ? 'Last known status' : 'Checked'} ·{' '}
+                    {date(status.observedAt)}
+                  </p>
+                )}
+                {offline ? (
+                  <p>Offline. Showing saved status.</p>
+                ) : query.isError ? (
+                  <p>{query.error.message}</p>
+                ) : null}
+              </div>
+              {rows.some((row) => row.schedule.startsWith('Reconnect')) && (
+                <Button variant="outline" onClick={() => void reconnect()}>
+                  Reconnect Strava
+                </Button>
+              )}
+              {connectionError && (
+                <p role="alert" className="text-sm">
+                  {connectionError}
+                </p>
+              )}
+            </section>
+            <section
+              aria-labelledby="browser-heading"
+              className="space-y-3 border-t pt-5"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 id="browser-heading" className="font-semibold">
+                    This browser
+                  </h2>
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {browserTitle}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={requestBrowserSync}
+                  disabled={
+                    !userId ||
+                    offline ||
+                    browser.phase === 'syncing' ||
+                    (!!browser.retryAt && clock < browser.retryAt)
+                  }
+                >
+                  Sync browser
+                </Button>
+              </div>
+              {browser.error && (
+                <p role="alert" className="text-sm">
+                  {browser.error}
+                </p>
+              )}
+              {browser.retryAt && clock < browser.retryAt && (
+                <p className="text-xs text-muted-foreground">
+                  Retry after {date(new Date(browser.retryAt).toISOString())}
+                </p>
+              )}
+              <details className="text-xs text-muted-foreground">
+                <summary className="cursor-pointer">Download details</summary>
+                <div className="space-y-2 pt-2">
+                  <p>
+                    Last success:{' '}
+                    {browser.lastSuccess
+                      ? date(browser.lastSuccess)
+                      : 'Not recorded'}
+                  </p>
+                  <p>
+                    Downloads ActivityMap metadata to this browser. Strava
+                    import and image downloads run separately.
+                  </p>
+                </div>
+              </details>
+            </section>
+          </TabsContent>
+          <TabsContent value="account" className="space-y-4 py-5">
+            <div>
+              <h2 className="font-semibold">
+                {userId ? (user?.name ?? 'Your account') : 'Your account'}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {userId
+                  ? user?.stravaConnected
+                    ? 'Strava connected'
+                    : 'Strava needs reconnecting'
+                  : 'Sign in to view your activities.'}
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => void reconnect()}>
+              {userId ? 'Reconnect Strava' : 'Sign in with Strava'}
+            </Button>
+            {connectionError && (
+              <p role="alert" className="text-sm">
+                {connectionError}
+              </p>
+            )}
+          </TabsContent>
+          <TabsContent value="display" className="py-5">
+            <DisplaySettings />
+          </TabsContent>
+          <TabsContent value="about" className="space-y-2 py-5">
+            <h2 className="font-semibold">ActivityMap</h2>
+            <p className="text-sm text-muted-foreground">
+              Your activities, on a map and beyond.
+            </p>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
 }
