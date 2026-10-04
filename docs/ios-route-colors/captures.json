@@ -1,0 +1,49 @@
+{
+  "baseCommit": "89f16497fe6f0ea2d6c06ab6285809ee24b2592e",
+  "date": "2026-10-04",
+  "device": "iPhone 18 Pro simulator",
+  "os": "iOS 27.0 (24A434)",
+  "mapboxSDK": "11.31.0",
+  "basemap": "Live Mapbox Standard",
+  "fixtureSHA256": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+  "before": "All six route layers omit lineEmissiveStrength, as at the base commit.",
+  "after": "All six route layers set lineEmissiveStrength(1); palette, widths and filters unchanged.",
+  "captures": [
+    {
+      "file": "after-map--phone-dark.jpg",
+      "sha256": "8890910535fe280dcc1b4ee6cb881018e2653b8e5ecefdd2ba5c155b0bac71fa"
+    },
+    {
+      "file": "after-map--phone.jpg",
+      "sha256": "807d7ba982804a9e2bb7fb4616b9aa905679e85a418a736fef1d5d82780ec26d"
+    },
+    {
+      "file": "after-map-detail--phone-dark.jpg",
+      "sha256": "1ee7065ac4a9d160b33b46ceaba0f51212822903f0c79d03bd93009249ba148d"
+    },
+    {
+      "file": "after-map-detail--phone.jpg",
+      "sha256": "f931905a71d284e49b194289a1aef58f2c23ff0af9c2ec7b793877da3cafdbdc"
+    },
+    {
+      "file": "after-map-results--phone-dark.jpg",
+      "sha256": "79e39074ea3603aab5be929bd9f1704babddc8cf4917ab04d71b6ff31c21f317"
+    },
+    {
+      "file": "after-map-results--phone.jpg",
+      "sha256": "1e2472497ee19772a6fe95721be0f08d37b43ccd43c0b9d30a97d5b9f584b0dd"
+    },
+    {
+      "file": "before-map--phone-dark.jpg",
+      "sha256": "d664629530a33eb77b739c199dfe49d0fc5d17611ef4d33f0f2eba9ab0f8eba2"
+    },
+    {
+      "file": "before-map-detail--phone-dark.jpg",
+      "sha256": "59fb1f3359b631b7a73488cce0fdba215af80fade1bf8df8ae4bf742b1e1cbcc"
+    },
+    {
+      "file": "before-map-results--phone-dark.jpg",
+      "sha256": "d807c38b202ebd57e86c895ba84bc6107535701bcf4e0f938f1109c6d0cb0b6e"
+    }
+  ]
+}
