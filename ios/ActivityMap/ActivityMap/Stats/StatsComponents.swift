@@ -372,22 +372,27 @@ extension View {
 }
 
 /// Reflows persistent summary items into detail rows on the section's clock.
+/// Collapsed, items fill up to `compactColumns` columns of at least
+/// `minimumItemWidth`, so wide cards use one row instead of a half-empty grid.
 struct StatsDetailGrid<Content: View>: View {
     let expanded: Bool
     let compactColumns: Int
+    var minimumItemWidth = 150.0
     @ViewBuilder let content: () -> Content
     @Environment(\.statsExpansionProgress) private var progress
     var body: some View {
-        StatsDetailGridLayout(progress: progress ?? (expanded ? 1 : 0), compactColumns: compactColumns) {
+        StatsDetailGridLayout(progress: progress ?? (expanded ? 1 : 0), maximumColumns: compactColumns, minimumItemWidth: minimumItemWidth) {
             content()
         }
     }
 }
 private struct StatsDetailGridLayout: Layout {
     let progress: Double
-    let compactColumns: Int
+    let maximumColumns: Int
+    let minimumItemWidth: Double
     private func frames(width: Double, subviews: Subviews) -> [CGRect] {
         let spacing = 16.0
+        let compactColumns = max(1, min(maximumColumns, Int((width + spacing) / (minimumItemWidth + spacing))))
         let compactWidth = max(0, (width - spacing * Double(compactColumns - 1)) / Double(compactColumns))
         let itemWidth = compactWidth + (width - compactWidth) * progress
         let heights = subviews.map { $0.sizeThatFits(.init(width: itemWidth, height: nil)).height }

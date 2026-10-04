@@ -1001,7 +1001,10 @@ function RecordStats({
   onOpenActivity?: (id: number) => void;
 }) {
   const noteFor = (record: ActivityRecord | undefined) => {
-    if (!record || !detailed) return undefined;
+    if (!record) return undefined;
+    // Collapsed, say when and in which sport; expanded rows link the activity.
+    if (!detailed)
+      return `${categorySettings[record.sport].name} · ${shortDate(dateOfDay(record.day))}`;
     const date = `${shortDate(dateOfDay(record.day))}, ${dateOfDay(record.day).getUTCFullYear()}`;
     return (
       <>
@@ -1113,7 +1116,7 @@ function RecordStats({
         }
         unit={best.biggestWeek ? 'km' : undefined}
         note={
-          detailed && best.biggestWeek
+          best.biggestWeek
             ? weekOf(String(best.biggestWeek.weekStart))
             : undefined
         }
@@ -1167,7 +1170,7 @@ function RecordsDetail({ context }: { context: TileContext }) {
 
 const recordsView: TileView = {
   expandable: true,
-  period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
+  period: () => 'This year',
   expandedPeriod: 'Personal bests',
   summary: () => null,
   face: ({ activities, today }) => (

@@ -25,7 +25,7 @@ struct StatsDashboardTile: View {
         case .monthVsLastMonth: "\(comparisonLabels.current) vs \(comparisonLabels.previous)"
         case .yearToDate: "\(year.formatted(.number.grouping(.never))) vs \((year - 1).formatted(.number.grouping(.never)))"
         case .yearPace: "\(year.formatted(.number.grouping(.never))) projection"
-        case .records: expanded ? "Personal bests" : String(year)
+        case .records: expanded ? "Personal bests" : "This year"
         // Expanded, the period navigation names the range; label the colour switch instead.
         case .activityCalendar: expanded ? "Colour by" : "Last 12 months"
         case .sportMix: displayedOption == .allTime ? "All time by moving time" : "\(year.formatted(.number.grouping(.never))) by moving time"

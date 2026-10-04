@@ -22,10 +22,16 @@ struct StatsRecordsDetail: View {
                 Text(range == .allTime ? "All-time records" : "Records · \(String(year))").font(.caption).foregroundStyle(.secondary)
               }.padding(.bottom, 16)
             }
-            StatsDetailGrid(expanded: expanded, compactColumns: typeSize.isAccessibilitySize ? 1 : 2) {
+            StatsDetailGrid(expanded: expanded, compactColumns: typeSize.isAccessibilitySize ? 1 : 4) {
                 ForEach(metrics, id: \.self) { metric in
                     VStack(alignment: .leading, spacing: 4) {
                         recordValue(title(metric), records.activities[metric].map { StatsDisplay.measurement($0.value, metric: metric) } ?? "—")
+                        // Collapsed, say when and in which sport; expanded rows give the full detail.
+                        StatsExpansionReveal(expanded: !expanded, inverted: true) {
+                            if let record = records.activities[metric] {
+                                Text("\(record.sport.name) · \(StatsDisplay.shortDate(record.day))").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
                         StatsExpansionReveal(expanded: expanded) {
                           if let record = records.activities[metric] {
                             if let id = record.activityID {
@@ -42,6 +48,9 @@ struct StatsRecordsDetail: View {
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     recordValue("Biggest week", records.biggestWeek.map { StatsDisplay.measurement($0.value, metric: .distance) } ?? "—")
+                    StatsExpansionReveal(expanded: !expanded, inverted: true) {
+                        if let week = records.biggestWeek { Text("Week of \(StatsDisplay.shortDate(week.weekStart))").font(.caption).foregroundStyle(.secondary) }
+                    }
                     StatsExpansionReveal(expanded: expanded) {
                         if let week = records.biggestWeek { Text("Week of \(StatsDisplay.date(week.weekStart))").font(.caption).foregroundStyle(.secondary) }
                     }
