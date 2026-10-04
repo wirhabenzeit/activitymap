@@ -121,7 +121,8 @@ const signed = (value: number, format: (value: number) => string) =>
   `${value >= 0 ? '+' : '−'}${format(Math.abs(value))}`;
 
 // "+1,260 km · +15% vs 2025 by Sep 26": the absolute difference (when a
-// metric is given) and the percentage, coloured by direction.
+// metric is given) and the percentage. Increases are green; a decrease is
+// not a failure, so it keeps the neutral text colour.
 function Delta({
   current,
   previous,
@@ -141,11 +142,9 @@ function Delta({
     <>
       <span
         className={cn(
-          neutral
-            ? 'text-foreground'
-            : current >= previous
-              ? 'text-green-700 dark:text-green-400'
-              : 'text-orange-700 dark:text-orange-400',
+          !neutral && current > previous
+            ? 'text-green-700 dark:text-green-400'
+            : 'text-foreground',
         )}
       >
         {metric &&

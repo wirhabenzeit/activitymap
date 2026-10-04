@@ -211,7 +211,8 @@ struct StatsDashboardTile: View {
             let prefix = change >= 0 ? "+" : "−"
             let absolute = unitless ? "" : "\(delta >= 0 ? "+" : "−")\(StatsDisplay.measurement(abs(delta), metric: metric)) · "
             if pilot {
-                Text("\(Text("\(absolute)\(prefix)\(percent)%").foregroundColor(change > 0 && !unitless ? (colorScheme == .dark ? Color.green : Color(red: 0.08, green: 0.43, blue: 0.2)) : Color.secondary)) \(Text(context).foregroundColor(.secondary))")
+                // Increases are green; a decrease is not a failure, so it keeps the primary text colour.
+                Text("\(Text("\(absolute)\(prefix)\(percent)%").foregroundColor(change > 0 && !unitless ? (colorScheme == .dark ? Color.green : Color(red: 0.08, green: 0.43, blue: 0.2)) : Color.primary)) \(Text(context).foregroundColor(.secondary))")
                     .font(.caption).fixedSize(horizontal: false, vertical: true)
             } else {
                 StatsComparison(value: "\(absolute)\(prefix)\(percent)%", context: context,
