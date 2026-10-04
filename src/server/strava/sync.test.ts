@@ -24,9 +24,10 @@ import {
  * change-record-emitting repository method; the transaction itself is
  * covered by `~/server/repositories/activities.test.ts`.
  */
-function fakeActivitiesRepo(
-  overrides: Partial<ActivitiesRepository> = {},
-): { repo: ActivitiesRepository; deleteCalls: { athleteId: number; ids: number[] }[] } {
+function fakeActivitiesRepo(overrides: Partial<ActivitiesRepository> = {}): {
+  repo: ActivitiesRepository;
+  deleteCalls: { athleteId: number; ids: number[] }[];
+} {
   const deleteCalls: { athleteId: number; ids: number[] }[] = [];
   const repo: ActivitiesRepository = {
     findManyByAthlete: async () => [],
@@ -376,4 +377,24 @@ void test('syncUser stops after a rate limit instead of spending more requests',
     outcome: 'deferred',
     reason: 'rate_limited',
   });
+});
+
+void test('syncUser retains the global rate-limit stop after an earlier partial failure', async () => {
+  const result = await syncUser(
+    USER,
+    QUOTA,
+    userDeps({
+      fetchActivities: async (input) => {
+        if (input.before) throw new StravaApiError('too many', 429);
+        return {
+          activities: fetched([7]),
+          photos: [],
+          notFoundIds: [],
+          photoRefreshFailedIds: [7],
+        };
+      },
+    }),
+  );
+  assert.equal(result.outcome.outcome, 'partial');
+  assert.equal(result.stoppedForRateLimit, true);
 });

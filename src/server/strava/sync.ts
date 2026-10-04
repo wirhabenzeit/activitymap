@@ -86,6 +86,7 @@ export type SyncUserResult = {
   failedDetails: number;
   fetchedOlder: number;
   reachedOldest: boolean;
+  stoppedForRateLimit: boolean;
 };
 
 /**
@@ -117,6 +118,7 @@ export async function syncUser(
     failedDetails: 0,
     fetchedOlder: 0,
     reachedOldest: false,
+    stoppedForRateLimit: false,
   };
 
   const accessToken = await resolveAccessToken(user.id);
@@ -206,6 +208,9 @@ export async function syncUser(
     }
   }
 
+  result.stoppedForRateLimit = steps.some(
+    (step) => step.outcome === 'deferred' && step.reason === 'rate_limited',
+  );
   result.outcome = combineSteps(steps);
   return result;
 }
@@ -282,6 +287,7 @@ export async function syncActivities(
         deps,
       );
       outcome = userResult.outcome;
+      stoppedForRateLimit = userResult.stoppedForRateLimit;
       updatedIncomplete += userResult.updatedIncomplete;
       failedDetails += userResult.failedDetails;
       fetchedOlder += userResult.fetchedOlder;
@@ -309,8 +315,7 @@ export async function syncActivities(
     }
 
     // Strava limits are application-wide: later users would only fail too.
-    if (outcome.outcome === 'deferred' && outcome.reason === 'rate_limited') {
-      stoppedForRateLimit = true;
+    if (stoppedForRateLimit) {
       break;
     }
     // Check if we've hit the overall activities limit
