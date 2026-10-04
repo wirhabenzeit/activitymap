@@ -12,6 +12,7 @@ import {
   mergeSummaryActivity,
 } from '~/server/repositories/summary-reconciliation.ts';
 import type { StravaActivity } from './types.ts';
+import type { IngestionOutcomeRecord } from './ingestion-policy.ts';
 import { transformStravaActivity } from './transforms.ts';
 import {
   reconcileStravaSummaries,
@@ -210,6 +211,12 @@ function fakeRepository(): SummaryReconciliationRepository & {
   deletions: number[];
   confirmations: number[];
   beforeValues: number[];
+  outcomes: IngestionOutcomeRecord[];
+  recordOutcome: (
+    userId: string,
+    pipeline: 'history' | 'details',
+    record: IngestionOutcomeRecord,
+  ) => Promise<void>;
 } {
   const candidate: SummaryReconciliationCandidate = {
     userId: 'user-1',
@@ -238,6 +245,16 @@ function fakeRepository(): SummaryReconciliationRepository & {
     deletions: [] as number[],
     confirmations: [] as number[],
     beforeValues: [] as number[],
+    outcomes: [] as IngestionOutcomeRecord[],
+    async recordOutcome(
+      userId: string,
+      pipeline: 'history' | 'details',
+      record: IngestionOutcomeRecord,
+    ) {
+      assert.equal(userId, 'user-1');
+      assert.equal(pipeline, 'history');
+      repository.outcomes.push(record);
+    },
     async listDue() {
       return completed ? [] : [candidate];
     },
@@ -283,6 +300,8 @@ function fakeRepository(): SummaryReconciliationRepository & {
     deletions: number[];
     confirmations: number[];
     beforeValues: number[];
+    outcomes: IngestionOutcomeRecord[];
+    recordOutcome: unknown;
   };
   return repository;
 }
@@ -309,6 +328,7 @@ void test('a bounded scan resumes with the same upper bound, confirms omissions,
     pageSize: 2,
     pagesPerAthlete: 1,
     repository,
+    recordOutcome: repository.recordOutcome,
     resolveAccount,
     createSource: () => source,
   });
@@ -321,6 +341,7 @@ void test('a bounded scan resumes with the same upper bound, confirms omissions,
     pageSize: 2,
     pagesPerAthlete: 1,
     repository,
+    recordOutcome: repository.recordOutcome,
     resolveAccount,
     createSource: () => source,
   });
@@ -329,6 +350,11 @@ void test('a bounded scan resumes with the same upper bound, confirms omissions,
   assert.equal(second.confirmedPresent, 1);
   assert.deepEqual(repository.pageCalls, [1, 2]);
   assert.equal(new Set(repository.beforeValues).size, 1);
+  // A checkpointed scan with more pages left is progress, not a failure.
+  assert.deepEqual(repository.outcomes, [
+    { outcome: 'succeeded', reason: null },
+    { outcome: 'succeeded', reason: null },
+  ]);
   assert.deepEqual(repository.deletions, [2]);
   assert.deepEqual(repository.confirmations, [3]);
 });
@@ -349,6 +375,7 @@ void test('a short non-empty Strava page does not terminate the scan', async () 
     pageSize: 3,
     pagesPerAthlete: 3,
     repository,
+    recordOutcome: repository.recordOutcome,
     resolveAccount: async () => ({
       accessToken: 'token',
       access_token: 'token',
@@ -383,6 +410,7 @@ void test('the invocation time budget checkpoints and releases partial work', as
     timeBudgetMs: 45_000,
     clock: () => currentTime,
     repository,
+    recordOutcome: repository.recordOutcome,
     resolveAccount: async () => ({
       accessToken: 'token',
       access_token: 'token',
@@ -397,6 +425,9 @@ void test('the invocation time budget checkpoints and releases partial work', as
   assert.equal(result.stoppedForRateLimit, 0);
   assert.equal(result.elapsedMs, 45_000);
   assert.equal(repository.releases, 1);
+  assert.deepEqual(repository.outcomes, [
+    { outcome: 'deferred', reason: 'time_budget' },
+  ]);
 });
 
 void test('low Strava rate-limit headroom stops before another API request', async () => {
@@ -429,6 +460,7 @@ void test('low Strava rate-limit headroom stops before another API request', asy
     pageSize: 2,
     pagesPerAthlete: 3,
     repository,
+    recordOutcome: repository.recordOutcome,
     resolveAccount: async () => ({
       accessToken: 'token',
       access_token: 'token',
@@ -458,6 +490,7 @@ void test('a Strava 429 preserves the checkpoint and yields without failing the 
   const result = await reconcileStravaSummaries({
     now: NOW,
     repository,
+    recordOutcome: repository.recordOutcome,
     resolveAccount: async () => ({
       accessToken: 'token',
       access_token: 'token',
@@ -471,6 +504,9 @@ void test('a Strava 429 preserves the checkpoint and yields without failing the 
   assert.equal(result.stoppedForRateLimit, 1);
   assert.equal(repository.releases, 1);
   assert.deepEqual(repository.deletions, []);
+  assert.deepEqual(repository.outcomes, [
+    { outcome: 'deferred', reason: 'rate_limited' },
+  ]);
 });
 
 void test('a revoked (deauthorized) account is never used to call Strava, even if a stale access token is still present', async () => {
@@ -495,6 +531,7 @@ void test('a revoked (deauthorized) account is never used to call Strava, even i
   const result = await reconcileStravaSummaries({
     now: NOW,
     repository,
+    recordOutcome: repository.recordOutcome,
     resolveAccount: async () =>
       ({
         accessToken: 'stale-but-still-present-token',
@@ -512,6 +549,9 @@ void test('a revoked (deauthorized) account is never used to call Strava, even i
   assert.equal(result.completed, 0);
   assert.equal(result.partial, 0);
   assert.equal(repository.releases, 1, 'the claim must be released so a future cycle can retry once un-revoked');
+  assert.deepEqual(repository.outcomes, [
+    { outcome: 'blocked', reason: 'credentials_unavailable' },
+  ]);
 });
 
 void test('an account with no resolvable access token at all is treated the same as a revoked one', async () => {
@@ -519,6 +559,7 @@ void test('an account with no resolvable access token at all is treated the same
   const result = await reconcileStravaSummaries({
     now: NOW,
     repository,
+    recordOutcome: repository.recordOutcome,
     resolveAccount: async () =>
       ({ accessToken: null, access_token: null, revokedAt: null }) as unknown as Account,
     createSource: () => {

@@ -33,6 +33,7 @@ export function createStreamBackfillCronHandler(dependencies: {
     options: z.infer<typeof parameters>,
   ) => Promise<StreamBackfillResult>;
   onResult?: (result: StreamBackfillResult) => void;
+  onDisabled?: () => Promise<void>;
   onError?: (error: unknown) => void;
 }) {
   return async function POST(request: Request) {
@@ -49,7 +50,10 @@ export function createStreamBackfillCronHandler(dependencies: {
       );
     if (request.headers.get('x-cron-secret') !== secret)
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!dependencies.isEnabled()) return Response.json({ disabled: true });
+    if (!dependencies.isEnabled()) {
+      await dependencies.onDisabled?.();
+      return Response.json({ disabled: true });
+    }
     const text = await request.text();
     let body: unknown;
     try {

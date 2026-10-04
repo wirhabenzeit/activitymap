@@ -1,4 +1,8 @@
 import { backfillActivityStreams } from '~/server/application/stream-backfill';
+import {
+  recordJobDisabled,
+  withJobHeartbeat,
+} from '~/server/application/job-heartbeat';
 import { externalEffectsEnabled } from '~/server/config/external-effects';
 import { logger } from '~/server/logging/logger';
 import { createStreamBackfillCronHandler } from './handler';
@@ -9,7 +13,12 @@ export const POST = createStreamBackfillCronHandler({
   isProduction: () => process.env.VERCEL_ENV === 'production',
   isEnabled: () => process.env.ACTIVITYMAP_STREAM_BACKFILL === 'enabled',
   getCronSecret: () => process.env.CRON_SECRET,
-  backfill: backfillActivityStreams,
+  backfill: withJobHeartbeat(
+    'backfill-activity-streams',
+    backfillActivityStreams,
+    (result) => result.stopReason,
+  ),
+  onDisabled: () => recordJobDisabled('backfill-activity-streams'),
   onResult: (result) => logger.info('[Stream backfill] Cycle complete', result),
   onError: (error) => logger.error('[Stream backfill] Cycle failed', error),
 });

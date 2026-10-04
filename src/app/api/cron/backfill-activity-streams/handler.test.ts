@@ -47,6 +47,28 @@ void test('backfill cron fails closed for preview, disabled effects, missing/wro
     assert.equal(calls, 0);
   }
 });
+void test('a scheduled call with the rollout switch off is recorded as disabled, not as silence', async () => {
+  let disabled = 0;
+  const handler = createStreamBackfillCronHandler({
+    ...base,
+    isEnabled: () => false,
+    onDisabled: async () => {
+      disabled++;
+    },
+  });
+  assert.equal((await handler(request())).status, 200);
+  assert.equal(disabled, 1);
+  // Unauthenticated callers cannot write the heartbeat.
+  await createStreamBackfillCronHandler({
+    ...base,
+    isEnabled: () => false,
+    getCronSecret: () => 'other',
+    onDisabled: async () => {
+      disabled++;
+    },
+  })(request());
+  assert.equal(disabled, 1);
+});
 void test('backfill cron validates caps, refuses malformed JSON, defaults to 5 activities/10 requests', async () => {
   let received: unknown;
   const handler = createStreamBackfillCronHandler({

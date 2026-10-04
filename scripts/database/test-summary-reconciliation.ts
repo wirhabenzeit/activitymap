@@ -7,6 +7,7 @@ import postgres from 'postgres';
 import { resolveMigrationTarget } from '../../src/server/db/migration-tooling.ts';
 import {
   accounts,
+  ingestionOutcomes,
   activities,
   activityDeletions,
   photoDeletions,
@@ -15,6 +16,7 @@ import {
   syncChanges,
   users,
 } from '../../src/server/db/schema.ts';
+import { createIngestionRepository } from '../../src/server/repositories/ingestion.ts';
 import { createSummaryReconciliationRepository } from '../../src/server/repositories/summary-reconciliation.ts';
 import { StravaApiError } from '../../src/server/strava/client.ts';
 import {
@@ -48,6 +50,10 @@ const repository = createSummaryReconciliationRepository(
 );
 
 const NOW = new Date('2026-09-20T12:00:00.000Z');
+const ingestion = createIngestionRepository(
+  testDb as unknown as Parameters<typeof createIngestionRepository>[0],
+  () => NOW,
+);
 const USER_ID = 'summary-reconciliation-proof-user';
 const ACCOUNT_ID = 'summary-reconciliation-proof-account';
 const ATHLETE_ID = 9_101_001;
@@ -274,6 +280,7 @@ async function run(): Promise<void> {
     repository,
     resolveAccount,
     createSource: () => source,
+    recordOutcome: ingestion.recordOutcome,
   };
 
   const first = await reconcileStravaSummaries(common);
@@ -301,6 +308,14 @@ async function run(): Promise<void> {
   const third = await reconcileStravaSummaries(common);
   assert.equal(third.confirmedPresent, 1);
   assert.equal(third.completed, 1);
+  // Each checkpointed run is recorded as account-scoped history progress.
+  const [historyOutcome] = await testDb
+    .select()
+    .from(ingestionOutcomes)
+    .where(eq(ingestionOutcomes.userId, USER_ID));
+  assert.equal(historyOutcome?.pipeline, 'history');
+  assert.equal(historyOutcome?.outcome, 'succeeded');
+  assert.equal(historyOutcome?.lastSucceededAt?.toISOString(), NOW.toISOString());
   assert.equal(
     (await repository.lastCompletedAt(ATHLETE_ID))?.toISOString(),
     NOW.toISOString(),

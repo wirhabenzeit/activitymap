@@ -265,9 +265,15 @@ function YearlyHistory({ activities, globalLoading }: { activities: DbActivity[]
         onSettled: () => setRepairingYear(null),
         onSuccess: (data) => {
             if (data.success) {
+                const problems = [
+                    data.failedIds?.length ? `${data.failedIds.length} failed` : null,
+                    data.notFoundIds?.length ? `${data.notFoundIds.length} no longer on Strava` : null,
+                    data.photoRefreshFailedIds?.length ? `photos not refreshed for ${data.photoRefreshFailedIds.length}` : null,
+                ].filter(Boolean);
                 toast({
-                    title: 'Repair Complete',
-                    description: `Repaired ${data.count} activities.${data.remaining ? ' More remaining.' : ''}`,
+                    title: data.partial ? 'Repair Partly Complete' : 'Repair Complete',
+                    description: `Repaired ${data.count} activities.${problems.length ? ` ${problems.join(', ')}.` : ''}${data.remaining ? ' More remaining.' : ''}`,
+                    ...(data.partial ? { variant: 'destructive' as const } : {}),
                 });
                 void queryClient.invalidateQueries({ queryKey: ['activities'] });
                 void queryClient.invalidateQueries({ queryKey: ['photos'] });

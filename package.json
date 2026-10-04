@@ -38,6 +38,7 @@
     "friflyt:enrich": "node scripts/enrich-friflyt-geojson.mjs",
     "friflyt:enrich:translate": "node scripts/enrich-friflyt-geojson.mjs --translate",
     "db:test-stream-backfill": "tsx --conditions=react-server scripts/database/test-stream-backfill.ts",
+    "db:test-ingestion-status": "tsx --conditions=react-server scripts/database/test-ingestion-status.ts",
     "stats-tiles:generate": "tsx scripts/generate-stats-tiles.ts",
     "stats-tiles:check": "tsx scripts/generate-stats-tiles.ts --check",
     "db:convert-stream-summaries": "tsx --conditions=react-server scripts/database/convert-stream-summaries.ts",
