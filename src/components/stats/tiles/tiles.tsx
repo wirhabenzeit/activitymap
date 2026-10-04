@@ -79,6 +79,8 @@ export type TileView = {
   // Expansion must offer useful details, controls, or a more inspectable chart.
   expandable: boolean;
   period: (context: TileContext, option?: string) => string;
+  // The period line while expanded, when it differs from the face's.
+  expandedPeriod?: string;
   // Null leaves the face without a headline number.
   summary: (
     context: TileContext,
@@ -342,6 +344,7 @@ const weeklyVolumeView: TileView = {
     <VolumeHistory context={context} metric={asMetric(option, 'distance')} />
   ),
   period: () => '12-week trend',
+  expandedPeriod: 'Volume by sport',
   summary: (context, option) => {
     const metric = asMetric(option, 'distance');
     const { current, previous } = fourWeekVolume(
@@ -402,6 +405,8 @@ const weeklyVolumeView: TileView = {
 const activityCalendarView: TileView = {
   expandable: true,
   period: () => 'Last 12 months',
+  // The period navigation names the range; label the colour switch instead.
+  expandedPeriod: 'Colour by',
   summary: () => null,
   face: (context, option, expanded) => (
     <CalendarHistory
@@ -1186,6 +1191,7 @@ function RecordsDetail({ context }: { context: TileContext }) {
 const recordsView: TileView = {
   expandable: true,
   period: ({ today }) => String(dateOfDay(today).getUTCFullYear()),
+  expandedPeriod: 'Personal bests',
   summary: () => null,
   face: ({ activities, today }) => (
     <div className="my-auto">

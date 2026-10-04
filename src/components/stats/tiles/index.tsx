@@ -534,11 +534,9 @@ function TileCard({
         </div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <span className="text-[11px] text-muted-foreground">
-            {hasDetail && tile.id === 'weeklyVolume'
-              ? 'Volume by sport'
-              : hasDetail || (expanded && tile.id === 'activityCalendar')
-                ? 'History & details'
-                : view.period(context, option)}
+            {expanded && view.expandedPeriod
+              ? view.expandedPeriod
+              : view.period(context, option)}
           </span>
           {toggle && (
             <FaceSwitch
