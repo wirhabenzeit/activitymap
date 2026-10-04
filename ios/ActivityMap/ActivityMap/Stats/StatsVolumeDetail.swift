@@ -139,7 +139,14 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                 }
             }
         }
-        .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { tick in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let value = tick.as(Double.self) { Text(StatsDisplay.value(value, metric: metric)) }
+                }
+            }
+        }
         .chartLegend(.hidden)
         .chartXSelection(value: $selectedX)
         .statsExpansionHeight(expanded: expanded, compact: compactHeight, detail: height)

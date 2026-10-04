@@ -1,9 +1,12 @@
 'use client';
 
+import { useDisplayUnits } from '~/hooks/use-display-preferences';
+import { measurementScale, measurementUnit } from '~/lib/units';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { ElevationProfile } from '~/lib/activity-stream-summary';
 import {
   elevationDistanceLabel,
+  elevationDistanceAxis,
   elevationAxisTicks,
   elevationSelectionLabel,
   nearestElevationSample,
@@ -19,6 +22,7 @@ export function ElevationPlot({
   height?: number;
   onSelection?: (index: number | null) => void;
 }) {
+  const units = useDisplayUnits();
   const container = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(304);
   // A selection belongs to the profile it was made on: the chart clears the
@@ -47,17 +51,19 @@ export function ElevationPlot({
 
   const start = profile.distance[0]!;
   const span = profile.distance.at(-1)! - start;
-  const minimum = Math.min(...profile.altitude);
-  const maximum = Math.max(...profile.altitude);
-  const padding = Math.max(5, (maximum - minimum) * 0.1);
+  const elevationDivisor = measurementScale('elevation', units);
+  const elevationUnit = measurementUnit('elevation', units);
+  const minimum = Math.min(...profile.altitude) / elevationDivisor;
+  const maximum = Math.max(...profile.altitude) / elevationDivisor;
+  const padding = Math.max(5 / elevationDivisor, (maximum - minimum) * 0.1);
   const headerHeight = 28;
   const plotHeight = height - headerHeight;
   const left = 48,
     right = Math.max(left + 1, width - 12),
     top = 8,
     bottom = plotHeight - 38;
-  const distanceDivisor = span >= 1000 ? 1000 : 1;
-  const distanceUnit = span >= 1000 ? 'km' : 'm';
+  const { divisor: distanceDivisor, unit: distanceUnit } =
+    elevationDistanceAxis(span, units);
   const distanceTicks = elevationAxisTicks(0, span / distanceDivisor);
   const altitudeTicks = elevationAxisTicks(
     minimum - padding,
@@ -71,7 +77,8 @@ export function ElevationPlot({
     ((altitude - minimum + padding) / (maximum - minimum + padding * 2)) *
       (bottom - top);
   const points = profile.distance.map(
-    (distance, index) => `${x(distance)},${y(profile.altitude[index]!)}`,
+    (distance, index) =>
+      `${x(distance)},${y(profile.altitude[index]! / elevationDivisor)}`,
   );
   const line = `M${points.join(' L')}`;
   const value = (index: number) =>
@@ -79,8 +86,9 @@ export function ElevationPlot({
       profile.distance[index]! - start,
       profile.altitude[index]!,
       span,
+      units,
     );
-  const description = `${elevationDistanceLabel(span, span)}, elevation ${minimum.toLocaleString()} to ${maximum.toLocaleString()} m`;
+  const description = `${elevationDistanceLabel(span, span, units)}, elevation ${minimum.toLocaleString()} to ${maximum.toLocaleString()} ${elevationUnit}`;
   const select = (index: number | null) => {
     if (emitted.current.profile === profile && emitted.current.index === index)
       return;
@@ -175,7 +183,9 @@ export function ElevationPlot({
         className="flex h-7 items-center justify-between gap-2 text-xs"
         data-testid="elevation-readout-row"
       >
-        <span className="text-muted-foreground">Elevation (m)</span>
+        <span className="text-muted-foreground">
+          Elevation ({elevationUnit})
+        </span>
         <span
           data-testid="elevation-selection-readout"
           aria-hidden="true"
@@ -266,7 +276,7 @@ export function ElevationPlot({
             />
             <circle
               cx={x(profile.distance[selected]!)}
-              cy={y(profile.altitude[selected]!)}
+              cy={y(profile.altitude[selected]! / elevationDivisor)}
               r={4}
               fill="var(--activity-accent)"
               stroke="hsl(var(--background))"

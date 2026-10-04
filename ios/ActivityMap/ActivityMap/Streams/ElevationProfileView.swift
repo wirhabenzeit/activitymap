@@ -171,19 +171,20 @@ struct ElevationPlot: View {
     @State private var accessibleSampleID: Int?
     @ScaledMetric(relativeTo: .caption) private var chartHeight = 160.0
     @ScaledMetric(relativeTo: .caption) private var reservedHeight = 200.0
+    private var units: UnitSystem { DisplayPreferences.shared.units }
     private var selected: ElevationProfile.Point? {
         guard let selectedX else { return nil }
         if let accessibleSampleID, let point = profile.points.first(where: { $0.id == accessibleSampleID }),
-           point.distance / profile.distanceDivisor == selectedX { return point }
-        return profile.nearest(to: selectedX * profile.distanceDivisor)
+           point.distance / profile.distanceDivisor(units: units) == selectedX { return point }
+        return profile.nearest(to: selectedX * profile.distanceDivisor(units: units))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Elevation (m)").foregroundStyle(AppTheme.secondaryText)
+                Text("Elevation (\(units.elevationUnit))").foregroundStyle(AppTheme.secondaryText)
                 Spacer(minLength: 0)
-                Text(selected.map(profile.selectionLabel) ?? " ")
+                Text(selected.map { profile.selectionLabel($0, units: units) } ?? " ")
                     .fontWeight(.medium).monospacedDigit()
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 6).padding(.vertical, 3)
@@ -197,27 +198,27 @@ struct ElevationPlot: View {
             .frame(minHeight: 24)
             Chart {
                 ForEach(profile.points) { point in
-                    AreaMark(x: .value("Distance", point.distance / profile.distanceDivisor),
-                             yStart: .value("Baseline", profile.altitudeDomain.lowerBound), yEnd: .value("Elevation", point.altitude))
+                    AreaMark(x: .value("Distance", point.distance / profile.distanceDivisor(units: units)),
+                             yStart: .value("Baseline", profile.altitudeDomain.lowerBound / units.elevationScale), yEnd: .value("Elevation", point.altitude / units.elevationScale))
                         .foregroundStyle(AppTheme.accent.opacity(0.15))
                         .interpolationMethod(.linear)
-                    LineMark(x: .value("Distance", point.distance / profile.distanceDivisor), y: .value("Elevation", point.altitude))
+                    LineMark(x: .value("Distance", point.distance / profile.distanceDivisor(units: units)), y: .value("Elevation", point.altitude / units.elevationScale))
                         .foregroundStyle(AppTheme.accent).lineStyle(StrokeStyle(lineWidth: 2))
                         .interpolationMethod(.linear)
                 }
                 if let selected {
-                    RuleMark(x: .value("Distance", selected.distance / profile.distanceDivisor))
+                    RuleMark(x: .value("Distance", selected.distance / profile.distanceDivisor(units: units)))
                         .foregroundStyle(.secondary).lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    PointMark(x: .value("Distance", selected.distance / profile.distanceDivisor), y: .value("Elevation", selected.altitude))
+                    PointMark(x: .value("Distance", selected.distance / profile.distanceDivisor(units: units)), y: .value("Elevation", selected.altitude / units.elevationScale))
                         .foregroundStyle(AppTheme.accent).symbolSize(45)
 
                 }
             }
-            .chartXScale(domain: 0...(profile.span / profile.distanceDivisor))
-            .chartYScale(domain: profile.altitudeDomain)
+            .chartXScale(domain: 0...(profile.span / profile.distanceDivisor(units: units)))
+            .chartYScale(domain: (profile.altitudeDomain.lowerBound / units.elevationScale)...(profile.altitudeDomain.upperBound / units.elevationScale))
             .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
             .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) }
-            .chartXAxisLabel("Distance (\(profile.distanceUnit))", alignment: .center)
+            .chartXAxisLabel("Distance (\(profile.distanceUnit(units: units)))", alignment: .center)
             .chartXSelection(value: $selectedX)
             .chartGesture { proxy in
                 DragGesture(minimumDistance: 0)
@@ -230,8 +231,8 @@ struct ElevationPlot: View {
             }
             .frame(height: compact ? reservedHeight * 0.75 - 32 : chartHeight)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Elevation profile, \(profile.description)")
-            .accessibilityValue(selected.map(profile.valueLabel) ?? "No sample selected")
+            .accessibilityLabel("Elevation profile, \(profile.accessibilityDescription(units: units))")
+            .accessibilityValue(selected.map { profile.valueLabel($0, units: units) } ?? "No sample selected")
             .accessibilityHint("Swipe up or down to move through recorded samples.")
             .accessibilityAdjustableAction { direction in
                 let index = selected?.id ?? 0
@@ -244,6 +245,7 @@ struct ElevationPlot: View {
             .accessibilityAction(named: "Clear selected sample") { select(nil) }
         }
         .frame(minHeight: compact ? reservedHeight * 0.75 : reservedHeight, alignment: .top)
+        .onChange(of: units) { _, _ in select(nil) }
         .onChange(of: selected?.id) { _, _ in onSelection(selected) }
         .onChange(of: isDragging) { _, dragging in
             onDrag(dragging)
@@ -253,6 +255,6 @@ struct ElevationPlot: View {
     }
     private func select(_ point: ElevationProfile.Point?) {
         accessibleSampleID = point?.id
-        selectedX = point.map { $0.distance / profile.distanceDivisor }
+        selectedX = point.map { $0.distance / profile.distanceDivisor(units: units) }
     }
 }

@@ -49,6 +49,8 @@ struct ActivityDetailPanel: View {
     var showsHeading = true
     var mapExpansion: MapActivityExpansion? = nil
     var compactMapProfile = false
+    var scrollsMapHeading = false
+    var mapBottomContentInset: CGFloat = 0
     var showOnMap: ((Int) -> Void)? = nil
 
     private var activity: Activity? { store.activity(id: activityID) }
@@ -58,8 +60,8 @@ struct ActivityDetailPanel: View {
             if let activity {
                 if let mapExpansion {
                     MapActivityDetailReveal(store: store, activity: activity, expansion: mapExpansion, compactProfile: compactMapProfile,
-                                            trailingInset: headerTrailingInset, hasRoute: store.routableActivityIDs.contains(activityID),
-                                            summary: "\(Formatters.distance(activity.distance))  ·  \(Formatters.duration(activity.movingTime))  ·  \(Formatters.elevation(activity.totalElevationGain)) ↑") { id in
+                                            scrollsHeading: scrollsMapHeading, bottomContentInset: mapBottomContentInset,
+                                            trailingInset: headerTrailingInset, hasRoute: store.routableActivityIDs.contains(activityID)) { id in
                         if let showOnMap { showOnMap(id) }
                         else { store.showOnMap(id) }
                     }
@@ -97,82 +99,90 @@ private struct MapActivityDetailReveal: View {
     let activity: Activity
     let expansion: MapActivityExpansion
     let compactProfile: Bool
-    private var progress: CGFloat { expansion.progress }
+    let scrollsHeading: Bool
+    let bottomContentInset: CGFloat
+    private var progress: CGFloat { scrollsHeading ? 1 : expansion.progress }
     let trailingInset: CGFloat
     let hasRoute: Bool
-    let summary: String
     let showOnMap: (Int) -> Void
-    @State private var summaryHeight: CGFloat = 20
     private var reveal: CGFloat { min(1, max(0, (progress - 0.25) / 0.75)) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 8) {
-                ActivityDetailIdentity(activity: activity, trailingInset: trailingInset,
-                                       titleLineLimit: compactProfile ? 2 : nil)
-                Button { showOnMap(activity.id) } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .frame(width: 44, height: 44)
+        if scrollsHeading {
+            // Keep the entire landscape/iPad detail in the stable scroll viewport.
+            ScrollView {
+                VStack(spacing: 0) {
+                    heading
+                    fullDetail
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(AppTheme.accent)
-                .disabled(!hasRoute)
-                .accessibilityLabel("Fit route")
-                .accessibilityIdentifier("activity-show-on-map")
-                .accessibilityHint(hasRoute ? "Frame this route while keeping its elevation profile visible" : "This activity has no GPS route")
+                .padding(.bottom, bottomContentInset)
             }
-            .padding(.horizontal, AppTheme.Spacing.large)
-            .padding(.vertical, AppTheme.Spacing.small)
-            if !compactProfile {
-                Text(summary)
+            .accessibilityIdentifier("activity-detail-scroll")
+            .clipped()
+        } else {
+            VStack(spacing: 0) {
+                heading
+                ScrollView { fullDetail }
+                    .accessibilityIdentifier("activity-detail-scroll")
+                    .clipped()
+                    .allowsHitTesting(progress > 0.8)
+            }
+        }
+    }
+
+    private var heading: some View {
+        HStack(alignment: .top, spacing: 8) {
+            ActivityDetailIdentity(activity: activity, trailingInset: trailingInset,
+                                   titleLineLimit: compactProfile ? 2 : nil)
+            Button { showOnMap(activity.id) } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.accent)
+            .disabled(!hasRoute)
+            .accessibilityLabel("Fit route")
+            .accessibilityIdentifier("activity-show-on-map")
+            .accessibilityHint(hasRoute ? "Frame this route while keeping its elevation profile visible" : "This activity has no GPS route")
+        }
+        .padding(.horizontal, AppTheme.Spacing.large)
+        .padding(.vertical, AppTheme.Spacing.small)
+    }
+
+    private var fullDetail: some View {
+        VStack(spacing: 0) {
+            if !hasRoute {
+                Text("No GPS route recorded")
                     .font(.caption).foregroundStyle(AppTheme.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, AppTheme.Spacing.large)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { summaryHeight = $0 }
-                    .opacity(max(0, 1 - progress * 4))
-                    .frame(height: summaryHeight * (1 - progress), alignment: .top)
-                    .clipped()
-                    .accessibilityHidden(progress > 0.25)
+                    .accessibilityIdentifier("activity-no-route")
             }
-            ScrollView {
-                // The header's Fit route icon is only disabled; say why.
-                if !hasRoute {
-                    Text("No GPS route recorded")
-                        .font(.caption).foregroundStyle(AppTheme.secondaryText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, AppTheme.Spacing.large)
-                        .accessibilityIdentifier("activity-no-route")
+            if compactProfile {
+                VStack(spacing: 16) {
+                    ActivityDetailDescription(activity: activity)
+                    elevation
+                    Divider()
+                    ActivityHeadlineStats(activity: activity)
                 }
-                if compactProfile {
-                    VStack(spacing: 16) {
-                        ActivityDetailDescription(activity: activity)
-                        elevation
-                        Divider()
-                        ActivityHeadlineStats(activity: activity)
-                    }
-                    .padding(.horizontal, AppTheme.Spacing.large)
-                    .padding(.vertical, AppTheme.Spacing.small)
-                    ActivityDetailContent(activity: activity, showsHeading: false, showsPrimaryMetrics: false, showsDescription: false,
-                                          profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
-                } else {
-                    ActivityDetailContent(activity: activity, showsHeading: false, profile: { _ in
-                        elevation
-                    }, photos: { _ in EmptyView() })
-                }
+                .padding(.horizontal, AppTheme.Spacing.large)
+                .padding(.vertical, AppTheme.Spacing.small)
+                ActivityDetailContent(activity: activity, showsHeading: false, showsPrimaryMetrics: false, showsDescription: false,
+                                      profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
+            } else {
+                ActivityDetailContent(activity: activity, showsHeading: false,
+                                      profile: { _ in elevation }, photos: { _ in EmptyView() })
             }
-            .accessibilityIdentifier("activity-detail-scroll")
-            .opacity(reveal)
-            .clipped()
-            .allowsHitTesting(progress > 0.8)
-            .accessibilityHidden(progress < 0.8)
-
         }
+        .opacity(reveal)
+        .allowsHitTesting(progress > 0.8)
+        .accessibilityHidden(progress < 0.8)
     }
 
     private var elevation: some View {
         ElevationProfileView(store: store, activityID: activity.id,
-            isRelevant: progress > 0.8 && store.selectedTab == .map && store.activeActivityID == activity.id,
+            isRelevant: expansion.progress > 0.8 && store.selectedTab == .map && store.activeActivityID == activity.id,
             compact: compactProfile)
     }
 }

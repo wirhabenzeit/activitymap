@@ -58,17 +58,25 @@ nonisolated struct ElevationProfile: Equatable, Sendable {
         points.min { abs($0.distance - distance) < abs($1.distance - distance) }!
     }
 
-    func distanceLabel(_ metres: Double) -> String {
-        "\((metres / distanceDivisor).formatted(.number.precision(.fractionLength(0...(usesKilometres ? 1 : 0))))) \(distanceUnit)"
+    func distanceDivisor(units: UnitSystem) -> Double {
+        span >= units.distanceScale ? units.distanceScale : units.elevationScale
     }
-    var description: String {
-        "\(distanceLabel(span)), elevation \(minimum.formatted(.number.precision(.fractionLength(0...1)))) to \(maximum.formatted(.number.precision(.fractionLength(0...1)))) m"
+    func distanceUnit(units: UnitSystem) -> String {
+        span >= units.distanceScale ? units.distanceUnit : units.elevationUnit
     }
-    func selectionLabel(_ point: Point) -> String {
-        "\(distanceLabel(point.distance)) · \(point.altitude.formatted(.number.precision(.fractionLength(0)))) m"
+    func distanceLabel(_ metres: Double, units: UnitSystem = .metric) -> String {
+        let decimals = span >= units.distanceScale ? 1 : 0
+        return "\((metres / distanceDivisor(units: units)).formatted(.number.precision(.fractionLength(0...decimals)))) \(distanceUnit(units: units))"
     }
-    func valueLabel(_ point: Point) -> String {
-        "\(distanceLabel(point.distance)) · \(point.altitude.formatted(.number.precision(.fractionLength(0...1)))) m elevation"
+    var description: String { accessibilityDescription(units: .metric) }
+    func accessibilityDescription(units: UnitSystem) -> String {
+        "\(distanceLabel(span, units: units)), elevation \((minimum / units.elevationScale).formatted(.number.precision(.fractionLength(0...1)))) to \((maximum / units.elevationScale).formatted(.number.precision(.fractionLength(0...1)))) \(units.elevationUnit)"
+    }
+    func selectionLabel(_ point: Point, units: UnitSystem = .metric) -> String {
+        "\(distanceLabel(point.distance, units: units)) · \((point.altitude / units.elevationScale).formatted(.number.precision(.fractionLength(0)))) \(units.elevationUnit)"
+    }
+    func valueLabel(_ point: Point, units: UnitSystem = .metric) -> String {
+        "\(distanceLabel(point.distance, units: units)) · \((point.altitude / units.elevationScale).formatted(.number.precision(.fractionLength(0...1)))) \(units.elevationUnit) elevation"
     }
 }
 

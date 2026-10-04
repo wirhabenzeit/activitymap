@@ -1,3 +1,6 @@
+'use client';
+
+import { useDisplayUnits } from '~/hooks/use-display-preferences';
 import type { ReactNode } from 'react';
 import {
   ChevronDown,
@@ -29,7 +32,11 @@ export function ActivityDetailStats({
   activity: Activity;
   children?: ReactNode;
 }) {
-  const { headline, groups } = activityDetailStats(activity);
+  const { headline, groups } = activityDetailStats(
+    activity,
+    undefined,
+    useDisplayUnits(),
+  );
   return (
     <div className="space-y-5">
       <dl

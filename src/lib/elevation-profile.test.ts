@@ -110,3 +110,9 @@ void test('shared chart ticks use readable round intervals and compact values', 
   );
   assert.equal(elevationSelectionLabel(123.4, 52.2, 800), '123 m · 52 m');
 });
+
+void test('profile display units do not change source distances or sample selection', () => {
+  assert.equal(elevationDistanceLabel(1609.344, 3218.688, 'imperial'), '1 mi');
+  assert.equal(elevationDistanceLabel(30.48, 100, 'imperial'), '100 ft');
+  assert.equal(elevationSelectionLabel(1609.344, 30.48, 3218.688, 'imperial'), '1 mi · 100 ft');
+});

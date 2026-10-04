@@ -1,16 +1,21 @@
 import { Calendar, Clock, Heart, Mountain, Zap } from 'lucide-react';
 import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
 import { type Activity } from '~/server/db/schema';
+import { formatPreferredDate, type DateFormat } from '~/lib/date-preferences';
 import { formatLocalDate } from '~/lib/local-date-time';
-import * as d3 from 'd3';
+import { aggregateMetric } from '~/lib/activity-presentation';
+import { formatMeasurement, type UnitSystem } from '~/lib/units';
 import { type ComponentType } from 'react';
 
 function decFormatter(unit = '', decimals = 0) {
   return (num: number | undefined) =>
-    num == undefined ? null : num.toFixed(decimals) + unit;
+    num == undefined || !Number.isFinite(num)
+      ? '—'
+      : num.toFixed(decimals) + (unit ? ' ' + unit : '');
 }
 
 function durationFormatter(seconds: number) {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return '—';
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
@@ -26,125 +31,127 @@ function durationFormatter(seconds: number) {
 export type ActivityValueType = number | string | Date | boolean;
 
 export type ActivityField<K> = {
-  formatter: (value: K) => string;
+  formatter: (value: K, units?: UnitSystem, dateFormat?: DateFormat) => string;
   accessorFn?: (activity: Activity) => K;
   Icon?: ComponentType<{ className?: string }>;
   title: string;
-  reducer?: (values: K[]) => K;
+  reducer?: (values: K[]) => K | null;
   reducerSymbol?: string;
   summary?: (values: K[]) => string;
 };
 
 export const activityFields = {
   distance: {
-    formatter: (value: number) => decFormatter('km', 1)(value / 1000),
+    formatter: (value: number, units: UnitSystem = 'metric') =>
+      formatMeasurement(value, 'distance', units),
     Icon: RulerHorizontalIcon,
     title: 'Distance',
-    reducer: d3.sum,
+    reducer: (values: number[]) => aggregateMetric(values, 'sum').value,
   },
   moving_time: {
     formatter: durationFormatter,
     Icon: StopwatchIcon,
     title: 'Moving Time',
-    reducer: d3.sum,
+    reducer: (values: number[]) => aggregateMetric(values, 'sum').value,
   },
   elapsed_time: {
     formatter: durationFormatter,
     Icon: StopwatchIcon,
     title: 'Elapsed Time',
-    reducer: d3.sum,
+    reducer: (values: number[]) => aggregateMetric(values, 'sum').value,
   },
   total_elevation_gain: {
-    formatter: (v: number) => decFormatter('m', 0)(v),
+    formatter: (v: number, units: UnitSystem = 'metric') =>
+      formatMeasurement(v, 'elevation', units),
     Icon: Mountain,
     title: 'Elevation Gain',
-    reducer: d3.sum,
+    reducer: (values: number[]) => aggregateMetric(values, 'sum').value,
   },
   elev_high: {
-    formatter: (v: number) => decFormatter('m', 0)(v),
+    formatter: (v: number, units: UnitSystem = 'metric') =>
+      formatMeasurement(v, 'elevation', units),
     Icon: Mountain,
     title: 'Elevation High',
-    reducer: d3.max,
+    reducer: (values: number[]) => aggregateMetric(values, 'max').value,
     reducerSymbol: '≤',
   },
   elev_low: {
-    formatter: (v: number) => decFormatter('m', 0)(v),
+    formatter: (v: number, units: UnitSystem = 'metric') =>
+      formatMeasurement(v, 'elevation', units),
     Icon: Mountain,
     title: 'Elevation Low',
-    reducer: d3.min,
+    reducer: (values: number[]) => aggregateMetric(values, 'min').value,
     reducerSymbol: '≥',
   },
   date: {
     accessorFn: (act: Activity) => act.start_date_local,
-    formatter: (date: Date) =>
-      formatLocalDate(
-        date,
-        {
-          day: '2-digit',
-          month: '2-digit',
-          year: '2-digit',
-        },
-        'en-US',
-      ),
+    formatter: (
+      date: Date,
+      _units: UnitSystem = 'metric',
+      dateFormat: DateFormat = 'system',
+    ) => (date == null ? '—' : formatPreferredDate(date, dateFormat)),
     Icon: Calendar,
     title: 'Date',
     summary: (v: Date[]) => {
       const dates = new Set(
-        v.map((d) =>
-          formatLocalDate(
-            d,
-            {
-              month: '2-digit',
-              year: '2-digit',
-              day: '2-digit',
-            },
-            'en-US',
+        v
+          .filter((d) => d != null)
+          .map((d) =>
+            formatLocalDate(
+              d,
+              {
+                month: '2-digit',
+                year: '2-digit',
+                day: '2-digit',
+              },
+              'en-US',
+            ),
           ),
-        ),
       );
       return `${dates.size}d`;
     },
   },
   average_speed: {
-    formatter: (v: number) => decFormatter('kmh', 1)(v * 3.6),
+    formatter: (v: number, units: UnitSystem = 'metric') =>
+      formatMeasurement(v, 'speed', units),
     Icon: Clock,
     title: 'Average Speed',
-    reducer: d3.mean,
+    reducer: (values: number[]) => aggregateMetric(values, 'mean').value,
     reducerSymbol: '∅',
   },
   weighted_average_watts: {
     formatter: (v: number) => decFormatter('W', 0)(v),
     Icon: Zap,
     title: 'Weighted Average Watts',
-    reducer: d3.mean,
+    reducer: (values: number[]) => aggregateMetric(values, 'mean').value,
     reducerSymbol: '∅',
   },
   average_watts: {
     formatter: (v: number) => decFormatter('W', 0)(v),
     Icon: Zap,
     title: 'Average Watts',
-    reducer: d3.mean,
+    reducer: (values: number[]) => aggregateMetric(values, 'mean').value,
     reducerSymbol: '∅',
   },
   max_watts: {
     formatter: (v: number) => decFormatter('W', 0)(v),
     Icon: Zap,
     title: 'Max Watts',
-    reducer: d3.max,
+    reducer: (values: number[]) => aggregateMetric(values, 'max').value,
     reducerSymbol: '≤',
   },
   max_heartrate: {
     formatter: (v: number) => decFormatter('bpm', 0)(v),
     Icon: Heart,
     title: 'Max Heartrate',
-    reducer: d3.max,
+    reducer: (values: number[]) => aggregateMetric(values, 'max').value,
     reducerSymbol: '≤',
   },
   average_heartrate: {
     formatter: (v: number) => decFormatter('bpm', 0)(v),
     Icon: Heart,
     title: 'Average Heartrate',
-    reducer: d3.mean,
+    reducer: (values: number[]) => aggregateMetric(values, 'mean').value,
     reducerSymbol: '∅',
   },
 } as const;

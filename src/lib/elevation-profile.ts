@@ -1,3 +1,4 @@
+import { measurementScale, measurementUnit, type UnitSystem } from './units';
 import type { ElevationProfile } from './activity-stream-summary';
 
 /** Select supplied samples, including pauses, without resampling or sorting. */
@@ -17,9 +18,27 @@ export function nearestElevationSample(
   return nearest;
 }
 
-export function elevationDistanceLabel(metres: number, span: number) {
-  const kilometres = span >= 1000;
-  return `${(metres / (kilometres ? 1000 : 1)).toLocaleString(undefined, { maximumFractionDigits: kilometres ? 1 : 0 })} ${kilometres ? 'km' : 'm'}`;
+export function elevationDistanceAxis(
+  span: number,
+  units: UnitSystem = 'metric',
+) {
+  const scale = measurementScale('distance', units);
+  return span >= scale
+    ? { divisor: scale, unit: measurementUnit('distance', units), decimals: 1 }
+    : {
+        divisor: measurementScale('elevation', units),
+        unit: measurementUnit('elevation', units),
+        decimals: 0,
+      };
+}
+
+export function elevationDistanceLabel(
+  metres: number,
+  span: number,
+  units: UnitSystem = 'metric',
+) {
+  const axis = elevationDistanceAxis(span, units);
+  return `${(metres / axis.divisor).toLocaleString(undefined, { maximumFractionDigits: axis.decimals })} ${axis.unit}`;
 }
 
 /** Round 1/2/5 intervals: never use an arbitrary half-span or endpoint as a tick. */
@@ -52,6 +71,7 @@ export function elevationSelectionLabel(
   distance: number,
   altitude: number,
   span: number,
+  units: UnitSystem = 'metric',
 ) {
-  return `${elevationDistanceLabel(distance, span)} · ${altitude.toLocaleString(undefined, { maximumFractionDigits: 0 })} m`;
+  return `${elevationDistanceLabel(distance, span, units)} · ${(altitude / measurementScale('elevation', units)).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${measurementUnit('elevation', units)}`;
 }

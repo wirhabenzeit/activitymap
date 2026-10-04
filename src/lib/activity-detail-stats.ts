@@ -1,3 +1,4 @@
+import { measurementScale, measurementUnit, type UnitSystem } from './units';
 import type { Activity } from '~/server/db/schema';
 
 export type DetailStat = { id: string; label: string; value: string };
@@ -11,6 +12,7 @@ export type DetailStatGroup = {
 export function activityDetailStats(
   activity: Partial<Activity>,
   locale?: string,
+  units: UnitSystem = 'metric',
 ) {
   const number = (value: number | null | undefined, unit = '', decimals = 0) =>
     value != null && Number.isFinite(value)
@@ -29,7 +31,16 @@ export function activityDetailStats(
         : `${minutes}m`;
   };
   const speed = (value: number | null | undefined) =>
-    number(value == null ? value : value * 3.6, 'km/h', 1);
+    number(
+      value == null ? value : value / measurementScale('speed', units),
+      measurementUnit('speed', units),
+      1,
+    );
+  const elevation = (value: number | null | undefined) =>
+    number(
+      value == null ? value : value / measurementScale('elevation', units),
+      measurementUnit('elevation', units),
+    );
   const flag = (value: boolean | null | undefined) =>
     value == null ? undefined : value ? 'Yes' : 'No';
   const stat = (
@@ -44,8 +55,8 @@ export function activityDetailStats(
       number(
         activity.distance == null
           ? activity.distance
-          : activity.distance / 1000,
-        'km',
+          : activity.distance / measurementScale('distance', units),
+        measurementUnit('distance', units),
         1,
       ),
     ),
@@ -53,7 +64,7 @@ export function activityDetailStats(
     stat(
       'elevationGain',
       'Elevation gain',
-      number(activity.total_elevation_gain, 'm'),
+      elevation(activity.total_elevation_gain),
     ),
   ];
   const groups: DetailStatGroup[] = [];
@@ -73,8 +84,8 @@ export function activityDetailStats(
     ['maxSpeed', 'Maximum speed', speed(activity.max_speed)],
   ]);
   group('elevation', 'Elevation', [
-    ['elevLow', 'Minimum', number(activity.elev_low, 'm')],
-    ['elevHigh', 'Maximum', number(activity.elev_high, 'm')],
+    ['elevLow', 'Minimum', elevation(activity.elev_low)],
+    ['elevHigh', 'Maximum', elevation(activity.elev_high)],
   ]);
   group('power', 'Power', [
     ['averageWatts', 'Average', number(activity.average_watts, 'W')],

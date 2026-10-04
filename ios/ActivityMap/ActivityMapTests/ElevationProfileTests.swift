@@ -69,6 +69,15 @@ struct ElevationProfileTests {
         }
     }
 
+    @Test func profileUnitsConvertLabelsWithoutChangingRecordedSamples() throws {
+        let profile = try #require(ElevationProfile.make(ElevationFixtures.summary(distance: [0, 1609.344, 2000, 3218.688])))
+        #expect(profile.distanceDivisor(units: .imperial) == 1609.344)
+        #expect(profile.distanceUnit(units: .imperial) == "mi")
+        #expect(profile.distanceLabel(1609.344, units: .imperial) == "1 mi")
+        #expect(profile.selectionLabel(profile.points[1], units: .imperial).hasSuffix("ft"))
+        #expect(profile.points[1].distance == 1609.344)
+    }
+
     @Test func statusHonorsRetryAndOfflineContext() {
         let deadline = Date().addingTimeInterval(60)
         let pending = ElevationStatus(state: .pending(retryAt: deadline, paused: true), hasProfile: false, offline: false)

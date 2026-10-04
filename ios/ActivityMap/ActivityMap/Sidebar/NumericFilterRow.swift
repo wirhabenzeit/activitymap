@@ -86,6 +86,7 @@ struct NumericFilterRow: View {
         }
         .onAppear { loadApplied() }
         .onChange(of: filter) { _, _ in loadApplied() }
+        .onChange(of: scale) { _, _ in loadApplied() }
     }
 
     private func thumb(minimum: Bool, width: CGFloat) -> some View {

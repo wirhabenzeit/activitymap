@@ -7,6 +7,116 @@ import Vision
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
+    @Test(arguments: ["landscape", "landscape-large-text", "tablet"])
+    func customPanelScrollsToBottomEdgeWithSafeContentInset(scenario: String) async throws {
+        var activity = ActivityStoreSelectionTests.activity(1)
+        activity.name = "A long activity title along the river and through the forest"
+        activity.description = String(repeating: "A long description with details from the route. ", count: 60)
+        let store = ActivityStore(activities: [activity, ActivityStoreSelectionTests.activity(2)])
+        store.replaceSelection(with: [1, 2])
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        picker.showDetail(1, store: store, motion: .none)
+        let size = scenario == "tablet" ? CGSize(width: 820, height: 1180) : CGSize(width: 844, height: 390)
+        let bottom: CGFloat = 21
+        let usable = CGSize(width: size.width, height: size.height - bottom)
+        let largeText = scenario == "landscape-large-text"
+        let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store, size: usable,
+            topInset: 44, bottomInset: bottom, largeText: largeText)
+            .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large)
+            .ignoresSafeArea(), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(300))
+        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
+        let page = try #require(pager.viewControllers?.first as? MapActivityPager.Page)
+        func scrolls(_ view: UIView) -> [UIScrollView] {
+            ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrolls)
+        }
+        let scroll = try #require(scrolls(page.view).first)
+        let viewport = scroll.convert(scroll.bounds, to: host.host.view)
+        #expect(viewport.height >= 100, "Short landscapes must have a usable detail viewport: \(viewport)")
+        #expect(abs(viewport.maxY - size.height) < 1, "Content must scroll through the bottom safe area, without a fixed blank strip: \(viewport)")
+        scroll.setContentOffset(CGPoint(x: 0, y: 300), animated: false)
+        try await Task.sleep(for: .milliseconds(150))
+        let offset = scroll.contentOffset
+        picker.detent = .compact
+        try await Task.sleep(for: .milliseconds(250))
+        picker.detent = .expanded
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(pager.viewControllers?.first === page)
+        #expect(scroll.contentOffset == offset, "Resizing must retain the detail's scroll position")
+        let end = max(-scroll.adjustedContentInset.top,
+                      scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)
+        scroll.setContentOffset(CGPoint(x: 0, y: end), animated: false)
+        try await Task.sleep(for: .milliseconds(150))
+        let image = host.snapshot()
+        try host.save(image, name: "panel-bottom-\(scenario)")
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(text.contains("Geometry status"), "The final grouped content row must be visible at the end of scrolling: \(text)")
+        let lowestText = (request.results ?? []).map(\.boundingBox.minY).min() ?? 0
+        #expect(lowestText * size.height >= bottom - 1, "Final text must still stop above the home indicator")
+        #expect(store.mapContext.pendingRequest == nil)
+    }
+
+    @Test func customResultsScrollThroughBottomInset() async throws {
+        var activities = (1...20).map { ActivityStoreSelectionTests.activity($0) }
+        activities[0].name = "Last selected route"
+        let store = ActivityStore(activities: activities)
+        store.replaceSelection(with: Array(1...20))
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let size = CGSize(width: 844, height: 390)
+        let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store,
+            size: CGSize(width: size.width, height: size.height - 21), topInset: 44,
+            bottomInset: 21, largeText: false).ignoresSafeArea(), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(300))
+        let scroll = try #require(host.descendants(of: UIScrollView.self).first)
+        #expect(abs(scroll.convert(scroll.bounds, to: host.host.view).maxY - size.height) < 1)
+        try host.save(host.snapshot(), name: "panel-results-bottom-edge")
+        scroll.setContentOffset(CGPoint(x: 0, y: scroll.contentSize.height - scroll.bounds.height
+                                       + scroll.adjustedContentInset.bottom), animated: false)
+        try await Task.sleep(for: .milliseconds(200))
+        let image = host.snapshot()
+        try host.save(image, name: "panel-results-last-row")
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(text.contains("Last selected route"))
+    }
+
+    @Test func customPanelHandleKeepsItsTrailingPosition() async throws {
+        let store = ActivityStore(activities: (1...6).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: Array(1...6))
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        picker.detent = .compact
+        var handleFrame = CGRect.zero
+        let handle = Color.gray.frame(width: 60, height: 44)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { handleFrame = $0 }
+        let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: true,
+            panelHandle: AnyView(handle)).ignoresSafeArea(), size: CGSize(width: 330, height: 300))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(200))
+        let initial = handleFrame
+        #expect(initial.width == 60 && initial.maxX == 318)
+        for state in ["results", "detail", "compact-detail", "expanded-detail", "back"] {
+            switch state {
+            case "results", "expanded-detail": picker.detent = .expanded
+            case "detail": picker.showDetail(1, store: store, motion: .none)
+            case "compact-detail": picker.detent = .compact
+            default: picker.showResults()
+            }
+            try await Task.sleep(for: .milliseconds(250))
+            #expect(handleFrame.minX == initial.minX && handleFrame.maxX == initial.maxX,
+                    "The grabber must stay under the same finger in \(state)")
+        }
+    }
+
     @Test func detailUpdatesInPlaceAndHandlesDeletion() async throws {
         var activity = try StoredModelMapper.activity(Fixtures.activity([
             "sport_type": "Ride", "name": "Morning ride", "description": "Along the river", "distance": 31200,
@@ -589,5 +699,40 @@ extension RenderedRoutePickingTests {
         host.host.rootView = root(nil)
         try await Task.sleep(for: .milliseconds(400))
         #expect(selected == nil, "Clearing the native chart selection must remove the route cursor")
+    }
+}
+
+
+extension RenderedRoutePickingTests {
+    @Test func landscapePanelShowsLoadedProfileWithScrollingHeading() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let dto = try Fixtures.activity(["id": "1", "name": "Landscape ride"])
+        try await storage.apply([.upsertActivity(dto)], scope: Fixtures.scope)
+        let fence = await storage.streamFence()
+        _ = try await storage.saveStreamSummary(ElevationFixtures.dto(), scope: Fixtures.scope, fence: fence, now: .now)
+        let loader = StreamSummaryLoader(source: { _ in SummarySourceProbe([]) })
+        await loader.configure(SyncFixtures.session(verified: false), storage: storage)
+        await loader.load(activityID: "1")
+        let store = ActivityStore(activities: [try StoredModelMapper.activity(dto), ActivityStoreSelectionTests.activity(2)])
+        store.streamSummaries = loader
+        store.replaceSelection(with: [1, 2])
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        picker.showDetail(1, store: store, motion: .none)
+        let size = CGSize(width: 844, height: 390)
+        let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store,
+            size: CGSize(width: size.width, height: size.height - 21), topInset: 44,
+            bottomInset: 21, largeText: false).ignoresSafeArea(), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(500))
+        let image = host.snapshot()
+        try host.save(image, name: "combined-landscape-elevation")
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(text.contains("Landscape ride") && text.contains("Elevation (m)") && text.contains("Distance (km)"),
+                "The scrolling heading and complete chart axes must fit in the opening landscape panel: \(text)")
+        #expect(!text.contains("Fit route"), "Fit is the title-row icon, not a footer")
     }
 }

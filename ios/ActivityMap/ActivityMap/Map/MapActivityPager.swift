@@ -9,6 +9,8 @@ struct MapActivityPager: UIViewControllerRepresentable {
     let picker: RoutePicker
     var expansion: CGFloat = 1
     var compactProfile = false
+    var scrollsHeading = false
+    var bottomContentInset: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -71,7 +73,8 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
         func update(_ next: MapActivityPager) {
             let appearanceChanged = parent.colorScheme != next.colorScheme || parent.typeSize != next.typeSize
-                || parent.sizeClass != next.sizeClass || parent.compactProfile != next.compactProfile
+                || parent.sizeClass != next.sizeClass || parent.compactProfile != next.compactProfile || parent.scrollsHeading != next.scrollsHeading
+                || parent.bottomContentInset != next.bottomContentInset
             parent = next
             guard let controller else { return }
             if next.picker.candidateIDs.count > 1 {
@@ -103,7 +106,8 @@ struct MapActivityPager: UIViewControllerRepresentable {
 
         private func content(_ id: Int, expansion: MapActivityExpansion) -> AnyView {
             AnyView(ActivityDetailPanel(store: parent.store, activityID: id,
-                mapExpansion: expansion, compactMapProfile: parent.compactProfile) { [weak self] id in
+                mapExpansion: expansion, compactMapProfile: parent.compactProfile, scrollsMapHeading: parent.scrollsHeading,
+                mapBottomContentInset: parent.bottomContentInset) { [weak self] id in
                     guard let self else { return }
                     self.parent.store.showOnMap(id)
                 }

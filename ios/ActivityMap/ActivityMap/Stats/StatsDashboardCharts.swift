@@ -131,7 +131,10 @@ struct StatsSeriesChart: View {
             }
             .chartYAxis {
                 if style == .consistency { AxisMarks(position: .leading, values: [0, 7]) }
-                else { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) }
+                else { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { tick in
+                    AxisGridLine()
+                    AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.value(value, metric: metric)).font(.caption2) } }
+                } }
             }
             .chartLegend(position: .bottom, alignment: .leading)
             .chartLegend(series.count > 1 && !compact ? .visible : .hidden)
@@ -229,12 +232,18 @@ struct StatsPeriodBars: View {
     /// Inspection label, e.g. "Mon, 28 Sep".
     let detailLabel: (StatsChartPoint) -> String
     let valueLabel: (Double) -> String
+    /// Converts a canonical value to display units for the compact y-axis labels.
+    var axisValue: (Double) -> Double = { $0 }
     var base: Color = Color.primary.opacity(0.28)
     /// The incomplete (current) period; lighter by default, as in Training volume.
     var partial: Color = Color.primary.opacity(0.12)
     @State private var selectedKey: String?
     @ScaledMetric private var overviewHeight = 110.0
     private var maximum: Double { max(1, points.compactMap(\.value).max() ?? 0) * 1.08 }
+    private var axisTicks: [Double] { StatsDisplay.axisTicks(maximum: maximum) }
+    private var axisStep: Double {
+        axisTicks.count > 1 ? abs(axisValue(axisTicks[1]) - axisValue(axisTicks[0])) : 1
+    }
     private func key(_ index: Int) -> String { String(index) }
     private var selected: StatsChartPoint? {
         selectedKey.flatMap(Int.init).flatMap { points.indices.contains($0) ? points[$0] : nil }
@@ -266,9 +275,13 @@ struct StatsPeriodBars: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+            AxisMarks(position: .leading, values: axisTicks) { value in
                 AxisGridLine()
-                AxisValueLabel { if let y = value.as(Double.self) { Text(y >= 1000 ? "\(StatsDisplay.number(y / 1000, decimals: y.truncatingRemainder(dividingBy: 1000) == 0 ? 0 : 1))k" : StatsDisplay.number(y)).font(.caption2) } }
+                AxisValueLabel {
+                    if let y = value.as(Double.self).map(axisValue) {
+                        Text(StatsDisplay.compactAxis(y, step: axisStep)).font(.caption2)
+                    }
+                }
             }
         }
         .chartXSelection(value: $selectedKey)

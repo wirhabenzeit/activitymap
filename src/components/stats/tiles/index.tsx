@@ -15,6 +15,11 @@
 // interacting outside the card leaves it open, including touch scrolling.
 
 import {
+  useDisplayUnits,
+  useDateFormat,
+} from '~/hooks/use-display-preferences';
+import { statsFormat } from './format';
+import {
   Activity,
   useCallback,
   useEffect,
@@ -176,9 +181,13 @@ export function StatsTileGrid({
       document.removeEventListener('visibilitychange', update);
     };
   }, []);
+  const units = useDisplayUnits();
+  const dateFormat = useDateFormat();
   const context: TileContext = useMemo(
     () => ({
       activities,
+      units,
+      dateFormat,
       today: reportingDay ?? today,
       filtered,
       singleSport,
@@ -189,6 +198,8 @@ export function StatsTileGrid({
       activities,
       today,
       reportingDay,
+      units,
+      dateFormat,
       resolvedTheme,
       filtered,
       singleSport,
@@ -553,6 +564,7 @@ function FaceSwitch({
   value: string | undefined;
   onChange: (value: string) => void;
 }) {
+  const { metricUnit } = statsFormat(useDisplayUnits());
   return (
     <div
       role="group"
@@ -577,7 +589,11 @@ function FaceSwitch({
             option === value && 'bg-background text-foreground shadow-xs',
           )}
         >
-          {faceOptionLabels[option] ?? option}
+          {option === 'distance'
+            ? metricUnit.distance
+            : option === 'elevation'
+              ? metricUnit.elevation
+              : (faceOptionLabels[option] ?? option)}
         </button>
       ))}
     </div>

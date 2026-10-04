@@ -33,11 +33,9 @@ import {
 import { ActivityRow } from './activity-row';
 import { MonthRows } from './calendar';
 import { Measure, SportArea } from './charts';
-import { formatWithUnit, monthName, shortDate } from './format';
+import { formatPreferredDate } from '~/lib/date-preferences';
+import { statsFormat, monthName, shortDate } from './format';
 import { type TileContext } from './tiles';
-
-const dateLabel = (day: number) =>
-  `${shortDate(dateOfDay(day))}, ${dateOfDay(day).getUTCFullYear()}`;
 
 function PeriodNavigation({
   label,
@@ -95,6 +93,14 @@ export function VolumeHistory({
   context: TileContext;
   metric: StatsMetric;
 }) {
+  const { formatWithUnit, formatShort } = statsFormat(context.units);
+  const dateLabel = (day: number) =>
+    formatPreferredDate(dateOfDay(day), context.dateFormat, undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
   const [range, setRange] = useState<HistoryRange>('weeks');
   const buckets = useMemo(
     () => volumeHistory(context.activities, context.today, metric, range),
@@ -176,6 +182,7 @@ export function VolumeHistory({
             trendLabel={averageLabel}
             palette={context.palette}
             valueFormat={(value) => formatWithUnit(value, metric)}
+            axisFormat={(value, step) => formatShort(value, metric, step)}
             xTickFormat={(value) =>
               range === 'years'
                 ? label(Number(value))
@@ -278,6 +285,14 @@ export function CalendarHistory({
   colorBy: 'sport' | StatsMetric;
   expanded: boolean;
 }) {
+  const { formatWithUnit } = statsFormat(context.units);
+  const dateLabel = (day: number) =>
+    formatPreferredDate(dateOfDay(day), context.dateFormat, undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
   const currentYear = dateOfDay(context.today).getUTCFullYear();
   const earliestYear = dateOfDay(
     firstActivityDay(context.activities, context.today),
@@ -393,6 +408,8 @@ export function CalendarHistory({
         }
       >
         <MonthRows
+          units={context.units}
+          dateFormat={context.dateFormat}
           key={`${first}-${last}`}
           today={last}
           first={first}

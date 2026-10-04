@@ -25,11 +25,13 @@ import { type Features } from './table-extensions';
 
 import { Card, CardHeader, CardTitle } from '~/components/ui/card';
 import { ActivityDetailStats } from './activity-detail-stats';
+import { useDateFormat } from '~/hooks/use-display-preferences';
 
 import { EditActivity } from './edit';
 import { useState } from 'react';
 import { cn } from '~/lib/utils';
-import { formatLocalDate, formatLocalTime } from '~/lib/local-date-time';
+import { formatPreferredDate } from '~/lib/date-preferences';
+import { formatLocalTime } from '~/lib/local-date-time';
 import { useShallowStore } from '~/store';
 import { PhotoLightbox } from './photo';
 import { ElevationChart } from './elevation-chart';
@@ -81,6 +83,7 @@ export function ActivityCardContent({
   onClearSelection,
   onFit,
 }: ActivityCardContentProps) {
+  const dateFormat = useDateFormat();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { isGuest, stravaConnected, userId } = useShallowStore((state) => ({
@@ -220,13 +223,7 @@ export function ActivityCardContent({
                 {row.getValue('name')}
               </CardTitle>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {sport_type} ·{' '}
-                {formatLocalDate(date, {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })}{' '}
-                ·{' '}
+                {sport_type} · {formatPreferredDate(date, dateFormat)} ·{' '}
                 {formatLocalTime(date, {
                   hour: '2-digit',
                   minute: '2-digit',

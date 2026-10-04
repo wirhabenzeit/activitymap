@@ -93,3 +93,10 @@ void test('missing siblings and invalid values never hide zero or false', () => 
     ],
   );
 });
+
+void test('grouped measurements retain imperial display preferences', () => {
+  const result = activityDetailStats({ distance: 1609.344, total_elevation_gain: 30.48, average_speed: 4.4704 }, 'en-US', 'imperial');
+  assert.equal(result.headline[0]?.value, '1.0 mi');
+  assert.equal(result.headline[2]?.value, '100 ft');
+  assert.equal(result.groups[0]?.stats[0]?.value, '10.0 mph');
+});

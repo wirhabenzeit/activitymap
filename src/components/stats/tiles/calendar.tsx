@@ -5,18 +5,15 @@
 import { useState, useRef, type ReactNode } from 'react';
 
 import { interpolateRgb } from 'd3';
+import { type UnitSystem } from '~/lib/units';
+import { formatPreferredDate, type DateFormat } from '~/lib/date-preferences';
 
 import { categorySettings } from '~/settings/category';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
 import { type Sport } from '~/lib/stats/tile-data';
 import { dateOfDay, calendarMonths } from '~/lib/stats/tile-series';
 
-import {
-  formatWithUnit,
-  monthName,
-  shortDate,
-  type TilePalette,
-} from './format';
+import { statsFormat, monthName, type TilePalette } from './format';
 
 // The tile face's calendar: one row per month (oldest at the top), one cell
 // per day of the month, coloured by the day's dominant sport. Hovering a day
@@ -33,7 +30,11 @@ export function MonthRows({
   secondSport = new Map<number, Sport>(),
   onSelectDay,
   selectedDay,
+  units,
+  dateFormat,
 }: {
+  units?: UnitSystem;
+  dateFormat?: DateFormat;
   today: number;
   dominantSport: Map<number, Sport>;
   totals: Map<number, Record<StatsMetric, number>>;
@@ -46,6 +47,7 @@ export function MonthRows({
   onSelectDay?: (day: number) => void;
   selectedDay?: number | null;
 }) {
+  const { formatWithUnit } = statsFormat(units);
   const [hover, setHover] = useState<string | null>(null);
   const months = calendarMonths(today, first);
   const [focusedDay, setFocusedDay] = useState(today);
@@ -70,7 +72,7 @@ export function MonthRows({
   const dayLabel = (day: number) => {
     const sport = dominantSport.get(day);
     const dayTotals = totals.get(day);
-    return `${shortDate(dateOfDay(day))}, ${dateOfDay(day).getUTCFullYear()}: ${
+    return `${formatPreferredDate(dateOfDay(day), dateFormat, undefined, { month: 'short', day: 'numeric', year: 'numeric' })}: ${
       sport && dayTotals
         ? `${mixedDays.has(day) ? 'Multiple sports' : categorySettings[sport].name}, ${formatWithUnit(dayTotals[colorBy === 'sport' ? 'time' : colorBy], colorBy === 'sport' ? 'time' : colorBy)}`
         : 'no matching activities'

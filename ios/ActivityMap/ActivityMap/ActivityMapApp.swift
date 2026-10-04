@@ -21,6 +21,7 @@ struct ActivityMapApp: App {
                 switch persistence {
                 case .success(let store):
                     ContentView().environment(\.localStore, store)
+                        .preferredColorScheme(DisplayPreferences.shared.appearance.colorScheme)
                 case .failure:
                     ContentUnavailableView(
                         "Couldn’t open saved activities", systemImage: "externaldrive.badge.exclamationmark",
