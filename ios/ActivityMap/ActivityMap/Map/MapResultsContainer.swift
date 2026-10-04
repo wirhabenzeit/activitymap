@@ -102,7 +102,7 @@ private struct NativeMapResultsSheet: View {
         NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.visibleActivityIDs.contains).count,
                                             detail: picker.detailID != nil, height: size.height, largeText: largeText)
     }
-    private var compact: PresentationDetent { .height(largeText ? 240 : 156) }
+    private var compact: PresentationDetent { .height(NativeMapResultsSizing.compactHeight(largeText: largeText)) }
     private var opening: PresentationDetent { .height(openingHeight) }
     private var detents: Set<PresentationDetent> { [compact, opening, .large] }
     // Resolve the initial detent before UIKit starts presenting. A default
@@ -118,23 +118,29 @@ private struct NativeMapResultsSheet: View {
     var body: some View {
         Color.clear.allowsHitTesting(false)
             .sheet(isPresented: Binding(get: { picker.isPresented && store.selectedTab == .map && !suspended }, set: { _ in }), onDismiss: { presentationChanged(false) }) {
-                RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
-                                 collapsedOverride: selected == compact,
-                                 nativePresentation: true)
-                    .presentationDetents(detents, selection: selection)
-                    .presentationDragIndicator(.visible)
-                    .presentationBackgroundInteraction(.enabled(upThrough: .large))
-                    // Only the detail's elevation chart needs drags to reach content
-                    // first; the results list keeps swipe-to-resize.
-                    .presentationContentInteraction(picker.detailID == nil ? .resizes : .scrolls)
-                    .interactiveDismissDisabled()
-                    .onAppear { presentationChanged(true) }
+                GeometryReader { geometry in
+                    RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
+                                     bottomInset: geometry.safeAreaInsets.bottom,
+                                     collapsedOverride: selected == compact,
+                                     nativePresentation: true)
+                        .ignoresSafeArea(.container, edges: .bottom)
+                }
+                .presentationDetents(detents, selection: selection)
+                .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled(upThrough: .large))
+                // Only the detail's elevation chart needs drags to reach content
+                // first; the results list keeps swipe-to-resize.
+                .presentationContentInteraction(picker.detailID == nil ? .resizes : .scrolls)
+                .interactiveDismissDisabled()
+                .onAppear { presentationChanged(true) }
 
             }
     }
 }
 
 enum NativeMapResultsSizing {
+    static func compactHeight(largeText: Bool) -> CGFloat { largeText ? 140 : 76 }
+
     static func openingHeight(count: Int, detail: Bool, height: CGFloat, largeText: Bool) -> CGFloat {
         // Phone detail opens with its profile visible and the map above it.
         // The smallest phones still retain a usable map instead of requiring .large.

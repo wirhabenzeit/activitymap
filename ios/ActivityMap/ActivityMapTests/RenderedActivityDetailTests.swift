@@ -738,3 +738,55 @@ extension RenderedRoutePickingTests {
         #expect(!text.contains("Fit route"), "Fit is the title-row icon, not a footer")
     }
 }
+
+extension RenderedRoutePickingTests {
+    @Test(arguments: [false, true])
+    func nativeSheetUsesCompactHeadingAndScrollsThroughBottom(largeText: Bool) async throws {
+        var activities = (1...20).map { ActivityStoreSelectionTests.activity($0) }
+        activities[0].name = "Alpine morning ride with a very long title"
+        let store = ActivityStore(activities: activities)
+        store.replaceSelection(with: Array(1...20))
+        let picker = RoutePicker()
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let size = scene.coordinateSpace.bounds.size
+        let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store,
+            size: size, topInset: 0, bottomInset: 0, largeText: largeText)
+            .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large), size: size)
+        defer { host.host.dismiss(animated: false); host.close() }
+        picker.reviewSelection(store: store)
+        try await Task.sleep(for: .milliseconds(700))
+        let sheet = try #require(host.host.presentedViewController)
+        func scrolls(_ view: UIView) -> [UIScrollView] {
+            ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrolls)
+        }
+        let list = try #require(scrolls(sheet.view).first)
+        let viewport = list.convert(list.bounds, to: sheet.view)
+        #expect(abs(viewport.maxY - sheet.view.bounds.maxY) < 1,
+                "The list must reach the sheet bottom instead of stopping above a fixed strip: \(viewport), \(sheet.view.bounds)")
+        let offset = CGPoint(x: 0, y: 100)
+        list.setContentOffset(offset, animated: false)
+        func screenshot(_ name: String) throws -> String {
+            let image = UIGraphicsImageRenderer(bounds: host.window.bounds).image { _ in
+                host.window.drawHierarchy(in: host.window.bounds, afterScreenUpdates: true)
+            }
+            try host.save(image, name: "native-sheet-\(name)-\(largeText)")
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+            return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        }
+        _ = try screenshot("list-bottom")
+        for detail in [false, true] {
+            if detail { picker.showDetail(1, store: store, motion: .none) }
+            picker.detent = .compact
+            try await Task.sleep(for: .milliseconds(500))
+            #expect(sheet.view.bounds.height < (largeText ? 220 : 150), "Collapsed sheets should fit only their heading")
+            let text = try screenshot(detail ? "compact-detail" : "compact-results")
+            #expect(!text.contains("activities to explore") && !text.contains("Expand to review"))
+            #expect(detail ? text.contains("Alpine") : text.contains("20 selected"), "Compact heading must stay visible: \(text)")
+            picker.detent = .medium
+            try await Task.sleep(for: .milliseconds(400))
+            #expect(list.contentOffset == offset, "Collapsing must preserve the list position")
+        }
+    }
+}

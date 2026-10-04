@@ -31,14 +31,6 @@ struct RoutePickerSheet: View {
                         if !collapsed { panelHeaderHeight = $0 }
                     }
             } else { header }
-            if detail == nil && !isSidePanel {
-                compactSummary
-                    .opacity(max(0, 1 - expansion * 4))
-                    .frame(height: (typeSize.isAccessibilitySize ? 130 : 80) * (1 - expansion), alignment: .top)
-                    .clipped()
-                    .allowsHitTesting(collapsed)
-                    .accessibilityHidden(!collapsed)
-            }
             // Keep results mounted through detail and detent changes. Back
             // restores the exact scroll position, without a second overlay.
             GeometryReader { viewport in
@@ -143,7 +135,7 @@ struct RoutePickerSheet: View {
             // Visual grabber clearance only. The 44pt native touch target
             // overlays the surface instead of reserving an empty row.
             Color.clear.frame(height: 13).allowsHitTesting(false)
-            if !singleDetail {
+            if !singleDetail && !(collapsed && detail != nil) {
                 let layout = typeSize.isAccessibilitySize
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
                     : AnyLayout(HStackLayout(spacing: 4))
@@ -210,28 +202,6 @@ struct RoutePickerSheet: View {
             BrowseIconLabel(systemImage: "ellipsis")
         }
         .accessibilityLabel("Selection actions")
-    }
-
-    private var compactSummary: some View {
-        Button {
-            resize(to: .medium)
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                if let activity = detail ?? (candidates.count == 1 ? candidates.first : nil) {
-                    Text(activity.name).font(.subheadline.weight(.semibold)).lineLimit(2)
-                    Text("\(Formatters.distance(activity.distance))  ·  \(Formatters.duration(activity.elapsedTime))  ·  \(Formatters.elevation(activity.totalElevationGain)) ↑")
-                        .font(.caption).foregroundStyle(AppTheme.secondaryText).lineLimit(2)
-                } else {
-                    Text(candidates.isEmpty ? "Hidden by filters" : "\(candidates.count) activities to explore")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Expand to review your selection").font(.caption).foregroundStyle(AppTheme.secondaryText)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(.horizontal, 20).padding(.bottom, 16)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     private func detailNavigation(_ activity: Activity) -> some View {

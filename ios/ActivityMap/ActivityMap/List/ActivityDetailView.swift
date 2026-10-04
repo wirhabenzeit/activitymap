@@ -122,7 +122,7 @@ private struct MapActivityDetailReveal: View {
         } else {
             VStack(spacing: 0) {
                 heading
-                ScrollView { fullDetail }
+                ScrollView { fullDetail.padding(.bottom, bottomContentInset) }
                     .accessibilityIdentifier("activity-detail-scroll")
                     .clipped()
                     .allowsHitTesting(progress > 0.8)

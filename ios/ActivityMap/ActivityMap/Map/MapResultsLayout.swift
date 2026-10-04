@@ -34,7 +34,7 @@ struct MapResultsLayout {
         // expanded; no empty control lane is reserved beside the panel.
         let top = topInset + 12
         let available = max(120, size.height - top - (isSidePanel ? 0 : 12))
-        let compact = min(available, isSidePanel ? (largeText ? 120 : 64) : (largeText ? 240 : 156))
+        let compact = min(available, isSidePanel ? (largeText ? 120 : 64) : NativeMapResultsSizing.compactHeight(largeText: largeText))
         let height: CGFloat
         switch detent {
         case .compact: height = compact
