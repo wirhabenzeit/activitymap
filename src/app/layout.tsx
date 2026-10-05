@@ -16,7 +16,18 @@ export const viewport: Viewport = {
 export const metadata = {
   title: 'ActivityMap',
   description: 'Visualize your activities',
-  icons: [{ rel: 'icon', url: '/favicon.ico' }],
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48', type: 'image/x-icon' },
+      { url: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/apple-icon-180.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      { rel: 'mask-icon', url: '/safari-pinned-tab.svg', color: '#1976d2' },
+    ],
+  },
 };
 
 /**
@@ -53,7 +64,6 @@ export default function RootLayout({
       {/* <ReactScan /> */}
       <head>
         <link rel="manifest" href="/site.webmanifest" />
-        <link rel="apple-touch-icon" href="/apple-icon-180.png" />
 
         {/* <meta
           name="viewport"

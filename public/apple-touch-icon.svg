@@ -1,16 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Generator: Adobe Illustrator 27.7.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 viewBox="0 0 24 24" style="enable-background:new 0 0 24 24;" xml:space="preserve">
-<style type="text/css">
-	.st0{fill:#1976D2;}
-	.st1{fill:#FFFFFF;}
-</style>
-<g id="Layer_2">
-	<rect x="0" class="st0" width="24" height="24"/>
-</g>
-<g id="Layer_1" focusable="false">
-	<path class="st1" d="M19.5,4.1l-0.1,0l-4.7,1.8L9.4,4.1l-5,1.7C4.2,5.8,4.1,5.9,4.1,6.2v13.4c0,0.2,0.2,0.4,0.4,0.4l0.1,0l4.7-1.8
-		l5.3,1.9l5-1.7c0.2-0.1,0.3-0.2,0.3-0.4V4.5C20,4.2,19.8,4.1,19.5,4.1z M14.6,18.2l-5.3-1.9V5.8l5.3,1.9V18.2z"/>
-</g>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs><linearGradient id="background" x1="0" y1="0" x2="0" y2="1"><stop offset="0.03125" stop-color="#1D86EC"/><stop offset="0.12500" stop-color="#1A82E7"/><stop offset="0.25000" stop-color="#1A80E4"/><stop offset="0.50000" stop-color="#197CDE"/><stop offset="0.75000" stop-color="#1978D7"/><stop offset="0.87500" stop-color="#1976D4"/><stop offset="0.96875" stop-color="#1A77D4"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#background)"/><path xmlns="http://www.w3.org/2000/svg" d="M206 315 Q206 298 222 292 L400 226 Q410 222 421 226 L601 294 Q612 298 623 294 L791 232 Q819 222 819 251 L819 681 Q819 699 802 706 L623 772 Q612 777 600 772 L421 700 Q410 696 399 700 L232 763 Q206 774 206 748 Z" fill="#FFFFFF" />
+  <path xmlns="http://www.w3.org/2000/svg" d="M410 224 Q415 224 421 226 L601 294 Q606 296 612 296 L612 775 Q606 775 600 772 L421 700 Q415 698 410 698 Z" fill="#E1EAF4" />
+  <path xmlns="http://www.w3.org/2000/svg" d="M612 296 Q617 296 623 294 L791 232 Q819 222 819 251 L819 681 Q819 699 802 706 L623 772 Q617 775 612 775 Z" fill="#F5F8FC" />
+  <path xmlns="http://www.w3.org/2000/svg" d="M410 228 L410 695 M612 300 L612 771" stroke="#ffffff" stroke-opacity="0.34" stroke-width="2" />
+<g xmlns="http://www.w3.org/2000/svg" fill="#1976D2">
+    <path d="M334 529 C385 475 428 464 488 514 C531 550 553 578 599 570 C646 562 660 521 689 493" fill="none" stroke="#1976D2" stroke-width="40" stroke-linecap="round" />
+    <path fill-rule="evenodd" d="M352 564 A58 58 0 1 1 236 564 A58 58 0 1 1 352 564 Z M317 564 A23 23 0 1 0 271 564 A23 23 0 1 0 317 564 Z" />
+    <path fill-rule="evenodd" d="M780 451 A58 58 0 1 1 664 451 A58 58 0 1 1 780 451 Z M745 451 A23 23 0 1 0 699 451 A23 23 0 1 0 745 451 Z" />
+  </g>
+
 </svg>
