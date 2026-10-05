@@ -549,6 +549,84 @@ nonisolated extension ActivityMapAPI {
         let freshness: SyncFreshnessMeta
     }
 
+    struct IngestionRunOutcome: Codable, Hashable, Sendable {
+        let outcome: IngestionOutcome
+        let reason: IngestionReason?
+        let attemptedAt: Date
+        let lastSucceededAt: Date?
+        let retryAt: Date?
+    }
+
+    /// The shape of `IngestionHistory.reconciliation`.
+    struct IngestionReconciliation: Codable, Hashable, Sendable {
+        let phase: ReconciliationPhase
+        let pagesScanned: Int?
+        let scanStartedAt: Date?
+        let lastCompletedAt: Date?
+        let nextDueAt: Date?
+        let freshness: HistoryFreshness
+    }
+
+    struct IngestionHistory: Codable, Hashable, Sendable {
+        let progress: IngestionProgress
+        let scheduling: IngestionScheduling
+        let schedulingReason: IngestionReason?
+        let retryAt: Date?
+        let lastOutcome: IngestionRunOutcome?
+        let knownActivityCount: Int
+        let totalActivityCount: Int?
+        let oldestActivityStart: Date?
+        let newestActivityStart: Date?
+        let reconciliation: IngestionReconciliation
+    }
+
+    struct IngestionDetails: Codable, Hashable, Sendable {
+        let progress: IngestionProgress
+        let scheduling: IngestionScheduling
+        let schedulingReason: IngestionReason?
+        let retryAt: Date?
+        let lastOutcome: IngestionRunOutcome?
+        let detailed: Int
+        let neverFetched: Int
+        let invalidated: Int
+        let retryWaiting: Int
+    }
+
+    struct IngestionPhotos: Codable, Hashable, Sendable {
+        let progress: IngestionProgress
+        let scheduling: IngestionScheduling
+        let schedulingReason: IngestionReason?
+        let retryAt: Date?
+        let activitiesWithPhotos: Int
+        let current: Int
+        let refreshRequired: Int
+        let unknown: Int
+        let photoCount: Int
+    }
+
+    struct IngestionStreams: Codable, Hashable, Sendable {
+        let progress: IngestionProgress
+        let scheduling: IngestionScheduling
+        let schedulingReason: IngestionReason?
+        let retryAt: Date?
+        let withData: Int
+        let withoutData: Int
+        let runnable: Int
+        let waiting: Int
+        let blocked: Int
+        let failed: Int
+        let invalidated: Int
+        let chartSummaries: Int
+    }
+
+    struct IngestionStatus: Codable, Hashable, Sendable {
+        let observedAt: Date
+        let history: IngestionHistory
+        let details: IngestionDetails
+        let photos: IngestionPhotos
+        let streams: IngestionStreams
+    }
+
     /// The shape of `ErrorEnvelope.error`.
     struct ErrorBody: Codable, Hashable, Sendable {
         let code: String
@@ -622,6 +700,53 @@ nonisolated extension ActivityMapAPI {
         case refreshRequired = "refresh_required"
     }
 
+    enum HistoryFreshness: String, Codable, Hashable, Sendable {
+        case neverCompleted = "never_completed"
+        case current = "current"
+        case due = "due"
+        case overdue = "overdue"
+    }
+
+    enum IngestionOutcome: String, Codable, Hashable, Sendable {
+        case succeeded = "succeeded"
+        case partial = "partial"
+        case deferred = "deferred"
+        case failed = "failed"
+        case blocked = "blocked"
+    }
+
+    enum IngestionProgress: String, Codable, Hashable, Sendable {
+        case notStarted = "not_started"
+        case inProgress = "in_progress"
+        case complete = "complete"
+        case unknown = "unknown"
+    }
+
+    enum IngestionReason: String, Codable, Hashable, Sendable {
+        case rateLimited = "rate_limited"
+        case timeBudget = "time_budget"
+        case credentialsUnavailable = "credentials_unavailable"
+        case unauthorized = "unauthorized"
+        case upstreamError = "upstream_error"
+        case invalidResponse = "invalid_response"
+        case detailFailures = "detail_failures"
+        case photoRefreshFailed = "photo_refresh_failed"
+        case historyFetchFailed = "history_fetch_failed"
+        case persistenceFailed = "persistence_failed"
+        case internalError = "internal_error"
+    }
+
+    enum IngestionScheduling: String, Codable, Hashable, Sendable {
+        case idle = "idle"
+        case scheduled = "scheduled"
+        case waiting = "waiting"
+        case blocked = "blocked"
+        case disabled = "disabled"
+        case stalled = "stalled"
+        case notScheduled = "not_scheduled"
+        case unknown = "unknown"
+    }
+
     enum PhotoRefreshStatus: String, Codable, Hashable, Sendable {
         case complete = "complete"
         case partial = "partial"
@@ -630,6 +755,12 @@ nonisolated extension ActivityMapAPI {
     enum PhotosState: String, Codable, Hashable, Sendable {
         case current = "current"
         case refreshRequired = "refresh_required"
+    }
+
+    enum ReconciliationPhase: String, Codable, Hashable, Sendable {
+        case idle = "idle"
+        case scanning = "scanning"
+        case confirming = "confirming"
     }
 
     enum SportType: String, Codable, Hashable, Sendable {

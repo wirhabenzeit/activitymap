@@ -1,14 +1,27 @@
-import { eq, desc, and, asc } from 'drizzle-orm';
+import { eq, desc, asc } from 'drizzle-orm';
 import { db } from '~/server/db';
 import { activities, activitySync, users } from '~/server/db/schema';
 import { getAccountInternal } from '~/server/db/internal';
 import { logger } from '~/server/logging/logger';
-import { fetchStravaActivities } from './service';
+import { fetchStravaActivities, StravaPersistenceError } from './service';
 import {
   activitiesRepository,
   type ActivitiesRepository,
 } from '~/server/repositories/activities';
-import { legacyActivitySyncRepository } from '~/server/repositories/legacy-activity-sync';
+import {
+  ingestionRepository,
+  type IngestionRepository,
+} from '~/server/repositories/ingestion';
+import {
+  legacyActivitySyncRepository,
+  type LegacyActivitySyncUser,
+} from '~/server/repositories/legacy-activity-sync';
+import {
+  classifyIngestionFailure,
+  outcomeForError,
+  type DetailFailureCode,
+  type IngestionOutcomeRecord,
+} from './ingestion-policy';
 
 export type SyncActivityOptions = {
   maxActivities?: number; // Total max activities to process (default: 50)
@@ -17,19 +30,210 @@ export type SyncActivityOptions = {
   minActivitiesThreshold?: number; // Min activities returned to consider we've reached oldest (default: 2)
 };
 
+/** One step of a user's run: what it committed and how it ended. */
+type StepResult = IngestionOutcomeRecord & { committed: number };
+
+const succeeded = (committed = 0): StepResult => ({
+  outcome: 'succeeded',
+  reason: null,
+  committed,
+});
+
+/** Outcome of a step that threw before committing anything. */
+function stepFailure(error: unknown): StepResult {
+  if (error instanceof StravaPersistenceError)
+    return { outcome: 'failed', reason: 'persistence_failed', committed: 0 };
+  return { ...outcomeForError(error), committed: 0 };
+}
+
+/**
+ * A user's run outcome. Credential and rate-limit stops dominate; otherwise a
+ * failed step only makes the run `failed` when nothing else was committed.
+ */
+export function combineSteps(steps: StepResult[]): IngestionOutcomeRecord {
+  const pick = (outcome: StepResult['outcome']) =>
+    steps.find((step) => step.outcome === outcome);
+  const blocked = pick('blocked');
+  if (blocked) return { outcome: 'blocked', reason: blocked.reason };
+  const failure = pick('failed') ?? pick('partial');
+  if (failure) {
+    const committed = steps.some((step) => step.committed > 0);
+    return {
+      outcome: failure.outcome === 'failed' && !committed ? 'failed' : 'partial',
+      reason: failure.reason,
+    };
+  }
+  const deferred = pick('deferred');
+  if (deferred) return { outcome: 'deferred', reason: deferred.reason };
+  return { outcome: 'succeeded', reason: null };
+}
+
+export type SyncUserDeps = {
+  resolveAccessToken?: (userId: string) => Promise<string | null>;
+  fetchActivities?: typeof fetchStravaActivities;
+  activitiesRepo?: ActivitiesRepository;
+  ingestion?: Pick<
+    IngestionRepository,
+    'findDetailCandidates' | 'recordDetailFailures' | 'clearDetailAttempts'
+  >;
+  findMostRecentActivityId?: (athleteId: number) => Promise<number | null>;
+  findOldestStartDate?: (athleteId: number) => Promise<Date | null>;
+};
+
+export type SyncUserResult = {
+  outcome: IngestionOutcomeRecord;
+  updatedIncomplete: number;
+  failedDetails: number;
+  fetchedOlder: number;
+  reachedOldest: boolean;
+  stoppedForRateLimit: boolean;
+};
+
+/**
+ * One user's legacy sync: refresh the most recent activity (with photos),
+ * enrich pending details, then page further back in history. Every step
+ * reports what it committed and how it ended; nothing is swallowed into a
+ * zero-work success (issue #296).
+ */
+export async function syncUser(
+  user: LegacyActivitySyncUser & { athlete_id: number },
+  quota: { incomplete: number; older: number; minActivitiesThreshold: number },
+  deps: SyncUserDeps = {},
+): Promise<SyncUserResult> {
+  const fetchActivities = deps.fetchActivities ?? fetchStravaActivities;
+  const ingestion = deps.ingestion ?? ingestionRepository;
+  const resolveAccessToken =
+    deps.resolveAccessToken ??
+    (async (userId: string) => {
+      const account = await getAccountInternal({ userId });
+      return account?.access_token ?? null;
+    });
+  const findMostRecentActivityId =
+    deps.findMostRecentActivityId ?? findMostRecentActivityIdInDb;
+  const findOldestStartDate = deps.findOldestStartDate ?? findOldestStartDateInDb;
+
+  const result: SyncUserResult = {
+    outcome: { outcome: 'succeeded', reason: null },
+    updatedIncomplete: 0,
+    failedDetails: 0,
+    fetchedOlder: 0,
+    reachedOldest: false,
+    stoppedForRateLimit: false,
+  };
+
+  const accessToken = await resolveAccessToken(user.id);
+  if (!accessToken) {
+    result.outcome = { outcome: 'blocked', reason: 'credentials_unavailable' };
+    return result;
+  }
+  const athleteId = user.athlete_id;
+  const steps: StepResult[] = [];
+  const stopped = () =>
+    steps.some(
+      (step) => step.outcome === 'blocked' || step.outcome === 'deferred',
+    );
+
+  // --- Refresh the most recent activity, including its photos ---
+  try {
+    const mostRecentId = await findMostRecentActivityId(athleteId);
+    if (mostRecentId !== null) {
+      const recent = await fetchActivities({
+        accessToken,
+        activityIds: [mostRecentId],
+        athleteId,
+        includePhotos: true,
+        shouldDeletePhotos: true,
+        limit: 2,
+      });
+      await ingestion.clearDetailAttempts(recent.activities.map((a) => a.id));
+      const failure = recent.failures?.[0];
+      if (failure) {
+        steps.push(stepFailure(failure.error));
+      } else if (recent.photoRefreshFailedIds?.length) {
+        // The activity committed but its photo set is still stale.
+        steps.push({
+          outcome: 'partial',
+          reason: 'photo_refresh_failed',
+          committed: recent.activities.length,
+        });
+      } else {
+        steps.push(succeeded(recent.activities.length));
+      }
+    }
+  } catch (error) {
+    logger.error(`[User ${user.id}] Error syncing most recent activity:`, error);
+    steps.push(stepFailure(error));
+  }
+
+  // --- Enrich pending details ---
+  if (!stopped() && quota.incomplete > 0) {
+    const enrichment = await updateIncompleteActivities(
+      athleteId,
+      accessToken,
+      quota.incomplete,
+      {
+        activitiesRepo: deps.activitiesRepo,
+        fetchActivities,
+        ingestion,
+      },
+    );
+    result.updatedIncomplete = enrichment.updated;
+    result.failedDetails = enrichment.failed;
+    steps.push({
+      ...enrichment.outcome,
+      committed: enrichment.updated + enrichment.deleted,
+    });
+  }
+
+  // --- Page further back in history ---
+  if (!stopped() && quota.older > 0 && !user.oldest_activity_reached) {
+    const older = await fetchOlderActivities(
+      athleteId,
+      accessToken,
+      quota.older,
+      quota.minActivitiesThreshold,
+      { fetchActivities, findOldestStartDate },
+    );
+    result.fetchedOlder = older.fetched;
+    result.reachedOldest = older.reachedOldest;
+    if (older.error === undefined) {
+      steps.push(succeeded(older.fetched));
+    } else {
+      const failure = stepFailure(older.error);
+      steps.push(
+        failure.outcome === 'failed'
+          ? { ...failure, reason: 'history_fetch_failed' }
+          : failure,
+      );
+    }
+  }
+
+  result.stoppedForRateLimit = steps.some(
+    (step) => step.outcome === 'deferred' && step.reason === 'rate_limited',
+  );
+  result.outcome = combineSteps(steps);
+  return result;
+}
+
 /**
  * Update activities for all users with Strava accounts:
- * 1. Fetch activities older than the oldest existing activity
+ * 1. Refresh each user's most recent activity
  * 2. Replace summary activities with detailed ones
+ * 3. Fetch activities older than the oldest existing activity
  */
 export async function syncActivities(
   options: SyncActivityOptions = {},
+  deps: SyncUserDeps & {
+    recordOutcome?: IngestionRepository['recordOutcome'];
+  } = {},
 ): Promise<{
   updatedIncomplete: number;
+  failedDetails: number;
   fetchedOlder: number;
   reachedOldest: string[];
   errors: Record<string, string>;
   processedUsers: number;
+  stoppedForRateLimit: boolean;
 }> {
   const {
     maxActivities = 50,
@@ -37,10 +241,14 @@ export async function syncActivities(
     maxOldActivities = Math.floor(maxActivities / 2),
     minActivitiesThreshold = 2,
   } = options;
+  const recordOutcome =
+    deps.recordOutcome ?? ingestionRepository.recordOutcome;
 
   // Tracking variables
   let updatedIncomplete = 0;
+  let failedDetails = 0;
   let fetchedOlder = 0;
+  let stoppedForRateLimit = false;
   const reachedOldest: string[] = [];
   const errors: Record<string, string> = {};
 
@@ -63,345 +271,283 @@ export async function syncActivities(
   // guarded PostgreSQL proof in CI.
   const usersToProcess = await legacyActivitySyncRepository.listEligibleUsers();
 
-
-
-  // Process each user
   for (const user of usersToProcess) {
-    if (!user.athlete_id) {
+    if (!user.athlete_id) continue;
 
-      continue;
-    }
-
-    // Initialize sync status outside try/catch for scope access
-    let syncStatus = null;
-
+    const syncStatusId = await beginSyncStatus(user.id);
+    let outcome: IngestionOutcomeRecord;
     try {
-      // Get or create sync status record
-      syncStatus = await db.query.activitySync.findFirst({
-        where: eq(activitySync.user_id, user.id),
-      });
+      const userResult = await syncUser(
+        { ...user, athlete_id: user.athlete_id },
+        {
+          incomplete: maxIncompleteActivities - updatedIncomplete,
+          older: maxOldActivities - fetchedOlder,
+          minActivitiesThreshold,
+        },
+        deps,
+      );
+      outcome = userResult.outcome;
+      stoppedForRateLimit = userResult.stoppedForRateLimit;
+      updatedIncomplete += userResult.updatedIncomplete;
+      failedDetails += userResult.failedDetails;
+      fetchedOlder += userResult.fetchedOlder;
 
-      // Create sync record if it doesn't exist
-      if (!syncStatus) {
-        const [newSyncStatus] = await db
-          .insert(activitySync)
-          .values({
-            id: crypto.randomUUID(),
-            user_id: user.id,
-            last_sync: new Date(),
-            sync_in_progress: true,
-          })
-          .returning();
-
-        // TypeScript protection: newSyncStatus should always exist after insertion
-        if (!newSyncStatus) {
-          throw new Error(`Failed to create sync status for user ${user.id}`);
-        }
-
-        syncStatus = newSyncStatus;
-      } else {
-        // Update sync status to in progress
+      if (userResult.reachedOldest) {
         await db
-          .update(activitySync)
-          .set({ sync_in_progress: true, last_error: null })
-          .where(eq(activitySync.id, syncStatus.id));
-      }
-
-      // Get account with refreshed tokens using getAccount
-      const account = await getAccountInternal({ userId: user.id });
-      if (!account?.access_token) {
-        throw new Error(`No valid Strava token found for user ${user.id}`);
-      }
-
-      // Get athlete ID from account
-      const athleteId = parseInt(account.accountId);
-
-      // --- Sync most recent activity ---
-      try {
-        const mostRecentActivity = await db.query.activities.findFirst({
-          where: eq(activities.athlete, athleteId),
-          orderBy: desc(activities.start_date),
-          columns: { id: true },
-        });
-
-        if (mostRecentActivity) {
-
-          await fetchStravaActivities({
-            accessToken: account.access_token,
-            activityIds: [mostRecentActivity.id],
-            athleteId,
-            includePhotos: true, // Ensure photos are updated
-            shouldDeletePhotos: true, // Add this line to replace existing photos
-            limit: 2, // Only fetching one activity
-          });
-
-        } else {
-
-        }
-      } catch (recentSyncError) {
-        logger.error(
-          `[User ${user.id}/${athleteId}] Error syncing most recent activity:`,
-          recentSyncError,
-        );
-        // Log error but continue with other sync steps
-        errors[`user_${user.id}_recent`] =
-          (recentSyncError as Error).message ||
-          'Unknown error syncing recent activity';
-      }
-      // --- End sync most recent activity ---
-
-      // Calculate how many activities to process for this user
-      const remainingIncomplete = maxIncompleteActivities - updatedIncomplete;
-      const remainingOlder = maxOldActivities - fetchedOlder;
-
-      // Step 2: Update incomplete activities if any quota remains
-      if (remainingIncomplete > 0) {
-        const updated = await updateIncompleteActivities(
-          athleteId,
-          account.access_token,
-          remainingIncomplete,
-        );
-        updatedIncomplete += updated;
-      }
-
-      // Step 3: Fetch older activities if any quota remains and user hasn't reached oldest
-      if (remainingOlder > 0 && !user.oldest_activity_reached) {
-        const { fetched, reachedOldest: hasReachedOldest } =
-          await fetchOlderActivities(
-            athleteId,
-            account.access_token,
-            remainingOlder,
-            minActivitiesThreshold,
-          );
-
-        fetchedOlder += fetched;
-
-        // Update user if we've reached the oldest activities
-        if (hasReachedOldest) {
-          await db
-            .update(users)
-            .set({ oldest_activity_reached: true })
-            .where(eq(users.id, user.id));
-
-          reachedOldest.push(user.id);
-        }
-      }
-
-      // Update sync status to completed
-      if (syncStatus) {
-        await db
-          .update(activitySync)
-          .set({
-            sync_in_progress: false,
-            last_sync: new Date(),
-          })
-          .where(eq(activitySync.id, syncStatus.id));
+          .update(users)
+          .set({ oldest_activity_reached: true })
+          .where(eq(users.id, user.id));
+        reachedOldest.push(user.id);
       }
     } catch (error) {
       logger.error(`Error processing user ${user.id}:`, error);
-      errors[user.id] = error instanceof Error ? error.message : String(error);
-
-      // Update sync status with error
-      if (syncStatus) {
-        await db
-          .update(activitySync)
-          .set({
-            sync_in_progress: false,
-            last_error: error instanceof Error ? error.message : String(error),
-          })
-          .where(eq(activitySync.id, syncStatus.id));
-      } else {
-        // Create error record if sync status doesn't exist
-        await db.insert(activitySync).values({
-          id: crypto.randomUUID(),
-          user_id: user.id,
-          last_sync: new Date(),
-          sync_in_progress: false,
-          last_error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      outcome = { outcome: 'failed', reason: 'internal_error' };
     }
 
-    // Check if we've hit the overall activities limit
-    if (updatedIncomplete + fetchedOlder >= maxActivities) {
+    if (outcome.outcome !== 'succeeded') {
+      errors[user.id] = outcome.reason ?? outcome.outcome;
+    }
+    try {
+      await recordOutcome(user.id, 'details', outcome);
+      await finishSyncStatus(syncStatusId, outcome);
+    } catch (error) {
+      logger.error(`Failed to record sync outcome for user ${user.id}:`, error);
+    }
 
+    // Strava limits are application-wide: later users would only fail too.
+    if (stoppedForRateLimit) {
       break;
     }
+    // Check if we've hit the overall activities limit
+    if (updatedIncomplete + fetchedOlder >= maxActivities) break;
   }
 
   return {
     updatedIncomplete,
+    failedDetails,
     fetchedOlder,
     reachedOldest,
     errors,
     processedUsers: usersToProcess.length,
+    stoppedForRateLimit,
   };
 }
 
-async function findIncompleteActivityIdsInDb(
-  athleteId: number,
-  limit: number,
-): Promise<number[]> {
-  const incompleteActivities = await db
-    .select({ id: activities.id })
-    .from(activities)
-    .where(
-      and(eq(activities.athlete, athleteId), eq(activities.is_complete, false)),
+/** Legacy per-user row; `last_sync` only advances after a fully successful run. */
+async function beginSyncStatus(userId: string): Promise<string> {
+  const existing = await db.query.activitySync.findFirst({
+    where: eq(activitySync.user_id, userId),
+    columns: { id: true },
+  });
+  if (existing) {
+    await db
+      .update(activitySync)
+      .set({ sync_in_progress: true })
+      .where(eq(activitySync.id, existing.id));
+    return existing.id;
+  }
+  const id = crypto.randomUUID();
+  await db.insert(activitySync).values({
+    id,
+    user_id: userId,
+    last_sync: null,
+    sync_in_progress: true,
+  });
+  return id;
+}
+
+async function finishSyncStatus(id: string, outcome: IngestionOutcomeRecord) {
+  await db
+    .update(activitySync)
+    .set(
+      outcome.outcome === 'succeeded'
+        ? { sync_in_progress: false, last_sync: new Date(), last_error: null }
+        : {
+            sync_in_progress: false,
+            last_error: outcome.reason ?? outcome.outcome,
+          },
     )
-    .orderBy(desc(activities.start_date_local))
-    .limit(limit);
-  return incompleteActivities.map((activity) => activity.id);
+    .where(eq(activitySync.id, id));
+}
+
+async function findMostRecentActivityIdInDb(
+  athleteId: number,
+): Promise<number | null> {
+  const mostRecent = await db.query.activities.findFirst({
+    where: eq(activities.athlete, athleteId),
+    orderBy: desc(activities.start_date),
+    columns: { id: true },
+  });
+  return mostRecent?.id ?? null;
+}
+
+async function findOldestStartDateInDb(athleteId: number): Promise<Date | null> {
+  const [oldest] = await db
+    .select({ startDate: activities.start_date })
+    .from(activities)
+    .where(eq(activities.athlete, athleteId))
+    .orderBy(asc(activities.start_date))
+    .limit(1);
+  return oldest?.startDate ?? null;
 }
 
 export type UpdateIncompleteActivitiesDeps = {
   activitiesRepo?: ActivitiesRepository;
   fetchActivities?: typeof fetchStravaActivities;
-  findIncompleteActivityIds?: typeof findIncompleteActivityIdsInDb;
+  ingestion?: Pick<
+    IngestionRepository,
+    'findDetailCandidates' | 'recordDetailFailures' | 'clearDetailAttempts'
+  >;
+};
+
+export type DetailEnrichmentResult = {
+  /** Activities whose details were fetched and committed. */
+  updated: number;
+  /** Activities Strava confirmed missing and that were deleted. */
+  deleted: number;
+  /** Activities that failed individually and now back off before a retry. */
+  failed: number;
+  outcome: IngestionOutcomeRecord;
 };
 
 /**
- * Update incomplete activities for a user using fetchStravaActivities.
+ * Enrich pending activities (`detailEnrichmentPending`) for one athlete.
  *
- * Exported (and given an injectable `deps`) so
- * `~/server/strava/sync.test.ts` can prove the not-found/delete branch below
- * delegates to `ActivitiesRepository.deleteManyForAthlete` - and therefore
- * gets the same one-transaction delete+tombstone+change-record atomicity
- * that repository method already has - without a live database or a real
- * Strava API call.
+ * Activity-level failures are recorded with a capped backoff so one failing
+ * activity cannot starve the rest; rate limits and rejected credentials stop
+ * the batch without blaming any activity. The not-found branch delegates to
+ * `ActivitiesRepository.deleteManyForAthlete`, which performs the delete, its
+ * tombstone and change-feed entries in one transaction (issues #120/#122).
  */
 export async function updateIncompleteActivities(
   athleteId: number,
   accessToken: string,
   limit: number,
   deps: UpdateIncompleteActivitiesDeps = {},
-): Promise<number> {
+): Promise<DetailEnrichmentResult> {
   const activitiesRepo = deps.activitiesRepo ?? activitiesRepository;
   const fetchActivities = deps.fetchActivities ?? fetchStravaActivities;
-  const findIncompleteActivityIds =
-    deps.findIncompleteActivityIds ?? findIncompleteActivityIdsInDb;
+  const ingestion = deps.ingestion ?? ingestionRepository;
+  const result: DetailEnrichmentResult = {
+    updated: 0,
+    deleted: 0,
+    failed: 0,
+    outcome: { outcome: 'succeeded', reason: null },
+  };
 
-  // Get incomplete activities, prioritizing recent ones
-  const activityIds = await findIncompleteActivityIds(athleteId, limit);
+  const activityIds = await ingestion.findDetailCandidates(athleteId, limit);
+  if (activityIds.length === 0) return result;
 
-  if (activityIds.length === 0) {
-
-    return 0;
-  }
-
-
-
+  let fetched: Awaited<ReturnType<typeof fetchStravaActivities>>;
   try {
-    // Use fetchStravaActivities to get complete activities with full details
-    const { activities: updatedActivities, notFoundIds } =
-      await fetchActivities({
-        accessToken,
-        activityIds,
-        athleteId,
-        includePhotos: false, // No need for photos in this context
-        limit,
-      });
-
-    // Delete activities that were not found on Strava. This delegates to
-    // `ActivitiesRepository.deleteManyForAthlete`, which performs the
-    // delete, its tombstone insert, and its `sync_change` change-feed
-    // entries (including for any photo cascade-deleted with it) inside one
-    // database transaction - fixing the same non-atomic
-    // delete-then-separately-tombstone bug already fixed for the webhook
-    // path (#133) and for this same method's own former inline duplicate of
-    // it (issue #120's review), rather than re-implementing that
-    // transaction a third time here. See issue #122.
-    if (notFoundIds && notFoundIds.length > 0) {
-      try {
-        const deletedIds = await activitiesRepo.deleteManyForAthlete(
-          athleteId,
-          notFoundIds,
-        );
-
-        if (deletedIds.length !== notFoundIds.length) {
-          logger.warn(
-            `Mismatch in deleted count. Expected ${notFoundIds.length}, got ${deletedIds.length}`,
-          );
-        }
-      } catch (deleteError) {
-        logger.error(
-          `Error during database delete operation for athlete ${athleteId}:`,
-          deleteError,
-        );
-        // Optionally re-throw or handle appropriately if deletion is critical
-      }
-    }
-
-
-    return updatedActivities.length;
+    fetched = await fetchActivities({
+      accessToken,
+      activityIds,
+      athleteId,
+      includePhotos: false, // No need for photos in this context
+      limit,
+    });
   } catch (error) {
     logger.error(
       `Error updating incomplete activities for athlete ${athleteId}:`,
       error,
     );
-    return 0;
+    const { outcome, reason } = stepFailure(error);
+    result.outcome = { outcome, reason };
+    return result;
   }
+
+  result.updated = fetched.activities.length;
+  await ingestion.clearDetailAttempts(fetched.activities.map((a) => a.id));
+
+  const activityFailures: { activityId: number; code: DetailFailureCode }[] = [];
+  let stop: IngestionOutcomeRecord | null = null;
+  for (const { activityId, error } of fetched.failures ?? []) {
+    const failure = classifyIngestionFailure(error);
+    if (failure.scope === 'activity') {
+      activityFailures.push({ activityId, code: failure.code });
+    } else if (!stop || failure.outcome === 'blocked') {
+      stop = { outcome: failure.outcome, reason: failure.reason };
+    }
+  }
+  await ingestion.recordDetailFailures(activityFailures);
+  result.failed = activityFailures.length;
+
+  let deleteFailed = false;
+  if (fetched.notFoundIds.length > 0) {
+    try {
+      const deletedIds = await activitiesRepo.deleteManyForAthlete(
+        athleteId,
+        fetched.notFoundIds,
+      );
+      result.deleted = deletedIds.length;
+      if (deletedIds.length !== fetched.notFoundIds.length) {
+        logger.warn(
+          `Mismatch in deleted count. Expected ${fetched.notFoundIds.length}, got ${deletedIds.length}`,
+        );
+      }
+    } catch (deleteError) {
+      deleteFailed = true;
+      logger.error(
+        `Error during database delete operation for athlete ${athleteId}:`,
+        deleteError,
+      );
+    }
+  }
+
+  const committed = result.updated + result.deleted > 0;
+  if (stop) {
+    result.outcome = stop;
+  } else if (activityFailures.length > 0) {
+    result.outcome = {
+      outcome: committed ? 'partial' : 'failed',
+      reason: 'detail_failures',
+    };
+  } else if (deleteFailed) {
+    result.outcome = {
+      outcome: committed ? 'partial' : 'failed',
+      reason: 'persistence_failed',
+    };
+  }
+  return result;
 }
 
 /**
- * Fetch activities older than the oldest existing activity using fetchStravaActivities
+ * Fetch activities older than the oldest existing activity. Summary
+ * reconciliation, not this step, is what proves the history complete.
  */
 async function fetchOlderActivities(
   athleteId: number,
   accessToken: string,
   limit: number,
   minActivitiesThreshold: number,
-): Promise<{ fetched: number; reachedOldest: boolean }> {
-
-
-  // Find the oldest activity timestamp
-  const oldestActivity = await db
-    .select()
-    .from(activities)
-    .where(eq(activities.athlete, athleteId))
-    .orderBy(asc(activities.start_date))
-    .limit(1);
-
-  // Default to "now" if no activities found
-  const oldestTimestamp =
-    oldestActivity.length > 0 && oldestActivity[0]?.start_date
-      ? Math.floor(new Date(oldestActivity[0].start_date).getTime() / 1000)
-      : Math.floor(Date.now() / 1000);
-
-
+  deps: {
+    fetchActivities: typeof fetchStravaActivities;
+    findOldestStartDate: (athleteId: number) => Promise<Date | null>;
+  },
+): Promise<{ fetched: number; reachedOldest: boolean; error?: unknown }> {
   try {
-    // Use fetchStravaActivities to get older activities
-    const { activities: olderActivities } = await fetchStravaActivities({
+    const oldest = await deps.findOldestStartDate(athleteId);
+    const oldestTimestamp = Math.floor(
+      (oldest?.getTime() ?? Date.now()) / 1000,
+    );
+    const { activities: olderActivities } = await deps.fetchActivities({
       accessToken,
       before: oldestTimestamp,
       athleteId,
       includePhotos: false,
       limit,
     });
-
-
-
-    // Check if we've reached the oldest activities
-    // If number of activities returned is less than threshold, assume we've reached the end
-    const reachedOldest = olderActivities.length < minActivitiesThreshold;
-
-    if (olderActivities.length === 0) {
-
-      return { fetched: 0, reachedOldest: true };
-    }
-
-    if (reachedOldest) {
-
-    }
-
+    // If fewer activities than the threshold come back, assume we've reached the end
     return {
       fetched: olderActivities.length,
-      reachedOldest,
+      reachedOldest: olderActivities.length < minActivitiesThreshold,
     };
   } catch (error) {
     logger.error(
       `Error fetching older activities for athlete ${athleteId}:`,
       error,
     );
-    return { fetched: 0, reachedOldest: false };
+    return { fetched: 0, reachedOldest: false, error };
   }
 }

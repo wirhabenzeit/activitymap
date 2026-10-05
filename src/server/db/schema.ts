@@ -743,6 +743,81 @@ export const streamBackfillAccounts = pgTable('stream_backfill_account', {
   blockedCredentials: text('blocked_credentials'),
 });
 
+// Detail enrichment retry state (issue #296). Only failed attempts are kept:
+// a row is deleted when the worker enriches the activity, and eligibility
+// itself always comes from `activities.geometry_state`. Like stream attempts,
+// this never publishes change-feed entries.
+export const activityDetailAttempts = pgTable(
+  'activity_detail_attempt',
+  {
+    activityId: bigint('activity_id', { mode: 'number' })
+      .primaryKey()
+      .references(() => activities.id, { onDelete: 'cascade' }),
+    attemptCount: integer('attempt_count').notNull(),
+    lastAttemptAt: timestamp('last_attempt_at', { mode: 'date' }).notNull(),
+    nextAttemptAt: timestamp('next_attempt_at', { mode: 'date' }).notNull(),
+    lastErrorCode: text('last_error_code', {
+      enum: ['upstream_error', 'invalid_response', 'forbidden'],
+    }).notNull(),
+  },
+  (table) => [
+    index('activity_detail_attempt_next_idx').on(table.nextAttemptAt),
+  ],
+);
+
+export type ActivityDetailAttempt = typeof activityDetailAttempts.$inferSelect;
+
+// Last observed outcome of each per-account ingestion pipeline (issue #296).
+// Progress itself is derived from the activity rows and reconciliation state;
+// this records only what a run could not otherwise leave behind: when it ran,
+// whether it failed, and a safe reason. Never upstream bodies or tokens.
+export const ingestionPipelineEnum = pgEnum('ingestion_pipeline', [
+  'history',
+  'details',
+]);
+export const ingestionOutcomeEnum = pgEnum('ingestion_run_outcome', [
+  'succeeded',
+  'partial',
+  'deferred',
+  'failed',
+  'blocked',
+]);
+
+export const ingestionOutcomes = pgTable(
+  'ingestion_outcome',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    pipeline: ingestionPipelineEnum('pipeline').notNull(),
+    lastAttemptAt: timestamp('last_attempt_at', { mode: 'date' }).notNull(),
+    // Last run that finished without any failure; partial runs do not count.
+    lastSucceededAt: timestamp('last_succeeded_at', { mode: 'date' }),
+    outcome: ingestionOutcomeEnum('outcome').notNull(),
+    reason: text('reason'),
+    retryAt: timestamp('retry_at', { mode: 'date' }),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.pipeline] })],
+);
+
+export type IngestionOutcomeRow = typeof ingestionOutcomes.$inferSelect;
+
+// Global heartbeat for the scheduled ingestion jobs (issue #296). The GitHub
+// scheduler cannot be observed from the server, so an absent or old heartbeat
+// is the only evidence that a job stopped running.
+export const backgroundJobRuns = pgTable('background_job_run', {
+  job: text('job').primaryKey(),
+  lastStartedAt: timestamp('last_started_at', { mode: 'date' }).notNull(),
+  lastFinishedAt: timestamp('last_finished_at', { mode: 'date' }),
+  lastStatus: text('last_status', {
+    enum: ['running', 'completed', 'failed', 'disabled'],
+  }).notNull(),
+  lastStopReason: text('last_stop_reason'),
+  lastCompletedAt: timestamp('last_completed_at', { mode: 'date' }),
+});
+
+export type BackgroundJobRun = typeof backgroundJobRuns.$inferSelect;
+
 // Scheduling metadata is separate from stream data: retries/checkpoints must
 // not publish activity change-feed entries or load large JSON payloads.
 export const streamBackfillAttempts = pgTable('stream_backfill_attempt', {

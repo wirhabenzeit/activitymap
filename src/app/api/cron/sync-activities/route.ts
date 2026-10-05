@@ -1,10 +1,17 @@
-import { syncActivities } from '~/server/strava/sync';
+import { syncActivities as runSyncActivities } from '~/server/strava/sync';
+import { withJobHeartbeat } from '~/server/application/job-heartbeat';
 import { type NextRequest, NextResponse } from 'next/server';
 import { logger } from '~/server/logging/logger';
 import {
   EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   externalEffectsEnabled,
 } from '~/server/config/external-effects';
+
+const syncActivities = withJobHeartbeat(
+  'sync-activities',
+  runSyncActivities,
+  (result) => (result.stoppedForRateLimit ? 'rate_limit' : null),
+);
 
 // Define type for configuration options
 interface SyncConfig {

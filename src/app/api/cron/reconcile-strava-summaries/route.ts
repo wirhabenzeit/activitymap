@@ -4,6 +4,7 @@ import {
 } from '~/server/config/external-effects';
 import { logger } from '~/server/logging/logger';
 import { reconcileStravaSummaries } from '~/server/strava/summary-reconciliation';
+import { withJobHeartbeat } from '~/server/application/job-heartbeat';
 import { createSummaryReconciliationCronHandler } from './handler';
 
 // The reconciler intentionally checkpoints work across invocations. A single
@@ -17,6 +18,15 @@ export const POST = createSummaryReconciliationCronHandler({
   externalEffectsEnabled,
   externalEffectsDisabledMessage: EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   getCronSecret: () => process.env.CRON_SECRET,
-  reconcile: reconcileStravaSummaries,
+  reconcile: withJobHeartbeat(
+    'reconcile-strava-summaries',
+    reconcileStravaSummaries,
+    (result) =>
+      result.stoppedForRateLimit
+        ? 'rate_limit'
+        : result.stoppedForTimeBudget
+          ? 'time_budget'
+          : null,
+  ),
   onError: (message, error) => logger.error(message, error),
 });

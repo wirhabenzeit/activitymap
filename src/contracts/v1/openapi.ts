@@ -17,6 +17,7 @@ import { photoDTOSchema } from './photo';
 import { currentUserDTOSchema } from './user';
 import { syncBootstrapPageDTOSchema, syncChangesPageDTOSchema } from './sync';
 import { errorEnvelopeSchema } from './error';
+import { ingestionStatusDTOSchema } from './ingestion-status';
 import { responseEnvelope } from './envelope';
 import { paginatedSchema, MAX_PAGE_SIZE } from './pagination';
 import {
@@ -59,6 +60,9 @@ export function buildOpenApiDocument() {
   });
   registry.add(responseEnvelope(syncChangesPageDTOSchema), {
     id: 'SyncChangesPageResponse',
+  });
+  registry.add(responseEnvelope(ingestionStatusDTOSchema), {
+    id: 'IngestionStatusResponse',
   });
   registry.add(errorEnvelopeSchema, { id: 'FailureResponse' });
   registry.add(responseEnvelope(currentUserDTOSchema), {
@@ -148,6 +152,28 @@ export function buildOpenApiDocument() {
             '500': errorResponse(
               'The server could not serialize a valid contract response',
             ),
+          },
+        },
+      },
+      '/api/v1/ingestion-status': {
+        get: {
+          operationId: 'getIngestionStatus',
+          summary: "The caller's Strava import coverage and progress",
+          description:
+            'Read-only, account-scoped status of what ActivityMap has imported from Strava (history, details, photo metadata and streams) and whether automatic work will continue. It never reflects a client\'s own local sync state, never calls Strava, and is privately cacheable for `max-age`; clients should not poll faster. See docs/ingestion-status.md.',
+          security,
+          responses: {
+            '200': {
+              description: 'The ingestion status as observed now',
+              content: {
+                'application/json': { schema: ref('IngestionStatusResponse') },
+              },
+            },
+            '401': errorResponse(
+              'No valid session or bearer credential was presented',
+            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
+            '500': errorResponse('The status could not be read'),
           },
         },
       },

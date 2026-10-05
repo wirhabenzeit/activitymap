@@ -15,6 +15,15 @@ import {
   type StravaRateLimitUsage,
 } from '~/server/strava/client';
 import type { StravaActivity } from '~/server/strava/types';
+import {
+  ingestionRepository,
+  type IngestionRepository,
+} from '~/server/repositories/ingestion';
+import {
+  CredentialUnavailableError,
+  outcomeForError,
+  type IngestionOutcomeRecord,
+} from './ingestion-policy';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /**
@@ -114,6 +123,7 @@ export async function reconcileStravaSummaries({
   repository = defaultRepository,
   resolveAccount = getAccountInternal,
   createSource = productionSource,
+  recordOutcome = ingestionRepository.recordOutcome,
 }: {
   batchSize?: number;
   pagesPerAthlete?: number;
@@ -125,6 +135,7 @@ export async function reconcileStravaSummaries({
   repository?: SummaryReconciliationRepository;
   resolveAccount?: AccountResolver;
   createSource?: (accessToken: string) => SummaryReconciliationSource;
+  recordOutcome?: IngestionRepository['recordOutcome'];
 } = {}): Promise<SummaryReconciliationRunResult> {
   if (
     !Number.isInteger(batchSize) ||
@@ -182,6 +193,17 @@ export async function reconcileStravaSummaries({
     timeBudgetMs,
   });
 
+  // An outcome is observational: failing to store it must not abort the scan.
+  const record = async (userId: string, outcome: IngestionOutcomeRecord) => {
+    try {
+      await recordOutcome(userId, 'history', outcome);
+    } catch (error) {
+      logger.error('[Summary reconciliation] Failed to record outcome', {
+        error,
+      });
+    }
+  };
+
   // Sequential by design: Strava's API limits are global to the application,
   // and each page can create hundreds of transactional change-feed writes.
   let stopReason: 'time_budget' | 'rate_limit' | null = null;
@@ -212,7 +234,7 @@ export async function reconcileStravaSummaries({
       });
       const accessToken = account?.accessToken ?? account?.access_token;
       if (!accessToken || account?.revokedAt) {
-        throw new Error('Authorized Strava credential is unavailable');
+        throw new CredentialUnavailableError();
       }
       source = createSource(accessToken);
 
@@ -309,6 +331,15 @@ export async function reconcileStravaSummaries({
         await repository.release(claim, now);
         result.partial += 1;
       }
+      await record(
+        candidate.userId,
+        stopReason
+          ? {
+              outcome: 'deferred',
+              reason: stopReason === 'rate_limit' ? 'rate_limited' : 'time_budget',
+            }
+          : { outcome: 'succeeded', reason: null },
+      );
       if (
         !stopReason &&
         hasInsufficientStravaRateLimitHeadroom(source.getRateLimitUsage?.())
@@ -316,6 +347,8 @@ export async function reconcileStravaSummaries({
         stopReason = 'rate_limit';
       }
     } catch (error) {
+      // Only a claimed athlete has a run worth reporting.
+      if (claim) await record(candidate.userId, outcomeForError(error));
       if (claim) {
         try {
           await repository.release(claim, now);

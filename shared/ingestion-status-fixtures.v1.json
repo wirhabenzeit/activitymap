@@ -1,0 +1,1587 @@
+{
+  "version": 1,
+  "description": "Account ingestion status scenarios (issues #296/#297). Each `snapshot` is the server read model input and `status` the exact GET /api/v1/ingestion-status `data` it derives. Clients assert their presentation against `status` and `clientExpectation`. See docs/ingestion-status.md.",
+  "scenarios": [
+    {
+      "id": "initial-import-unknown-total",
+      "description": "A new account four pages into its first Strava summary scan. Nothing has been enriched yet and the total history size is not known.",
+      "clientExpectation": "Show history as importing with the known count only; never show a percentage or a total.",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-09-05T12:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": null,
+          "scan": {
+            "phase": "scanning",
+            "nextPage": 5,
+            "scanStartedAt": "2026-10-05T09:00:00.000Z"
+          }
+        },
+        "activities": {
+          "total": 800,
+          "oldestStartDate": "2021-06-11T05:40:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 0,
+          "neverDetailed": 800,
+          "invalidated": 0,
+          "detailRetryWaiting": 0,
+          "detailNextRetryAt": null
+        },
+        "photos": {
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "withData": 0,
+          "withoutData": 0,
+          "chartSummaries": 0,
+          "failed": 0,
+          "waiting": 0,
+          "runnable": 800,
+          "invalidated": 0,
+          "nextRetryAt": null
+        },
+        "outcomes": {
+          "history": {
+            "userId": "fixture-user",
+            "pipeline": "history",
+            "lastAttemptAt": "2026-10-05T11:37:00.000Z",
+            "lastSucceededAt": "2026-10-05T11:37:00.000Z",
+            "outcome": "succeeded",
+            "reason": null,
+            "retryAt": null
+          }
+        },
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "in_progress",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": {
+            "outcome": "succeeded",
+            "reason": null,
+            "attemptedAt": "2026-10-05T11:37:00.000Z",
+            "lastSucceededAt": "2026-10-05T11:37:00.000Z",
+            "retryAt": null
+          },
+          "knownActivityCount": 800,
+          "totalActivityCount": null,
+          "oldestActivityStart": "2021-06-11T05:40:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "scanning",
+            "pagesScanned": 4,
+            "scanStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastCompletedAt": null,
+            "nextDueAt": null,
+            "freshness": "never_completed"
+          }
+        },
+        "details": {
+          "progress": "not_started",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "detailed": 0,
+          "neverFetched": 800,
+          "invalidated": 0,
+          "retryWaiting": 0
+        },
+        "photos": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "progress": "not_started",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "withData": 0,
+          "withoutData": 0,
+          "runnable": 800,
+          "waiting": 0,
+          "blocked": 0,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 0
+        }
+      }
+    },
+    {
+      "id": "partial-import-with-detail-failures",
+      "description": "History is complete. Most details and streams are imported; a few detail fetches failed and back off, some activities have no GPS or sensor streams, and some streams failed permanently.",
+      "clientExpectation": "Even when this device has synced every stored activity, show details and streams as still importing. Activities without streams are complete, not missing.",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-09-05T12:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-10-03T12:00:00.000Z",
+          "scan": null
+        },
+        "activities": {
+          "total": 1000,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 900,
+          "neverDetailed": 80,
+          "invalidated": 20,
+          "detailRetryWaiting": 5,
+          "detailNextRetryAt": "2026-10-05T14:00:00.000Z"
+        },
+        "photos": {
+          "activitiesWithPhotos": 120,
+          "current": 100,
+          "refreshRequired": 15,
+          "unknown": 5,
+          "photoCount": 410
+        },
+        "streams": {
+          "withData": 400,
+          "withoutData": 50,
+          "chartSummaries": 395,
+          "failed": 20,
+          "waiting": 10,
+          "runnable": 520,
+          "invalidated": 12,
+          "nextRetryAt": "2026-10-05T13:00:00.000Z"
+        },
+        "outcomes": {
+          "history": {
+            "userId": "fixture-user",
+            "pipeline": "history",
+            "lastAttemptAt": "2026-10-05T11:37:00.000Z",
+            "lastSucceededAt": "2026-10-05T11:37:00.000Z",
+            "outcome": "succeeded",
+            "reason": null,
+            "retryAt": null
+          },
+          "details": {
+            "userId": "fixture-user",
+            "pipeline": "details",
+            "lastAttemptAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-04T21:00:00.000Z",
+            "outcome": "partial",
+            "reason": "detail_failures",
+            "retryAt": null
+          }
+        },
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": {
+            "outcome": "succeeded",
+            "reason": null,
+            "attemptedAt": "2026-10-05T11:37:00.000Z",
+            "lastSucceededAt": "2026-10-05T11:37:00.000Z",
+            "retryAt": null
+          },
+          "knownActivityCount": 1000,
+          "totalActivityCount": 1000,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "idle",
+            "pagesScanned": null,
+            "scanStartedAt": null,
+            "lastCompletedAt": "2026-10-03T12:00:00.000Z",
+            "nextDueAt": "2026-10-09T12:00:00.000Z",
+            "freshness": "current"
+          }
+        },
+        "details": {
+          "progress": "in_progress",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": {
+            "outcome": "partial",
+            "reason": "detail_failures",
+            "attemptedAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-04T21:00:00.000Z",
+            "retryAt": null
+          },
+          "detailed": 900,
+          "neverFetched": 80,
+          "invalidated": 20,
+          "retryWaiting": 5
+        },
+        "photos": {
+          "progress": "in_progress",
+          "scheduling": "not_scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 120,
+          "current": 100,
+          "refreshRequired": 15,
+          "unknown": 5,
+          "photoCount": 410
+        },
+        "streams": {
+          "progress": "in_progress",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "withData": 400,
+          "withoutData": 50,
+          "runnable": 520,
+          "waiting": 10,
+          "blocked": 0,
+          "failed": 20,
+          "invalidated": 12,
+          "chartSummaries": 395
+        }
+      }
+    },
+    {
+      "id": "complete-with-no-gps-and-empty-streams",
+      "description": "Everything is imported. Some activities are manual or indoor with no GPS route, and some recorded no sensor streams.",
+      "clientExpectation": "Show everything as up to date. Activities without a route or streams are not pending work.",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-09-05T12:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-10-03T12:00:00.000Z",
+          "scan": null
+        },
+        "activities": {
+          "total": 230,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 230,
+          "neverDetailed": 0,
+          "invalidated": 0,
+          "detailRetryWaiting": 0,
+          "detailNextRetryAt": null
+        },
+        "photos": {
+          "activitiesWithPhotos": 12,
+          "current": 12,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 31
+        },
+        "streams": {
+          "withData": 200,
+          "withoutData": 30,
+          "chartSummaries": 200,
+          "failed": 0,
+          "waiting": 0,
+          "runnable": 0,
+          "invalidated": 0,
+          "nextRetryAt": null
+        },
+        "outcomes": {
+          "history": {
+            "userId": "fixture-user",
+            "pipeline": "history",
+            "lastAttemptAt": "2026-10-03T12:00:00.000Z",
+            "lastSucceededAt": "2026-10-03T12:00:00.000Z",
+            "outcome": "succeeded",
+            "reason": null,
+            "retryAt": null
+          },
+          "details": {
+            "userId": "fixture-user",
+            "pipeline": "details",
+            "lastAttemptAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-05T09:00:00.000Z",
+            "outcome": "succeeded",
+            "reason": null,
+            "retryAt": null
+          }
+        },
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": {
+            "outcome": "succeeded",
+            "reason": null,
+            "attemptedAt": "2026-10-03T12:00:00.000Z",
+            "lastSucceededAt": "2026-10-03T12:00:00.000Z",
+            "retryAt": null
+          },
+          "knownActivityCount": 230,
+          "totalActivityCount": 230,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "idle",
+            "pagesScanned": null,
+            "scanStartedAt": null,
+            "lastCompletedAt": "2026-10-03T12:00:00.000Z",
+            "nextDueAt": "2026-10-09T12:00:00.000Z",
+            "freshness": "current"
+          }
+        },
+        "details": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": {
+            "outcome": "succeeded",
+            "reason": null,
+            "attemptedAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-05T09:00:00.000Z",
+            "retryAt": null
+          },
+          "detailed": 230,
+          "neverFetched": 0,
+          "invalidated": 0,
+          "retryWaiting": 0
+        },
+        "photos": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 12,
+          "current": 12,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 31
+        },
+        "streams": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "withData": 200,
+          "withoutData": 30,
+          "runnable": 0,
+          "waiting": 0,
+          "blocked": 0,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 200
+        }
+      }
+    },
+    {
+      "id": "details-waiting-after-failures",
+      "description": "The only pending details failed recently and are backing off.",
+      "clientExpectation": "Show the remaining details as waiting until retryAt, not as stuck or failed forever.",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-09-05T12:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-10-03T12:00:00.000Z",
+          "scan": null
+        },
+        "activities": {
+          "total": 300,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 297,
+          "neverDetailed": 3,
+          "invalidated": 0,
+          "detailRetryWaiting": 3,
+          "detailNextRetryAt": "2026-10-05T16:00:00.000Z"
+        },
+        "photos": {
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "withData": 297,
+          "withoutData": 3,
+          "chartSummaries": 297,
+          "failed": 0,
+          "waiting": 0,
+          "runnable": 0,
+          "invalidated": 0,
+          "nextRetryAt": null
+        },
+        "outcomes": {
+          "details": {
+            "userId": "fixture-user",
+            "pipeline": "details",
+            "lastAttemptAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-03T12:00:00.000Z",
+            "outcome": "failed",
+            "reason": "detail_failures",
+            "retryAt": null
+          }
+        },
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "knownActivityCount": 300,
+          "totalActivityCount": 300,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "idle",
+            "pagesScanned": null,
+            "scanStartedAt": null,
+            "lastCompletedAt": "2026-10-03T12:00:00.000Z",
+            "nextDueAt": "2026-10-09T12:00:00.000Z",
+            "freshness": "current"
+          }
+        },
+        "details": {
+          "progress": "in_progress",
+          "scheduling": "waiting",
+          "schedulingReason": "detail_failures",
+          "retryAt": "2026-10-05T16:00:00.000Z",
+          "lastOutcome": {
+            "outcome": "failed",
+            "reason": "detail_failures",
+            "attemptedAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-03T12:00:00.000Z",
+            "retryAt": null
+          },
+          "detailed": 297,
+          "neverFetched": 3,
+          "invalidated": 0,
+          "retryWaiting": 3
+        },
+        "photos": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "withData": 297,
+          "withoutData": 3,
+          "runnable": 0,
+          "waiting": 0,
+          "blocked": 0,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 297
+        }
+      }
+    },
+    {
+      "id": "account-credentials-rejected",
+      "description": "Strava rejected the stored credentials during the last enrichment run and for stream backfill; the grant has not changed since.",
+      "clientExpectation": "Offer reconnecting Strava. Do not suggest retrying or waiting.",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-09-25T12:00:00.000Z",
+          "streamCredentialsBlocked": true
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-10-03T12:00:00.000Z",
+          "scan": null
+        },
+        "activities": {
+          "total": 500,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 450,
+          "neverDetailed": 50,
+          "invalidated": 0,
+          "detailRetryWaiting": 0,
+          "detailNextRetryAt": null
+        },
+        "photos": {
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "withData": 300,
+          "withoutData": 20,
+          "chartSummaries": 300,
+          "failed": 0,
+          "waiting": 0,
+          "runnable": 180,
+          "invalidated": 0,
+          "nextRetryAt": null
+        },
+        "outcomes": {
+          "details": {
+            "userId": "fixture-user",
+            "pipeline": "details",
+            "lastAttemptAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-02T12:00:00.000Z",
+            "outcome": "blocked",
+            "reason": "unauthorized",
+            "retryAt": null
+          }
+        },
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "knownActivityCount": 500,
+          "totalActivityCount": 500,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "idle",
+            "pagesScanned": null,
+            "scanStartedAt": null,
+            "lastCompletedAt": "2026-10-03T12:00:00.000Z",
+            "nextDueAt": "2026-10-09T12:00:00.000Z",
+            "freshness": "current"
+          }
+        },
+        "details": {
+          "progress": "in_progress",
+          "scheduling": "blocked",
+          "schedulingReason": "unauthorized",
+          "retryAt": null,
+          "lastOutcome": {
+            "outcome": "blocked",
+            "reason": "unauthorized",
+            "attemptedAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-02T12:00:00.000Z",
+            "retryAt": null
+          },
+          "detailed": 450,
+          "neverFetched": 50,
+          "invalidated": 0,
+          "retryWaiting": 0
+        },
+        "photos": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "progress": "in_progress",
+          "scheduling": "blocked",
+          "schedulingReason": "unauthorized",
+          "retryAt": null,
+          "withData": 300,
+          "withoutData": 20,
+          "runnable": 0,
+          "waiting": 0,
+          "blocked": 180,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 300
+        }
+      }
+    },
+    {
+      "id": "reconnected-after-rejection",
+      "description": "The same account after reconnecting: the grant changed after the rejected run, so work is scheduled again before the next run reports.",
+      "clientExpectation": "Stop offering reconnect; show the work as scheduled. The last outcome still describes the earlier rejected run.",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-10-05T11:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-10-03T12:00:00.000Z",
+          "scan": null
+        },
+        "activities": {
+          "total": 500,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 450,
+          "neverDetailed": 50,
+          "invalidated": 0,
+          "detailRetryWaiting": 0,
+          "detailNextRetryAt": null
+        },
+        "photos": {
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "withData": 300,
+          "withoutData": 20,
+          "chartSummaries": 300,
+          "failed": 0,
+          "waiting": 0,
+          "runnable": 180,
+          "invalidated": 0,
+          "nextRetryAt": null
+        },
+        "outcomes": {
+          "details": {
+            "userId": "fixture-user",
+            "pipeline": "details",
+            "lastAttemptAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-02T12:00:00.000Z",
+            "outcome": "blocked",
+            "reason": "unauthorized",
+            "retryAt": null
+          }
+        },
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "knownActivityCount": 500,
+          "totalActivityCount": 500,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "idle",
+            "pagesScanned": null,
+            "scanStartedAt": null,
+            "lastCompletedAt": "2026-10-03T12:00:00.000Z",
+            "nextDueAt": "2026-10-09T12:00:00.000Z",
+            "freshness": "current"
+          }
+        },
+        "details": {
+          "progress": "in_progress",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": {
+            "outcome": "blocked",
+            "reason": "unauthorized",
+            "attemptedAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-02T12:00:00.000Z",
+            "retryAt": null
+          },
+          "detailed": 450,
+          "neverFetched": 50,
+          "invalidated": 0,
+          "retryWaiting": 0
+        },
+        "photos": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "progress": "in_progress",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "withData": 300,
+          "withoutData": 20,
+          "runnable": 180,
+          "waiting": 0,
+          "blocked": 0,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 300
+        }
+      }
+    },
+    {
+      "id": "rate-limit-wait",
+      "description": "A rescan stopped at the Strava rate limit and every outstanding stream is waiting for its retry time.",
+      "clientExpectation": "Explain that ActivityMap is waiting for Strava limits and continues automatically; no action is needed.",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-09-05T12:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-09-29T10:00:00.000Z",
+          "scan": {
+            "phase": "scanning",
+            "nextPage": 2,
+            "scanStartedAt": "2026-10-05T10:00:00.000Z"
+          }
+        },
+        "activities": {
+          "total": 700,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 700,
+          "neverDetailed": 0,
+          "invalidated": 0,
+          "detailRetryWaiting": 0,
+          "detailNextRetryAt": null
+        },
+        "photos": {
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "withData": 640,
+          "withoutData": 20,
+          "chartSummaries": 640,
+          "failed": 0,
+          "waiting": 40,
+          "runnable": 0,
+          "invalidated": 0,
+          "nextRetryAt": "2026-10-05T12:45:00.000Z"
+        },
+        "outcomes": {
+          "history": {
+            "userId": "fixture-user",
+            "pipeline": "history",
+            "lastAttemptAt": "2026-10-05T11:37:00.000Z",
+            "lastSucceededAt": "2026-10-04T12:00:00.000Z",
+            "outcome": "deferred",
+            "reason": "rate_limited",
+            "retryAt": null
+          }
+        },
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": {
+            "outcome": "deferred",
+            "reason": "rate_limited",
+            "attemptedAt": "2026-10-05T11:37:00.000Z",
+            "lastSucceededAt": "2026-10-04T12:00:00.000Z",
+            "retryAt": null
+          },
+          "knownActivityCount": 700,
+          "totalActivityCount": 700,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "scanning",
+            "pagesScanned": 1,
+            "scanStartedAt": "2026-10-05T10:00:00.000Z",
+            "lastCompletedAt": "2026-09-29T10:00:00.000Z",
+            "nextDueAt": "2026-10-05T10:00:00.000Z",
+            "freshness": "due"
+          }
+        },
+        "details": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "detailed": 700,
+          "neverFetched": 0,
+          "invalidated": 0,
+          "retryWaiting": 0
+        },
+        "photos": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "progress": "in_progress",
+          "scheduling": "waiting",
+          "schedulingReason": null,
+          "retryAt": "2026-10-05T12:45:00.000Z",
+          "withData": 640,
+          "withoutData": 20,
+          "runnable": 0,
+          "waiting": 40,
+          "blocked": 0,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 640
+        }
+      }
+    },
+    {
+      "id": "scheduler-stalled-or-disabled",
+      "description": "Summary reconciliation has not run for five hours, stream backfill is switched off on the server, and the legacy sync job has never reported.",
+      "clientExpectation": "Say automatic import is currently paused or unavailable rather than implying progress. Users cannot fix this themselves.",
+      "streamBackfillEnabled": false,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-09-05T12:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-09-29T07:00:00.000Z",
+          "scan": null
+        },
+        "activities": {
+          "total": 400,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 380,
+          "neverDetailed": 20,
+          "invalidated": 0,
+          "detailRetryWaiting": 0,
+          "detailNextRetryAt": null
+        },
+        "photos": {
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "withData": 0,
+          "withoutData": 0,
+          "chartSummaries": 0,
+          "failed": 0,
+          "waiting": 0,
+          "runnable": 400,
+          "invalidated": 0,
+          "nextRetryAt": null
+        },
+        "outcomes": {},
+        "jobs": {
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T07:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T07:00:30.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T07:00:30.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "stalled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "knownActivityCount": 400,
+          "totalActivityCount": 400,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "idle",
+            "pagesScanned": null,
+            "scanStartedAt": null,
+            "lastCompletedAt": "2026-09-29T07:00:00.000Z",
+            "nextDueAt": "2026-10-05T07:00:00.000Z",
+            "freshness": "due"
+          }
+        },
+        "details": {
+          "progress": "in_progress",
+          "scheduling": "unknown",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "detailed": 380,
+          "neverFetched": 20,
+          "invalidated": 0,
+          "retryWaiting": 0
+        },
+        "photos": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "progress": "not_started",
+          "scheduling": "disabled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "withData": 0,
+          "withoutData": 0,
+          "runnable": 400,
+          "waiting": 0,
+          "blocked": 0,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 0
+        }
+      }
+    },
+    {
+      "id": "revoked-account",
+      "description": "The athlete deauthorized ActivityMap on Strava. Stored data remains until erasure, but no import work can continue.",
+      "clientExpectation": "Show the account as disconnected with a reconnect action; keep showing what was imported.",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": false,
+          "updatedAt": "2026-10-04T12:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-09-27T12:00:00.000Z",
+          "scan": null
+        },
+        "activities": {
+          "total": 150,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 140,
+          "neverDetailed": 10,
+          "invalidated": 0,
+          "detailRetryWaiting": 0,
+          "detailNextRetryAt": null
+        },
+        "photos": {
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "withData": 100,
+          "withoutData": 0,
+          "chartSummaries": 100,
+          "failed": 0,
+          "waiting": 5,
+          "runnable": 45,
+          "invalidated": 0,
+          "nextRetryAt": "2026-10-05T13:00:00.000Z"
+        },
+        "outcomes": {},
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "blocked",
+          "schedulingReason": "credentials_unavailable",
+          "retryAt": null,
+          "lastOutcome": null,
+          "knownActivityCount": 150,
+          "totalActivityCount": 150,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "idle",
+            "pagesScanned": null,
+            "scanStartedAt": null,
+            "lastCompletedAt": "2026-09-27T12:00:00.000Z",
+            "nextDueAt": "2026-10-03T12:00:00.000Z",
+            "freshness": "overdue"
+          }
+        },
+        "details": {
+          "progress": "in_progress",
+          "scheduling": "blocked",
+          "schedulingReason": "credentials_unavailable",
+          "retryAt": null,
+          "lastOutcome": null,
+          "detailed": 140,
+          "neverFetched": 10,
+          "invalidated": 0,
+          "retryWaiting": 0
+        },
+        "photos": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "progress": "in_progress",
+          "scheduling": "blocked",
+          "schedulingReason": "credentials_unavailable",
+          "retryAt": null,
+          "withData": 100,
+          "withoutData": 0,
+          "runnable": 0,
+          "waiting": 0,
+          "blocked": 50,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 100
+        }
+      }
+    },
+    {
+      "id": "photo-only-staleness",
+      "description": "Everything is imported except photo metadata for a few activities, which the last run could not refresh.",
+      "clientExpectation": "Show photos as needing a refresh that is not automatic; everything else is up to date.",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-09-05T12:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-10-03T12:00:00.000Z",
+          "scan": null
+        },
+        "activities": {
+          "total": 90,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 90,
+          "neverDetailed": 0,
+          "invalidated": 0,
+          "detailRetryWaiting": 0,
+          "detailNextRetryAt": null
+        },
+        "photos": {
+          "activitiesWithPhotos": 9,
+          "current": 6,
+          "refreshRequired": 3,
+          "unknown": 0,
+          "photoCount": 20
+        },
+        "streams": {
+          "withData": 90,
+          "withoutData": 0,
+          "chartSummaries": 90,
+          "failed": 0,
+          "waiting": 0,
+          "runnable": 0,
+          "invalidated": 0,
+          "nextRetryAt": null
+        },
+        "outcomes": {
+          "details": {
+            "userId": "fixture-user",
+            "pipeline": "details",
+            "lastAttemptAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-04T12:00:00.000Z",
+            "outcome": "partial",
+            "reason": "photo_refresh_failed",
+            "retryAt": null
+          }
+        },
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "knownActivityCount": 90,
+          "totalActivityCount": 90,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "idle",
+            "pagesScanned": null,
+            "scanStartedAt": null,
+            "lastCompletedAt": "2026-10-03T12:00:00.000Z",
+            "nextDueAt": "2026-10-09T12:00:00.000Z",
+            "freshness": "current"
+          }
+        },
+        "details": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": {
+            "outcome": "partial",
+            "reason": "photo_refresh_failed",
+            "attemptedAt": "2026-10-05T09:00:00.000Z",
+            "lastSucceededAt": "2026-10-04T12:00:00.000Z",
+            "retryAt": null
+          },
+          "detailed": 90,
+          "neverFetched": 0,
+          "invalidated": 0,
+          "retryWaiting": 0
+        },
+        "photos": {
+          "progress": "in_progress",
+          "scheduling": "not_scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 9,
+          "current": 6,
+          "refreshRequired": 3,
+          "unknown": 0,
+          "photoCount": 20
+        },
+        "streams": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "withData": 90,
+          "withoutData": 0,
+          "runnable": 0,
+          "waiting": 0,
+          "blocked": 0,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 90
+        }
+      }
+    },
+    {
+      "id": "expired-status-snapshot",
+      "description": "A status the client fetched three hours ago and is still displaying offline.",
+      "clientExpectation": "Present it as the last known status as of observedAt; do not present its scheduling as current.",
+      "clientNow": "2026-10-05T15:00:00.000Z",
+      "streamBackfillEnabled": true,
+      "snapshot": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "account": {
+          "connected": true,
+          "updatedAt": "2026-09-05T12:00:00.000Z",
+          "streamCredentialsBlocked": false
+        },
+        "history": {
+          "lastSummaryReconciledAt": "2026-10-03T12:00:00.000Z",
+          "scan": null
+        },
+        "activities": {
+          "total": 50,
+          "oldestStartDate": "2014-03-02T07:15:00.000Z",
+          "newestStartDate": "2026-10-04T16:30:00.000Z",
+          "detailed": 40,
+          "neverDetailed": 10,
+          "invalidated": 0,
+          "detailRetryWaiting": 0,
+          "detailNextRetryAt": null
+        },
+        "photos": {
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "withData": 40,
+          "withoutData": 0,
+          "chartSummaries": 40,
+          "failed": 0,
+          "waiting": 0,
+          "runnable": 10,
+          "invalidated": 0,
+          "nextRetryAt": null
+        },
+        "outcomes": {},
+        "jobs": {
+          "sync-activities": {
+            "job": "sync-activities",
+            "lastStartedAt": "2026-10-05T09:00:00.000Z",
+            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+          },
+          "reconcile-strava-summaries": {
+            "job": "reconcile-strava-summaries",
+            "lastStartedAt": "2026-10-05T11:37:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:38:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": null,
+            "lastCompletedAt": "2026-10-05T11:38:00.000Z"
+          },
+          "backfill-activity-streams": {
+            "job": "backfill-activity-streams",
+            "lastStartedAt": "2026-10-05T11:38:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:39:00.000Z",
+            "lastStatus": "completed",
+            "lastStopReason": "activity_limit",
+            "lastCompletedAt": "2026-10-05T11:39:00.000Z"
+          }
+        }
+      },
+      "status": {
+        "observedAt": "2026-10-05T12:00:00.000Z",
+        "history": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "knownActivityCount": 50,
+          "totalActivityCount": 50,
+          "oldestActivityStart": "2014-03-02T07:15:00.000Z",
+          "newestActivityStart": "2026-10-04T16:30:00.000Z",
+          "reconciliation": {
+            "phase": "idle",
+            "pagesScanned": null,
+            "scanStartedAt": null,
+            "lastCompletedAt": "2026-10-03T12:00:00.000Z",
+            "nextDueAt": "2026-10-09T12:00:00.000Z",
+            "freshness": "current"
+          }
+        },
+        "details": {
+          "progress": "in_progress",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "lastOutcome": null,
+          "detailed": 40,
+          "neverFetched": 10,
+          "invalidated": 0,
+          "retryWaiting": 0
+        },
+        "photos": {
+          "progress": "complete",
+          "scheduling": "idle",
+          "schedulingReason": null,
+          "retryAt": null,
+          "activitiesWithPhotos": 0,
+          "current": 0,
+          "refreshRequired": 0,
+          "unknown": 0,
+          "photoCount": 0
+        },
+        "streams": {
+          "progress": "in_progress",
+          "scheduling": "scheduled",
+          "schedulingReason": null,
+          "retryAt": null,
+          "withData": 40,
+          "withoutData": 0,
+          "runnable": 10,
+          "waiting": 0,
+          "blocked": 0,
+          "failed": 0,
+          "invalidated": 0,
+          "chartSummaries": 40
+        }
+      }
+    }
+  ]
+}

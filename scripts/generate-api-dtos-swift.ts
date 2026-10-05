@@ -63,6 +63,19 @@ import {
 } from '../src/contracts/v1/sync';
 import { errorEnvelopeSchema } from '../src/contracts/v1/error';
 import {
+  historyFreshnessSchema,
+  ingestionDetailsDTOSchema,
+  ingestionHistoryDTOSchema,
+  ingestionOutcomeSchema,
+  ingestionPhotosDTOSchema,
+  ingestionProgressSchema,
+  ingestionReasonSchema,
+  ingestionRunOutcomeDTOSchema,
+  ingestionSchedulingSchema,
+  ingestionStatusDTOSchema,
+  ingestionStreamsDTOSchema,
+} from '../src/contracts/v1/ingestion-status';
+import {
   mobileExchangeRequestSchema,
   mobileExchangeResponseDTOSchema,
   mobileSessionDTOSchema,
@@ -116,6 +129,17 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['SyncChangeItem', syncChangeItemDTOSchema],
   ['SyncBootstrapPage', syncBootstrapPageDTOSchema],
   ['SyncChangesPage', syncChangesPageDTOSchema],
+  ['IngestionProgress', ingestionProgressSchema],
+  ['IngestionScheduling', ingestionSchedulingSchema],
+  ['IngestionOutcome', ingestionOutcomeSchema],
+  ['IngestionReason', ingestionReasonSchema],
+  ['HistoryFreshness', historyFreshnessSchema],
+  ['IngestionRunOutcome', ingestionRunOutcomeDTOSchema],
+  ['IngestionHistory', ingestionHistoryDTOSchema],
+  ['IngestionDetails', ingestionDetailsDTOSchema],
+  ['IngestionPhotos', ingestionPhotosDTOSchema],
+  ['IngestionStreams', ingestionStreamsDTOSchema],
+  ['IngestionStatus', ingestionStatusDTOSchema],
   ['ErrorEnvelope', errorEnvelopeSchema],
   ['MobileExchangeRequest', mobileExchangeRequestSchema],
   ['MobileExchangeResponse', mobileExchangeResponseDTOSchema],
@@ -141,6 +165,7 @@ const inlineEnumNames = new Map<string, string>([
   [enumKey(['low', 'medium', 'high']), 'StreamResolution'],
   [enumKey(['time', 'distance']), 'StreamSeriesType'],
   [enumKey(['complete', 'partial']), 'PhotoRefreshStatus'],
+  [enumKey(['idle', 'scanning', 'confirming']), 'ReconciliationPhase'],
 ]);
 
 /**
@@ -150,6 +175,7 @@ const inlineEnumNames = new Map<string, string>([
  */
 const nestedObjectNames = new Map<string, string>([
   ['ErrorEnvelope.error', 'ErrorBody'],
+  ['IngestionHistory.reconciliation', 'IngestionReconciliation'],
 ]);
 
 type JSONSchema = Record<string, unknown>;

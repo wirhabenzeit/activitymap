@@ -83,10 +83,21 @@ export async function repairYear(year: number, idsToRepair: number[]) {
             includePhotos: true,
         });
 
+        // Report every per-activity outcome the service returned instead of
+        // collapsing a partial repair into a plain success (issue #296).
+        const failedIds = result.failedIds ?? [];
+        const photoRefreshFailedIds = result.photoRefreshFailedIds ?? [];
         return {
             success: true,
             count: result.activities.length,
             remaining: remainingIds.length > 0,
+            failedIds,
+            notFoundIds: result.notFoundIds,
+            photoRefreshFailedIds,
+            partial:
+                failedIds.length > 0 ||
+                result.notFoundIds.length > 0 ||
+                photoRefreshFailedIds.length > 0,
         };
     } catch (error) {
         logger.error(`Failed to repair year ${year}:`, error);
