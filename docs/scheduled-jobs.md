@@ -14,11 +14,11 @@ hourly jobs gaps of up to 9.7 hours. Vercel's Hobby plan only allows daily
 cron jobs. The `activitymap-cron` Worker in `cloudflare/cron` therefore
 triggers the routes on time:
 
-| Cron (UTC)    | Jobs, in order                                                     |
-| ------------- | ------------------------------------------------------------------ |
-| `*/5 * * * *` | `drain-webhook-inbox`                                              |
-| `0 * * * *`   | `cleanup-rate-limits`                                              |
-| `17 * * * *`  | `erase-revoked-athletes`                                           |
+| Cron (UTC)    | Jobs, in order                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `*/5 * * * *` | `drain-webhook-inbox`                                                                                               |
+| `0 * * * *`   | `cleanup-rate-limits`                                                                                               |
+| `17 * * * *`  | `erase-revoked-athletes`                                                                                            |
 | `37 * * * *`  | `reconcile-strava-summaries`, `backfill-activity-streams` (only if reconcile succeeded), `backfill-activity-photos` |
 
 `cloudflare/cron/src/jobs.ts` defines the jobs and their request bodies.
