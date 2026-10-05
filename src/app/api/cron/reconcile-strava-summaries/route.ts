@@ -5,6 +5,7 @@ import {
 import { logger } from '~/server/logging/logger';
 import { reconcileStravaSummaries } from '~/server/strava/summary-reconciliation';
 import { withJobHeartbeat } from '~/server/application/job-heartbeat';
+import { withJobLog } from '~/server/application/job-log';
 import { createSummaryReconciliationCronHandler } from './handler';
 
 // The reconciler intentionally checkpoints work across invocations. A single
@@ -13,20 +14,29 @@ import { createSummaryReconciliationCronHandler } from './handler';
 // the bounded page/account limits in the worker itself.
 export const maxDuration = 60;
 
+const reconciliationStopReason = (result: {
+  stoppedForRateLimit: number;
+  stoppedForTimeBudget: number;
+}) =>
+  result.stoppedForRateLimit
+    ? 'rate_limit'
+    : result.stoppedForTimeBudget
+      ? 'time_budget'
+      : null;
+
 /** Production-only, resumable seven-day Strava summary reconciliation. */
 export const POST = createSummaryReconciliationCronHandler({
   externalEffectsEnabled,
   externalEffectsDisabledMessage: EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   getCronSecret: () => process.env.CRON_SECRET,
-  reconcile: withJobHeartbeat(
+  reconcile: withJobLog(
     'reconcile-strava-summaries',
-    reconcileStravaSummaries,
-    (result) =>
-      result.stoppedForRateLimit
-        ? 'rate_limit'
-        : result.stoppedForTimeBudget
-          ? 'time_budget'
-          : null,
+    withJobHeartbeat(
+      'reconcile-strava-summaries',
+      reconcileStravaSummaries,
+      reconciliationStopReason,
+    ),
+    { stopReason: reconciliationStopReason },
   ),
   onError: (message, error) => logger.error(message, error),
 });

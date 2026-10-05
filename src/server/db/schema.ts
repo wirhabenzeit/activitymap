@@ -818,6 +818,33 @@ export const backgroundJobRuns = pgTable('background_job_run', {
 
 export type BackgroundJobRun = typeof backgroundJobRuns.$inferSelect;
 
+// One row per scheduled job run, for the admin dashboard (issue #328).
+// `background_job_run` keeps only each job's latest state; this keeps a short
+// history, pruned by the hourly rate-limit cleanup. `summary` holds the run's
+// numeric counters only; `error` is a short message, never an upstream body.
+export const scheduledJobLog = pgTable(
+  'scheduled_job_log',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    job: text('job').notNull(),
+    startedAt: timestamp('started_at', { mode: 'date' }).notNull(),
+    durationMs: integer('duration_ms').notNull(),
+    status: text('status', {
+      enum: ['completed', 'failed', 'disabled'],
+    }).notNull(),
+    stopReason: text('stop_reason'),
+    summary: jsonb('summary').$type<Record<string, number | boolean>>(),
+    error: text('error'),
+  },
+  (table) => [
+    index('scheduled_job_log_started_at_idx').on(table.startedAt),
+  ],
+);
+
+export type ScheduledJobLogEntry = typeof scheduledJobLog.$inferSelect;
+
 // Scheduling metadata is separate from stream data: retries/checkpoints must
 // not publish activity change-feed entries or load large JSON payloads.
 export const streamBackfillAttempts = pgTable('stream_backfill_attempt', {

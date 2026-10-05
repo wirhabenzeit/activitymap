@@ -52,3 +52,12 @@ Worker's triggers in the Cloudflare dashboard.
 The workflows in `.github/workflows` keep their schedules as a fallback for
 now, and `workflow_dispatch` for manual runs. `fetch.yml` (legacy
 `sync-activities`) has no recorded runs and isn't part of the Worker.
+
+## Admin dashboard
+
+`/admin` shows each job's health (late after 2.5 missed intervals), the run
+history from `scheduled_job_log` (14 days, pruned by `cleanup-rate-limits`),
+the webhook inbox, per-athlete import coverage and the Strava request budget.
+Every cron route appends one row per run through `withJobLog`; writing it
+never fails the job. Access requires a Strava sign-in whose athlete id is
+listed in `ACTIVITYMAP_ADMIN_ATHLETE_IDS`; anyone else gets a 404.

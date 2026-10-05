@@ -11,6 +11,25 @@ import {
   getWebhookInboxMetrics,
   reconcileStuckWebhookEvents,
 } from '~/server/strava/webhook-drain';
+import { withJobLog } from '~/server/application/job-log';
+
+const drainInbox = withJobLog(
+  'drain-webhook-inbox',
+  async (options: { batchSize: number; concurrency: number }) => {
+    const reconciled = await reconcileStuckWebhookEvents();
+    const drainResult = await drainWebhookInbox(options);
+    const metrics = await getWebhookInboxMetrics();
+    return { reconciled, ...drainResult, metrics };
+  },
+  {
+    summarize: ({ metrics, ...counts }) => ({
+      ...counts,
+      deadLetterTotal: metrics.countsByStatus.dead_letter ?? 0,
+      failedTotal: metrics.countsByStatus.failed ?? 0,
+      pendingTotal: metrics.countsByStatus.pending ?? 0,
+    }),
+  },
+);
 
 /**
  * Scheduled drain of the Strava webhook inbox (issue #125).
@@ -76,17 +95,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const reconciled = await reconcileStuckWebhookEvents();
-    const drainResult = await drainWebhookInbox({ batchSize, concurrency });
-    const metrics = await getWebhookInboxMetrics();
-
-    logger.info('[Cron] drain-webhook-inbox complete', {
-      reconciled,
-      ...drainResult,
-      metrics,
-    });
-
-    return NextResponse.json({ reconciled, ...drainResult, metrics });
+    const result = await drainInbox({ batchSize, concurrency });
+    logger.info('[Cron] drain-webhook-inbox complete', result);
+    return NextResponse.json(result);
   } catch (error) {
     logger.error('[Cron] drain-webhook-inbox failed:', error);
     return NextResponse.json(

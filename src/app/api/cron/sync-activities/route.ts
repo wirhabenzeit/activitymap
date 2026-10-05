@@ -1,5 +1,6 @@
 import { syncActivities as runSyncActivities } from '~/server/strava/sync';
 import { withJobHeartbeat } from '~/server/application/job-heartbeat';
+import { withJobLog } from '~/server/application/job-log';
 import { type NextRequest, NextResponse } from 'next/server';
 import { logger } from '~/server/logging/logger';
 import {
@@ -7,10 +8,14 @@ import {
   externalEffectsEnabled,
 } from '~/server/config/external-effects';
 
-const syncActivities = withJobHeartbeat(
+const syncActivities = withJobLog(
   'sync-activities',
-  runSyncActivities,
-  (result) => (result.stoppedForRateLimit ? 'rate_limit' : null),
+  withJobHeartbeat('sync-activities', runSyncActivities, (result) =>
+    result.stoppedForRateLimit ? 'rate_limit' : null,
+  ),
+  {
+    stopReason: (result) => (result.stoppedForRateLimit ? 'rate_limit' : null),
+  },
 );
 
 // Define type for configuration options
