@@ -30,6 +30,7 @@ function getSessionUserId(value: unknown): string | null {
 export const auth = betterAuth({
   baseURL: {
     allowedHosts: [
+      'activitymap.cc',
       'activitymap.dominik.page',
       '*.vercel.app',
       'localhost',
