@@ -2,7 +2,7 @@
 
 Map, list, and analyze all your Strava activities.
 
-[Demo](https://activitymap.dominik.page)
+[Demo](https://activitymap.cc)
 
 ## Features
 
