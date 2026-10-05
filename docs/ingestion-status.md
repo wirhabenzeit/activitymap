@@ -14,7 +14,7 @@ local sync never makes the server status complete.
 | --- | --- | --- | --- |
 | History | Activity summaries | `user.last_summary_reconciled_at` and `strava_summary_reconciliation` | Hourly summary reconciliation, a full rescan every 6 days |
 | Details | Every stored activity | `activities.geometry_state` | Legacy sync job, twice daily |
-| Photos | Activities Strava reports as having photos | `activities.photos_state` | Every detail fetch and an hourly photo-only catch-up, when enabled |
+| Photos | Activities Strava reports as having photos | `activities.photos_state` | Every detail fetch and an hourly photo-only catch-up, enabled by default in production |
 | Streams | Every stored activity | `activity_streams` and `stream_backfill_attempt` | Hourly stream backfill, if enabled |
 
 Derived chart summaries are computed from fetched streams. They are reported as
@@ -237,9 +237,14 @@ history summary count change queues photos without invalidating activity
 details. Detail confirmations from history reconciliation also queue photos
 when they have not fetched the collection themselves.
 
-`POST /api/cron/backfill-activity-photos` requires the cron secret, production
-external effects, and `ACTIVITYMAP_PHOTO_BACKFILL=enabled`. The hourly workflow
-also requires the GitHub variable of that name. It has a durable cap of five
+`POST /api/cron/backfill-activity-photos` requires the cron secret and production
+external effects. Photo catch-up and its hourly workflow are enabled by default
+in production; no additional Vercel or GitHub opt-in is required. Setting
+`ACTIVITYMAP_PHOTO_BACKFILL=disabled` in Vercel pauses the endpoint; setting the
+GitHub repository variable of that name to `disabled` pauses the scheduled step.
+An absent switch leaves catch-up enabled. The cron and Settings use the same
+server configuration check, including the external-effects guard.
+It has a durable cap of five
 activity selections and twelve requests per UTC hour, including both image
 sizes and OAuth requests, and uses the shared Strava budget with background
 reserves. Repeated dispatches cannot reset those caps. Failed collections back
@@ -255,11 +260,10 @@ follow-up. Complete the rollout in this order:
    the Preview migration/build.
 2. Apply migrations through 0018 using the existing Production migration
    workflow, and confirm that no migrations remain pending for the release.
-3. Set `ACTIVITYMAP_PHOTO_BACKFILL=enabled` in Vercel's **Production** environment,
-   then deploy the dependent code so the deployment includes that setting.
-4. After the production deployment succeeds, enable the scheduled job with
-   `gh variable set ACTIVITYMAP_PHOTO_BACKFILL --body enabled`.
-5. Dispatch `gh workflow run reconcile-strava-summaries.yml --ref main` and
+3. Deploy the dependent code. Photo catch-up starts with the hourly workflow
+   automatically, unless an operator has explicitly set either pause switch to
+   `disabled`. No new environment variable is needed for the normal rollout.
+4. Dispatch `gh workflow run reconcile-strava-summaries.yml --ref main` and
    inspect the photo step's result and the ingestion status in Settings. A
    successful skipped or disabled step does not verify catch-up. Confirm an
    enabled run, its selected/fetched counts and stop reason, and that Settings
@@ -270,6 +274,8 @@ production run is verified. Keep the fixed five-activity/twelve-request hourly
 cap; inspect results before considering larger limits. To pause scheduled
 catch-up, set the GitHub variable to `disabled`. To disable the endpoint as
 well, set the Vercel Production variable to `disabled` and redeploy.
+To resume, remove the pause switches (or set them to `enabled`); redeploy after
+changing the Vercel environment. The next hourly workflow resumes catch-up.
 
 Preview never runs this production cron; the database proof injects a fake
 Strava source to exercise failure and deletion cases without touching Strava.

@@ -4,6 +4,7 @@ import {
   withJobHeartbeat,
 } from '~/server/application/job-heartbeat';
 import { externalEffectsEnabled } from '~/server/config/external-effects';
+import { photoBackfillEnabled } from '~/server/config/photo-backfill';
 import { logger } from '~/server/logging/logger';
 import { createPhotoBackfillCronHandler } from './handler';
 
@@ -11,7 +12,7 @@ export const maxDuration = 60;
 export const POST = createPhotoBackfillCronHandler({
   externalEffectsEnabled,
   isProduction: () => process.env.VERCEL_ENV === 'production',
-  isEnabled: () => process.env.ACTIVITYMAP_PHOTO_BACKFILL === 'enabled',
+  isEnabled: photoBackfillEnabled,
   getCronSecret: () => process.env.CRON_SECRET,
   backfill: withJobHeartbeat(
     'backfill-activity-photos',

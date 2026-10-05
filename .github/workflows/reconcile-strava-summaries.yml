@@ -41,7 +41,8 @@ jobs:
             https://activitymap.cc/api/cron/backfill-activity-streams
 
       - name: Catch up activity photos
-        if: ${{ !cancelled() && vars.ACTIVITYMAP_PHOTO_BACKFILL == 'enabled' }}
+        # Runs by default after deployment; the repository variable can pause it.
+        if: ${{ !cancelled() && vars.ACTIVITYMAP_PHOTO_BACKFILL != 'disabled' }}
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
