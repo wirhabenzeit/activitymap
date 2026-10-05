@@ -21,6 +21,12 @@ triggers the routes on time:
 | `17 * * * *`  | `erase-revoked-athletes`                                                                                            |
 | `37 * * * *`  | `reconcile-strava-summaries`, `backfill-activity-streams` (only if reconcile succeeded), `backfill-activity-photos` |
 
+Each hour, stream backfill handles up to 40 activities (60 Strava requests)
+and photo catch-up up to 20 activities (48 requests). With Strava's 3,000
+daily reads, that leaves room for details, reconciliation and interactive use.
+The first stream call in an hour sets that hour's allowance and later calls can
+only lower it, so every scheduler must request the same 40/60.
+
 `cloudflare/cron/src/jobs.ts` defines the jobs and their request bodies.
 `wrangler.jsonc` defines the triggers, and a test keeps the two in step. A
 failed job doesn't stop later jobs, but it marks the invocation as failed in

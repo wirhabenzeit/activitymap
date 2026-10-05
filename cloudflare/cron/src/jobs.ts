@@ -38,7 +38,7 @@ export const SCHEDULES: Record<string, CronJob[]> = {
     {
       name: 'backfill-activity-streams',
       path: '/api/cron/backfill-activity-streams',
-      body: { activityLimit: 5, requestLimit: 10 },
+      body: { activityLimit: 40, requestLimit: 60 },
       requires: 'reconcile-strava-summaries',
     },
     {

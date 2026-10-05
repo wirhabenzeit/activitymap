@@ -1,7 +1,10 @@
-export const STREAM_BACKFILL_DEFAULT_ACTIVITIES = 5;
-export const STREAM_BACKFILL_MAX_ACTIVITIES = 10;
-export const STREAM_BACKFILL_DEFAULT_REQUESTS = 10;
-export const STREAM_BACKFILL_MAX_REQUESTS = 20;
+// Hourly caps. Strava allows this app 3,000 reads a day; 40 activities an hour
+// (about 1,100 reads a day) clears the historical backlog within days while
+// leaving room for photos, details and interactive use.
+export const STREAM_BACKFILL_DEFAULT_ACTIVITIES = 40;
+export const STREAM_BACKFILL_MAX_ACTIVITIES = 40;
+export const STREAM_BACKFILL_DEFAULT_REQUESTS = 60;
+export const STREAM_BACKFILL_MAX_REQUESTS = 60;
 export const STREAM_BACKFILL_TIME_MS = 45_000;
 export const STREAM_BACKFILL_LEASE_MS = 90_000;
 export const STREAM_BACKFILL_HOUR_MS = 3_600_000;

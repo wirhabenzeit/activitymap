@@ -10,12 +10,12 @@ local sync never makes the server status complete.
 
 ## Categories
 
-| Category | Population | Source of truth | Automatic work |
-| --- | --- | --- | --- |
-| History | Activity summaries | `user.last_summary_reconciled_at` and `strava_summary_reconciliation` | Hourly summary reconciliation, a full rescan every 6 days |
-| Details | Every stored activity | `activities.geometry_state` | Legacy sync job, twice daily |
-| Photos | Activities Strava reports as having photos | `activities.photos_state` | Every detail fetch and an hourly photo-only catch-up, enabled by default in production |
-| Streams | Every stored activity | `activity_streams` and `stream_backfill_attempt` | Hourly stream backfill, if enabled |
+| Category | Population                                 | Source of truth                                                       | Automatic work                                                                         |
+| -------- | ------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| History  | Activity summaries                         | `user.last_summary_reconciled_at` and `strava_summary_reconciliation` | Hourly summary reconciliation, a full rescan every 6 days                              |
+| Details  | Every stored activity                      | `activities.geometry_state`                                           | Legacy sync job, twice daily                                                           |
+| Photos   | Activities Strava reports as having photos | `activities.photos_state`                                             | Every detail fetch and an hourly photo-only catch-up, enabled by default in production |
+| Streams  | Every stored activity                      | `activity_streams` and `stream_backfill_attempt`                      | Hourly stream backfill, if enabled                                                     |
 
 Derived chart summaries are computed from fetched streams. They are reported as
 an overlapping count within streams, not as a separate import.
@@ -195,7 +195,6 @@ it and clients show no photo percentage. A 100% photo bar means every activity
 in that population has at least one photo available, not that every individual
 photo has been fetched. No bar is shown for an empty population.
 
-
 Status requests run only while Settings is visible, at least 60 seconds apart,
 with server Retry-After deadlines respected. Both clients retain the observation
 time and label snapshots older than two minutes, or viewed offline, as last
@@ -215,7 +214,6 @@ scoping, late responses, rejected sessions and persisted retry deadlines.
 `RenderedIngestionStatusTests` exercises phone, dark, large Dynamic Type and iPad
 layouts with fixture data. Physical-device and manual VoiceOver certification
 remain separate checks; these tests do not certify either.
-
 
 ## Photo catch-up and legacy data
 
@@ -246,8 +244,8 @@ in production; no additional Vercel or GitHub opt-in is required. Setting
 GitHub repository variable of that name to `disabled` pauses the scheduled step.
 An absent switch leaves catch-up enabled. The cron and Settings use the same
 server configuration check, including the external-effects guard.
-It has a durable cap of five
-activity selections and twelve requests per UTC hour, including both image
+It has a durable cap of 20
+activity selections and 48 requests per UTC hour, including both image
 sizes and OAuth requests, and uses the shared Strava budget with background
 reserves. Repeated dispatches cannot reset those caps. Failed collections back
 off from one hour to a maximum of 24 hours. Account credential rejections block
@@ -276,8 +274,9 @@ follow-up. Complete the rollout in this order:
    reflects the resulting photo coverage and remaining refresh work.
 
 The rollout is complete only after photo catch-up is enabled and its first
-production run is verified. Keep the fixed five-activity/twelve-request hourly
-cap; inspect results before considering larger limits. To pause scheduled
+production run is verified. The hourly cap is
+20 activities and 48 requests; it was raised from 5/12 once scheduling moved to
+the Cloudflare Worker (`docs/scheduled-jobs.md`). To pause scheduled
 catch-up, set the GitHub variable to `disabled`. To disable the endpoint as
 well, set the Vercel Production variable to `disabled` and redeploy.
 To resume, remove the pause switches (or set them to `enabled`); redeploy after

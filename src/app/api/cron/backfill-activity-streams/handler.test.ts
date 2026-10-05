@@ -79,13 +79,13 @@ void test('backfill cron validates caps, refuses malformed JSON, defaults to 5 a
     },
   });
   assert.equal((await handler(request())).status, 200);
-  assert.deepEqual(received, { activityLimit: 5, requestLimit: 10 });
+  assert.deepEqual(received, { activityLimit: 40, requestLimit: 60 });
   for (const body of [
     '{',
     'null',
     '[]',
-    '{"activityLimit":11}',
-    '{"requestLimit":21}',
+    '{"activityLimit":41}',
+    '{"requestLimit":61}',
     '{"activityLimit":0}',
     '{"activityLimit":1.5}',
     '{"force":true}',

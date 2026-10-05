@@ -55,7 +55,7 @@ void test('jobs are POSTed in order with the cron secret and their bounds', asyn
   }
   assert.equal(
     calls[1]!.init.body,
-    JSON.stringify({ activityLimit: 5, requestLimit: 10 }),
+    JSON.stringify({ activityLimit: 40, requestLimit: 60 }),
   );
   assert.equal(calls[2]!.init.body, undefined);
   assert.ok(results.every(isSuccess));
