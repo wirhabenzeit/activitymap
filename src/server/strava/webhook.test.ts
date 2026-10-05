@@ -3,7 +3,11 @@ import test from 'node:test';
 
 import { accounts, activities, photos, syncChanges } from '~/server/db/schema';
 
-import { processWebhookEvent, type ProcessWebhookEventDeps } from './webhook.ts';
+import {
+  isRegisteredStravaAthlete,
+  processWebhookEvent,
+  type ProcessWebhookEventDeps,
+} from './webhook.ts';
 import type { StravaWebhookEvent } from './webhook.ts';
 
 type FakeCall = { method: string; via: 'outer' | 'tx' };
@@ -54,7 +58,10 @@ function buildFakeDb(opts: {
         };
       },
       delete(table: unknown) {
-        calls.push({ method: `delete:${table === activities ? 'activities' : 'photos'}`, via });
+        calls.push({
+          method: `delete:${table === activities ? 'activities' : 'photos'}`,
+          via,
+        });
         return { where: async () => undefined };
       },
       insert(table: unknown) {
@@ -76,7 +83,9 @@ function buildFakeDb(opts: {
         }
         if (table === activities) {
           calls.push({ method: 'insertActivity', via });
-          return { values: () => ({ onConflictDoUpdate: async () => undefined }) };
+          return {
+            values: () => ({ onConflictDoUpdate: async () => undefined }),
+          };
         }
         if (table === photos) {
           calls.push({ method: 'insertPhotos', via });
@@ -84,7 +93,9 @@ function buildFakeDb(opts: {
         }
         // activityDeletions / photoDeletions tombstones.
         calls.push({ method: 'insertTombstone', via });
-        return { values: () => ({ onConflictDoUpdate: async () => undefined }) };
+        return {
+          values: () => ({ onConflictDoUpdate: async () => undefined }),
+        };
       },
     };
   }
@@ -92,7 +103,9 @@ function buildFakeDb(opts: {
   const outerHandle = makeHandle('outer');
   const fakeDb = {
     ...outerHandle,
-    async transaction<T>(cb: (tx: ReturnType<typeof makeHandle>) => Promise<T>) {
+    async transaction<T>(
+      cb: (tx: ReturnType<typeof makeHandle>) => Promise<T>,
+    ) {
       return cb(makeHandle('tx'));
     },
   };
@@ -109,7 +122,9 @@ const baseEvent: StravaWebhookEvent = {
   event_time: 1_700_000_000,
 };
 
-function deps(overrides: Partial<ProcessWebhookEventDeps> = {}): ProcessWebhookEventDeps {
+function deps(
+  overrides: Partial<ProcessWebhookEventDeps> = {},
+): ProcessWebhookEventDeps {
   return {
     resolveAccount: async () => ({ access_token: 'token' }) as never,
     ...overrides,
@@ -138,13 +153,35 @@ void test('processWebhookEvent upserts the activity and records one change entry
   assert.ok(calls.every((call) => call.via === 'tx'));
   assert.deepEqual(
     calls.map((c) => c.method),
-    ['insertActivity', 'select', 'delete:photos', 'insertPhotos', 'insertTombstone', 'insertChange'],
+    [
+      'insertActivity',
+      'select',
+      'delete:photos',
+      'insertPhotos',
+      'insertTombstone',
+      'insertChange',
+    ],
   );
 
   assert.deepEqual(recordedChanges, [
-    { athleteId: 42, entityType: 'activity', entityId: '100', operation: 'upsert' },
-    { athleteId: 42, entityType: 'photo', entityId: 'old-photo', operation: 'delete' },
-    { athleteId: 42, entityType: 'photo', entityId: 'new-photo', operation: 'upsert' },
+    {
+      athleteId: 42,
+      entityType: 'activity',
+      entityId: '100',
+      operation: 'upsert',
+    },
+    {
+      athleteId: 42,
+      entityType: 'photo',
+      entityId: 'old-photo',
+      operation: 'delete',
+    },
+    {
+      athleteId: 42,
+      entityType: 'photo',
+      entityId: 'new-photo',
+      operation: 'upsert',
+    },
   ]);
 });
 
@@ -231,8 +268,18 @@ void test('processWebhookEvent records a delete change entry (and cascaded photo
 
   assert.ok(calls.every((call) => call.via === 'tx'));
   assert.deepEqual(recordedChanges, [
-    { athleteId: 42, entityType: 'activity', entityId: '100', operation: 'delete' },
-    { athleteId: 42, entityType: 'photo', entityId: 'cascaded-photo', operation: 'delete' },
+    {
+      athleteId: 42,
+      entityType: 'activity',
+      entityId: '100',
+      operation: 'delete',
+    },
+    {
+      athleteId: 42,
+      entityType: 'photo',
+      entityId: 'cascaded-photo',
+      operation: 'delete',
+    },
   ]);
 });
 
@@ -282,8 +329,18 @@ void test('replaying the same webhook delivery (idempotent retry) upserts the ac
   );
 
   assert.deepEqual(recordedChanges, [
-    { athleteId: 42, entityType: 'activity', entityId: '100', operation: 'upsert' },
-    { athleteId: 42, entityType: 'activity', entityId: '100', operation: 'upsert' },
+    {
+      athleteId: 42,
+      entityType: 'activity',
+      entityId: '100',
+      operation: 'upsert',
+    },
+    {
+      athleteId: 42,
+      entityType: 'activity',
+      entityId: '100',
+      operation: 'upsert',
+    },
   ]);
 });
 
@@ -302,7 +359,10 @@ type FakeAccountRow = {
   updatedAt: Date;
 };
 
-type AccountUpdateCall = { via: 'outer' | 'tx'; values: Partial<FakeAccountRow> };
+type AccountUpdateCall = {
+  via: 'outer' | 'tx';
+  values: Partial<FakeAccountRow>;
+};
 
 /**
  * A minimal stand-in for the drizzle `db`/`tx` handle, deep enough to
@@ -332,7 +392,8 @@ function buildFakeAccountsDb(initialAccount: FakeAccountRow | null) {
         };
       },
       update(table: unknown) {
-        if (table !== accounts) throw new Error('unexpected update target in this fake');
+        if (table !== accounts)
+          throw new Error('unexpected update target in this fake');
         return {
           set(values: Partial<FakeAccountRow>) {
             return {
@@ -350,7 +411,9 @@ function buildFakeAccountsDb(initialAccount: FakeAccountRow | null) {
   const outerHandle = makeHandle('outer');
   const fakeDb = {
     ...outerHandle,
-    async transaction<T>(cb: (tx: ReturnType<typeof makeHandle>) => Promise<T>) {
+    async transaction<T>(
+      cb: (tx: ReturnType<typeof makeHandle>) => Promise<T>,
+    ) {
       return cb(makeHandle('tx'));
     },
   };
@@ -371,10 +434,14 @@ const deauthorizationEvent: StravaWebhookEvent = {
 function neverCallStravaDeps(): ProcessWebhookEventDeps {
   return {
     resolveAccount: async () => {
-      throw new Error('resolveAccount must not be called while handling deauthorization');
+      throw new Error(
+        'resolveAccount must not be called while handling deauthorization',
+      );
     },
     fetchActivities: async () => {
-      throw new Error('fetchActivities must not be called while handling deauthorization');
+      throw new Error(
+        'fetchActivities must not be called while handling deauthorization',
+      );
     },
   };
 }
@@ -418,7 +485,8 @@ void test('processWebhookEvent handles athlete deauthorization: stops using the 
   // 30-day erasure deadline, per docs/strava-data-policy.md §1/§3.
   assert.ok(account.scheduledErasureAt instanceof Date);
   const scheduledDays =
-    (account.scheduledErasureAt.getTime() - account.revokedAt.getTime()) / (24 * 60 * 60 * 1000);
+    (account.scheduledErasureAt.getTime() - account.revokedAt.getTime()) /
+    (24 * 60 * 60 * 1000);
   assert.equal(scheduledDays, 30);
 });
 
@@ -447,7 +515,10 @@ void test('processWebhookEvent deauthorization is idempotent: replaying it for a
   assert.equal(updateCalls.length, 0);
   const account = getAccount();
   assert.equal(account?.revokedAt?.getTime(), originalRevokedAt.getTime());
-  assert.equal(account?.scheduledErasureAt?.getTime(), originalErasureAt.getTime());
+  assert.equal(
+    account?.scheduledErasureAt?.getTime(),
+    originalErasureAt.getTime(),
+  );
 });
 
 void test('processWebhookEvent deauthorization for an unknown/unlinked account is a safe no-op', async () => {
@@ -462,4 +533,36 @@ void test('processWebhookEvent deauthorization for an unknown/unlinked account i
   );
 
   assert.equal(updateCalls.length, 0);
+});
+
+function accountLookupDb(rows: { id: string }[]) {
+  const seen: { table?: unknown; limit?: number } = {};
+  const database = {
+    select: () => ({
+      from: (table: unknown) => {
+        seen.table = table;
+        return {
+          where: () => ({
+            limit: async (count: number) => {
+              seen.limit = count;
+              return rows;
+            },
+          }),
+        };
+      },
+    }),
+  } as unknown as Parameters<typeof isRegisteredStravaAthlete>[1];
+  return { database, seen };
+}
+
+void test('isRegisteredStravaAthlete finds an athlete with a Strava account', async () => {
+  const { database, seen } = accountLookupDb([{ id: 'account-1' }]);
+  assert.equal(await isRegisteredStravaAthlete(12345, database), true);
+  assert.equal(seen.table, accounts);
+  assert.equal(seen.limit, 1);
+});
+
+void test('isRegisteredStravaAthlete rejects an athlete without an ActivityMap account', async () => {
+  const { database } = accountLookupDb([]);
+  assert.equal(await isRegisteredStravaAthlete(129318689, database), false);
 });

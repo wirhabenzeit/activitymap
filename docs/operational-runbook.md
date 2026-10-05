@@ -42,6 +42,11 @@ means the job no longer keeps up and needs a larger `batchSize`.
 
 ## Dead letters
 
+Webhooks for athletes without an ActivityMap Strava account are acknowledged
+with `200` and never stored. Strava sends them for anyone who authorised the
+Strava app, including sign-ups on local or preview deployments and erased
+athletes. A dead letter therefore always concerns a registered athlete.
+
 Inspect recent rows without selecting `payload` unless it is necessary:
 
 ```sql
