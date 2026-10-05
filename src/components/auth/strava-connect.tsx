@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import Image from 'next/image';
-import { Loader2 } from 'lucide-react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { usePathname, useSearchParams } from 'next/navigation';
 
@@ -124,39 +123,32 @@ export function useStravaConnect(): StravaConnect {
 
 /**
  * Strava's official "Connect with Strava" artwork, unmodified and at its
- * native proportions (193 × 48, including Strava's own padding). Progress
- * stays next to the artwork rather than drawn over it.
+ * native proportions (193 × 48, including Strava's own padding). Clicking it
+ * is effectively a link to Strava: the brief request that prepares the
+ * redirect only disables the button so a second click cannot start another.
  */
 export function StravaConnectButton({ className }: { className?: string }) {
   const { connect, pending } = useStravaConnect();
   return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <button
-        type="button"
-        onClick={connect}
-        disabled={pending}
-        aria-busy={pending}
-        className="shrink-0 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70"
-      >
-        <Image
-          src="/btn_strava.svg"
-          alt="Connect with Strava"
-          width={193}
-          height={48}
-          priority
-          unoptimized
-        />
-      </button>
-      {pending && (
-        <span
-          role="status"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground"
-        >
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-          Opening Strava…
-        </span>
+    <button
+      type="button"
+      onClick={connect}
+      disabled={pending}
+      aria-busy={pending}
+      className={cn(
+        'shrink-0 self-start rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait',
+        className,
       )}
-    </div>
+    >
+      <Image
+        src="/btn_strava.svg"
+        alt="Connect with Strava"
+        width={193}
+        height={48}
+        priority
+        unoptimized
+      />
+    </button>
   );
 }
 
