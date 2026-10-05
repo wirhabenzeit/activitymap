@@ -105,7 +105,7 @@ example after a reconnect, even before the next run reports.
 Three things gate the scheduled jobs:
 
 - the GitHub workflow schedule
-- repository variables, such as `ACTIVITYMAP_STREAM_BACKFILL`
+- repository variables, such as `ACTIVITYMAP_STREAM_BACKFILL=disabled`
 - server environment switches
 
 The server cannot observe the first two. Each cron route therefore records a
