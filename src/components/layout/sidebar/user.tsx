@@ -3,7 +3,7 @@
 import { ChevronsUpDown, LogOut, Loader2, Info } from 'lucide-react';
 
 import { signOut } from '~/lib/auth-client';
-import { displayEmail } from '~/lib/auth-return';
+import { displayEmail, safeReturnPath } from '~/lib/auth-return';
 
 import { useShallowStore } from '~/store';
 
@@ -136,6 +136,24 @@ export function UserSettings() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const email = displayEmail(user?.email);
 
+  // The app shell resolves the session on the server, so a reload is what
+  // brings every store and query back in the signed-out state; it keeps the
+  // current view rather than jumping elsewhere.
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: 'Couldn’t sign out',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    window.location.assign(
+      safeReturnPath(`${window.location.pathname}${window.location.search}`),
+    );
+  };
+
   if (isInitialized && !user) return <SignedOutAccountRow />;
 
   return (
@@ -216,7 +234,7 @@ export function UserSettings() {
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => signOut()}
+              onClick={() => void handleSignOut()}
               className="cursor-pointer text-destructive focus:bg-destructive focus:text-destructive-foreground"
             >
               <LogOut className="mr-2 h-4 w-4" />
