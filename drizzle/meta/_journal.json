@@ -127,6 +127,20 @@
       "when": 1791153731476,
       "tag": "0017_ingestion-status",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791179839567,
+      "tag": "0018_photo-catch-up",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791183877507,
+      "tag": "0019_photo-account-block",
+      "breakpoints": true
     }
   ]
 }
