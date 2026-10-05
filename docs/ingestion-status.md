@@ -219,7 +219,9 @@ remain separate checks; these tests do not certify either.
 
 ## Photo catch-up and legacy data
 
-Migration `0018_photo-catch-up` adds attempt and hourly-run ledgers only. It
+Migration `0018_photo-catch-up` adds attempt and hourly-run ledgers only.
+Migration `0019_photo-account-block` adds a credential-block ledger keyed by
+Strava account; both are additive and ship ahead of this application change. It
 neither deletes existing photos nor marks legacy collections verified from
 matching counts. Stored photos remain usable immediately, independently of
 `photos_state`. Catch-up prioritizes activities without stored photos, then
@@ -248,7 +250,11 @@ It has a durable cap of five
 activity selections and twelve requests per UTC hour, including both image
 sizes and OAuth requests, and uses the shared Strava budget with background
 reserves. Repeated dispatches cannot reset those caps. Failed collections back
-off from one hour to a maximum of 24 hours. Leases recover after crashes; late
+off from one hour to a maximum of 24 hours. Account credential rejections block
+all photo work for that grant until refresh or reconnect changes it; Settings
+reports that as requiring reconnection. Quota and credential errors do not add
+activity retry delays. Parallel photo sizes share one token refresh.
+Leases recover after crashes; late
 responses cannot publish after an activity update, deletion, grant change or
 account revocation. Existing photo rows and their metadata are never cleared
 because a request failed.
@@ -258,7 +264,7 @@ follow-up. Complete the rollout in this order:
 
 1. Run `pnpm db:test-photo-backfill` against guarded local Postgres and verify
    the Preview migration/build.
-2. Apply migrations through 0018 using the existing Production migration
+2. Apply migrations through 0019 using the existing Production migration
    workflow, and confirm that no migrations remain pending for the release.
 3. Deploy the dependent code. Photo catch-up starts with the hourly workflow
    automatically, unless an operator has explicitly set either pause switch to

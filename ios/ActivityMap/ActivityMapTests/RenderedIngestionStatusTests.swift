@@ -92,7 +92,7 @@ struct RenderedIngestionStatusTests {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
-        let expected = page == "account" ? "Not Signed In" : "Version"
+        let expected = page == "account" ? "Connect Strava" : "Version"
         let content = try #require(request.results?.first { $0.topCandidates(1).first?.string.contains(expected) == true })
         #expect(content.boundingBox.midY > 0.5, "Form content belongs near the top, not floating in the centre")
         let directory = URL(fileURLWithPath: "/tmp/activitymap-ingestion-preview")

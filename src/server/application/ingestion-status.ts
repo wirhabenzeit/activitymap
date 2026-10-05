@@ -221,6 +221,9 @@ export function deriveIngestionStatus(
       ...(stalePhotos === 0
         ? schedule('idle')
         : (credentialBlock(snapshot, undefined) ??
+          (snapshot.account.photoCredentialsBlocked
+            ? schedule('blocked', snapshot.account.photoCredentialsBlocked)
+            : null) ??
           (options.photoBackfillEnabled === undefined
             ? schedule('not_scheduled')
             : fromJob(

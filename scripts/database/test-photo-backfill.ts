@@ -576,6 +576,65 @@ try {
     'current',
   );
 
+  // A 401 blocks the grant across hourly runs, without blaming an activity.
+  await seed();
+  now = new Date('2026-10-07T12:00:00Z');
+  const rejectedRun = await begin();
+  const rejectedClaim = await next(rejectedRun);
+  await repo.blockAccount(rejectedClaim, 'unauthorized');
+  await repo.release(rejectedClaim, null);
+  await repo.finish(rejectedRun);
+  now = new Date('2026-10-07T13:00:00Z');
+  const laterRun = await begin();
+  assert.equal(
+    await repo.claimNext(laterRun),
+    null,
+    'unchanged rejected grant stays blocked on later runs',
+  );
+  const blockedSnapshot = await createIngestionStatusRepository(db).snapshot(
+    user,
+    athlete,
+    now,
+  );
+  const blockedStatus = deriveIngestionStatus(blockedSnapshot, {
+    streamBackfillEnabled: false,
+    photoBackfillEnabled: true,
+  });
+  assert.equal(blockedStatus.photos.scheduling, 'blocked');
+  assert.equal(blockedStatus.photos.schedulingReason, 'unauthorized');
+  assert.equal(
+    blockedSnapshot.photos.retryWaiting,
+    0,
+    'account failure does not create an activity cooldown',
+  );
+  assert.equal(
+    blockedSnapshot.photos.photoCount,
+    4,
+    'rejected grant preserves all stored photos',
+  );
+  await database
+    .update(accounts)
+    .set({ accessToken: 'reconnected-proof', updatedAt: now })
+    .where(eq(accounts.id, rejectedClaim.accountId));
+  const reconnected = await next(laterRun);
+  assert.equal(reconnected.activityId, rejectedClaim.activityId);
+  assert.equal(
+    reconnected.attemptCount,
+    1,
+    'rejected credentials did not consume an activity failure attempt',
+  );
+  await repo.blockAccount(rejectedClaim, 'unauthorized');
+  const reconnectedSnapshot = await createIngestionStatusRepository(
+    db,
+  ).snapshot(user, athlete, now);
+  assert.equal(
+    reconnectedSnapshot.account.photoCredentialsBlocked,
+    null,
+    'late failures cannot block the new grant',
+  );
+  assert.equal(await repo.complete(reconnected, []), true);
+  await repo.finish(laterRun);
+
   console.log(
     'Photo catch-up proof passed: legacy availability, missing-first selection, retries, replacements/removals and change feed, stale/deleted/revoked guards, lease recovery, durable hourly limits, status.',
   );

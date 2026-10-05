@@ -142,9 +142,11 @@ export async function backfillActivityPhotos({
           throw error;
         }
         const failure = classifyIngestionFailure(error);
+        if (failure.scope === 'account')
+          await repository.blockAccount(claim, failure.reason);
         await repository.release(
           claim,
-          failure.scope === 'activity' ? failure.code : failure.reason,
+          failure.scope === 'activity' ? failure.code : null,
         );
         if (failure.scope === 'run')
           throw new PhotoBackfillStopped('rate_limited');

@@ -12,6 +12,7 @@ import {
   ingestionOutcomes,
   photos,
   photoFetchAttempts,
+  photoBackfillAccounts,
   stravaSummaryReconciliations,
   streamBackfillAccounts,
   streamBackfillAttempts,
@@ -24,7 +25,10 @@ import type {
   IngestionPipeline,
 } from '~/server/strava/ingestion-policy';
 import { detailEnrichmentPending } from './ingestion';
-import { photoRefreshPending } from './photo-backfill';
+import {
+  photoRefreshPending,
+  photoCredentialFingerprint,
+} from './photo-backfill';
 
 type DrizzleDb = typeof defaultDb;
 
@@ -42,6 +46,7 @@ export type IngestionSnapshot = {
     updatedAt: Date | null;
     /** Strava rejected the current credentials for stream backfill. */
     streamCredentialsBlocked: boolean;
+    photoCredentialsBlocked?: 'unauthorized' | 'credentials_unavailable' | null;
   };
   history: {
     lastSummaryReconciledAt: Date | null;
@@ -183,8 +188,15 @@ export function createIngestionStatusRepository(
             // Same fingerprint as stream backfill's account block.
             streamCredentialsBlocked: sql<boolean>`coalesce(${streamBackfillAccounts.blockedCredentials}
               = concat_ws('|', ${accounts.accessTokenExpiresAt}, ${accounts.expiresAt}, ${accounts.expires_at}, ${accounts.updatedAt}), false)`,
+            photoCredentialsBlocked: sql<
+              'unauthorized' | 'credentials_unavailable' | null
+            >`case when ${photoBackfillAccounts.blockedCredentials} = ${photoCredentialFingerprint} then ${photoBackfillAccounts.reason} end`,
           })
           .from(accounts)
+          .leftJoin(
+            photoBackfillAccounts,
+            eq(photoBackfillAccounts.accountId, accounts.id),
+          )
           .leftJoin(
             streamBackfillAccounts,
             eq(streamBackfillAccounts.userId, accounts.userId),
@@ -283,6 +295,7 @@ export function createIngestionStatusRepository(
           connected: account?.connected ?? false,
           updatedAt: account?.updatedAt ?? null,
           streamCredentialsBlocked: account?.streamCredentialsBlocked ?? false,
+          photoCredentialsBlocked: account?.photoCredentialsBlocked ?? null,
         },
         history: {
           lastSummaryReconciledAt: user?.lastSummaryReconciledAt ?? null,

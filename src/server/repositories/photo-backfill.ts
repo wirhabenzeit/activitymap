@@ -10,6 +10,7 @@ import {
   photoDeletions,
   photoFetchAttempts as attempts,
   photoBackfillRuns as runs,
+  photoBackfillAccounts as blocks,
   type Account,
   type Photo,
 } from '~/server/db/schema';
@@ -29,6 +30,9 @@ export const PHOTO_ACTIVITY_LIMIT = 5;
 export const PHOTO_REQUEST_LIMIT = 12; // Two sizes per activity, plus OAuth headroom.
 const LEASE_MS = 90_000;
 const KEY = 'photos';
+// Match the existing stream worker's non-secret grant fingerprint. Token
+// refresh and reconnect update these columns; old blocks then stop applying.
+export const photoCredentialFingerprint = sql<string>`concat_ws('|', ${accounts.accessTokenExpiresAt}, ${accounts.expiresAt}, ${accounts.expires_at}, ${accounts.updatedAt})`;
 export class PhotoBackfillStopped extends Error {
   constructor(public readonly reason: string) {
     super(reason);
@@ -204,9 +208,11 @@ export function createPhotoBackfillRepository(
           .innerJoin(users, eq(users.athlete_id, activities.athlete))
           .innerJoin(accounts, eq(accounts.userId, users.id))
           .leftJoin(attempts, eq(attempts.activityId, activities.id))
+          .leftJoin(blocks, eq(blocks.accountId, accounts.id))
           .where(
             and(
               connected,
+              sql`${blocks.blockedCredentials} is distinct from ${photoCredentialFingerprint}`,
               photoRefreshPending,
               sql`(${attempts.nextAttemptAt} is null or ${attempts.nextAttemptAt} <= ${now.toISOString()})`,
               sql`(${attempts.leaseExpiresAt} is null or ${attempts.leaseExpiresAt} <= ${now.toISOString()})`,
@@ -265,6 +271,29 @@ export function createPhotoBackfillRepository(
       return database.transaction(async (tx) =>
         Boolean(await lockClaim(tx, claim)),
       );
+    },
+    async blockAccount(
+      claim: PhotoClaim,
+      reason: 'unauthorized' | 'credentials_unavailable',
+    ) {
+      await database.transaction(async (tx) => {
+        // A late failure from an old grant must not block a fresh reconnect.
+        if (!(await lockClaim(tx, claim))) return;
+        const [current] = await tx
+          .select({ fingerprint: photoCredentialFingerprint })
+          .from(accounts)
+          .where(eq(accounts.id, claim.accountId));
+        if (!current) return;
+        const values = {
+          accountId: claim.accountId,
+          blockedCredentials: current.fingerprint,
+          reason,
+        };
+        await tx
+          .insert(blocks)
+          .values(values)
+          .onConflictDoUpdate({ target: blocks.accountId, set: values });
+      });
     },
     async replaceCredentials(
       claim: PhotoClaim,
@@ -378,6 +407,9 @@ export function createPhotoBackfillRepository(
           leaseToken: null,
           leaseExpiresAt: null,
           lastErrorCode: errorCode,
+          attemptCount: errorCode
+            ? claim.attemptCount
+            : Math.max(0, claim.attemptCount - 1),
           nextAttemptAt: errorCode
             ? detailRetryAt(clock(), claim.attemptCount)
             : clock(),

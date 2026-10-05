@@ -28,7 +28,11 @@ import {
   requestBrowserSync,
   useBrowserSyncStatus,
 } from '~/lib/sync/browser-status';
-import { signIn } from '~/lib/auth-client';
+import {
+  StravaConnectButton,
+  StravaConnectFailure,
+  STRAVA_CONNECT_PERMISSIONS,
+} from '~/components/auth/strava-connect';
 
 const date = (value: string) => new Date(value).toLocaleString();
 
@@ -50,7 +54,6 @@ export function SettingsDialog({
     userId ? (state.byUser[userId] ?? emptyBrowserStatus) : emptyBrowserStatus,
   );
   const [clock, setClock] = useState(0);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
   useEffect(() => {
     if (!open) return;
     const tick = () => setClock(Date.now());
@@ -68,22 +71,6 @@ export function SettingsDialog({
     query.errorUpdatedAt + 60_000,
     query.error instanceof IngestionStatusError ? query.error.retryAt : 0,
   );
-  const reconnect = async () => {
-    setConnectionError(null);
-    try {
-      const result = await signIn.social({
-        provider: 'strava',
-        callbackURL: '/map',
-      });
-      if (result.error)
-        setConnectionError(
-          result.error.message ??
-            'Could not connect to Strava. Please try again.',
-        );
-    } catch {
-      setConnectionError('Could not connect to Strava. Please try again.');
-    }
-  };
   const browserTitle = {
     idle: 'Not yet synced',
     syncing: 'Downloading changes…',
@@ -293,15 +280,9 @@ export function SettingsDialog({
                 ) : null}
               </div>
               {rows.some((row) => row.schedule.startsWith('Reconnect')) && (
-                <Button variant="outline" onClick={() => void reconnect()}>
-                  Reconnect Strava
-                </Button>
+                <StravaConnectButton />
               )}
-              {connectionError && (
-                <p role="alert" className="text-sm">
-                  {connectionError}
-                </p>
-              )}
+              <StravaConnectFailure />
             </section>
             <section
               aria-labelledby="browser-heading"
@@ -370,14 +351,11 @@ export function SettingsDialog({
                   : 'Sign in to view your activities.'}
               </p>
             </div>
-            <Button variant="outline" onClick={() => void reconnect()}>
-              {userId ? 'Reconnect Strava' : 'Sign in with Strava'}
-            </Button>
-            {connectionError && (
-              <p role="alert" className="text-sm">
-                {connectionError}
-              </p>
-            )}
+            <StravaConnectButton />
+            <StravaConnectFailure />
+            <p className="text-sm text-muted-foreground">
+              {STRAVA_CONNECT_PERMISSIONS}
+            </p>
           </TabsContent>
           <TabsContent value="display" className="py-5">
             <DisplaySettings />

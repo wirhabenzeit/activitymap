@@ -16,7 +16,10 @@ type Scenario = {
 
 const fixtures = JSON.parse(
   readFileSync(
-    new URL('../../../shared/ingestion-status-fixtures.v1.json', import.meta.url),
+    new URL(
+      '../../../shared/ingestion-status-fixtures.v1.json',
+      import.meta.url,
+    ),
     'utf8',
   ),
 ) as { version: number; scenarios: Scenario[] };
@@ -45,17 +48,26 @@ for (const scenario of fixtures.scenarios) {
     // The contract's documented partitions hold for every scenario.
     const known = status.history.knownActivityCount;
     const { details, streams, photos } = status;
-    assert.equal(details.detailed + details.neverFetched + details.invalidated, known);
     assert.equal(
-      streams.withData + streams.withoutData + streams.runnable +
-        streams.waiting + streams.blocked + streams.failed,
+      details.detailed + details.neverFetched + details.invalidated,
+      known,
+    );
+    assert.equal(
+      streams.withData +
+        streams.withoutData +
+        streams.runnable +
+        streams.waiting +
+        streams.blocked +
+        streams.failed,
       known,
     );
     assert.equal(
       photos.current + photos.refreshRequired + photos.unknown,
       photos.activitiesWithPhotos,
     );
-    assert.ok(details.retryWaiting <= details.neverFetched + details.invalidated);
+    assert.ok(
+      details.retryWaiting <= details.neverFetched + details.invalidated,
+    );
     assert.ok(streams.chartSummaries <= streams.withData);
     // Unknown totals are never invented.
     if (status.history.progress !== 'complete')
@@ -65,22 +77,19 @@ for (const scenario of fixtures.scenarios) {
 
 void test('the shared fixtures cover every scenario #297 asks clients to agree on', () => {
   assert.equal(fixtures.version, 1);
-  assert.deepEqual(
-    fixtures.scenarios.map((scenario) => scenario.id).sort(),
-    [
-      'account-credentials-rejected',
-      'complete-with-no-gps-and-empty-streams',
-      'details-waiting-after-failures',
-      'expired-status-snapshot',
-      'initial-import-unknown-total',
-      'partial-import-with-detail-failures',
-      'photo-only-staleness',
-      'rate-limit-wait',
-      'reconnected-after-rejection',
-      'revoked-account',
-      'scheduler-stalled-or-disabled',
-    ],
-  );
+  assert.deepEqual(fixtures.scenarios.map((scenario) => scenario.id).sort(), [
+    'account-credentials-rejected',
+    'complete-with-no-gps-and-empty-streams',
+    'details-waiting-after-failures',
+    'expired-status-snapshot',
+    'initial-import-unknown-total',
+    'partial-import-with-detail-failures',
+    'photo-only-staleness',
+    'rate-limit-wait',
+    'reconnected-after-rejection',
+    'revoked-account',
+    'scheduler-stalled-or-disabled',
+  ]);
 });
 
 const NOW = new Date('2026-10-05T12:00:00.000Z');
@@ -104,11 +113,19 @@ void test('job heartbeats distinguish active, stalled, crashed, disabled and nev
   assert.equal(jobState(job, run({ lastStatus: 'failed' }), NOW), 'active');
   // Two missed hourly runs plus grace is a stall.
   assert.equal(
-    jobState(job, run({ lastStartedAt: new Date(NOW.getTime() - 2 * 3_600_000) }), NOW),
+    jobState(
+      job,
+      run({ lastStartedAt: new Date(NOW.getTime() - 2 * 3_600_000) }),
+      NOW,
+    ),
     'active',
   );
   assert.equal(
-    jobState(job, run({ lastStartedAt: new Date(NOW.getTime() - 3 * 3_600_000) }), NOW),
+    jobState(
+      job,
+      run({ lastStartedAt: new Date(NOW.getTime() - 3 * 3_600_000) }),
+      NOW,
+    ),
     'stalled',
   );
   // Started and never finished: the worker crashed or timed out.
@@ -193,5 +210,26 @@ void test('photo availability can be complete while verification is queued, wait
     deriveIngestionStatus(snapshot, { ...options, photoBackfillEnabled: false })
       .photos.scheduling,
     'disabled',
+  );
+});
+
+void test('photo credential rejection takes precedence over activity retries and clears after reconnect', () => {
+  const snapshot = revive(fixtures.scenarios[0]!.snapshot) as IngestionSnapshot;
+  snapshot.account.connected = true;
+  snapshot.account.photoCredentialsBlocked = 'unauthorized';
+  snapshot.photos.pendingRefreshes = 1;
+  snapshot.photos.retryWaiting = 1;
+  snapshot.photos.nextRetryAt = new Date(
+    snapshot.observedAt.getTime() + 3_600_000,
+  );
+  const options = { streamBackfillEnabled: false, photoBackfillEnabled: true };
+  const status = deriveIngestionStatus(snapshot, options).photos;
+  assert.equal(status.scheduling, 'blocked');
+  assert.equal(status.schedulingReason, 'unauthorized');
+  assert.equal(status.retryAt, null);
+  snapshot.account.photoCredentialsBlocked = null;
+  assert.notEqual(
+    deriveIngestionStatus(snapshot, options).photos.scheduling,
+    'blocked',
   );
 });
