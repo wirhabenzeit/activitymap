@@ -38,12 +38,17 @@ export function DataTableViewOptions<TData extends RowData>({
   hiddenByFit,
 }: DataTableViewOptionsProps<TData>) {
   return (
-    <div className="flex items-center space-x-2">
+    <div className="flex shrink-0 items-center space-x-2">
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-8">
-            <MixerHorizontalIcon className="mr-2 h-4 w-4" />
-            View
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 px-0 sm:w-auto sm:px-3"
+            aria-label="View"
+          >
+            <MixerHorizontalIcon className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">View</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56">
