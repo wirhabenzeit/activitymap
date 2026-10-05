@@ -26,8 +26,8 @@ import {
 import { detailRetryAt } from '~/server/strava/ingestion-policy';
 import type { StravaTokens } from '~/server/strava/client';
 
-export const PHOTO_ACTIVITY_LIMIT = 5;
-export const PHOTO_REQUEST_LIMIT = 12; // Two sizes per activity, plus OAuth headroom.
+export const PHOTO_ACTIVITY_LIMIT = 20;
+export const PHOTO_REQUEST_LIMIT = 48; // Two sizes per activity, plus OAuth headroom.
 const LEASE_MS = 90_000;
 const KEY = 'photos';
 // Match the existing stream worker's non-secret grant fingerprint. Token

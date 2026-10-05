@@ -38,7 +38,7 @@ jobs:
             --request POST \
             --header "x-cron-secret: ${CRON_SECRET}" \
             --header "content-type: application/json" \
-            --data '{"activityLimit":5,"requestLimit":10}' \
+            --data '{"activityLimit":40,"requestLimit":60}' \
             https://activitymap.cc/api/cron/backfill-activity-streams
 
       - name: Catch up activity photos

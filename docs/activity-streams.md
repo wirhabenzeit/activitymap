@@ -284,9 +284,9 @@ An absent switch leaves backfill enabled. The cron and Settings use the same
 server configuration check, including the external-effects guard.
 A failed reconciliation step skips backfill for that hour.
 
-Defaults are **5 activities and 10 outbound request reservations globally per
-UTC hour**, sequentially. JSON parameters `activityLimit` (1–10) and
-`requestLimit` (1–20) can lower or modestly raise the caps; the first invocation
+Defaults are **40 activities and 60 outbound request reservations globally per
+UTC hour**, sequentially. JSON parameters `activityLimit` (1–40) and
+`requestLimit` (1–60) can lower the caps; the first invocation
 sets the hour's allowance, and replays can only lower it. OAuth refresh counts
 as a request, as does any retry. There are no in-run automatic retries.
 Reservations are charged before outbound work and are not refunded on crashes,
