@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { errorEnvelopeSchema } from '~/contracts/v1/error.ts';
 import { parseMobileRedirectAllowlist } from '~/server/auth/mobile-redirect-allowlist.ts';
 import { createMobileAuthCallbackHandler } from './handler.ts';
 
@@ -40,8 +39,9 @@ void test('GET /api/v1/auth/mobile/callback redirects to the universal link with
   });
 });
 
-void test('GET /api/v1/auth/mobile/callback returns not_authenticated without a session', async () => {
+void test('GET /api/v1/auth/mobile/callback returns to the app with not_authenticated without a session', async () => {
   const GET = createMobileAuthCallbackHandler({
+    createRequestId: () => 'req-1',
     loadRedirectAllowlist: () => ALLOWLIST,
     resolveSessionUserId: async () => null,
     extractSessionBearerToken: () => 'signed-session-token.sig',
@@ -51,10 +51,76 @@ void test('GET /api/v1/auth/mobile/callback returns not_authenticated without a 
   });
 
   const response = await GET(new Request(CALLBACK_URL));
-  const body: unknown = await response.json();
 
-  assert.equal(response.status, 401);
-  assert.equal(errorEnvelopeSchema.safeParse(body).success, true);
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get('location') ?? '');
+  assert.equal(location.protocol, 'activitymap:');
+  assert.equal(location.searchParams.get('error'), 'not_authenticated');
+  assert.equal(location.searchParams.get('state'), 's1');
+  assert.equal(location.searchParams.get('request_id'), 'req-1');
+  assert.equal(location.searchParams.get('code'), null);
+});
+
+void test('GET /api/v1/auth/mobile/callback hands a declined authorization back to the app', async () => {
+  let resolved = false;
+  const GET = createMobileAuthCallbackHandler({
+    loadRedirectAllowlist: () => ALLOWLIST,
+    resolveSessionUserId: async () => {
+      resolved = true;
+      return 'user-1';
+    },
+    extractSessionBearerToken: () => 'signed-session-token.sig',
+    issueLoginCode: async () => {
+      throw new Error('must not be called');
+    },
+  });
+
+  const response = await GET(
+    new Request(`${CALLBACK_URL}&error=access_denied&error_description=x`),
+  );
+
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get('location') ?? '');
+  assert.equal(location.searchParams.get('error'), 'access_denied');
+  assert.equal(location.searchParams.get('state'), 's1');
+  assert.equal(location.searchParams.get('error_description'), null);
+  assert.equal(location.searchParams.get('code'), null);
+  // An existing browser session must not turn a declined attempt into a login.
+  assert.equal(resolved, false);
+});
+
+void test('GET /api/v1/auth/mobile/callback does not forward arbitrary error text', async () => {
+  const GET = createMobileAuthCallbackHandler({
+    loadRedirectAllowlist: () => ALLOWLIST,
+    resolveSessionUserId: async () => 'user-1',
+    extractSessionBearerToken: () => 'signed-session-token.sig',
+    issueLoginCode: async () => ({ code: 'one-time-code' }),
+  });
+
+  const response = await GET(
+    new Request(`${CALLBACK_URL}&error=${encodeURIComponent('<b>nope</b>')}`),
+  );
+
+  const location = new URL(response.headers.get('location') ?? '');
+  assert.equal(location.searchParams.get('error'), 'sign_in_failed');
+});
+
+void test('GET /api/v1/auth/mobile/callback does not redirect a provider error outside the allow-list', async () => {
+  const GET = createMobileAuthCallbackHandler({
+    loadRedirectAllowlist: () => ALLOWLIST,
+    resolveSessionUserId: async () => 'user-1',
+    extractSessionBearerToken: () => 'signed-session-token.sig',
+    issueLoginCode: async () => ({ code: 'one-time-code' }),
+  });
+
+  const response = await GET(
+    new Request(
+      'https://app.example.test/api/v1/auth/mobile/callback?state=s1&code_challenge=c1&redirect_uri=https%3A%2F%2Fevil.example%2Fcallback&error=access_denied',
+    ),
+  );
+
+  assert.equal(response.status, 400);
+  assert.equal(response.headers.get('location'), null);
 });
 
 void test('GET /api/v1/auth/mobile/callback rejects a redirect_uri outside the allow-list without issuing a code', async () => {
@@ -100,6 +166,9 @@ void test('GET /api/v1/auth/mobile/callback fails closed when the session cookie
 
   const response = await GET(new Request(CALLBACK_URL));
 
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get('location') ?? '');
+  assert.equal(location.searchParams.get('error'), 'server_error');
+  assert.equal(location.searchParams.get('code'), null);
   assert.ok(capturedError instanceof Error);
 });

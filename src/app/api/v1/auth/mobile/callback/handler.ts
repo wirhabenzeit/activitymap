@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { requestIdFor } from '~/server/http/request-id';
 
 import { errorEnvelope } from '~/contracts/v1/error';
+import { mobileAuthErrorRedirect } from '~/server/auth/mobile-error-redirect';
 import {
   isAllowedMobileRedirectUri,
   loadMobileRedirectAllowlist,
@@ -87,15 +88,26 @@ export function createMobileAuthCallbackHandler({
       );
     }
 
+    // Better Auth sends a declined or failed Strava authorization here (the
+    // `errorCallbackURL` set by `/mobile/start`) with its `error` code. Hand
+    // it back to the app, which treats `access_denied` as a cancellation.
+    const providerError = url.searchParams.get('error');
+    if (providerError) {
+      return mobileAuthErrorRedirect(redirectUri, {
+        state,
+        error: providerError,
+        requestId,
+      });
+    }
+
     try {
       const userId = await resolveSessionUserId(request.headers);
       if (!userId) {
-        return Response.json(
-          errorEnvelope('not_authenticated', 'Authentication is required.', {
-            requestId,
-          }),
-          { status: 401 },
-        );
+        return mobileAuthErrorRedirect(redirectUri, {
+          state,
+          error: 'not_authenticated',
+          requestId,
+        });
       }
 
       const sessionBearerToken = extractSessionBearerToken(request);
@@ -119,13 +131,11 @@ export function createMobileAuthCallbackHandler({
       return Response.redirect(target.toString(), 302);
     } catch (error) {
       onError(error, requestId);
-      return Response.json(
-        errorEnvelope('internal_error', 'The request could not be completed.', {
-          requestId,
-          retryable: true,
-        }),
-        { status: 500 },
-      );
+      return mobileAuthErrorRedirect(redirectUri, {
+        state,
+        error: 'server_error',
+        requestId,
+      });
     }
   };
 }

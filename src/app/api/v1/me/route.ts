@@ -1,6 +1,7 @@
 import { toAuthenticationDTO } from '~/contracts/v1/auth';
 import { toCurrentUserDTOv1 } from '~/contracts/v1/user';
 import { auth } from '~/lib/auth';
+import { stravaPermissionsFromScope } from '~/lib/strava-permissions';
 import { resolveRequestSession } from '~/server/auth/request-session';
 import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
 import { db } from '~/server/db';
@@ -25,7 +26,7 @@ export const GET = withApiV1Observability(
             where: (users, { eq }) => eq(users.id, session.user.id),
           }),
           db.query.accounts.findFirst({
-            columns: { access_token: true, accessToken: true },
+            columns: { access_token: true, accessToken: true, scope: true },
             where: (accounts, { and, eq }) =>
               and(
                 eq(accounts.userId, session.user.id),
@@ -52,6 +53,7 @@ export const GET = withApiV1Observability(
             stravaConnected: Boolean(
               account?.accessToken ?? account?.access_token,
             ),
+            stravaPermissions: stravaPermissionsFromScope(account?.scope),
           },
           authentication,
         );

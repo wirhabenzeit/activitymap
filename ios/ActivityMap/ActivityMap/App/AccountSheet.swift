@@ -62,8 +62,10 @@ struct AccountSheet: View {
         switch auth.status {
         case .signedOut:
             signedOutContent
+        case .restoring:
+            progressContent("Checking your session…")
         case .signingIn:
-            signingInContent
+            progressContent("Signing in…")
         case .signedIn(let user):
             signedInContent(user)
         case .sessionRestoreFailed(let message):
@@ -95,11 +97,11 @@ struct AccountSheet: View {
         }
     }
 
-    private var signingInContent: some View {
+    private func progressContent(_ title: String) -> some View {
         Section {
             HStack(spacing: 8) {
                 ProgressView()
-                Text("Signing in…")
+                Text(title)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
@@ -129,18 +131,33 @@ struct AccountSheet: View {
                 .listRowBackground(Color.clear)
             }
 
-            Section("Connected Services") {
-                LabeledContent("Strava", value: user.stravaConnected ? "Connected" : "Not Connected")
-                StravaConnectControls()
+            Section {
+                LabeledContent("Strava", value: !user.stravaConnected ? "Not Connected"
+                    : StravaPermissionsCopy.isLimited(user.stravaPermissions) ? "Limited Access" : "Connected")
+                ForEach(StravaPermissionsCopy.notes(user.stravaPermissions), id: \.self) { note in
+                    Text(note)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                StravaConnectControls(showsPermissions: !user.stravaConnected)
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
+            } header: {
+                Text("Connected Services")
+            } footer: {
+                if StravaPermissionsCopy.isLimited(user.stravaPermissions) {
+                    Text(StravaPermissionsCopy.reconnect)
+                }
             }
 
             Section {
-                Button("Sign Out", role: .destructive) {
+                Button("Sign Out of ActivityMap", role: .destructive) {
                     Task { await auth.signOut() }
                 }
+            } footer: {
+                Text("Strava stays connected.")
             }
+
         }
     }
 
@@ -161,8 +178,11 @@ struct AccountSheet: View {
             }
 
             Section {
-                Button("Retry") {
-                    Task { await auth.restoreSession() }
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Button("Retry") {
+                        Task { await auth.restoreSession() }
+                    }
+                    .disabled(auth.restoreRetryAt.map { $0 > context.date } ?? false)
                 }
             }
         }
@@ -190,6 +210,14 @@ struct AccountSheet: View {
         }
     }
 
+    private var accountSummary: String {
+        guard let user = auth.currentUser else {
+            return auth.status == .restoring ? "Checking your session…" : "Sign in with Strava"
+        }
+        guard user.stravaConnected else { return "Reconnect Strava" }
+        return StravaPermissionsCopy.isLimited(user.stravaPermissions) ? "Limited Strava access" : "Strava connected"
+    }
+
     private var settingsContent: some View {
         Group {
             Section("Account") {
@@ -197,7 +225,7 @@ struct AccountSheet: View {
                     Label {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(auth.currentUser?.name ?? "Account")
-                            Text(auth.currentUser == nil ? "Sign in with Strava" : auth.currentUser?.stravaConnected == true ? "Strava connected" : "Reconnect Strava")
+                            Text(accountSummary)
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     } icon: { Image(systemName: "person.crop.circle") }

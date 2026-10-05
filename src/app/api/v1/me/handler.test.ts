@@ -15,6 +15,7 @@ const currentUser = {
   image: null,
   athleteId: '9007199254740991',
   stravaConnected: true,
+  stravaPermissions: { activities: 'all' as const, edit: true },
   authentication: {
     method: 'bearer' as const,
     sessionExpiresAt: '2026-10-20T12:00:00.000Z',

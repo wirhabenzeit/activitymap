@@ -66,6 +66,34 @@
           "stravaConnected": {
             "type": "boolean"
           },
+          "stravaPermissions": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "activities": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "public",
+                      "none"
+                    ]
+                  },
+                  "edit": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "activities",
+                  "edit"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "authentication": {
             "$ref": "#/components/schemas/Authentication"
           }
@@ -77,6 +105,7 @@
           "image",
           "athleteId",
           "stravaConnected",
+          "stravaPermissions",
           "authentication"
         ],
         "additionalProperties": false

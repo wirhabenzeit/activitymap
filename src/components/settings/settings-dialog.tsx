@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronRight, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,18 +9,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from '~/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { Button } from '~/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { DisplaySettings } from './display-settings';
 import { useShallowStore } from '~/store';
+import { useIngestionStatus } from '~/hooks/use-ingestion-status';
 import {
-  useIngestionStatus,
-  IngestionStatusError,
-} from '~/hooks/use-ingestion-status';
-import {
-  coverageRows,
-  coverageSummaries,
-  outcomeText,
+  coverageProgress,
   snapshotIsStale,
 } from '~/lib/ingestion/presentation';
 import {
@@ -33,8 +28,17 @@ import {
   StravaConnectFailure,
   STRAVA_CONNECT_PERMISSIONS,
 } from '~/components/auth/strava-connect';
+import {
+  STRAVA_PERMISSIONS_RECONNECT,
+  stravaPermissionNotes,
+  stravaPermissionsLimited,
+} from '~/lib/strava-permissions';
 
-const date = (value: string) => new Date(value).toLocaleString();
+const date = (value: string) =>
+  new Date(value).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 
 export function SettingsDialog({
   open,
@@ -66,302 +70,283 @@ export function SettingsDialog({
   const stale =
     !!status &&
     (offline || query.isError || snapshotIsStale(status.observedAt, clock));
-  const statusRetryAt = Math.max(
-    query.dataUpdatedAt + 60_000,
-    query.errorUpdatedAt + 60_000,
-    query.error instanceof IngestionStatusError ? query.error.retryAt : 0,
-  );
-  const browserTitle = {
-    idle: 'Not yet synced',
-    syncing: 'Downloading changes…',
-    ready: 'Up to date',
-    offline: 'Offline',
-    error: 'Couldn’t sync',
-  }[browser.phase];
-  const rows = status ? coverageRows(status) : [];
+  const needsReconnect =
+    !!userId &&
+    (!user?.stravaConnected ||
+      (status &&
+        [status.history, status.details, status.photos, status.streams].some(
+          (category) => category.scheduling === 'blocked',
+        )));
+  const browserMessage = !userId
+    ? 'Sign in to sync your activities.'
+    : offline || browser.phase === 'offline'
+      ? 'Offline. Sync will resume when you’re back online.'
+      : browser.phase === 'syncing'
+        ? 'Syncing…'
+        : browser.phase === 'error'
+          ? 'Couldn’t sync. Please try again.'
+          : null;
+  const fetched = status
+    ? [
+        {
+          title: 'Details',
+          progress: coverageProgress(
+            status.details.detailed,
+            status.history.knownActivityCount,
+          ),
+        },
+        {
+          title: 'Photos',
+          progress: coverageProgress(
+            status.photos.activitiesWithStoredPhotos,
+            status.photos.activitiesWithPhotos,
+          ),
+          emptyLabel:
+            status.photos.activitiesWithPhotos === 0 ? 'No photos' : '—',
+        },
+        {
+          title: 'Streams',
+          progress: coverageProgress(
+            status.streams.withData + status.streams.withoutData,
+            status.history.knownActivityCount,
+          ),
+        },
+      ]
+    : [];
+  const permissionNotes = stravaPermissionNotes(user?.stravaPermissions);
+  const showConnect = !userId || !!needsReconnect || permissionNotes.length > 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto break-words sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl">Settings</DialogTitle>
+      <DialogContent
+        overlayClassName="z-[70]"
+        className="z-[70] flex h-[min(30rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-md flex-col gap-0 overflow-hidden rounded-xl p-0 [@media(min-width:640px)_and_(max-height:500px)]:h-[calc(100dvh-2rem)] [@media(min-width:640px)_and_(max-height:500px)]:max-w-2xl [&>button]:right-2 [&>button]:top-2 [&>button]:flex [&>button]:size-11 [&>button]:items-center [&>button]:justify-center"
+      >
+        <DialogHeader className="shrink-0 px-5 py-4 text-left">
+          <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="sr-only">
-            Account, sync and display preferences.
+            Web sync, Strava import status and display preferences.
           </DialogDescription>
         </DialogHeader>
-        <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-          <TabsList
-            className="grid h-auto w-full grid-cols-4"
-            aria-label="Settings sections"
-          >
-            {[
-              ['account', 'Account'],
-              ['sync', 'Sync & data'],
-              ['display', 'Display'],
-              ['about', 'About'],
-            ].map(([value, title]) => (
-              <TabsTrigger
-                key={value}
-                value={value!}
-                className="min-w-0 whitespace-normal px-1 text-xs sm:text-sm"
-              >
-                {title}
+        <Tabs
+          value={tab}
+          onValueChange={setTab}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <div className="shrink-0 border-b px-5 pb-3">
+            <TabsList
+              aria-label="Settings sections"
+              className="grid h-10 w-full grid-cols-4"
+            >
+              <TabsTrigger value="sync" className="h-8 px-1 text-xs sm:text-sm">
+                Sync & data
               </TabsTrigger>
-            ))}
-          </TabsList>
-          <TabsContent value="sync" className="space-y-6 pt-4">
-            <section aria-labelledby="server-heading" className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 id="server-heading" className="font-semibold">
-                    Strava import
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Strava → ActivityMap
+              <TabsTrigger
+                value="display"
+                className="h-8 px-1 text-xs sm:text-sm"
+              >
+                Display
+              </TabsTrigger>
+              <TabsTrigger
+                value="account"
+                className="h-8 px-1 text-xs sm:text-sm"
+              >
+                Account
+              </TabsTrigger>
+              <TabsTrigger
+                value="about"
+                className="h-8 px-1 text-xs sm:text-sm"
+              >
+                About
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent
+            value="sync"
+            className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
+          >
+            <div className="grid gap-5 [@media(min-width:640px)_and_(max-height:500px)]:grid-cols-[0.85fr_1.15fr]">
+              <section aria-labelledby="web-sync-heading" className="space-y-2">
+                <div className="flex items-center justify-between gap-3 [@media(min-width:640px)_and_(max-height:500px)]:flex-col [@media(min-width:640px)_and_(max-height:500px)]:items-start">
+                  <div className="min-w-0 space-y-1">
+                    <h2 id="web-sync-heading" className="text-sm font-semibold">
+                      Last web sync
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      {browser.lastSuccess ? (
+                        <time dateTime={browser.lastSuccess}>
+                          {date(browser.lastSuccess)}
+                        </time>
+                      ) : (
+                        'Not yet synced'
+                      )}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="h-10 shrink-0"
+                    onClick={requestBrowserSync}
+                    disabled={
+                      !userId ||
+                      offline ||
+                      browser.phase === 'syncing' ||
+                      (!!browser.retryAt && clock < browser.retryAt)
+                    }
+                  >
+                    <RefreshCw
+                      aria-hidden="true"
+                      className={
+                        browser.phase === 'syncing' ? 'animate-spin' : ''
+                      }
+                    />
+                    Sync now
+                  </Button>
+                </div>
+                {browserMessage && (
+                  <p role="status" className="text-xs text-muted-foreground">
+                    {browserMessage}
                   </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Check server status"
-                  title={
-                    clock < statusRetryAt
-                      ? `Next check after ${date(new Date(statusRetryAt).toISOString())}`
-                      : 'Check server status'
-                  }
-                  disabled={
-                    !userId ||
-                    query.isFetching ||
-                    offline ||
-                    clock < statusRetryAt
-                  }
-                  onClick={() => void query.refetch()}
-                >
-                  <RefreshCw
-                    className={`size-4 ${query.isFetching ? 'animate-spin' : ''}`}
-                  />
-                </Button>
-              </div>
-              {status ? (
-                <div className="divide-y rounded-xl border">
-                  {coverageSummaries(status).map((summary, index) => {
-                    const row = rows[index]!;
-                    return (
-                      <details key={summary.title} className="group">
-                        <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 marker:hidden [&::-webkit-details-marker]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
-                          <div className="min-w-0 flex-1 space-y-2">
-                            <div className="flex items-baseline justify-between gap-3 text-sm font-medium">
-                              <span>{summary.title}</span>
-                              {summary.progress && (
-                                <span className="tabular-nums">
-                                  {summary.progress.percent.toLocaleString()}%
-                                </span>
-                              )}
-                            </div>
-                            {summary.progress && (
-                              <progress
-                                className="block h-2 w-full overflow-hidden rounded-full accent-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary"
-                                value={summary.progress.value}
-                                max={summary.progress.total}
-                                aria-label={summary.title}
-                                aria-valuetext={`${summary.progress.percent}% — ${summary.count}`}
-                              />
-                            )}
-                            <span className="block text-xs text-muted-foreground">
-                              {summary.count}
-                            </span>
-                            <span className="block text-xs text-muted-foreground">
-                              {summary.status}
-                            </span>
+                )}
+                {userId && browser.retryAt && clock < browser.retryAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Try again after{' '}
+                    {date(new Date(browser.retryAt).toISOString())}.
+                  </p>
+                )}
+              </section>
+              <section
+                aria-labelledby="import-heading"
+                className="space-y-3 border-t pt-4 [@media(min-width:640px)_and_(max-height:500px)]:space-y-2 [@media(min-width:640px)_and_(max-height:500px)]:border-t-0 [@media(min-width:640px)_and_(max-height:500px)]:border-l [@media(min-width:640px)_and_(max-height:500px)]:pt-0 [@media(min-width:640px)_and_(max-height:500px)]:pl-5"
+              >
+                <h2 id="import-heading" className="text-sm font-semibold">
+                  Strava import status
+                </h2>
+                {status ? (
+                  <>
+                    <dl className="space-y-3 text-sm [@media(min-width:640px)_and_(max-height:500px)]:space-y-2">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <dt className="text-muted-foreground">
+                          All activities imported
+                        </dt>
+                        <dd className="font-medium">
+                          {status.history.progress === 'complete'
+                            ? 'Yes'
+                            : status.history.progress === 'unknown'
+                              ? 'Unknown'
+                              : 'No'}
+                        </dd>
+                      </div>
+                      {fetched.map(({ title, progress, emptyLabel }) => (
+                        <div key={title} className="space-y-1.5">
+                          <div className="flex items-baseline justify-between gap-3">
+                            <dt className="text-muted-foreground">{title}</dt>
+                            <dd className="font-medium tabular-nums">
+                              {progress
+                                ? `${progress.percent.toLocaleString()}%`
+                                : (emptyLabel ?? '—')}
+                            </dd>
                           </div>
-                          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-                        </summary>
-                        <div className="space-y-2 px-4 pb-4 text-sm text-muted-foreground">
-                          <p>
-                            {stale ? 'At last check: ' : ''}
-                            {row.schedule}
-                          </p>
-                          {row.reason && <p>{row.reason}</p>}
-                          {row.retryAt && (
-                            <p>Eligible to retry after {date(row.retryAt)}.</p>
+                          {progress && (
+                            <dd>
+                              <progress
+                                className="block h-1.5 w-full overflow-hidden rounded-full accent-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary"
+                                value={progress.value}
+                                max={progress.total}
+                                aria-label={`${title} fetched`}
+                                aria-valuetext={`${progress.percent}%`}
+                              />
+                            </dd>
                           )}
-                          {index === 0 && (
-                            <div className="space-y-2">
-                              <p>
-                                {status.history.reconciliation.lastCompletedAt
-                                  ? `Last full history check: ${date(status.history.reconciliation.lastCompletedAt)}.`
-                                  : 'A full history check has not finished yet.'}
-                              </p>
-                              {status.history.reconciliation.nextDueAt && (
-                                <p>
-                                  {Date.parse(
-                                    status.history.reconciliation.nextDueAt,
-                                  ) <= Date.parse(status.observedAt)
-                                    ? 'Refresh was due'
-                                    : 'Next refresh due'}
-                                  :{' '}
-                                  {date(
-                                    status.history.reconciliation.nextDueAt,
-                                  )}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                          {index === 1 || index === 2 ? (
-                            <p>Of the activities imported so far.</p>
-                          ) : null}
-                          {index === 3 && (
-                            <p>
-                              Counts activities with photos available, not
-                              individual images.
-                            </p>
-                          )}
-                          <details className="space-y-2">
-                            <summary className="cursor-pointer">
-                              More information
-                            </summary>
-                            {index === 3 ? (
-                              <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2">
-                                <dt>Individual photos stored</dt>
-                                <dd>
-                                  {status.photos.photoCount.toLocaleString()}
-                                </dd>
-                                <dt>Collections verified current</dt>
-                                <dd>
-                                  {status.photos.current.toLocaleString()}
-                                </dd>
-                              </dl>
-                            ) : (
-                              <p>{row.counts}</p>
-                            )}
-                            {index === 2 && (
-                              <p>
-                                An activity with no recorded measurements still
-                                counts as checked.
-                              </p>
-                            )}
-                            {row.outcome && (
-                              <p>
-                                {outcomeText(row.outcome)} ·{' '}
-                                {date(row.outcome.attemptedAt)}
-                                {row.outcome.lastSucceededAt
-                                  ? ` · Last success: ${date(row.outcome.lastSucceededAt)}`
-                                  : ''}
-                              </p>
-                            )}
-                          </details>
                         </div>
-                      </details>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div
-                  role="status"
-                  className="rounded-xl border px-4 py-6 text-sm text-muted-foreground"
-                >
-                  {!userId
-                    ? 'Sign in to see your import status.'
-                    : query.isFetching
-                      ? 'Checking your import…'
-                      : 'Server status unavailable.'}
-                </div>
-              )}
-              <div role="status" className="text-xs text-muted-foreground">
-                {status && (
-                  <p title={date(status.observedAt)}>
-                    {stale ? 'Last known status' : 'Checked'} ·{' '}
+                      ))}
+                    </dl>
+                    <p className="text-xs text-muted-foreground">
+                      Fetched for imported activities. Photos count only
+                      activities with photos.
+                    </p>
+                  </>
+                ) : (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    {!userId
+                      ? 'Sign in to see your import status.'
+                      : query.isFetching
+                        ? 'Checking your import…'
+                        : 'Import status unavailable. Please try again later.'}
+                  </p>
+                )}
+                {stale && status && (
+                  <p role="status" className="text-xs text-muted-foreground">
+                    {offline ? 'Offline. ' : ''}Last known status ·{' '}
                     {date(status.observedAt)}
                   </p>
                 )}
-                {offline ? (
-                  <p>Offline. Showing saved status.</p>
-                ) : query.isError ? (
-                  <p>{query.error.message}</p>
-                ) : null}
-              </div>
-              {rows.some((row) => row.schedule.startsWith('Reconnect')) && (
-                <StravaConnectButton />
-              )}
-              <StravaConnectFailure />
-            </section>
-            <section
-              aria-labelledby="browser-heading"
-              className="space-y-3 border-t pt-5"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 id="browser-heading" className="font-semibold">
-                    This browser
-                  </h2>
-                  <p role="status" className="text-sm text-muted-foreground">
-                    {browserTitle}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={requestBrowserSync}
-                  disabled={
-                    !userId ||
-                    offline ||
-                    browser.phase === 'syncing' ||
-                    (!!browser.retryAt && clock < browser.retryAt)
-                  }
-                >
-                  Sync browser
-                </Button>
-              </div>
-              {browser.error && (
-                <p role="alert" className="text-sm">
-                  {browser.error}
-                </p>
-              )}
-              {browser.retryAt && clock < browser.retryAt && (
-                <p className="text-xs text-muted-foreground">
-                  Retry after {date(new Date(browser.retryAt).toISOString())}
-                </p>
-              )}
-              <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer">Download details</summary>
-                <div className="space-y-2 pt-2">
-                  <p>
-                    Last success:{' '}
-                    {browser.lastSuccess
-                      ? date(browser.lastSuccess)
-                      : 'Not recorded'}
-                  </p>
-                  <p>
-                    Downloads ActivityMap metadata to this browser. Strava
-                    import and image downloads run separately.
-                  </p>
-                </div>
-              </details>
-            </section>
-          </TabsContent>
-          <TabsContent value="account" className="space-y-4 py-5">
-            <div>
-              <h2 className="font-semibold">
-                {userId ? (user?.name ?? 'Your account') : 'Your account'}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {userId
-                  ? user?.stravaConnected
-                    ? 'Strava connected'
-                    : 'Strava needs reconnecting'
-                  : 'Sign in to view your activities.'}
-              </p>
+                {needsReconnect && (
+                  <div className="space-y-2">
+                    <p role="status" className="text-sm text-muted-foreground">
+                      Reconnect Strava to continue importing.
+                    </p>
+                    <StravaConnectButton />
+                    <StravaConnectFailure />
+                  </div>
+                )}
+              </section>
             </div>
-            <StravaConnectButton />
-            <StravaConnectFailure />
-            <p className="text-sm text-muted-foreground">
-              {STRAVA_CONNECT_PERMISSIONS}
-            </p>
           </TabsContent>
-          <TabsContent value="display" className="py-5">
+          <TabsContent
+            value="display"
+            className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
+          >
             <DisplaySettings />
           </TabsContent>
-          <TabsContent value="about" className="space-y-2 py-5">
-            <h2 className="font-semibold">ActivityMap</h2>
+          <TabsContent
+            value="account"
+            className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
+          >
+            <section aria-labelledby="account-heading" className="space-y-2">
+              <h2 id="account-heading" className="text-sm font-semibold">
+                Account
+              </h2>
+              <p className="break-words text-sm text-muted-foreground">
+                {userId
+                  ? (user?.name ?? 'Your account')
+                  : 'Connect Strava to see your activities.'}
+              </p>
+              {userId && !needsReconnect && (
+                <p className="text-xs text-muted-foreground">
+                  {stravaPermissionsLimited(user?.stravaPermissions)
+                    ? 'Strava connected with limited access'
+                    : 'Strava connected'}
+                </p>
+              )}
+              {permissionNotes.length > 0 && (
+                <div className="space-y-1 rounded-lg border px-3 py-2 text-xs">
+                  {permissionNotes.map((note) => (
+                    <p key={note}>{note}</p>
+                  ))}
+                  <p className="text-muted-foreground">
+                    {STRAVA_PERMISSIONS_RECONNECT}
+                  </p>
+                </div>
+              )}
+              {showConnect && <StravaConnectButton />}
+              <StravaConnectFailure />
+              {showConnect && (
+                <p className="text-xs text-muted-foreground">
+                  {STRAVA_CONNECT_PERMISSIONS}
+                </p>
+              )}
+              {userId && (
+                <p className="text-xs text-muted-foreground">
+                  Signing out keeps Strava connected.
+                </p>
+              )}
+            </section>
+          </TabsContent>
+          <TabsContent
+            value="about"
+            className="m-0 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5"
+          >
+            <h2 className="text-sm font-semibold">ActivityMap</h2>
             <p className="text-sm text-muted-foreground">
               Your activities, on a map and beyond.
             </p>
