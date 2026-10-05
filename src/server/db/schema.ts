@@ -832,3 +832,32 @@ export const streamBackfillAttempts = pgTable('stream_backfill_attempt', {
   leaseToken: text('lease_token'),
   leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }),
 });
+
+// Independent photo retries: legacy stored rows stay usable while this queue
+// verifies them. No migration guesses freshness from matching counts.
+export const photoFetchAttempts = pgTable('photo_fetch_attempt', {
+  activityId: bigint('activity_id', { mode: 'number' }).primaryKey()
+    .references(() => activities.id, { onDelete: 'cascade' }),
+  attemptCount: integer('attempt_count').notNull().default(0),
+  nextAttemptAt: timestamp('next_attempt_at', { mode: 'date' }).notNull(),
+  lastErrorCode: text('last_error_code'),
+  leaseToken: text('lease_token'),
+  leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }),
+});
+
+export const photoBackfillRuns = pgTable('photo_backfill_run', {
+  key: text('key').primaryKey(),
+  windowStart: timestamp('window_start', { mode: 'date' }).notNull(),
+  selected: integer('selected').notNull().default(0),
+  requests: integer('requests').notNull().default(0),
+  leaseToken: text('lease_token'),
+  leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }),
+});
+
+// A rejected grant blocks all photo work until refresh/reconnect changes it.
+export const photoBackfillAccounts = pgTable('photo_backfill_account', {
+  accountId: text('account_id').primaryKey()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  blockedCredentials: text('blocked_credentials').notNull(),
+  reason: text('reason').notNull(),
+});
