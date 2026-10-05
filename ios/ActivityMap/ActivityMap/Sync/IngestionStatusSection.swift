@@ -24,7 +24,14 @@ struct IngestionStatusSection: View {
                     NavigationLink {
                         Form {
                             Section(row.coverage) {
-                                Text(row.counts)
+                                if index == 3 {
+                                    LabeledContent("Activities with photos", value: snapshot.photos.activitiesWithPhotos.formatted())
+                                    LabeledContent("Up to date", value: snapshot.photos.current.formatted())
+                                    LabeledContent("Need checking", value: (snapshot.photos.refreshRequired + snapshot.photos.unknown).formatted())
+                                    LabeledContent("Individual photos stored", value: snapshot.photos.photoCount.formatted())
+                                } else {
+                                    Text(row.counts)
+                                }
                                 Text((stale ? "At last check: " : "") + row.schedule)
                                 if let reason = row.reason { Text(reason) }
                                 if let retry = row.retryAt { Text("Eligible to retry after \(retry.formatted()).") }
@@ -39,9 +46,16 @@ struct IngestionStatusSection: View {
                             if index == 0 {
                                 Section("History check") {
                                     if let checked = snapshot.history.reconciliation.lastCompletedAt {
-                                        Text("Last full check: \(checked.formatted()) (\(snapshot.history.reconciliation.freshness.rawValue)).")
+                                        LabeledContent("Last full check", value: checked.formatted())
                                     } else { Text("A full history check has not finished yet.") }
+                                    if let due = snapshot.history.reconciliation.nextDueAt {
+                                        LabeledContent(due <= snapshot.observedAt ? "Refresh was due" : "Next refresh due", value: due.formatted())
+                                    }
                                 }
+                            }
+                            if index == 3 {
+                                Text("Strava reports which activities have photos before their individual photos are fetched. One activity can have several photos.")
+                                    .foregroundStyle(.secondary)
                             }
                             if index == 2 { Text("Activities without GPS or sensors can be fully fetched.").foregroundStyle(.secondary) }
                             Section(stale ? "Last known status" : "Observed") { Text(snapshot.observedAt, format: .dateTime) }

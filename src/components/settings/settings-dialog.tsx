@@ -175,7 +175,29 @@ export function SettingsDialog({
                           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
                         </summary>
                         <div className="space-y-2 px-4 pb-4 text-sm text-muted-foreground">
-                          <p>{row.counts}</p>
+                          {index === 3 ? (
+                            <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2">
+                              <dt>Activities with photos</dt>
+                              <dd>
+                                {status.photos.activitiesWithPhotos.toLocaleString()}
+                              </dd>
+                              <dt>Up to date</dt>
+                              <dd>{status.photos.current.toLocaleString()}</dd>
+                              <dt>Need checking</dt>
+                              <dd>
+                                {(
+                                  status.photos.refreshRequired +
+                                  status.photos.unknown
+                                ).toLocaleString()}
+                              </dd>
+                              <dt>Individual photos stored</dt>
+                              <dd>
+                                {status.photos.photoCount.toLocaleString()}
+                              </dd>
+                            </dl>
+                          ) : (
+                            <p>{row.counts}</p>
+                          )}
                           <p>
                             {stale ? 'At last check: ' : ''}
                             {row.schedule}
@@ -194,10 +216,32 @@ export function SettingsDialog({
                             </p>
                           )}
                           {index === 0 && (
+                            <div className="space-y-2">
+                              <p>
+                                {status.history.reconciliation.lastCompletedAt
+                                  ? `Last full history check: ${date(status.history.reconciliation.lastCompletedAt)}.`
+                                  : 'A full history check has not finished yet.'}
+                              </p>
+                              {status.history.reconciliation.nextDueAt && (
+                                <p>
+                                  {Date.parse(
+                                    status.history.reconciliation.nextDueAt,
+                                  ) <= Date.parse(status.observedAt)
+                                    ? 'Refresh was due'
+                                    : 'Next refresh due'}
+                                  :{' '}
+                                  {date(
+                                    status.history.reconciliation.nextDueAt,
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {index === 3 && (
                             <p>
-                              {status.history.reconciliation.lastCompletedAt
-                                ? `History checked: ${date(status.history.reconciliation.lastCompletedAt)} (${status.history.reconciliation.freshness}).`
-                                : 'A full history check has not finished yet.'}
+                              Strava reports which activities have photos before
+                              their individual photos are fetched. One activity
+                              can have several photos.
                             </p>
                           )}
                           {index === 2 && (

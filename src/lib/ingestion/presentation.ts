@@ -8,7 +8,7 @@ import type {
 
 const progress: Record<IngestionProgress, string> = {
   not_started: 'Not started',
-  in_progress: 'In progress',
+  in_progress: 'Partially available',
   complete: 'Covered',
   unknown: 'Unknown',
 };
@@ -21,7 +21,7 @@ const scheduling: Record<IngestionScheduling, string> = {
   stalled:
     'Background processing has stopped reporting; contact support if this continues',
   not_scheduled: 'No automatic refresh is scheduled',
-  unknown: 'Background schedule is not yet known',
+  unknown: 'No background run has been recorded',
 };
 const reasons: Record<IngestionReason, string> = {
   rate_limited:

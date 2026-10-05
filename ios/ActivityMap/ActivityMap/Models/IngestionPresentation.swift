@@ -34,7 +34,7 @@ nonisolated struct IngestionPresentation {
     static func progress(_ value: ActivityMapAPI.IngestionProgress) -> String {
         switch value {
         case .notStarted: "Not started"
-        case .inProgress: "In progress"
+        case .inProgress: "Partially available"
         case .complete: "Covered"
         case .unknown: "Unknown"
         }
@@ -48,7 +48,7 @@ nonisolated struct IngestionPresentation {
         case .disabled: "Background processing is disabled on the server"
         case .stalled: "Background processing has stopped reporting; contact support if this continues"
         case .notScheduled: "No automatic refresh is scheduled"
-        case .unknown: "Background schedule is not yet known"
+        case .unknown: "No background run has been recorded"
         }
     }
     static func reason(_ value: ActivityMapAPI.IngestionReason) -> String {
