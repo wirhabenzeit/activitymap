@@ -3,8 +3,15 @@
 import * as React from 'react';
 import Image from 'next/image';
 import { Loader2 } from 'lucide-react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { usePathname, useSearchParams } from 'next/navigation';
 
+import {
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from '~/components/ui/dialog';
 import { signIn } from '~/lib/auth-client';
 import {
   connectFailure,
@@ -171,38 +178,43 @@ export function StravaConnectFailure({ className }: { className?: string }) {
 }
 
 /**
- * The first-use surface over Map, List and Stats while signed out: one tap
- * on the official button starts the Strava authorization. The surrounding
- * view stays visible and is not blocked beyond the card itself.
+ * The first-use surface while signed out: a centred, non-dismissible dialog
+ * floating over the whole app on a blurred backdrop. One tap on the official
+ * button starts the Strava authorization; the app stays visible behind it.
  */
 export function SignedOutConnectPanel() {
   const signedOut = useShallowStore(
     (state) => state.isInitialized && !state.user && !state.isGuest,
   );
-  if (!signedOut) return null;
+  // Nothing behind the dialog is usable without an account, so it cannot be
+  // closed; connecting (which reloads the shell) is the way forward.
+  const keepOpen = (event: Event) => event.preventDefault();
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
-      <section
-        aria-labelledby="strava-connect-title"
-        className="pointer-events-auto w-full max-w-sm space-y-4 rounded-xl border bg-card p-6 text-card-foreground shadow-lg"
-      >
-        <div className="space-y-2">
-          <h2
-            id="strava-connect-title"
-            className="text-lg font-semibold leading-tight"
-          >
-            Connect Strava to see your activities
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {STRAVA_CONNECT_PURPOSE}
+    <DialogPrimitive.Root open={signedOut}>
+      <DialogPortal>
+        {/* Above the app header (z-[60]) so the whole app sits behind the glass. */}
+        <DialogOverlay className="z-[70] bg-background/20 backdrop-blur-md" />
+        <DialogPrimitive.Content
+          onEscapeKeyDown={keepOpen}
+          onPointerDownOutside={keepOpen}
+          onInteractOutside={keepOpen}
+          className="fixed top-1/2 left-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 space-y-4 rounded-2xl border border-white/20 bg-card/75 p-6 text-card-foreground shadow-2xl ring-1 ring-black/5 backdrop-blur-xl duration-200 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-white/10"
+        >
+          <div className="space-y-2">
+            <DialogTitle className="text-lg leading-tight font-semibold">
+              Connect Strava to see your activities
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {STRAVA_CONNECT_PURPOSE}
+            </DialogDescription>
+          </div>
+          <StravaConnectButton />
+          <StravaConnectFailure />
+          <p className="text-xs text-muted-foreground">
+            {STRAVA_CONNECT_PERMISSIONS}
           </p>
-        </div>
-        <StravaConnectButton />
-        <StravaConnectFailure />
-        <p className="text-xs text-muted-foreground">
-          {STRAVA_CONNECT_PERMISSIONS}
-        </p>
-      </section>
-    </div>
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </DialogPrimitive.Root>
   );
 }

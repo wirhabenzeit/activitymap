@@ -7,15 +7,7 @@ import { displayEmail, safeReturnPath } from '~/lib/auth-return';
 
 import { useShallowStore } from '~/store';
 
-import {
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from '~/components/ui/sidebar';
-import {
-  StravaConnectButton,
-  useStravaConnect,
-} from '~/components/auth/strava-connect';
+import { SidebarMenuButton, SidebarMenuItem } from '~/components/ui/sidebar';
 import {
   DropdownMenu,
   DropdownMenuLabel,
@@ -154,7 +146,8 @@ export function UserSettings() {
     );
   };
 
-  if (isInitialized && !user) return <SignedOutAccountRow />;
+  // Signed out, the connect dialog over the app is the account entry point.
+  if (isInitialized && !user) return null;
 
   return (
     <SidebarMenuItem>
@@ -245,42 +238,6 @@ export function UserSettings() {
       </DropdownMenu>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-    </SidebarMenuItem>
-  );
-}
-
-/**
- * Signed out: the official Strava button starts the shared connection flow
- * directly. A collapsed icon-only sidebar keeps an equivalent Strava mark.
- */
-function SignedOutAccountRow() {
-  const { state, isMobile } = useSidebar();
-  const { connect, pending } = useStravaConnect();
-
-  if (state === 'collapsed' && !isMobile) {
-    return (
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          size="lg"
-          onClick={connect}
-          disabled={pending}
-          tooltip="Connect with Strava"
-          aria-label="Connect with Strava"
-        >
-          <Avatar className="h-8 w-8 rounded-lg">
-            <AvatarImage src="/icon_strava.svg" alt="" />
-            <AvatarFallback className="rounded-lg">ST</AvatarFallback>
-          </Avatar>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    );
-  }
-
-  return (
-    // Failure feedback lives on the signed-out panel, which is always visible
-    // beside this row; repeating it here would only duplicate the message.
-    <SidebarMenuItem className="px-1 py-1">
-      <StravaConnectButton className="flex-wrap" />
     </SidebarMenuItem>
   );
 }
