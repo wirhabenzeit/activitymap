@@ -337,10 +337,7 @@ export function SettingsDialog({
               )}
               {userId && (
                 <p className="text-xs text-muted-foreground">
-                  Signing out ends your ActivityMap session in this browser.
-                  Your Strava account and its connection to ActivityMap stay as
-                  they are; disconnect ActivityMap in Strava’s settings to
-                  remove its access.
+                  Signing out keeps Strava connected.
                 </p>
               )}
             </section>

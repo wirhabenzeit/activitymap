@@ -65,7 +65,10 @@ export const auth = betterAuth({
                 userInfoUrl: 'https://www.strava.com/api/v3/athlete',
                 clientId: process.env.AUTH_STRAVA_ID!,
                 clientSecret: process.env.AUTH_STRAVA_SECRET!,
-                scopes: ['read,activity:read_all,activity:write'],
+                // `activity:read` alongside `activity:read_all` gives Strava's
+                // consent screen separate public and private boxes, so leaving
+                // private unticked still shares public activities (#303).
+                scopes: ['read,activity:read,activity:read_all,activity:write'],
                 pkce: false,
                 // Custom function to fetch and map user info from Strava
                 getUserInfo: async (tokens) => {

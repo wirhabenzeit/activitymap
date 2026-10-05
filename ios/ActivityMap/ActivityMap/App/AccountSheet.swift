@@ -137,9 +137,9 @@ struct AccountSheet: View {
                 ForEach(StravaPermissionsCopy.notes(user.stravaPermissions), id: \.self) { note in
                     Text(note)
                         .font(.subheadline)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(.secondary)
                 }
-                StravaConnectControls()
+                StravaConnectControls(showsPermissions: !user.stravaConnected)
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
             } header: {
@@ -155,7 +155,7 @@ struct AccountSheet: View {
                     Task { await auth.signOut() }
                 }
             } footer: {
-                Text("Signs out on this device. Your Strava account and its connection to ActivityMap stay as they are; disconnect ActivityMap in Strava’s settings if you want to remove its access.")
+                Text("Strava stays connected.")
             }
 
         }

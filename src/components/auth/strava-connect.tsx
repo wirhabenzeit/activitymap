@@ -23,13 +23,13 @@ import { useShallowStore } from '~/store';
 
 /**
  * Why ActivityMap asks to connect Strava, and what the requested `read`,
- * `activity:read_all` and `activity:write` scopes are for. Mirrored by the
+ * `activity:read`, `activity:read_all` and `activity:write` scopes are for. Mirrored by the
  * iOS `StravaConnect` copy; keep them in step (issue #304).
  */
 export const STRAVA_CONNECT_PURPOSE =
   'ActivityMap shows your Strava activities on a map, in a list and as stats.';
 export const STRAVA_CONNECT_PERMISSIONS =
-  'Strava will ask you to let ActivityMap read your activities, including private ones, and update an activity’s name, description and sport when you edit it here.';
+  'ActivityMap reads your activities, including private ones, and updates those you edit here.';
 
 const FAILURE_MESSAGES: Record<ConnectFailure, string> = {
   cancelled:

@@ -27,18 +27,18 @@ extension EnvironmentValues {
 }
 
 /// Why ActivityMap connects to Strava and what the requested `read`,
-/// `activity:read_all` and `activity:write` scopes are for. Mirrors the web
+/// `activity:read`, `activity:read_all` and `activity:write` scopes are for. Mirrors the web
 /// copy in `src/components/auth/strava-connect.tsx`.
 enum StravaConnectCopy {
     static let purpose = "ActivityMap shows your Strava activities on a map, in a list and as stats."
-    static let permissions = "Strava will ask you to let ActivityMap read your activities, including private ones, and update an activity’s name, description and sport when you edit it here."
+    static let permissions = "ActivityMap reads your activities, including private ones, and updates those you edit here."
     static let failure = "Couldn’t connect to Strava. Please try again."
 }
 
 /// What a limited Strava grant leaves out (issue #303). Mirrors
 /// `stravaPermissionNotes` in `src/lib/strava-permissions.ts`.
 enum StravaPermissionsCopy {
-    static let reconnect = "To change this, connect with Strava again and keep every box ticked."
+    static let reconnect = "Reconnect to grant full access."
 
     static func isLimited(_ permissions: ActivityMapAPI.StravaPermissions?) -> Bool {
         guard let permissions else { return false }
@@ -50,14 +50,14 @@ enum StravaPermissionsCopy {
         var notes: [String] = []
         switch permissions.activities {
         case .none:
-            notes.append("Strava isn’t sharing your activities with ActivityMap, so none can be imported.")
+            notes.append("No activities are shared.")
         case .public:
-            notes.append("Activities visible only to you aren’t included, because access to private activities wasn’t granted.")
+            notes.append("Private activities aren’t shared.")
         case .all:
             break
         }
         if !permissions.edit {
-            notes.append("Editing activity names, descriptions and sports isn’t available, because permission to update activities wasn’t granted.")
+            notes.append("Editing isn’t allowed.")
         }
         return notes
     }
@@ -93,6 +93,8 @@ struct StravaConnectButton: View {
 /// The button with its adjacent failure and permission explanation.
 struct StravaConnectControls: View {
     var alignment: HorizontalAlignment = .center
+    /// The permission explanation matters before connecting, not afterwards.
+    var showsPermissions = true
     @Environment(\.stravaConnect) private var connect
 
     var body: some View {
@@ -104,10 +106,12 @@ struct StravaConnectControls: View {
                     .foregroundStyle(.red)
                     .accessibilityIdentifier("strava-connect-failure")
             }
-            Text(StravaConnectCopy.permissions)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if showsPermissions {
+                Text(StravaConnectCopy.permissions)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .multilineTextAlignment(alignment == .center ? .center : .leading)
     }

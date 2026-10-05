@@ -28,7 +28,7 @@ void test('unticked private activities and editing are limited access', () => {
 void test('a grant without any activity scope cannot import activities', () => {
   const permissions = stravaPermissionsFromScope('read');
   assert.deepEqual(permissions, { activities: 'none', edit: false });
-  assert.match(stravaPermissionNotes(permissions)[0]!, /none can be imported/);
+  assert.match(stravaPermissionNotes(permissions)[0]!, /No activities/);
 });
 
 void test('a missing or unrecognised stored scope is unknown, not nothing granted', () => {

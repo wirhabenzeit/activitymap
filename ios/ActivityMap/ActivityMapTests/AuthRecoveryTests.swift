@@ -55,7 +55,7 @@ struct AuthRecoveryTests {
         #expect(StravaPermissionsCopy.notes(publicOnly).count == 2)
 
         let nothing = ActivityMapAPI.StravaPermissions(activities: .none, edit: true)
-        #expect(StravaPermissionsCopy.notes(nothing).first?.contains("none can be imported") == true)
+        #expect(StravaPermissionsCopy.notes(nothing).first == "No activities are shared.")
 
         #expect(!StravaPermissionsCopy.isLimited(nil))
         #expect(StravaPermissionsCopy.notes(nil).isEmpty)

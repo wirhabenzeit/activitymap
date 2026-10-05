@@ -101,21 +101,12 @@ export function stravaPermissionNotes(
   if (!permissions) return [];
   const notes: string[] = [];
   if (permissions.activities === 'none') {
-    notes.push(
-      'Strava isn’t sharing your activities with ActivityMap, so none can be imported.',
-    );
+    notes.push('No activities are shared.');
   } else if (permissions.activities === 'public') {
-    notes.push(
-      'Activities visible only to you aren’t included, because access to private activities wasn’t granted.',
-    );
+    notes.push('Private activities aren’t shared.');
   }
-  if (!permissions.edit) {
-    notes.push(
-      'Editing activity names, descriptions and sports isn’t available, because permission to update activities wasn’t granted.',
-    );
-  }
+  if (!permissions.edit) notes.push('Editing isn’t allowed.');
   return notes;
 }
 
-export const STRAVA_PERMISSIONS_RECONNECT =
-  'To change this, connect with Strava again and keep every box ticked.';
+export const STRAVA_PERMISSIONS_RECONNECT = 'Reconnect to grant full access.';
