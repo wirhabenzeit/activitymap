@@ -19,6 +19,7 @@ import {
 } from '../../src/server/db/schema';
 import {
   createPhotoBackfillRepository,
+  PHOTO_ACTIVITY_LIMIT,
   PHOTO_REQUEST_LIMIT,
   PhotoBackfillStopped,
 } from '../../src/server/repositories/photo-backfill';
@@ -319,6 +320,12 @@ try {
     'old response cannot release a newer lease',
   );
   await repo.release(newer, null);
+  // Only five activities are eligible here; use up the rest of the hour's
+  // selections so the cap itself is exercised, whatever its size.
+  await database
+    .update(photoBackfillRuns)
+    .set({ selected: PHOTO_ACTIVITY_LIMIT })
+    .where(eq(photoBackfillRuns.key, 'photos'));
   await assert.rejects(
     () => repo.claimNext(token),
     (error) =>
