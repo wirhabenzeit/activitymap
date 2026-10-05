@@ -28,7 +28,8 @@ or route artwork to maintain. It exports:
   from Icon Composer's background-only rendering. Apple's dynamic enclosure
   lighting is omitted in this vector version.
 - `public/app-mark.svg`: the same vector panels and route with no background
-  rect or gradient, for coloured surfaces such as the web header. The route is
+  rect or gradient, for coloured surfaces such as the web header. Its viewBox
+  is cropped to the panels so the mark fills small boxes. The route is
   drawn over the white map panels, so it stays legible on any header colour and
   needs no outline.
 - Apple touch PNG/SVG and maskable PNGs: opaque, full-bleed backgrounds so the
