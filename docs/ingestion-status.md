@@ -248,10 +248,28 @@ responses cannot publish after an activity update, deletion, grant change or
 account revocation. Existing photo rows and their metadata are never cleared
 because a request failed.
 
-Rollout: run `pnpm db:test-photo-backfill` against guarded local Postgres,
-verify Preview migration/build, then apply migrations through 0018 using the
-existing Production migration workflow before deploying dependent code. Only
-then enable the server and GitHub photo-backfill gates. Start with the fixed
-small batch and inspect results before considering larger limits. Preview
-never runs this production cron; the database proof injects a fake Strava
-source to exercise failure and deletion cases without touching Strava.
+Enabling photo catch-up is part of the Settings rollout, not a separate
+follow-up. Complete the rollout in this order:
+
+1. Run `pnpm db:test-photo-backfill` against guarded local Postgres and verify
+   the Preview migration/build.
+2. Apply migrations through 0018 using the existing Production migration
+   workflow, and confirm that no migrations remain pending for the release.
+3. Set `ACTIVITYMAP_PHOTO_BACKFILL=enabled` in Vercel's **Production** environment,
+   then deploy the dependent code so the deployment includes that setting.
+4. After the production deployment succeeds, enable the scheduled job with
+   `gh variable set ACTIVITYMAP_PHOTO_BACKFILL --body enabled`.
+5. Dispatch `gh workflow run reconcile-strava-summaries.yml --ref main` and
+   inspect the photo step's result and the ingestion status in Settings. A
+   successful skipped or disabled step does not verify catch-up. Confirm an
+   enabled run, its selected/fetched counts and stop reason, and that Settings
+   reflects the resulting photo coverage and remaining refresh work.
+
+The rollout is complete only after photo catch-up is enabled and its first
+production run is verified. Keep the fixed five-activity/twelve-request hourly
+cap; inspect results before considering larger limits. To pause scheduled
+catch-up, set the GitHub variable to `disabled`. To disable the endpoint as
+well, set the Vercel Production variable to `disabled` and redeploy.
+
+Preview never runs this production cron; the database proof injects a fake
+Strava source to exercise failure and deletion cases without touching Strava.
