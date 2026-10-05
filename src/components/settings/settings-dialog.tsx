@@ -28,6 +28,11 @@ import {
   StravaConnectFailure,
   STRAVA_CONNECT_PERMISSIONS,
 } from '~/components/auth/strava-connect';
+import {
+  STRAVA_PERMISSIONS_RECONNECT,
+  stravaPermissionNotes,
+  stravaPermissionsLimited,
+} from '~/lib/strava-permissions';
 
 const date = (value: string) =>
   new Date(value).toLocaleString(undefined, {
@@ -108,6 +113,8 @@ export function SettingsDialog({
         },
       ]
     : [];
+  const permissionNotes = stravaPermissionNotes(user?.stravaPermissions);
+  const showConnect = !userId || !!needsReconnect || permissionNotes.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -304,17 +311,36 @@ export function SettingsDialog({
                   ? (user?.name ?? 'Your account')
                   : 'Connect Strava to see your activities.'}
               </p>
-              {userId && !needsReconnect ? (
+              {userId && !needsReconnect && (
                 <p className="text-xs text-muted-foreground">
-                  Strava connected
+                  {stravaPermissionsLimited(user?.stravaPermissions)
+                    ? 'Strava connected with limited access'
+                    : 'Strava connected'}
                 </p>
-              ) : (
-                <StravaConnectButton />
               )}
+              {permissionNotes.length > 0 && (
+                <div className="space-y-1 rounded-lg border px-3 py-2 text-xs">
+                  {permissionNotes.map((note) => (
+                    <p key={note}>{note}</p>
+                  ))}
+                  <p className="text-muted-foreground">
+                    {STRAVA_PERMISSIONS_RECONNECT}
+                  </p>
+                </div>
+              )}
+              {showConnect && <StravaConnectButton />}
               <StravaConnectFailure />
-              {(!userId || needsReconnect) && (
+              {showConnect && (
                 <p className="text-xs text-muted-foreground">
                   {STRAVA_CONNECT_PERMISSIONS}
+                </p>
+              )}
+              {userId && (
+                <p className="text-xs text-muted-foreground">
+                  Signing out ends your ActivityMap session in this browser.
+                  Your Strava account and its connection to ActivityMap stay as
+                  they are; disconnect ActivityMap in Strava’s settings to
+                  remove its access.
                 </p>
               )}
             </section>

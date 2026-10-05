@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { StravaPermissions } from '~/lib/strava-permissions';
 import { authenticationDTOSchema, type AuthenticationDTO } from './auth';
 import { idString, toIdString } from './primitives';
 
@@ -18,6 +19,19 @@ export const currentUserDTOSchema = z.object({
   image: z.string().nullable(),
   athleteId: idString.nullable(),
   stravaConnected: z.boolean(),
+  /**
+   * What the Strava scopes the person approved allow (issue #303): `all`
+   * activities including "Only You" ones, only `public` (Everyone/Followers)
+   * ones, or `none`; and whether activities can be edited. `null` when the
+   * grant is not known yet, e.g. an account connected before approved scopes
+   * were recorded. Never infer a limited grant from `null`.
+   */
+  stravaPermissions: z
+    .object({
+      activities: z.enum(['all', 'public', 'none']),
+      edit: z.boolean(),
+    })
+    .nullable(),
   authentication: authenticationDTOSchema,
 });
 
@@ -30,6 +44,7 @@ export interface CurrentUserSource {
   image: string | null;
   name: string | null;
   stravaConnected: boolean;
+  stravaPermissions: StravaPermissions | null;
 }
 
 export function toCurrentUserDTOv1(
@@ -43,6 +58,7 @@ export function toCurrentUserDTOv1(
     image: user.image,
     athleteId: user.athleteId === null ? null : toIdString(user.athleteId),
     stravaConnected: user.stravaConnected,
+    stravaPermissions: user.stravaPermissions,
     authentication,
   });
 }

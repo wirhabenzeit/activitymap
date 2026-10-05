@@ -13,11 +13,16 @@ void test('current-user DTO safely maps identity and authentication metadata', (
       image: null,
       athleteId: 9_007_199_254_740_991,
       stravaConnected: true,
+      stravaPermissions: { activities: 'public', edit: false },
     },
     toAuthenticationDTO('cookie', new Date('2026-10-20T12:00:00.000Z')),
   );
 
   assert.equal(dto.athleteId, '9007199254740991');
+  assert.deepEqual(dto.stravaPermissions, {
+    activities: 'public',
+    edit: false,
+  });
   assert.deepEqual(dto.authentication, {
     method: 'cookie',
     sessionExpiresAt: '2026-10-20T12:00:00.000Z',
@@ -34,6 +39,7 @@ void test('current-user DTO has no credential-bearing fields', () => {
       image: null,
       athleteId: null,
       stravaConnected: false,
+      stravaPermissions: null,
     },
     toAuthenticationDTO('bearer', new Date('2026-10-20T12:00:00.000Z')),
   );

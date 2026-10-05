@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { requestIdFor } from '~/server/http/request-id';
 
 import { errorEnvelope } from '~/contracts/v1/error';
+import { mobileAuthErrorRedirect } from '~/server/auth/mobile-error-redirect';
 import {
   isAllowedMobileRedirectUri,
   loadMobileRedirectAllowlist,
@@ -33,6 +34,11 @@ export interface MobileAuthStartHandlerDependencies {
    */
   startSocialSignIn: (input: {
     callbackURL: string;
+    /**
+     * Where Better Auth sends a declined or failed authorization: the same
+     * mobile callback, which returns the `error` to the app.
+     */
+    errorCallbackURL: string;
     headers: Headers;
   }) => Promise<{ url: string; headers?: Headers } | null>;
 }
@@ -111,6 +117,7 @@ export function createMobileAuthStartHandler({
       });
       const result = await startSocialSignIn({
         callbackURL,
+        errorCallbackURL: callbackURL,
         headers: request.headers,
       });
       if (!result?.url) {
@@ -128,13 +135,13 @@ export function createMobileAuthStartHandler({
       return new Response(null, { status: 302, headers: responseHeaders });
     } catch (error) {
       onError(error, requestId);
-      return Response.json(
-        errorEnvelope('internal_error', 'The request could not be completed.', {
-          requestId,
-          retryable: true,
-        }),
-        { status: 500 },
-      );
+      // The redirect target is allow-listed by now, so return to the app
+      // rather than leaving a JSON error in the sign-in sheet.
+      return mobileAuthErrorRedirect(redirectUri, {
+        state,
+        error: 'server_error',
+        requestId,
+      });
     }
   };
 }

@@ -9,6 +9,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '~/server/logging/logger';
 import { stravaAccessEnabled } from '~/server/config/external-effects';
+import { grantedStravaScope } from '~/lib/strava-permissions';
 
 const stravaProfileSchema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -149,6 +150,16 @@ export const auth = betterAuth({
               .update(users)
               .set({ athlete_id: athleteId })
               .where(eq(users.id, userId));
+
+            // Strava reports the scopes the person actually approved only on
+            // this redirect; Better Auth never records them (issue #303).
+            const scope = grantedStravaScope(ctx.request?.url);
+            if (scope !== null) {
+              await db
+                .update(accounts)
+                .set({ scope })
+                .where(eq(accounts.id, account.id));
+            }
           } catch (error) {
             logger.error('[Better Auth] Error updating athlete_id:', error);
           }

@@ -1,3 +1,7 @@
+import {
+  stravaPermissionsFromScope,
+  type StravaPermissions,
+} from '~/lib/strava-permissions';
 import type { Account, User } from './schema';
 
 /**
@@ -11,6 +15,8 @@ export type CurrentUserDTO = {
   image: string | null;
   athleteId: number | null;
   stravaConnected: boolean;
+  /** What the approved Strava scopes allow; `null` when not yet known. */
+  stravaPermissions: StravaPermissions | null;
 };
 
 export function toCurrentUserDTO(
@@ -24,5 +30,6 @@ export function toCurrentUserDTO(
     image: user.image,
     athleteId: user.athlete_id ?? null,
     stravaConnected: Boolean(account?.access_token ?? account?.accessToken),
+    stravaPermissions: stravaPermissionsFromScope(account?.scope),
   };
 }

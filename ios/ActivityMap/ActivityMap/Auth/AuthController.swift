@@ -23,6 +23,9 @@ import UIKit
 final class AuthController: NSObject {
     enum Status: Equatable {
         case signedOut
+        /// A Keychain session exists and is being confirmed with `/me`. It is
+        /// neither signed out (no new login is needed) nor verified yet.
+        case restoring
         case signingIn
         case signedIn(ActivityMapAPI.CurrentUser)
         /// `restoreSession()` found a Keychain token but could not confirm it
@@ -31,6 +34,7 @@ final class AuthController: NSObject {
         /// token is left in the Keychain; retry with `restoreSession()`
         /// rather than starting a fresh sign-in, since the stored token may
         /// still be perfectly valid.
+        /// The associated message is short, user-facing copy.
         case sessionRestoreFailed(String)
         /// `signOut()` could not confirm the server revoked the session — a
         /// transport failure, timeout, or `5xx`. The Keychain token is left
@@ -38,14 +42,19 @@ final class AuthController: NSObject {
         /// server session with nothing left to retry revocation with. Retry
         /// with `signOut()`.
         case signOutFailed(String)
+        /// A sign-in attempt failed for a reason other than the person
+        /// cancelling or declining; carries a short diagnostic code.
         case failed(String)
     }
 
-    enum AuthError: Error, CustomStringConvertible {
+    enum AuthError: Error, Equatable, CustomStringConvertible {
         case missingCodeOrState
         case stateMismatch
         case sessionFailedToStart
         case secureRandomUnavailable(OSStatus)
+        /// The server returned the sign-in to the app with an `error` code
+        /// (`/api/v1/auth/mobile/callback`), e.g. a failed Strava exchange.
+        case provider(code: String, requestID: String?)
 
         var description: String {
             switch self {
@@ -57,11 +66,15 @@ final class AuthController: NSObject {
                 "The sign-in sheet could not be presented."
             case .secureRandomUnavailable(let status):
                 "Could not generate a secure random value (status \(status))."
+            case .provider(let code, let requestID):
+                "Sign-in returned \(code)" + (requestID.map { " (request \($0))" } ?? "") + "."
             }
         }
     }
 
     private(set) var status: Status = .signedOut
+    /// The server asked not to retry session verification before this time.
+    private(set) var restoreRetryAt: Date?
 
     /// The last sign-in attempt failed; cancelling is not a failure.
     var signInFailed: Bool {
@@ -78,6 +91,9 @@ final class AuthController: NSObject {
         super.init()
         if let token = SessionStore.load() {
             currentUser = SessionIdentityStore.load(token: token, deployment: APIConfiguration.baseURL)
+            // A returning person is not asked to sign in while the stored
+            // session is checked (issue #303).
+            status = .restoring
         }
     }
 
@@ -111,8 +127,18 @@ final class AuthController: NSObject {
         guard !signingOut else { return }
         guard let token = SessionStore.load() else { return }
         guard restoringToken != token else { return }
+        // Respect the server's requested wait after a rate-limited or
+        // unavailable check; the failure message already names the time.
+        if case .sessionRestoreFailed = status, let restoreRetryAt, restoreRetryAt > Date() { return }
         restoringToken = token
         defer { if restoringToken == token { restoringToken = nil } }
+        // Re-verifying a signed-in session (pull to refresh) or the token a
+        // sign-in just saved keeps its status; only an unconfirmed session
+        // shows as restoring.
+        switch status {
+        case .signedOut, .sessionRestoreFailed: status = .restoring
+        default: break
+        }
         let requestRevision = revision
         do {
             let user = try await APIClient.get(
@@ -120,13 +146,15 @@ final class AuthController: NSObject {
             guard requestRevision == revision, SessionStore.load() == token else { return }
             try SessionIdentityStore.save(user, token: token, deployment: APIConfiguration.baseURL)
             currentUser = user
+            restoreRetryAt = nil
             status = .signedIn(user)
         } catch {
             guard requestRevision == revision, SessionStore.load() == token else { return }
             if Self.isExplicitlyUnauthenticated(error) {
                 invalidateSession(token: token)
             } else {
-                status = .sessionRestoreFailed(String(describing: error))
+                restoreRetryAt = Self.retryAfter(error).map { Date().addingTimeInterval($0) }
+                status = .sessionRestoreFailed(Self.userMessage(for: error))
             }
         }
     }
@@ -147,6 +175,10 @@ final class AuthController: NSObject {
         // Repeated taps while the hosted sheet is opening start nothing new.
         guard status != .signingIn else { return }
         revision += 1
+        // Every later step is fenced to this attempt: signing out, or an
+        // expired session being invalidated, supersedes it, and a late
+        // callback or exchange must not restore an unwanted session.
+        let attempt = revision
         currentUser = nil
         status = .signingIn
         do {
@@ -171,24 +203,32 @@ final class AuthController: NSObject {
             guard let url = startURL.url else { throw AuthError.missingCodeOrState }
 
             let callbackURL = try await presentAuthSession(startingAt: url)
+            guard attempt == revision else { return }
 
-            guard
-                let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
-                let code = components.queryItems?.first(where: { $0.name == "code" })?.value,
-                let returnedState = components.queryItems?.first(where: { $0.name == "state" })?
-                    .value
-            else {
-                throw AuthError.missingCodeOrState
+            let code: String
+            switch Self.parseCallback(callbackURL, expectedState: state) {
+            case .code(let value):
+                code = value
+            case .declined:
+                // Declining on Strava's consent screen is the person's
+                // choice, like closing the sheet: return quietly.
+                status = .signedOut
+                return
+            case .failure(let error):
+                throw error
             }
-            // Client-side CSRF check, in addition to the server checking
-            // `state` again during the exchange below.
-            guard returnedState == state else { throw AuthError.stateMismatch }
 
             let exchange = try await APIClient.post(
                 "/api/v1/auth/mobile/exchange",
                 body: ActivityMapAPI.MobileExchangeRequest(
                     code: code, pkceVerifier: verifier, state: state),
                 as: ActivityMapAPI.MobileExchangeResponse.self)
+            guard attempt == revision else {
+                // Superseded while exchanging: don't keep the new session,
+                // and don't leave it valid on the server either.
+                Self.revokeAbandoned(exchange.sessionToken)
+                return
+            }
 
             try SessionStore.save(exchange.sessionToken)
 
@@ -198,14 +238,90 @@ final class AuthController: NSObject {
             await restoreSession()
         } catch is CancellationError {
             // Swift-level task cancellation; not a failure to report.
+            guard attempt == revision else { return }
             status = .signedOut
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             // The person dismissed the sign-in sheet themselves. This is the
             // ordinary "changed their mind" path, not an error.
+            guard attempt == revision else { return }
             status = .signedOut
         } catch {
+            guard attempt == revision else { return }
             status = .failed(String(describing: error))
         }
+    }
+
+    enum CallbackResult: Equatable {
+        case code(String)
+        /// Strava's consent was declined (`access_denied`).
+        case declined
+        case failure(AuthError)
+    }
+
+    /// Interprets the app callback from `/api/v1/auth/mobile/callback`:
+    /// either `code` and `state`, or an `error` code and `state`. Every
+    /// outcome must carry the `state` this attempt sent, so a stale or forged
+    /// callback can't end or complete a different attempt.
+    static func parseCallback(_ url: URL, expectedState: String) -> CallbackResult {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
+        guard let returnedState = value("state") else { return .failure(.missingCodeOrState) }
+        // Client-side CSRF check, in addition to the server checking `state`
+        // again during the exchange.
+        guard returnedState == expectedState else { return .failure(.stateMismatch) }
+        if let error = value("error") {
+            return error == "access_denied"
+                ? .declined
+                : .failure(.provider(code: error, requestID: value("request_id")))
+        }
+        guard let code = value("code") else { return .failure(.missingCodeOrState) }
+        return .code(code)
+    }
+
+    private static func revokeAbandoned(_ token: String) {
+        Task.detached {
+            _ = try? await APIClient.post(
+                "/api/v1/auth/logout", bearerToken: token, as: JSONValue.self)
+        }
+    }
+
+    /// Short copy for a session that could not be confirmed. Diagnostics stay
+    /// out of the product UI, apart from a request ID worth quoting.
+    static func userMessage(for error: Error) -> String {
+        guard let error = error as? APIClient.RequestError else {
+            return "Something went wrong while checking your session. Try again."
+        }
+        switch error {
+        case .transport:
+            return "ActivityMap couldn’t be reached. Check your connection and try again."
+        case .rateLimited(let retryAfter, _):
+            return "ActivityMap is busy. Try again \(retryPhrase(retryAfter))."
+        case .serviceUnavailable(let retryAfter, let requestID):
+            return "ActivityMap is temporarily unavailable. Try again \(retryPhrase(retryAfter))."
+                + (requestID.map { " Reference: \($0)" } ?? "")
+        case .server(_, _, let status, let requestID, _, let retryAfter) where status == 429 || status >= 500:
+            return "ActivityMap is temporarily unavailable. Try again \(retryPhrase(retryAfter))."
+                + (requestID.map { " Reference: \($0)" } ?? "")
+        case .schemaVersionMismatch:
+            return "This version of ActivityMap needs an update to check your session."
+        default:
+            return "Something went wrong while checking your session. Try again."
+        }
+    }
+
+    /// The server's `Retry-After`, if it sent one. Never invented here.
+    static func retryAfter(_ error: Error) -> TimeInterval? {
+        switch error as? APIClient.RequestError {
+        case .rateLimited(let retryAfter, _): retryAfter
+        case .serviceUnavailable(let retryAfter, _): retryAfter
+        case .server(_, _, _, _, _, let retryAfter): retryAfter
+        default: nil
+        }
+    }
+
+    private static func retryPhrase(_ retryAfter: TimeInterval?) -> String {
+        guard let retryAfter, retryAfter > 0 else { return "in a moment" }
+        return "after " + Date().addingTimeInterval(retryAfter).formatted(date: .omitted, time: .shortened)
     }
 
     /// Revokes the session server-side first — so a leaked token can never be
@@ -239,9 +355,16 @@ final class AuthController: NSObject {
                 SessionIdentityStore.clear()
                 status = .signedOut
             } else {
-                status = .signOutFailed(String(describing: error))
+                status = .signOutFailed(Self.signOutMessage(for: error))
             }
         }
+    }
+
+    private static func signOutMessage(for error: Error) -> String {
+        if case .transport = error as? APIClient.RequestError {
+            return "ActivityMap couldn’t be reached, so you’re still signed in. Check your connection and try again."
+        }
+        return "ActivityMap couldn’t confirm the sign-out, so you’re still signed in. Try again."
     }
 
     /// True only for a server response that explicitly rejected the

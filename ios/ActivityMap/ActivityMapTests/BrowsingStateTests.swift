@@ -186,7 +186,7 @@ struct BrowsingStateTests {
         var reference = Date()
         let base = SyncFixtures.session()
         let user = ActivityMapAPI.CurrentUser(id: base.user.id, name: nil, email: nil, image: nil, athleteID: nil,
-                                              stravaConnected: true, authentication: .init(method: .bearer, sessionExpiresAt: reference.addingTimeInterval(1)))
+                                              stravaConnected: true, stravaPermissions: nil, authentication: .init(method: .bearer, sessionExpiresAt: reference.addingTimeInterval(1)))
         let controller = SyncController(activities: ActivityStore(), now: { reference }, source: { _ in source }, invalidate: { _ in })
         controller.setSession(SyncSession(user: user, token: base.token, deployment: base.deployment, verified: true), storage: storage)
         await controller.refresh()
@@ -218,6 +218,6 @@ struct BrowsingStateTests {
 
     private func expiredUser(_ user: ActivityMapAPI.CurrentUser, now: Date) -> ActivityMapAPI.CurrentUser {
         .init(id: user.id, name: user.name, email: user.email, image: user.image, athleteID: user.athleteID,
-              stravaConnected: user.stravaConnected, authentication: .init(method: .bearer, sessionExpiresAt: now.addingTimeInterval(-1)))
+              stravaConnected: user.stravaConnected, stravaPermissions: user.stravaPermissions, authentication: .init(method: .bearer, sessionExpiresAt: now.addingTimeInterval(-1)))
     }
 }

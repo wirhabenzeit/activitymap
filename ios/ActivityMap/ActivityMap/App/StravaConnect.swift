@@ -11,6 +11,8 @@ struct StravaConnect {
     var failed = false
     var restoreSession: @MainActor () async -> Void = {}
     var isVerifyingSession = false
+    /// The server asked not to check the session again before this time.
+    var restoreRetryAt: Date?
 }
 
 private struct StravaConnectKey: EnvironmentKey {
@@ -31,6 +33,34 @@ enum StravaConnectCopy {
     static let purpose = "ActivityMap shows your Strava activities on a map, in a list and as stats."
     static let permissions = "Strava will ask you to let ActivityMap read your activities, including private ones, and update an activity’s name, description and sport when you edit it here."
     static let failure = "Couldn’t connect to Strava. Please try again."
+}
+
+/// What a limited Strava grant leaves out (issue #303). Mirrors
+/// `stravaPermissionNotes` in `src/lib/strava-permissions.ts`.
+enum StravaPermissionsCopy {
+    static let reconnect = "To change this, connect with Strava again and keep every box ticked."
+
+    static func isLimited(_ permissions: ActivityMapAPI.StravaPermissions?) -> Bool {
+        guard let permissions else { return false }
+        return permissions.activities != .all || !permissions.edit
+    }
+
+    static func notes(_ permissions: ActivityMapAPI.StravaPermissions?) -> [String] {
+        guard let permissions else { return [] }
+        var notes: [String] = []
+        switch permissions.activities {
+        case .none:
+            notes.append("Strava isn’t sharing your activities with ActivityMap, so none can be imported.")
+        case .public:
+            notes.append("Activities visible only to you aren’t included, because access to private activities wasn’t granted.")
+        case .all:
+            break
+        }
+        if !permissions.edit {
+            notes.append("Editing activity names, descriptions and sports isn’t available, because permission to update activities wasn’t granted.")
+        }
+        return notes
+    }
 }
 
 /// Strava's official "Connect with Strava" artwork at its native 193 × 48
@@ -101,10 +131,10 @@ struct StravaConnectPrompt: Equatable {
     init?(status: SyncController.Status?, authStatus: AuthController.Status? = nil) {
         // A saved token whose verification failed is not a failed OAuth grant.
         // Keep cached browsing available; recover here only when the shell is blocked.
-        if case .sessionRestoreFailed = authStatus,
+        if case .sessionRestoreFailed(let reason) = authStatus,
            status == .signedOut || status == .expired || status == .disconnected {
             title = "Couldn’t verify your session"
-            message = "Your sign-in was saved. Try checking your session again when you’re connected."
+            message = "Your sign-in was saved. " + reason
             recovery = .verifySession
             return
         }
@@ -158,17 +188,19 @@ struct StravaConnectOverlay: View {
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             if prompt.recovery == .verifySession {
-                Button {
-                    Task { await connect.restoreSession() }
-                } label: {
-                    HStack {
-                        if connect.isVerifyingSession { ProgressView() }
-                        Text(connect.isVerifyingSession ? "Checking session…" : "Retry session verification")
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Button {
+                        Task { await connect.restoreSession() }
+                    } label: {
+                        HStack {
+                            if connect.isVerifyingSession { ProgressView() }
+                            Text(connect.isVerifyingSession ? "Checking session…" : "Retry session verification")
+                        }
                     }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(connect.isVerifyingSession || (connect.restoreRetryAt.map { $0 > context.date } ?? false))
+                    .accessibilityIdentifier("strava-verify-session")
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(connect.isVerifyingSession)
-                .accessibilityIdentifier("strava-verify-session")
             } else {
                 StravaConnectControls()
             }

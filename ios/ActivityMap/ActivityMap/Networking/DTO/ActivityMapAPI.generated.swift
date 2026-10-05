@@ -264,6 +264,12 @@ nonisolated extension ActivityMapAPI {
         let sessionExpiresAt: Date
     }
 
+    /// The shape of `CurrentUser.stravaPermissions`.
+    struct StravaPermissions: Codable, Hashable, Sendable {
+        let activities: StravaActivityAccess
+        let edit: Bool
+    }
+
     struct CurrentUser: Codable, Hashable, Sendable {
         let id: String
         let name: String?
@@ -271,6 +277,7 @@ nonisolated extension ActivityMapAPI {
         let image: String?
         let athleteID: String?
         let stravaConnected: Bool
+        let stravaPermissions: StravaPermissions?
         let authentication: Authentication
 
         enum CodingKeys: String, CodingKey {
@@ -280,6 +287,7 @@ nonisolated extension ActivityMapAPI {
             case image
             case athleteID = "athleteId"
             case stravaConnected
+            case stravaPermissions
             case authentication
         }
     }
@@ -815,6 +823,12 @@ nonisolated extension ActivityMapAPI {
         case windsurf = "Windsurf"
         case workout = "Workout"
         case yoga = "Yoga"
+    }
+
+    enum StravaActivityAccess: String, Codable, Hashable, Sendable {
+        case all = "all"
+        case `public` = "public"
+        case `none` = "none"
     }
 
     enum StreamFailureCode: String, Codable, Hashable, Sendable {
