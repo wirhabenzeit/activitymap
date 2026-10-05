@@ -27,6 +27,11 @@ or route artwork to maintain. It exports:
 - `public/favicon.svg`: vector panels and route, plus a static gradient sampled
   from Icon Composer's background-only rendering. Apple's dynamic enclosure
   lighting is omitted in this vector version.
+- `public/app-mark.svg`: the same vector panels and route with no background
+  rect or gradient, for coloured surfaces such as the web header. Its viewBox
+  is cropped to the panels so the mark fills small boxes. The route is
+  drawn over the white map panels, so it stays legible on any header colour and
+  needs no outline.
 - Apple touch PNG/SVG and maskable PNGs: opaque, full-bleed backgrounds so the
   operating system can apply its own mask. Maskable artwork is slightly inset
   to keep the map inside the central safe area.
@@ -34,8 +39,8 @@ or route artwork to maintain. It exports:
   all existing iOS web launch-image sizes.
 
 The root Next.js metadata prefers the SVG favicon and keeps the ICO fallback.
-The navigation uses the SVG; the web manifest distinguishes regular and
-maskable install icons. The service-worker cache version is bumped when these
+The navigation uses `app-mark.svg`, while tabs and install surfaces keep the
+tile; the web manifest distinguishes regular and maskable install icons. The service-worker cache version is bumped when these
 assets change so existing installations fetch the new identity.
 
 ## Verify a change
