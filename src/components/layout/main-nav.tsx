@@ -34,7 +34,7 @@ export function MainNav() {
         )}
       >
         <Image
-          src="/favicon.svg"
+          src="/app-mark.svg"
           alt=""
           width={24}
           height={24}
