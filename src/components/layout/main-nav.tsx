@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { usePathname, useRouter } from "next/navigation";
-import { Map } from "lucide-react";
-import { cn } from "~/lib/utils";
+import { usePathname, useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { cn } from '~/lib/utils';
 
 export function MainNav() {
   const pathname = usePathname();
@@ -24,25 +24,32 @@ export function MainNav() {
   return (
     <div className="ml-2 mr-4 flex">
       <button
+        aria-label="ActivityMap home"
         onClick={() => handleNavigation('/')}
         className={cn(
-          "hover:text-header-foreground mr-4 flex items-center space-x-2 lg:mr-6",
+          'hover:text-header-foreground mr-4 flex items-center space-x-2 lg:mr-6',
           currentView === 'map'
-            ? "text-header-foreground"
-            : "text-header-foreground/60",
+            ? 'text-header-foreground'
+            : 'text-header-foreground/60',
         )}
       >
-        <Map className="h-6 w-6" />
+        <Image
+          src="/favicon.svg"
+          alt=""
+          width={24}
+          height={24}
+          className="h-6 w-6"
+        />
         <span className="hidden font-bold lg:inline-block">ActivityMap</span>
       </button>
       <nav className="flex items-center gap-4 text-sm font-semibold lg:gap-6">
         <button
           onClick={() => handleNavigation('/list')}
           className={cn(
-            "hover:text-header-foreground",
+            'hover:text-header-foreground',
             currentView === 'list'
-              ? "text-header-foreground"
-              : "text-header-foreground/60",
+              ? 'text-header-foreground'
+              : 'text-header-foreground/60',
           )}
         >
           List
@@ -50,10 +57,10 @@ export function MainNav() {
         <button
           onClick={() => handleNavigation('/stats/tiles')}
           className={cn(
-            "hover:text-header-foreground",
+            'hover:text-header-foreground',
             currentView === 'stats'
-              ? "text-header-foreground"
-              : "text-header-foreground/60",
+              ? 'text-header-foreground'
+              : 'text-header-foreground/60',
           )}
         >
           Stats

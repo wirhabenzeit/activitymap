@@ -3,6 +3,8 @@ MAPBOX_ACCESS_TOKEN =
 
 // Shared by system controls and the explicit browsing selection treatment.
 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+// Editable layered source in ActivityMap/AppIcon.icon.
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
 
 // xcconfig treats "//" as the start of a comment, so URL separators have to be
 // composed from $(SLASH) instead of written literally.

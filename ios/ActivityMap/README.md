@@ -11,6 +11,14 @@ The SwiftUI client supports mobile sign-in and local-first activity synchronizat
 
 Swift Package Manager pins the Mapbox dependency in `Package.resolved`. Local Xcode state and credentials are intentionally ignored.
 
+## App icon
+
+`ActivityMap/AppIcon.icon` is the editable Icon Composer source. The synchronized
+app folder includes it in the target, and `Config/Base.xcconfig` selects `AppIcon`
+for both Debug and Release. Xcode compiles the native appearance variants.
+See [the shared icon workflow](../../docs/app-icon.md) to edit the design and
+regenerate the web assets.
+
 The app target currently uses development team `DX96FWY9AX` for physical-device signing. Choose another team in Signing & Capabilities if that team is unavailable to you. Simulator tests do not require signing. Legal links and App Store metadata remain unset while this is a mockup.
 
 ## Deployment configuration

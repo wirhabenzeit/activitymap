@@ -1,6 +1,6 @@
 /* global self, caches, fetch, Request, Response, URL */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = `activitymap-shell-${CACHE_VERSION}`;
 const STATIC_CACHE = `activitymap-static-${CACHE_VERSION}`;
 
@@ -11,6 +11,8 @@ const APP_SHELL_URLS = [
   '/offline.html',
   '/site.webmanifest',
   '/favicon.ico',
+  '/favicon.svg',
+  '/apple-icon-180.png',
 ];
 
 self.addEventListener('install', (event) => {

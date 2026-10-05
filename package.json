@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "icons:generate": "python3 scripts/generate-app-icons.py",
     "build": "pnpm db:migrate:preview && next build",
     "dev": "pnpm db:migrate && next dev --turbo",
     "lint": "eslint .",
