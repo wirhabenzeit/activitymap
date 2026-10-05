@@ -18,6 +18,15 @@ struct StravaConnectTests {
         #expect(signedOut.empty?.message == StravaConnectCopy.purpose)
     }
 
+    @Test func onlyStatesThatNeedStravaShowTheShellPrompt() {
+        #expect(StravaConnectPrompt(status: .signedOut)?.message == StravaConnectCopy.purpose)
+        #expect(StravaConnectPrompt(status: .expired) != nil)
+        #expect(StravaConnectPrompt(status: .disconnected) != nil)
+        for status: SyncController.Status? in [nil, .syncing, .ready, .offline, .paused, .failed("503")] {
+            #expect(StravaConnectPrompt(status: status) == nil)
+        }
+    }
+
     @Test func aFreshControllerIsNotFailedAndCancellingIsNotAFailure() {
         let auth = AuthController()
         #expect(!auth.signInFailed)

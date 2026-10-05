@@ -108,8 +108,15 @@ struct AppShell: View {
                 }
             }
         }
+        .overlay {
+            if let connectPrompt { StravaConnectOverlay(prompt: connectPrompt).transition(.opacity) }
+        }
+        .animation(.easeInOut(duration: 0.2), value: connectPrompt)
         .environment(\.stravaConnect, stravaConnect)
     }
+
+    /// Signed out, expired or disconnected: one prompt over the whole shell.
+    private var connectPrompt: StravaConnectPrompt? { StravaConnectPrompt(status: sync?.status) }
 
     /// The single connection flow every entry point uses (#304). Starting it
     /// in place keeps the person on the tab and context they started from.

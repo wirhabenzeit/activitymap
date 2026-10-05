@@ -10,12 +10,8 @@ struct BrowsingEmptyView: View {
             if scrolls {
                 ScrollView { textContent }.scrollBounceBehavior(.basedOnSize)
             } else { textContent }
-            if state.recovery == .account {
-                // Connecting starts the Strava authorization directly (#304).
-                StravaConnectControls()
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
-            } else if let action = state.recovery {
+            // Connecting is offered once, by the shell's overlay (#304).
+            if let action = state.recovery, action != .account {
                 Button(action.title) { recover(action) }
                     .buttonStyle(.borderedProminent)
                     .frame(minHeight: 44)

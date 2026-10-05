@@ -98,10 +98,9 @@ struct StatsScreen: View {
                 Text(store.activities.isEmpty ? "No activity history" : "No matching activities")
                     .font(.subheadline)
             }
-            if presentation.state == .unavailable {
-                // Signed out, expired or disconnected: connect directly (#304).
-                StravaConnectControls(alignment: .leading)
-            } else if presentation.retryAllowed && [.error, .cached].contains(presentation.state) {
+            // Signed out, expired or disconnected: the shell's overlay offers
+            // the connection (#304), so Stats only states why it is empty.
+            if presentation.state != .unavailable && presentation.retryAllowed && [.error, .cached].contains(presentation.state) {
                 Button("Retry sync") { Task { await refresh() } }.frame(minHeight: 44)
             }
         }

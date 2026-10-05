@@ -30,18 +30,11 @@ struct BrowsingStateTests {
         }
         #expect(presentation(.ready, cache: true, activities: 2, filtered: 2, tab: .list).empty == nil)
 
-        // #304: a connection in progress replaces the connect prompt, and the
-        // map shows connection states instead of silently stranding anyone.
+        // #304: a connection in progress replaces the signed-out empty state.
         let connecting = BrowsingPresentation(tab: .map, activityCount: 0, filteredCount: 0, routeCount: 0,
                                               status: .signedOut, hasCompletedCache: false, canRetry: false,
                                               isSigningIn: true)
         #expect(connecting.empty?.kind == .signingIn && connecting.empty?.recovery == nil)
-        for kind: BrowsingPresentation.EmptyKind in [.signedOut, .expired, .disconnected, .signingIn, .noMatches, .noRoutes] {
-            #expect(BrowseContent.mapNoticeKinds.contains(kind))
-        }
-        for kind: BrowsingPresentation.EmptyKind in [.preparing, .firstSync, .offline, .failed, .paused, .waiting, .emptyLibrary] {
-            #expect(!BrowseContent.mapNoticeKinds.contains(kind))
-        }
         #expect(presentation(.offline, cache: true, activities: 2, filtered: 2, routes: 1).empty == nil)
         #expect(presentation(.failed("503"), cache: true, activities: 2, filtered: 2, routes: 1).empty == nil)
     }

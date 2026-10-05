@@ -74,18 +74,14 @@ struct BrowseContent: View {
         }
     }
 
-    // Sync/loading information belongs in Settings. The map shows inline,
-    // content-sized notices only for filtering, missing routes and the Strava
-    // connection, so a signed-out map never strands anyone (#304).
+    // Sync/loading/auth information belongs in Settings, and the Strava
+    // connection in the shell's overlay (#304). Only map-specific filtering
+    // and missing-route context uses an inline, content-sized notice.
     private var mapEmptyState: BrowsingPresentation.EmptyState? {
         guard let empty = presentation.empty,
-              Self.mapNoticeKinds.contains(empty.kind) else { return nil }
+              empty.kind == .noMatches || empty.kind == .noRoutes else { return nil }
         return empty
     }
-
-    static let mapNoticeKinds: Set<BrowsingPresentation.EmptyKind> = [
-        .noMatches, .noRoutes, .signedOut, .expired, .disconnected, .signingIn,
-    ]
 
     private var presentation: BrowsingPresentation {
         BrowsingPresentation(store: store, sync: sync, isSigningIn: isSigningIn)

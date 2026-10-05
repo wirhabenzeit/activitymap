@@ -87,3 +87,67 @@ func displayEmail(_ email: String?) -> String? {
     guard let email, !email.lowercased().hasSuffix("@strava.local") else { return nil }
     return email
 }
+
+/// What the shell-level connection prompt says for a sync status that needs
+/// Strava, or `nil` when browsing can continue.
+struct StravaConnectPrompt: Equatable {
+    let title: String
+    let message: String
+
+    init?(status: SyncController.Status?) {
+        switch status {
+        case .signedOut:
+            title = "Connect Strava to see your activities"
+            message = StravaConnectCopy.purpose
+        case .expired:
+            title = "Your sign-in has expired"
+            message = "Connect with Strava again to restore access to your activities."
+        case .disconnected:
+            title = "Strava is disconnected"
+            message = "Connect with Strava again to load your activities."
+        default:
+            return nil
+        }
+    }
+}
+
+/// The single connection prompt (#304): a centred card floating over the
+/// whole shell, header included, on a frosted backdrop. Map, List and Stats
+/// stay visible but out of reach behind it, so there is exactly one button.
+struct StravaConnectOverlay: View {
+    let prompt: StravaConnectPrompt
+
+    var body: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            ViewThatFits(in: .vertical) {
+                card
+                ScrollView { card.padding(.vertical, 24) }
+                    .scrollBounceBehavior(.basedOnSize)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityIdentifier("strava-connect-overlay")
+    }
+
+    private var card: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 8) {
+                Text(prompt.title)
+                    .font(.title3.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                Text(prompt.message)
+                    .foregroundStyle(.secondary)
+            }
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            StravaConnectControls()
+        }
+        .padding(24)
+        .frame(maxWidth: 420)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.18), radius: 30, y: 12)
+        .padding(.horizontal, 20)
+    }
+}
