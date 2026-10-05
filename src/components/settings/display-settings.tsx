@@ -2,6 +2,14 @@
 
 import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
+import { Label } from '~/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select';
 import {
   useDisplayUnits,
   setDisplayUnits,
@@ -22,57 +30,71 @@ export function DisplaySettings() {
   );
   return (
     <section className="space-y-3" aria-labelledby="display-settings-title">
-      <h2 id="display-settings-title" className="font-semibold">
+      <h2 id="display-settings-title" className="text-sm font-semibold">
         Display
       </h2>
-      <label className="flex flex-wrap items-center justify-between gap-4">
-        Appearance
-        <select
-          className="min-w-0 max-w-full rounded-md border bg-background p-2"
-          value={mounted ? (theme ?? 'system') : 'system'}
-          onChange={(e) => setTheme(e.target.value)}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+        <Label
+          htmlFor="settings-appearance"
+          className="font-normal text-muted-foreground"
         >
-          <option value="system">System</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select>
-      </label>
-      <label className="flex flex-wrap items-center justify-between gap-4">
-        Units
-        <select
-          className="min-w-0 max-w-full rounded-md border bg-background p-2"
+          Appearance
+        </Label>
+        <Select
+          value={mounted ? (theme ?? 'system') : 'system'}
+          onValueChange={setTheme}
+        >
+          <SelectTrigger id="settings-appearance" className="h-10">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="z-[80]">
+            <SelectItem value="system">System</SelectItem>
+            <SelectItem value="light">Light</SelectItem>
+            <SelectItem value="dark">Dark</SelectItem>
+          </SelectContent>
+        </Select>
+        <Label
+          htmlFor="settings-units"
+          className="font-normal text-muted-foreground"
+        >
+          Units
+        </Label>
+        <Select
           value={units}
-          onChange={(e) =>
-            setDisplayUnits(
-              e.target.value === 'imperial' ? 'imperial' : 'metric',
-            )
+          onValueChange={(value) =>
+            setDisplayUnits(value === 'imperial' ? 'imperial' : 'metric')
           }
         >
-          <option value="metric">Metric</option>
-          <option value="imperial">Imperial</option>
-        </select>
-      </label>
-      <label className="flex flex-wrap items-center justify-between gap-4">
-        Date format
-        <select
-          className="min-w-0 max-w-full rounded-md border bg-background p-2"
-          value={dateFormat}
-          onChange={(e) => setDateFormat(e.target.value as DateFormat)}
+          <SelectTrigger id="settings-units" className="h-10">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="z-[80]">
+            <SelectItem value="metric">Metric</SelectItem>
+            <SelectItem value="imperial">Imperial</SelectItem>
+          </SelectContent>
+        </Select>
+        <Label
+          htmlFor="settings-date-format"
+          className="font-normal text-muted-foreground"
         >
-          {dateFormatOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="text-sm text-muted-foreground">
-        Distance, elevation and speed use{' '}
-        {units === 'metric'
-          ? 'kilometres, metres and km/h'
-          : 'miles, feet and mph'}
-        . Preferences are saved on this browser.
-      </p>
+          Date format
+        </Label>
+        <Select
+          value={dateFormat}
+          onValueChange={(value) => setDateFormat(value as DateFormat)}
+        >
+          <SelectTrigger id="settings-date-format" className="h-10">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="z-[80]">
+            {dateFormatOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </section>
   );
 }
