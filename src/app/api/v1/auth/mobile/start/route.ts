@@ -1,4 +1,5 @@
 import { auth } from '~/lib/auth';
+import { STRAVA_FORCE_CONSENT } from '~/lib/strava-permissions';
 import { logger } from '~/server/logging/logger';
 import { withApiV1Observability } from '~/server/api/observability';
 import {
@@ -12,7 +13,12 @@ const ROUTE = 'GET /api/v1/auth/mobile/start';
 export const GET = withApiV1Observability(
   withApiV1RateLimit(
     createMobileAuthStartHandler({
-      startSocialSignIn: async ({ callbackURL, headers }) => {
+      startSocialSignIn: async ({
+        callbackURL,
+        errorCallbackURL,
+        forceConsent,
+        headers,
+      }) => {
         // `asResponse: true` is required to get at the `Set-Cookie` header
         // Better Auth attaches for its own OAuth state verification -
         // without it, `auth.api.signInSocial` returns only the parsed body
@@ -20,7 +26,12 @@ export const GET = withApiV1Observability(
         // mobile sign-in fail once Strava redirected back (see the
         // handler's doc comment on `startSocialSignIn`).
         const response = await auth.api.signInSocial({
-          body: { provider: 'strava', callbackURL },
+          body: {
+            provider: 'strava',
+            callbackURL,
+            errorCallbackURL,
+            ...(forceConsent ? { additionalParams: STRAVA_FORCE_CONSENT } : {}),
+          },
           headers,
           asResponse: true,
         });

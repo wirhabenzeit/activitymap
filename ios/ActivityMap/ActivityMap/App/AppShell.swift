@@ -127,7 +127,8 @@ struct AppShell: View {
                       isConnecting: auth.status == .signingIn,
                       failed: auth.signInFailed,
                       restoreSession: { await auth.restoreSession() },
-                      isVerifyingSession: auth.isRestoringSession)
+                      isVerifyingSession: auth.isRestoringSession,
+                      restoreRetryAt: auth.restoreRetryAt)
     }
 
     // Global destinations stay outside the List's native navigation stack.

@@ -146,7 +146,7 @@ struct StreamSummaryCacheTests {
         #expect(try await store.cachedStreamSummary(activityID: id, scope: scope) == nil)
         #expect(try await store.cachedStreamSummary(activityID: id, scope: other) != nil)
         #expect(try await save(store, dto(), fence: ticket) == .fenced)
-        let expired = SyncSession(user: .init(id: scope.userID, name: "Expired", email: nil, image: nil, athleteID: "42", stravaConnected: true,
+        let expired = SyncSession(user: .init(id: scope.userID, name: "Expired", email: nil, image: nil, athleteID: "42", stravaConnected: true, stravaPermissions: nil,
             authentication: .init(method: .bearer, sessionExpiresAt: .distantPast)), token: "expired", deployment: scope.deployment, verified: true)
         try await store.apply([.upsertActivity(try activity())], scope: scope)
         #expect(try await save(store, dto()) == .stored)

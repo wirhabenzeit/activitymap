@@ -9,6 +9,10 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '~/server/logging/logger';
 import { stravaAccessEnabled } from '~/server/config/external-effects';
+import {
+  callbackScopeParam,
+  grantedStravaScope,
+} from '~/lib/strava-permissions';
 
 const stravaProfileSchema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -61,7 +65,10 @@ export const auth = betterAuth({
                 userInfoUrl: 'https://www.strava.com/api/v3/athlete',
                 clientId: process.env.AUTH_STRAVA_ID!,
                 clientSecret: process.env.AUTH_STRAVA_SECRET!,
-                scopes: ['read,activity:read_all,activity:write'],
+                // `activity:read` alongside `activity:read_all` gives Strava's
+                // consent screen separate public and private boxes, so leaving
+                // private unticked still shares public activities (#303).
+                scopes: ['read,activity:read,activity:read_all,activity:write'],
                 pkce: false,
                 // Custom function to fetch and map user info from Strava
                 getUserInfo: async (tokens) => {
@@ -129,7 +136,13 @@ export const auth = betterAuth({
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
       // Both the direct and proxied Strava callbacks create a local session.
-      if (ctx.path.startsWith('/callback/strava')) {
+      // Hooks see the route template (`/callback/:id`), with the provider in
+      // `params`; a concrete path is still accepted in case that changes.
+      const isStravaCallback =
+        ctx.path === '/callback/:id'
+          ? ctx.params?.id === 'strava'
+          : ctx.path.startsWith('/callback/strava');
+      if (isStravaCallback) {
         const userId = getSessionUserId(ctx.context.newSession);
         if (userId) {
           try {
@@ -149,6 +162,22 @@ export const auth = betterAuth({
               .update(users)
               .set({ athlete_id: athleteId })
               .where(eq(users.id, userId));
+
+            // Strava reports the scopes the person actually approved only on
+            // this redirect; Better Auth never records them (issue #303).
+            const query: unknown = ctx.query;
+            const scope = grantedStravaScope(
+              callbackScopeParam(ctx.request?.url) ??
+                (query && typeof query === 'object' && 'scope' in query
+                  ? query.scope
+                  : null),
+            );
+            if (scope !== null) {
+              await db
+                .update(accounts)
+                .set({ scope })
+                .where(eq(accounts.id, account.id));
+            }
           } catch (error) {
             logger.error('[Better Auth] Error updating athlete_id:', error);
           }

@@ -166,6 +166,7 @@ const inlineEnumNames = new Map<string, string>([
   [enumKey(['time', 'distance']), 'StreamSeriesType'],
   [enumKey(['complete', 'partial']), 'PhotoRefreshStatus'],
   [enumKey(['idle', 'scanning', 'confirming']), 'ReconciliationPhase'],
+  [enumKey(['all', 'public', 'none']), 'StravaActivityAccess'],
 ]);
 
 /**
@@ -176,6 +177,7 @@ const inlineEnumNames = new Map<string, string>([
 const nestedObjectNames = new Map<string, string>([
   ['ErrorEnvelope.error', 'ErrorBody'],
   ['IngestionHistory.reconciliation', 'IngestionReconciliation'],
+  ['CurrentUser.stravaPermissions', 'StravaPermissions'],
 ]);
 
 type JSONSchema = Record<string, unknown>;

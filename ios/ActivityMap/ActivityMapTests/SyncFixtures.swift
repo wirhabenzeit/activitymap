@@ -51,7 +51,7 @@ enum SyncFixtures {
     }
 
     static func session(id: String = "alice", verified: Bool = true, connected: Bool = true) -> SyncSession {
-        .init(user: .init(id: id, name: id, email: nil, image: nil, athleteID: "42", stravaConnected: connected,
+        .init(user: .init(id: id, name: id, email: nil, image: nil, athleteID: "42", stravaConnected: connected, stravaPermissions: nil,
                          authentication: .init(method: .bearer, sessionExpiresAt: Date().addingTimeInterval(86400))),
               token: "test-token-\(id)", deployment: Fixtures.scope.deployment, verified: verified)
     }

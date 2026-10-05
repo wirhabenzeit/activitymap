@@ -25,10 +25,18 @@ void test('buildMobileCallbackUrl round-trips state/PKCE challenge/redirect URI'
 
 void test('GET /api/v1/auth/mobile/start redirects to the Strava authorization URL', async () => {
   let capturedCallbackURL: string | undefined;
+  let capturedErrorCallbackURL: string | undefined;
+  let capturedForceConsent: boolean | undefined;
   const GET = createMobileAuthStartHandler({
     loadRedirectAllowlist: () => ALLOWLIST,
-    startSocialSignIn: async ({ callbackURL }) => {
+    startSocialSignIn: async ({
+      callbackURL,
+      errorCallbackURL,
+      forceConsent,
+    }) => {
       capturedCallbackURL = callbackURL;
+      capturedErrorCallbackURL = errorCallbackURL;
+      capturedForceConsent = forceConsent;
       return { url: 'https://www.strava.com/oauth/authorize?client_id=1' };
     },
   });
@@ -47,6 +55,29 @@ void test('GET /api/v1/auth/mobile/start redirects to the Strava authorization U
   );
   assert.ok(capturedCallbackURL?.includes('/api/v1/auth/mobile/callback'));
   assert.ok(capturedCallbackURL?.includes('state=s1'));
+  // A declined authorization returns through the same mobile callback.
+  assert.equal(capturedErrorCallbackURL, capturedCallbackURL);
+  // An ordinary sign-in lets Strava skip consent it already has.
+  assert.equal(capturedForceConsent, false);
+});
+
+void test('GET /api/v1/auth/mobile/start forces Strava consent for a reconnect', async () => {
+  let capturedForceConsent: boolean | undefined;
+  const GET = createMobileAuthStartHandler({
+    loadRedirectAllowlist: () => ALLOWLIST,
+    startSocialSignIn: async ({ forceConsent }) => {
+      capturedForceConsent = forceConsent;
+      return { url: 'https://www.strava.com/oauth/authorize?client_id=1' };
+    },
+  });
+
+  await GET(
+    new Request(
+      'https://app.example.test/api/v1/auth/mobile/start?state=s1&code_challenge=c1&redirect_uri=activitymap%3A%2F%2Fauth%2Fcallback&prompt=consent',
+    ),
+  );
+
+  assert.equal(capturedForceConsent, true);
 });
 
 void test('GET /api/v1/auth/mobile/start forwards every Set-Cookie header onto the redirect', async () => {
@@ -148,7 +179,7 @@ void test('GET /api/v1/auth/mobile/start rejects a redirect_uri outside the allo
   );
 });
 
-void test('GET /api/v1/auth/mobile/start fails closed when sign-in throws', async () => {
+void test('GET /api/v1/auth/mobile/start returns to the app when sign-in throws', async () => {
   let capturedError: unknown;
   const GET = createMobileAuthStartHandler({
     loadRedirectAllowlist: () => ALLOWLIST,
@@ -165,9 +196,11 @@ void test('GET /api/v1/auth/mobile/start fails closed when sign-in throws', asyn
       'https://app.example.test/api/v1/auth/mobile/start?state=s1&code_challenge=c1&redirect_uri=activitymap%3A%2F%2Fauth%2Fcallback',
     ),
   );
-  const body: unknown = await response.json();
 
-  assert.equal(response.status, 500);
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get('location') ?? '');
+  assert.equal(location.protocol, 'activitymap:');
+  assert.equal(location.searchParams.get('error'), 'server_error');
+  assert.equal(location.searchParams.get('state'), 's1');
   assert.ok(capturedError instanceof Error);
-  assert.equal(errorEnvelopeSchema.safeParse(body).success, true);
 });

@@ -197,7 +197,7 @@ nonisolated final class SummaryClock: @unchecked Sendable {
     @Test func initialTrueExpiryClearsCacheAndInvalidatesAuthentication() async throws {
         let store = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         try await store.apply([.upsertActivity(try Fixtures.activity(["id": id]))], scope: Fixtures.scope)
-        let expired = SyncSession(user: .init(id: Fixtures.scope.userID, name: "Expired", email: nil, image: nil, athleteID: "42", stravaConnected: true,
+        let expired = SyncSession(user: .init(id: Fixtures.scope.userID, name: "Expired", email: nil, image: nil, athleteID: "42", stravaConnected: true, stravaPermissions: nil,
             authentication: .init(method: .bearer, sessionExpiresAt: .distantPast)), token: "expired", deployment: Fixtures.scope.deployment, verified: true)
         var invalidated: String?
         let loader = StreamSummaryLoader(invalidate: { invalidated = $0 })
@@ -212,7 +212,7 @@ nonisolated final class SummaryClock: @unchecked Sendable {
         let probe = SummarySourceProbe([.success(try response()), .failure(.rateLimited(retryAfter: 60, requestID: "r"))])
         let store = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         try await store.apply([.upsertActivity(try Fixtures.activity(["id": id]))], scope: Fixtures.scope)
-        let session = SyncSession(user: .init(id: Fixtures.scope.userID, name: "Valid", email: nil, image: nil, athleteID: "42", stravaConnected: true,
+        let session = SyncSession(user: .init(id: Fixtures.scope.userID, name: "Valid", email: nil, image: nil, athleteID: "42", stravaConnected: true, stravaPermissions: nil,
             authentication: .init(method: .bearer, sessionExpiresAt: clock.now().addingTimeInterval(10))),
             token: "short-lived", deployment: Fixtures.scope.deployment, verified: true)
         var invalidated: String?

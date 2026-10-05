@@ -123,3 +123,18 @@ void test('CurrentUserDTO reports Strava connection status without leaking the a
   const disconnected = toCurrentUserDTO(buildUser(), null);
   assert.equal(disconnected.stravaConnected, false);
 });
+
+void test('CurrentUserDTO describes the approved Strava scopes, not the raw value', () => {
+  const limited = toCurrentUserDTO(
+    buildUser(),
+    buildAccount({ scope: 'read,activity:read' }),
+  );
+  assert.deepEqual(limited.stravaPermissions, {
+    activities: 'public',
+    edit: false,
+  });
+  assert.equal(JSON.stringify(limited).includes('activity:read'), false);
+
+  const unknown = toCurrentUserDTO(buildUser(), buildAccount({ scope: null }));
+  assert.equal(unknown.stravaPermissions, null);
+});
