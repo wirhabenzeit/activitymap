@@ -20,9 +20,16 @@ def run(*args):
     return subprocess.check_output([str(arg) for arg in args], text=True).strip()
 
 
-def svg(body):
-    return ('<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" '
-            'viewBox="0 0 1024 1024">\n' + body + '\n</svg>\n')
+def svg(body, view_box=(0, 0, 1024, 1024)):
+    x, y, width, height = view_box
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+            f'viewBox="{x} {y} {width} {height}">\n' + body + '\n</svg>\n')
+
+
+# The map panels span x 206-819 and y 222-777 of the icon canvas. Cropping the
+# transparent mark to them (with a little room for antialiasing) lets it fill
+# its box in small places such as the 24px web header.
+MARK_VIEW_BOX = (200, 216, 625, 565)
 
 
 def artwork(filename):
@@ -80,7 +87,7 @@ def main():
         (PUBLIC / 'favicon.svg').write_text(rounded)
         # Transparent mark for coloured surfaces such as the web header: the same
         # panels and route, without the background tile.
-        (PUBLIC / 'app-mark.svg').write_text(svg(foreground))
+        (PUBLIC / 'app-mark.svg').write_text(svg(foreground, MARK_VIEW_BOX))
         (PUBLIC / 'apple-touch-icon.svg').write_text(square)
         square_source = temporary / 'square.svg'
         square_source.write_text(square)

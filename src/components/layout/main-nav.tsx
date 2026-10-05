@@ -36,9 +36,9 @@ export function MainNav() {
         <Image
           src="/app-mark.svg"
           alt=""
-          width={24}
+          width={27}
           height={24}
-          className="h-6 w-6"
+          className="h-6 w-auto"
         />
         <span className="hidden font-bold lg:inline-block">ActivityMap</span>
       </button>
