@@ -377,7 +377,7 @@ curl --fail-with-body --silent --show-error --max-time 60 \
   --header "x-cron-secret: ${CRON_SECRET}" \
   --header 'content-type: application/json' \
   --data '{"activityLimit":1,"requestLimit":2}' \
-  https://activitymap.dominik.page/api/cron/backfill-activity-streams
+  https://activitymap.cc/api/cron/backfill-activity-streams
 ```
 
 `pnpm db:test-stream-backfill` uses a guarded local test database and mocked

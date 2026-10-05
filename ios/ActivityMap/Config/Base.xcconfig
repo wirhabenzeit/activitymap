@@ -14,7 +14,7 @@ SLASH = /
 // reach the Mac through localhost; a physical iPhone uses production over
 // HTTPS. Override either setting in the ignored Local.xcconfig as needed.
 ACTIVITYMAP_API_BASE_URL = http:$(SLASH)$(SLASH)localhost:3000
-ACTIVITYMAP_API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)activitymap.dominik.page
+ACTIVITYMAP_API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)activitymap.cc
 
 // Mobile sign-in callback. The scheme is registered under CFBundleURLTypes in
 // Info.plist and is what ASWebAuthenticationSession watches for. The full URI

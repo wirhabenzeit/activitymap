@@ -29,7 +29,7 @@ are stored in the Preview database, not Production's database.
 1. Confirm the managed `NEON_DATABASE_URL` points each Preview deployment to
    its own Neon branch. Keep `ACTIVITYMAP_EXTERNAL_EFFECTS` absent in Preview.
 2. In **Production**, set `OAUTH_PROXY_PRODUCTION_URL` to the canonical origin
-   (currently `https://activitymap.dominik.page`) and set a long random
+   (currently `https://activitymap.cc`) and set a long random
    `OAUTH_PROXY_SECRET`. Retain Production's Strava credentials and its own
    `BETTER_AUTH_SECRET`. Redeploy Production first.
 3. In the Vercel **Preview environment**, set `AUTH_STRAVA_ID`,
@@ -49,5 +49,5 @@ deployments restricted to trusted contributors, and use branch-specific
 variables if that is not true for every branch.
 
 The Strava callback remains
-`https://activitymap.dominik.page/api/auth/callback/strava`. Preview URLs do
+`https://activitymap.cc/api/auth/callback/strava`. Preview URLs do
 not need to be registered with Strava.

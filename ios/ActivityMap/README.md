@@ -21,7 +21,7 @@ The app talks to an ActivityMap deployment over `/api/v1`. It never holds a data
 
 | xcconfig value | Default | Purpose |
 | --- | --- | --- |
-| `ACTIVITYMAP_API_BASE_URL` | Simulator: `http://localhost:3000`; device: `https://activitymap.dominik.page` | The deployment to call |
+| `ACTIVITYMAP_API_BASE_URL` | Simulator: `http://localhost:3000`; device: `https://activitymap.cc` | The deployment to call |
 | `ACTIVITYMAP_AUTH_CALLBACK_SCHEME` | `activitymap` | Registered in `CFBundleURLTypes`; what `ASWebAuthenticationSession` watches for |
 | `ACTIVITYMAP_AUTH_REDIRECT_URI` | `activitymap://auth/callback` | Where mobile sign-in returns its one-time code |
 
@@ -34,10 +34,12 @@ Note that `//` starts a comment in xcconfig, so URL separators are composed from
 The simulator shares the Mac's `localhost`; an iPhone's `localhost` is the phone. `Config/Base.xcconfig` now sends simulator builds to the local server and physical-device builds to the production HTTPS deployment:
 
 ```xcconfig
-ACTIVITYMAP_API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)activitymap.dominik.page
+ACTIVITYMAP_API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)activitymap.cc
 ```
 
 Run the `ActivityMap` scheme on the connected iPhone in Xcode. The app target has a development team for signing; select your own in Signing & Capabilities if needed. The phone needs internet access to reach production. Its activity cache and session are scoped to this server URL, so it signs in and syncs independently of the simulator's local-server account.
+
+Production moved to `https://activitymap.cc`. Builds using this default treat it as a new cache scope, so the first launch needs a network connection to verify the existing session and download activities again. The Keychain token is retained and can be restored against the same production database; an expired session still requires sign-in. An explicit `Local.xcconfig` override takes precedence over the new default. Keep the old host's API available for installed builds until those clients have migrated.
 
 The production Vercel project's **Production** environment must set `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback`, have Strava sign-in enabled, and serve `/api/v1` on that HTTPS host. This Vercel setting is not stored in Git; after adding or changing it, redeploy Production for the server to read it. If sign-in fails with `redirect_not_allowed`, check this setting first. Vercel Preview also supports Strava after the [Preview Strava setup](../../docs/preview-strava-login.md).
 
