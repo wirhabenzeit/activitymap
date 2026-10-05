@@ -598,6 +598,7 @@ nonisolated extension ActivityMapAPI {
         let schedulingReason: IngestionReason?
         let retryAt: Date?
         let activitiesWithPhotos: Int
+        let activitiesWithStoredPhotos: Int?
         let current: Int
         let refreshRequired: Int
         let unknown: Int

@@ -59,6 +59,7 @@ export type IngestionSnapshot = {
   };
   photos: {
     activitiesWithPhotos: number;
+    activitiesWithStoredPhotos: number;
     current: number;
     refreshRequired: number;
     unknown: number;
@@ -214,6 +215,11 @@ export function createIngestionStatusRepository(database: DrizzleDb = defaultDb)
         database
           .select({
             activitiesWithPhotos: sql<number>`count(*)::integer`,
+            activitiesWithStoredPhotos: count(sql`exists (
+              select 1 from ${photos}
+              where ${photos.activity_id} = ${activities.id}
+                and ${photos.athlete_id} = ${athleteId}
+            )`),
             current: count(sql`${activities.photosState} = 'current'`),
             refreshRequired: count(
               sql`${activities.photosState} = 'refresh_required'`,
@@ -259,6 +265,7 @@ export function createIngestionStatusRepository(database: DrizzleDb = defaultDb)
         },
         photos: photoCounts ?? {
           activitiesWithPhotos: 0,
+          activitiesWithStoredPhotos: 0,
           current: 0,
           refreshRequired: 0,
           unknown: 0,

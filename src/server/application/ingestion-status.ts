@@ -219,6 +219,7 @@ export function deriveIngestionStatus(
             : 'not_started',
       ...(stalePhotos === 0 ? schedule('idle') : schedule('not_scheduled')),
       activitiesWithPhotos: photos.activitiesWithPhotos,
+      activitiesWithStoredPhotos: photos.activitiesWithStoredPhotos,
       current: photos.current,
       refreshRequired: photos.refreshRequired,
       unknown: photos.unknown,

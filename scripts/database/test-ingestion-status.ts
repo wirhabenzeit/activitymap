@@ -326,6 +326,7 @@ async function run() {
   });
   assert.deepEqual(snapshot.photos, {
     activitiesWithPhotos: 3,
+    activitiesWithStoredPhotos: 2,
     current: 1,
     refreshRequired: 1,
     unknown: 1,
@@ -384,6 +385,7 @@ async function run() {
   const other = await statusRepository.snapshot(OTHER, OTHER_ATHLETE, clock());
   assert.equal(other.activities.total, 2);
   assert.equal(other.photos.photoCount, 1);
+  assert.equal(other.photos.activitiesWithStoredPhotos, 1);
   assert.equal(other.outcomes.details, undefined);
   assert.equal(other.history.scan, null);
   const revoked = await statusRepository.snapshot(REVOKED, REVOKED_ATHLETE, clock());

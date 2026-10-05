@@ -80,14 +80,30 @@ nonisolated struct IngestionPresentation {
 }
 
 nonisolated extension IngestionPresentation {
-    struct Summary { let title: String; let count: String; let status: String }
+    struct CoverageProgress: Equatable {
+        let completed: Int
+        let total: Int
+        var fraction: Double { Double(completed) / Double(total) }
+        var percent: Double { floor(fraction * 1000) / 10 }
+        var percentage: String { percent.formatted(.number.precision(.fractionLength(0...1))) + "%" }
+    }
+    struct Summary {
+        let title: String
+        let count: String
+        let status: String
+        var progress: CoverageProgress? = nil
+    }
+    static func coverageProgress(_ completed: Int?, total: Int) -> CoverageProgress? {
+        guard let completed, total > 0 else { return nil }
+        return CoverageProgress(completed: min(total, max(0, completed)), total: total)
+    }
     static func summaries(_ value: ActivityMapAPI.IngestionStatus) -> [Summary] {
         let h = value.history, d = value.details, s = value.streams, p = value.photos
         return [
             Summary(title: "History", count: "\(h.knownActivityCount.formatted()) imported" + (h.totalActivityCount == nil ? " · total unknown" : ""), status: compactStatus(h.progress, h.scheduling, outcome: h.lastOutcome)),
-            Summary(title: "Details", count: "\(d.detailed.formatted()) of \(h.knownActivityCount.formatted()) ready", status: compactStatus(d.progress, d.scheduling, outcome: d.lastOutcome)),
-            Summary(title: "Streams", count: "\((s.withData + s.withoutData).formatted()) of \(h.knownActivityCount.formatted()) checked", status: s.failed > 0 ? "Needs attention" : compactStatus(s.progress, s.scheduling)),
-            Summary(title: "Photos", count: p.activitiesWithPhotos == 0 ? "No photos reported" : "\(p.current.formatted()) of \(p.activitiesWithPhotos.formatted()) activities checked", status: compactStatus(p.progress, p.scheduling))
+            Summary(title: "Details", count: "\(d.detailed.formatted()) of \(h.knownActivityCount.formatted()) ready", status: compactStatus(d.progress, d.scheduling, outcome: d.lastOutcome), progress: coverageProgress(d.detailed, total: h.knownActivityCount)),
+            Summary(title: "Streams", count: "\((s.withData + s.withoutData).formatted()) of \(h.knownActivityCount.formatted()) checked", status: s.failed > 0 ? "Needs attention" : compactStatus(s.progress, s.scheduling), progress: coverageProgress(s.withData + s.withoutData, total: h.knownActivityCount)),
+            Summary(title: "Photos", count: p.activitiesWithPhotos == 0 ? "No photos reported" : p.activitiesWithStoredPhotos.map { "\($0.formatted()) of \(p.activitiesWithPhotos.formatted()) activities have photos available" } ?? "Photo availability not reported by this server", status: compactStatus(p.progress, p.scheduling), progress: coverageProgress(p.activitiesWithStoredPhotos, total: p.activitiesWithPhotos))
         ]
     }
     static func compactStatus(_ progress: ActivityMapAPI.IngestionProgress, _ scheduling: ActivityMapAPI.IngestionScheduling, outcome: ActivityMapAPI.IngestionRunOutcome? = nil) -> String {

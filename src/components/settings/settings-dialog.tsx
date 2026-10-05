@@ -161,43 +161,34 @@ export function SettingsDialog({
                     return (
                       <details key={summary.title} className="group">
                         <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 marker:hidden [&::-webkit-details-marker]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
-                          <div className="min-w-0 flex-1">
-                            <span className="block text-sm font-medium">
-                              {summary.title}
-                            </span>
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex items-baseline justify-between gap-3 text-sm font-medium">
+                              <span>{summary.title}</span>
+                              {summary.progress && (
+                                <span className="tabular-nums">
+                                  {summary.progress.percent.toLocaleString()}%
+                                </span>
+                              )}
+                            </div>
+                            {summary.progress && (
+                              <progress
+                                className="block h-2 w-full overflow-hidden rounded-full accent-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary"
+                                value={summary.progress.value}
+                                max={summary.progress.total}
+                                aria-label={summary.title}
+                                aria-valuetext={`${summary.progress.percent}% — ${summary.count}`}
+                              />
+                            )}
                             <span className="block text-xs text-muted-foreground">
                               {summary.count}
                             </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {summary.status}
+                            </span>
                           </div>
-                          <span className="max-w-[40%] rounded-md bg-muted px-2 py-1 text-right text-xs">
-                            {summary.status}
-                          </span>
                           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
                         </summary>
                         <div className="space-y-2 px-4 pb-4 text-sm text-muted-foreground">
-                          {index === 3 ? (
-                            <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2">
-                              <dt>Activities with photos</dt>
-                              <dd>
-                                {status.photos.activitiesWithPhotos.toLocaleString()}
-                              </dd>
-                              <dt>Up to date</dt>
-                              <dd>{status.photos.current.toLocaleString()}</dd>
-                              <dt>Need checking</dt>
-                              <dd>
-                                {(
-                                  status.photos.refreshRequired +
-                                  status.photos.unknown
-                                ).toLocaleString()}
-                              </dd>
-                              <dt>Individual photos stored</dt>
-                              <dd>
-                                {status.photos.photoCount.toLocaleString()}
-                              </dd>
-                            </dl>
-                          ) : (
-                            <p>{row.counts}</p>
-                          )}
                           <p>
                             {stale ? 'At last check: ' : ''}
                             {row.schedule}
@@ -205,15 +196,6 @@ export function SettingsDialog({
                           {row.reason && <p>{row.reason}</p>}
                           {row.retryAt && (
                             <p>Eligible to retry after {date(row.retryAt)}.</p>
-                          )}
-                          {row.outcome && (
-                            <p>
-                              {outcomeText(row.outcome)} ·{' '}
-                              {date(row.outcome.attemptedAt)}
-                              {row.outcome.lastSucceededAt
-                                ? ` · Last success: ${date(row.outcome.lastSucceededAt)}`
-                                : ''}
-                            </p>
                           )}
                           {index === 0 && (
                             <div className="space-y-2">
@@ -237,19 +219,49 @@ export function SettingsDialog({
                               )}
                             </div>
                           )}
+                          {index === 1 || index === 2 ? (
+                            <p>Of the activities imported so far.</p>
+                          ) : null}
                           {index === 3 && (
                             <p>
-                              Strava reports which activities have photos before
-                              their individual photos are fetched. One activity
-                              can have several photos.
+                              Counts activities with photos available, not
+                              individual images.
                             </p>
                           )}
-                          {index === 2 && (
-                            <p>
-                              Activities without GPS or sensors can be fully
-                              fetched.
-                            </p>
-                          )}
+                          <details className="space-y-2">
+                            <summary className="cursor-pointer">
+                              More information
+                            </summary>
+                            {index === 3 ? (
+                              <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2">
+                                <dt>Individual photos stored</dt>
+                                <dd>
+                                  {status.photos.photoCount.toLocaleString()}
+                                </dd>
+                                <dt>Collections verified current</dt>
+                                <dd>
+                                  {status.photos.current.toLocaleString()}
+                                </dd>
+                              </dl>
+                            ) : (
+                              <p>{row.counts}</p>
+                            )}
+                            {index === 2 && (
+                              <p>
+                                An activity with no recorded measurements still
+                                counts as checked.
+                              </p>
+                            )}
+                            {row.outcome && (
+                              <p>
+                                {outcomeText(row.outcome)} ·{' '}
+                                {date(row.outcome.attemptedAt)}
+                                {row.outcome.lastSucceededAt
+                                  ? ` · Last success: ${date(row.outcome.lastSucceededAt)}`
+                                  : ''}
+                              </p>
+                            )}
+                          </details>
                         </div>
                       </details>
                     );

@@ -4,6 +4,7 @@ import test from 'node:test';
 import { ingestionStatusDTOSchema } from '~/contracts/v1/ingestion-status';
 import {
   coverageRows,
+  coverageProgress,
   coverageSummaries,
   outcomeText,
   snapshotIsStale,
@@ -67,3 +68,19 @@ for (const fixture of fixtures.scenarios) {
     );
   });
 }
+
+void test('progress measures available photos separately from freshness and omits unknown totals', () => {
+  const fixture = fixtures.scenarios.find((item) => item.id === 'photo-only-staleness')!;
+  const status = ingestionStatusDTOSchema.parse(fixture.status);
+  const summaries = coverageSummaries(status);
+  assert.equal(summaries[0]!.progress, null);
+  assert.equal(summaries[3]!.progress!.value, 8);
+  assert.equal(status.photos.current, 6);
+  assert.equal(summaries[3]!.progress!.percent, 88.8);
+  delete status.photos.activitiesWithStoredPhotos;
+  assert.equal(coverageSummaries(status)[3]!.progress, null);
+  assert.equal(coverageProgress(0, 0), null);
+  assert.equal(coverageProgress(undefined, 100), null);
+  assert.equal(coverageProgress(9999, 10000)!.percent, 99.9);
+  assert.equal(coverageProgress(100, 100)!.percent, 100);
+});

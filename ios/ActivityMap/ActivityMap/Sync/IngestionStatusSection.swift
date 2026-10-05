@@ -20,59 +20,11 @@ struct IngestionStatusSection: View {
                 let rows = IngestionPresentation.rows(snapshot)
                 let summaries = IngestionPresentation.summaries(snapshot)
                 ForEach(rows.indices, id: \.self) { index in
-                    let row = rows[index], summary = summaries[index]
+                    let summary = summaries[index]
                     NavigationLink {
-                        Form {
-                            Section(row.coverage) {
-                                if index == 3 {
-                                    LabeledContent("Activities with photos", value: snapshot.photos.activitiesWithPhotos.formatted())
-                                    LabeledContent("Up to date", value: snapshot.photos.current.formatted())
-                                    LabeledContent("Need checking", value: (snapshot.photos.refreshRequired + snapshot.photos.unknown).formatted())
-                                    LabeledContent("Individual photos stored", value: snapshot.photos.photoCount.formatted())
-                                } else {
-                                    Text(row.counts)
-                                }
-                                Text((stale ? "At last check: " : "") + row.schedule)
-                                if let reason = row.reason { Text(reason) }
-                                if let retry = row.retryAt { Text("Eligible to retry after \(retry.formatted()).") }
-                            }
-                            if let outcome = row.outcome {
-                                Section("Last run") {
-                                    Text(IngestionPresentation.outcome(outcome))
-                                    Text("Attempted: \(outcome.attemptedAt.formatted())")
-                                    if let success = outcome.lastSucceededAt { Text("Last success: \(success.formatted())") }
-                                }
-                            }
-                            if index == 0 {
-                                Section("History check") {
-                                    if let checked = snapshot.history.reconciliation.lastCompletedAt {
-                                        LabeledContent("Last full check", value: checked.formatted())
-                                    } else { Text("A full history check has not finished yet.") }
-                                    if let due = snapshot.history.reconciliation.nextDueAt {
-                                        LabeledContent(due <= snapshot.observedAt ? "Refresh was due" : "Next refresh due", value: due.formatted())
-                                    }
-                                }
-                            }
-                            if index == 3 {
-                                Text("Strava reports which activities have photos before their individual photos are fetched. One activity can have several photos.")
-                                    .foregroundStyle(.secondary)
-                            }
-                            if index == 2 { Text("Activities without GPS or sensors can be fully fetched.").foregroundStyle(.secondary) }
-                            Section(stale ? "Last known status" : "Observed") { Text(snapshot.observedAt, format: .dateTime) }
-                        }.navigationTitle(row.title)
+                        IngestionDetailView(snapshot: snapshot, index: index, stale: stale)
                     } label: {
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: 12) {
-                                rowTitle(summary)
-                                Spacer(minLength: 8)
-                                Text(summary.status).font(.caption).foregroundStyle(.secondary).fixedSize()
-                            }
-                            VStack(alignment: .leading, spacing: 4) {
-                                rowTitle(summary)
-                                Text(summary.status).font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                        .accessibilityElement(children: .combine)
+                        IngestionCoverageView(summary: summary)
                     }
                 }
             } else {
@@ -105,11 +57,98 @@ struct IngestionStatusSection: View {
             if scenePhase == .active { await status.observe(session) }
         }
     }
-    private func rowTitle(_ summary: IngestionPresentation.Summary) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(summary.title).foregroundStyle(.primary)
-            Text(summary.count).font(.caption).foregroundStyle(.secondary)
-        }
-    }
     private struct ObservationID: Equatable { let session: SyncSession; let active: Bool }
+}
+
+
+struct IngestionCoverageView: View {
+    let summary: IngestionPresentation.Summary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(summary.title).foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                if let progress = summary.progress {
+                    Text(progress.percentage).monospacedDigit().fontWeight(.semibold)
+                        .foregroundStyle(.primary).fixedSize()
+                }
+            }
+            if let progress = summary.progress {
+                ProgressView(value: Double(progress.completed), total: Double(progress.total))
+                    .tint(.accentColor)
+                    .accessibilityHidden(true)
+            }
+            Text(summary.count).font(.caption).foregroundStyle(.secondary)
+            Text(summary.status).font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(summary.title)
+        .accessibilityValue([summary.progress?.percentage, summary.count, summary.status].compactMap { $0 }.joined(separator: ", "))
+    }
+}
+
+struct IngestionDetailView: View {
+    let snapshot: ActivityMapAPI.IngestionStatus
+    let index: Int
+    let stale: Bool
+
+    private var row: IngestionPresentation.Row { IngestionPresentation.rows(snapshot)[index] }
+    private var summary: IngestionPresentation.Summary { IngestionPresentation.summaries(snapshot)[index] }
+
+    var body: some View {
+        Form {
+            Section {
+                IngestionCoverageView(summary: summary)
+            } footer: {
+                if index == 1 || index == 2 {
+                    Text("Of the activities imported so far.")
+                } else if index == 3 {
+                    Text("Counts activities with photos available, not individual images.")
+                }
+            }
+            if index == 0 {
+                Section("History check") {
+                    if let checked = snapshot.history.reconciliation.lastCompletedAt {
+                        LabeledContent("Last full check", value: checked.formatted())
+                    } else { Text("A full history check has not finished yet.") }
+                    if let due = snapshot.history.reconciliation.nextDueAt {
+                        LabeledContent(due <= snapshot.observedAt ? "Refresh was due" : "Next refresh due", value: due.formatted())
+                    }
+                }
+            }
+            Section("Background updates") {
+                Text((stale ? "At last check: " : "") + row.schedule)
+                if let reason = row.reason { Text(reason) }
+                if let retry = row.retryAt { LabeledContent("Retry after", value: retry.formatted()) }
+            }
+            Section {
+                DisclosureGroup("More information") {
+                    if index == 1 {
+                        LabeledContent("Not fetched yet", value: snapshot.details.neverFetched.formatted())
+                        LabeledContent("Need refreshing", value: snapshot.details.invalidated.formatted())
+                    }
+                    if index == 2 {
+                        LabeledContent("With recorded data", value: snapshot.streams.withData.formatted())
+                        LabeledContent("Checked, no recorded data", value: snapshot.streams.withoutData.formatted())
+                        if snapshot.streams.failed > 0 { LabeledContent("Failed", value: snapshot.streams.failed.formatted()) }
+                        Text("An activity with no recorded measurements still counts as checked.").foregroundStyle(.secondary)
+                    }
+                    if index == 3 {
+                        LabeledContent("Individual photos stored", value: snapshot.photos.photoCount.formatted())
+                        LabeledContent("Collections verified current", value: snapshot.photos.current.formatted())
+                        Text("An activity counts when at least one photo is stored. More photos may still need fetching, and available collections may need checking for changes.").foregroundStyle(.secondary)
+                    }
+                    if let outcome = row.outcome {
+                        Text(IngestionPresentation.outcome(outcome))
+                        LabeledContent("Last attempt", value: outcome.attemptedAt.formatted())
+                    }
+                    LabeledContent(stale ? "Last known status" : "Status checked", value: snapshot.observedAt.formatted())
+                }
+            }
+        }
+        .navigationTitle(index == 3 ? "Photos" : row.title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
 }

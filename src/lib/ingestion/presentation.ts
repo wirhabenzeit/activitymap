@@ -104,6 +104,13 @@ export function outcomeText(outcome: IngestionRunOutcomeDTO): string {
 export const snapshotIsStale = (observedAt: string, now: number) =>
   now - Date.parse(observedAt) >= 120_000;
 
+export function coverageProgress(completed: number | undefined, total: number) {
+  if (completed === undefined || total <= 0) return null;
+  const value = Math.max(0, Math.min(completed, total));
+  // Don't round incomplete work up to 100%.
+  return { value, total, percent: Math.floor((value / total) * 1000) / 10 };
+}
+
 /** Short summaries for the main screen; the full read model stays in disclosures. */
 export function coverageSummaries(status: IngestionStatusDTO) {
   const { history: h, details: d, streams: s, photos: p } = status;
@@ -138,24 +145,36 @@ export function coverageSummaries(status: IngestionStatusDTO) {
       title: 'History',
       count: `${h.knownActivityCount.toLocaleString()} imported${h.totalActivityCount === null ? ' · total unknown' : ''}`,
       status: label(h),
+      progress: null,
     },
     {
       title: 'Details',
       count: `${d.detailed.toLocaleString()} of ${h.knownActivityCount.toLocaleString()} ready`,
       status: label(d),
+      progress: coverageProgress(d.detailed, h.knownActivityCount),
     },
     {
       title: 'Streams',
       count: `${(s.withData + s.withoutData).toLocaleString()} of ${h.knownActivityCount.toLocaleString()} checked`,
       status: s.failed > 0 ? 'Needs attention' : label(s),
+      progress: coverageProgress(
+        s.withData + s.withoutData,
+        h.knownActivityCount,
+      ),
     },
     {
       title: 'Photos',
       count:
         p.activitiesWithPhotos === 0
           ? 'No photos reported'
-          : `${p.current.toLocaleString()} of ${p.activitiesWithPhotos.toLocaleString()} activities checked`,
+          : p.activitiesWithStoredPhotos === undefined
+            ? 'Photo availability not reported by this server'
+            : `${p.activitiesWithStoredPhotos.toLocaleString()} of ${p.activitiesWithPhotos.toLocaleString()} activities have photos available`,
       status: label(p),
+      progress: coverageProgress(
+        p.activitiesWithStoredPhotos,
+        p.activitiesWithPhotos,
+      ),
     },
   ];
 }

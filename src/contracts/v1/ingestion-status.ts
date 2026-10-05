@@ -144,6 +144,8 @@ export const ingestionPhotosDTOSchema = z.object({
   ...schedulingFields,
   /** Activities Strava reports as having photos. */
   activitiesWithPhotos: count,
+  /** Activities in that population with at least one stored photo, regardless of freshness. Absent on older servers. */
+  activitiesWithStoredPhotos: count.optional(),
   /** Partition of `activitiesWithPhotos` by photo metadata freshness. */
   current: count,
   refreshRequired: count,

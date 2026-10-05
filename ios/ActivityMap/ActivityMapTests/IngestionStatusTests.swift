@@ -51,6 +51,18 @@ import Testing
         #expect(restored.snapshot == nil)
         #expect(restored.scope == otherDeployment.scope)
     }
+    @Test func coverageUsesStoredPhotosAndDoesNotInventPercentages() throws {
+        let fixture = try #require(corpus().scenarios.first { $0.id == "photo-only-staleness" }?.status)
+        let summaries = IngestionPresentation.summaries(fixture)
+        #expect(summaries[0].progress == nil)
+        #expect(summaries[3].progress?.completed == 8)
+        #expect(fixture.photos.current == 6)
+        #expect(summaries[3].progress?.percent == 88.8)
+        #expect(IngestionPresentation.coverageProgress(nil, total: 100) == nil)
+        #expect(IngestionPresentation.coverageProgress(0, total: 0) == nil)
+        #expect(IngestionPresentation.coverageProgress(9999, total: 10000)?.percent == 99.9)
+        #expect(IngestionPresentation.coverageProgress(100, total: 100)?.percent == 100)
+    }
     @Test func rejectedSessionDoesNotServeACachedSnapshot() async throws {
         let suite = "ingestion-tests-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))

@@ -185,6 +185,17 @@ infer server totals from locally loaded activities. Terminal stream failures
 are labelled “Needs attention” even when the server has no runnable work.
 The former web Repair/Photos/Clean table is no longer part of Settings.
 
+Details and streams show coverage bars over the activities already imported;
+streams count successful empty results as checked. History has no percentage
+because discovery may not know the total. Photo coverage counts distinct
+activities with at least one stored photo, within the activities Strava reports
+as having photos. The optional `activitiesWithStoredPhotos` field is independent
+of photo freshness and of the number of individual photos; older servers omit
+it and clients show no photo percentage. A 100% photo bar means every activity
+in that population has at least one photo available, not that every individual
+photo has been fetched. No bar is shown for an empty population.
+
+
 Status requests run only while Settings is visible, at least 60 seconds apart,
 with server Retry-After deadlines respected. Both clients retain the observation
 time and label snapshots older than two minutes, or viewed offline, as last
