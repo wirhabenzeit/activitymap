@@ -11,6 +11,62 @@ The SwiftUI client supports mobile sign-in and local-first activity synchronizat
 
 Swift Package Manager pins the Mapbox dependency in `Package.resolved`. Local Xcode state and credentials are intentionally ignored.
 
+## TestFlight releases
+
+Publish a GitHub Release with a tag such as `ios/v1.0.0` or
+`ios/v1.0.0-beta.2`, targeting the commit you want testers to receive. Both full
+releases and prereleases trigger [the TestFlight workflow](../../.github/workflows/testflight.yml).
+Draft releases and tags without a published release do not trigger an upload.
+Web releases without the `ios/v` prefix are ignored.
+
+The workflow builds the exact tagged commit on the `xcode-27` runner. The numeric
+tag version becomes the app version; `100 + github.run_number` and
+`github.run_attempt` form the build number (for example `101.1`). A rerun gets a
+new build number. Do not move published tags; publish another prerelease tag to
+ship fixes. Apple processes the upload before the workflow copies the GitHub
+release body into TestFlight's **What to Test**, prefixed with its tag and commit.
+The existing **Internal Testing** group has automatic distribution enabled.
+External beta review and public App Store submission are separate operations.
+
+The Actions summary links to the accepted build, and the `testflight-*` artifact
+contains `source.json`, toolchain information, and archive/upload logs for 14 days.
+Signing material is never included in that artifact. If processing times out,
+check TestFlight before rerunning: the upload may have succeeded already.
+
+One-time setup uses a GitHub environment named `testflight`, restricted to
+release tags matching `ios/v*`, with these environment secrets:
+
+| Secret | Value |
+| --- | --- |
+| `IOS_DISTRIBUTION_P12_BASE64` | Base64-encoded Apple Distribution identity, including its private key |
+| `IOS_DISTRIBUTION_P12_PASSWORD` | Password protecting that P12 |
+| `IOS_PROVISION_PROFILE_BASE64` | Base64-encoded App Store profile for `page.dominik.activitymap`, containing the same certificate |
+| `APP_STORE_CONNECT_KEY_ID` | Dedicated App Store Connect team API key ID |
+| `APP_STORE_CONNECT_ISSUER_ID` | Team API issuer ID |
+| `APP_STORE_CONNECT_PRIVATE_KEY` | The downloaded `.p8` key, including PEM headers and newlines |
+| `MAPBOX_ACCESS_TOKEN` | Public Mapbox `pk.` token for the native app |
+
+The API key needs the **Developer** role for uploads and beta-build metadata.
+Team API keys apply across the team's apps; they cannot be restricted to one app.
+The distribution identity/profile performs signing, so the API key does not need
+certificate-management permissions. Credentials are installed into an ephemeral
+runner Keychain and removed in an `always()` cleanup step. Renew the distribution
+certificate/profile before expiration, and replace the corresponding secrets.
+
+The app declares only exempt/platform encryption with
+`ITSAppUsesNonExemptEncryption = NO`, matching its HTTPS, Keychain, and platform
+authentication usage. Reassess that declaration if encryption behavior or SDKs
+change. The location-purpose declaration is required by the linked map SDK even
+though ActivityMap does not request live location.
+
+Local workflow checks:
+
+```sh
+python3 -m unittest discover -s scripts/testflight -p 'test_*.py'
+ruby scripts/testflight/test_auth.rb
+bash -n scripts/testflight/signing.sh scripts/testflight/upload.sh
+```
+
 ## App icon
 
 `ActivityMap/AppIcon.icon` is the editable Icon Composer source. The synchronized

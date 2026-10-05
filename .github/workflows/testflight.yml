@@ -1,0 +1,73 @@
+name: TestFlight
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    if: startsWith(github.event.release.tag_name, 'ios/v')
+    runs-on: xcode-27
+    environment: testflight
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      APPLE_TEAM_ID: DX96FWY9AX
+      APP_STORE_APP_ID: '6819172681'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The release event's SHA is the tagged commit, not a moving main.
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate release and record source
+        run: |
+          python3 -B -m unittest discover -s scripts/testflight -p 'test_*.py'
+          ruby scripts/testflight/test_auth.rb
+          python3 scripts/testflight/metadata.py
+      - name: Install signing credentials
+        env:
+          IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+        run: bash scripts/testflight/signing.sh
+      - name: Archive and upload
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: bash scripts/testflight/upload.sh
+      - name: Wait for processing and publish test notes
+        timeout-minutes: 20
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: ruby scripts/testflight/finish.rb
+      - name: Save build provenance and logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: testflight-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/testflight-output/
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Remove signing credentials
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/testflight-signing.keychain-db" || true
+          rm -rf "$RUNNER_TEMP/testflight-private"
+          rm -f ios/ActivityMap/Config/Local.xcconfig
+          if [ -f "$RUNNER_TEMP/testflight-profile-path" ]; then
+            while IFS= read -r profile; do rm -f "$profile"; done < "$RUNNER_TEMP/testflight-profile-path"
+          fi
