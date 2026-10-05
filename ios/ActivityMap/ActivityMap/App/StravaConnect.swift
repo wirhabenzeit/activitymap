@@ -9,6 +9,8 @@ struct StravaConnect {
     var isConnecting = false
     /// The last attempt failed for a reason other than the person cancelling.
     var failed = false
+    var restoreSession: @MainActor () async -> Void = {}
+    var isVerifyingSession = false
 }
 
 private struct StravaConnectKey: EnvironmentKey {
@@ -91,10 +93,22 @@ func displayEmail(_ email: String?) -> String? {
 /// What the shell-level connection prompt says for a sync status that needs
 /// Strava, or `nil` when browsing can continue.
 struct StravaConnectPrompt: Equatable {
+    enum Recovery: Equatable { case connect, verifySession }
     let title: String
     let message: String
+    let recovery: Recovery
 
-    init?(status: SyncController.Status?) {
+    init?(status: SyncController.Status?, authStatus: AuthController.Status? = nil) {
+        // A saved token whose verification failed is not a failed OAuth grant.
+        // Keep cached browsing available; recover here only when the shell is blocked.
+        if case .sessionRestoreFailed = authStatus,
+           status == .signedOut || status == .expired || status == .disconnected {
+            title = "Couldn’t verify your session"
+            message = "Your sign-in was saved. Try checking your session again when you’re connected."
+            recovery = .verifySession
+            return
+        }
+        recovery = .connect
         switch status {
         case .signedOut:
             title = "Connect Strava to see your activities"
@@ -116,6 +130,7 @@ struct StravaConnectPrompt: Equatable {
 /// stay visible but out of reach behind it, so there is exactly one button.
 struct StravaConnectOverlay: View {
     let prompt: StravaConnectPrompt
+    @Environment(\.stravaConnect) private var connect
 
     var body: some View {
         ZStack {
@@ -142,7 +157,21 @@ struct StravaConnectOverlay: View {
             }
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
-            StravaConnectControls()
+            if prompt.recovery == .verifySession {
+                Button {
+                    Task { await connect.restoreSession() }
+                } label: {
+                    HStack {
+                        if connect.isVerifyingSession { ProgressView() }
+                        Text(connect.isVerifyingSession ? "Checking session…" : "Retry session verification")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(connect.isVerifyingSession)
+                .accessibilityIdentifier("strava-verify-session")
+            } else {
+                StravaConnectControls()
+            }
         }
         .padding(24)
         .frame(maxWidth: 420)

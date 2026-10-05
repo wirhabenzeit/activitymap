@@ -116,14 +116,18 @@ struct AppShell: View {
     }
 
     /// Signed out, expired or disconnected: one prompt over the whole shell.
-    private var connectPrompt: StravaConnectPrompt? { StravaConnectPrompt(status: sync?.status) }
+    private var connectPrompt: StravaConnectPrompt? {
+        StravaConnectPrompt(status: sync?.status, authStatus: auth.status)
+    }
 
     /// The single connection flow every entry point uses (#304). Starting it
     /// in place keeps the person on the tab and context they started from.
     private var stravaConnect: StravaConnect {
         StravaConnect(start: { Task { await auth.signIn() } },
                       isConnecting: auth.status == .signingIn,
-                      failed: auth.signInFailed)
+                      failed: auth.signInFailed,
+                      restoreSession: { await auth.restoreSession() },
+                      isVerifyingSession: auth.isRestoringSession)
     }
 
     // Global destinations stay outside the List's native navigation stack.

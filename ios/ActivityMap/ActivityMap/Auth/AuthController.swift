@@ -71,6 +71,7 @@ final class AuthController: NSObject {
     private(set) var currentUser: ActivityMapAPI.CurrentUser?
     private var revision = 0
     private var restoringToken: String?
+    var isRestoringSession: Bool { restoringToken != nil }
     private var signingOut = false
 
     override init() {

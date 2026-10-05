@@ -31,4 +31,17 @@ struct StravaConnectTests {
         let auth = AuthController()
         #expect(!auth.signInFailed)
     }
+
+    @Test func savedSignInRetriesVerificationInsteadOfStartingOAuthAgain() {
+        // OAuth exchanged and saved a token, but /me failed before an identity
+        // could be loaded. Sync is still signed out and the shell is blocked.
+        let prompt = StravaConnectPrompt(status: .signedOut, authStatus: .sessionRestoreFailed("503"))
+        #expect(prompt?.recovery == .verifySession)
+        #expect(prompt?.message.contains("sign-in was saved") == true)
+        // An explicitly rejected token returns to the ordinary connection flow.
+        #expect(StravaConnectPrompt(status: .signedOut, authStatus: .signedOut)?.recovery == .connect)
+        // A cached identity remains usable offline while verification retries.
+        #expect(StravaConnectPrompt(status: .offline, authStatus: .sessionRestoreFailed("offline")) == nil)
+        #expect(StravaConnectPrompt(status: .ready) == nil)
+    }
 }
