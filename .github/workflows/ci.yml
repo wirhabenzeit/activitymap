@@ -132,6 +132,8 @@ jobs:
         run: pnpm db:test-activity-streams
       - name: Prove stream API, invalidation and shared request budgeting
         run: pnpm db:test-stream-lifecycle
+      - name: Prove photo catch-up preserves existing data
+        run: pnpm db:test-photo-backfill
       - name: Prove conservative hourly stream backfill
         run: pnpm db:test-stream-backfill
       - name: Prove ingestion eligibility, outcomes and account-scoped status

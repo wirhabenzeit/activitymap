@@ -364,7 +364,7 @@ export async function processWebhookEvent(
           ...activityToSave,
           ...(photosAreAuthoritative
             ? {}
-            : { photosState: sql`${activities.photosState}` }),
+            : { photosState: 'refresh_required' as const }),
         },
       });
 

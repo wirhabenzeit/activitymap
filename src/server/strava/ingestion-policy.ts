@@ -115,6 +115,7 @@ export const INGESTION_JOBS = {
   'sync-activities': { intervalMs: 12 * DETAIL_RETRY_HOUR_MS },
   'reconcile-strava-summaries': { intervalMs: DETAIL_RETRY_HOUR_MS },
   'backfill-activity-streams': { intervalMs: DETAIL_RETRY_HOUR_MS },
+  'backfill-activity-photos': { intervalMs: DETAIL_RETRY_HOUR_MS },
 } as const;
 export type IngestionJob = keyof typeof INGESTION_JOBS;
 

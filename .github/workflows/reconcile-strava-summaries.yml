@@ -39,3 +39,14 @@ jobs:
             --header "content-type: application/json" \
             --data '{"activityLimit":5,"requestLimit":10}' \
             https://activitymap.cc/api/cron/backfill-activity-streams
+
+      - name: Catch up activity photos
+        if: ${{ !cancelled() && vars.ACTIVITYMAP_PHOTO_BACKFILL == 'enabled' }}
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --max-time 60 \
+            --request POST \
+            --header "x-cron-secret: ${CRON_SECRET}" \
+            https://activitymap.cc/api/cron/backfill-activity-photos

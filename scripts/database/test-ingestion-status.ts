@@ -325,6 +325,9 @@ async function run() {
     detailNextRetryAt: new Date('2026-10-05T14:00:00.000Z'),
   });
   assert.deepEqual(snapshot.photos, {
+    pendingRefreshes: 2,
+    retryWaiting: 0,
+    nextRetryAt: null,
     activitiesWithPhotos: 3,
     activitiesWithStoredPhotos: 2,
     current: 1,

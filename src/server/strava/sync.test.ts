@@ -398,3 +398,81 @@ void test('syncUser retains the global rate-limit stop after an earlier partial 
   assert.equal(result.outcome.outcome, 'partial');
   assert.equal(result.stoppedForRateLimit, true);
 });
+
+void test('detail enrichment bundles photos and reports their partial failure without retrying successful details', async () => {
+  const { ingestion, cleared } = fakeIngestion([1]);
+  const result = await updateIncompleteActivities(42, 'token', 1, {
+    ingestion,
+    activitiesRepo: fakeActivitiesRepo().repo,
+    fetchActivities: async (input) => {
+      assert.equal(input.includePhotos, true);
+      assert.equal(input.shouldDeletePhotos, true);
+      return {
+        activities: fetched([1]),
+        photos: [],
+        notFoundIds: [],
+        photoRefreshFailedIds: [1],
+        photoRefreshFailures: [
+          { activityId: 1, error: new StravaApiError('unavailable', 503) },
+        ],
+      };
+    },
+  });
+  assert.deepEqual(cleared, [1]);
+  assert.equal(result.updated, 1);
+  assert.deepEqual(result.outcome, {
+    outcome: 'partial',
+    reason: 'photo_refresh_failed',
+  });
+});
+
+void test('photo rate limit during detail enrichment stops subsequent work', async () => {
+  const result = await updateIncompleteActivities(42, 'token', 1, {
+    ingestion: fakeIngestion([1]).ingestion,
+    activitiesRepo: fakeActivitiesRepo().repo,
+    fetchActivities: async () => ({
+      activities: fetched([1]),
+      photos: [],
+      notFoundIds: [],
+      photoRefreshFailedIds: [1],
+      photoRefreshFailures: [
+        { activityId: 1, error: new StravaApiError('limited', 429) },
+      ],
+    }),
+  });
+  assert.deepEqual(result.outcome, {
+    outcome: 'deferred',
+    reason: 'rate_limited',
+  });
+});
+
+void test('rate-limited latest-activity photos stop detail and history fetching', async () => {
+  let calls = 0;
+  const result = await syncUser(
+    { id: 'user', athlete_id: 42, oldest_activity_reached: false },
+    { incomplete: 5, older: 5, minActivitiesThreshold: 2 },
+    {
+      resolveAccessToken: async () => 'token',
+      findMostRecentActivityId: async () => 1,
+      ingestion: fakeIngestion([2]).ingestion,
+      fetchActivities: async () => {
+        calls++;
+        return {
+          activities: fetched([1]),
+          photos: [],
+          notFoundIds: [],
+          photoRefreshFailedIds: [1],
+          photoRefreshFailures: [
+            { activityId: 1, error: new StravaApiError('limited', 429) },
+          ],
+        };
+      },
+    },
+  );
+  assert.equal(calls, 1);
+  assert.equal(result.stoppedForRateLimit, true);
+  assert.deepEqual(result.outcome, {
+    outcome: 'deferred',
+    reason: 'rate_limited',
+  });
+});

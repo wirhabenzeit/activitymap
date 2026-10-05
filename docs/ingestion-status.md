@@ -14,7 +14,7 @@ local sync never makes the server status complete.
 | --- | --- | --- | --- |
 | History | Activity summaries | `user.last_summary_reconciled_at` and `strava_summary_reconciliation` | Hourly summary reconciliation, a full rescan every 6 days |
 | Details | Every stored activity | `activities.geometry_state` | Legacy sync job, twice daily |
-| Photos | Activities Strava reports as having photos | `activities.photos_state` | None. Photos are refreshed only for the most recent activity, by webhooks and by explicit refreshes |
+| Photos | Activities Strava reports as having photos | `activities.photos_state` | Every detail fetch and an hourly photo-only catch-up, when enabled |
 | Streams | Every stored activity | `activity_streams` and `stream_backfill_attempt` | Hourly stream backfill, if enabled |
 
 Derived chart summaries are computed from fetched streams. They are reported as
@@ -84,7 +84,7 @@ from them. They must not be merged into one state.
   - `blocked`: the account needs reconnecting (`schedulingReason`).
   - `disabled`: the job is switched off on the server.
   - `stalled`: the job has stopped reporting.
-  - `not_scheduled`: no automatic job covers this work (stale photos).
+  - `not_scheduled`: no automatic job covers this work (legacy servers).
   - `unknown`: the job has never reported.
 - **`lastOutcome`** (history and details): how the last run for this account
   ended:
@@ -117,7 +117,7 @@ The status uses the heartbeats as follows:
 - A job that never reported is `unknown`.
 - A job whose last start is older than twice its interval plus 15 minutes, or
   that started and did not finish within 5 minutes, is `stalled`.
-- The stream backfill server switch is read directly, so a server-side
+- The photo and stream backfill server switches are read directly, so a server-side
   `disabled` is certain.
 
 A recent heartbeat is not a promise that the next run will happen.
@@ -215,3 +215,43 @@ scoping, late responses, rejected sessions and persisted retry deadlines.
 `RenderedIngestionStatusTests` exercises phone, dark, large Dynamic Type and iPad
 layouts with fixture data. Physical-device and manual VoiceOver certification
 remain separate checks; these tests do not certify either.
+
+
+## Photo catch-up and legacy data
+
+Migration `0018_photo-catch-up` adds attempt and hourly-run ledgers only. It
+neither deletes existing photos nor marks legacy collections verified from
+matching counts. Stored photos remain usable immediately, independently of
+`photos_state`. Catch-up prioritizes activities without stored photos, then
+verifies existing collections; it requests photo metadata directly without
+refetching details or downloading image binaries.
+
+All detail-fetch callers reconcile photos, including historical enrichment.
+A detailed response with both photo counts explicitly zero is authoritative
+for removal; otherwise photos are fetched, including non-GPS activities and
+unknown/conflicting counts. Explicit user refreshes always check the photo
+endpoint. Successful responses replace the collection and mark it current in
+one transaction with the sync change feed. Failed requests preserve photos,
+mark the collection pending, and leave independent photo catch-up work. A
+history summary count change queues photos without invalidating activity
+details. Detail confirmations from history reconciliation also queue photos
+when they have not fetched the collection themselves.
+
+`POST /api/cron/backfill-activity-photos` requires the cron secret, production
+external effects, and `ACTIVITYMAP_PHOTO_BACKFILL=enabled`. The hourly workflow
+also requires the GitHub variable of that name. It has a durable cap of five
+activity selections and twelve requests per UTC hour, including both image
+sizes and OAuth requests, and uses the shared Strava budget with background
+reserves. Repeated dispatches cannot reset those caps. Failed collections back
+off from one hour to a maximum of 24 hours. Leases recover after crashes; late
+responses cannot publish after an activity update, deletion, grant change or
+account revocation. Existing photo rows and their metadata are never cleared
+because a request failed.
+
+Rollout: run `pnpm db:test-photo-backfill` against guarded local Postgres,
+verify Preview migration/build, then apply migrations through 0018 using the
+existing Production migration workflow before deploying dependent code. Only
+then enable the server and GitHub photo-backfill gates. Start with the fixed
+small batch and inspect results before considering larger limits. Preview
+never runs this production cron; the database proof injects a fake Strava
+source to exercise failure and deletion cases without touching Strava.

@@ -146,3 +146,52 @@ void test('job heartbeats distinguish active, stalled, crashed, disabled and nev
     'active',
   );
 });
+
+void test('photo availability can be complete while verification is queued, waiting, or disabled', () => {
+  const snapshot = revive(fixtures.scenarios[0]!.snapshot) as IngestionSnapshot;
+  snapshot.account.connected = true;
+  snapshot.photos = {
+    activitiesWithPhotos: 183,
+    activitiesWithStoredPhotos: 183,
+    current: 0,
+    refreshRequired: 183,
+    unknown: 0,
+    photoCount: 290,
+    pendingRefreshes: 183,
+    retryWaiting: 0,
+  };
+  snapshot.jobs['backfill-activity-photos'] = {
+    job: 'backfill-activity-photos',
+    lastStartedAt: snapshot.observedAt,
+    lastFinishedAt: snapshot.observedAt,
+    lastCompletedAt: snapshot.observedAt,
+    lastStatus: 'completed',
+    lastStopReason: null,
+  };
+  const options = { streamBackfillEnabled: false, photoBackfillEnabled: true };
+  assert.equal(
+    deriveIngestionStatus(snapshot, options).photos.progress,
+    'complete',
+  );
+  assert.equal(
+    deriveIngestionStatus(snapshot, options).photos.scheduling,
+    'scheduled',
+  );
+  snapshot.photos.retryWaiting = 183;
+  snapshot.photos.nextRetryAt = new Date(
+    snapshot.observedAt.getTime() + 3_600_000,
+  );
+  assert.equal(
+    deriveIngestionStatus(snapshot, options).photos.scheduling,
+    'waiting',
+  );
+  assert.equal(
+    deriveIngestionStatus(snapshot, options).photos.retryAt,
+    snapshot.photos.nextRetryAt.toISOString(),
+  );
+  assert.equal(
+    deriveIngestionStatus(snapshot, { ...options, photoBackfillEnabled: false })
+      .photos.scheduling,
+    'disabled',
+  );
+});

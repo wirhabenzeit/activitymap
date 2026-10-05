@@ -22,12 +22,18 @@ export const GET = withApiV1Observability(
           ),
           {
             // The server-side rollout switch the backfill cron also checks.
+            photoBackfillEnabled:
+              process.env.ACTIVITYMAP_PHOTO_BACKFILL === 'enabled' &&
+              process.env.VERCEL_ENV === 'production',
             streamBackfillEnabled:
               process.env.ACTIVITYMAP_STREAM_BACKFILL === 'enabled',
           },
         ),
       onError: (error, requestId) => {
-        logger.error('GET /api/v1/ingestion-status failed', { error, requestId });
+        logger.error('GET /api/v1/ingestion-status failed', {
+          error,
+          requestId,
+        });
       },
     }),
     { route: ROUTE, resolveUserId: resolveRateLimitUserId },
