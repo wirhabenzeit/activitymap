@@ -28,7 +28,8 @@ jobs:
             --data '{"batchSize":1,"pagesPerAthlete":3}' \
             https://activitymap.cc/api/cron/reconcile-strava-summaries
       - name: Backfill historical activity streams
-        if: ${{ vars.ACTIVITYMAP_STREAM_BACKFILL == 'enabled' }}
+        # Runs by default after deployment; the repository variable can pause it.
+        if: ${{ vars.ACTIVITYMAP_STREAM_BACKFILL != 'disabled' }}
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |

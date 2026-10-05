@@ -275,9 +275,13 @@ and raw stream arrays. CI runs the PostgreSQL proof and Swift decoding check.
 `POST /api/cron/backfill-activity-streams` is a separate invocation after summary
 reconciliation, so each worker retains its own 45-second work budget within a
 60-second route. The new endpoint requires the existing `x-cron-secret`,
-`VERCEL_ENV=production`, `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`, and
-`ACTIVITYMAP_STREAM_BACKFILL=enabled`. It is disabled by default. The workflow
-also requires the GitHub repository variable `ACTIVITYMAP_STREAM_BACKFILL=enabled`.
+`VERCEL_ENV=production` and `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`. Backfill
+is enabled by default in production; no additional Vercel or GitHub opt-in is
+required, and Preview and local environments remain disabled. Setting
+`ACTIVITYMAP_STREAM_BACKFILL=disabled` in Vercel pauses the endpoint; setting the
+GitHub repository variable of that name to `disabled` pauses the scheduled step.
+An absent switch leaves backfill enabled. The cron and Settings use the same
+server configuration check, including the external-effects guard.
 A failed reconciliation step skips backfill for that hour.
 
 Defaults are **5 activities and 10 outbound request reservations globally per
