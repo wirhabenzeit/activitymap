@@ -150,6 +150,8 @@ async function seed(owners = 4, count = 80) {
     );
   }
 }
+// The scenarios below are sized for a 5-activity/10-request hourly cap, so
+// pass it explicitly rather than relying on the production defaults.
 const run = (
   options: Partial<Parameters<typeof backfillActivityStreams>[0]> = {},
 ) =>
@@ -158,6 +160,8 @@ const run = (
     streamRepository: streams,
     requestBudget: background(),
     clock: () => time,
+    activityLimit: 5,
+    requestLimit: 10,
     ...options,
   });
 const nextHour = () => {
