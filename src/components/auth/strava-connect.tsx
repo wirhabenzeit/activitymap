@@ -17,6 +17,7 @@ import {
   safeReturnPath,
   type ConnectFailure,
 } from '~/lib/auth-return';
+import { STRAVA_FORCE_CONSENT } from '~/lib/strava-permissions';
 import { cn } from '~/lib/utils';
 import { useShallowStore } from '~/store';
 
@@ -57,6 +58,11 @@ export function StravaConnectProvider({
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // Someone already signed in is reconnecting, usually to change what they
+  // granted: show Strava's consent screen instead of letting it skip ahead.
+  const reconnecting = useShallowStore(
+    (state) => !!state.user && !state.isGuest,
+  );
   const [pending, setPending] = React.useState(false);
   const [attemptFailure, setAttemptFailure] =
     React.useState<ConnectFailure | null>(null);
@@ -84,6 +90,7 @@ export function StravaConnectProvider({
         provider: 'strava',
         callbackURL: returnPath,
         errorCallbackURL: returnPath,
+        ...(reconnecting ? { additionalParams: STRAVA_FORCE_CONSENT } : {}),
       })
       .then((result) => {
         // Success navigates away to Strava; only a failure returns here.
@@ -96,7 +103,7 @@ export function StravaConnectProvider({
         setPending(false);
         setAttemptFailure('failed');
       });
-  }, [pending, pathname, searchParams]);
+  }, [pending, pathname, searchParams, reconnecting]);
 
   const value = React.useMemo(
     () => ({ connect, pending, failure }),

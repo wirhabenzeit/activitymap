@@ -179,6 +179,10 @@ final class AuthController: NSObject {
         // expired session being invalidated, supersedes it, and a late
         // callback or exchange must not restore an unwanted session.
         let attempt = revision
+        // Someone already signed in is reconnecting, usually to change what
+        // they granted. Strava skips its consent screen for an app it has
+        // already authorised, so ask for it explicitly.
+        let reviewPermissions = currentUser != nil
         currentUser = nil
         status = .signingIn
         do {
@@ -200,6 +204,9 @@ final class AuthController: NSObject {
                     name: "redirect_uri",
                     value: APIConfiguration.authRedirectURI.absoluteString),
             ]
+            if reviewPermissions {
+                startURL.queryItems?.append(URLQueryItem(name: "prompt", value: "consent"))
+            }
             guard let url = startURL.url else { throw AuthError.missingCodeOrState }
 
             let callbackURL = try await presentAuthSession(startingAt: url)

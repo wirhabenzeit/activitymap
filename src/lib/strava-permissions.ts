@@ -58,20 +58,29 @@ export function stravaPermissionsFromScope(
 /**
  * The `scope` Strava appends to its authorization redirect, normalised for
  * storage. Strava reports the approved scopes only there; the token response
- * carries none, so Better Auth cannot record them itself.
+ * carries none, so Better Auth cannot record them itself. `null` when the
+ * redirect carried no `scope`, which leaves the stored grant untouched.
  */
-export function grantedStravaScope(callbackUrl: string | undefined) {
-  if (!callbackUrl) return null;
-  let scope: string | null;
+export function grantedStravaScope(scope: unknown): string | null {
+  if (typeof scope !== 'string') return null;
+  return scopeList(scope).join(',');
+}
+
+/** The raw `scope` query value of an OAuth callback URL, if any. */
+export function callbackScopeParam(url: string | undefined): string | null {
+  if (!url) return null;
   try {
-    scope = new URL(callbackUrl).searchParams.get('scope');
+    return new URL(url).searchParams.get('scope');
   } catch {
     return null;
   }
-  // Present but empty is still an answer: no scope was granted.
-  if (scope === null) return null;
-  return scopeList(scope).join(',');
 }
+
+/**
+ * Strava skips its consent screen for an athlete who already authorised the
+ * app, so reconnecting to grant more access needs `approval_prompt=force`.
+ */
+export const STRAVA_FORCE_CONSENT = { approval_prompt: 'force' } as const;
 
 export function stravaPermissionsLimited(
   permissions: StravaPermissions | null | undefined,

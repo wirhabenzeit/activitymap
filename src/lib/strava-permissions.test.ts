@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  callbackScopeParam,
   grantedStravaScope,
   stravaPermissionNotes,
   stravaPermissionsFromScope,
@@ -46,33 +47,30 @@ void test('space-separated scopes are accepted as well as Strava’s commas', ()
 });
 
 void test('the granted scope is read from Strava’s authorization redirect', () => {
+  const url =
+    'https://activitymap.cc/api/auth/callback/strava?state=s&code=c&scope=read,activity:read';
+  assert.equal(callbackScopeParam(url), 'read,activity:read');
   assert.equal(
-    grantedStravaScope(
-      'https://activitymap.cc/api/auth/callback/strava?state=s&code=c&scope=read,activity:read',
-    ),
+    grantedStravaScope(callbackScopeParam(url)),
     'read,activity:read',
   );
   assert.equal(
-    grantedStravaScope(
-      'https://activitymap.cc/api/auth/callback/strava?code=c&scope=read,bogus,activity:write',
-    ),
+    grantedStravaScope('read,bogus,activity:write'),
     'read,activity:write',
   );
-  assert.equal(
-    grantedStravaScope(
-      'https://activitymap.cc/api/auth/callback/strava?scope=',
-    ),
-    '',
-  );
+  assert.equal(grantedStravaScope(''), '');
 });
 
 void test('no scope parameter leaves the stored grant untouched', () => {
   assert.equal(
-    grantedStravaScope(
+    callbackScopeParam(
       'https://activitymap.cc/api/auth/callback/strava?code=c',
     ),
     null,
   );
+  assert.equal(callbackScopeParam(undefined), null);
+  assert.equal(callbackScopeParam('not a url'), null);
+  assert.equal(grantedStravaScope(null), null);
   assert.equal(grantedStravaScope(undefined), null);
-  assert.equal(grantedStravaScope('not a url'), null);
+  assert.equal(grantedStravaScope(['read']), null);
 });

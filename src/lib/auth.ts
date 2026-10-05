@@ -9,7 +9,10 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '~/server/logging/logger';
 import { stravaAccessEnabled } from '~/server/config/external-effects';
-import { grantedStravaScope } from '~/lib/strava-permissions';
+import {
+  callbackScopeParam,
+  grantedStravaScope,
+} from '~/lib/strava-permissions';
 
 const stravaProfileSchema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -130,7 +133,13 @@ export const auth = betterAuth({
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
       // Both the direct and proxied Strava callbacks create a local session.
-      if (ctx.path.startsWith('/callback/strava')) {
+      // Hooks see the route template (`/callback/:id`), with the provider in
+      // `params`; a concrete path is still accepted in case that changes.
+      const isStravaCallback =
+        ctx.path === '/callback/:id'
+          ? ctx.params?.id === 'strava'
+          : ctx.path.startsWith('/callback/strava');
+      if (isStravaCallback) {
         const userId = getSessionUserId(ctx.context.newSession);
         if (userId) {
           try {
@@ -153,7 +162,13 @@ export const auth = betterAuth({
 
             // Strava reports the scopes the person actually approved only on
             // this redirect; Better Auth never records them (issue #303).
-            const scope = grantedStravaScope(ctx.request?.url);
+            const query: unknown = ctx.query;
+            const scope = grantedStravaScope(
+              callbackScopeParam(ctx.request?.url) ??
+                (query && typeof query === 'object' && 'scope' in query
+                  ? query.scope
+                  : null),
+            );
             if (scope !== null) {
               await db
                 .update(accounts)
