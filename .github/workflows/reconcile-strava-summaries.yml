@@ -26,7 +26,7 @@ jobs:
             --header "x-cron-secret: ${CRON_SECRET}" \
             --header "content-type: application/json" \
             --data '{"batchSize":1,"pagesPerAthlete":3}' \
-            https://activitymap.dominik.page/api/cron/reconcile-strava-summaries
+            https://activitymap.cc/api/cron/reconcile-strava-summaries
       - name: Backfill historical activity streams
         if: ${{ vars.ACTIVITYMAP_STREAM_BACKFILL == 'enabled' }}
         env:
@@ -38,4 +38,4 @@ jobs:
             --header "x-cron-secret: ${CRON_SECRET}" \
             --header "content-type: application/json" \
             --data '{"activityLimit":5,"requestLimit":10}' \
-            https://activitymap.dominik.page/api/cron/backfill-activity-streams
+            https://activitymap.cc/api/cron/backfill-activity-streams
