@@ -47,6 +47,33 @@ export async function findActiveSubscription(subscriptionId: number) {
   });
 }
 
+/**
+ * Whether `owner_id` belongs to an athlete with a Strava account in
+ * ActivityMap. Strava delivers events for every athlete who ever authorised
+ * the Strava app, including ones who signed up on another deployment that
+ * shares it (local development, previews) or whose account was erased.
+ * Those events are acknowledged but never stored: they carry another
+ * person's activity ids and nothing here could process them. A revoked
+ * account keeps its row until erasure, so its deauthorization replays are
+ * still recorded.
+ */
+export async function isRegisteredStravaAthlete(
+  ownerId: number,
+  database: DrizzleDb = defaultDb,
+): Promise<boolean> {
+  const [account] = await database
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(
+      and(
+        eq(accounts.providerId, 'strava'),
+        eq(accounts.accountId, String(ownerId)),
+      ),
+    )
+    .limit(1);
+  return Boolean(account);
+}
+
 export type RecordedWebhookEvent = {
   id: string;
   payload: StravaWebhookEvent;
@@ -82,7 +109,10 @@ export async function recordWebhookEvent(
         stravaWebhookEvents.eventTime,
       ],
     })
-    .returning({ id: stravaWebhookEvents.id, payload: stravaWebhookEvents.payload });
+    .returning({
+      id: stravaWebhookEvents.id,
+      payload: stravaWebhookEvents.payload,
+    });
 
   return inserted ?? null;
 }
@@ -126,13 +156,17 @@ export async function processInboxEvent(
     await processWebhookEvent(payload ?? claimed.payload, database);
     const completed = await repository.complete(claimed, new Date());
     if (!completed) {
-      logger.warn(`[Webhook] Processing lease expired before event ${eventId} completed`);
+      logger.warn(
+        `[Webhook] Processing lease expired before event ${eventId} completed`,
+      );
     }
   } catch (error) {
     logger.error(`[Webhook] Failed to process inbox event ${eventId}:`, error);
     const decision = await repository.fail(claimed, error, new Date());
     if (!decision) {
-      logger.warn(`[Webhook] Processing lease expired before event ${eventId} failed`);
+      logger.warn(
+        `[Webhook] Processing lease expired before event ${eventId} failed`,
+      );
     }
   }
 }
@@ -170,12 +204,20 @@ async function handleAthleteDeauthorization(
     const [account] = await tx
       .select()
       .from(accounts)
-      .where(and(eq(accounts.accountId, ownerId.toString()), eq(accounts.providerId, 'strava')));
+      .where(
+        and(
+          eq(accounts.accountId, ownerId.toString()),
+          eq(accounts.providerId, 'strava'),
+        ),
+      );
 
     if (!account) {
-      logger.info('[Webhook] Deauthorization received for unknown/unlinked account; nothing to revoke', {
-        owner_id: ownerId,
-      });
+      logger.info(
+        '[Webhook] Deauthorization received for unknown/unlinked account; nothing to revoke',
+        {
+          owner_id: ownerId,
+        },
+      );
       return;
     }
 
@@ -183,9 +225,12 @@ async function handleAthleteDeauthorization(
       // Idempotent no-op: a replayed/redelivered deauthorization for an
       // account already marked revoked must not re-extend the erasure
       // deadline or redo work.
-      logger.info('[Webhook] Deauthorization already recorded for this account; ignoring replay', {
-        owner_id: ownerId,
-      });
+      logger.info(
+        '[Webhook] Deauthorization already recorded for this account; ignoring replay',
+        {
+          owner_id: ownerId,
+        },
+      );
       return;
     }
 
@@ -205,10 +250,13 @@ async function handleAthleteDeauthorization(
       })
       .where(eq(accounts.id, account.id));
 
-    logger.info('[Webhook] Recorded athlete deauthorization; tokens cleared and erasure scheduled', {
-      owner_id: ownerId,
-      scheduledErasureAt,
-    });
+    logger.info(
+      '[Webhook] Recorded athlete deauthorization; tokens cleared and erasure scheduled',
+      {
+        owner_id: ownerId,
+        scheduledErasureAt,
+      },
+    );
   });
 }
 
@@ -267,20 +315,20 @@ export async function processWebhookEvent(
     photoRefreshAuthoritativeIds = [],
     photoRefreshFailedIds = [],
   } = await fetchActivities({
-      accessToken: account.access_token,
-      activityIds: [object_id],
-      includePhotos: true,
-      athleteId: owner_id,
-      shouldDeletePhotos: true, // Indicate intent to replace photos
-      limit: 2, // Ensure we only fetch the specific activity
-      // This function performs its own transactional upsert/photo-replace
-      // below and records the change feed for it - `persist: false` stops
-      // `fetchStravaActivities` from separately (and non-transactionally)
-      // writing the same activity/photos first, which would otherwise
-      // produce a duplicate, non-atomic write and a duplicate change record
-      // for one logical webhook delivery. See issue #122.
-      persist: false,
-    });
+    accessToken: account.access_token,
+    activityIds: [object_id],
+    includePhotos: true,
+    athleteId: owner_id,
+    shouldDeletePhotos: true, // Indicate intent to replace photos
+    limit: 2, // Ensure we only fetch the specific activity
+    // This function performs its own transactional upsert/photo-replace
+    // below and records the change feed for it - `persist: false` stops
+    // `fetchStravaActivities` from separately (and non-transactionally)
+    // writing the same activity/photos first, which would otherwise
+    // produce a duplicate, non-atomic write and a duplicate change record
+    // for one logical webhook delivery. See issue #122.
+    persist: false,
+  });
 
   // Handle case where activity was not found (e.g., deleted). The delete,
   // its tombstone, and its change record must commit together: writing the
@@ -369,7 +417,9 @@ export async function processWebhookEvent(
       });
 
     if (data.aspect_type === 'update') {
-      await tx.execute(sql`select invalidate_activity_streams(${String(object_id)}::bigint)`);
+      await tx.execute(
+        sql`select invalidate_activity_streams(${String(object_id)}::bigint)`,
+      );
     }
 
     // 2. Handle photos: Delete existing, then insert new ones

@@ -4,6 +4,7 @@ import { stravaWebhooks } from '~/server/db/schema';
 import { eq } from 'drizzle-orm';
 import {
   findActiveSubscription,
+  isRegisteredStravaAthlete,
   processInboxEvent,
   recordWebhookEvent,
   type RecordedWebhookEvent,
@@ -55,7 +56,9 @@ export async function GET(request: NextRequest) {
         });
 
         if (webhookRecord) {
-          logger.info('Webhook verification successful, responding with challenge');
+          logger.info(
+            'Webhook verification successful, responding with challenge',
+          );
           // Respond with the challenge to confirm the subscription
           return NextResponse.json({ 'hub.challenge': challenge });
         } else {
@@ -68,7 +71,9 @@ export async function GET(request: NextRequest) {
       logger.error('No verification token provided');
     }
   } else {
-    logger.error('Invalid webhook verification request, missing required parameters');
+    logger.error(
+      'Invalid webhook verification request, missing required parameters',
+    );
   }
 
   // If we get here, something went wrong with the verification
@@ -83,8 +88,8 @@ export async function GET(request: NextRequest) {
  * subscription_id, event_time, and (for updates) an `updates` object.
  *
  * Per issue #124, this handler only validates the delivery, checks it
- * against a known active subscription, and durably inserts it into the
- * webhook inbox before responding — it never calls Strava or mutates
+ * against a known active subscription and a registered athlete, and durably
+ * inserts it into the webhook inbox before responding — it never calls Strava or mutates
  * activities/photos itself, so the response time never depends on Strava's
  * API latency. A single best-effort processing attempt is scheduled via
  * `after()` to run once the response has been sent, keeping activities
@@ -122,14 +127,30 @@ export async function POST(request: NextRequest) {
 
   const subscription = await findActiveSubscription(data.subscription_id);
   if (!subscription) {
-    logger.error('[Webhook] Rejected event for unknown or inactive subscription:', {
-      subscription_id: data.subscription_id,
+    logger.error(
+      '[Webhook] Rejected event for unknown or inactive subscription:',
+      {
+        subscription_id: data.subscription_id,
+      },
+    );
+    return new NextResponse('Unknown or inactive subscription', {
+      status: 403,
     });
-    return new NextResponse('Unknown or inactive subscription', { status: 403 });
   }
 
   let recorded: RecordedWebhookEvent | null;
   try {
+    // Acknowledge, but never store, events for athletes without an
+    // ActivityMap account: Strava only needs the 200, and anything other
+    // than 2xx makes it redeliver.
+    if (!(await isRegisteredStravaAthlete(data.owner_id))) {
+      logger.info('[Webhook] Ignored event for an unregistered athlete', {
+        object_type: data.object_type,
+        aspect_type: data.aspect_type,
+        owner_id: data.owner_id,
+      });
+      return new NextResponse('Event received', { status: 200 });
+    }
     recorded = await recordWebhookEvent(data);
   } catch (error) {
     logger.error('[Webhook] Failed to durably record event:', error);
