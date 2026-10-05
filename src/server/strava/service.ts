@@ -10,10 +10,7 @@ import {
 
 import { db } from '~/server/db';
 import { logger } from '~/server/logging/logger';
-import {
-  isStravaActivityNotFoundError,
-  StravaClient,
-} from './client';
+import { isStravaActivityNotFoundError, StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type StravaPhoto } from './types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -24,7 +21,6 @@ import {
   type NewSyncChange,
 } from '~/server/repositories/changes';
 
-const changesRepo = createChangesRepository(db);
 type ActivityPersistenceTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0];
@@ -97,6 +93,7 @@ type ActivityDetailClient = Pick<
 >;
 
 export type FetchStravaActivitiesDeps = {
+  database?: typeof db;
   createClient?: (accessToken: string) => ActivityDetailClient;
 };
 
@@ -148,6 +145,8 @@ export async function fetchStravaActivities(
   input: FetchActivitiesInput,
   deps: FetchStravaActivitiesDeps = {},
 ): Promise<FetchStravaActivitiesResult> {
+  const database = deps.database ?? db;
+  const changesRepo = createChangesRepository(database);
   const {
     accessToken,
     before,
@@ -155,16 +154,16 @@ export async function fetchStravaActivities(
     page,
     per_page,
     activityIds: requestedActivityIds,
-    includePhotos,
     athleteId,
-    shouldDeletePhotos,
     limit,
     persist,
     requireExisting,
   } = fetchActivitiesSchema.parse(input);
 
   // Token refresh is now handled outside this function
-  const client = (deps.createClient ?? StravaClient.withAccessToken)(accessToken);
+  const client = (deps.createClient ?? StravaClient.withAccessToken)(
+    accessToken,
+  );
   const photos: Photo[] = [];
   let notFoundIds: number[] = [];
   let failedIds: number[] = [];
@@ -211,29 +210,22 @@ export async function fetchStravaActivities(
   }
 
   const photoRefreshSucceeded = new Set<number>();
-  if (includePhotos && requestedActivityIds) {
-    // A detailed Strava response with both counts at zero is authoritative
-    // without spending a second request. Explicit user refreshes still call
-    // the photo endpoint so they can reconcile independently of count data.
-    if (!requireExisting) {
-      for (const activity of fetchedActivities) {
-        if (
-          activity.total_photo_count === 0 &&
-          activity.photo_count === 0 &&
-          !activity.map?.polyline &&
-          !activity.map?.summary_polyline
-        ) {
-          photoRefreshSucceeded.add(activity.id);
-        }
+  // Every detail path owns the photo follow-up; callers cannot silently skip it.
+  if (requestedActivityIds) {
+    // Explicit zero counts on a detailed response are authoritative, including
+    // removal of previously stored photos. An explicit user refresh still
+    // checks the endpoint independently of the counts.
+    for (const activity of fetchedActivities) {
+      if (
+        !requireExisting &&
+        activity.total_photo_count === 0 &&
+        activity.photo_count === 0
+      ) {
+        photoRefreshSucceeded.add(activity.id);
       }
     }
     const photoCandidates = fetchedActivities.filter(
-      (activity) =>
-        requireExisting ||
-        !!activity.map?.polyline ||
-        !!activity.map?.summary_polyline ||
-        activity.total_photo_count > 0 ||
-        activity.photo_count > 0,
+      (activity) => !photoRefreshSucceeded.has(activity.id),
     );
     const photoFetchPromises = photoCandidates.map(async (act) => {
       try {
@@ -261,9 +253,12 @@ export async function fetchStravaActivities(
     // Only mark as complete if we explicitly requested IDs (Detail View)
     // OR if it has a detailed polyline (strong indicator of detail view).
     const isComplete = !!requestedActivityIds || !!act.map?.polyline;
-    return transformStravaActivity(act, isComplete, {
+    const transformed = transformStravaActivity(act, isComplete, {
       photosCurrent: photoRefreshSucceeded.has(act.id),
     });
+    if (photoRefreshFailed.has(act.id))
+      transformed.photosState = 'refresh_required';
+    return transformed;
   });
 
   const dbActivities = activitiesToProcess.map((act) => ({
@@ -298,9 +293,9 @@ export async function fetchStravaActivities(
         // - rather than diffing field by field - mirrors how Strava itself
         // treats an activity's photo set as replaced wholesale on refetch.
         let removedPhotoRows: { photoId: string; activityId: number }[] = [];
-        if (shouldDeletePhotos) {
+        if (photoRefreshSucceeded.size > 0) {
           // A failed photo request is non-authoritative. Preserve prior photo
-          // rows and freshness for that activity rather than replacing them
+          // rows for that activity rather than replacing them
           // with a synthetic empty set.
           const activityIdsWithPhotos = fetchedActivities
             .map((act) => act.id)
@@ -412,7 +407,7 @@ export async function fetchStravaActivities(
                 // CASE WHEN excluded.is_complete THEN true ELSE activity.is_complete END
                 is_complete: sql`CASE WHEN excluded.is_complete THEN true ELSE ${activitySchema.is_complete} END`,
                 geometryState: sql`CASE WHEN excluded.is_complete THEN excluded.geometry_state ELSE COALESCE(${activitySchema.geometryState}, excluded.geometry_state) END`,
-                photosState: sql`CASE WHEN ${photosCurrentForRow} THEN excluded.photos_state ELSE COALESCE(${activitySchema.photosState}, excluded.photos_state) END`,
+                photosState: sql`CASE WHEN ${photosCurrentForRow} THEN excluded.photos_state WHEN ${requestedActivityIds !== undefined} OR ${activitySchema.photo_count} IS DISTINCT FROM excluded.photo_count OR ${activitySchema.total_photo_count} IS DISTINCT FROM excluded.total_photo_count THEN 'refresh_required'::photos_state ELSE ${activitySchema.photosState} END`,
                 lastSummarySeenAt: sql`excluded.last_summary_seen_at`,
                 lastDetailedFetchedAt: sql`COALESCE(excluded.last_detailed_fetched_at, ${activitySchema.lastDetailedFetchedAt})`,
 
@@ -426,6 +421,7 @@ export async function fetchStravaActivities(
                 average_watts: sql`excluded.average_watts`,
                 device_watts: sql`excluded.device_watts`,
                 calories: sql`COALESCE(excluded.calories, ${activitySchema.calories})`,
+                photo_count: sql`excluded.photo_count`,
                 total_photo_count: sql`excluded.total_photo_count`,
                 upload_id: sql`excluded.upload_id`,
                 pr_count: sql`excluded.pr_count`,
@@ -441,7 +437,6 @@ export async function fetchStravaActivities(
                       description: sql`excluded.description`,
                       start_latlng: sql`excluded.start_latlng`,
                       end_latlng: sql`excluded.end_latlng`,
-                      photo_count: sql`excluded.photo_count`,
                       map_id: sql`excluded.map_id`,
                       map_polyline: sql`excluded.map_polyline`,
                       trainer: sql`excluded.trainer`,
@@ -520,12 +515,12 @@ export async function fetchStravaActivities(
       };
       savedActivities = requireExisting
         ? ((await withLockedExistingActivities(
-            db,
+            database,
             athleteId,
             requestedActivityIds ?? [],
             persistRows,
           )) ?? [])
-        : await db.transaction(persistRows);
+        : await database.transaction(persistRows);
     } catch (error) {
       throw new StravaPersistenceError({ cause: error });
     }

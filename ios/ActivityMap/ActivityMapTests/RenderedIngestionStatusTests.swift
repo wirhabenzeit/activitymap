@@ -1,0 +1,103 @@
+import SwiftUI
+import Testing
+import UIKit
+import Vision
+@testable import ActivityMap
+
+@MainActor @Suite(.serialized)
+struct RenderedIngestionStatusTests {
+    @Test(arguments: ["phone-light", "phone-dark", "large-text", "ipad", "details", "streams", "photos", "photos-large"])
+    func serverCoverageIsReadable(layout: String) async throws {
+        let suite = "ingestion-render-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let shared = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appending(path: "shared/ingestion-status-fixtures.v1.json")
+        let corpus = try ActivityMapAPI.makeDecoder().decode(IngestionStatusTests.Corpus.self, from: Data(contentsOf: shared))
+        let fixture = try #require(corpus.scenarios.first { $0.id == "partial-import-with-detail-failures" }?.status)
+        let controller = IngestionStatusController(defaults: defaults) { _ in fixture }
+        let session = SyncFixtures.session()
+        controller.activate(session)
+        await controller.refresh(session)
+        let detailIndex = ["details": 1, "streams": 2, "photos": 3, "photos-large": 3][layout]
+        let root = NavigationStack {
+            if let detailIndex {
+                IngestionDetailView(snapshot: fixture, index: detailIndex, stale: false)
+            } else {
+                Form { IngestionStatusSection(session: SyncFixtures.session(verified: false), controller: controller) }
+                    .navigationTitle("Settings")
+            }
+        }
+        .environment(\.colorScheme, layout == "phone-dark" ? .dark : .light)
+        .environment(\.dynamicTypeSize, (layout == "large-text" || layout == "photos-large") ? .accessibility2 : .large)
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let old = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        let size = layout == "ipad" ? CGSize(width: 768, height: 1024) : CGSize(width: 375, height: 812)
+        window.frame = CGRect(origin: .zero, size: size)
+        let host = UIHostingController(rootView: root)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; old?.makeKeyAndVisible() }
+        host.view.frame = window.bounds
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(250))
+        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
+            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+        }
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        if let detailIndex {
+            #expect(text.contains("%"), "Coverage should lead with a visible percentage")
+            if layout != "photos-large" { #expect(text.contains("More information")) }
+            if detailIndex == 3 {
+                #expect(text.contains("110") && text.contains("120"))
+                #expect(!text.contains("Collections verified"), "Freshness belongs in the collapsed detail")
+            }
+        } else {
+            #expect(text.contains("Settings"))
+            #expect(text.contains("History") && text.contains("imported"))
+        }
+        let directory = URL(fileURLWithPath: "/tmp/activitymap-ingestion-preview")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try image.pngData()?.write(to: directory.appending(path: "\(layout).png"))
+    }
+    @Test(arguments: ["account", "about"])
+    func settingsDestinationsKeepTheirNativeFormLayout(page: String) async throws {
+        let settings = AccountSheet(destination: .settings, auth: AuthController())
+        let root = NavigationStack {
+            if page == "account" { settings.accountPage }
+            else { settings.aboutPage }
+        }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let old = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: CGSize(width: 390, height: 844))
+        let host = UIHostingController(rootView: root)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; old?.makeKeyAndVisible() }
+        host.view.frame = window.bounds
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(250))
+        func scrollViews(_ view: UIView) -> [UIScrollView] {
+            ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrollViews)
+        }
+        #expect(!scrollViews(host.view).isEmpty, "Pushed destinations must retain a scrollable native Form")
+        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
+            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+        }
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let expected = page == "account" ? "Connect Strava" : "Version"
+        let content = try #require(request.results?.first { $0.topCandidates(1).first?.string.contains(expected) == true })
+        #expect(content.boundingBox.midY > 0.5, "Form content belongs near the top, not floating in the centre")
+        let directory = URL(fileURLWithPath: "/tmp/activitymap-ingestion-preview")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try image.pngData()?.write(to: directory.appending(path: "settings-\(page).png"))
+    }
+
+}

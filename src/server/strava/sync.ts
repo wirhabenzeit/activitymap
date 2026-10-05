@@ -59,13 +59,30 @@ export function combineSteps(steps: StepResult[]): IngestionOutcomeRecord {
   if (failure) {
     const committed = steps.some((step) => step.committed > 0);
     return {
-      outcome: failure.outcome === 'failed' && !committed ? 'failed' : 'partial',
+      outcome:
+        failure.outcome === 'failed' && !committed ? 'failed' : 'partial',
       reason: failure.reason,
     };
   }
   const deferred = pick('deferred');
   if (deferred) return { outcome: 'deferred', reason: deferred.reason };
   return { outcome: 'succeeded', reason: null };
+}
+
+/** Photo failures must stop further Strava work on account/quota errors. */
+function photoRefreshOutcome(
+  result: Awaited<ReturnType<typeof fetchStravaActivities>>,
+): IngestionOutcomeRecord | null {
+  if (!result.photoRefreshFailedIds?.length) return null;
+  const failures = (result.photoRefreshFailures ?? []).map(({ error }) =>
+    classifyIngestionFailure(error),
+  );
+  const stop =
+    failures.find((failure) => failure.scope === 'account') ??
+    failures.find((failure) => failure.scope === 'run');
+  return stop
+    ? { outcome: stop.outcome, reason: stop.reason }
+    : { outcome: 'partial', reason: 'photo_refresh_failed' };
 }
 
 export type SyncUserDeps = {
@@ -110,7 +127,8 @@ export async function syncUser(
     });
   const findMostRecentActivityId =
     deps.findMostRecentActivityId ?? findMostRecentActivityIdInDb;
-  const findOldestStartDate = deps.findOldestStartDate ?? findOldestStartDateInDb;
+  const findOldestStartDate =
+    deps.findOldestStartDate ?? findOldestStartDateInDb;
 
   const result: SyncUserResult = {
     outcome: { outcome: 'succeeded', reason: null },
@@ -152,8 +170,7 @@ export async function syncUser(
       } else if (recent.photoRefreshFailedIds?.length) {
         // The activity committed but its photo set is still stale.
         steps.push({
-          outcome: 'partial',
-          reason: 'photo_refresh_failed',
+          ...photoRefreshOutcome(recent)!,
           committed: recent.activities.length,
         });
       } else {
@@ -161,7 +178,10 @@ export async function syncUser(
       }
     }
   } catch (error) {
-    logger.error(`[User ${user.id}] Error syncing most recent activity:`, error);
+    logger.error(
+      `[User ${user.id}] Error syncing most recent activity:`,
+      error,
+    );
     steps.push(stepFailure(error));
   }
 
@@ -241,8 +261,7 @@ export async function syncActivities(
     maxOldActivities = Math.floor(maxActivities / 2),
     minActivitiesThreshold = 2,
   } = options;
-  const recordOutcome =
-    deps.recordOutcome ?? ingestionRepository.recordOutcome;
+  const recordOutcome = deps.recordOutcome ?? ingestionRepository.recordOutcome;
 
   // Tracking variables
   let updatedIncomplete = 0;
@@ -381,7 +400,9 @@ async function findMostRecentActivityIdInDb(
   return mostRecent?.id ?? null;
 }
 
-async function findOldestStartDateInDb(athleteId: number): Promise<Date | null> {
+async function findOldestStartDateInDb(
+  athleteId: number,
+): Promise<Date | null> {
   const [oldest] = await db
     .select({ startDate: activities.start_date })
     .from(activities)
@@ -444,7 +465,8 @@ export async function updateIncompleteActivities(
       accessToken,
       activityIds,
       athleteId,
-      includePhotos: false, // No need for photos in this context
+      includePhotos: true,
+      shouldDeletePhotos: true,
       limit,
     });
   } catch (error) {
@@ -460,7 +482,8 @@ export async function updateIncompleteActivities(
   result.updated = fetched.activities.length;
   await ingestion.clearDetailAttempts(fetched.activities.map((a) => a.id));
 
-  const activityFailures: { activityId: number; code: DetailFailureCode }[] = [];
+  const activityFailures: { activityId: number; code: DetailFailureCode }[] =
+    [];
   let stop: IngestionOutcomeRecord | null = null;
   for (const { activityId, error } of fetched.failures ?? []) {
     const failure = classifyIngestionFailure(error);
@@ -496,8 +519,13 @@ export async function updateIncompleteActivities(
   }
 
   const committed = result.updated + result.deleted > 0;
-  if (stop) {
+  const photoOutcome = photoRefreshOutcome(fetched);
+  if (photoOutcome?.outcome === 'blocked') {
+    result.outcome = photoOutcome;
+  } else if (stop) {
     result.outcome = stop;
+  } else if (photoOutcome) {
+    result.outcome = photoOutcome;
   } else if (activityFailures.length > 0) {
     result.outcome = {
       outcome: committed ? 'partial' : 'failed',

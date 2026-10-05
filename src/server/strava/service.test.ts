@@ -2,10 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { StravaApiError } from './client';
-import {
-  fetchStravaActivities,
-  withLockedExistingActivities,
-} from './service';
+import { fetchStravaActivities, withLockedExistingActivities } from './service';
 import type { StravaActivity } from './types';
 
 function stravaActivity(
@@ -164,7 +161,7 @@ void test('multi-ID detail fetch retains partial success and only tombstones an 
   assert.deepEqual(result.notFoundIds, [3]);
 });
 
-void test('legacy photo sync avoids GPS-less zero-photo fanout while explicit refresh stays authoritative', async () => {
+void test('detail fetching bundles photos; explicit zero counts avoid unnecessary photo requests', async () => {
   const activities = new Map([
     [1, stravaActivity(1)],
     [2, stravaActivity(2, { total_photo_count: 1, photo_count: 1 })],
@@ -206,7 +203,7 @@ void test('legacy photo sync avoids GPS-less zero-photo fanout while explicit re
     },
     { createClient },
   );
-  assert.deepEqual(photoCalls, [2, 3]);
+  assert.deepEqual(photoCalls, [2]);
   assert.deepEqual(legacy.photoRefreshFailedIds, [2]);
   assert.deepEqual(legacy.photoRefreshAuthoritativeIds?.sort(), [1, 3]);
   assert.deepEqual(legacy.photoRefreshFailures, [
@@ -233,4 +230,50 @@ void test('legacy photo sync avoids GPS-less zero-photo fanout while explicit re
   assert.deepEqual(explicit.photoRefreshFailedIds, []);
   assert.deepEqual(explicit.photoRefreshAuthoritativeIds, [1]);
   assert.equal(explicit.activities[0]?.photosState, 'current');
+});
+
+void test('detail callers cannot opt out of photos, including metadata-only non-GPS activities', async () => {
+  const calls: number[] = [];
+  const result = await fetchStravaActivities(
+    {
+      accessToken: 'token',
+      athleteId: 42,
+      activityIds: [7],
+      includePhotos: false,
+      persist: false,
+    },
+    {
+      createClient: () => ({
+        getActivity: async () =>
+          stravaActivity(7, { total_photo_count: 1, photo_count: 0 }),
+        getActivities: async () => {
+          throw new Error('must not fetch history');
+        },
+        getActivityPhotos: async (id) => {
+          calls.push(id);
+          return [];
+        },
+      }),
+    },
+  );
+  assert.deepEqual(calls, [7]);
+  assert.deepEqual(result.photoRefreshAuthoritativeIds, [7]);
+});
+
+void test('conflicting zero and positive photo counts still fetch photos and keep failures pending', async () => {
+  const result = await fetchStravaActivities(
+    { accessToken: 'token', athleteId: 42, activityIds: [7], persist: false },
+    {
+      createClient: () => ({
+        getActivity: async () =>
+          stravaActivity(7, { total_photo_count: 0, photo_count: 1 }),
+        getActivities: async () => [],
+        getActivityPhotos: async () => {
+          throw new StravaApiError('unavailable', 503);
+        },
+      }),
+    },
+  );
+  assert.deepEqual(result.photoRefreshFailedIds, [7]);
+  assert.equal(result.activities[0]?.photosState, 'refresh_required');
 });

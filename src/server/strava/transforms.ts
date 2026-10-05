@@ -101,7 +101,7 @@ export function transformStravaActivity(
     last_updated: observedAt,
     geometryState: isComplete ? 'detailed' : 'summary',
     photosState:
-      options.photosCurrent || activity.total_photo_count === 0
+      options.photosCurrent || (activity.total_photo_count === 0 && activity.photo_count === 0)
         ? 'current'
         : 'refresh_required',
     lastSummarySeenAt: observedAt,

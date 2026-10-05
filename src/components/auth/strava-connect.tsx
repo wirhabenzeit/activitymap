@@ -57,15 +57,10 @@ export function StravaConnectProvider({
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const signedOut = useShallowStore(
-    (state) => state.isInitialized && !state.user && !state.isGuest,
-  );
   const [pending, setPending] = React.useState(false);
   const [attemptFailure, setAttemptFailure] =
     React.useState<ConnectFailure | null>(null);
-  const returnedFailure = signedOut
-    ? connectFailure(searchParams.get('error'))
-    : null;
+  const returnedFailure = connectFailure(searchParams.get('error'));
   const failure = pending ? null : (attemptFailure ?? returnedFailure);
 
   // Returning with the Back button can restore this page from the

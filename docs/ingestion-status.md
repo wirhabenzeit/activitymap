@@ -14,7 +14,7 @@ local sync never makes the server status complete.
 | --- | --- | --- | --- |
 | History | Activity summaries | `user.last_summary_reconciled_at` and `strava_summary_reconciliation` | Hourly summary reconciliation, a full rescan every 6 days |
 | Details | Every stored activity | `activities.geometry_state` | Legacy sync job, twice daily |
-| Photos | Activities Strava reports as having photos | `activities.photos_state` | None. Photos are refreshed only for the most recent activity, by webhooks and by explicit refreshes |
+| Photos | Activities Strava reports as having photos | `activities.photos_state` | Every detail fetch and an hourly photo-only catch-up, enabled by default in production |
 | Streams | Every stored activity | `activity_streams` and `stream_backfill_attempt` | Hourly stream backfill, if enabled |
 
 Derived chart summaries are computed from fetched streams. They are reported as
@@ -84,7 +84,7 @@ from them. They must not be merged into one state.
   - `blocked`: the account needs reconnecting (`schedulingReason`).
   - `disabled`: the job is switched off on the server.
   - `stalled`: the job has stopped reporting.
-  - `not_scheduled`: no automatic job covers this work (stale photos).
+  - `not_scheduled`: no automatic job covers this work (legacy servers).
   - `unknown`: the job has never reported.
 - **`lastOutcome`** (history and details): how the last run for this account
   ended:
@@ -117,7 +117,7 @@ The status uses the heartbeats as follows:
 - A job that never reported is `unknown`.
 - A job whose last start is older than twice its interval plus 15 minutes, or
   that started and did not finish within 5 minutes, is `stalled`.
-- The stream backfill server switch is read directly, so a server-side
+- The photo and stream backfill server switches are read directly, so a server-side
   `disabled` is certain.
 
 A recent heartbeat is not a promise that the next run will happen.
@@ -173,3 +173,115 @@ values.
 
 `pnpm db:test-ingestion-status` checks the eligibility rule, detail backoff,
 outcomes, heartbeats and account isolation against PostgreSQL.
+
+## Settings clients (#300 / #301)
+
+Web Settings and the native Settings form show server history, details, streams
+and photo metadata independently from browser/device downloads. The main
+screen uses compact status rows; detailed counts and run explanations expand
+on web and open native destinations on iOS. Web account, display and about
+settings have separate tabs. The screens do not
+infer server totals from locally loaded activities. Terminal stream failures
+are labelled “Needs attention” even when the server has no runnable work.
+The former web Repair/Photos/Clean table is no longer part of Settings.
+
+Details and streams show coverage bars over the activities already imported;
+streams count successful empty results as checked. History has no percentage
+because discovery may not know the total. Photo coverage counts distinct
+activities with at least one stored photo, within the activities Strava reports
+as having photos. The optional `activitiesWithStoredPhotos` field is independent
+of photo freshness and of the number of individual photos; older servers omit
+it and clients show no photo percentage. A 100% photo bar means every activity
+in that population has at least one photo available, not that every individual
+photo has been fetched. No bar is shown for an empty population.
+
+
+Status requests run only while Settings is visible, at least 60 seconds apart,
+with server Retry-After deadlines respected. Both clients retain the observation
+time and label snapshots older than two minutes, or viewed offline, as last
+known state. iOS persists only the typed snapshot and next-check deadline under
+the existing deployment/account scope. Cancellation and account changes fence
+late responses. A missing or incompatible endpoint leaves coverage unknown.
+
+Browser download state comes from OfflineSyncProvider, including the last
+successful persisted sync, safe failures, offline state and a bounded retry.
+iOS continues to use SyncController and its authorized cache and recovery rules;
+pausing/downloading explicitly affects this device only.
+
+`shared/ingestion-client-expectations.v1.json` defines matching web/iOS wording
+for all shared status fixtures. Node presentation tests and native
+`IngestionStatusTests` compare every scenario; native tests also cover cache
+scoping, late responses, rejected sessions and persisted retry deadlines.
+`RenderedIngestionStatusTests` exercises phone, dark, large Dynamic Type and iPad
+layouts with fixture data. Physical-device and manual VoiceOver certification
+remain separate checks; these tests do not certify either.
+
+
+## Photo catch-up and legacy data
+
+Migration `0018_photo-catch-up` adds attempt and hourly-run ledgers only.
+Migration `0019_photo-account-block` adds a credential-block ledger keyed by
+Strava account; both are additive and ship ahead of this application change. It
+neither deletes existing photos nor marks legacy collections verified from
+matching counts. Stored photos remain usable immediately, independently of
+`photos_state`. Catch-up prioritizes activities without stored photos, then
+verifies existing collections; it requests photo metadata directly without
+refetching details or downloading image binaries.
+
+All detail-fetch callers reconcile photos, including historical enrichment.
+A detailed response with both photo counts explicitly zero is authoritative
+for removal; otherwise photos are fetched, including non-GPS activities and
+unknown/conflicting counts. Explicit user refreshes always check the photo
+endpoint. Successful responses replace the collection and mark it current in
+one transaction with the sync change feed. Failed requests preserve photos,
+mark the collection pending, and leave independent photo catch-up work. A
+history summary count change queues photos without invalidating activity
+details. Detail confirmations from history reconciliation also queue photos
+when they have not fetched the collection themselves.
+
+`POST /api/cron/backfill-activity-photos` requires the cron secret and production
+external effects. Photo catch-up and its hourly workflow are enabled by default
+in production; no additional Vercel or GitHub opt-in is required. Setting
+`ACTIVITYMAP_PHOTO_BACKFILL=disabled` in Vercel pauses the endpoint; setting the
+GitHub repository variable of that name to `disabled` pauses the scheduled step.
+An absent switch leaves catch-up enabled. The cron and Settings use the same
+server configuration check, including the external-effects guard.
+It has a durable cap of five
+activity selections and twelve requests per UTC hour, including both image
+sizes and OAuth requests, and uses the shared Strava budget with background
+reserves. Repeated dispatches cannot reset those caps. Failed collections back
+off from one hour to a maximum of 24 hours. Account credential rejections block
+all photo work for that grant until refresh or reconnect changes it; Settings
+reports that as requiring reconnection. Quota and credential errors do not add
+activity retry delays. Parallel photo sizes share one token refresh.
+Leases recover after crashes; late
+responses cannot publish after an activity update, deletion, grant change or
+account revocation. Existing photo rows and their metadata are never cleared
+because a request failed.
+
+Enabling photo catch-up is part of the Settings rollout, not a separate
+follow-up. Complete the rollout in this order:
+
+1. Run `pnpm db:test-photo-backfill` against guarded local Postgres and verify
+   the Preview migration/build.
+2. Apply migrations through 0019 using the existing Production migration
+   workflow, and confirm that no migrations remain pending for the release.
+3. Deploy the dependent code. Photo catch-up starts with the hourly workflow
+   automatically, unless an operator has explicitly set either pause switch to
+   `disabled`. No new environment variable is needed for the normal rollout.
+4. Dispatch `gh workflow run reconcile-strava-summaries.yml --ref main` and
+   inspect the photo step's result and the ingestion status in Settings. A
+   successful skipped or disabled step does not verify catch-up. Confirm an
+   enabled run, its selected/fetched counts and stop reason, and that Settings
+   reflects the resulting photo coverage and remaining refresh work.
+
+The rollout is complete only after photo catch-up is enabled and its first
+production run is verified. Keep the fixed five-activity/twelve-request hourly
+cap; inspect results before considering larger limits. To pause scheduled
+catch-up, set the GitHub variable to `disabled`. To disable the endpoint as
+well, set the Vercel Production variable to `disabled` and redeploy.
+To resume, remove the pause switches (or set them to `enabled`); redeploy after
+changing the Vercel environment. The next hourly workflow resumes catch-up.
+
+Preview never runs this production cron; the database proof injects a fake
+Strava source to exercise failure and deletion cases without touching Strava.

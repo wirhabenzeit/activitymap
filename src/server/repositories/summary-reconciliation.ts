@@ -193,9 +193,8 @@ export function mergeSummaryActivity(
         ? 'summary'
         : 'refresh_required'
       : priorGeometryState,
-    photosState: photosChanged
-      ? 'refresh_required'
-      : (existing.photosState ?? incoming.photosState),
+    // An unchanged summary cannot verify a legacy photo collection.
+    photosState: photosChanged ? 'refresh_required' : existing.photosState,
     lastSummarySeenAt: observedAt,
     lastDetailedFetchedAt: existing.lastDetailedFetchedAt,
     // Keep the legacy web signal coherent until #126 removes its consumers.
@@ -220,9 +219,11 @@ function mergeConfirmedDetail(
 
   return {
     ...incoming,
-    photosState: photosChanged
-      ? 'refresh_required'
-      : (existing?.photosState ?? incoming.photosState),
+    // This confirmation fetched details only; the photo worker must follow up.
+    photosState:
+      photosChanged || incoming.photosState !== 'current'
+        ? 'refresh_required'
+        : existing ? existing.photosState : incoming.photosState,
     lastSummarySeenAt: scanStartedAt,
   };
 }

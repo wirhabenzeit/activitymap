@@ -12,8 +12,10 @@ export const fetchActivitiesSchema = z.object({
     page: z.number().optional(),
     per_page: z.number().optional(),
     activityIds: z.array(z.number()).optional(),
+    // Legacy input compatibility: details always reconcile photos; lists do not.
     includePhotos: z.boolean().default(false),
     athleteId: z.number(),
+    // Authoritative detail photo responses now always replace the stored set.
     shouldDeletePhotos: z.boolean().default(false),
     limit: z.number().default(50),
     // Whether this call should itself persist the fetched activities/photos

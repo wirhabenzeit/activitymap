@@ -1,6 +1,7 @@
 import { deriveIngestionStatus } from '~/server/application/ingestion-status';
 import { resolveActor } from '~/server/auth/actor';
 import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
+import { photoBackfillEnabled } from '~/server/config/photo-backfill';
 import { logger } from '~/server/logging/logger';
 import { ingestionStatusRepository } from '~/server/repositories/ingestion-status';
 import { withApiV1Observability } from '~/server/api/observability';
@@ -21,13 +22,16 @@ export const GET = withApiV1Observability(
             observedAt,
           ),
           {
-            // The server-side rollout switch the backfill cron also checks.
+            photoBackfillEnabled: photoBackfillEnabled(),
             streamBackfillEnabled:
               process.env.ACTIVITYMAP_STREAM_BACKFILL === 'enabled',
           },
         ),
       onError: (error, requestId) => {
-        logger.error('GET /api/v1/ingestion-status failed', { error, requestId });
+        logger.error('GET /api/v1/ingestion-status failed', {
+          error,
+          requestId,
+        });
       },
     }),
     { route: ROUTE, resolveUserId: resolveRateLimitUserId },

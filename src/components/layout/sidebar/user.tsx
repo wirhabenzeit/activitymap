@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronsUpDown, LogOut, Loader2, Info } from 'lucide-react';
+import { ChevronsUpDown, LogOut, Loader2, Info, Settings2 } from 'lucide-react';
 
 import { signOut } from '~/lib/auth-client';
 import { displayEmail, safeReturnPath } from '~/lib/auth-return';
@@ -203,8 +203,8 @@ export function UserSettings() {
               onClick={() => setSettingsOpen(true)}
               className="cursor-pointer"
             >
-              <Info className="mr-2 h-4 w-4" />
-              Settings & Status
+              <Settings2 className="mr-2 h-4 w-4" />
+              Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {isDevelopment && (

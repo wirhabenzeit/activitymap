@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+import {
+  updateBrowserSyncStatus,
+  useBrowserSyncStatus,
+} from '~/lib/sync/browser-status';
+import { SyncApiError } from '~/lib/sync/v1-client';
+import { getV1SyncState } from '~/lib/sync/v1-store';
 import { deleteLegacyOfflineDatabase } from '~/lib/sync/v1-store';
 import { runV1Sync } from '~/lib/sync/v1-sync';
 import { useShallowStore } from '~/store';
@@ -40,37 +46,63 @@ export function OfflineSyncProvider() {
 
   const runSync = useCallback(() => {
     if (!isInitialized || isGuest || !userId) return;
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-    if (inFlightRef.current?.userId === userId) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      updateBrowserSyncStatus(userId, { phase: 'offline' });
+      return;
+    }
+    const retryAt = useBrowserSyncStatus.getState().byUser[userId]?.retryAt;
+    if (retryAt && retryAt > Date.now()) return;
+    if (
+      inFlightRef.current?.userId === userId &&
+      !inFlightRef.current.controller.signal.aborted
+    )
+      return;
+    const preceding = inFlightRef.current?.promise;
     inFlightRef.current?.controller.abort();
 
     const scope = `auth:${userId}`;
     const controller = new AbortController();
     const token = Symbol(userId);
-    const promise = runV1Sync({
-      scope,
-      signal: controller.signal,
-      onScopeReset: () => reloadStreamSummaryScope(queryClient, userId),
-      onActivityChanges: async (changes) => {
-        for (const change of changes) {
-          if (change.operation === 'delete') {
-            await removeStreamSummaryActivity(
-              queryClient,
-              userId,
-              change.activityId,
-            );
-          } else {
-            await reconcileStreamSummaryMetadata(
-              queryClient,
-              userId,
-              change.activityId,
-              change.metadata,
-            );
-          }
-        }
-      },
-    })
+    updateBrowserSyncStatus(userId, {
+      phase: 'syncing',
+      error: null,
+      retryAt: null,
+    });
+    // Let an aborted pass finish its pending cache writes before starting another.
+    const promise = Promise.resolve(preceding)
+      .then(() => {
+        controller.signal.throwIfAborted();
+        return runV1Sync({
+          scope,
+          signal: controller.signal,
+          onScopeReset: () => reloadStreamSummaryScope(queryClient, userId),
+          onActivityChanges: async (changes) => {
+            for (const change of changes) {
+              if (change.operation === 'delete') {
+                await removeStreamSummaryActivity(
+                  queryClient,
+                  userId,
+                  change.activityId,
+                );
+              } else {
+                await reconcileStreamSummaryMetadata(
+                  queryClient,
+                  userId,
+                  change.activityId,
+                  change.metadata,
+                );
+              }
+            }
+          },
+        });
+      })
       .then(async () => {
+        if (controller.signal.aborted) return;
+        updateBrowserSyncStatus(userId, {
+          phase: 'ready',
+          lastSuccess: new Date().toISOString(),
+          error: null,
+        });
         const cleanup = await deleteLegacyOfflineDatabase();
         if (cleanup === 'blocked' || cleanup === 'failed') {
           console.warn(
@@ -79,7 +111,15 @@ export function OfflineSyncProvider() {
         }
       })
       .catch((error: unknown) => {
-        console.error('v1 sync failed:', error);
+        if (controller.signal.aborted) return;
+        updateBrowserSyncStatus(userId, {
+          phase: navigator.onLine ? 'error' : 'offline',
+          error:
+            error instanceof SyncApiError && error.status === 401
+              ? 'Sign in again to download ActivityMap changes.'
+              : 'Could not download ActivityMap changes. Your cached data remains available; retry when connected.',
+          retryAt: error instanceof SyncApiError ? error.retryAt : null,
+        });
       })
       .finally(() => {
         if (inFlightRef.current?.token === token) {
@@ -92,7 +132,7 @@ export function OfflineSyncProvider() {
   useEffect(() => {
     const previous = previousUserIdRef.current;
     previousUserIdRef.current = !isGuest ? userId : undefined;
-    if (previous && previous !== userId) {
+    if (previous && (previous !== userId || isGuest)) {
       inFlightRef.current?.controller.abort();
       void removeStreamSummaryScope(queryClient, previous);
     }
@@ -100,7 +140,29 @@ export function OfflineSyncProvider() {
 
   useEffect(() => {
     runSync();
+    return () => {
+      inFlightRef.current?.controller.abort();
+    };
   }, [runSync]);
+
+  useEffect(() => {
+    if (!userId || isGuest) return;
+    let cancelled = false;
+    void getV1SyncState(`auth:${userId}`)
+      .then((state) => {
+        if (
+          !cancelled &&
+          state?.lastSyncAt &&
+          !useBrowserSyncStatus.getState().byUser[userId]?.lastSuccess
+        ) {
+          updateBrowserSyncStatus(userId, { lastSuccess: state.lastSyncAt });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, isGuest]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -108,11 +170,19 @@ export function OfflineSyncProvider() {
     const handleOnline = () => {
       runSync();
     };
+    const handleOffline = () => {
+      if (userId && !isGuest)
+        updateBrowserSyncStatus(userId, { phase: 'offline' });
+    };
     window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('activitymap:retry-browser-sync', runSync);
     return () => {
       window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('activitymap:retry-browser-sync', runSync);
     };
-  }, [runSync]);
+  }, [runSync, userId, isGuest]);
 
   return null;
 }

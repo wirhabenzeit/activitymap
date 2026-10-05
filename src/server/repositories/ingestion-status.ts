@@ -11,6 +11,8 @@ import {
   backgroundJobRuns,
   ingestionOutcomes,
   photos,
+  photoFetchAttempts,
+  photoBackfillAccounts,
   stravaSummaryReconciliations,
   streamBackfillAccounts,
   streamBackfillAttempts,
@@ -18,8 +20,15 @@ import {
   type BackgroundJobRun,
   type IngestionOutcomeRow,
 } from '~/server/db/schema';
-import type { IngestionJob, IngestionPipeline } from '~/server/strava/ingestion-policy';
+import type {
+  IngestionJob,
+  IngestionPipeline,
+} from '~/server/strava/ingestion-policy';
 import { detailEnrichmentPending } from './ingestion';
+import {
+  photoRefreshPending,
+  photoCredentialFingerprint,
+} from './photo-backfill';
 
 type DrizzleDb = typeof defaultDb;
 
@@ -37,6 +46,7 @@ export type IngestionSnapshot = {
     updatedAt: Date | null;
     /** Strava rejected the current credentials for stream backfill. */
     streamCredentialsBlocked: boolean;
+    photoCredentialsBlocked?: 'unauthorized' | 'credentials_unavailable' | null;
   };
   history: {
     lastSummaryReconciledAt: Date | null;
@@ -59,10 +69,14 @@ export type IngestionSnapshot = {
   };
   photos: {
     activitiesWithPhotos: number;
+    activitiesWithStoredPhotos: number;
     current: number;
     refreshRequired: number;
     unknown: number;
     photoCount: number;
+    pendingRefreshes?: number;
+    retryWaiting?: number;
+    nextRetryAt?: Date | null;
   };
   streams: {
     withData: number;
@@ -83,7 +97,9 @@ export type IngestionSnapshot = {
 const count = (condition: ReturnType<typeof sql>) =>
   sql<number>`count(*) filter (where ${condition})::integer`;
 
-export function createIngestionStatusRepository(database: DrizzleDb = defaultDb) {
+export function createIngestionStatusRepository(
+  database: DrizzleDb = defaultDb,
+) {
   /**
    * Partition every activity by stream state, using the same `needsFetch`,
    * terminal-generation and retry rules as the backfill selector. Only
@@ -122,9 +138,10 @@ export function createIngestionStatusRepository(database: DrizzleDb = defaultDb)
           sql`${needsFetch} and not ${terminal} and ${retryAt} is null`,
         ),
         invalidated: count(sql`${activityStreams.invalidatedAt} is not null`),
-        nextRetryAt: sql<Date | null>`min(${retryAt}) filter (where ${needsFetch} and not ${terminal})`.mapWith(
-          activityStreams.nextRetryAt,
-        ),
+        nextRetryAt:
+          sql<Date | null>`min(${retryAt}) filter (where ${needsFetch} and not ${terminal})`.mapWith(
+            activityStreams.nextRetryAt,
+          ),
       })
       .from(activities)
       .leftJoin(activityStreams, eq(activityStreams.activityId, activities.id))
@@ -159,6 +176,7 @@ export function createIngestionStatusRepository(database: DrizzleDb = defaultDb)
         streams,
         outcomeRows,
         jobRows,
+        [photoQueue],
       ] = await Promise.all([
         database
           .select({
@@ -170,8 +188,15 @@ export function createIngestionStatusRepository(database: DrizzleDb = defaultDb)
             // Same fingerprint as stream backfill's account block.
             streamCredentialsBlocked: sql<boolean>`coalesce(${streamBackfillAccounts.blockedCredentials}
               = concat_ws('|', ${accounts.accessTokenExpiresAt}, ${accounts.expiresAt}, ${accounts.expires_at}, ${accounts.updatedAt}), false)`,
+            photoCredentialsBlocked: sql<
+              'unauthorized' | 'credentials_unavailable' | null
+            >`case when ${photoBackfillAccounts.blockedCredentials} = ${photoCredentialFingerprint} then ${photoBackfillAccounts.reason} end`,
           })
           .from(accounts)
+          .leftJoin(
+            photoBackfillAccounts,
+            eq(photoBackfillAccounts.accountId, accounts.id),
+          )
           .leftJoin(
             streamBackfillAccounts,
             eq(streamBackfillAccounts.userId, accounts.userId),
@@ -192,28 +217,39 @@ export function createIngestionStatusRepository(database: DrizzleDb = defaultDb)
         database
           .select({
             total: sql<number>`count(*)::integer`,
-            oldestStartDate: sql<Date | null>`min(${activities.start_date})`.mapWith(
-              activities.start_date,
-            ),
-            newestStartDate: sql<Date | null>`max(${activities.start_date})`.mapWith(
-              activities.start_date,
-            ),
+            oldestStartDate:
+              sql<Date | null>`min(${activities.start_date})`.mapWith(
+                activities.start_date,
+              ),
+            newestStartDate:
+              sql<Date | null>`max(${activities.start_date})`.mapWith(
+                activities.start_date,
+              ),
             detailed: count(sql`${activities.geometryState} = 'detailed'`),
             neverDetailed: count(sql`${activities.geometryState} = 'summary'`),
             invalidated: count(
               sql`${activities.geometryState} = 'refresh_required'`,
             ),
             detailRetryWaiting: count(pendingRetry),
-            detailNextRetryAt: sql<Date | null>`min(${detailAttempts.nextAttemptAt}) filter (where ${pendingRetry})`.mapWith(
-              detailAttempts.nextAttemptAt,
-            ),
+            detailNextRetryAt:
+              sql<Date | null>`min(${detailAttempts.nextAttemptAt}) filter (where ${pendingRetry})`.mapWith(
+                detailAttempts.nextAttemptAt,
+              ),
           })
           .from(activities)
-          .leftJoin(detailAttempts, eq(detailAttempts.activityId, activities.id))
+          .leftJoin(
+            detailAttempts,
+            eq(detailAttempts.activityId, activities.id),
+          )
           .where(eq(activities.athlete, athleteId)),
         database
           .select({
             activitiesWithPhotos: sql<number>`count(*)::integer`,
+            activitiesWithStoredPhotos: count(sql`exists (
+              select 1 from ${photos}
+              where ${photos.activity_id} = ${activities.id}
+                and ${photos.athlete_id} = ${athleteId}
+            )`),
             current: count(sql`${activities.photosState} = 'current'`),
             refreshRequired: count(
               sql`${activities.photosState} = 'refresh_required'`,
@@ -234,6 +270,23 @@ export function createIngestionStatusRepository(database: DrizzleDb = defaultDb)
           .from(ingestionOutcomes)
           .where(eq(ingestionOutcomes.userId, userId)),
         database.select().from(backgroundJobRuns),
+        database
+          .select({
+            pendingRefreshes: count(photoRefreshPending),
+            retryWaiting: count(
+              sql`${photoRefreshPending} and ${photoFetchAttempts.nextAttemptAt} > ${now}::timestamp`,
+            ),
+            nextRetryAt:
+              sql<Date | null>`min(${photoFetchAttempts.nextAttemptAt}) filter (where ${photoRefreshPending} and ${photoFetchAttempts.nextAttemptAt} > ${now}::timestamp)`.mapWith(
+                photoFetchAttempts.nextAttemptAt,
+              ),
+          })
+          .from(activities)
+          .leftJoin(
+            photoFetchAttempts,
+            eq(photoFetchAttempts.activityId, activities.id),
+          )
+          .where(eq(activities.athlete, athleteId)),
       ]);
 
       return {
@@ -242,6 +295,7 @@ export function createIngestionStatusRepository(database: DrizzleDb = defaultDb)
           connected: account?.connected ?? false,
           updatedAt: account?.updatedAt ?? null,
           streamCredentialsBlocked: account?.streamCredentialsBlocked ?? false,
+          photoCredentialsBlocked: account?.photoCredentialsBlocked ?? null,
         },
         history: {
           lastSummaryReconciledAt: user?.lastSummaryReconciledAt ?? null,
@@ -257,12 +311,16 @@ export function createIngestionStatusRepository(database: DrizzleDb = defaultDb)
           detailRetryWaiting: 0,
           detailNextRetryAt: null,
         },
-        photos: photoCounts ?? {
-          activitiesWithPhotos: 0,
-          current: 0,
-          refreshRequired: 0,
-          unknown: 0,
-          photoCount: 0,
+        photos: {
+          ...photoQueue,
+          ...(photoCounts ?? {
+            activitiesWithPhotos: 0,
+            activitiesWithStoredPhotos: 0,
+            current: 0,
+            refreshRequired: 0,
+            unknown: 0,
+            photoCount: 0,
+          }),
         },
         streams,
         outcomes: Object.fromEntries(

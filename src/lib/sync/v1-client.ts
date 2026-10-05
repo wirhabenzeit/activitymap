@@ -12,6 +12,7 @@
  * anything into IndexedDB; callers apply the pages it returns.
  */
 
+import { retryDeadline } from './retry-deadline';
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
 import {
@@ -36,6 +37,7 @@ const defaultFetch: FetchLike = (input, init) => fetch(input, init);
  * for a response whose body does not match the expected envelope/DTO shape.
  */
 export class SyncApiError extends Error {
+  retryAt: number | null = null;
   readonly status: number;
   readonly code: string;
   readonly requestId: string | null;
@@ -72,13 +74,16 @@ export class SyncApiError extends Error {
  */
 export class SyncRebootstrapRequiredError extends SyncApiError {
   constructor(options: { requestId: string | null; details?: unknown }) {
-    super('The sync cursor is no longer valid; a full re-bootstrap is required.', {
-      status: 409,
-      code: 'sync_rebootstrap_required',
-      requestId: options.requestId,
-      retryable: false,
-      details: options.details,
-    });
+    super(
+      'The sync cursor is no longer valid; a full re-bootstrap is required.',
+      {
+        status: 409,
+        code: 'sync_rebootstrap_required',
+        requestId: options.requestId,
+        retryable: false,
+        details: options.details,
+      },
+    );
     this.name = 'SyncRebootstrapRequiredError';
   }
 }
@@ -95,6 +100,16 @@ async function requestJson(
     headers: { Accept: 'application/json' },
   });
   const body: unknown = await response.json().catch(() => null);
+  if (response.status === 429 || response.status === 503) {
+    try {
+      throwForErrorBody(response.status, body);
+    } catch (error) {
+      if (error instanceof SyncApiError) {
+        error.retryAt = retryDeadline(response.headers);
+      }
+      throw error;
+    }
+  }
   return { status: response.status, body };
 }
 
@@ -142,12 +157,21 @@ export async function fetchSyncBootstrapPage(
   options: { signal?: AbortSignal; fetchImpl?: FetchLike } = {},
 ): Promise<SyncBootstrapPageDTO> {
   const fetchImpl = options.fetchImpl ?? defaultFetch;
-  const url = new URL('/api/v1/sync/bootstrap', globalThis.location?.origin ?? 'http://localhost');
+  const url = new URL(
+    '/api/v1/sync/bootstrap',
+    globalThis.location?.origin ?? 'http://localhost',
+  );
   url.searchParams.set('resource', params.resource ?? 'activities');
-  if (params.cursor !== undefined) url.searchParams.set('cursor', params.cursor);
-  if (params.limit !== undefined) url.searchParams.set('limit', String(params.limit));
+  if (params.cursor !== undefined)
+    url.searchParams.set('cursor', params.cursor);
+  if (params.limit !== undefined)
+    url.searchParams.set('limit', String(params.limit));
 
-  const { status, body } = await requestJson(fetchImpl, url.pathname + url.search, options.signal);
+  const { status, body } = await requestJson(
+    fetchImpl,
+    url.pathname + url.search,
+    options.signal,
+  );
   if (status < 200 || status >= 300) throwForErrorBody(status, body);
 
   const envelope = responseEnvelope(syncBootstrapPageDTOSchema).parse(body);
@@ -169,11 +193,19 @@ export async function fetchSyncChangesPage(
   options: { signal?: AbortSignal; fetchImpl?: FetchLike } = {},
 ): Promise<SyncChangesPageDTO> {
   const fetchImpl = options.fetchImpl ?? defaultFetch;
-  const url = new URL('/api/v1/sync/changes', globalThis.location?.origin ?? 'http://localhost');
+  const url = new URL(
+    '/api/v1/sync/changes',
+    globalThis.location?.origin ?? 'http://localhost',
+  );
   url.searchParams.set('cursor', params.cursor);
-  if (params.limit !== undefined) url.searchParams.set('limit', String(params.limit));
+  if (params.limit !== undefined)
+    url.searchParams.set('limit', String(params.limit));
 
-  const { status, body } = await requestJson(fetchImpl, url.pathname + url.search, options.signal);
+  const { status, body } = await requestJson(
+    fetchImpl,
+    url.pathname + url.search,
+    options.signal,
+  );
   if (status < 200 || status >= 300) throwForErrorBody(status, body);
 
   const envelope = responseEnvelope(syncChangesPageDTOSchema).parse(body);
@@ -226,7 +258,10 @@ export async function drainSyncChanges(
   let pagesApplied = 0;
 
   for (;;) {
-    const page = await fetchSyncChangesPage({ cursor: current, limit: options.limit }, options);
+    const page = await fetchSyncChangesPage(
+      { cursor: current, limit: options.limit },
+      options,
+    );
     if (page.items.length === 0) {
       return { nextCursor: page.nextCursor, pagesApplied };
     }

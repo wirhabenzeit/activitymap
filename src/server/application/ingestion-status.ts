@@ -108,7 +108,7 @@ function credentialBlock(
  */
 export function deriveIngestionStatus(
   snapshot: IngestionSnapshot,
-  options: { streamBackfillEnabled: boolean },
+  options: { streamBackfillEnabled: boolean; photoBackfillEnabled?: boolean },
 ): IngestionStatusDTO {
   const now = snapshot.observedAt;
   const { activities, photos, streams, history } = snapshot;
@@ -147,8 +147,9 @@ export function deriveIngestionStatus(
         ? 'complete'
         : 'not_started';
 
-  // --- Photos: no automatic job refreshes stale photo metadata today ---
-  const stalePhotos = photos.refreshRequired + photos.unknown;
+  // --- Photos: availability and queued verification are independent ---
+  const stalePhotos =
+    photos.pendingRefreshes ?? photos.refreshRequired + photos.unknown;
 
   // --- Streams ---
   const streamBlocked =
@@ -212,13 +213,27 @@ export function deriveIngestionStatus(
     },
     photos: {
       progress:
-        stalePhotos === 0
+        photos.activitiesWithStoredPhotos === photos.activitiesWithPhotos
           ? 'complete'
-          : photos.current > 0
+          : photos.activitiesWithStoredPhotos > 0
             ? 'in_progress'
             : 'not_started',
-      ...(stalePhotos === 0 ? schedule('idle') : schedule('not_scheduled')),
+      ...(stalePhotos === 0
+        ? schedule('idle')
+        : (credentialBlock(snapshot, undefined) ??
+          (snapshot.account.photoCredentialsBlocked
+            ? schedule('blocked', snapshot.account.photoCredentialsBlocked)
+            : null) ??
+          (options.photoBackfillEnabled === undefined
+            ? schedule('not_scheduled')
+            : fromJob(
+                job('backfill-activity-photos', options.photoBackfillEnabled),
+              )) ??
+          (photos.retryWaiting === stalePhotos
+            ? schedule('waiting', 'photo_refresh_failed', photos.nextRetryAt)
+            : schedule('scheduled')))),
       activitiesWithPhotos: photos.activitiesWithPhotos,
+      activitiesWithStoredPhotos: photos.activitiesWithStoredPhotos,
       current: photos.current,
       refreshRequired: photos.refreshRequired,
       unknown: photos.unknown,
@@ -239,7 +254,9 @@ export function deriveIngestionStatus(
         : streamBlocked
           ? schedule(
               'blocked',
-              snapshot.account.connected ? 'unauthorized' : 'credentials_unavailable',
+              snapshot.account.connected
+                ? 'unauthorized'
+                : 'credentials_unavailable',
             )
           : (fromJob(
               job('backfill-activity-streams', options.streamBackfillEnabled),

@@ -16,15 +16,13 @@ struct AccountSheet: View {
     var body: some View {
         NavigationStack {
             TimelineView(.periodic(from: .now, by: 5)) { _ in
-                Form {
-                    switch destination {
-                    case .profile:
-                        profileContent
-                    case .settings:
-                        settingsContent
-                    case .about:
-                        aboutContent
-                    }
+                switch destination {
+                case .profile:
+                    accountPage
+                case .settings:
+                    Form { settingsContent }
+                case .about:
+                    aboutPage
                 }
             }
             .navigationTitle(title)
@@ -36,13 +34,27 @@ struct AccountSheet: View {
             }
         }
         .preferredColorScheme(preferences.appearance.colorScheme)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .onAppear {
             if openedForLogin == nil { openedForLogin = destination == .profile && auth.currentUser == nil }
         }
         .onChange(of: auth.status) { _, status in
             if case .signedIn = status, openedForLogin == true { dismiss() }
         }
+    }
+
+    // Section content must be hosted in a Form at each navigation destination.
+    // A bare Group loses the list layout when pushed from Settings.
+    var accountPage: some View {
+        Form { profileContent }
+            .navigationTitle("Account")
+            .navigationBarTitleDisplayMode(.inline)
+    }
+
+    var aboutPage: some View {
+        Form { aboutContent }
+            .navigationTitle("About ActivityMap")
+            .navigationBarTitleDisplayMode(.inline)
     }
 
     @ViewBuilder
@@ -119,19 +131,9 @@ struct AccountSheet: View {
 
             Section("Connected Services") {
                 LabeledContent("Strava", value: user.stravaConnected ? "Connected" : "Not Connected")
-                if let athleteID = user.athleteID {
-                    LabeledContent("Athlete ID", value: athleteID)
-                }
-            }
-
-            if !user.stravaConnected || user.authentication.sessionExpiresAt <= Date() {
-                Section {
-                    StravaConnectControls()
-                        .frame(maxWidth: .infinity)
-                        .listRowBackground(Color.clear)
-                } header: {
-                    Text(user.stravaConnected ? "Sign-in expired" : "Strava is disconnected")
-                }
+                StravaConnectControls()
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
             }
 
             Section {
@@ -190,6 +192,19 @@ struct AccountSheet: View {
 
     private var settingsContent: some View {
         Group {
+            Section("Account") {
+                NavigationLink { accountPage } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(auth.currentUser?.name ?? "Account")
+                            Text(auth.currentUser == nil ? "Sign in with Strava" : auth.currentUser?.stravaConnected == true ? "Strava connected" : "Reconnect Strava")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: { Image(systemName: "person.crop.circle") }
+                }
+                .accessibilityIdentifier("settings-account")
+            }
+            if let session = sync?.session { IngestionStatusSection(session: session) }
             syncContent
 
             Section {
@@ -211,19 +226,20 @@ struct AccountSheet: View {
             } header: { Text("Display") } footer: {
                 Text("Distance, elevation and speed use \(preferences.units == .metric ? "kilometres, metres and km/h" : "miles, feet and mph"). Preferences are saved on this device.")
             }
+            Section("About") {
+                NavigationLink("About ActivityMap") { aboutPage }
+                    .accessibilityIdentifier("settings-about")
+            }
         }
     }
 
     @ViewBuilder
     private var syncContent: some View {
         if let sync {
-            Section("Activity Data") {
-                Text(sync.status.title)
+            Section {
+                Text(sync.status == .ready ? "Device download complete" : sync.status.title)
                 if let lastSync = sync.checkpoint?.lastSyncAt {
-                    LabeledContent("Last synced") { Text(lastSync, style: .relative) }
-                }
-                if let reconciled = sync.checkpoint?.freshness?.lastSummaryReconciledAt {
-                    LabeledContent("Strava last checked") { Text(reconciled, style: .relative) }
+                    LabeledContent("Last device download") { Text(lastSync, style: .relative) }
                 }
                 if case .failed(let message) = sync.status {
                     Text(message).font(.footnote).foregroundStyle(.secondary)
@@ -231,24 +247,24 @@ struct AccountSheet: View {
                 if let date = sync.retryNotBefore {
                     LabeledContent("Retry after") { Text(date, style: .time) }
                 }
-                NavigationLink("Sync Details") {
+                NavigationLink("Download details") {
                     BrowsingSyncDetails(presentation: BrowsingPresentation(store: sync.activities, sync: sync),
                                         failureMessage: syncFailureMessage, recover: recoverSync)
-                        .navigationTitle("Sync Details")
+                        .navigationTitle("Device download")
                         .navigationBarTitleDisplayMode(.inline)
                 }
                 if sync.status == .syncing {
-                    Button("Pause Sync") { sync.pause() }
+                    Button("Pause device download") { sync.pause() }
                 }
                 if let refresh, sync.session != nil {
                     Button {
                         Task { await refresh() }
                     } label: {
-                        Label("Refresh Activities", systemImage: "arrow.clockwise")
+                        Label("Sync this device", systemImage: "arrow.clockwise")
                     }
                         .disabled(!sync.canRefresh)
                 }
-            }
+            } header: { Text("This device") } footer: { Text("ActivityMap → this device. Server import continues independently.") }
         }
     }
 
@@ -283,7 +299,7 @@ struct AccountSheet: View {
 
     private var title: String {
         switch destination {
-        case .profile: "Profile"
+        case .profile: "Account"
         case .settings: "Settings"
         case .about: "About"
         }

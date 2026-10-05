@@ -37,7 +37,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "withData": 0,
@@ -134,7 +135,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "progress": "not_started",
@@ -183,7 +185,8 @@
           "current": 100,
           "refreshRequired": 15,
           "unknown": 5,
-          "photoCount": 410
+          "photoCount": 410,
+          "activitiesWithStoredPhotos": 110
         },
         "streams": {
           "withData": 400,
@@ -295,7 +298,8 @@
           "current": 100,
           "refreshRequired": 15,
           "unknown": 5,
-          "photoCount": 410
+          "photoCount": 410,
+          "activitiesWithStoredPhotos": 110
         },
         "streams": {
           "progress": "in_progress",
@@ -344,7 +348,8 @@
           "current": 12,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 31
+          "photoCount": 31,
+          "activitiesWithStoredPhotos": 12
         },
         "streams": {
           "withData": 200,
@@ -456,7 +461,8 @@
           "current": 12,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 31
+          "photoCount": 31,
+          "activitiesWithStoredPhotos": 12
         },
         "streams": {
           "progress": "complete",
@@ -505,7 +511,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "withData": 297,
@@ -602,7 +609,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "progress": "complete",
@@ -651,7 +659,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "withData": 300,
@@ -748,7 +757,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "progress": "in_progress",
@@ -797,7 +807,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "withData": 300,
@@ -894,7 +905,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "progress": "in_progress",
@@ -947,7 +959,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "withData": 640,
@@ -1044,7 +1057,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "progress": "in_progress",
@@ -1093,7 +1107,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "withData": 0,
@@ -1158,7 +1173,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "progress": "not_started",
@@ -1207,7 +1223,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "withData": 100,
@@ -1288,7 +1305,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "progress": "in_progress",
@@ -1337,7 +1355,8 @@
           "current": 6,
           "refreshRequired": 3,
           "unknown": 0,
-          "photoCount": 20
+          "photoCount": 20,
+          "activitiesWithStoredPhotos": 8
         },
         "streams": {
           "withData": 90,
@@ -1434,7 +1453,8 @@
           "current": 6,
           "refreshRequired": 3,
           "unknown": 0,
-          "photoCount": 20
+          "photoCount": 20,
+          "activitiesWithStoredPhotos": 8
         },
         "streams": {
           "progress": "complete",
@@ -1484,7 +1504,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "withData": 40,
@@ -1565,7 +1586,8 @@
           "current": 0,
           "refreshRequired": 0,
           "unknown": 0,
-          "photoCount": 0
+          "photoCount": 0,
+          "activitiesWithStoredPhotos": 0
         },
         "streams": {
           "progress": "in_progress",

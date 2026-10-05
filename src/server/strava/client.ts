@@ -132,6 +132,7 @@ export class StravaClient {
   private signal?: AbortSignal;
   private beforeRequest?: () => Promise<void>;
   private refreshToken?: string;
+  private tokenRefreshPromise?: Promise<StravaTokens>;
   private clientId: string;
   private clientSecret: string;
   private tokenRefreshCallback?: (tokens: StravaTokens) => Promise<void>;
@@ -249,6 +250,19 @@ export class StravaClient {
    * Refresh the access token using the refresh token
    */
   async refreshAccessToken(): Promise<StravaTokens> {
+    // Photo sizes are requested in parallel. Both must use the same refresh
+    // and persistence callback, or one can invalidate the other's grant claim.
+    if (this.tokenRefreshPromise) return this.tokenRefreshPromise;
+    const refresh = this.performTokenRefresh();
+    this.tokenRefreshPromise = refresh;
+    try {
+      return await refresh;
+    } finally {
+      this.tokenRefreshPromise = undefined;
+    }
+  }
+
+  private async performTokenRefresh(): Promise<StravaTokens> {
     if (!this.refreshToken) {
       throw new Error('No refresh token available');
     }

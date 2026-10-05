@@ -25,10 +25,10 @@ export function DisplaySettings() {
       <h2 id="display-settings-title" className="font-semibold">
         Display
       </h2>
-      <label className="flex items-center justify-between gap-4">
+      <label className="flex flex-wrap items-center justify-between gap-4">
         Appearance
         <select
-          className="rounded-md border bg-background p-2"
+          className="min-w-0 max-w-full rounded-md border bg-background p-2"
           value={mounted ? (theme ?? 'system') : 'system'}
           onChange={(e) => setTheme(e.target.value)}
         >
@@ -37,10 +37,10 @@ export function DisplaySettings() {
           <option value="dark">Dark</option>
         </select>
       </label>
-      <label className="flex items-center justify-between gap-4">
+      <label className="flex flex-wrap items-center justify-between gap-4">
         Units
         <select
-          className="rounded-md border bg-background p-2"
+          className="min-w-0 max-w-full rounded-md border bg-background p-2"
           value={units}
           onChange={(e) =>
             setDisplayUnits(
@@ -52,10 +52,10 @@ export function DisplaySettings() {
           <option value="imperial">Imperial</option>
         </select>
       </label>
-      <label className="flex items-center justify-between gap-4">
+      <label className="flex flex-wrap items-center justify-between gap-4">
         Date format
         <select
-          className="min-w-0 rounded-md border bg-background p-2"
+          className="min-w-0 max-w-full rounded-md border bg-background p-2"
           value={dateFormat}
           onChange={(e) => setDateFormat(e.target.value as DateFormat)}
         >
