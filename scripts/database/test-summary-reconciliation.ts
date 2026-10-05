@@ -198,7 +198,9 @@ async function seed(): Promise<void> {
       start_date_local: new Date('2025-01-01T09:00:00Z'),
       timezone: '(GMT+01:00) Europe/Zurich',
       geometryState: 'detailed' as const,
-      photosState: 'current' as const,
+      photosState: id === ACTIVITY_IDS[2] ? 'refresh_required' as const : 'current' as const,
+      photo_count: 0,
+      total_photo_count: 0,
       lastSummarySeenAt: new Date('2026-09-01T00:00:00Z'),
       lastDetailedFetchedAt: new Date('2026-09-01T00:00:00Z'),
       is_complete: true,
@@ -248,7 +250,7 @@ const source: SummaryReconciliationSource = {
       throw new StravaApiError('Record Not Found', 404);
     }
     if (activityId === ACTIVITY_IDS[2]) {
-      return stravaActivity(activityId, { description: 'Still available' });
+      return stravaActivity(activityId, { description: 'Still available', photo_count: 0, total_photo_count: 0 });
     }
     throw new Error('Unexpected detail confirmation request');
   },
@@ -345,6 +347,7 @@ async function run(): Promise<void> {
   assert.equal(byId.has(ACTIVITY_IDS[1]), false);
   assert.equal(byId.get(ACTIVITY_IDS[2])?.geometryState, 'detailed');
   assert.equal(byId.get(ACTIVITY_IDS[2])?.description, 'Still available');
+  assert.equal(byId.get(ACTIVITY_IDS[2])?.photosState, 'refresh_required', 'detail confirmation cannot clear pending photo removals without reconciling the stored collection');
   assert.equal(byId.get(ACTIVITY_IDS[3])?.geometryState, 'summary');
   assert.equal(byId.get(ACTIVITY_IDS[3])?.photosState, 'current');
 

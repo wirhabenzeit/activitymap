@@ -220,7 +220,10 @@ function mergeConfirmedDetail(
   return {
     ...incoming,
     // This confirmation fetched details only; the photo worker must follow up.
-    photosState: photosChanged ? 'refresh_required' : incoming.photosState,
+    photosState:
+      photosChanged || incoming.photosState !== 'current'
+        ? 'refresh_required'
+        : existing ? existing.photosState : incoming.photosState,
     lastSummarySeenAt: scanStartedAt,
   };
 }
