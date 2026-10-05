@@ -12,6 +12,10 @@ import { ToastManager } from '~/components/providers/toast';
 import { QueryProvider } from '~/providers/query-provider';
 import { ServiceWorkerProvider } from '~/components/providers/service-worker';
 import { OfflineSyncProvider } from '~/components/providers/offline-sync';
+import {
+  SignedOutConnectPanel,
+  StravaConnectProvider,
+} from '~/components/auth/strava-connect';
 
 /**
  * The authenticated web app's shell (sidebar, header, its own Share button,
@@ -51,21 +55,24 @@ export default async function AppShellLayout({
         {/* Reads the React Query client, so it must sit inside QueryProvider. */}
         <OfflineSyncProvider />
         <AuthProvider initialAuth={initialAuth}>
-          <SidebarProvider
-            className="flex h-dvh flex-col"
-            style={{ height: '100dvh' }}
-          >
-            <AppHeader />
-            <div className="flex min-h-0 flex-1 overflow-hidden">
-              <AppSidebar />
-              <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                <div className="h-14 w-full" />
-                <div className="min-h-0 w-full flex-1 overflow-hidden">
-                  {children}
-                </div>
-              </main>
-            </div>
-          </SidebarProvider>
+          <StravaConnectProvider>
+            <SidebarProvider
+              className="flex h-dvh flex-col"
+              style={{ height: '100dvh' }}
+            >
+              <AppHeader />
+              <div className="flex min-h-0 flex-1 overflow-hidden">
+                <AppSidebar />
+                <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                  <div className="h-14 w-full" />
+                  <div className="min-h-0 w-full flex-1 overflow-hidden">
+                    {children}
+                    <SignedOutConnectPanel />
+                  </div>
+                </main>
+              </div>
+            </SidebarProvider>
+          </StravaConnectProvider>
           <Toaster />
           <ToastManager />
         </AuthProvider>

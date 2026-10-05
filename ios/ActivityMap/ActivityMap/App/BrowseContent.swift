@@ -5,9 +5,9 @@ struct BrowseContent: View {
     var refresh: () async -> Void = {}
     var sync: SyncController? = nil
     var isSigningIn = false
-    var openAccount: () -> Void = {}
     var mapPicker: RoutePicker? = nil
     @Environment(\.browseStatsDestination) private var statsDestination
+    @Environment(\.stravaConnect) private var stravaConnect
 
     var body: some View {
         GeometryReader { geometry in
@@ -74,8 +74,9 @@ struct BrowseContent: View {
         }
     }
 
-    // Sync/loading/auth information belongs in Settings. Only map-specific
-    // filtering and missing-route context uses an inline, content-sized notice.
+    // Sync/loading/auth information belongs in Settings, and the Strava
+    // connection in the shell's overlay (#304). Only map-specific filtering
+    // and missing-route context uses an inline, content-sized notice.
     private var mapEmptyState: BrowsingPresentation.EmptyState? {
         guard let empty = presentation.empty,
               empty.kind == .noMatches || empty.kind == .noRoutes else { return nil }
@@ -92,7 +93,7 @@ struct BrowseContent: View {
         case .retry:
             guard sync?.canRefresh == true else { return }
             Task { await refresh() }
-        case .account: openAccount()
+        case .account: stravaConnect.start()
         case .showList: store.selectedTab = .list
         case .cancelSync: sync?.pause()
         }

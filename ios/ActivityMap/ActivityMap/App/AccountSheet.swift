@@ -8,6 +8,10 @@ struct AccountSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Bindable private var preferences = DisplayPreferences.shared
+    /// Profile opened while signed out is only a login presentation: once the
+    /// connection is verified it closes and returns to the browsing context.
+    /// Profile opened for account management stays open (#304).
+    @State private var openedForLogin: Bool?
 
     var body: some View {
         NavigationStack {
@@ -33,6 +37,12 @@ struct AccountSheet: View {
         }
         .preferredColorScheme(preferences.appearance.colorScheme)
         .presentationDetents([.medium, .large])
+        .onAppear {
+            if openedForLogin == nil { openedForLogin = destination == .profile && auth.currentUser == nil }
+        }
+        .onChange(of: auth.status) { _, status in
+            if case .signedIn = status, openedForLogin == true { dismiss() }
+        }
     }
 
     @ViewBuilder
@@ -48,32 +58,28 @@ struct AccountSheet: View {
             sessionRestoreFailedContent(message)
         case .signOutFailed(let message):
             signOutFailedContent(message)
-        case .failed(let message):
-            signInFailedContent(message)
+        case .failed:
+            // The adjacent failure text comes from `StravaConnectControls`;
+            // the raw error stays out of the product UI.
+            signedOutContent
         }
     }
 
     private var signedOutContent: some View {
-        Group {
-            Section {
-                VStack(spacing: 12) {
-                    Image(systemName: "person.crop.circle")
-                        .font(.system(size: 64))
-                        .foregroundStyle(.secondary)
-                    Text("Not Signed In")
+        Section {
+            VStack(spacing: 16) {
+                VStack(spacing: 8) {
+                    Text("Connect Strava to see your activities")
                         .font(.headline)
+                    Text(StravaConnectCopy.purpose)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity)
-                .listRowBackground(Color.clear)
+                .multilineTextAlignment(.center)
+                StravaConnectControls()
             }
-
-            Section {
-                Button {
-                    Task { await auth.signIn() }
-                } label: {
-                    Label("Sign in with Strava", systemImage: "figure.outdoor.cycle")
-                }
-            }
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
         }
     }
 
@@ -100,7 +106,7 @@ struct AccountSheet: View {
                     VStack(spacing: 3) {
                         Text(user.name ?? "ActivityMap Account")
                             .font(.headline)
-                        if let email = user.email {
+                        if let email = displayEmail(user.email) {
                             Text(email)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -116,40 +122,21 @@ struct AccountSheet: View {
                 if let athleteID = user.athleteID {
                     LabeledContent("Athlete ID", value: athleteID)
                 }
-                LabeledContent("Session", value: user.authentication.method.rawValue.capitalized)
             }
 
             if !user.stravaConnected || user.authentication.sessionExpiresAt <= Date() {
                 Section {
-                    Button(user.stravaConnected ? "Sign in Again" : "Reconnect Strava") {
-                        Task { await auth.signIn() }
-                    }
+                    StravaConnectControls()
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
+                } header: {
+                    Text(user.stravaConnected ? "Sign-in expired" : "Strava is disconnected")
                 }
             }
 
             Section {
                 Button("Sign Out", role: .destructive) {
                     Task { await auth.signOut() }
-                }
-            }
-        }
-    }
-
-    private func signInFailedContent(_ message: String) -> some View {
-        Group {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Sign-In Failed")
-                        .font(.headline)
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Section {
-                Button("Try Again") {
-                    Task { await auth.signIn() }
                 }
             }
         }

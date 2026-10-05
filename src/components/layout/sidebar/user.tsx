@@ -1,13 +1,9 @@
 'use client';
 
-import {
-  ChevronsUpDown,
-  LogOut,
-  Loader2,
-  Info,
-} from 'lucide-react';
+import { ChevronsUpDown, LogOut, Loader2, Info } from 'lucide-react';
 
-import { signIn, signOut } from '~/lib/auth-client';
+import { signOut } from '~/lib/auth-client';
+import { displayEmail, safeReturnPath } from '~/lib/auth-return';
 
 import { useShallowStore } from '~/store';
 
@@ -24,7 +20,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 
 import * as React from 'react';
-import Image from 'next/image';
 import { cn } from '~/lib/utils';
 import {
   checkWebhookStatus,
@@ -36,46 +31,18 @@ import { useIsFetching } from '@tanstack/react-query';
 import { SettingsDialog } from '~/components/settings/settings-dialog';
 
 export function UserSettings() {
-  const { user, isInitialized } = useShallowStore(
-    (state) => ({
-      user: state.user,
-      isInitialized: state.isInitialized,
-    }),
-  );
+  const { user, isInitialized } = useShallowStore((state) => ({
+    user: state.user,
+    isInitialized: state.isInitialized,
+  }));
 
   const isFetchingActivities = useIsFetching({ queryKey: ['activities'] }) > 0;
   const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
   const { toast } = useToast();
 
-  const handleSignIn = async () => {
-    try {
-      const result = await signIn.social({
-        provider: 'strava',
-        callbackURL: '/map',
-      });
-      if (result.error) {
-        toast({
-          title: 'Strava sign-in unavailable',
-          description:
-            result.error.status === 404
-              ? 'Strava sign-in is not enabled for this deployment.'
-              : result.error.message ?? 'Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Strava sign-in failed',
-        description: error instanceof Error ? error.message : 'Please try again.',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const handleCreateWebhook = async () => {
     try {
       const result = await createWebhookSubscription();
-
 
       // Display the result in a toast notification
       toast({
@@ -116,7 +83,6 @@ export function UserSettings() {
   const handleWebhookStatus = async () => {
     try {
       const result = await checkWebhookStatus();
-
 
       // Display the result in a toast notification
       toast({
@@ -160,6 +126,28 @@ export function UserSettings() {
   };
 
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const email = displayEmail(user?.email);
+
+  // The app shell resolves the session on the server, so a reload is what
+  // brings every store and query back in the signed-out state; it keeps the
+  // current view rather than jumping elsewhere.
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: 'Couldn’t sign out',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    window.location.assign(
+      safeReturnPath(`${window.location.pathname}${window.location.search}`),
+    );
+  };
+
+  // Signed out, the connect dialog over the app is the account entry point.
+  if (isInitialized && !user) return null;
 
   return (
     <SidebarMenuItem>
@@ -168,51 +156,29 @@ export function UserSettings() {
           <SidebarMenuButton
             size="lg"
             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            onClick={
-              !isInitialized || user
-                ? undefined
-                : handleSignIn
-            }
           >
-            {user || !isInitialized ? (
-              <>
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage
-                    src={user?.image ?? undefined}
-                    alt={user?.name ?? ''}
-                  />
-                  <Loader2
-                    className={cn(
-                      'absolute inset-0 m-auto size-8 text-white animate-spin',
-                      {
-                        hidden: !isFetchingActivities,
-                      },
-                    )}
-                  />
-                  <AvatarFallback className="rounded-lg"></AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{user?.name}</span>
-                  <span className="truncate text-xs">{user?.email}</span>
-                </div>
-                <ChevronsUpDown className="ml-auto size-4" />
-              </>
-            ) : (
-              !isFetchingActivities && (
-                <>
-                  <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src="/icon_strava.svg" alt="Strava" />
-                    <AvatarFallback className="rounded-lg">ST</AvatarFallback>
-                  </Avatar>
-                  <Image
-                    src="/btn_strava.svg"
-                    alt="Strava Login Icon"
-                    width={185}
-                    height={40}
-                  />
-                </>
-              )
-            )}
+            <>
+              <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarImage
+                  src={user?.image ?? undefined}
+                  alt={user?.name ?? ''}
+                />
+                <Loader2
+                  className={cn(
+                    'absolute inset-0 m-auto size-8 text-white animate-spin',
+                    {
+                      hidden: !isFetchingActivities,
+                    },
+                  )}
+                />
+                <AvatarFallback className="rounded-lg"></AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">{user?.name}</span>
+                {email && <span className="truncate text-xs">{email}</span>}
+              </div>
+              <ChevronsUpDown className="ml-auto size-4" />
+            </>
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         {user && (
@@ -225,9 +191,11 @@ export function UserSettings() {
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">{user?.name}</p>
-                <p className="text-xs leading-none text-muted-foreground">
-                  {user?.email}
-                </p>
+                {email && (
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {email}
+                  </p>
+                )}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -259,7 +227,7 @@ export function UserSettings() {
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => signOut()}
+              onClick={() => void handleSignOut()}
               className="cursor-pointer text-destructive focus:bg-destructive focus:text-destructive-foreground"
             >
               <LogOut className="mr-2 h-4 w-4" />

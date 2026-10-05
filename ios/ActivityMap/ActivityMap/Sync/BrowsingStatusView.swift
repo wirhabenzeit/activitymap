@@ -10,7 +10,8 @@ struct BrowsingEmptyView: View {
             if scrolls {
                 ScrollView { textContent }.scrollBounceBehavior(.basedOnSize)
             } else { textContent }
-            if let action = state.recovery {
+            // Connecting is offered once, by the shell's overlay (#304).
+            if let action = state.recovery, action != .account {
                 Button(action.title) { recover(action) }
                     .buttonStyle(.borderedProminent)
                     .frame(minHeight: 44)

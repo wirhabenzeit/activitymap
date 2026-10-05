@@ -21,11 +21,11 @@ final class SyncController {
 
         var title: String {
             switch self {
-            case .signedOut: "Sign in to load activities"
+            case .signedOut: "Connect Strava to see your activities"
             case .syncing: "Syncing activities…"
             case .ready: "Activity sync complete"
             case .offline: "Offline · reconnect to sync"
-            case .expired: "Sign-in expired · sign in again to sync"
+            case .expired: "Sign-in expired · connect with Strava again to sync"
             case .disconnected: "Strava is not connected"
             case .paused: "Activity sync paused"
             case .failed: "Couldn’t sync activities"

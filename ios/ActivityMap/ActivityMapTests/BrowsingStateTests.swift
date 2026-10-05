@@ -29,6 +29,12 @@ struct BrowsingStateTests {
             #expect(state.empty?.title.isEmpty == false && state.empty?.message.isEmpty == false)
         }
         #expect(presentation(.ready, cache: true, activities: 2, filtered: 2, tab: .list).empty == nil)
+
+        // #304: a connection in progress replaces the signed-out empty state.
+        let connecting = BrowsingPresentation(tab: .map, activityCount: 0, filteredCount: 0, routeCount: 0,
+                                              status: .signedOut, hasCompletedCache: false, canRetry: false,
+                                              isSigningIn: true)
+        #expect(connecting.empty?.kind == .signingIn && connecting.empty?.recovery == nil)
         #expect(presentation(.offline, cache: true, activities: 2, filtered: 2, routes: 1).empty == nil)
         #expect(presentation(.failed("503"), cache: true, activities: 2, filtered: 2, routes: 1).empty == nil)
     }

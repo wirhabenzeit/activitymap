@@ -4,7 +4,6 @@ struct StatsScreen: View {
     @Bindable var store: ActivityStore
     var sync: SyncController? = nil
     var refresh: () async -> Void = {}
-    var openAccount: () -> Void = {}
     @State private var inspectedActivityID: Int?
     @State var dashboard = StatsDashboardState()
     @Environment(\.localStore) private var localStore
@@ -99,9 +98,9 @@ struct StatsScreen: View {
                 Text(store.activities.isEmpty ? "No activity history" : "No matching activities")
                     .font(.subheadline)
             }
-            if presentation.state == .unavailable {
-                Button("Open Account", action: openAccount).frame(minHeight: 44)
-            } else if presentation.retryAllowed && [.error, .cached].contains(presentation.state) {
+            // Signed out, expired or disconnected: the shell's overlay offers
+            // the connection (#304), so Stats only states why it is empty.
+            if presentation.state != .unavailable && presentation.retryAllowed && [.error, .cached].contains(presentation.state) {
                 Button("Retry sync") { Task { await refresh() } }.frame(minHeight: 44)
             }
         }
@@ -114,7 +113,6 @@ struct StatsScreen: View {
 
 struct StatsRecovery {
     var refresh: () async -> Void = {}
-    var openAccount: () -> Void = {}
 }
 private struct StatsRecoveryKey: EnvironmentKey {
     static let defaultValue = StatsRecovery()
@@ -130,7 +128,7 @@ private struct StatsDashboardDestination: View {
     let sync: SyncController?
     @Environment(\.statsRecovery) private var recovery
     var body: some View {
-        StatsScreen(store: store, sync: sync, refresh: recovery.refresh, openAccount: recovery.openAccount)
+        StatsScreen(store: store, sync: sync, refresh: recovery.refresh)
     }
 }
 extension BrowseStatsDestination {
