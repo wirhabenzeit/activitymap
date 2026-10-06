@@ -59,7 +59,8 @@ if [[ -z "$token" && -z "$(local_config "$repo")" ]]; then
 fi
 [[ -n "$token" ]] && settings+=("MAPBOX_ACCESS_TOKEN=$token")
 
-echo "Building $(git -C "$repo" rev-parse --short HEAD) ($(git -C "$repo" branch --show-current || true)); log: $work/build.log" >&2
+branch="$(git -C "$repo" branch --show-current)"
+echo "Building $(git -C "$repo" rev-parse --short HEAD) (${branch:-detached HEAD}); log: $work/build.log" >&2
 xcodebuild build -project "$repo/ios/ActivityMap/ActivityMap.xcodeproj" -scheme ActivityMap \
   -configuration Debug -destination "platform=iOS,id=$udid" -derivedDataPath "$work/DerivedData" \
   -allowProvisioningUpdates \
