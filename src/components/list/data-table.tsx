@@ -34,6 +34,7 @@ import {
 import { cn } from '~/lib/utils';
 
 import { DataTablePagination } from './data-table-pagination';
+import { ListDetailTransition } from './list-detail-transition';
 import {
   type DensityState,
   type SummaryRowState,
@@ -84,8 +85,13 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   headerClassName?: string;
   cellClassName?: string;
   onRowClick?: (row: Row<Features, TData>) => void;
-  renderInlineDetails?: (row: Row<Features, TData>) => React.ReactNode;
-  renderSingleDetails?: (row: Row<Features, TData>) => React.ReactNode;
+  /** A separate detail page; the table stays mounted behind it. */
+  renderDetails?: (row: Row<Features, TData>) => React.ReactNode;
+  onDetailBack?: () => void;
+  detailBackLabel?: string;
+  detailNavigation?: React.ReactNode;
+  /** Travels with the retained list during the detail transition. */
+  listHeader?: React.ReactNode;
   /** Fade the bottom edge while more rows are hidden below the fold. */
   scrollHint?: boolean;
   /** Report whether the list has hidden rows, independent of its scroll position. */
@@ -114,8 +120,11 @@ export const DataTable = React.memo(function DataTable<
   headerClassName,
   cellClassName,
   onRowClick,
-  renderInlineDetails,
-  renderSingleDetails,
+  renderDetails,
+  onDetailBack,
+  detailBackLabel = 'Back to activities',
+  detailNavigation,
+  listHeader,
   scrollHint = false,
   onOverflowChange,
   setSorting,
@@ -149,8 +158,6 @@ export const DataTable = React.memo(function DataTable<
           : updater;
       setSelected(Object.keys(selection).map(Number));
     },
-    getRowCanExpand: () => Boolean(renderInlineDetails),
-    getIsRowExpanded: (row) => Number(row.id) === activeId,
     onDensityChange: setDensity,
     onSummaryRowChange: setSummaryRow,
     onFitWidthChange: setFitWidth,
@@ -175,11 +182,11 @@ export const DataTable = React.memo(function DataTable<
       summaryRow,
       fitWidth,
       rowSelection: Object.fromEntries(selected.map((id) => [id, true])),
-      expanded: activeId ? { [activeId]: true } : {},
     },
   });
 
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const returnFocusRef = React.useRef<HTMLElement | null>(null);
 
   // With fitWidth, keep pinned columns plus as many following columns as fit
   // at their natural width, instead of scrolling sideways. Natural widths come
@@ -269,21 +276,6 @@ export const DataTable = React.memo(function DataTable<
     onOverflowChange?.(scroller.scrollHeight - scroller.clientHeight > 4);
   }, [onOverflowChange]);
 
-  // Bring a newly opened card into view below the sticky header, but only
-  // when part of it is hidden, so opening a visible row doesn't jump.
-  React.useEffect(() => {
-    const container = containerRef.current;
-    const scroller = container?.querySelector('#table-main')?.parentElement;
-    const active = container?.querySelector('[data-active-row]');
-    if (!scroller || !active) return;
-    const header = container?.querySelector('thead');
-    const view = scroller.getBoundingClientRect();
-    const top = view.top + (header?.getBoundingClientRect().height ?? 0);
-    const card = active.getBoundingClientRect();
-    if (card.top >= top && card.bottom <= view.bottom) return;
-    scroller.scrollTo({ top: scroller.scrollTop + card.top - top });
-  }, [activeId, sorting]);
-
   React.useEffect(() => {
     if (!scrollHint && !onOverflowChange) return;
     updateMoreBelow();
@@ -296,14 +288,11 @@ export const DataTable = React.memo(function DataTable<
     return () => observer.disconnect();
   }, [scrollHint, onOverflowChange, updateMoreBelow, data.length, activeId]);
 
-  const singleRow = table.getRowModel().rows[0];
-  if (data.length === 1 && singleRow && renderSingleDetails) {
-    return (
-      <div className={cn('overflow-y-auto', className)}>
-        {renderSingleDetails(singleRow)}
-      </div>
-    );
-  }
+  const detailRow = renderDetails
+    ? table
+        .getFilteredRowModel()
+        .rows.find((row) => Number(row.id) === activeId)
+    : undefined;
 
   return (
     <div
@@ -313,231 +302,240 @@ export const DataTable = React.memo(function DataTable<
         scrollHint || onOverflowChange ? updateMoreBelow : undefined
       }
     >
-      <Table
-        id="table-main"
-        className="text-xs grid"
-        // An inline-size container lets expanded cards match the visible
-        // width (100cqw) instead of the full, horizontally scrolling table.
-        wrapperClassName={cn(
-          'overflow-scroll min-h-0 w-full flex-1 [container-type:inline-size]',
-          fitWidth && 'overflow-x-hidden',
-        )}
-        style={{
-          gridTemplateColumns: visibleColumns
-            .filter((column) => isShown(column.id))
-            .map(trackWidth)
-            .join(' '),
-        }}
+      <ListDetailTransition
+        detailId={activeId ?? 0}
+        detail={detailRow && renderDetails?.(detailRow)}
+        onBack={onDetailBack ?? (() => undefined)}
+        backLabel={detailBackLabel}
+        navigation={detailNavigation}
+        returnFocus={returnFocusRef}
       >
-        <TableHeader
-          className={cn(
-            'sticky [&_tr]:border-b-0 grid grid-cols-subgrid col-span-full',
-            headerClassName,
+        {listHeader}
+        <Table
+          id="table-main"
+          className="text-xs grid"
+          // An inline-size container lets expanded cards match the visible
+          // width (100cqw) instead of the full, horizontally scrolling table.
+          wrapperClassName={cn(
+            'overflow-scroll min-h-0 w-full flex-1 [container-type:inline-size]',
+            fitWidth && 'overflow-x-hidden',
           )}
-        >
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow
-              key={headerGroup.id}
-              className="border-b-0 grid grid-cols-subgrid col-span-full"
-            >
-              {headerGroup.headers
-                .filter((header) => isShown(header.column.id))
-                .map((header) => {
-                  return (
-                    <TableHead
-                      className={cn(
-                        'py-0 flex items-center',
-                        header.column.getIsPinned() == 'start' &&
-                          'sticky left-0 bg-muted border-border border-r',
-                        header.column.getIsPinned() == 'end' &&
-                          'sticky right-0 bg-muted border-border border-l',
-                      )}
-                      key={header.id}
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                    </TableHead>
-                  );
-                })}
-            </TableRow>
-          ))}
-          {table.getFooterGroups().map((footerGroup) => (
-            <TableRow
-              key={footerGroup.id}
-              className={cn(
-                'border-b grid grid-cols-subgrid col-span-full',
-                !summaryRow && 'hidden',
-              )}
-            >
-              {footerGroup.headers
-                .filter((footer) => isShown(footer.column.id))
-                .map((footer) => {
-                  return (
-                    <TableHead
-                      key={footer.id}
-                      className={cn(
-                        'h-8 border-b border-t border-border text-xs font-bold flex items-center',
-                        footer.column.getIsPinned() == 'start' &&
-                          'sticky left-0 bg-muted border-r border-border',
-                        footer.column.getIsPinned() == 'end' &&
-                          'sticky right-0 bg-muted border-l border-border',
-                      )}
-                    >
-                      {flexRender(
-                        footer.column.columnDef.footer,
-                        footer.getContext(),
-                      )}
-                    </TableHead>
-                  );
-                })}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody className="grid grid-cols-subgrid col-span-full">
-          {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <React.Fragment key={row.id}>
-                {row.getIsExpanded() && renderInlineDetails ? (
-                  // The expanded card replaces its row rather than repeating it.
-                  <TableRow
-                    data-active-row
-                    className="grid grid-cols-subgrid col-span-full ring-1 ring-inset ring-orange-500"
-                  >
-                    <TableCell
-                      colSpan={row.getVisibleCells().length}
-                      className="col-span-full p-0 bg-background"
-                    >
-                      <div className="sticky left-0 w-[100cqw]">
-                        {renderInlineDetails(row)}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  <TableRow
-                    data-state={row.getIsSelected() && 'selected'}
-                    className={cn(
-                      'group grid grid-cols-subgrid col-span-full',
-                      onRowClick && 'cursor-pointer',
-                    )}
-                    {...(onRowClick && {
-                      tabIndex: 0,
-                      onClick: (event: React.MouseEvent) => {
-                        const target = event.target as Element;
-                        // Ignore clicks bubbling up from portals (e.g. the edit
-                        // dialog) and from controls inside the row.
-                        if (
-                          !event.currentTarget.contains(target) ||
-                          target.closest(
-                            'button, a, input, select, textarea, [role="menuitem"]',
-                          )
-                        )
-                          return;
-                        onRowClick(row);
-                      },
-                      onKeyDown: (event: React.KeyboardEvent) => {
-                        if (event.target !== event.currentTarget) return;
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          onRowClick(row);
-                        }
-                      },
-                    })}
-                  >
-                    {row
-                      .getVisibleCells()
-                      .filter((cell) => isShown(cell.column.id))
-                      .map((cell) => (
-                        <TableCell
-                          className={cn(
-                            'bg-background group-data-[state=selected]:bg-muted flex items-center',
-                            cell.column.getIsPinned() == 'start' &&
-                              'sticky left-0 border-border border-r',
-                            cell.column.getIsPinned() == 'end' &&
-                              'sticky right-0 border-border border-l',
-                            density == 'sm'
-                              ? 'py-1 px-1'
-                              : density == 'md'
-                                ? 'p-2'
-                                : 'py-3 px-2 text-sm',
-                            cellClassName,
-                          )}
-                          key={cell.id}
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                  </TableRow>
-                )}
-              </React.Fragment>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center">
-                No results.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-      {fitWidth && (
-        <table
-          aria-hidden
-          inert
-          className="pointer-events-none invisible absolute left-0 top-0 grid h-0 overflow-hidden text-xs"
           style={{
-            gridTemplateColumns: `repeat(${visibleColumns.length}, max-content)`,
+            gridTemplateColumns: visibleColumns
+              .filter((column) => isShown(column.id))
+              .map(trackWidth)
+              .join(' '),
           }}
         >
-          <TableHeader className="grid grid-cols-subgrid col-span-full">
-            <TableRow
-              ref={sizerRef}
-              className="grid grid-cols-subgrid col-span-full"
-            >
-              {visibleColumns.map((column) => {
-                const header = table
-                  .getFlatHeaders()
-                  .find((entry) => entry.column.id === column.id);
-                return (
-                  <TableHead key={column.id} className="py-0 flex items-center">
-                    {header &&
-                      flexRender(column.columnDef.header, header.getContext())}
-                  </TableHead>
-                );
-              })}
-            </TableRow>
-            <TableRow className="grid grid-cols-subgrid col-span-full">
-              {visibleColumns.map((column) => {
-                const footer = table
-                  .getFooterGroups()[0]
-                  ?.headers.find((entry) => entry.column.id === column.id);
-                return (
-                  <TableHead
-                    key={column.id}
-                    className="h-8 text-xs font-bold flex items-center"
-                  >
-                    {summaryRow &&
-                      footer &&
-                      flexRender(column.columnDef.footer, footer.getContext())}
-                  </TableHead>
-                );
-              })}
-            </TableRow>
+          <TableHeader
+            className={cn(
+              'sticky [&_tr]:border-b-0 grid grid-cols-subgrid col-span-full',
+              headerClassName,
+            )}
+          >
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow
+                key={headerGroup.id}
+                className="border-b-0 grid grid-cols-subgrid col-span-full"
+              >
+                {headerGroup.headers
+                  .filter((header) => isShown(header.column.id))
+                  .map((header) => {
+                    return (
+                      <TableHead
+                        className={cn(
+                          'py-0 flex items-center',
+                          header.column.getIsPinned() == 'start' &&
+                            'sticky left-0 bg-muted border-border border-r',
+                          header.column.getIsPinned() == 'end' &&
+                            'sticky right-0 bg-muted border-border border-l',
+                        )}
+                        key={header.id}
+                      >
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                      </TableHead>
+                    );
+                  })}
+              </TableRow>
+            ))}
+            {table.getFooterGroups().map((footerGroup) => (
+              <TableRow
+                key={footerGroup.id}
+                className={cn(
+                  'border-b grid grid-cols-subgrid col-span-full',
+                  !summaryRow && 'hidden',
+                )}
+              >
+                {footerGroup.headers
+                  .filter((footer) => isShown(footer.column.id))
+                  .map((footer) => {
+                    return (
+                      <TableHead
+                        key={footer.id}
+                        className={cn(
+                          'h-8 border-b border-t border-border text-xs font-bold flex items-center',
+                          footer.column.getIsPinned() == 'start' &&
+                            'sticky left-0 bg-muted border-r border-border',
+                          footer.column.getIsPinned() == 'end' &&
+                            'sticky right-0 bg-muted border-l border-border',
+                        )}
+                      >
+                        {flexRender(
+                          footer.column.columnDef.footer,
+                          footer.getContext(),
+                        )}
+                      </TableHead>
+                    );
+                  })}
+              </TableRow>
+            ))}
           </TableHeader>
-        </table>
-      )}
-      {scrollHint && moreBelow && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background to-transparent" />
-      )}
-      {paginationControl && (
-        <DataTablePagination table={table} hiddenByFit={hiddenByFit} />
-      )}
+          <TableBody className="grid grid-cols-subgrid col-span-full">
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-detail-origin={Number(row.id) === activeId || undefined}
+                  data-state={row.getIsSelected() && 'selected'}
+                  className={cn(
+                    'group grid grid-cols-subgrid col-span-full',
+                    onRowClick && 'cursor-pointer',
+                  )}
+                  {...(onRowClick && {
+                    tabIndex: 0,
+                    onClick: (event: React.MouseEvent<HTMLTableRowElement>) => {
+                      const target = event.target as Element;
+                      // Ignore clicks bubbling up from portals (e.g. the edit
+                      // dialog) and from controls inside the row.
+                      if (
+                        !event.currentTarget.contains(target) ||
+                        target.closest(
+                          'button, a, input, select, textarea, [role="menuitem"]',
+                        )
+                      )
+                        return;
+                      returnFocusRef.current = event.currentTarget;
+                      onRowClick(row);
+                    },
+                    onKeyDown: (
+                      event: React.KeyboardEvent<HTMLTableRowElement>,
+                    ) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        returnFocusRef.current = event.currentTarget;
+                        onRowClick(row);
+                      }
+                    },
+                  })}
+                >
+                  {row
+                    .getVisibleCells()
+                    .filter((cell) => isShown(cell.column.id))
+                    .map((cell) => (
+                      <TableCell
+                        className={cn(
+                          'bg-background group-data-[state=selected]:bg-muted flex items-center',
+                          cell.column.getIsPinned() == 'start' &&
+                            'sticky left-0 border-border border-r',
+                          cell.column.getIsPinned() == 'end' &&
+                            'sticky right-0 border-border border-l',
+                          density == 'sm'
+                            ? 'py-1 px-1'
+                            : density == 'md'
+                              ? 'p-2'
+                              : 'py-3 px-2 text-sm',
+                          cellClassName,
+                        )}
+                        key={cell.id}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+        {fitWidth && (
+          <table
+            aria-hidden
+            inert
+            className="pointer-events-none invisible absolute left-0 top-0 grid h-0 overflow-hidden text-xs"
+            style={{
+              gridTemplateColumns: `repeat(${visibleColumns.length}, max-content)`,
+            }}
+          >
+            <TableHeader className="grid grid-cols-subgrid col-span-full">
+              <TableRow
+                ref={sizerRef}
+                className="grid grid-cols-subgrid col-span-full"
+              >
+                {visibleColumns.map((column) => {
+                  const header = table
+                    .getFlatHeaders()
+                    .find((entry) => entry.column.id === column.id);
+                  return (
+                    <TableHead
+                      key={column.id}
+                      className="py-0 flex items-center"
+                    >
+                      {header &&
+                        flexRender(
+                          column.columnDef.header,
+                          header.getContext(),
+                        )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+              <TableRow className="grid grid-cols-subgrid col-span-full">
+                {visibleColumns.map((column) => {
+                  const footer = table
+                    .getFooterGroups()[0]
+                    ?.headers.find((entry) => entry.column.id === column.id);
+                  return (
+                    <TableHead
+                      key={column.id}
+                      className="h-8 text-xs font-bold flex items-center"
+                    >
+                      {summaryRow &&
+                        footer &&
+                        flexRender(
+                          column.columnDef.footer,
+                          footer.getContext(),
+                        )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            </TableHeader>
+          </table>
+        )}
+        {scrollHint && moreBelow && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background to-transparent" />
+        )}
+        {paginationControl && (
+          <DataTablePagination table={table} hiddenByFit={hiddenByFit} />
+        )}
+      </ListDetailTransition>
     </div>
   );
 }) as <TData extends RowWithId & RowData>(
