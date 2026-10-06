@@ -24,6 +24,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     @State var showTotals = false
     var expanded = true
     @Environment(\.statsExpansionProgress) private var sharedProgress
+    @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
     private var progress: Double { sharedProgress ?? (expanded ? 1 : 0) }
     @ViewBuilder let compactSummary: () -> CompactSummary
     private var trend: [StatsPoint] { averages[shownRange] ?? [] }
@@ -79,15 +80,36 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     }
 
     private var expandedHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            StatsRangePicker(title: "Volume grouping", ranges: StatsHistoryRange.allCases,
-                             selection: $range, label: \.label)
-            if let first = buckets.first, let last = buckets.last {
-                Text("\(StatsDisplay.date(first.start)) – \(StatsDisplay.date(last.end))")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text("\(Text(StatsDisplay.measurement(buckets.reduce(0) { $0 + $1.total }, metric: metric)).font(.title2.weight(.semibold))) \(Text(shownRange.totalLabel).font(.caption).foregroundColor(.secondary))")
-                    .monospacedDigit()
+        // iPhone landscape: grouping, total and range share one row when they fit.
+        ViewThatFits(in: .horizontal) {
+            if shortViewportLimit != nil {
+                HStack(alignment: .center, spacing: 12) {
+                    groupingPicker.fixedSize()
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 2) { total; dateRange }.fixedSize()
+                }
             }
+            VStack(alignment: .leading, spacing: 12) {
+                groupingPicker
+                dateRange
+                total
+            }
+        }
+    }
+    private var groupingPicker: some View {
+        StatsRangePicker(title: "Volume grouping", ranges: StatsHistoryRange.allCases,
+                         selection: $range, label: \.label)
+    }
+    @ViewBuilder private var dateRange: some View {
+        if let first = buckets.first, let last = buckets.last {
+            Text("\(StatsDisplay.date(first.start)) – \(StatsDisplay.date(last.end))")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+    @ViewBuilder private var total: some View {
+        if !buckets.isEmpty {
+            Text("\(Text(StatsDisplay.measurement(buckets.reduce(0) { $0 + $1.total }, metric: metric)).font(.title2.weight(.semibold))) \(Text(shownRange.totalLabel).font(.caption).foregroundColor(.secondary))")
+                .monospacedDigit()
         }
     }
 

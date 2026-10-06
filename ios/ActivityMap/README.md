@@ -181,7 +181,9 @@ This opt-in test uses an existing connected account in the local database. It cr
 
 ## Screenshot gallery
 
-`shared/gallery-scenarios.json` defines the scenario IDs, selected/detail activity IDs and viewport variants consumed by both capture harnesses. Six scenes have matching web captures: Map, selection results, map detail, List, list detail and Filters. Settings remains native-only and shows an explicit missing-web placeholder. Stats is excluded until the iOS dashboard is implemented.
+`shared/gallery-scenarios.json` defines the scenario IDs, selected/detail activity IDs and viewport variants consumed by both capture harnesses. Six scenes have matching web captures: Map, selection results, map detail, List, list detail and Filters. Stats (dashboard and expanded Training volume) and Settings remain native-only and show an explicit missing-web placeholder. Set `TEST_RUNNER_ACTIVITYMAP_GALLERY_STATS_TILE` to another tile ID, such as `activityCalendar`, to expand that tile instead.
+
+The `phone-landscape` variant builds each screen in portrait and then rotates the simulator, as a person turning the phone would, so safe areas and size classes are real. Rotating a window before its first layout leaves stale safe-area backgrounds, and the Mapbox map can keep its interim size when its resize completion is lost during rotation; a fitted route then lands off-centre and the capture fails with the projected route and camera centre point.
 
 ```sh
 scripts/ios-gallery.sh review --web                       # native + running local pnpm dev

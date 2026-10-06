@@ -11,35 +11,25 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let content: () -> Content
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
-            // Keep both controls at 44pt while removing the extra vertical
-            // gutter between title and period/picker rows on compact cards.
-            VStack(alignment: .leading, spacing: typeSize.isAccessibilitySize ? AppTheme.Spacing.small : 0) {
-                HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
-                    BrowseSectionHeading(title: title)
-                    Spacer(minLength: 0)
-                    if let expand {
-                        BrowseIconButton(title: "\(expanded ? "Collapse" : "Expand") \(title)", systemImage: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", action: expand)
-                    }
-                }
-                .frame(minHeight: AppTheme.minimumTarget)
-                if compactHeader && !typeSize.isAccessibilitySize {
-                    ViewThatFits(in: .horizontal) {
-                        HStack {
-                            periodLabel.fixedSize()
-                            Spacer(minLength: 8)
-                            controls()
-                        }
-                        VStack(alignment: .leading, spacing: 4) { periodLabel; controls() }
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                        periodLabel
+            if shortViewportLimit != nil && !typeSize.isAccessibilitySize {
+                // iPhone landscape: one header row where the card is wide enough.
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
+                        BrowseSectionHeading(title: title).fixedSize()
+                        periodLabel.fixedSize()
+                        Spacer(minLength: 8)
                         controls()
+                        expandButton
                     }
+                    .frame(minHeight: AppTheme.minimumTarget)
+                    header
                 }
+            } else {
+                header
             }
             content()
         }
@@ -47,6 +37,38 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
         .modifier(BrowseSurface())
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius))
 
+    }
+    @ViewBuilder private var expandButton: some View {
+        if let expand {
+            BrowseIconButton(title: "\(expanded ? "Collapse" : "Expand") \(title)", systemImage: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", action: expand)
+        }
+    }
+    private var header: some View {
+        // Keep both controls at 44pt while removing the extra vertical
+        // gutter between title and period/picker rows on compact cards.
+        VStack(alignment: .leading, spacing: typeSize.isAccessibilitySize ? AppTheme.Spacing.small : 0) {
+            HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
+                BrowseSectionHeading(title: title)
+                Spacer(minLength: 0)
+                expandButton
+            }
+            .frame(minHeight: AppTheme.minimumTarget)
+            if compactHeader && !typeSize.isAccessibilitySize {
+                ViewThatFits(in: .horizontal) {
+                    HStack {
+                        periodLabel.fixedSize()
+                        Spacer(minLength: 8)
+                        controls()
+                    }
+                    VStack(alignment: .leading, spacing: 4) { periodLabel; controls() }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
+                    periodLabel
+                    controls()
+                }
+            }
+        }
     }
     private var periodLabel: some View {
         Text(period).font(AppTheme.Typography.caption).foregroundStyle(.secondary)
@@ -356,6 +378,10 @@ extension EnvironmentValues {
         get { self[StatsExpansionProgressKey.self] }
         set { self[StatsExpansionProgressKey.self] = newValue }
     }
+    /// Set only for short viewports (iPhone landscape): caps expanded visuals,
+    /// so a tile's header, controls and chart fit on one screen. Never below
+    /// compact. Its presence also selects the dense one-row tile headers.
+    @Entry var statsDetailHeightLimit: Double? = nil
 }
 
 /// Shared sizing for charts, calendar cells and any future compact/detail visual.
@@ -365,7 +391,9 @@ private struct StatsExpansionHeight: ViewModifier {
     let compact: Double
     let detail: Double
     @Environment(\.statsExpansionProgress) private var progress
+    @Environment(\.statsDetailHeightLimit) private var limit
     func body(content: Content) -> some View {
+        let detail = limit.map { max(compact, min(detail, $0)) } ?? detail
         content.frame(height: compact + (detail - compact) * (progress ?? (expanded ? 1 : 0)))
     }
 }

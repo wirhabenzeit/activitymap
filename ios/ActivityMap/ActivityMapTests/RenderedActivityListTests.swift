@@ -110,8 +110,9 @@ extension RenderedRoutePickingTests {
         let presentation = ActivityListPresentation(defaults: nil)
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)], listPresentation: presentation)
         store.selectedTab = .list
+        presentation.displayOpen = true
         let host = try ListHarness(root: NavigationStack {
-            ListScreen(store: store, displayOpen: true)
+            ListScreen(store: store)
         }, size: CGSize(width: 390, height: 844))
         defer { host.close() }
         try await listWait { host.host.presentedViewController != nil }

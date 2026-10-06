@@ -22,29 +22,43 @@ struct StatsScreen: View {
 
     var body: some View {
         GeometryReader { geometry in
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
-                    scopeSummary
-                    if let message = presentation.message {
-                        status(message)
-                    }
-                    if presentation.hasContent {
-                        ForEach(StatsTileGroup.allCases, id: \.self) { group in
-                            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                                Text(group.title).font(.title2.weight(.semibold))
-                                    .accessibilityAddTraits(.isHeader)
-                                let columns = !typeSize.isAccessibilitySize && geometry.size.width >= 760 ? 2 : 1
-                                // A flat, stable child list keeps local picker/day state
-                                // alive when expansion changes row placement.
-                                StatsAnimatedSection(tiles: StatsDashboard.tiles.filter { $0.group == group },
-                                                     expandedTile: dashboard.expandedTile, columns: columns) { definition in
-                                    tile(definition)
+            let detailLimit = detailHeightLimit(viewport: geometry.size.height)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+                        scopeSummary
+                        if let message = presentation.message {
+                            status(message)
+                        }
+                        if presentation.hasContent {
+                            ForEach(StatsTileGroup.allCases, id: \.self) { group in
+                                VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
+                                    Text(group.title).font(.title2.weight(.semibold))
+                                        .accessibilityAddTraits(.isHeader)
+                                    // iPhone landscape pairs tiles too: half its width is a phone card.
+                                    let columns = !typeSize.isAccessibilitySize
+                                        && geometry.size.width >= (detailLimit != nil ? 640 : 760) ? 2 : 1
+                                    // A flat, stable child list keeps local picker/day state
+                                    // alive when expansion changes row placement.
+                                    StatsAnimatedSection(tiles: StatsDashboard.tiles.filter { $0.group == group },
+                                                         expandedTile: dashboard.expandedTile, columns: columns) { definition in
+                                        tile(definition)
+                                    }
                                 }
                             }
                         }
                     }
+                    .padding(12)
                 }
-                .padding(12)
+                .environment(\.statsDetailHeightLimit, detailLimit)
+                .onChange(of: dashboard.expandedTile) { _, id in
+                    // A short viewport shows little more than the expanded tile.
+                    // Start it at the top rather than leaving its chart off-screen.
+                    guard detailLimit != nil, let id else { return }
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                        proxy.scrollTo(id, anchor: .top)
+                    }
+                }
             }
             .background(AppTheme.contentBackground)
             .accessibilityIdentifier("stats-dashboard")
@@ -76,6 +90,20 @@ struct StatsScreen: View {
                    dashboard.toggleExpansion(tile.id)
                }
            }, openActivity: { inspectedActivityID = $0 })
+        .id(tile.id)
+    }
+
+    /// Short viewports (iPhone landscape) get dense tile headers and a cap on
+    /// expanded visuals: the room left once that header, the tile's own
+    /// controls and the scroll padding are on screen. Taller viewports keep
+    /// each tile's natural detail height.
+    ///
+    /// Only while Stats is shown: restructuring the hidden dashboard during a
+    /// rotation can swallow Mapbox's resize completion, leaving the retained
+    /// map at its interim size so later fits land off-centre.
+    private func detailHeightLimit(viewport: CGFloat) -> Double? {
+        guard store.selectedTab == .stats, viewport < 480, !typeSize.isAccessibilitySize else { return nil }
+        return Double(viewport) - 170
     }
 
     @ViewBuilder private var scopeSummary: some View {

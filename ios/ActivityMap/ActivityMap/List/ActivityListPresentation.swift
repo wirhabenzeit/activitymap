@@ -268,6 +268,10 @@ final class ActivityListPresentation {
         }
     }
 
+    // Transient: the shell's landscape bar and the List open the same sheets.
+    var sortOpen = false
+    var displayOpen = false
+
     init(defaults: UserDefaults? = .standard) {
         self.defaults = defaults
         settings = defaults?.data(forKey: Self.defaultsKey)

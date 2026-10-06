@@ -7,9 +7,9 @@ struct ListScreen: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var hasPushedDetail = false
-    @State var sortOpen = false
-    @State var displayOpen = false
     @Environment(\.filterSidebarVisible) private var filterSidebarVisible
+    // iPhone landscape: the shell bar carries the status/options row (#315).
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         GeometryReader { geometry in
@@ -65,7 +65,8 @@ struct ListScreen: View {
         List {
             ForEach(store.listedActivities) { activity in
                 ActivityRowView(store: store, activity: activity, availableWidth: width)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                    .listRowInsets(EdgeInsets(top: verticalSizeClass == .compact ? 2 : 4, leading: 8,
+                                              bottom: verticalSizeClass == .compact ? 2 : 4, trailing: 8))
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 44 }
                     .listRowBackground(store.selectedActivityIDs.contains(activity.id) ? AppTheme.selectionBackground : Color(uiColor: .systemBackground))
             }
@@ -78,7 +79,8 @@ struct ListScreen: View {
         .listStyle(.plain)
         .safeAreaInset(edge: .top, spacing: 0) {
             if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize, availableWidth: width) {
-                ActivityTableHeader(store: store, availableWidth: width)
+                ActivityTableHeader(store: store, availableWidth: width,
+                                    rowHeight: verticalSizeClass == .compact ? 32 : 44)
             } else if store.listPresentation.settings.width == .columns && !typeSize.isAccessibilitySize {
                 // A resized window or older saved preferences can exceed the
                 // column budget. Keep every metric visible and explain the fallback.
@@ -94,19 +96,19 @@ struct ListScreen: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            HStack(spacing: AppTheme.Spacing.small) {
-                SelectionBar(store: store, includesTotal: true)
-                Spacer(minLength: 8)
-                ListControls(presentation: store.listPresentation, iconOnly: true,
-                             sortOpen: $sortOpen, displayOpen: $displayOpen)
+            if verticalSizeClass != .compact {
+                HStack(spacing: AppTheme.Spacing.small) {
+                    SelectionBar(store: store, includesTotal: true)
+                    Spacer(minLength: 8)
+                    ListControls(presentation: store.listPresentation, iconOnly: true)
+                }
+                .padding(.horizontal, AppTheme.Spacing.small)
+                .background(.bar)
+                .overlay(alignment: .top) { Color(uiColor: .separator).frame(height: 0.5) }
+                .accessibilityIdentifier("list-status-bar")
             }
-            .padding(.horizontal, AppTheme.Spacing.small)
-            .background(.bar)
-            .overlay(alignment: .top) { Color(uiColor: .separator).frame(height: 0.5) }
-            .accessibilityIdentifier("list-status-bar")
         }
-        .modifier(ListOptionsSheets(presentation: store.listPresentation, sortOpen: $sortOpen,
-                                    displayOpen: $displayOpen, availableWidth: width))
+        .modifier(ListOptionsSheets(presentation: store.listPresentation, availableWidth: width))
     }
 
     @ViewBuilder private var detailColumn: some View {
@@ -145,6 +147,8 @@ struct SelectionBar: View {
     @Bindable var store: ActivityStore
     var iconOnly = false
     var includesTotal = false
+    /// White on the blue shell bar instead of the List's own status bar.
+    var onNavigationBar = false
 
     private var selectedCount: Int { store.selectedActivityIDs.count }
 
@@ -191,12 +195,12 @@ struct SelectionBar: View {
                     } else {
                         HStack(spacing: 4) {
                             Image(systemName: selectedCount > 0 ? "checkmark.circle.fill" : "checklist")
-                                .foregroundStyle(selectedCount > 0 ? AppTheme.accent : Color.secondary)
+                                .foregroundStyle(onNavigationBar ? Color.white : selectedCount > 0 ? AppTheme.accent : Color.secondary)
                             Text(visibleSummary).font(.caption.weight(.medium))
                                 .fixedSize(horizontal: false, vertical: true)
                             Image(systemName: "chevron.down").font(.system(size: 9))
                         }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(onNavigationBar ? AnyShapeStyle(Color.white.opacity(0.9)) : AnyShapeStyle(.secondary))
                         .frame(minHeight: 44)
                     }
                 }
