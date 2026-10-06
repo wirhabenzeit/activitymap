@@ -1,0 +1,41 @@
+{
+  "viewportSizes": [
+    {
+      "width": 390,
+      "height": 844
+    },
+    {
+      "width": 1280,
+      "height": 800
+    }
+  ],
+  "errors": [],
+  "requests": [
+    "/thumb-1",
+    "/thumb-2",
+    "/thumb-3",
+    "/thumb-4",
+    "/full-2",
+    "/full-3",
+    "/full-4",
+    "/full-4",
+    "/full-4"
+  ],
+  "checks": [
+    "non-first initial photo",
+    "reopen",
+    "one-full-request",
+    "captions/count",
+    "image click",
+    "keyboard",
+    "touch swipes",
+    "single/empty galleries",
+    "focus return/containment",
+    "scroll lock",
+    "missing/broken/retry",
+    "deletion",
+    "account switch",
+    "nested detail",
+    "origin marker/selection/preview"
+  ]
+}

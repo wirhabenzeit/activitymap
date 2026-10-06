@@ -46,8 +46,21 @@ export const createAuthSlice: StateCreator<
 
   // Actions
   initializeAuth: (auth) => {
-
     set((state) => {
+      const nextUser = auth.currentUser ?? undefined;
+      if (
+        state.user?.id !== nextUser?.id ||
+        state.isGuest !== Boolean(auth.guestMode) ||
+        JSON.stringify(state.guestMode) !==
+          JSON.stringify(auth.guestMode ?? { type: null })
+      ) {
+        state.selected = [];
+        state.highlighted = 0;
+        state.knownSelectionIDs = null;
+        state.visibleSelectionIDs = null;
+      }
+      state.user = nextUser;
+      state.isGuest = Boolean(auth.guestMode);
       if (auth.guestMode) {
         state.isGuest = true;
         state.guestMode = {
@@ -56,6 +69,7 @@ export const createAuthSlice: StateCreator<
           activityIds: auth.guestMode.activityIds,
         };
       } else {
+        state.guestMode = { type: null };
         state.user = auth.currentUser ?? undefined;
       }
       state.isInitialized = true;

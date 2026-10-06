@@ -141,7 +141,11 @@ const RouteLayer = React.memo(function RouteLayer() {
     filter,
     selectedFilter,
   ];
-  const filterHigh: mapboxgl.FilterSpecification = ['==', 'id', highlighted];
+  const filterHigh: mapboxgl.FilterSpecification = [
+    'all',
+    filter,
+    ['==', 'id', highlighted],
+  ];
 
   return (
     <Source data={geoJson} id="routeSource" type="geojson">
@@ -307,6 +311,11 @@ export default function InteractiveMap() {
     summaryUserId:
       !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
   }));
+  const visibleSelected = useMemo(
+    () => selected.filter((id) => filterIDs.includes(id) && activityDict[id]),
+    [selected, filterIDs, activityDict],
+  );
+  const hiddenSelectedCount = selected.length - visibleSelected.length;
   // Closing details retains the highlighted map route and the results table.
   const [detailId, setDetailId] = useState(highlighted);
   const [previousHighlight, setPreviousHighlight] = useState(highlighted);
@@ -608,7 +617,7 @@ export default function InteractiveMap() {
   );
   const rows = useMemo(
     () =>
-      selected
+      visibleSelected
         .map((key) => {
           const activity = activityDict[key];
           if (!activity) return undefined;
@@ -618,7 +627,7 @@ export default function InteractiveMap() {
           };
         })
         .filter((x) => x != undefined),
-    [selected, activityDict, photoDict],
+    [visibleSelected, activityDict, photoDict],
   );
   const resultIds = useMemo(
     () =>
@@ -862,7 +871,7 @@ export default function InteractiveMap() {
         id="map-route-panel"
         className={cn(
           'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,48rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
-          { hidden: rows.length == 0 },
+          { hidden: selected.length === 0 },
         )}
       >
         <DataTable
@@ -892,8 +901,11 @@ export default function InteractiveMap() {
               aria-label="Route results"
               className="flex min-h-12 shrink-0 items-center justify-between gap-1 border-b px-2 text-xs"
             >
-              <span className="px-1 font-semibold">
+              <span className="min-w-0 px-1 font-semibold">
                 {resultIds.length} {resultIds.length === 1 ? 'route' : 'routes'}
+                {hiddenSelectedCount > 0
+                  ? ` · ${hiddenSelectedCount} hidden by filters`
+                  : ''}
               </span>
               {panelControls(resultIds, 'Fit selected routes')}
             </div>

@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Pencil,
   X,
+  Image as PhotosIcon,
 } from 'lucide-react';
 import { decode } from '@mapbox/polyline';
 import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
@@ -398,15 +399,25 @@ export function ActivityCardContent({
           elevation={elevationProfile}
           description={row.original.description}
         >
-          <ActivityDetailStats activity={row.original}>
-            {photos.length > 0 && (
-              <PhotoLightbox
-                photos={photos}
-                title={row.getValue('name')}
-                className="h-16"
-              />
-            )}
-          </ActivityDetailStats>
+          <ActivityDetailStats
+            activity={row.original}
+            photos={photos.length > 0 ? (
+              <section className="min-w-0 border-t pt-3" aria-label="Activity photos">
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                  <PhotosIcon className="h-4 w-4" aria-hidden="true" />
+                  Photos
+                  <span className="text-xs font-normal tabular-nums text-muted-foreground">
+                    {photos.length}
+                  </span>
+                </h3>
+                <PhotoLightbox
+                  photos={photos}
+                  title={row.getValue('name')}
+                  className="h-24 sm:h-28"
+                />
+              </section>
+            ) : undefined}
+          />
         </RouteDetailsContent>
       </Card>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />

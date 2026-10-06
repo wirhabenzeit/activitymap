@@ -31,6 +31,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                 Divider()
                 ActivityHeadlineStats(activity: activity)
             }
+            photos(activity)
             ForEach(ActivityMetricGroup.groups(for: activity)) { group in
                 VStack(alignment: .leading, spacing: 12) {
                     Divider()
@@ -55,7 +56,6 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                 }
                 .accessibilityIdentifier("activity-metric-group-\(group.id)")
             }
-            photos(activity)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, AppTheme.Spacing.large)

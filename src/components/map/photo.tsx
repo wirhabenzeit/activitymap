@@ -1,94 +1,90 @@
-import { Marker } from 'react-map-gl/mapbox';
-import { useShallowStore } from '~/store';
-import { Avatar, AvatarImage } from '../ui/avatar';
-import { useMemo, useState } from 'react';
+'use client';
 
+import { Marker } from 'react-map-gl/mapbox';
+import { useMemo } from 'react';
+import { useShallowStore } from '~/store';
 import { usePhotos } from '~/hooks/use-photos';
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+import type { Photo } from '~/server/db/schema';
+import { photoVariant, validPhotoLocation } from '~/lib/photo-gallery';
+import { PhotoImage, PhotoLightbox } from '../list/photo';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
 export default function PhotoLayer() {
-  const { position } = useShallowStore((state) => ({
-    position: state.position,
-  }));
-
+  const zoom = useShallowStore((state) => state.position.zoom);
   const { data: photos = [] } = usePhotos();
   const { filterIDs } = useFilteredActivities();
-
-  const displayPhotos = useMemo(() => {
-    return photos.filter((photo) => {
-      if (!photo.location?.[0] || !photo.location[1]) return false;
-      return filterIDs.includes(photo.activity_id);
-    });
-  }, [photos, filterIDs]);
+  const visible = useMemo(() => new Set(filterIDs), [filterIDs]);
+  const galleries = useMemo(() => {
+    const result = new Map<number, Photo[]>();
+    for (const photo of photos) {
+      const group = result.get(photo.activity_id) ?? [];
+      group.push(photo);
+      result.set(photo.activity_id, group);
+    }
+    return result;
+  }, [photos]);
 
   return (
-    position.zoom > 8 && (
+    zoom > 8 && (
       <>
-        {displayPhotos.map((photo) => (
-          <PhotoMarker
-            longitude={photo.location![1]}
-            latitude={photo.location![0]}
-            key={photo.unique_id}
-            urls={photo.urls ?? {}}
-            sizes={photo.sizes ?? {}}
-            activity_name={photo.activity_name!}
-            activity_id={photo.activity_id}
-            caption={photo.caption ?? undefined}
-          />
-        ))}
+        {photos
+          .filter(
+            (p) => visible.has(p.activity_id) && validPhotoLocation(p.location),
+          )
+          .map((photo) => (
+            <PhotoMarker
+              key={photo.unique_id}
+              photo={photo}
+              gallery={galleries.get(photo.activity_id) ?? []}
+            />
+          ))}
       </>
     )
   );
 }
 
-function PhotoMarker({
-  urls,
-  longitude,
-  latitude,
-  activity_name,
-  activity_id,
-  caption,
-}: {
-  urls: Record<number, string>;
-  sizes: Record<number, [number, number]>;
-  longitude?: number;
-  latitude?: number;
-  activity_name: string;
-  activity_id: number;
-  caption?: string;
-}) {
-  const photoUrl = Object.values(urls)[0];
-  const [hover, setHover] = useState(false);
-
-  const { setSelected } = useShallowStore((state) => ({
-    setSelected: state.setSelected,
-  }));
-
+function PhotoMarker({ photo, gallery }: { photo: Photo; gallery: Photo[] }) {
+  const setSelected = useShallowStore((state) => state.setSelected);
+  if (!validPhotoLocation(photo.location)) return null;
   return (
-    longitude &&
-    latitude && (
-      <Marker
-        longitude={longitude}
-        latitude={latitude}
-        anchor="center"
-        style={{ zIndex: hover ? 3 : 2, cursor: 'pointer' }}
-        onClick={(e) => {
-          e.originalEvent.stopPropagation();
-          setSelected([activity_id]);
-        }}
-      >
-        <Avatar
-          onMouseEnter={() => setHover(true)}
-          onMouseLeave={() => setHover(false)}
-          className="size-8 border-2 border-white transition-all hover:size-32 overflow-auto"
+    <Marker
+      longitude={photo.location[1]}
+      latitude={photo.location[0]}
+      anchor="center"
+      style={{ zIndex: 2 }}
+      onClick={(e) => e.originalEvent.stopPropagation()}
+    >
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="h-11 w-11 overflow-hidden rounded-lg border-2 border-white bg-black text-white shadow-md"
+            aria-label={`Select ${photo.activity_name ?? 'activity'} and preview photo`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelected([photo.activity_id]);
+            }}
+          >
+            <PhotoImage variant={photoVariant(photo, 'thumbnail')} alt="" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="z-[60] w-64 space-y-3"
+          onClick={(e) => e.stopPropagation()}
         >
-          <AvatarImage
-            src={photoUrl}
-            alt={caption ?? activity_name}
-            className="w-full h-full object-cover"
+          <p className="text-sm font-medium">
+            {photo.activity_name ?? 'Activity photos'}
+          </p>
+          <p className="text-xs text-muted-foreground">View photos</p>
+          <PhotoLightbox
+            photos={gallery}
+            title={photo.activity_name ?? 'Activity photos'}
+            thumbnailID={photo.unique_id}
+            className="h-24"
           />
-        </Avatar>
-      </Marker>
-    )
+        </PopoverContent>
+      </Popover>
+    </Marker>
   );
 }

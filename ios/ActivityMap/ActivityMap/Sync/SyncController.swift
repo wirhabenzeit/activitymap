@@ -244,13 +244,24 @@ final class SyncController {
         guard let checkpoint, checkpoint.bootstrapComplete, checkpoint.lastSyncAt != nil else {
             activities.activities = []
             photos = []
+            activities.photos = []
+            try? await activities.photoImages.configure(scope: session.scope, photos: [])
             return
         }
         let mapped = try snapshot.activities.map(StoredModelMapper.activity)
         // Assigning activities drops selection/focus/inspection of absent IDs
         // (committed deletions and rebootstrap removals) inside ActivityStore.
         activities.activities = mapped
-        photos = snapshot.photos.map(StoredModelMapper.photo)
+        let activityIDs = Set(mapped.map { String($0.id) })
+        let mappedPhotos = snapshot.photos.map(StoredModelMapper.photo).filter { photo in
+            activityIDs.contains(photo.activityID)
+        }
+        photos = mappedPhotos
+        activities.photos = mappedPhotos
+        // Image-cache I/O failure must not invalidate committed metadata or sync.
+        // The image loader will show an unavailable state if its byte store fails.
+        try? await activities.photoImages.configure(scope: session.scope, photos: mappedPhotos)
+        guard current == generation, !Task.isCancelled else { throw CancellationError() }
     }
 
     private func clearVisible() {
