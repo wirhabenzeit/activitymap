@@ -169,7 +169,9 @@ struct SelectionBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        // iOS grows a menu out of its button and absorbs the button's label,
+        // so only the icon is the menu: the count stays readable beside it (#283).
+        HStack(spacing: 2) {
             Menu {
                 Text(visibleSummary)
                 Divider()
@@ -191,23 +193,26 @@ struct SelectionBar: View {
                         Image(systemName: selectedCount > 0 ? "checkmark.square.fill" : "square")
                             .font(.body)
                             .foregroundStyle(selectedCount > 0 ? AppTheme.accent : Color.secondary)
-                            .frame(width: 44, height: 44)
                     } else {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 3) {
                             Image(systemName: selectedCount > 0 ? "checkmark.circle.fill" : "checklist")
                                 .foregroundStyle(onNavigationBar ? Color.white : selectedCount > 0 ? AppTheme.accent : Color.secondary)
-                            Text(visibleSummary).font(.caption.weight(.medium))
-                                .fixedSize(horizontal: false, vertical: true)
-                            Image(systemName: "chevron.down").font(.system(size: 9))
+                            Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(onNavigationBar ? AnyShapeStyle(Color.white.opacity(0.9)) : AnyShapeStyle(.secondary))
                         }
-                        .foregroundStyle(onNavigationBar ? AnyShapeStyle(Color.white.opacity(0.9)) : AnyShapeStyle(.secondary))
-                        .frame(minHeight: 44)
                     }
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
             }
             .accessibilityLabel("Selection actions for all filtered activities")
             .accessibilityValue(summary)
+            if !iconOnly {
+                Text(visibleSummary).font(.caption.weight(.medium))
+                    .foregroundStyle(onNavigationBar ? AnyShapeStyle(Color.white.opacity(0.9)) : AnyShapeStyle(.secondary))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityHidden(true) // read as the menu's value
+            }
         }
         .buttonStyle(.plain)
     }

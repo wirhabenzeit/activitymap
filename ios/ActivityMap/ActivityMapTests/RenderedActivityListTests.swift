@@ -6,7 +6,7 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
-    @Test func filtersReplaceNativeMapSheetAndRestoreSelection() async throws {
+    @Test func filtersAndSettingsStackOverNativeMapSheet() async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = token }
@@ -24,17 +24,21 @@ extension RenderedRoutePickingTests {
         picker.reviewSelection(store: store)
         try await listWait { sheets.mapResultsPresented }
         let selection = store.selectedActivityIDs
+        // Presented by the results sheet itself, so it opens at once instead of
+        // waiting for the results to fade out (device review, 2026-10-06).
+        let stacked = { host.host.presentedViewController?.presentedViewController != nil }
         sheets.showsFilters = true
-        try await listWait { sheets.shellSheetPresented && !sheets.mapResultsPresented }
-        #expect(sheets.showsFilters, "The filter request must survive dismissal of map selection")
+        try await listWait { stacked() }
+        #expect(sheets.mapResultsPresented && !sheets.shellSheetPresented, "Filters stack over the map results")
         store.searchText = "Ride"
         sheets.showsFilters = false
-        try await listWait { sheets.mapResultsPresented && !sheets.shellSheetPresented }
-        #expect(store.selectedActivityIDs == selection && picker.isPresented)
+        try await listWait { !stacked() }
+        #expect(sheets.mapResultsPresented && store.selectedActivityIDs == selection && picker.isPresented)
         sheets.accountDestination = .about
-        try await listWait { sheets.shellSheetPresented && !sheets.mapResultsPresented }
+        try await listWait { stacked() }
+        #expect(sheets.mapResultsPresented, "Settings stack over the map results")
         sheets.accountDestination = nil
-        try await listWait { sheets.mapResultsPresented && !sheets.shellSheetPresented }
+        try await listWait { !stacked() && sheets.mapResultsPresented }
     }
 
     @Test func nativeMapSheetUsesContentHeightAndRetainsPaging() async throws {
