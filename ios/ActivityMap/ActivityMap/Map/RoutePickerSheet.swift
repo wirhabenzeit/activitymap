@@ -125,7 +125,10 @@ struct RoutePickerSheet: View {
             // Always the trailing control, regardless of summary/navigation.
             panelHandle
         }
-        .padding(.horizontal, collapsed && detail != nil ? AppTheme.Spacing.large : 12)
+        // The collapsed identity aligns with portrait detail; the trailing
+        // handle keeps its inset so it stays under the same finger.
+        .padding(.leading, collapsed && detail != nil ? AppTheme.Spacing.large : 12)
+        .padding(.trailing, 12)
         .padding(.vertical, collapsed && detail != nil ? AppTheme.Spacing.small : 0)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
