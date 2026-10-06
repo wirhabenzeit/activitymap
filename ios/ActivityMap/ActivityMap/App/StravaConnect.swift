@@ -38,7 +38,7 @@ enum StravaConnectCopy {
 /// What a limited Strava grant leaves out (issue #303). Mirrors
 /// `stravaPermissionNotes` in `src/lib/strava-permissions.ts`.
 enum StravaPermissionsCopy {
-    static let reconnect = "Reconnect to grant full access."
+    static let reconnect = "Connect with Strava again to grant the missing permissions."
 
     static func isLimited(_ permissions: ActivityMapAPI.StravaPermissions?) -> Bool {
         guard let permissions else { return false }

@@ -10,6 +10,8 @@ import {
   DialogDescription,
 } from '~/components/ui/dialog';
 import { Button } from '~/components/ui/button';
+import { signOut } from '~/lib/auth-client';
+import { displayEmail, safeReturnPath } from '~/lib/auth-return';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { DisplaySettings } from './display-settings';
 import { useShallowStore } from '~/store';
@@ -53,7 +55,12 @@ export function SettingsDialog({
   }));
   const userId = isGuest ? undefined : user?.id;
   const [tab, setTab] = useState('sync');
-  const query = useIngestionStatus(userId, open && tab === 'sync');
+  const query = useIngestionStatus(
+    userId,
+    open && (tab === 'sync' || tab === 'account'),
+  );
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutFailed, setSignOutFailed] = useState(false);
   const browser = useBrowserSyncStatus((state) =>
     userId ? (state.byUser[userId] ?? emptyBrowserStatus) : emptyBrowserStatus,
   );
@@ -113,8 +120,27 @@ export function SettingsDialog({
         },
       ]
     : [];
-  const permissionNotes = stravaPermissionNotes(user?.stravaPermissions);
+  const permissionNotes =
+    userId && user?.stravaConnected
+      ? stravaPermissionNotes(user.stravaPermissions)
+      : [];
   const showConnect = !userId || !!needsReconnect || permissionNotes.length > 0;
+  const email = userId ? displayEmail(user?.email) : null;
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    setSignOutFailed(false);
+    try {
+      const result = await signOut();
+      if (result.error) throw new Error('Sign-out failed');
+      window.location.assign(
+        safeReturnPath(`${window.location.pathname}${window.location.search}`),
+      );
+    } catch {
+      setSignOutFailed(true);
+      setSigningOut(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -283,10 +309,11 @@ export function SettingsDialog({
                 {needsReconnect && (
                   <div className="space-y-2">
                     <p role="status" className="text-sm text-muted-foreground">
-                      Reconnect Strava to continue importing.
+                      Reconnect Strava from Account to continue importing.
                     </p>
-                    <StravaConnectButton />
-                    <StravaConnectFailure />
+                    <Button variant="outline" onClick={() => setTab('account')}>
+                      Go to Account
+                    </Button>
                   </div>
                 )}
               </section>
@@ -302,43 +329,70 @@ export function SettingsDialog({
             value="account"
             className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
           >
-            <section aria-labelledby="account-heading" className="space-y-2">
-              <h2 id="account-heading" className="text-sm font-semibold">
-                Account
-              </h2>
-              <p className="break-words text-sm text-muted-foreground">
-                {userId
-                  ? (user?.name ?? 'Your account')
-                  : 'Connect Strava to see your activities.'}
-              </p>
-              {userId && !needsReconnect && (
-                <p className="text-xs text-muted-foreground">
-                  {stravaPermissionsLimited(user?.stravaPermissions)
-                    ? 'Strava connected with limited access'
-                    : 'Strava connected'}
+            <section aria-labelledby="account-heading" className="space-y-4">
+              <div className="space-y-1">
+                <h2 id="account-heading" className="text-sm font-semibold">
+                  Account
+                </h2>
+                <p className="break-words text-sm text-muted-foreground">
+                  {userId
+                    ? (user?.name ?? 'Your account')
+                    : 'Connect Strava to see your activities.'}
                 </p>
-              )}
-              {permissionNotes.length > 0 && (
-                <div className="space-y-1 rounded-lg border px-3 py-2 text-xs">
-                  {permissionNotes.map((note) => (
-                    <p key={note}>{note}</p>
-                  ))}
-                  <p className="text-muted-foreground">
-                    {STRAVA_PERMISSIONS_RECONNECT}
+                {email && (
+                  <p className="break-words text-xs text-muted-foreground">
+                    {email}
                   </p>
-                </div>
-              )}
-              {showConnect && <StravaConnectButton />}
-              <StravaConnectFailure />
-              {showConnect && (
-                <p className="text-xs text-muted-foreground">
-                  {STRAVA_CONNECT_PERMISSIONS}
-                </p>
-              )}
+                )}
+              </div>
               {userId && (
                 <p className="text-xs text-muted-foreground">
-                  Signing out keeps Strava connected.
+                  {!user?.stravaConnected
+                    ? 'Strava not connected'
+                    : stravaPermissionsLimited(user.stravaPermissions)
+                      ? 'Strava connected with limited access'
+                      : 'Strava connected'}
                 </p>
+              )}
+              {showConnect && (
+                <div className="space-y-3">
+                  {permissionNotes.length > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {permissionNotes.join(' ')} {STRAVA_PERMISSIONS_RECONNECT}
+                    </p>
+                  ) : needsReconnect ? (
+                    <p className="text-xs text-muted-foreground">
+                      Connect with Strava again to restore access to your
+                      activities.
+                    </p>
+                  ) : null}
+                  <StravaConnectButton />
+                  <StravaConnectFailure />
+                  {!userId && (
+                    <p className="text-muted-foreground">
+                      {STRAVA_CONNECT_PERMISSIONS}
+                    </p>
+                  )}
+                </div>
+              )}
+              {userId && (
+                <div className="space-y-2 border-t pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={handleSignOut}
+                    disabled={signingOut}
+                  >
+                    {signingOut ? 'Signing out…' : 'Sign out of ActivityMap'}
+                  </Button>
+                  {signOutFailed && (
+                    <p role="alert" className="text-xs text-destructive">
+                      Couldn’t sign out. Please try again.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Strava stays connected.
+                  </p>
+                </div>
               )}
             </section>
           </TabsContent>

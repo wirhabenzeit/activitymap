@@ -176,14 +176,18 @@ outcomes, heartbeats and account isolation against PostgreSQL.
 
 ## Settings clients (#300 / #301)
 
-Web Settings and the native Settings form show server history, details, streams
-and photo metadata independently from browser/device downloads. The main
-screen uses compact status rows; detailed counts and run explanations expand
-on web and open native destinations on iOS. Web account, display and about
-settings have separate tabs. The screens do not
-infer server totals from locally loaded activities. Terminal stream failures
-are labelled “Needs attention” even when the server has no runnable work.
-The former web Repair/Photos/Clean table is no longer part of Settings.
+Web Settings and the native Settings form use the same compact presentation:
+last successful browser/device sync, a **Sync now** action, and Strava import
+coverage. History is shown as **All activities imported** (Yes, No or Unknown),
+followed by Details, Photos and Streams percentages. Import counts come from
+the server snapshot, independently of browser/device downloads. Settings omit
+scheduling diagnostics and nested import/download detail screens.
+
+Account shows identity, Strava connection status and **Sign out of ActivityMap**.
+The connection button appears only when signed out, disconnected, missing
+permissions or blocked by rejected Strava credentials. Missing permissions have
+a short explanation and can be granted by connecting again. Signing out keeps
+Strava connected. Web uses tabs; iOS keeps these controls in the Settings form.
 
 Details and streams show coverage bars over the activities already imported;
 streams count successful empty results as checked. History has no percentage
@@ -195,7 +199,7 @@ it and clients show no photo percentage. A 100% photo bar means every activity
 in that population has at least one photo available, not that every individual
 photo has been fetched. No bar is shown for an empty population.
 
-Status requests run only while Settings is visible, at least 60 seconds apart,
+Status requests run only while Settings or Account is visible, at least 60 seconds apart,
 with server Retry-After deadlines respected. Both clients retain the observation
 time and label snapshots older than two minutes, or viewed offline, as last
 known state. iOS persists only the typed snapshot and next-check deadline under
@@ -204,8 +208,8 @@ late responses. A missing or incompatible endpoint leaves coverage unknown.
 
 Browser download state comes from OfflineSyncProvider, including the last
 successful persisted sync, safe failures, offline state and a bounded retry.
-iOS continues to use SyncController and its authorized cache and recovery rules;
-pausing/downloading explicitly affects this device only.
+iOS continues to use SyncController and its authorized cache and recovery rules.
+Sync now downloads to this device; Strava import continues independently.
 
 `shared/ingestion-client-expectations.v1.json` defines matching web/iOS wording
 for all shared status fixtures. Node presentation tests and native

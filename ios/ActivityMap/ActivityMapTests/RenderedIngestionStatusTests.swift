@@ -6,7 +6,7 @@ import Vision
 
 @MainActor @Suite(.serialized)
 struct RenderedIngestionStatusTests {
-    @Test(arguments: ["phone-light", "phone-dark", "large-text", "ipad", "details", "streams", "photos", "photos-large"])
+    @Test(arguments: ["phone-light", "phone-dark", "large-text", "ipad"])
     func serverCoverageIsReadable(layout: String) async throws {
         let suite = "ingestion-render-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -19,17 +19,12 @@ struct RenderedIngestionStatusTests {
         let session = SyncFixtures.session()
         controller.activate(session)
         await controller.refresh(session)
-        let detailIndex = ["details": 1, "streams": 2, "photos": 3, "photos-large": 3][layout]
         let root = NavigationStack {
-            if let detailIndex {
-                IngestionDetailView(snapshot: fixture, index: detailIndex, stale: false)
-            } else {
-                Form { IngestionStatusSection(session: SyncFixtures.session(verified: false), controller: controller) }
-                    .navigationTitle("Settings")
-            }
+            Form { IngestionStatusSection(session: SyncFixtures.session(verified: false), controller: controller) }
+                .navigationTitle("Settings")
         }
         .environment(\.colorScheme, layout == "phone-dark" ? .dark : .light)
-        .environment(\.dynamicTypeSize, (layout == "large-text" || layout == "photos-large") ? .accessibility2 : .large)
+        .environment(\.dynamicTypeSize, layout == "large-text" ? .accessibility2 : .large)
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let old = scene.keyWindow
         let window = UIWindow(windowScene: scene)
@@ -49,21 +44,58 @@ struct RenderedIngestionStatusTests {
         request.recognitionLevel = .accurate
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        if let detailIndex {
-            #expect(text.contains("%"), "Coverage should lead with a visible percentage")
-            if layout != "photos-large" { #expect(text.contains("More information")) }
-            if detailIndex == 3 {
-                #expect(text.contains("110") && text.contains("120"))
-                #expect(!text.contains("Collections verified"), "Freshness belongs in the collapsed detail")
-            }
-        } else {
-            #expect(text.contains("Settings"))
-            #expect(text.contains("History") && text.contains("imported"))
-        }
+        #expect(text.contains("Settings"))
+        #expect(text.contains("All activities imported"))
+        #expect(text.contains("%"), "Import coverage should show a visible percentage")
+        #expect(!text.contains("Background updates") && !text.contains("More information"))
         let directory = URL(fileURLWithPath: "/tmp/activitymap-ingestion-preview")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try image.pngData()?.write(to: directory.appending(path: "\(layout).png"))
     }
+    @Test(arguments: ["full", "limited", "disconnected", "unknown"])
+    func accountOffersReconnectionOnlyWhenNeeded(connection: String) async throws {
+        let base = SyncFixtures.session().user
+        let user = ActivityMapAPI.CurrentUser(
+            id: base.id, name: "Ada Example", email: "42@strava.local", image: nil, athleteID: base.athleteID,
+            stravaConnected: connection != "disconnected",
+            stravaPermissions: connection == "unknown" ? nil : .init(
+                activities: connection == "limited" ? .public : .all, edit: connection != "limited"),
+            authentication: base.authentication)
+        let account = AccountSheet(destination: .profile, auth: AuthController())
+        let root = NavigationStack {
+            Form { account.signedInContent(user) }.navigationTitle("Account")
+        }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let old = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: CGSize(width: 390, height: 844))
+        let host = UIHostingController(rootView: root)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; old?.makeKeyAndVisible() }
+        host.view.frame = window.bounds
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(250))
+        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
+            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+        }
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(text.contains("Ada Example"))
+        #expect(!text.contains("strava.local"))
+        #expect(text.contains("Sign out of ActivityMap"))
+        let showsConnect = (request.results ?? []).contains {
+            $0.topCandidates(1).first?.string.lowercased() == "connect with strava"
+        }
+        #expect(showsConnect == (connection == "limited" || connection == "disconnected"), "\(text)")
+        if connection == "limited" { #expect(text.contains("missing permissions")) }
+        let directory = URL(fileURLWithPath: "/tmp/activitymap-ingestion-preview")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try image.pngData()?.write(to: directory.appending(path: "account-\(connection).png"))
+    }
+
     @Test(arguments: ["account", "about"])
     func settingsDestinationsKeepTheirNativeFormLayout(page: String) async throws {
         let settings = AccountSheet(destination: .settings, auth: AuthController())
