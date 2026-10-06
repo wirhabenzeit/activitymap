@@ -52,6 +52,15 @@ export function DataTableViewOptions<TData extends RowData>({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56">
+          <DropdownMenuItem onSelect={() => table.toggleAllRowsSelected(true)}>
+            Select all filtered activities
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => table.toggleAllRowsSelected(false)}>
+            Deselect all filtered activities
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => table.setRowSelection({})}>
+            Clear selection
+          </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="gap-2">
               <Columns className="size-4" />

@@ -135,7 +135,11 @@ const RouteLayer = React.memo(function RouteLayer() {
     filter,
     selectedFilter,
   ];
-  const filterHigh: mapboxgl.FilterSpecification = ['==', 'id', highlighted];
+  const filterHigh: mapboxgl.FilterSpecification = [
+    'all',
+    filter,
+    ['==', 'id', highlighted],
+  ];
 
   return (
     <Source data={geoJson} id="routeSource" type="geojson">
@@ -302,6 +306,11 @@ export default function InteractiveMap() {
     summaryUserId:
       !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
   }));
+  const visibleSelected = useMemo(
+    () => selected.filter((id) => filterIDs.includes(id) && activityDict[id]),
+    [selected, filterIDs, activityDict],
+  );
+  const hiddenSelectedCount = selected.length - visibleSelected.length;
   const selectedSummaryActivities = useMemo(
     () =>
       selected.flatMap((id) => {
@@ -587,7 +596,7 @@ export default function InteractiveMap() {
   );
   const rows = useMemo(
     () =>
-      selected
+      visibleSelected
         .map((key) => {
           const activity = activityDict[key];
           if (!activity) return undefined;
@@ -597,7 +606,7 @@ export default function InteractiveMap() {
           };
         })
         .filter((x) => x != undefined),
-    [selected, activityDict, photoDict],
+    [visibleSelected, activityDict, photoDict],
   );
   const mapColumns = useMemo(
     () =>
@@ -785,24 +794,28 @@ export default function InteractiveMap() {
         id="map-route-panel"
         className={cn(
           'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,48rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
-          { hidden: rows.length == 0 },
+          { hidden: selected.length === 0 },
         )}
       >
-        {selected.length > 1 && (
+        {(selected.length > 1 || hiddenSelectedCount > 0) && (
           <div className="flex items-center gap-1 border-b px-3 py-2 text-xs sm:gap-2">
-            <span className="whitespace-nowrap font-semibold">
-              {selected.length} routes
+            <span className="min-w-0 font-semibold">
+              {selected.length} selected
+              {hiddenSelectedCount > 0
+                ? ` · ${hiddenSelectedCount} hidden by filters`
+                : ''}
             </span>
             <div className="flex-1" />
             <Button
               size="icon"
               variant="ghost"
               className="h-9 w-9 shrink-0"
-              aria-label="Fit selected routes"
-              title="Fit selected routes"
+              aria-label="Fit visible selected routes"
+              disabled={visibleSelected.length === 0}
+              title="Fit visible selected routes"
               onClick={() => {
                 setPanelExpanded(false);
-                requestRouteFit(selected);
+                requestRouteFit(visibleSelected);
               }}
             >
               <Scan aria-hidden="true" />
@@ -846,7 +859,7 @@ export default function InteractiveMap() {
           className={
             // Opening a card keeps the panel compact (card plus a few rows).
             // The list size control explicitly makes more room for rows.
-            selected.length === 1
+            visibleSelected.length === 1
               ? 'max-h-[70vh]'
               : panelExpanded
                 ? 'max-h-[65vh]'
@@ -864,14 +877,21 @@ export default function InteractiveMap() {
           paginationControl={false}
           headerClassName="max-lg:hidden"
           cellClassName="max-lg:px-2 max-lg:border-r-0"
-          {...inlineRouteDetails(highlighted, setHighlighted)}
-          renderSingleDetails={(row) => (
-            <ActivityCardContent
-              row={row}
-              onClearSelection={clearSelection}
-              onFit={() => requestRouteFit(selected)}
-            />
+          {...inlineRouteDetails(
+            filterIDs.includes(highlighted) ? highlighted : 0,
+            setHighlighted,
           )}
+          renderSingleDetails={
+            highlighted !== 0 && visibleSelected[0] === highlighted
+              ? (row) => (
+                  <ActivityCardContent
+                    row={row}
+                    onClearSelection={clearSelection}
+                    onFit={() => requestRouteFit(visibleSelected)}
+                  />
+                )
+              : undefined
+          }
           {...compactList}
           columnVisibility={mapColumnVisibility}
         />

@@ -79,7 +79,7 @@ struct ActivityDetailPanel: View {
                         }, profile: { activity in
                             ElevationProfileView(store: store, activityID: activity.id,
                                                  isRelevant: store.selectedTab == .list)
-                        }, photos: { _ in EmptyView() })
+                        }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
                     }
                     .accessibilityIdentifier("activity-detail-scroll")
                     .clipped()
@@ -159,10 +159,10 @@ private struct MapActivityDetailReveal: View {
                 .padding(.horizontal, AppTheme.Spacing.large)
                 .padding(.vertical, AppTheme.Spacing.small)
                 ActivityDetailContent(activity: activity, showsHeading: false, showsPrimaryMetrics: false, showsDescription: false,
-                                      profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
+                                      profile: { _ in EmptyView() }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             } else {
                 ActivityDetailContent(activity: activity, showsHeading: false,
-                                      profile: { _ in elevation }, photos: { _ in EmptyView() })
+                                      profile: { _ in elevation }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             }
         }
         .opacity(reveal)

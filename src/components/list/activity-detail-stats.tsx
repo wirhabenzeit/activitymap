@@ -27,10 +27,10 @@ const icons = {
 
 export function ActivityDetailStats({
   activity,
-  children,
+  photos,
 }: {
   activity: Activity;
-  children?: ReactNode;
+  photos?: ReactNode;
 }) {
   const { headline, groups } = activityDetailStats(
     activity,
@@ -65,6 +65,7 @@ export function ActivityDetailStats({
         </summary>
         <div className="space-y-5 pt-3">
           <div className="grid gap-x-6 gap-y-5 @2xl:grid-cols-2">
+            {photos}
             {groups.map((group) => {
               const Icon = icons[group.id as keyof typeof icons];
               return (
@@ -97,7 +98,6 @@ export function ActivityDetailStats({
               );
             })}
           </div>
-          {children}
         </div>
       </details>
     </div>

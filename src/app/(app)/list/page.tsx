@@ -12,12 +12,11 @@ import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import { usePhotos } from '~/hooks/use-photos';
 
 export default function ListPage() {
-  const { selected, setSelected, tableState } =
-    useShallowStore((state) => ({
-      selected: state.selected,
-      setSelected: state.setSelected,
-      tableState: state.fullList,
-    }));
+  const { selected, setSelected, tableState } = useShallowStore((state) => ({
+    selected: state.selected,
+    setSelected: state.setSelected,
+    tableState: state.fullList,
+  }));
 
   // The open card is local to the list: browsing details must not select an
   // activity or change the route highlighted on the map.
@@ -25,6 +24,8 @@ export default function ListPage() {
   const { data: activities = [] } = useActivities();
   const { data: photos = [] } = usePhotos();
   const { filterIDs } = useFilteredActivities(activities);
+
+  if (openId !== 0 && !filterIDs.includes(openId)) setOpenId(0);
 
   const columnFilters = [{ id: 'id', value: filterIDs }];
   const photoDict = React.useMemo(

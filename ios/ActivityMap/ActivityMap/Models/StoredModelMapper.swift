@@ -75,6 +75,6 @@ enum StoredModelMapper {
         let location = coordinate(dto.location)
         return Photo(
             id: dto.uniqueID, activityID: dto.activityID, caption: dto.caption,
-            urls: dto.urls ?? [:], location: location, createdAt: dto.createdAt)
+            urls: dto.urls ?? [:], location: location, createdAt: dto.createdAt, sizes: dto.sizes ?? [:])
     }
 }

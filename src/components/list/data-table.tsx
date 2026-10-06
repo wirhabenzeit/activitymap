@@ -147,7 +147,21 @@ export const DataTable = React.memo(function DataTable<
         typeof updater === 'function'
           ? updater(Object.fromEntries(selected.map((id) => [id, true])))
           : updater;
-      setSelected(Object.keys(selection).map(Number));
+      setSelected((previous) => {
+        const requested = new Set(
+          Object.keys(selection)
+            .filter((id) => selection[id])
+            .map(Number),
+        );
+        // A filtered/page toggle cannot silently discard hidden selection.
+        const dataIDs = new Set(data.map((row) => row.id));
+        return [
+          ...new Set([
+            ...previous.filter((id) => !dataIDs.has(id)),
+            ...requested,
+          ]),
+        ];
+      });
     },
     getRowCanExpand: () => Boolean(renderInlineDetails),
     getIsRowExpanded: (row) => Number(row.id) === activeId,

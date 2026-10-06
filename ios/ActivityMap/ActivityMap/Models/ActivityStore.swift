@@ -81,6 +81,8 @@ final class ActivityStore {
         }
         return routeAvailabilityIDs
     }
+    var photos: [Photo] = []
+    let photoImages: PhotoImageCache
     var streamSummaries: StreamSummaryLoader?
     var elevationCursor: ElevationCursor?
     /// The profile whose chart is being dragged. Only an active drag suspends
@@ -89,7 +91,8 @@ final class ActivityStore {
     let mapContext = MapContext()
     let listPresentation: ActivityListPresentation
 
-    init(activities: [Activity] = [], listPresentation: ActivityListPresentation = ActivityListPresentation(), stats: StatsController = StatsController()) {
+    init(activities: [Activity] = [], listPresentation: ActivityListPresentation = ActivityListPresentation(), stats: StatsController = StatsController(), photoImages: PhotoImageCache = PhotoImageCache()) {
+        self.photoImages = photoImages
         self.stats = stats
         self.listPresentation = listPresentation
         self.activities = activities
@@ -387,6 +390,8 @@ final class ActivityStore {
 
     /// Logout, account or deployment transition.
     func clearScope() {
+        photos = []
+        photoImages.reset()
         elevationCursor = nil
         elevationScrubOwner = nil
         stats.clearScope()
