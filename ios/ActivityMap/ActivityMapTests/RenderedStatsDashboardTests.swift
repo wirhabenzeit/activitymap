@@ -363,10 +363,11 @@ import Testing
             }
             return Array(bytes.prefix(3))
         }
-        // Fixed renderer geometry: neither sample intersects axes or lines.
+        // Fixed renderer geometry: neither 4pt sample intersects an axis, a
+        // gridline (10'000 at y≈72, 5'000 at y≈115) or the tail (y≈105).
         // Default stacking puts the pale area ABOVE the tail instead of below it.
-        #expect(try rgb(x: 300, y: 70).allSatisfy { $0 > 250 }, "No phantom area above the dashed tail")
-        #expect(try rgb(x: 300, y: 115).allSatisfy { $0 > 235 && $0 < 250 }, "The pale area remains below the tail")
+        #expect(try rgb(x: 300, y: 88).allSatisfy { $0 > 250 }, "No phantom area above the dashed tail")
+        #expect(try rgb(x: 300, y: 135).allSatisfy { $0 > 235 && $0 < 250 }, "The pale area remains below the tail")
     }
 
     @Test func largeTextShellKeepsStatsDestinationReachable() async throws {
