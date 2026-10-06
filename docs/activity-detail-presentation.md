@@ -4,7 +4,7 @@ Applies to web Map/List cards and iOS Map/List detail panels. Native controls ma
 
 ## Hierarchy
 
-1. Activity title, sport and activity-local date/time. Keep route/navigation actions in the heading or action bar. On the native map, Fit route sits beside the activity title in portrait, landscape and iPad panels; it must not reserve a footer row.
+1. Activity title, sport and activity-local date/time. Route/navigation actions sit beside the title, never in a footer row. Every surface uses the same tinted map button: on the map it is Fit route; in List, the iPad detail pane and Stats it is Show on map, which adds the activity to the selection and keeps it there. Rows at least 520pt/px wide label the action and, on web, keep Edit beside it; narrower rows show the map icon alone and move Edit into the ••• menu. Edit, Strava refresh, GPX and Open in Strava join a ••• menu in the same row.
 2. Elevation graph when an elevation profile is available, with its axes and units.
 3. Activity description, when present, below the graph. Preserve line breaks; omit blank descriptions.
 4. Exactly three headline measurements: **Distance**, **Moving time**, **Elevation gain**, in that order. Use one row at ordinary phone size; reflow for accessibility text sizes. Values are prominent, labels secondary. Do not repeat elapsed time or min/max as headline captions. Missing primary values show an em dash.
