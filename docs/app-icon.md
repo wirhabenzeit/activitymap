@@ -6,8 +6,15 @@ automatic gradient based on app blue (`#1976D2`); the route uses the same solid
 blue. The map panels have solid fills, with glass shading disabled.
 
 The Xcode target includes the package through its synchronized `ActivityMap`
-folder. `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` in `Base.xcconfig` selects
-it in both build configurations. Keep the package name and this setting aligned.
+folder. `ACTIVITYMAP_APP_ICON = AppIcon` in `Base.xcconfig` selects it for every
+ordinary build, Release and TestFlight included. Keep the package name and this
+setting aligned.
+
+The ActivityMap Dev build (`scripts/install-dev-iphone.sh`) selects
+[`AppIconDev.icon`](../ios/ActivityMap/ActivityMap/AppIconDev.icon) instead: the
+same artwork with an outlined DEV badge. Don't edit it by hand;
+`python3 scripts/generate-app-icons.py --dev-only` regenerates it from
+`AppIcon.icon`, and the full generator refreshes it too.
 
 ## Regenerate web assets
 

@@ -93,6 +93,20 @@ Note that `//` starts a comment in xcconfig, so URL separators are composed from
 
 `Info.plist` carries one narrow App Transport Security exception, permitting insecure HTTP loads to `localhost` only, so Debug builds can reach a local `pnpm dev` server. Running against a device on the LAN needs its own exception or an HTTPS tunnel.
 
+### Install ActivityMap Dev on your iPhone
+
+```sh
+scripts/install-dev-iphone.sh                   # first paired, unlocked iPhone
+scripts/install-dev-iphone.sh --device "NAME"   # or a UDID
+scripts/install-dev-iphone.sh --build-only      # build and verify without installing
+```
+
+This builds the current checkout (Debug, production server) as **ActivityMap Dev**, `page.dominik.activitymap.dev`, with the DEV-badged icon and the `activitymap-dev://auth/callback` sign-in scheme. It installs beside the TestFlight app and never replaces it: the script refuses any other bundle ID. The build overrides `ACTIVITYMAP_BUNDLE_ID_SUFFIX`, `ACTIVITYMAP_DISPLAY_NAME`, `ACTIVITYMAP_APP_ICON` and `ACTIVITYMAP_AUTH_CALLBACK_SCHEME`; their `Base.xcconfig` defaults keep Release and TestFlight builds as `page.dominik.activitymap`.
+
+Worktrees have no ignored `Local.xcconfig`, so the script takes `MAPBOX_ACCESS_TOKEN` from the environment or from the main checkout's `Local.xcconfig`. It stops if the built app would have no token, because the map would be blank. Production's `MOBILE_AUTH_REDIRECT_ALLOWLIST` must include `activitymap-dev://auth/callback`.
+
+Running the plain `ActivityMap` scheme on a device from Xcode builds `page.dominik.activitymap`, which replaces the TestFlight app. Use the script instead.
+
 ### Run on a physical iPhone
 
 The simulator shares the Mac's `localhost`; an iPhone's `localhost` is the phone. `Config/Base.xcconfig` now sends simulator builds to the local server and physical-device builds to the production HTTPS deployment:

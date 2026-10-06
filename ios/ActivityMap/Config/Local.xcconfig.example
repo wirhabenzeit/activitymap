@@ -16,5 +16,7 @@ MAPBOX_ACCESS_TOKEN = pk.your-public-mapbox-token
 // ACTIVITYMAP_API_BASE_URL = https:$(SLASH)$(SLASH)your-host.example
 //
 // Changing the callback scheme also requires updating the server's
-// MOBILE_AUTH_REDIRECT_ALLOWLIST to match, or sign-in is rejected.
+// MOBILE_AUTH_REDIRECT_ALLOWLIST to match, or sign-in is rejected. The
+// ActivityMap Dev build uses activitymap-dev, so production must allow both
+// activitymap://auth/callback and activitymap-dev://auth/callback.
 // ACTIVITYMAP_AUTH_CALLBACK_SCHEME = activitymap

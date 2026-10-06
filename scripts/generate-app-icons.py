@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
@@ -37,7 +38,38 @@ def artwork(filename):
                    for child in ET.parse(SOURCE / 'Assets' / filename).getroot())
 
 
+def generate_development_icon():
+    """Keep the Dev build's artwork in step with the release source, with a vector DEV badge."""
+    destination = SOURCE.with_name('AppIconDev.icon')
+    (destination / 'Assets').mkdir(parents=True, exist_ok=True)
+    document = json.loads((SOURCE / 'icon.json').read_text())
+    for asset in (SOURCE / 'Assets').iterdir():
+        if asset.is_file():
+            shutil.copyfile(asset, destination / 'Assets' / asset.name)
+    # Outlined glyphs stay predictable in Icon Composer without a font dependency.
+    (destination / 'Assets' / 'Dev-Badge.svg').write_text(svg(
+        '<rect x="262" y="770" width="500" height="160" rx="40" fill="#111827" stroke="#FBBF24" stroke-width="8"/>'
+        '<g fill="#FBBF24">'
+        '<path fill-rule="evenodd" d="M342 802H384C419 802 433 823 433 850S419 898 384 898H342ZM367 824V876H383C401 876 408 867 408 850S401 824 383 824Z"/>'
+        '<path d="M455 802H529V824H480V838H524V860H480V876H529V898H455Z"/>'
+        '<path d="M548 802H575L598 867L621 802H648L612 898H584Z"/>'
+        '</g>'
+    ))
+    document['groups'].append({
+        'name': 'Development badge',
+        'layers': [{'name': 'DEV', 'image-name': 'Dev-Badge.svg', 'glass': False}],
+        'shadow': {'kind': 'none', 'opacity': 0},
+        'specular': False,
+        'translucency': {'enabled': False, 'value': 0},
+    })
+    (destination / 'icon.json').write_text(json.dumps(document, indent=2) + '\n')
+
+
 def main():
+    generate_development_icon()
+    if '--dev-only' in sys.argv:
+        print('Updated AppIconDev.icon from AppIcon.icon.')
+        return
     for executable in ('magick', 'rsvg-convert', 'xcode-select'):
         if not shutil.which(executable):
             raise SystemExit(f'Missing {executable}; see docs/app-icon.md.')

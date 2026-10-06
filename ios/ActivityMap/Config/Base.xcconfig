@@ -3,8 +3,17 @@ MAPBOX_ACCESS_TOKEN =
 
 // Shared by system controls and the explicit browsing selection treatment.
 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+// App identity. Release and TestFlight use these defaults. The Dev build
+// (scripts/install-dev-iphone.sh) overrides them on the command line, so it
+// installs beside the TestFlight app as "ActivityMap Dev" with its own icon
+// (AppIconDev.icon, generated from AppIcon.icon) and sign-in callback scheme.
+// Only this target reads these names; packages are unaffected.
+ACTIVITYMAP_BUNDLE_ID_SUFFIX =
+ACTIVITYMAP_DISPLAY_NAME = ActivityMap
+ACTIVITYMAP_APP_ICON = AppIcon
+INFOPLIST_KEY_CFBundleDisplayName = $(ACTIVITYMAP_DISPLAY_NAME)
 // Editable layered source in ActivityMap/AppIcon.icon.
-ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+ASSETCATALOG_COMPILER_APPICON_NAME = $(ACTIVITYMAP_APP_ICON)
 
 // xcconfig treats "//" as the start of a comment, so URL separators have to be
 // composed from $(SLASH) instead of written literally.
