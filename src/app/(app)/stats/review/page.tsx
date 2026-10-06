@@ -10,9 +10,11 @@ import { dayFromISODate } from '~/lib/stats/tile-data';
 
 export default async function Page() {
   if (process.env.NODE_ENV !== 'development') notFound();
+  // Development only (see above): the ignore comment stops the dynamic path
+  // from making Turbopack trace the whole project into the production bundle.
   const fixture = JSON.parse(
     await readFile(
-      process.env.ACTIVITYMAP_GALLERY_LIBRARY ??
+      /* turbopackIgnore: true */ process.env.ACTIVITYMAP_GALLERY_LIBRARY ??
         join(
           process.cwd(),
           'ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json',
