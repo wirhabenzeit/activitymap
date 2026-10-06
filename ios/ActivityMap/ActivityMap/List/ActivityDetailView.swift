@@ -131,24 +131,13 @@ private struct MapActivityDetailReveal: View {
         }
     }
 
+    // The same title row and map button as List and Stats; here it fits the route.
     private var heading: some View {
-        HStack(alignment: .top, spacing: 8) {
-            ActivityDetailIdentity(activity: activity, trailingInset: trailingInset,
-                                   titleLineLimit: compactProfile ? (expansion.progress > 0.8 ? 2 : 1) : nil)
-            Button { showOnMap(activity.id) } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(AppTheme.accent)
-            .disabled(!hasRoute)
-            .accessibilityLabel("Fit route")
-            .accessibilityIdentifier("activity-show-on-map")
-            .accessibilityHint(hasRoute ? "Frame this route while keeping its elevation profile visible" : "This activity has no GPS route")
-        }
-        .padding(.horizontal, AppTheme.Spacing.large)
-        .padding(.vertical, AppTheme.Spacing.small)
+        ActivityDetailHeading(activity: activity, trailingInset: trailingInset,
+                              titleLineLimit: compactProfile ? (expansion.progress > 0.8 ? 2 : 1) : nil,
+                              hasRoute: hasRoute, showsNoRouteNote: false, showOnMap: showOnMap)
+            .padding(.horizontal, AppTheme.Spacing.large)
+            .padding(.vertical, AppTheme.Spacing.small)
     }
 
     private var fullDetail: some View {

@@ -151,6 +151,8 @@ struct ActivityDetailHeading: View {
     var trailingInset: CGFloat = 0
     var titleLineLimit: Int? = nil
     var hasRoute = true
+    /// The map panel explains a missing route in its own detail instead.
+    var showsNoRouteNote = true
     var showOnMap: ((Int) -> Void)? = nil
     @Environment(\.activityDetailOverMap) private var overMap
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -161,8 +163,9 @@ struct ActivityDetailHeading: View {
     /// sizes show the icon alone.
     static let labelledWidth: CGFloat = 520
     private var labelled: Bool { width >= Self.labelledWidth && !typeSize.isAccessibilitySize }
+    // One map symbol everywhere; over the map the same action frames the route.
     private var title: String { overMap ? "Fit route" : "Show on map" }
-    private var icon: String { overMap ? "arrow.up.left.and.arrow.down.right" : "map" }
+    private let icon = "map"
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
@@ -196,7 +199,7 @@ struct ActivityDetailHeading: View {
                     .accessibilityHint(hasRoute ? (overMap ? "Frame this route while keeping its elevation profile visible" : "Select this activity and frame its route") : "This activity has no GPS route")
                 }
             }
-            if showOnMap != nil && !hasRoute {
+            if showOnMap != nil && !hasRoute && showsNoRouteNote {
                 Text("No GPS route recorded").font(.caption).foregroundStyle(AppTheme.secondaryText)
                     .accessibilityIdentifier("activity-no-route")
             }

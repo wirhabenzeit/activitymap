@@ -2,7 +2,6 @@
 
 import {
   Map,
-  Scan,
   Minus,
   Download,
   MoreHorizontal,
@@ -371,16 +370,17 @@ export function ActivityCardContent({
                 <Minus className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
+            {/* Same map button as List; on the map it frames the route. */}
             {onFit && (
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="icon"
-                className="h-7 w-7 shrink-0"
+                className="h-8 w-8 shrink-0 bg-header-background/10 text-header-background hover:bg-header-background/15"
                 onClick={onFit}
                 aria-label="Fit route"
                 title="Fit route"
               >
-                <Scan className="h-4 w-4" aria-hidden="true" />
+                <Map className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
             {onClearSelection && (
