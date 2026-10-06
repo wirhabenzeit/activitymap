@@ -50,8 +50,14 @@ struct AppShell: View {
                             Divider()
                         }
                         content.environment(\.filterSidebarVisible, sidebarAvailable && sidebarVisible)
-                            .environment(\.mapResultsSheetSuspended, sheets.showsFilters || sheets.accountDestination != nil || sheets.shellSheetPresented)
+                            // Filters and Settings stack over the map's results sheet
+                            // instead of waiting for it to dismiss first.
+                            .environment(\.mapResultsSheetSuspended, sheets.shellSheetPresented)
                             .environment(\.mapResultsPresentationChanged, { sheets.mapResultsPresented = $0 })
+                            .environment(\.stackedShellSheet, StackedShellSheet(
+                                request: Binding(get: { shellRequest(sidebarAvailable: sidebarAvailable) },
+                                                 set: { if $0 == nil { clearShellRequest() } }),
+                                content: { AnyView(shellSheet($0)) }))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -76,35 +82,16 @@ struct AppShell: View {
                         await refresh()
                     }
                 }
+                // While the map's results sheet is up, it presents these itself.
                 .sheet(item: Binding(
-                    get: { sheets.mapResultsPresented ? nil : (sheets.showsFilters && !sidebarAvailable ? ShellSheet.filters : sheets.accountDestination.map(ShellSheet.account)) },
+                    get: { sheets.mapResultsPresented ? nil : shellRequest(sidebarAvailable: sidebarAvailable) },
                     set: { value in
                         guard !sheets.mapResultsPresented, value == nil else { return }
-                        sheets.showsFilters = false
-                        sheets.accountDestination = nil
+                        clearShellRequest()
                     }
                 ), onDismiss: { sheets.shellSheetPresented = false }) { destination in
-                    Group {
-                        switch destination {
-                        case .filters:
-                            NavigationStack {
-                                FilterPanel(store: store, scope: filterScope)
-                                    .navigationTitle("Filters")
-                                    .navigationBarTitleDisplayMode(.inline)
-                                    .toolbar {
-                                        ToolbarItem(placement: .confirmationAction) {
-                                            Button("Done") { sheets.showsFilters = false }
-                                                .accessibilityIdentifier("filters-done")
-                                        }
-                                    }
-                            }
-                            .presentationDetents(verticalSizeClass == .compact || typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
-                            .presentationDragIndicator(.visible)
-                        case .account(let account):
-                            AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
-                        }
-                    }
-                    .onAppear { sheets.shellSheetPresented = true }
+                    shellSheet(destination)
+                        .onAppear { sheets.shellSheetPresented = true }
                 }
             }
         }
@@ -113,6 +100,36 @@ struct AppShell: View {
         }
         .animation(.easeInOut(duration: 0.2), value: connectPrompt)
         .environment(\.stravaConnect, stravaConnect)
+    }
+
+    private func shellRequest(sidebarAvailable: Bool) -> ShellSheet? {
+        sheets.showsFilters && !sidebarAvailable ? .filters : sheets.accountDestination.map(ShellSheet.account)
+    }
+
+    private func clearShellRequest() {
+        sheets.showsFilters = false
+        sheets.accountDestination = nil
+    }
+
+    @ViewBuilder private func shellSheet(_ destination: ShellSheet) -> some View {
+        switch destination {
+        case .filters:
+            NavigationStack {
+                FilterPanel(store: store, scope: filterScope)
+                    .navigationTitle("Filters")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { sheets.showsFilters = false }
+                                .accessibilityIdentifier("filters-done")
+                        }
+                    }
+            }
+            .presentationDetents(verticalSizeClass == .compact || typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
+            .presentationDragIndicator(.visible)
+        case .account(let account):
+            AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
+        }
     }
 
     /// Signed out, expired or disconnected: one prompt over the whole shell.
@@ -292,7 +309,7 @@ enum AccountDestination: String, Identifiable {
     AppShell(activities: SampleData.activities)
 }
 
-private enum ShellSheet: Identifiable {
+enum ShellSheet: Identifiable {
     case filters
     case account(AccountDestination)
     var id: String {

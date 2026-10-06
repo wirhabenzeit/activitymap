@@ -29,7 +29,6 @@ struct MapScreen: View {
                 MapReader { proxy in
                     mapView(proxy: proxy, geometry: geometry)
                 }
-                let showingResults = picker.isPresented
                 // Keep the map tools anchored below navigation as results resize.
                 mapControls
                     .position(MapResultsLayout.controlsCenter(size: geometry.size,
@@ -42,13 +41,6 @@ struct MapScreen: View {
                 MapResultsContainer(picker: picker, store: store, size: geometry.size,
                                         topInset: max(topOcclusion, geometry.safeAreaInsets.top),
                                         bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize)
-                if !showingResults {
-                    VStack {
-                        Spacer()
-                        HStack { selectionMenu; Spacer(minLength: 132) }
-                            .padding(.horizontal, 16).padding(.bottom, 32)
-                    }
-                }
             }
 
         }
@@ -249,41 +241,6 @@ struct MapScreen: View {
                 .rasterOpacity(overlay.opacity)
         }
 
-    }
-
-    @ViewBuilder
-    private var selectionMenu: some View {
-        if !store.selectedActivityIDs.isEmpty {
-            Menu {
-                Button {
-                    picker.reviewSelection(store: store)
-                } label: {
-                    Label("Show selected activities", systemImage: "list.bullet")
-                }
-                Toggle("Add routes to selection", isOn: $picker.isAdding)
-                Button("Clear selection", role: .destructive) { store.clearSelection() }
-            } label: {
-                HStack(spacing: 6) {
-                    if picker.isAdding { Image(systemName: "plus.circle") }
-                    VStack(spacing: 2) {
-                        Text("\(store.selectedActivityIDs.count) selected")
-                            .font(.subheadline.weight(.semibold))
-                        if store.hiddenSelectedCount > 0 {
-                            Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption2)
-                        }
-                    }
-                    Image(systemName: "chevron.down").font(.caption.weight(.semibold))
-                }
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.primary)
-            .accessibilityLabel("\(store.selectedActivityIDs.count) selected, \(store.hiddenSelectedCount) hidden by filters")
-            .accessibilityValue(picker.isAdding ? "Add routes enabled" : "Replace selection")
-            .accessibilityHint("Show selected activities, add routes or clear selection")
-            .modifier(MapChromeSurface())
-        }
     }
 
     private var mapControls: some View {

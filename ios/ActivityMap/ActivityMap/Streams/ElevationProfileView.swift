@@ -33,7 +33,22 @@ struct ElevationProfileView: View {
         return decoded?.profile
     }
 
+    /// The server has no elevation by distance for this activity, so the
+    /// detail reserves no space for it. Loading, pending, stale and failed
+    /// states keep their placeholder, as a profile may still arrive.
+    private var hasNoProfile: Bool {
+        switch state {
+        case .unavailable: return true
+        case .current: return decoded?.cached == cached && decoded?.profile == nil
+        default: return false
+        }
+    }
+
     var body: some View {
+        if hasNoProfile { EmptyView() } else { content }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             Group {
                 if let profile {

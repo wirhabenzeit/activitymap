@@ -88,6 +88,15 @@ extension EnvironmentValues {
         get { self[MapResultsSheetSuspendedKey.self] }
         set { self[MapResultsSheetSuspendedKey.self] = newValue }
     }
+    @Entry var stackedShellSheet: StackedShellSheet? = nil
+}
+
+/// The shell's Filters and Settings sheets, presented over the phone results
+/// sheet while it is up. UIKit shows one sheet per presenter, so the results
+/// sheet presents them instead of being dismissed first.
+struct StackedShellSheet {
+    var request: Binding<ShellSheet?>
+    var content: (ShellSheet) -> AnyView
 }
 
 /// The system owns phone scrolling and drag arbitration.
@@ -98,6 +107,7 @@ private struct NativeMapResultsSheet: View {
     let largeText: Bool
     @Environment(\.mapResultsSheetSuspended) private var suspended
     @Environment(\.mapResultsPresentationChanged) private var presentationChanged
+    @Environment(\.stackedShellSheet) private var stacked
     private var openingHeight: CGFloat {
         NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.visibleActivityIDs.contains).count,
                                             detail: picker.detailID != nil, height: size.height, largeText: largeText)
@@ -133,6 +143,9 @@ private struct NativeMapResultsSheet: View {
                 .presentationContentInteraction(picker.detailID == nil ? .resizes : .scrolls)
                 .interactiveDismissDisabled()
                 .onAppear { presentationChanged(true) }
+                .sheet(item: stacked?.request ?? .constant(nil)) { destination in
+                    stacked?.content(destination)
+                }
 
             }
     }
