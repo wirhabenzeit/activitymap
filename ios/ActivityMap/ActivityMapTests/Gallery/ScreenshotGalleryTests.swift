@@ -17,14 +17,29 @@ struct ScreenshotGalleryTests {
         let library = try GalleryLibrary.load()
         let available = Set(library.activities.map(\.id))
         try #require(Set(scenario.selectedIDs + [scenario.detailID].compactMap { $0 }).isSubset(of: available), "Scenario IDs missing from gallery library")
-        for spec in manifest.variants where GalleryEnvironment.includes(spec.name, key: "VARIANTS") {
-            let variant = spec.variant
-            let staged = try scene.stage(library.activities, scenario: scenario)
-            let window = try GalleryWindow(root: staged.root, variant: variant)
-            defer { window.close() }
-            try await window.settle(staged)
-            try window.save(scene: scene, variant: variant, library: library.source, scenario: scenario)
+        do {
+            for spec in manifest.variants where GalleryEnvironment.includes(spec.name, key: "VARIANTS") {
+                let variant = spec.variant
+                // Like a person turning the phone: build in portrait, then rotate.
+                try await GalleryWindow.orient(landscape: false)
+                let staged = try scene.stage(library.activities, scenario: scenario)
+                let window = try GalleryWindow(root: staged.root, variant: variant)
+                defer { window.close() }
+                if variant.landscape {
+                    // Rotating before the first layout leaves stale safe-area
+                    // backgrounds, which never happens on a device.
+                    try await Task.sleep(for: .milliseconds(800))
+                    try await GalleryWindow.orient(landscape: true)
+                }
+                try await window.settle(staged)
+                try window.save(scene: scene, variant: variant, library: library.source, scenario: scenario)
+            }
+        } catch {
+            // Never leave the shared simulator rotated for later scenes or runs.
+            try? await GalleryWindow.orient(landscape: false)
+            throw error
         }
+        try await GalleryWindow.orient(landscape: false)
     }
 }
 
@@ -48,13 +63,15 @@ struct GalleryVariant {
     let dark: Bool
     let contentSize: UIContentSizeCategory
     let regular: Bool
+    /// Rotates the simulator scene, so safe areas and size classes are real.
+    var landscape = false
 
     var dynamicTypeSize: DynamicTypeSize { DynamicTypeSize(contentSize) ?? .large }
 }
 
 enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
     case map, mapResults = "map-results", mapDetail = "map-detail", list, listDetail = "list-detail"
-    case filters, settings
+    case filters, stats, statsExpanded = "stats-expanded", settings
 
     var testDescription: String { rawValue }
 
@@ -105,7 +122,8 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
         case .list:
             store.replaceSelection(with: scenario.selectedIDs)
             if GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LIST_OPTIONS"] == "1" {
-                return Staged(root: AnyView(NavigationStack { ListScreen(store: store, displayOpen: true) }))
+                store.listPresentation.displayOpen = true
+                return Staged(root: AnyView(NavigationStack { ListScreen(store: store) }))
             }
             return Staged(root: shell(.list))
         case .listDetail:
@@ -118,6 +136,16 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
             return Staged(root: AnyView(NavigationStack {
                 FilterPanel(store: store).navigationTitle("Filters").navigationBarTitleDisplayMode(.inline)
             }))
+        case .stats, .statsExpanded:
+            let dashboard = StatsDashboardState()
+            store.selectedTab = .stats
+            let root = AppShell(store: store, mapPicker: picker, statsContent: .init { store, _ in
+                AnyView(StatsScreen(store: store, dashboard: dashboard))
+            })
+            guard self == .statsExpanded else { return Staged(root: AnyView(root)) }
+            // Review other expandable tiles with ACTIVITYMAP_GALLERY_STATS_TILE.
+            let tile = GalleryEnvironment.values["ACTIVITYMAP_GALLERY_STATS_TILE"].flatMap(StatsTileID.init(rawValue:)) ?? .weeklyVolume
+            return Staged(root: AnyView(root), prepare: { dashboard.toggleExpansion(tile) })
         case .settings:
             return Staged(root: AnyView(AccountSheet(destination: .settings, auth: AuthController())))
         }
@@ -150,7 +178,9 @@ private final class GalleryWindow {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         oldWindow = scene.keyWindow
         window = UIWindow(windowScene: scene)
-        window.frame = CGRect(origin: .zero, size: variant.size)
+        // Landscape windows start portrait; UIKit swaps the bounds on rotation.
+        window.frame = CGRect(origin: .zero, size: variant.landscape
+            ? CGSize(width: variant.size.height, height: variant.size.width) : variant.size)
         window.traitOverrides.userInterfaceStyle = variant.dark ? .dark : .light
         window.traitOverrides.preferredContentSizeCategory = variant.contentSize
         window.traitOverrides.horizontalSizeClass = variant.regular ? .regular : .compact
@@ -163,6 +193,20 @@ private final class GalleryWindow {
         window.rootViewController = host
         window.makeKeyAndVisible()
         host.view.frame = window.bounds
+    }
+
+    /// Island-on-the-right landscape, as reported in #315; portrait otherwise.
+    static func orient(landscape: Bool) async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        guard scene.effectiveGeometry.interfaceOrientation.isLandscape != landscape else { return }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeLeft : .portrait))
+        let end = Date().addingTimeInterval(5)
+        while scene.effectiveGeometry.interfaceOrientation.isLandscape != landscape, Date() < end {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        try #require(scene.effectiveGeometry.interfaceOrientation.isLandscape == landscape, "Simulator did not rotate")
+        // The reported orientation changes before the rotation animation ends.
+        try await Task.sleep(for: .seconds(1))
     }
 
     func close() {
@@ -193,7 +237,8 @@ private final class GalleryWindow {
             let camera = map.mapboxMap.cameraState
             let points = map.mapboxMap.points(for: staged.coordinates)
             let projected = points.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: CGSize(width: 0.01, height: 0.01))) }
-            self.readinessDetail = "idleCamera=\(String(describing: idleCamera)), projected=\(projected)"
+            // A centre point outside the padded rect means Mapbox kept a stale size.
+            self.readinessDetail = "idleCamera=\(String(describing: idleCamera)), projected=\(projected), centerPoint=\(map.mapboxMap.point(for: camera.center))"
             guard case .state = map.viewport.status, idleCamera == camera else { return false }
             guard !staged.coordinates.isEmpty else { return true }
             guard camera.padding != .zero else { return false }
@@ -311,9 +356,11 @@ struct GalleryManifest: Decodable {
         let height: Double
         let dark: Bool
         let largeText: Bool
+        let landscape: Bool?
         var variant: GalleryVariant {
             GalleryVariant(name: name, size: CGSize(width: width, height: height), dark: dark,
-                           contentSize: largeText ? .accessibilityExtraLarge : .large, regular: width >= 768)
+                           contentSize: largeText ? .accessibilityExtraLarge : .large, regular: width >= 768,
+                           landscape: landscape ?? false)
         }
     }
     let scenarios: [Scenario]

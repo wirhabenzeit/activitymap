@@ -51,6 +51,16 @@
       "search": "ride"
     },
     {
+      "id": "stats",
+      "title": "Stats \u00b7 dashboard",
+      "selectedIDs": []
+    },
+    {
+      "id": "stats-expanded",
+      "title": "Stats \u00b7 expanded Training volume",
+      "selectedIDs": []
+    },
+    {
       "id": "settings",
       "title": "Settings \u00b7 signed out",
       "selectedIDs": []
@@ -70,6 +80,14 @@
       "height": 874,
       "dark": true,
       "largeText": false
+    },
+    {
+      "name": "phone-landscape",
+      "width": 874,
+      "height": 402,
+      "dark": false,
+      "largeText": false,
+      "landscape": true
     },
     {
       "name": "small-large-text",

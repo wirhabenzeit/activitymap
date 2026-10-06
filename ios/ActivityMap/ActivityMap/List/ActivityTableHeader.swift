@@ -56,6 +56,8 @@ enum ActivityTableLayout {
 struct ActivityTableHeader: View {
     @Bindable var store: ActivityStore
     var availableWidth: CGFloat = 390
+    /// Shorter in iPhone landscape, where vertical space is scarce.
+    var rowHeight: CGFloat = 44
     private var presentation: ActivityListPresentation { store.listPresentation }
 
     var body: some View {
@@ -65,7 +67,7 @@ struct ActivityTableHeader: View {
                     Image(systemName: "checkmark.circle")
                     if presentation.settings.sort.field == .selection { arrow }
                 }
-                .frame(width: 44, height: 44)
+                .frame(width: 44, height: rowHeight)
                 .contentShape(Rectangle())
             }
             .accessibilityLabel("Sort by selection state")
@@ -83,7 +85,7 @@ struct ActivityTableHeader: View {
                         Image(systemName: "chevron.down").font(.system(size: 8))
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .accessibilityLabel("Sort activities by name or date")
@@ -93,7 +95,7 @@ struct ActivityTableHeader: View {
                         Text("Date")
                         if presentation.settings.sort.field == .localDate { arrow }
                     }
-                    .frame(width: 120, height: 44, alignment: .leading)
+                    .frame(width: 120, height: rowHeight, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Sort by date")
@@ -104,7 +106,7 @@ struct ActivityTableHeader: View {
                         Text(ActivityTableLayout.title(metric))
                         if presentation.settings.sort.field == metric.field { arrow }
                     }
-                    .frame(width: ActivityTableLayout.width(metric, availableWidth: availableWidth), height: 44, alignment: .trailing)
+                    .frame(width: ActivityTableLayout.width(metric, availableWidth: availableWidth), height: rowHeight, alignment: .trailing)
                     .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Sort by \(metric.title)")

@@ -131,30 +131,40 @@ struct AppShell: View {
                       restoreRetryAt: auth.restoreRetryAt)
     }
 
+    /// iPhone landscape: a slimmer bar that also carries the List's status row (#315).
+    private var compactBar: Bool { verticalSizeClass == .compact }
+    private var syncing: Bool { sync?.status.showsLoadingIndicator == true }
+
     // Global destinations stay outside the List's native navigation stack.
     private func shellHeader(sidebarAvailable: Bool) -> some View {
         HStack(spacing: 8) {
             let filtersOpen = sidebarAvailable ? sidebarVisible : sheets.showsFilters
-            Button {
-                if sidebarAvailable { sidebarVisible.toggle() }
-                else { sheets.showsFilters.toggle() }
-            } label: {
-                Image(systemName: activeFilterCount == 0
-                    ? "line.3.horizontal.decrease"
-                    : "line.3.horizontal.decrease.circle.fill")
-                    .rotationEffect(.degrees(sidebarAvailable ? 90 : 0))
-                    .frame(width: 44, height: 44)
-                    .background(filtersOpen ? Color.white.opacity(0.2) : .clear,
-                                in: RoundedRectangle(cornerRadius: 12))
+            // Equal flexible sides keep the destination picker centred.
+            HStack(spacing: 8) {
+                Button {
+                    if sidebarAvailable { sidebarVisible.toggle() }
+                    else { sheets.showsFilters.toggle() }
+                } label: {
+                    Image(systemName: activeFilterCount == 0
+                        ? "line.3.horizontal.decrease"
+                        : "line.3.horizontal.decrease.circle.fill")
+                        .rotationEffect(.degrees(sidebarAvailable ? 90 : 0))
+                        .frame(width: 44, height: 44)
+                        .background(filtersOpen ? Color.white.opacity(0.2) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .accessibilityLabel(filterButtonLabel)
+                .accessibilityValue(filtersOpen ? "Expanded" : "Collapsed")
+                .accessibilityAddTraits(filtersOpen ? .isSelected : [])
+                if compactBar && store.selectedTab == .list {
+                    SelectionBar(store: store, includesTotal: true, onNavigationBar: true)
+                }
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
-            .frame(width: 44, height: 44)
-            .accessibilityLabel(filterButtonLabel)
-            .accessibilityValue(filtersOpen ? "Expanded" : "Collapsed")
-            .accessibilityAddTraits(filtersOpen ? .isSelected : [])
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 0)
             ViewThatFits(in: .horizontal) {
                 modePicker.fixedSize(horizontal: true, vertical: false)
                 Menu {
@@ -169,34 +179,44 @@ struct AppShell: View {
                 .accessibilityLabel("View: \(store.selectedTab.title)")
                 .accessibilityIdentifier("browse-destination-menu")
             }
-            Spacer(minLength: 0)
-            Button {
-                sheets.accountDestination = .settings
-            } label: {
-                AsyncImage(url: auth.currentUser?.image.flatMap(URL.init(string:))) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFill()
-                            .frame(width: 32, height: 32)
-                            .clipShape(Circle())
-                            .overlay { Circle().strokeBorder(.white.opacity(0.65), lineWidth: 1) }
-                    } else {
-                        Image(systemName: "person.crop.circle")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(.white)
-                    }
+            // Measured before the sides, so the full picker wins when it fits.
+            .layoutPriority(1)
+            HStack(spacing: 8) {
+                if compactBar && store.selectedTab == .list {
+                    ListControls(presentation: store.listPresentation, iconOnly: true, onNavigationBar: true)
                 }
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-                .accessibilityHidden(true)
+                Button {
+                    sheets.accountDestination = .settings
+                } label: {
+                    AsyncImage(url: auth.currentUser?.image.flatMap(URL.init(string:))) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                                .frame(width: 32, height: 32)
+                                .clipShape(Circle())
+                                .overlay { Circle().strokeBorder(.white.opacity(0.65), lineWidth: 1) }
+                        } else {
+                            Image(systemName: "person.crop.circle")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    // Quiet activity-loading indicator (#309); sync detail lives in Settings.
+                    .overlay { AvatarSyncIndicator(busy: syncing) }
+                    .contentShape(Rectangle())
+                    .accessibilityHidden(true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Settings")
+                .accessibilityValue(syncing ? "Syncing activities" : "")
+                .accessibilityIdentifier("open-settings")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Settings")
-            .accessibilityIdentifier("open-settings")
-
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 16)
-        .frame(height: 54)
-        .background(AppTheme.navigationBlue.ignoresSafeArea(edges: .top))
+        .frame(height: compactBar ? 44 : 54)
+        // Controls stay inside the safe area; only the colour reaches the edges.
+        .background(AppTheme.navigationBlue.ignoresSafeArea(edges: [.top, .horizontal]))
         .accessibilityIdentifier("browse-header")
     }
 
@@ -242,7 +262,7 @@ struct AppShell: View {
                         .foregroundStyle(Color.white)
                         .frame(minWidth: 54)
                         .padding(.horizontal, 8)
-                        .frame(minHeight: 44)
+                        .frame(minHeight: compactBar ? 36 : 44)
                         .background(
                             store.selectedTab == tab ? Color.white.opacity(0.22) : .clear,
                             in: Capsule()
@@ -253,7 +273,7 @@ struct AppShell: View {
                 .accessibilityIdentifier("browse-destination-\(tab.title.lowercased())")
             }
         }
-        .padding(3)
+        .padding(compactBar ? 2 : 3)
         .background(Color.white.opacity(0.08), in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("View")

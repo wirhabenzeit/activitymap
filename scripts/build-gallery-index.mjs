@@ -22,7 +22,7 @@ const embed = (shot) =>
 
 const shots = read(runDir).map((s) => ({ ...s, platform: s.platform ?? 'ios' }));
 const baseline = baselineDir && existsSync(baselineDir) ? new Map(read(baselineDir).map((s) => [s.stem, s])) : null;
-const variantOrder = ['phone', 'phone-dark', 'small-large-text', 'tablet', 'desktop'];
+const variantOrder = ['phone', 'phone-dark', 'phone-landscape', 'small-large-text', 'tablet', 'desktop'];
 const variants = [...new Set(shots.map((s) => s.variant))].sort((a, b) => variantOrder.indexOf(a) - variantOrder.indexOf(b));
 // Web screens join the native scene they correspond to; others get their own section.
 const sceneOf = (s) => s.scene;

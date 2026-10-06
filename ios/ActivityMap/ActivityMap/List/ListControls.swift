@@ -3,8 +3,7 @@ import SwiftUI
 struct ListControls: View {
     @Bindable var presentation: ActivityListPresentation
     var iconOnly = false
-    @Binding var sortOpen: Bool
-    @Binding var displayOpen: Bool
+    var onNavigationBar = false
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
@@ -16,12 +15,12 @@ struct ListControls: View {
 
     private var controls: some View {
         Menu {
-            Button { sortOpen = true } label: {
+            Button { presentation.sortOpen = true } label: {
                 Label("Sort activities", systemImage: "arrow.up.arrow.down")
             }
             .accessibilityValue("\(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
             .accessibilityIdentifier("list-sort-control")
-            Button { displayOpen = true } label: {
+            Button { presentation.displayOpen = true } label: {
                 Label("View and metrics", systemImage: "rectangle.split.3x1")
             }
             .accessibilityIdentifier("list-display-control")
@@ -33,7 +32,7 @@ struct ListControls: View {
                     Label("View", systemImage: "slider.horizontal.3")
                 }
             }
-            .foregroundStyle(AppTheme.accent)
+            .foregroundStyle(onNavigationBar ? Color.white : AppTheme.accent)
             .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
         }
@@ -45,8 +44,6 @@ struct ListControls: View {
 /// Owned by the retained list, never by an adaptive header branch.
 struct ListOptionsSheets: ViewModifier {
     @Bindable var presentation: ActivityListPresentation
-    @Binding var sortOpen: Bool
-    @Binding var displayOpen: Bool
     var availableWidth: CGFloat = 390
 
     private var metricsFitColumns: Bool {
@@ -55,7 +52,7 @@ struct ListOptionsSheets: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-        .sheet(isPresented: $sortOpen) {
+        .sheet(isPresented: $presentation.sortOpen) {
             NavigationStack {
                 Form {
                     Section {
@@ -80,10 +77,10 @@ struct ListOptionsSheets: ViewModifier {
                     }
                 }
                 .navigationTitle("Sort activities")
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { sortOpen = false } } }
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { presentation.sortOpen = false } } }
             }
         }
-        .sheet(isPresented: $displayOpen) {
+        .sheet(isPresented: $presentation.displayOpen) {
             NavigationStack {
                 Form {
                     Section {
@@ -139,7 +136,7 @@ struct ListOptionsSheets: ViewModifier {
                     footer: { Text("Your selection is shared by both views. Adding more metrics than Columns can fit switches to Details. Name, sport and local date always stay visible. Larger accessibility text stacks metrics for readability.") }
                 }
                 .navigationTitle("List display")
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { displayOpen = false } } }
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { presentation.displayOpen = false } } }
             }
         }
     }

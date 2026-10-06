@@ -5,6 +5,7 @@ struct ActivityRowView: View {
     let activity: Activity
     var availableWidth: CGFloat = 390
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private var isSelected: Bool { store.selectedActivityIDs.contains(activity.id) }
     private var isActive: Bool { store.activeActivityID == activity.id }
@@ -49,7 +50,7 @@ struct ActivityRowView: View {
                 }
             }
         }
-        .padding(.vertical, settings.density == .compact ? 0 : 2)
+        .padding(.vertical, settings.density == .compact || verticalSizeClass == .compact ? 0 : 2)
         .contentShape(Rectangle())
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             if hasGeometry {

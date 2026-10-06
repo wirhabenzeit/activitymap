@@ -12,6 +12,7 @@ struct StatsCalendarDetail: View {
     @State var selectedDay: Int?
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
     private var snapshot: StatsCalendarSnapshot { expanded ? year.flatMap { years[$0] } ?? rolling : rolling }
     private var first: Int { snapshot.months.first?.first ?? today }
     private var last: Int { snapshot.months.last?.last ?? today }
@@ -96,7 +97,8 @@ struct StatsCalendarDetail: View {
                             let day = month.start + index
                             if day >= month.first && day <= month.last { select(day) }
                         }
-                    }.statsExpansionHeight(expanded: expanded, compact: 12, detail: 22)
+                    // Twelve month rows: denser in a short viewport so most of the year fits.
+                    }.statsExpansionHeight(expanded: expanded, compact: 12, detail: shortViewportLimit == nil ? 22 : 14)
                 }
             }
         }
