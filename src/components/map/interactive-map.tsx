@@ -8,13 +8,18 @@ import React, {
   useRef,
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
-import { Camera, Maximize2, Minimize2, Globe, X, Scan } from 'lucide-react';
-import { columns } from '~/components/list/columns';
 import {
-  ActivityCard,
-  ActivityCardContent,
-  inlineRouteDetails,
-} from '~/components/list/card';
+  Camera,
+  Maximize2,
+  Minimize2,
+  Globe,
+  X,
+  Scan,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+import { columns } from '~/components/list/columns';
+import { ActivityCard, ActivityCardContent } from '~/components/list/card';
 import { usePrefetchStreamSummaries } from '~/components/list/elevation-chart';
 import { Button } from '~/components/ui/button';
 import { activityFields } from '~/settings/activity';
@@ -62,6 +67,7 @@ import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import PhotoLayer from '~/components/map/photo';
 import { ElevationRouteMarker } from './elevation-route-marker';
 import { cn, groupBy } from '~/lib/utils';
+import { sortActivities } from '~/lib/activity-presentation';
 
 import {
   useActivityGeoJsonFromActivities,
@@ -228,7 +234,6 @@ export default function InteractiveMap() {
   );
   const [cursor, setCursor] = useState('auto');
   const [panelExpanded, setPanelExpanded] = useState(false);
-  const [panelOverflow, setPanelOverflow] = useState(false);
   // Bumped on every map pick so a new list starts scrolled to the top.
   const [pickCount, setPickCount] = useState(0);
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
@@ -302,6 +307,19 @@ export default function InteractiveMap() {
     summaryUserId:
       !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
   }));
+  // Closing details retains the highlighted map route and the results table.
+  const [detailId, setDetailId] = useState(highlighted);
+  const [previousHighlight, setPreviousHighlight] = useState(highlighted);
+  if (previousHighlight !== highlighted) {
+    setPreviousHighlight(highlighted);
+    setDetailId(highlighted);
+  } else if (
+    !activitiesPending &&
+    detailId &&
+    (!selected.includes(detailId) || !filterIDs.includes(detailId))
+  ) {
+    setDetailId(0);
+  }
   const selectedSummaryActivities = useMemo(
     () =>
       selected.flatMap((id) => {
@@ -317,7 +335,10 @@ export default function InteractiveMap() {
   const mapRefLoc = useRef<MapRef>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const columnFilters = [{ id: 'id', value: filterIDs }];
+  const columnFilters = useMemo(
+    () => [{ id: 'id', value: filterIDs }],
+    [filterIDs],
+  );
   const hydratedFromUrlRef = useRef(false);
 
   useEffect(() => {
@@ -599,6 +620,19 @@ export default function InteractiveMap() {
         .filter((x) => x != undefined),
     [selected, activityDict, photoDict],
   );
+  const resultIds = useMemo(
+    () =>
+      sortActivities(
+        rows.filter((row) => filterIDs.includes(row.id)),
+        compactList.sorting,
+      ).map((row) => row.id),
+    [rows, filterIDs, compactList.sorting],
+  );
+  const detailIndex = resultIds.indexOf(detailId);
+  const openDetail = (id: number) => {
+    setHighlighted(id);
+    setDetailId(id);
+  };
   const mapColumns = useMemo(
     () =>
       columns.map((column) => {
@@ -640,8 +674,50 @@ export default function InteractiveMap() {
   );
   const clearSelection = () => {
     setSelected([]);
+    setDetailId(0);
     setPanelExpanded(false);
   };
+
+  const panelControls = (fitIds: number[], fitLabel: string) => (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8"
+        aria-label={fitLabel}
+        title={fitLabel}
+        onClick={() => requestRouteFit(fitIds)}
+      >
+        <Scan className="h-4 w-4" aria-hidden="true" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8"
+        aria-label={panelExpanded ? 'Shrink route panel' : 'Expand route panel'}
+        title={panelExpanded ? 'Shrink route panel' : 'Expand route panel'}
+        aria-expanded={panelExpanded}
+        aria-controls="map-route-panel"
+        onClick={() => setPanelExpanded((value) => !value)}
+      >
+        {panelExpanded ? (
+          <Minimize2 className="h-4 w-4" aria-hidden="true" />
+        ) : (
+          <Maximize2 className="h-4 w-4" aria-hidden="true" />
+        )}
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8"
+        aria-label="Clear selection"
+        title="Clear selection"
+        onClick={clearSelection}
+      >
+        <X className="h-4 w-4" aria-hidden="true" />
+      </Button>
+    </div>
+  );
 
   // Part of #132: a visitor who arrived via a legacy `/map?user=`/
   // `/map?activities=` share link gets an explicit "no longer works"
@@ -728,6 +804,7 @@ export default function InteractiveMap() {
           onSelection={(ids) => {
             setSelected(ids);
             setHighlighted(ids.length === 1 ? ids[0]! : 0);
+            setDetailId(ids.length === 1 ? ids[0]! : 0);
             setPanelExpanded(false);
             setPickCount((count) => count + 1);
           }}
@@ -788,74 +865,15 @@ export default function InteractiveMap() {
           { hidden: rows.length == 0 },
         )}
       >
-        {selected.length > 1 && (
-          <div className="flex items-center gap-1 border-b px-3 py-2 text-xs sm:gap-2">
-            <span className="whitespace-nowrap font-semibold">
-              {selected.length} routes
-            </span>
-            <div className="flex-1" />
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9 shrink-0"
-              aria-label="Fit selected routes"
-              title="Fit selected routes"
-              onClick={() => {
-                setPanelExpanded(false);
-                requestRouteFit(selected);
-              }}
-            >
-              <Scan aria-hidden="true" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9 shrink-0"
-              aria-label="Clear selection"
-              title="Clear selection"
-              onClick={clearSelection}
-            >
-              <X aria-hidden="true" />
-            </Button>
-            {(panelExpanded || panelOverflow) && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9 shrink-0"
-                aria-label={
-                  panelExpanded ? 'Shrink route list' : 'Expand route list'
-                }
-                title={
-                  panelExpanded ? 'Shrink route list' : 'Expand route list'
-                }
-                aria-expanded={panelExpanded}
-                aria-controls="map-route-panel"
-                onClick={() => setPanelExpanded((value) => !value)}
-              >
-                {panelExpanded ? (
-                  <Minimize2 aria-hidden="true" />
-                ) : (
-                  <Maximize2 aria-hidden="true" />
-                )}
-              </Button>
-            )}
-          </div>
-        )}
         <DataTable
           key={pickCount}
+          // List and detail share a stable footprint; only the size control changes it.
           className={
-            // Opening a card keeps the panel compact (card plus a few rows).
-            // The list size control explicitly makes more room for rows.
-            selected.length === 1
-              ? 'max-h-[70vh]'
-              : panelExpanded
-                ? 'max-h-[65vh]'
-                : highlighted !== 0
-                  ? 'max-h-[min(60vh,24rem)]'
-                  : 'max-h-[12.5rem]'
+            panelExpanded
+              ? 'h-[calc(65dvh+3rem)]'
+              : 'h-[calc(min(60dvh,26rem)+3rem)]'
           }
-          scrollHint
-          onOverflowChange={setPanelOverflow}
+          scrollHint={detailId === 0}
           columns={mapColumns}
           data={rows}
           selected={selected}
@@ -864,12 +882,65 @@ export default function InteractiveMap() {
           paginationControl={false}
           headerClassName="max-lg:hidden"
           cellClassName="max-lg:px-2 max-lg:border-r-0"
-          {...inlineRouteDetails(highlighted, setHighlighted)}
-          renderSingleDetails={(row) => (
+          activeId={detailId}
+          onRowClick={(row) => openDetail(row.original.id)}
+          onDetailBack={() => setDetailId(0)}
+          detailBackLabel={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
+          listHeader={
+            <div
+              role="toolbar"
+              aria-label="Route results"
+              className="flex min-h-12 shrink-0 items-center justify-between gap-1 border-b px-2 text-xs"
+            >
+              <span className="px-1 font-semibold">
+                {resultIds.length} {resultIds.length === 1 ? 'route' : 'routes'}
+              </span>
+              {panelControls(resultIds, 'Fit selected routes')}
+            </div>
+          }
+          detailNavigation={
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+              {resultIds.length > 1 && (
+                <div className="flex min-w-0 flex-1 items-center justify-center text-xs tabular-nums">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-7 shrink-0"
+                    aria-label="Previous activity"
+                    disabled={detailIndex <= 0}
+                    onClick={() => openDetail(resultIds[detailIndex - 1]!)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span
+                    className="whitespace-nowrap px-1"
+                    aria-label={`Activity ${detailIndex + 1} of ${resultIds.length}`}
+                  >
+                    {detailIndex + 1}/{resultIds.length}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-7 shrink-0"
+                    aria-label="Next activity"
+                    disabled={
+                      detailIndex < 0 || detailIndex >= resultIds.length - 1
+                    }
+                    onClick={() => openDetail(resultIds[detailIndex + 1]!)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {panelControls([detailId], 'Fit current route')}
+            </div>
+          }
+          renderDetails={(row) => (
             <ActivityCardContent
+              key={row.id}
               row={row}
-              onClearSelection={clearSelection}
-              onFit={() => requestRouteFit(selected)}
+              stickyHeader
+              showMapButton={false}
             />
           )}
           {...compactList}

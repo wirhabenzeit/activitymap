@@ -3,7 +3,7 @@
 import React from 'react';
 import { columns } from '~/components/list/columns';
 import { DataTable } from '~/components/list/data-table';
-import { inlineRouteDetails } from '~/components/list/card';
+import { ActivityCardContent } from '~/components/list/card';
 import { groupBy } from '~/lib/utils';
 import { useShallowStore } from '~/store';
 
@@ -12,12 +12,11 @@ import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import { usePhotos } from '~/hooks/use-photos';
 
 export default function ListPage() {
-  const { selected, setSelected, tableState } =
-    useShallowStore((state) => ({
-      selected: state.selected,
-      setSelected: state.setSelected,
-      tableState: state.fullList,
-    }));
+  const { selected, setSelected, tableState } = useShallowStore((state) => ({
+    selected: state.selected,
+    setSelected: state.setSelected,
+    tableState: state.fullList,
+  }));
 
   // The open card is local to the list: browsing details must not select an
   // activity or change the route highlighted on the map.
@@ -26,7 +25,12 @@ export default function ListPage() {
   const { data: photos = [] } = usePhotos();
   const { filterIDs } = useFilteredActivities(activities);
 
-  const columnFilters = [{ id: 'id', value: filterIDs }];
+  if (openId && !filterIDs.includes(openId)) setOpenId(0);
+
+  const columnFilters = React.useMemo(
+    () => [{ id: 'id', value: filterIDs }],
+    [filterIDs],
+  );
   const photoDict = React.useMemo(
     () => groupBy(photos, (photo) => photo.activity_id),
     [photos],
@@ -53,7 +57,12 @@ export default function ListPage() {
         selected={selected}
         setSelected={setSelected}
         columnFilters={columnFilters}
-        {...inlineRouteDetails(openId, setOpenId)}
+        activeId={openId}
+        onRowClick={(row) => setOpenId(row.original.id)}
+        onDetailBack={() => setOpenId(0)}
+        renderDetails={(row) => (
+          <ActivityCardContent key={row.id} row={row} stickyHeader />
+        )}
         {...tableState}
       />
     </div>
