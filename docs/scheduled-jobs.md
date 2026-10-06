@@ -20,6 +20,7 @@ triggers the routes on time:
 | `0 * * * *`   | `cleanup-rate-limits`                                                                                               |
 | `17 * * * *`  | `erase-revoked-athletes`                                                                                            |
 | `37 * * * *`  | `reconcile-strava-summaries`, `backfill-activity-streams` (only if reconcile succeeded), `backfill-activity-photos` |
+| `47 * * * *`  | `sync-activities` (up to 30 detail refreshes and 30 older activities)                                               |
 
 Each hour, stream backfill handles up to 40 activities (60 Strava requests)
 and photo catch-up up to 20 activities (48 requests). With Strava's 3,000
@@ -50,8 +51,8 @@ Worker's triggers in the Cloudflare dashboard.
 ## GitHub Actions
 
 The workflows in `.github/workflows` keep their schedules as a fallback for
-now, and `workflow_dispatch` for manual runs. `fetch.yml` (legacy
-`sync-activities`) has no recorded runs and isn't part of the Worker.
+now, and `workflow_dispatch` for manual runs. `fetch.yml` triggers
+`sync-activities` twice a day as a fallback for the Worker's hourly run.
 
 ## Admin dashboard
 

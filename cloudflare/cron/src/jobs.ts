@@ -46,6 +46,19 @@ export const SCHEDULES: Record<string, CronJob[]> = {
       path: '/api/cron/backfill-activity-photos',
     },
   ],
+  // Fills in full activity details (and older history) for summary-only
+  // activities; same bounds as `.github/workflows/fetch.yml`.
+  '47 * * * *': [
+    {
+      name: 'sync-activities',
+      path: '/api/cron/sync-activities',
+      body: {
+        maxIncompleteActivities: 30,
+        maxOldActivities: 30,
+        minActivitiesThreshold: 2,
+      },
+    },
+  ],
 };
 
 export interface JobResult {

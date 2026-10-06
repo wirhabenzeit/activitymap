@@ -76,8 +76,8 @@ void test('the latest run decides failing and disabled, and failures are counted
   assert.equal(rows['backfill-activity-photos']!.health, 'disabled');
 });
 
-void test('jobs without runs are flagged unless they have no schedule', () => {
+void test('jobs without runs are flagged', () => {
   const rows = byJob([]);
   assert.equal(rows['reconcile-strava-summaries']!.health, 'no_runs');
-  assert.equal(rows['sync-activities']!.health, 'unscheduled');
+  assert.equal(rows['sync-activities']!.health, 'no_runs');
 });

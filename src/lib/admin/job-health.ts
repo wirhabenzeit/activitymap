@@ -10,7 +10,7 @@ export const SCHEDULED_JOB_INTERVALS = {
   'reconcile-strava-summaries': 60 * 60_000,
   'backfill-activity-streams': 60 * 60_000,
   'backfill-activity-photos': 60 * 60_000,
-  'sync-activities': null,
+  'sync-activities': 60 * 60_000,
 } as const satisfies Record<string, number | null>;
 
 export type ScheduledJob = keyof typeof SCHEDULED_JOB_INTERVALS;

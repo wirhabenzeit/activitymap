@@ -64,11 +64,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
@@ -221,11 +221,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
@@ -384,11 +384,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
@@ -538,11 +538,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
@@ -686,11 +686,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
@@ -834,11 +834,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
@@ -986,11 +986,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
@@ -1240,11 +1240,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
@@ -1382,11 +1382,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
@@ -1521,11 +1521,11 @@
         "jobs": {
           "sync-activities": {
             "job": "sync-activities",
-            "lastStartedAt": "2026-10-05T09:00:00.000Z",
-            "lastFinishedAt": "2026-10-05T09:00:40.000Z",
+            "lastStartedAt": "2026-10-05T11:47:00.000Z",
+            "lastFinishedAt": "2026-10-05T11:47:40.000Z",
             "lastStatus": "completed",
             "lastStopReason": null,
-            "lastCompletedAt": "2026-10-05T09:00:40.000Z"
+            "lastCompletedAt": "2026-10-05T11:47:40.000Z"
           },
           "reconcile-strava-summaries": {
             "job": "reconcile-strava-summaries",
