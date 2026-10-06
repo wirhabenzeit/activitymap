@@ -148,6 +148,13 @@
       "when": 1791237932106,
       "tag": "0020_drop-unregistered-webhook-dead-letters",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791238248362,
+      "tag": "0021_scheduled-job-log",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@ import {
   recordJobDisabled,
   withJobHeartbeat,
 } from '~/server/application/job-heartbeat';
+import { recordJobLogDisabled, withJobLog } from '~/server/application/job-log';
 import { externalEffectsEnabled } from '~/server/config/external-effects';
 import { streamBackfillEnabled } from '~/server/config/stream-backfill';
 import { logger } from '~/server/logging/logger';
@@ -14,12 +15,19 @@ export const POST = createStreamBackfillCronHandler({
   isProduction: () => process.env.VERCEL_ENV === 'production',
   isEnabled: streamBackfillEnabled,
   getCronSecret: () => process.env.CRON_SECRET,
-  backfill: withJobHeartbeat(
+  backfill: withJobLog(
     'backfill-activity-streams',
-    backfillActivityStreams,
-    (result) => result.stopReason,
+    withJobHeartbeat(
+      'backfill-activity-streams',
+      backfillActivityStreams,
+      (result) => result.stopReason,
+    ),
+    { stopReason: (result) => result.stopReason },
   ),
-  onDisabled: () => recordJobDisabled('backfill-activity-streams'),
+  onDisabled: async () => {
+    await recordJobDisabled('backfill-activity-streams');
+    await recordJobLogDisabled('backfill-activity-streams');
+  },
   onResult: (result) => logger.info('[Stream backfill] Cycle complete', result),
   onError: (error) => logger.error('[Stream backfill] Cycle failed', error),
 });

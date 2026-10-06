@@ -4,6 +4,8 @@ import {
   externalEffectsEnabled,
 } from '~/server/config/external-effects';
 import { rateLimitRepository } from '~/server/repositories/rate-limit';
+import { scheduledJobLogRepository } from '~/server/repositories/scheduled-job-log';
+import { JOB_LOG_RETENTION_MS, withJobLog } from '~/server/application/job-log';
 import { createCleanupRateLimitsCronHandler } from './handler';
 
 /**
@@ -19,6 +21,21 @@ export const POST = createCleanupRateLimitsCronHandler({
   externalEffectsEnabled,
   externalEffectsDisabledMessage: EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   getCronSecret: () => process.env.CRON_SECRET,
-  deleteWindowsBefore: (cutoff) => rateLimitRepository.deleteWindowsBefore(cutoff),
+  deleteWindowsBefore: withJobLog(
+    'cleanup-rate-limits',
+    async (cutoff: Date) => {
+      const deleted = await rateLimitRepository.deleteWindowsBefore(cutoff);
+      // The admin dashboard's run history is kept for a fixed window too.
+      try {
+        await scheduledJobLogRepository.deleteBefore(
+          new Date(Date.now() - JOB_LOG_RETENTION_MS),
+        );
+      } catch (error) {
+        logger.error('[Job log] Failed to prune old runs', error);
+      }
+      return deleted;
+    },
+    { summarize: (deleted) => ({ deleted }) },
+  ),
   onError: (message, error) => logger.error(message, error),
 });

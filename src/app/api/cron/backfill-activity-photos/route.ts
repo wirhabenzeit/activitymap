@@ -3,6 +3,7 @@ import {
   recordJobDisabled,
   withJobHeartbeat,
 } from '~/server/application/job-heartbeat';
+import { recordJobLogDisabled, withJobLog } from '~/server/application/job-log';
 import { externalEffectsEnabled } from '~/server/config/external-effects';
 import { photoBackfillEnabled } from '~/server/config/photo-backfill';
 import { logger } from '~/server/logging/logger';
@@ -14,11 +15,18 @@ export const POST = createPhotoBackfillCronHandler({
   isProduction: () => process.env.VERCEL_ENV === 'production',
   isEnabled: photoBackfillEnabled,
   getCronSecret: () => process.env.CRON_SECRET,
-  backfill: withJobHeartbeat(
+  backfill: withJobLog(
     'backfill-activity-photos',
-    backfillActivityPhotos,
-    (result) => result.stopReason,
+    withJobHeartbeat(
+      'backfill-activity-photos',
+      backfillActivityPhotos,
+      (result) => result.stopReason,
+    ),
+    { stopReason: (result) => result.stopReason },
   ),
-  onDisabled: () => recordJobDisabled('backfill-activity-photos'),
+  onDisabled: async () => {
+    await recordJobDisabled('backfill-activity-photos');
+    await recordJobLogDisabled('backfill-activity-photos');
+  },
   onError: (error) => logger.error('[Photo backfill] Cycle failed', error),
 });
