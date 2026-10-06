@@ -27,7 +27,7 @@ import {
 } from '~/server/strava/actions';
 import { env } from '~/env';
 import { useToast } from '~/hooks/use-toast';
-import { useIsFetching } from '@tanstack/react-query';
+import { useActivityLoadIndicator } from '~/hooks/use-activity-load-indicator';
 import { SettingsDialog } from '~/components/settings/settings-dialog';
 
 export function UserSettings() {
@@ -36,7 +36,7 @@ export function UserSettings() {
     isInitialized: state.isInitialized,
   }));
 
-  const isFetchingActivities = useIsFetching({ queryKey: ['activities'] }) > 0;
+  const isLoadingActivities = useActivityLoadIndicator();
   const isDevelopment = env.NEXT_PUBLIC_ENV === 'development';
   const { toast } = useToast();
 
@@ -163,14 +163,17 @@ export function UserSettings() {
                   src={user?.image ?? undefined}
                   alt={user?.name ?? ''}
                 />
+                {/* Stays mounted, so the rotation never restarts between pages. */}
                 <Loader2
+                  aria-hidden
                   className={cn(
-                    'absolute inset-0 m-auto size-8 text-white animate-spin',
-                    {
-                      hidden: !isFetchingActivities,
-                    },
+                    'absolute inset-0 m-auto size-8 text-white animate-spin motion-reduce:animate-none transition-opacity duration-300',
+                    isLoadingActivities ? 'opacity-100' : 'opacity-0',
                   )}
                 />
+                <span role="status" className="sr-only">
+                  {isLoadingActivities ? 'Loading activities' : ''}
+                </span>
                 <AvatarFallback className="rounded-lg"></AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">

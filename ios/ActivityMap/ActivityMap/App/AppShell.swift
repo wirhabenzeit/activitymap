@@ -133,6 +133,7 @@ struct AppShell: View {
 
     /// iPhone landscape: a slimmer bar that also carries the List's status row (#315).
     private var compactBar: Bool { verticalSizeClass == .compact }
+    private var syncing: Bool { sync?.status.showsLoadingIndicator == true }
 
     // Global destinations stay outside the List's native navigation stack.
     private func shellHeader(sidebarAvailable: Bool) -> some View {
@@ -200,11 +201,14 @@ struct AppShell: View {
                         }
                     }
                     .frame(width: 44, height: 44)
+                    // Quiet activity-loading indicator (#309); sync detail lives in Settings.
+                    .overlay { AvatarSyncIndicator(busy: syncing) }
                     .contentShape(Rectangle())
                     .accessibilityHidden(true)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Settings")
+                .accessibilityValue(syncing ? "Syncing activities" : "")
                 .accessibilityIdentifier("open-settings")
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
