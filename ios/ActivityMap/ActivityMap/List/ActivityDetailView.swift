@@ -21,7 +21,10 @@ struct ActivityDetailView: View {
                 .accessibilityLabel("Back to activities")
                 .accessibilityIdentifier("list-detail-back")
                 if let activity = store.activity(id: activityID) {
-                    ActivityDetailIdentity(activity: activity, titleLineLimit: 2)
+                    ActivityDetailHeading(activity: activity, titleLineLimit: 2,
+                                          hasRoute: store.routableActivityIDs.contains(activityID)) { id in
+                        store.showOnMap(id)
+                    }
                 } else {
                     Spacer(minLength: 0)
                 }
@@ -40,7 +43,7 @@ struct ActivityDetailView: View {
 }
 
 /// Resolve by identity on every update, never retain the destination's initial snapshot.
-/// The action bar is outside the scroll view so long content cannot bury actions.
+/// Actions live in the title row, so no footer bar takes height from the content.
 struct ActivityDetailPanel: View {
     @Environment(\.activityDetailOverMap) private var overMap
     @Bindable var store: ActivityStore
@@ -66,22 +69,20 @@ struct ActivityDetailPanel: View {
                         else { store.showOnMap(id) }
                     }
                 } else {
-                    VStack(spacing: 0) {
-                        ScrollView {
-                            ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset,
-                                                  showsHeading: showsHeading,
-                                                  profile: { activity in
-                                ElevationProfileView(store: store, activityID: activity.id,
-                                                     isRelevant: store.selectedTab == .list)
-                            }, photos: { _ in EmptyView() })
-                        }
-                        .accessibilityIdentifier("activity-detail-scroll")
-                        .clipped()
-                        ActivityDetailActions(activity: activity, hasRoute: store.routableActivityIDs.contains(activityID)) { id in
+                    ScrollView {
+                        ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset,
+                                              showsHeading: showsHeading,
+                                              hasRoute: store.routableActivityIDs.contains(activityID),
+                                              showOnMap: { id in
                             if let showOnMap { showOnMap(id) }
                             else { store.showOnMap(id) }
-                        }
+                        }, profile: { activity in
+                            ElevationProfileView(store: store, activityID: activity.id,
+                                                 isRelevant: store.selectedTab == .list)
+                        }, photos: { _ in EmptyView() })
                     }
+                    .accessibilityIdentifier("activity-detail-scroll")
+                    .clipped()
                 }
             } else {
                 ContentUnavailableView("Activity unavailable", systemImage: "figure.run.circle",
@@ -184,43 +185,6 @@ private struct MapActivityDetailReveal: View {
         ElevationProfileView(store: store, activityID: activity.id,
             isRelevant: expansion.progress > 0.8 && store.selectedTab == .map && store.activeActivityID == activity.id,
             compact: compactProfile)
-    }
-}
-
-/// Single integration point for real edit/refresh/share actions (#220–#222).
-/// Add those actions when implemented; the current surface contains only working actions.
-private struct ActivityDetailActions: View {
-    @Environment(\.activityDetailOverMap) private var overMap
-    let activity: Activity
-    let hasRoute: Bool
-    let showOnMap: (Int) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Button {
-                    showOnMap(activity.id)
-                } label: {
-                    Label(overMap ? "Fit route" : "Show on map", systemImage: overMap ? "arrow.up.left.and.arrow.down.right" : "map")
-                        .font(.subheadline.weight(.medium))
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(AppTheme.accent)
-                .disabled(!hasRoute)
-                .accessibilityIdentifier("activity-show-on-map")
-                .accessibilityHint(hasRoute ? (overMap ? "Frame this route while keeping its elevation profile visible" : "Select this activity and frame its route") : "This activity has no GPS route")
-                Spacer(minLength: 0)
-            }
-            if !hasRoute {
-                Text("No GPS route recorded").font(.caption).foregroundStyle(AppTheme.secondaryText)
-            }
-        }
-        .padding(.horizontal, AppTheme.Spacing.large)
-        .padding(.vertical, AppTheme.Spacing.tight)
-        .background { if !overMap { AppTheme.surface } }
-        .overlay(alignment: .top) { Divider() }
     }
 }
 

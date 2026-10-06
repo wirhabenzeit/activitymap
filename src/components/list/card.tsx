@@ -7,6 +7,7 @@ import {
   Download,
   MoreHorizontal,
   ExternalLink,
+  Pencil,
   X,
 } from 'lucide-react';
 import { decode } from '@mapbox/polyline';
@@ -28,7 +29,7 @@ import { ActivityDetailStats } from './activity-detail-stats';
 import { useDateFormat } from '~/hooks/use-display-preferences';
 
 import { EditActivity } from './edit';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { cn } from '~/lib/utils';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import { formatLocalTime } from '~/lib/local-date-time';
@@ -50,6 +51,55 @@ interface ActivityCardContentProps {
   onCollapse?: () => void;
   onClearSelection?: () => void;
   onFit?: () => void;
+}
+
+/**
+ * Adds the activity to the selection, keeps whatever else is selected, and
+ * frames its route on the map.
+ */
+function useShowOnMap(row: Row<Features, Activity>) {
+  const router = useRouter();
+  const { setHighlighted, requestRouteFit, setSelected, addNotification } =
+    useShallowStore((state) => ({
+      setHighlighted: state.setHighlighted,
+      requestRouteFit: state.requestRouteFit,
+      setSelected: state.setSelected,
+      addNotification: state.addNotification,
+    }));
+  return () => {
+    if (!routeBounds(routeCoordinates(row.original))) {
+      addNotification({
+        type: 'info',
+        title: 'Map camera',
+        message: 'This activity has no GPS route to frame.',
+      });
+      return;
+    }
+    setSelected((selected) =>
+      selected.includes(row.original.id)
+        ? selected
+        : [...selected, row.original.id],
+    );
+    setHighlighted(row.original.id);
+    requestRouteFit([row.original.id]);
+    router.push('/map');
+  };
+}
+
+/** Cards this wide label "Show on map" and keep Edit beside it (as on iOS). */
+const LABELLED_ACTIONS_WIDTH = 520;
+
+function useElementWidth() {
+  const [width, setWidth] = useState(0);
+  const ref = useCallback((element: HTMLElement | null) => {
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setWidth(entry.contentRect.width);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, width] as const;
 }
 
 export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
@@ -94,6 +144,10 @@ export function ActivityCardContent({
   const { data: allPhotos = [] } = usePhotos();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const showOnMap = useShowOnMap(row);
+  const [cardRef, cardWidth] = useElementWidth();
+  const labelled = cardWidth >= LABELLED_ACTIONS_WIDTH;
+  const hasRoute = !!(row.original.map_polyline ?? row.original.map_summary_polyline);
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
@@ -198,7 +252,7 @@ export function ActivityCardContent({
     <>
       {/* Lay out by the card's own width, not the screen's: a card spanning a
           wide table goes side by side even on a phone. */}
-      <Card className="@container w-full border-none shadow-none">
+      <Card ref={cardRef} className="@container w-full border-none shadow-none">
         <CardHeader className="space-y-1 px-4 pb-3 pt-3">
           <div className="flex items-center gap-2">
             <Button
@@ -230,15 +284,35 @@ export function ActivityCardContent({
                 })}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 shrink-0 px-2 text-xs"
-              onClick={() => setOpen(true)}
-              disabled={isGuest}
-            >
-              Edit
-            </Button>
+            {/* On the map, Fit route below frames it in place instead. */}
+            {!onFit && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className={cn(
+                  'h-8 shrink-0 gap-1.5 bg-header-background/10 text-header-background hover:bg-header-background/15',
+                  labelled ? 'px-3' : 'w-8 px-0',
+                )}
+                onClick={showOnMap}
+                disabled={!hasRoute}
+                aria-label={`Show ${String(row.getValue('name'))} on map`}
+                title={hasRoute ? 'Show on map' : 'No GPS route recorded'}
+              >
+                <Map className="h-4 w-4" aria-hidden="true" />
+                {labelled && 'Show on map'}
+              </Button>
+            )}
+            {labelled && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 shrink-0 px-2 text-xs"
+                onClick={() => setOpen(true)}
+                disabled={isGuest}
+              >
+                Edit
+              </Button>
+            )}
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -251,6 +325,14 @@ export function ActivityCardContent({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {!labelled && (
+                  <DropdownMenuItem
+                    onSelect={() => setOpen(true)}
+                    disabled={isGuest}
+                  >
+                    <Pencil /> Edit
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onSelect={() => void handleRefresh()}
                   disabled={loading || isGuest || !stravaConnected}
@@ -362,45 +444,15 @@ export function ActivityCard({
   showMapButton?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
-  const {
-    highlighted,
-    setHighlighted,
-    isGuest,
-    requestRouteFit,
-    setSelected,
-    addNotification,
-  } = useShallowStore((state) => ({
+  const { highlighted, isGuest } = useShallowStore((state) => ({
     highlighted: state.highlighted,
-    setHighlighted: state.setHighlighted,
     isGuest: state.isGuest,
-    requestRouteFit: state.requestRouteFit,
-    setSelected: state.setSelected,
-    addNotification: state.addNotification,
   }));
+  const handleMapClick = useShowOnMap(row);
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
-
-  const handleMapClick = () => {
-    if (!routeBounds(routeCoordinates(row.original))) {
-      addNotification({
-        type: 'info',
-        title: 'Map camera',
-        message: 'This activity has no GPS route to frame.',
-      });
-      return;
-    }
-    setSelected((selected) =>
-      selected.includes(row.original.id)
-        ? selected
-        : [...selected, row.original.id],
-    );
-    setHighlighted(row.original.id);
-    requestRouteFit([row.original.id]);
-    router.push('/map');
-  };
 
   const nameClassName = cn(
     'text-left truncate justify-start max-w-full hover:underline',

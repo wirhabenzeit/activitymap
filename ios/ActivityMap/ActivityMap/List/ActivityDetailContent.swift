@@ -8,6 +8,9 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     var showsHeading = true
     var showsPrimaryMetrics = true
     var showsDescription = true
+    /// Puts the route action beside the title (List, iPad pane, Stats sheet).
+    var hasRoute = true
+    var showOnMap: ((Int) -> Void)? = nil
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -19,7 +22,8 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
             if showsHeading {
-                ActivityDetailIdentity(activity: activity, trailingInset: headerTrailingInset)
+                ActivityDetailHeading(activity: activity, trailingInset: headerTrailingInset,
+                                      hasRoute: hasRoute, showOnMap: showOnMap)
             }
             profile(activity)
             if showsDescription { ActivityDetailDescription(activity: activity) }
@@ -135,6 +139,69 @@ struct ActivityDetailIdentity: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.trailing, trailingInset)
+    }
+}
+
+/// An activity's title row. The route action sits beside the title rather
+/// than in a footer row; Edit, Strava refresh, GPX and Open in Strava
+/// (#220–#222) join it as a ••• menu once they exist.
+struct ActivityDetailHeading: View {
+    let activity: Activity
+    var trailingInset: CGFloat = 0
+    var titleLineLimit: Int? = nil
+    var hasRoute = true
+    var showOnMap: ((Int) -> Void)? = nil
+    @Environment(\.activityDetailOverMap) private var overMap
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var width: CGFloat = 0
+
+    /// Rows this wide keep a readable title beside "Show on map" (iPhone
+    /// landscape, full-width iPad). Narrower rows and accessibility text
+    /// sizes show the icon alone.
+    static let labelledWidth: CGFloat = 520
+    private var labelled: Bool { width >= Self.labelledWidth && !typeSize.isAccessibilitySize }
+    private var title: String { overMap ? "Fit route" : "Show on map" }
+    private var icon: String { overMap ? "arrow.up.left.and.arrow.down.right" : "map" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
+            HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
+                ActivityDetailIdentity(activity: activity, titleLineLimit: titleLineLimit)
+                if let showOnMap {
+                    Button { showOnMap(activity.id) } label: {
+                        if labelled {
+                            Label(title, systemImage: icon)
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 36)
+                                .background(AppTheme.selectionBackground, in: Capsule())
+                                .frame(minHeight: AppTheme.minimumTarget)
+                        } else {
+                            // Grows with Dynamic Type instead of clipping the symbol.
+                            Image(systemName: icon)
+                                .font(.body.weight(.semibold))
+                                .padding(10)
+                                .frame(minWidth: AppTheme.minimumTarget, minHeight: AppTheme.minimumTarget)
+                                .background(AppTheme.selectionBackground, in: Circle())
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(AppTheme.accent)
+                    .contentShape(Rectangle())
+                    .disabled(!hasRoute)
+                    .opacity(hasRoute ? 1 : 0.4)
+                    .accessibilityLabel(title)
+                    .accessibilityIdentifier("activity-show-on-map")
+                    .accessibilityHint(hasRoute ? (overMap ? "Frame this route while keeping its elevation profile visible" : "Select this activity and frame its route") : "This activity has no GPS route")
+                }
+            }
+            if showOnMap != nil && !hasRoute {
+                Text("No GPS route recorded").font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    .accessibilityIdentifier("activity-no-route")
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .padding(.trailing, trailingInset)
     }
 }
