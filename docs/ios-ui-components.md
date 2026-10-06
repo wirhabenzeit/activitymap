@@ -65,7 +65,7 @@ Map controls form a vertical stack at the top-right, 12pt below navigation and 1
 
 ### Status
 
-Routine sync information no longer occupies a browsing bar: Account → Settings → Activity Data owns status, refresh/pause and a nested Sync Details destination with timestamps, errors, retry deadline and photo metadata explanation. First sync does not put a loading popup over Map. List keeps its contextual loading/recovery states; Map-specific filtering/no-route messages are content-sized.
+Routine sync information lives in Settings: last device sync, Sync now, short recovery messages and compact Strava import coverage matching web. Account controls appear directly in the form; sign-out is always available when signed in, while Connect with Strava appears only when connection or permission recovery is needed. First sync does not put a loading popup over Map. List keeps its contextual loading/recovery states; Map-specific filtering/no-route messages are content-sized.
 
 Stats components retain their established styling.
 

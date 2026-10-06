@@ -109,4 +109,5 @@ export function stravaPermissionNotes(
   return notes;
 }
 
-export const STRAVA_PERMISSIONS_RECONNECT = 'Reconnect to grant full access.';
+export const STRAVA_PERMISSIONS_RECONNECT =
+  'Connect with Strava again to grant the missing permissions.';

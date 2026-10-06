@@ -7,6 +7,8 @@ struct AccountSheet: View {
     var refresh: (() async -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var ingestionStatus = IngestionStatusController()
     @Bindable private var preferences = DisplayPreferences.shared
     /// Profile opened while signed out is only a login presentation: once the
     /// connection is verified it closes and returns to the browsing context.
@@ -41,6 +43,20 @@ struct AccountSheet: View {
         .onChange(of: auth.status) { _, status in
             if case .signedIn = status, openedForLogin == true { dismiss() }
         }
+        .task(id: StatusObservation(session: syncSession, active: scenePhase == .active)) {
+            if destination != .about, scenePhase == .active, let session = syncSession {
+                await ingestionStatus.observe(session)
+            }
+        }
+    }
+
+    private var syncSession: SyncSession? { sync?.session ?? auth.syncSession }
+    private struct StatusObservation: Equatable { let session: SyncSession?; let active: Bool }
+    private var importNeedsReconnect: Bool {
+        guard let session = syncSession, ingestionStatus.scope == session.scope,
+              let status = ingestionStatus.snapshot else { return false }
+        return status.history.scheduling == .blocked || status.details.scheduling == .blocked
+            || status.photos.scheduling == .blocked || status.streams.scheduling == .blocked
     }
 
     // Section content must be hosted in a Form at each navigation destination.
@@ -109,51 +125,40 @@ struct AccountSheet: View {
         }
     }
 
-    private func signedInContent(_ user: ActivityMapAPI.CurrentUser) -> some View {
-        Group {
-            Section {
-                VStack(spacing: 12) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 64))
-                        .foregroundStyle(.secondary)
-
-                    VStack(spacing: 3) {
-                        Text(user.name ?? "ActivityMap Account")
-                            .font(.headline)
-                        if let email = displayEmail(user.email) {
-                            Text(email)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
+    func signedInContent(_ user: ActivityMapAPI.CurrentUser) -> some View {
+        let limited = user.stravaConnected && StravaPermissionsCopy.isLimited(user.stravaPermissions)
+        let needsReconnect = !user.stravaConnected || limited || importNeedsReconnect
+        return Group {
+            Section("Account") {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(user.name ?? "Your account")
+                        .font(.headline)
+                    if let email = displayEmail(user.email) {
+                        Text(email)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .listRowBackground(Color.clear)
-            }
-
-            Section {
-                LabeledContent("Strava", value: !user.stravaConnected ? "Not Connected"
-                    : StravaPermissionsCopy.isLimited(user.stravaPermissions) ? "Limited Access" : "Connected")
-                ForEach(StravaPermissionsCopy.notes(user.stravaPermissions), id: \.self) { note in
-                    Text(note)
+                Text(!user.stravaConnected ? "Strava not connected"
+                    : limited ? "Strava connected with limited access" : "Strava connected")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if needsReconnect {
+                    Text(limited
+                         ? (StravaPermissionsCopy.notes(user.stravaPermissions) + [StravaPermissionsCopy.reconnect]).joined(separator: " ")
+                         : "Connect with Strava again to restore access to your activities.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                }
-                StravaConnectControls(showsPermissions: !user.stravaConnected)
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
-            } header: {
-                Text("Connected Services")
-            } footer: {
-                if StravaPermissionsCopy.isLimited(user.stravaPermissions) {
-                    Text(StravaPermissionsCopy.reconnect)
+                    StravaConnectControls(showsPermissions: false)
+                        .frame(maxWidth: .infinity)
                 }
             }
 
             Section {
-                Button("Sign Out of ActivityMap", role: .destructive) {
+                Button("Sign out of ActivityMap", role: .destructive) {
                     Task { await auth.signOut() }
                 }
+                .accessibilityIdentifier("account-sign-out")
             } footer: {
                 Text("Strava stays connected.")
             }
@@ -210,30 +215,14 @@ struct AccountSheet: View {
         }
     }
 
-    private var accountSummary: String {
-        guard let user = auth.currentUser else {
-            return auth.status == .restoring ? "Checking your session…" : "Sign in with Strava"
-        }
-        guard user.stravaConnected else { return "Reconnect Strava" }
-        return StravaPermissionsCopy.isLimited(user.stravaPermissions) ? "Limited Strava access" : "Strava connected"
-    }
-
     private var settingsContent: some View {
         Group {
-            Section("Account") {
-                NavigationLink { accountPage } label: {
-                    Label {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(auth.currentUser?.name ?? "Account")
-                            Text(accountSummary)
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    } icon: { Image(systemName: "person.crop.circle") }
-                }
-                .accessibilityIdentifier("settings-account")
-            }
-            if let session = sync?.session { IngestionStatusSection(session: session) }
             syncContent
+            if let session = syncSession {
+                IngestionStatusSection(session: session, controller: ingestionStatus)
+            }
+
+            profileContent
 
             Section {
                 Picker("Units", selection: $preferences.units) {
@@ -264,51 +253,38 @@ struct AccountSheet: View {
     @ViewBuilder
     private var syncContent: some View {
         if let sync {
-            Section {
-                Text(sync.status == .ready ? "Device download complete" : sync.status.title)
-                if let lastSync = sync.checkpoint?.lastSyncAt {
-                    LabeledContent("Last device download") { Text(lastSync, style: .relative) }
-                }
-                if case .failed(let message) = sync.status {
-                    Text(message).font(.footnote).foregroundStyle(.secondary)
-                }
-                if let date = sync.retryNotBefore {
-                    LabeledContent("Retry after") { Text(date, style: .time) }
-                }
-                NavigationLink("Download details") {
-                    BrowsingSyncDetails(presentation: BrowsingPresentation(store: sync.activities, sync: sync),
-                                        failureMessage: syncFailureMessage, recover: recoverSync)
-                        .navigationTitle("Device download")
-                        .navigationBarTitleDisplayMode(.inline)
-                }
-                if sync.status == .syncing {
-                    Button("Pause device download") { sync.pause() }
-                }
+            Section("Sync & data") {
+                LabeledContent("Last device sync", value: sync.lastSyncAt?.formatted(date: .abbreviated, time: .shortened) ?? "Not yet synced")
                 if let refresh, sync.session != nil {
                     Button {
                         Task { await refresh() }
                     } label: {
-                        Label("Sync this device", systemImage: "arrow.clockwise")
+                        Label("Sync now", systemImage: "arrow.clockwise")
                     }
                         .disabled(!sync.canRefresh)
                 }
-            } header: { Text("This device") } footer: { Text("ActivityMap → this device. Server import continues independently.") }
+                if let syncMessage {
+                    Text(syncMessage).font(.footnote).foregroundStyle(.secondary)
+                }
+                if let date = sync.retryNotBefore, date > Date() {
+                    Text("Try again after \(date.formatted(date: .abbreviated, time: .shortened)).")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
-    private var syncFailureMessage: String? {
-        if case .failed(let message) = sync?.status { return message }
-        return nil
-    }
-
-    private func recoverSync(_ action: BrowsingPresentation.Recovery) {
-        switch action {
-        case .retry:
-            guard sync?.canRefresh == true, let refresh else { return }
-            Task { await refresh() }
-        case .cancelSync: sync?.pause()
-        case .account: Task { await auth.signIn() }
-        case .clearFilters, .showList: break
+    private var syncMessage: String? {
+        switch sync?.status {
+        case .signedOut: "Sign in to sync your activities."
+        case .syncing: "Syncing…"
+        case .offline: "Offline. Sync will resume when you’re back online."
+        case .failed: "Couldn’t sync. Please try again."
+        case .paused: "Sync paused. Tap Sync now to resume."
+        case .expired: "Sign in again from Account to sync your activities."
+        case .disconnected: "Reconnect Strava from Account to sync your activities."
+        case .rateLimited, .retryAfter: "Couldn’t sync. Please try again later."
+        case .ready, nil: nil
         }
     }
 

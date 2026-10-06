@@ -44,14 +44,15 @@ extension RenderedRoutePickingTests {
             settingsRequest.recognitionLevel = .accurate
             try VNImageRequestHandler(cgImage: try #require(settings.snapshot().cgImage)).perform([settingsRequest])
             settingsText = (settingsRequest.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-            if settingsText.contains("Pause device download") { break }
+            if settingsText.contains("Syncing") && settingsText.contains("Sync now") { break }
             for scroll in settings.descendants(of: UIScrollView.self) where scroll.contentSize.height > scroll.bounds.height {
                 scroll.setContentOffset(CGPoint(x: 0, y: min(scroll.contentOffset.y + 300, scroll.contentSize.height - scroll.bounds.height)), animated: false)
             }
             try await Task.sleep(for: .milliseconds(100))
         }
-        #expect(settingsText.contains("Syncing activities") && settingsText.contains("Pause device download"),
-                "Progress and device pause remain reachable in Settings: \(settingsText)")
+        #expect(settingsText.contains("Syncing") && settingsText.contains("Sync now"),
+                "Simple sync status and the sync action remain reachable in Settings: \(settingsText)")
+        #expect(!settingsText.contains("Download details") && !settingsText.contains("Pause device download"))
         try settings.save(name: "settings-first-sync-progress")
     }
 
