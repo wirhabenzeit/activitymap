@@ -136,6 +136,10 @@ private struct NativeMapResultsSheet: View {
                         .ignoresSafeArea(.container, edges: .bottom)
                 }
                 .presentationDetents(detents, selection: selection)
+                // While rotating to landscape, size classes change before the side
+                // panel replaces this sheet; iOS would otherwise adapt it to full
+                // screen for that moment (device review, 2026-10-06).
+                .presentationCompactAdaptation(.none)
                 .presentationDragIndicator(.visible)
                 .presentationBackgroundInteraction(.enabled(upThrough: .large))
                 // Only the detail's elevation chart needs drags to reach content
