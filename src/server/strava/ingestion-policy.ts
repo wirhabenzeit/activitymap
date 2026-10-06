@@ -28,7 +28,8 @@ export type IngestionOutcomeRecord = {
 };
 
 export const DETAIL_RETRY_HOUR_MS = 3_600_000;
-export type DetailFailureCode = 'upstream_error' | 'invalid_response' | 'forbidden';
+export type DetailFailureCode =
+  'upstream_error' | 'invalid_response' | 'forbidden';
 
 /** Same capped exponential backoff as historical stream backfill. */
 export function detailRetryAt(now: Date, attempt: number): Date {
@@ -108,11 +109,12 @@ export function outcomeForError(error: unknown): IngestionOutcomeRecord {
 
 /**
  * Scheduled ingestion jobs and how often each is expected to start. The
- * GitHub workflows in .github/workflows own the actual schedule; these only
- * decide when a missing heartbeat means the job has stalled.
+ * `activitymap-cron` Cloudflare Worker (cloudflare/cron) owns the actual
+ * schedule; these only decide when a missing heartbeat means the job has
+ * stalled.
  */
 export const INGESTION_JOBS = {
-  'sync-activities': { intervalMs: 12 * DETAIL_RETRY_HOUR_MS },
+  'sync-activities': { intervalMs: DETAIL_RETRY_HOUR_MS },
   'reconcile-strava-summaries': { intervalMs: DETAIL_RETRY_HOUR_MS },
   'backfill-activity-streams': { intervalMs: DETAIL_RETRY_HOUR_MS },
   'backfill-activity-photos': { intervalMs: DETAIL_RETRY_HOUR_MS },

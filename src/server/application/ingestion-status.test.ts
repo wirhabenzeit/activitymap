@@ -153,14 +153,22 @@ void test('job heartbeats distinguish active, stalled, crashed, disabled and nev
     ),
     'active',
   );
-  // The twice-daily legacy sync is judged on its own interval.
+  // The detail sync runs hourly, like the other ingestion jobs.
+  assert.equal(
+    jobState(
+      'sync-activities',
+      run({ lastStartedAt: new Date(NOW.getTime() - 3_600_000) }),
+      NOW,
+    ),
+    'active',
+  );
   assert.equal(
     jobState(
       'sync-activities',
       run({ lastStartedAt: new Date(NOW.getTime() - 13 * 3_600_000) }),
       NOW,
     ),
-    'active',
+    'stalled',
   );
 });
 

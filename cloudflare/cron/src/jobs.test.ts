@@ -61,6 +61,24 @@ void test('jobs are POSTed in order with the cron secret and their bounds', asyn
   assert.ok(results.every(isSuccess));
 });
 
+void test('the hourly detail sync keeps the bounds of the GitHub workflow', async () => {
+  const { fetch, calls } = fakeFetch({});
+  await runSchedule('47 * * * *', { ...options, fetch });
+  assert.deepEqual(
+    calls.map((call) => [new URL(call.url).pathname, call.init.body]),
+    [
+      [
+        '/api/cron/sync-activities',
+        JSON.stringify({
+          maxIncompleteActivities: 30,
+          maxOldActivities: 30,
+          minActivitiesThreshold: 2,
+        }),
+      ],
+    ],
+  );
+});
+
 void test('a failed reconcile skips stream backfill but still catches up photos', async () => {
   const { fetch, calls } = fakeFetch({
     '/api/cron/reconcile-strava-summaries': 503,
