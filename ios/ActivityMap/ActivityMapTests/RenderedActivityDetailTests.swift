@@ -529,8 +529,11 @@ extension RenderedRoutePickingTests {
             if scenario == "loading" { await source.resolve(response) }
         }
         let ready = try #require(heights["ready"])
-        #expect(heights.count == 5)
-        #expect(heights.values.allSatisfy { abs($0 - ready) < 1 }, "Profile states must reserve the same space: \(heights)")
+        // A profile that may still arrive keeps its space; none at all takes none.
+        let waiting = heights.filter { $0.key != "unavailable" }
+        #expect(waiting.count == 4)
+        #expect(waiting.values.allSatisfy { abs($0 - ready) < 1 }, "Profile states must reserve the same space: \(heights)")
+        #expect((heights["unavailable"] ?? 0) < 1, "An activity without elevation must not reserve space: \(heights)")
     }
 }
 

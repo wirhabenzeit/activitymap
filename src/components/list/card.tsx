@@ -50,7 +50,8 @@ interface ActivityCardContentProps {
   row: Row<Features, Activity>;
   onCollapse?: () => void;
   onClearSelection?: () => void;
-  onFit?: () => void;
+  showMapButton?: boolean;
+  stickyHeader?: boolean;
 }
 
 /**
@@ -131,7 +132,8 @@ export function ActivityCardContent({
   row,
   onCollapse,
   onClearSelection,
-  onFit,
+  showMapButton = true,
+  stickyHeader = false,
 }: ActivityCardContentProps) {
   const dateFormat = useDateFormat();
   const [open, setOpen] = useState(false);
@@ -147,7 +149,9 @@ export function ActivityCardContent({
   const showOnMap = useShowOnMap(row);
   const [cardRef, cardWidth] = useElementWidth();
   const labelled = cardWidth >= LABELLED_ACTIONS_WIDTH;
-  const hasRoute = !!(row.original.map_polyline ?? row.original.map_summary_polyline);
+  const hasRoute = !!(
+    row.original.map_polyline ?? row.original.map_summary_polyline
+  );
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
@@ -253,7 +257,12 @@ export function ActivityCardContent({
       {/* Lay out by the card's own width, not the screen's: a card spanning a
           wide table goes side by side even on a phone. */}
       <Card ref={cardRef} className="@container w-full border-none shadow-none">
-        <CardHeader className="space-y-1 px-4 pb-3 pt-3">
+        <CardHeader
+          className={cn(
+            'space-y-1 px-4 pb-3 pt-3',
+            stickyHeader && 'sticky top-0 z-10 bg-background',
+          )}
+        >
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -284,8 +293,8 @@ export function ActivityCardContent({
                 })}
               </p>
             </div>
-            {/* On the map, Fit route below frames it in place instead. */}
-            {!onFit && (
+            {/* The map overlay provides its fit action in the navigation header. */}
+            {showMapButton && (
               <Button
                 variant="secondary"
                 size="sm"
@@ -371,19 +380,6 @@ export function ActivityCardContent({
                 <Minus className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
-            {/* Same map button as List; on the map it frames the route. */}
-            {onFit && (
-              <Button
-                variant="secondary"
-                size="icon"
-                className="h-8 w-8 shrink-0 bg-header-background/10 text-header-background hover:bg-header-background/15"
-                onClick={onFit}
-                aria-label="Fit route"
-                title="Fit route"
-              >
-                <Map className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            )}
             {onClearSelection && (
               <Button
                 variant="ghost"
@@ -427,23 +423,6 @@ export function ActivityCardContent({
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
     </>
   );
-}
-
-/**
- * DataTable props that open a route's card in place of its row. The map panel
- * passes its active route; the list passes its own open row.
- */
-export function inlineRouteDetails(
-  activeId: number,
-  setActiveId: (id: number) => void,
-) {
-  return {
-    activeId,
-    onRowClick: (row: Row<Features, Activity>) => setActiveId(row.original.id),
-    renderInlineDetails: (row: Row<Features, Activity>) => (
-      <ActivityCardContent row={row} onCollapse={() => setActiveId(0)} />
-    ),
-  };
 }
 
 /** Name cell: selection toggle, name, and optionally a jump to the map. */

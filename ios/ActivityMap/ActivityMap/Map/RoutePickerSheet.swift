@@ -166,10 +166,6 @@ struct RoutePickerSheet: View {
         }
     }
 
-    private func resize(to detent: MapResultsDetent) {
-        picker.detent = detent
-    }
-
     private var selectionSummary: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("\(store.selectedActivityIDs.count) selected").font(.headline)
@@ -187,20 +183,18 @@ struct RoutePickerSheet: View {
         Menu {
             if let activity = detail {
                 Section(activity.name) {
-                    Button("Frame route", systemImage: "scope") {
+                    Button("Frame route", systemImage: "map") {
                         store.showOnMap(activity.id)
                     }.disabled(activity.coordinates.isEmpty)
                     Button("Deselect activity", systemImage: "minus.circle") { store.removeFromSelection([activity.id]) }
                 }
             }
-            Toggle("Add routes to selection", isOn: $picker.isAdding)
-            Button("Fit selection", systemImage: "scope") {
+            Toggle("Add routes to selection", systemImage: "plus", isOn: $picker.isAdding)
+            Button("Fit selection", systemImage: "arrow.up.left.and.arrow.down.right") {
                 store.mapContext.request(.fitSelection)
             }
             .disabled(!candidates.contains { !$0.coordinates.isEmpty })
-            Button("Expand results fully", systemImage: "arrow.up.left.and.arrow.down.right") { resize(to: .expanded) }
             Button("Clear selection", systemImage: "xmark.circle", role: .destructive) { store.clearSelection() }
-            Button("Hide results", systemImage: "eye.slash") { picker.isPresented = false }
         } label: {
             BrowseIconLabel(systemImage: "ellipsis")
         }

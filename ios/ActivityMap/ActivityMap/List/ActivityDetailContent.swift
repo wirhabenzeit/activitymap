@@ -151,8 +151,6 @@ struct ActivityDetailHeading: View {
     var trailingInset: CGFloat = 0
     var titleLineLimit: Int? = nil
     var hasRoute = true
-    /// The map panel explains a missing route in its own detail instead.
-    var showsNoRouteNote = true
     var showOnMap: ((Int) -> Void)? = nil
     @Environment(\.activityDetailOverMap) private var overMap
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -198,10 +196,6 @@ struct ActivityDetailHeading: View {
                     .accessibilityIdentifier("activity-show-on-map")
                     .accessibilityHint(hasRoute ? (overMap ? "Frame this route while keeping its elevation profile visible" : "Select this activity and frame its route") : "This activity has no GPS route")
                 }
-            }
-            if showOnMap != nil && !hasRoute && showsNoRouteNote {
-                Text("No GPS route recorded").font(.caption).foregroundStyle(AppTheme.secondaryText)
-                    .accessibilityIdentifier("activity-no-route")
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }

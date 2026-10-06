@@ -135,20 +135,13 @@ private struct MapActivityDetailReveal: View {
     private var heading: some View {
         ActivityDetailHeading(activity: activity, trailingInset: trailingInset,
                               titleLineLimit: compactProfile ? (expansion.progress > 0.8 ? 2 : 1) : nil,
-                              hasRoute: hasRoute, showsNoRouteNote: false, showOnMap: showOnMap)
+                              hasRoute: hasRoute, showOnMap: showOnMap)
             .padding(.horizontal, AppTheme.Spacing.large)
             .padding(.vertical, AppTheme.Spacing.small)
     }
 
     private var fullDetail: some View {
         VStack(spacing: 0) {
-            if !hasRoute {
-                Text("No GPS route recorded")
-                    .font(.caption).foregroundStyle(AppTheme.secondaryText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, AppTheme.Spacing.large)
-                    .accessibilityIdentifier("activity-no-route")
-            }
             if compactProfile {
                 VStack(spacing: 16) {
                     elevation

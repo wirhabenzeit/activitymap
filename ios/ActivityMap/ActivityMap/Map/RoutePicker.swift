@@ -106,6 +106,10 @@ final class RoutePicker {
             detailID = nil
             isAdding = false
             detent = .medium
+        } else if !isPresented {
+            // A selection always has its results panel, including one made in
+            // List or Stats; its handle shrinks it instead of a hide action.
+            isPresented = true
         }
     }
 
