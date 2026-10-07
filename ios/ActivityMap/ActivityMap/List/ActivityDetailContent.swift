@@ -121,19 +121,21 @@ struct ActivityDetailIdentity: View {
     let activity: Activity
     var trailingInset: CGFloat = 0
     var titleLineLimit: Int? = nil
+    var onNavigationBar = false
 
     var body: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.small) {
             BrowseSportSymbol(category: activity.category)
             VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
                 Text(activity.name).font(.headline)
+                    .foregroundStyle(onNavigationBar ? Color.white : .primary)
                     .lineLimit(titleLineLimit)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("activity-detail-name")
                 Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
-                    .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    .font(.caption).foregroundStyle(onNavigationBar ? Color.white.opacity(0.8) : AppTheme.secondaryText)
                     .lineLimit(titleLineLimit == 1 ? 1 : nil)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -150,6 +152,7 @@ struct ActivityDetailHeading: View {
     let activity: Activity
     var trailingInset: CGFloat = 0
     var titleLineLimit: Int? = nil
+    var onNavigationBar = false
     var hasRoute = true
     var showOnMap: ((Int) -> Void)? = nil
     @Environment(\.activityDetailOverMap) private var overMap
@@ -168,7 +171,7 @@ struct ActivityDetailHeading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
             HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
-                ActivityDetailIdentity(activity: activity, titleLineLimit: titleLineLimit)
+                ActivityDetailIdentity(activity: activity, titleLineLimit: titleLineLimit, onNavigationBar: onNavigationBar)
                 if let showOnMap {
                     Button { showOnMap(activity.id) } label: {
                         if labelled {
@@ -176,7 +179,7 @@ struct ActivityDetailHeading: View {
                                 .font(.subheadline.weight(.semibold))
                                 .padding(.horizontal, 14)
                                 .frame(minHeight: 36)
-                                .background(AppTheme.selectionBackground, in: Capsule())
+                                .background(onNavigationBar ? Color.white.opacity(0.18) : AppTheme.selectionBackground, in: Capsule())
                                 .frame(minHeight: AppTheme.minimumTarget)
                         } else {
                             // Grows with Dynamic Type instead of clipping the symbol.
@@ -184,11 +187,11 @@ struct ActivityDetailHeading: View {
                                 .font(.body.weight(.semibold))
                                 .padding(10)
                                 .frame(minWidth: AppTheme.minimumTarget, minHeight: AppTheme.minimumTarget)
-                                .background(AppTheme.selectionBackground, in: Circle())
+                                .background(onNavigationBar ? Color.white.opacity(0.18) : AppTheme.selectionBackground, in: Circle())
                         }
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(onNavigationBar ? Color.white : AppTheme.accent)
                     .contentShape(Rectangle())
                     .disabled(!hasRoute)
                     .opacity(hasRoute ? 1 : 0.4)

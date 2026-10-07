@@ -189,7 +189,8 @@ private final class GalleryWindow {
             .environment(\.timeZone, TimeZone(identifier: "Europe/Zurich")!)
             .environment(\.colorScheme, variant.dark ? .dark : .light)
             .environment(\.dynamicTypeSize, variant.dynamicTypeSize)
-            .environment(\.horizontalSizeClass, variant.regular ? .regular : .compact)))
+            .environment(\.horizontalSizeClass, variant.regular ? .regular : .compact)
+            .environment(\.statsDetailPresentation, min(variant.size.width, variant.size.height) < 600 ? .navigation : .inline)))
         window.rootViewController = host
         window.makeKeyAndVisible()
         host.view.frame = window.bounds

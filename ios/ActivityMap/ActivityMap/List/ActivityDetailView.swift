@@ -6,39 +6,72 @@ struct ActivityDetailView: View {
     @Bindable var store: ActivityStore
     let activityID: Int
     @Environment(\.dismiss) private var dismiss
+    @State private var navigationReference = DetailNavigationReference()
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
+        ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false)
+        .background(AppTheme.surface)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden()
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
+        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .medium))
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.primary)
-                .glassEffect(.regular.interactive(), in: .circle)
+                .foregroundStyle(.white)
                 .accessibilityLabel("Back to activities")
                 .accessibilityIdentifier("list-detail-back")
+            }.sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .principal) {
                 if let activity = store.activity(id: activityID) {
-                    ActivityDetailHeading(activity: activity, titleLineLimit: 2,
-                                          hasRoute: store.routableActivityIDs.contains(activityID)) { id in
-                        store.showOnMap(id)
-                    }
-                } else {
-                    Spacer(minLength: 0)
+                    ActivityDetailIdentity(activity: activity, titleLineLimit: 2, onNavigationBar: true)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false)
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showActivityOnMapFromDetail(activityID, store: store, navigationController: navigationReference.controller)
+                } label: {
+                    Image(systemName: "map")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                        .background(.white.opacity(0.18), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .disabled(!store.routableActivityIDs.contains(activityID))
+                .opacity(store.routableActivityIDs.contains(activityID) ? 1 : 0.4)
+                .accessibilityLabel("Show on map")
+                .accessibilityIdentifier("activity-show-on-map")
+                .accessibilityHint(store.routableActivityIDs.contains(activityID)
+                    ? "Select this activity and frame its route" : "This activity has no GPS route")
+            }.sharedBackgroundVisibility(.hidden)
         }
-        .background(AppTheme.surface)
-        // UIKit adds a late top inset when a hidden bar is shown during a
-        // push. Keep chrome in the sliding content so its geometry is fixed.
-        .toolbar(.hidden, for: .navigationBar)
-        .background(ListDetailBackGesture())
+        .background(DetailBackGesture(navigationReference: navigationReference))
         .accessibilityAction(.escape) { dismiss() }
+    }
+}
+
+/// This action changes browsing destinations, rather than going Back to List.
+/// Remove the pushed detail in the same transaction as the tab switch so the
+/// retained Map cannot present its results sheet over an outgoing List page.
+@MainActor func showActivityOnMapFromDetail(_ activityID: Int, store: ActivityStore,
+                                         navigationController: UINavigationController?) {
+    var transaction = Transaction()
+    transaction.disablesAnimations = true
+    withTransaction(transaction) {
+        if store.showOnMap(activityID) == .shown {
+            store.dismissInspection()
+            // An Observation-driven destination binding can still animate a
+            // pop despite disablesAnimations. Finish the native stack now too.
+            navigationController?.popToRootViewController(animated: false)
+        }
     }
 }
 
@@ -167,50 +200,5 @@ private struct MapActivityDetailReveal: View {
         ElevationProfileView(store: store, activityID: activity.id,
             isRelevant: expansion.progress > 0.8 && store.selectedTab == .map && store.activeActivityID == activity.id,
             compact: compactProfile)
-    }
-}
-
-/// A hidden navigation bar normally disables UIKit's interactive pop gesture.
-/// Keep the native transition recognizer, with a depth/transition guard, and
-/// restore its original delegate when this detail leaves the hierarchy.
-private struct ListDetailBackGesture: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> Controller { Controller() }
-    func updateUIViewController(_ controller: Controller, context: Context) {}
-    static func dismantleUIViewController(_ controller: Controller, coordinator: ()) {
-        controller.restore()
-    }
-
-    final class Controller: UIViewController, UIGestureRecognizerDelegate {
-        private weak var gesture: UIGestureRecognizer?
-        private weak var previousDelegate: (any UIGestureRecognizerDelegate)?
-        private var previousEnabled = false
-
-        override func viewDidAppear(_ animated: Bool) {
-            super.viewDidAppear(animated)
-            guard let recognizer = navigationController?.interactivePopGestureRecognizer else { return }
-            guard recognizer.delegate !== self else { return }
-            gesture = recognizer
-            previousDelegate = recognizer.delegate
-            previousEnabled = recognizer.isEnabled
-            recognizer.delegate = self
-            recognizer.isEnabled = true
-        }
-
-        override func viewDidDisappear(_ animated: Bool) {
-            super.viewDidDisappear(animated)
-            restore()
-        }
-
-        func restore() {
-            guard let gesture, gesture.delegate === self else { return }
-            gesture.delegate = previousDelegate
-            gesture.isEnabled = previousEnabled
-        }
-
-        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-            guard let navigationController else { return false }
-            return navigationController.viewControllers.count > 1
-                && navigationController.transitionCoordinator == nil
-        }
     }
 }

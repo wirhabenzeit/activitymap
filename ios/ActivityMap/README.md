@@ -99,9 +99,12 @@ Note that `//` starts a comment in xcconfig, so URL separators are composed from
 scripts/install-dev-iphone.sh                   # first paired, unlocked iPhone
 scripts/install-dev-iphone.sh --device "NAME"   # or a UDID
 scripts/install-dev-iphone.sh --build-only      # build and verify without installing
+scripts/install-dev-iphone.sh --release         # optimized Dev app for performance review
 ```
 
 This builds the current checkout (Debug, production server) as **ActivityMap Dev**, `page.dominik.activitymap.dev`, with the DEV-badged icon and the `activitymap-dev://auth/callback` sign-in scheme. It installs beside the TestFlight app and never replaces it: the script refuses any other bundle ID. The build overrides `ACTIVITYMAP_BUNDLE_ID_SUFFIX`, `ACTIVITYMAP_DISPLAY_NAME`, `ACTIVITYMAP_APP_ICON` and `ACTIVITYMAP_AUTH_CALLBACK_SCHEME`; their `Base.xcconfig` defaults keep Release and TestFlight builds as `page.dominik.activitymap`.
+
+Use `--release` when judging animation and navigation responsiveness on the phone. The default Debug build disables Swift optimization and can exaggerate chart preparation pauses. The optimized build keeps the same Dev identity, icon, sign-in scheme and production server.
 
 Worktrees have no ignored `Local.xcconfig`, so the script takes `MAPBOX_ACCESS_TOKEN` from the environment or from the main checkout's `Local.xcconfig`. It stops if the built app would have no token, because the map would be blank. Production's `MOBILE_AUTH_REDIRECT_ALLOWLIST` must include `activitymap-dev://auth/callback`.
 

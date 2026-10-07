@@ -186,7 +186,9 @@ struct StatsSeriesChart: View {
         }
     }
     private func isReference(_ point: StatsChartPoint) -> Bool {
-        style == .lines && point.series != series.first
+        // The first distinct series is the first point's series. Rebuilding
+        // the full series list for every mark makes long charts quadratic.
+        style == .lines && point.series != points.first?.series
     }
     private var endpoints: [StatsChartPoint] {
         series.compactMap { name in points.last { $0.series == name && $0.value != nil } }

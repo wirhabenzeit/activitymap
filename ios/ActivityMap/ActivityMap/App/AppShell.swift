@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AppShell: View {
     @State private var store = ActivityStore()
@@ -7,6 +8,9 @@ struct AppShell: View {
     @Environment(\.localStore) private var localStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var sheets: BrowseSheetPresentation
+    @State private var statsNavigation = StatsShellNavigation()
+    @Environment(\.statsDetailPresentation) private var statsDetailPresentation
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("browse.filterSidebarVisible") private var sidebarVisible = true
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -30,12 +34,117 @@ struct AppShell: View {
         self.statsContent = statsContent
     }
 
+    private var usesPhoneNavigation: Bool {
+        guard statsContent != nil else { return false }
+        switch statsDetailPresentation {
+        case .automatic: return UIDevice.current.userInterfaceIdiom == .phone
+        case .navigation: return true
+        case .inline: return false
+        }
+    }
+
+    private var statsDetailSelection: Binding<StatsTileID?> {
+        Binding(get: { statsNavigation.dashboard?.expandedTile },
+                set: { statsNavigation.dashboard?.expandedTile = $0 })
+    }
+
     var body: some View {
+        Group {
+            if usesPhoneNavigation {
+                NavigationStack {
+                    shellContent
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar(.visible, for: .navigationBar)
+                        .toolbar { phoneRootToolbar }
+                        .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
+                        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+                        .toolbarColorScheme(.dark, for: .navigationBar)
+                        .navigationDestination(item: statsDetailSelection) { id in
+                            if let dashboard = statsNavigation.dashboard,
+                               let tile = StatsDashboard.tiles.first(where: { $0.id == id }) {
+                                phoneStatsDetail(tile, dashboard: dashboard)
+                            }
+                        }
+                }
+                .environment(\.statsShellNavigation, statsNavigation)
+                .tint(.white)
+            } else {
+                shellContent
+            }
+        }
+        .overlay {
+            if let connectPrompt { StravaConnectOverlay(prompt: connectPrompt).transition(.opacity) }
+        }
+        .animation(.easeInOut(duration: 0.2), value: connectPrompt)
+        .environment(\.stravaConnect, stravaConnect)
+        .task {
+            guard let localStore else { return } // Xcode previews stay offline.
+            if sync == nil {
+                sync = SyncController(activities: store, invalidate: { auth.invalidateSession(token: $0) })
+            }
+            sync?.setSession(auth.syncSession, storage: localStore)
+            await refresh()
+        }
+        .onChange(of: auth.syncSession) { _, session in
+            if let localStore { sync?.setSession(session, storage: localStore) }
+        }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { sync?.pause(); return }
+            store.stats.refreshToday()
+            if sync != nil { await refresh() }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(60)) } catch { return }
+                store.stats.refreshToday()
+                await refresh()
+            }
+        }
+        // The phone presenter belongs to the whole stack, so Settings can
+        // open from either the dashboard or a pushed stat destination.
+        .sheet(item: Binding(
+            get: { usesPhoneNavigation && !sheets.mapResultsPresented ? shellRequest(sidebarAvailable: false) : nil },
+            set: { if usesPhoneNavigation && !sheets.mapResultsPresented && $0 == nil { clearShellRequest() } }
+        ), onDismiss: { sheets.shellSheetPresented = false }) { destination in
+            shellSheet(destination).onAppear { sheets.shellSheetPresented = true }
+        }
+        .onChange(of: store.selectedTab) { _, tab in
+            if tab != .stats { statsNavigation.dashboard?.expandedTile = nil }
+        }
+        .onChange(of: store.mapContext.scopeRevision) { _, _ in
+            statsNavigation.dashboard?.resetInspection()
+        }
+    }
+
+    @ToolbarContentBuilder private var phoneRootToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarLeading) {
+            filterButton(sidebarAvailable: false)
+            if compactBar && store.selectedTab == .list {
+                SelectionBar(store: store, includesTotal: true, onNavigationBar: true)
+            }
+        }.sharedBackgroundVisibility(.hidden)
+        ToolbarItem(placement: .principal) {
+            destinationPicker.accessibilityIdentifier("browse-header")
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            if compactBar && store.selectedTab == .list {
+                ListControls(presentation: store.listPresentation, iconOnly: true, onNavigationBar: true)
+            }
+            accountButton
+        }.sharedBackgroundVisibility(.hidden)
+    }
+
+    @ViewBuilder private func phoneStatsDetail(_ tile: StatsTileDefinition, dashboard: StatsDashboardState) -> some View {
+        let content = StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync)
+            .tint(AppTheme.accent)
+        if reduceMotion { content.navigationTransition(.crossFade) }
+        else { content }
+    }
+
+    private var shellContent: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
                 let sidebarAvailable = sizeClass == .regular && geometry.size.width >= 760 && !typeSize.isAccessibilitySize
                 VStack(spacing: 0) {
-                    shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
+                    if !usesPhoneNavigation { shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1) }
                     HStack(spacing: 0) {
                         if sidebarAvailable && sidebarVisible {
                             VStack(spacing: 0) {
@@ -61,32 +170,11 @@ struct AppShell: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .task {
-                    guard let localStore else { return } // Xcode previews stay offline.
-                    if sync == nil {
-                        sync = SyncController(activities: store, invalidate: { auth.invalidateSession(token: $0) })
-                    }
-                    sync?.setSession(auth.syncSession, storage: localStore)
-                    await refresh()
-                }
-                .onChange(of: auth.syncSession) { _, session in
-                    if let localStore { sync?.setSession(session, storage: localStore) }
-                }
-                .task(id: scenePhase) {
-                    guard scenePhase == .active else { sync?.pause(); return }
-                    store.stats.refreshToday()
-                    if sync != nil { await refresh() }
-                    while !Task.isCancelled {
-                        do { try await Task.sleep(for: .seconds(60)) } catch { return }
-                        store.stats.refreshToday()
-                        await refresh()
-                    }
-                }
                 // While the map's results sheet is up, it presents these itself.
                 .sheet(item: Binding(
-                    get: { sheets.mapResultsPresented ? nil : shellRequest(sidebarAvailable: sidebarAvailable) },
+                    get: { usesPhoneNavigation || sheets.mapResultsPresented ? nil : shellRequest(sidebarAvailable: sidebarAvailable) },
                     set: { value in
-                        guard !sheets.mapResultsPresented, value == nil else { return }
+                        guard !usesPhoneNavigation, !sheets.mapResultsPresented, value == nil else { return }
                         clearShellRequest()
                     }
                 ), onDismiss: { sheets.shellSheetPresented = false }) { destination in
@@ -95,11 +183,6 @@ struct AppShell: View {
                 }
             }
         }
-        .overlay {
-            if let connectPrompt { StravaConnectOverlay(prompt: connectPrompt).transition(.opacity) }
-        }
-        .animation(.easeInOut(duration: 0.2), value: connectPrompt)
-        .environment(\.stravaConnect, stravaConnect)
     }
 
     private func shellRequest(sidebarAvailable: Bool) -> ShellSheet? {
@@ -155,78 +238,23 @@ struct AppShell: View {
     // Global destinations stay outside the List's native navigation stack.
     private func shellHeader(sidebarAvailable: Bool) -> some View {
         HStack(spacing: 8) {
-            let filtersOpen = sidebarAvailable ? sidebarVisible : sheets.showsFilters
             // Equal flexible sides keep the destination picker centred.
             HStack(spacing: 8) {
-                Button {
-                    if sidebarAvailable { sidebarVisible.toggle() }
-                    else { sheets.showsFilters.toggle() }
-                } label: {
-                    Image(systemName: activeFilterCount == 0
-                        ? "line.3.horizontal.decrease"
-                        : "line.3.horizontal.decrease.circle.fill")
-                        .rotationEffect(.degrees(sidebarAvailable ? 90 : 0))
-                        .frame(width: 44, height: 44)
-                        .background(filtersOpen ? Color.white.opacity(0.2) : .clear,
-                                    in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .accessibilityLabel(filterButtonLabel)
-                .accessibilityValue(filtersOpen ? "Expanded" : "Collapsed")
-                .accessibilityAddTraits(filtersOpen ? .isSelected : [])
+                filterButton(sidebarAvailable: sidebarAvailable)
                 if compactBar && store.selectedTab == .list {
                     SelectionBar(store: store, includesTotal: true, onNavigationBar: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            ViewThatFits(in: .horizontal) {
-                modePicker.fixedSize(horizontal: true, vertical: false)
-                Menu {
-                    ForEach(AppTab.available(stats: statsContent != nil), id: \.self) { tab in
-                        Button(tab.title) { store.selectedTab = tab }
-                    }
-                } label: {
-                    Label(store.selectedTab.title, systemImage: "chevron.down")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white).frame(minHeight: 44)
-                }
-                .accessibilityLabel("View: \(store.selectedTab.title)")
-                .accessibilityIdentifier("browse-destination-menu")
-            }
+            destinationPicker
             // Measured before the sides, so the full picker wins when it fits.
             .layoutPriority(1)
             HStack(spacing: 8) {
                 if compactBar && store.selectedTab == .list {
                     ListControls(presentation: store.listPresentation, iconOnly: true, onNavigationBar: true)
                 }
-                Button {
-                    sheets.accountDestination = .settings
-                } label: {
-                    AsyncImage(url: auth.currentUser?.image.flatMap(URL.init(string:))) { phase in
-                        if let image = phase.image {
-                            image.resizable().scaledToFill()
-                                .frame(width: 32, height: 32)
-                                .clipShape(Circle())
-                                .overlay { Circle().strokeBorder(.white.opacity(0.65), lineWidth: 1) }
-                        } else {
-                            Image(systemName: "person.crop.circle")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .frame(width: 44, height: 44)
-                    // Quiet activity-loading indicator (#309); sync detail lives in Settings.
-                    .overlay { AvatarSyncIndicator(busy: syncing) }
-                    .contentShape(Rectangle())
-                    .accessibilityHidden(true)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Settings")
-                .accessibilityValue(syncing ? "Syncing activities" : "")
-                .accessibilityIdentifier("open-settings")
+                accountButton
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -235,6 +263,73 @@ struct AppShell: View {
         // Controls stay inside the safe area; only the colour reaches the edges.
         .background(AppTheme.navigationBlue.ignoresSafeArea(edges: [.top, .horizontal]))
         .accessibilityIdentifier("browse-header")
+    }
+
+    private func filterButton(sidebarAvailable: Bool) -> some View {
+        let filtersOpen = sidebarAvailable ? sidebarVisible : sheets.showsFilters
+        return Button {
+            if sidebarAvailable { sidebarVisible.toggle() }
+            else { sheets.showsFilters.toggle() }
+        } label: {
+            Image(systemName: activeFilterCount == 0
+                ? "line.3.horizontal.decrease"
+                : "line.3.horizontal.decrease.circle.fill")
+                .rotationEffect(.degrees(sidebarAvailable ? 90 : 0))
+                .frame(width: 44, height: 44)
+                .background(filtersOpen ? Color.white.opacity(0.2) : .clear,
+                            in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .frame(width: 44, height: 44)
+        .accessibilityLabel(filterButtonLabel)
+        .accessibilityValue(filtersOpen ? "Expanded" : "Collapsed")
+        .accessibilityAddTraits(filtersOpen ? .isSelected : [])
+    }
+
+    private var destinationPicker: some View {
+        ViewThatFits(in: .horizontal) {
+            modePicker.fixedSize(horizontal: true, vertical: false)
+            Menu {
+                ForEach(AppTab.available(stats: statsContent != nil), id: \.self) { tab in
+                    Button(tab.title) { store.selectedTab = tab }
+                }
+            } label: {
+                Label(store.selectedTab.title, systemImage: "chevron.down")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white).frame(minHeight: 44)
+            }
+            .accessibilityLabel("View: \(store.selectedTab.title)")
+            .accessibilityIdentifier("browse-destination-menu")
+        }
+    }
+
+    private var accountButton: some View {
+        Button {
+            sheets.accountDestination = .settings
+        } label: {
+            AsyncImage(url: auth.currentUser?.image.flatMap(URL.init(string:))) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                        .frame(width: 32, height: 32)
+                        .clipShape(Circle())
+                        .overlay { Circle().strokeBorder(.white.opacity(0.65), lineWidth: 1) }
+                } else {
+                    Image(systemName: "person.crop.circle")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .frame(width: 44, height: 44)
+            // Quiet activity-loading indicator (#309); sync detail lives in Settings.
+            .overlay { AvatarSyncIndicator(busy: syncing) }
+            .contentShape(Rectangle())
+            .accessibilityHidden(true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Settings")
+        .accessibilityValue(syncing ? "Syncing activities" : "")
+        .accessibilityIdentifier("open-settings")
     }
 
     private var content: some View {

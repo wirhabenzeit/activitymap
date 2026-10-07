@@ -12,6 +12,7 @@ struct MapScreen: View {
     @Environment(\.mapStyleOverride) private var mapStyleOverride
     @State private var viewport: Viewport
     @State private var acceptsCameraEvents = false
+    @State private var cameraTransitionID: UUID?
 
     init(store: ActivityStore, topOcclusion: CGFloat = 0, picker: RoutePicker? = nil) {
         _picker = State(initialValue: picker ?? RoutePicker())
@@ -63,21 +64,25 @@ struct MapScreen: View {
         }
         .onChange(of: store.selectedTab) { _, tab in
             if tab != .map {
+                cameraTransitionID = nil
                 picker.invalidateQuery()
             }
         }
         .onChange(of: picker.isAdding) { _, _ in picker.invalidateQuery() }
         .onChange(of: context.baseStyle) { oldStyle, newStyle in
+            cameraTransitionID = nil
             if oldStyle.styleURL != newStyle.styleURL { acceptsCameraEvents = false }
             picker.invalidateQuery()
         }
         .onChange(of: context.activeOverlays) { _, _ in picker.invalidateQuery() }
         .onChange(of: context.scopeRevision) { _, _ in
+            cameraTransitionID = nil
             picker.isPresented = false
             picker.isAdding = false
             viewport = context.camera.viewport
         }
         .onDisappear {
+            cameraTransitionID = nil
             acceptsCameraEvents = false
             picker.invalidateQuery()
         }
@@ -192,12 +197,18 @@ struct MapScreen: View {
         let padding = camera.padding ?? context.camera.padding
         let target = Viewport.camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
             .padding(EdgeInsets(top: padding.top, leading: padding.left, bottom: padding.bottom, trailing: padding.right))
+        let transitionID = UUID()
+        cameraTransitionID = transitionID
         switch action {
         case .activity, .fitSelection, .fitFiltered:
-            // A fit can also change projection and panel layout. The SDK's
-            // animated transition can cancel during those updates, leaving the
-            // initial camera after the request has already been consumed.
-            viewport = target
+            // Commit navigation/results layout first. Updating the viewport
+            // inside that same SwiftUI update loses its animation transaction.
+            // Ease the fixed camera and final panel padding together afterwards.
+            DispatchQueue.main.async {
+                guard cameraTransitionID == transitionID, store.selectedTab == .map,
+                      map.isStyleLoaded else { return }
+                withViewportAnimation(.easeOut(duration: 0.5)) { viewport = target }
+            }
         default:
             withViewportAnimation(.default(maxDuration: 0.5)) { viewport = target }
         }

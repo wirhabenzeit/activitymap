@@ -1,0 +1,696 @@
+{
+  "issue": "https://github.com/wirhabenzeit/activitymap/issues/347",
+  "date": "2026-10-07",
+  "productionSourceCommit": "5e6172f5ad11a50856295608325db3c8d3e69cb9",
+  "configuration": "Release, ENABLE_TESTABILITY=YES, iPhone 18 Pro simulator, iOS 27.0",
+  "activityCount": 4578,
+  "reportingDay": "2026-10-04",
+  "animationDurationMs": 250,
+  "measurementWindowMs": 700,
+  "validation": {
+    "diagnosticsTestsPassed": 2,
+    "scriptSyntaxCheckPassed": true,
+    "physicalDeviceChecked": false
+  },
+  "findings": [
+    {
+      "status": "measured",
+      "finding": "Year-to-date presentation is expensive during expansion. At 402pt, production settles around 405ms versus about 58ms without animation. Freezing descendant progress alone leaves most of this cost."
+    },
+    {
+      "status": "measured",
+      "finding": "Stable one-column neighbors are mostly cached: in the warmed volume expansion, thisWeek and monthVsLastMonth each receive only two diagnostic size measurements, while the expanded volume receives many. The issue theory that every neighbor is remeasured every frame is too broad."
+    },
+    {
+      "status": "source-confirmed",
+      "finding": "Expansion changes only expandedTile, outside the dashboard query request key. Cached analytics are reused; no stream fetch or analytics recalculation is required."
+    },
+    {
+      "status": "source-confirmed-and-measured",
+      "finding": "The height limit applies only below a 480pt viewport, excludes accessibility text sizes, and caps individual visuals rather than the whole tile. Long Records and Hilliness content never uses that cap. Even the limited landscape calendar remains too tall."
+    },
+    {
+      "status": "source-confirmed",
+      "finding": "Portrait expansion skips scrollTo. A tile can fit in the viewport but still expand partly below the visible area."
+    },
+    {
+      "status": "source-confirmed",
+      "finding": "The inclusive rolling calendar crosses 13 calendar months, including partial first and last months. This is existing date semantics, not a request to drop days."
+    },
+    {
+      "status": "source-inference",
+      "finding": "Numeric calendar colors repeatedly compute the maximum over all active days per active cell, potentially quadratic work per color pass. This is an additional optimization opportunity, not an established dominant hotspot."
+    }
+  ],
+  "nextImplementation": [
+    "Separate card movement/reveal from the continuous invalidation of expensive live chart content; compare against these diagnostics and inspect actual intermediate frames. Simply shortening the duration or freezing the height is insufficient for year-to-date.",
+    "Use a whole-tile phone height budget, accounting for measured headers and controls. Page or scroll long calendar/list content instead of clipping it; preserve readable text and local inspection state.",
+    "Keep the expanded tile visible in portrait as well as landscape, and regression-check two-column row expansion and Reduce Motion."
+  ],
+  "limitations": [
+    "One expand and one collapse sample per combination, after warming both endpoints; these are diagnostic comparisons, not statistical performance budgets.",
+    "Process CPU includes all test-host threads. Display-link callback gaps indicate main-run-loop availability, not measured GPU-presented frame rates.",
+    "Timing uses an isolated production section, not the entire app shell. Height checks use isolated production tiles and explicit content budgets, not a final physical-device layout certification.",
+    "The endpoint and cached-endpoint controls deliberately change transition behavior and can reset local state; they are experiments, not proposed production patches.",
+    "Physical iPhone unavailable during investigation. Device recording and iPad/accessibility acceptance remain open."
+  ],
+  "measurements": [
+    {
+      "run": "focused-final",
+      "width": 402,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 161.6,
+      "meanLastGeometryChangeMs": 270.1,
+      "maxMainRunLoopDisplayGapMs": 33.3
+    },
+    {
+      "run": "focused-final",
+      "width": 402,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 53.4,
+      "meanLastGeometryChangeMs": 282.4,
+      "maxMainRunLoopDisplayGapMs": 23.9
+    },
+    {
+      "run": "focused-final",
+      "width": 402,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "no-animation",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 18.7,
+      "meanLastGeometryChangeMs": 8.7,
+      "maxMainRunLoopDisplayGapMs": 33.3
+    },
+    {
+      "run": "focused-final",
+      "width": 402,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 360.9,
+      "meanLastGeometryChangeMs": 405.3,
+      "maxMainRunLoopDisplayGapMs": 74.9
+    },
+    {
+      "run": "focused-final",
+      "width": 402,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 302.0,
+      "meanLastGeometryChangeMs": 365.5,
+      "maxMainRunLoopDisplayGapMs": 75.4
+    },
+    {
+      "run": "focused-final",
+      "width": 402,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "no-animation",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 64.1,
+      "meanLastGeometryChangeMs": 57.7,
+      "maxMainRunLoopDisplayGapMs": 17.2
+    },
+    {
+      "run": "focused-final",
+      "width": 820,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 155.7,
+      "meanLastGeometryChangeMs": 272.5,
+      "maxMainRunLoopDisplayGapMs": 33.3
+    },
+    {
+      "run": "focused-final",
+      "width": 820,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 47.5,
+      "meanLastGeometryChangeMs": 282.2,
+      "maxMainRunLoopDisplayGapMs": 23.2
+    },
+    {
+      "run": "focused-final",
+      "width": 820,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "no-animation",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 15.4,
+      "meanLastGeometryChangeMs": 8.0,
+      "maxMainRunLoopDisplayGapMs": 17.7
+    },
+    {
+      "run": "focused-final",
+      "width": 820,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 359.0,
+      "meanLastGeometryChangeMs": 423.9,
+      "maxMainRunLoopDisplayGapMs": 89.9
+    },
+    {
+      "run": "focused-final",
+      "width": 820,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 238.5,
+      "meanLastGeometryChangeMs": 356.2,
+      "maxMainRunLoopDisplayGapMs": 90.7
+    },
+    {
+      "run": "focused-final",
+      "width": 820,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "no-animation",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 104.3,
+      "meanLastGeometryChangeMs": 81.2,
+      "maxMainRunLoopDisplayGapMs": 33.3
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 149.9,
+      "meanLastGeometryChangeMs": 267.9,
+      "maxMainRunLoopDisplayGapMs": 33.3
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 55.7,
+      "meanLastGeometryChangeMs": 279.5,
+      "maxMainRunLoopDisplayGapMs": 24.3
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 82.1,
+      "meanLastGeometryChangeMs": 396.2,
+      "maxMainRunLoopDisplayGapMs": 50.4
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "monthVsLastMonth",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 122.0,
+      "meanLastGeometryChangeMs": 281.5,
+      "maxMainRunLoopDisplayGapMs": 22.2
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "monthVsLastMonth",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 49.6,
+      "meanLastGeometryChangeMs": 272.7,
+      "maxMainRunLoopDisplayGapMs": 22.4
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "monthVsLastMonth",
+      "option": "distance",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 66.1,
+      "meanLastGeometryChangeMs": 283.1,
+      "maxMainRunLoopDisplayGapMs": 33.3
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 372.5,
+      "meanLastGeometryChangeMs": 418.9,
+      "maxMainRunLoopDisplayGapMs": 85.0
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 311.0,
+      "meanLastGeometryChangeMs": 370.1,
+      "maxMainRunLoopDisplayGapMs": 76.7
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 318.0,
+      "meanLastGeometryChangeMs": 386.8,
+      "maxMainRunLoopDisplayGapMs": 76.1
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "activityCalendar",
+      "option": "sport",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 91.5,
+      "meanLastGeometryChangeMs": 301.7,
+      "maxMainRunLoopDisplayGapMs": 67.6
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "activityCalendar",
+      "option": "sport",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 56.7,
+      "meanLastGeometryChangeMs": 279.6,
+      "maxMainRunLoopDisplayGapMs": 66.7
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "activityCalendar",
+      "option": "sport",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 103.4,
+      "meanLastGeometryChangeMs": 303.0,
+      "maxMainRunLoopDisplayGapMs": 49.8
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "activityCalendar",
+      "option": "time",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 123.5,
+      "meanLastGeometryChangeMs": 284.3,
+      "maxMainRunLoopDisplayGapMs": 22.1
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "activityCalendar",
+      "option": "time",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 76.9,
+      "meanLastGeometryChangeMs": 283.8,
+      "maxMainRunLoopDisplayGapMs": 18.4
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 402,
+      "tile": "activityCalendar",
+      "option": "time",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 107.5,
+      "meanLastGeometryChangeMs": 333.0,
+      "maxMainRunLoopDisplayGapMs": 33.4
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 152.3,
+      "meanLastGeometryChangeMs": 272.1,
+      "maxMainRunLoopDisplayGapMs": 37.9
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 81.3,
+      "meanLastGeometryChangeMs": 272.0,
+      "maxMainRunLoopDisplayGapMs": 32.6
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "weeklyVolume",
+      "option": "distance",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 74.0,
+      "meanLastGeometryChangeMs": 291.5,
+      "maxMainRunLoopDisplayGapMs": 32.8
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "monthVsLastMonth",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 115.6,
+      "meanLastGeometryChangeMs": 277.3,
+      "maxMainRunLoopDisplayGapMs": 33.8
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "monthVsLastMonth",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 117.3,
+      "meanLastGeometryChangeMs": 286.8,
+      "maxMainRunLoopDisplayGapMs": 34.8
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "monthVsLastMonth",
+      "option": "distance",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 130.2,
+      "meanLastGeometryChangeMs": 301.8,
+      "maxMainRunLoopDisplayGapMs": 41.2
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 376.1,
+      "meanLastGeometryChangeMs": 423.7,
+      "maxMainRunLoopDisplayGapMs": 92.2
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 211.4,
+      "meanLastGeometryChangeMs": 346.6,
+      "maxMainRunLoopDisplayGapMs": 91.6
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "yearToDate",
+      "option": "distance",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 246.4,
+      "meanLastGeometryChangeMs": 361.9,
+      "maxMainRunLoopDisplayGapMs": 75.9
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "activityCalendar",
+      "option": "sport",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 121.7,
+      "meanLastGeometryChangeMs": 286.2,
+      "maxMainRunLoopDisplayGapMs": 33.7
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "activityCalendar",
+      "option": "sport",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 119.1,
+      "meanLastGeometryChangeMs": 294.9,
+      "maxMainRunLoopDisplayGapMs": 50.6
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "activityCalendar",
+      "option": "sport",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 140.5,
+      "meanLastGeometryChangeMs": 306.3,
+      "maxMainRunLoopDisplayGapMs": 33.8
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "activityCalendar",
+      "option": "time",
+      "control": "production",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 135.9,
+      "meanLastGeometryChangeMs": 283.2,
+      "maxMainRunLoopDisplayGapMs": 22.7
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "activityCalendar",
+      "option": "time",
+      "control": "endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 125.8,
+      "meanLastGeometryChangeMs": 299.3,
+      "maxMainRunLoopDisplayGapMs": 37.1
+    },
+    {
+      "run": "warmed-all-tiles",
+      "width": 820,
+      "tile": "activityCalendar",
+      "option": "time",
+      "control": "cached-endpoint-content",
+      "sampleCount": 2,
+      "meanProcessCpuMs": 160.8,
+      "meanLastGeometryChangeMs": 342.7,
+      "maxMainRunLoopDisplayGapMs": 37.4
+    }
+  ],
+  "expandedTileHeights": [
+    {
+      "availableHeight": 700,
+      "overflow": 0,
+      "tile": "monthVsLastMonth",
+      "tileHeight": 455.7,
+      "visualHeightLimit": null,
+      "width": 402
+    },
+    {
+      "availableHeight": 700,
+      "overflow": 0,
+      "tile": "weeklyVolume",
+      "tileHeight": 579.7,
+      "visualHeightLimit": null,
+      "width": 402
+    },
+    {
+      "availableHeight": 700,
+      "overflow": 0,
+      "tile": "yearToDate",
+      "tileHeight": 465.3,
+      "visualHeightLimit": null,
+      "width": 402
+    },
+    {
+      "availableHeight": 700,
+      "overflow": 236,
+      "tile": "records",
+      "tileHeight": 936,
+      "visualHeightLimit": null,
+      "width": 402
+    },
+    {
+      "availableHeight": 700,
+      "overflow": 0,
+      "tile": "activityCalendar",
+      "tileHeight": 632,
+      "visualHeightLimit": null,
+      "width": 402
+    },
+    {
+      "availableHeight": 700,
+      "overflow": 0,
+      "tile": "sportMix",
+      "tileHeight": 623,
+      "visualHeightLimit": null,
+      "width": 402
+    },
+    {
+      "availableHeight": 700,
+      "overflow": 134,
+      "tile": "distanceVsElevation",
+      "tileHeight": 834,
+      "visualHeightLimit": null,
+      "width": 402
+    },
+    {
+      "availableHeight": 580,
+      "overflow": 0,
+      "tile": "monthVsLastMonth",
+      "tileHeight": 455.7,
+      "visualHeightLimit": null,
+      "width": 375
+    },
+    {
+      "availableHeight": 580,
+      "overflow": 0,
+      "tile": "weeklyVolume",
+      "tileHeight": 579.7,
+      "visualHeightLimit": null,
+      "width": 375
+    },
+    {
+      "availableHeight": 580,
+      "overflow": 0,
+      "tile": "yearToDate",
+      "tileHeight": 465.3,
+      "visualHeightLimit": null,
+      "width": 375
+    },
+    {
+      "availableHeight": 580,
+      "overflow": 356,
+      "tile": "records",
+      "tileHeight": 936,
+      "visualHeightLimit": null,
+      "width": 375
+    },
+    {
+      "availableHeight": 580,
+      "overflow": 70,
+      "tile": "activityCalendar",
+      "tileHeight": 650,
+      "visualHeightLimit": null,
+      "width": 375
+    },
+    {
+      "availableHeight": 580,
+      "overflow": 43,
+      "tile": "sportMix",
+      "tileHeight": 623,
+      "visualHeightLimit": null,
+      "width": 375
+    },
+    {
+      "availableHeight": 580,
+      "overflow": 254,
+      "tile": "distanceVsElevation",
+      "tileHeight": 834,
+      "visualHeightLimit": null,
+      "width": 375
+    },
+    {
+      "availableHeight": 270,
+      "overflow": 12,
+      "tile": "monthVsLastMonth",
+      "tileHeight": 282,
+      "visualHeightLimit": 100,
+      "width": 820
+    },
+    {
+      "availableHeight": 270,
+      "overflow": 71,
+      "tile": "weeklyVolume",
+      "tileHeight": 341,
+      "visualHeightLimit": 100,
+      "width": 820
+    },
+    {
+      "availableHeight": 270,
+      "overflow": 21.7,
+      "tile": "yearToDate",
+      "tileHeight": 291.7,
+      "visualHeightLimit": 100,
+      "width": 820
+    },
+    {
+      "availableHeight": 270,
+      "overflow": 651.7,
+      "tile": "records",
+      "tileHeight": 921.7,
+      "visualHeightLimit": 100,
+      "width": 820
+    },
+    {
+      "availableHeight": 270,
+      "overflow": 196,
+      "tile": "activityCalendar",
+      "tileHeight": 466,
+      "visualHeightLimit": 100,
+      "width": 820
+    },
+    {
+      "availableHeight": 270,
+      "overflow": 50.3,
+      "tile": "sportMix",
+      "tileHeight": 320.3,
+      "visualHeightLimit": 100,
+      "width": 820
+    },
+    {
+      "availableHeight": 270,
+      "overflow": 419.7,
+      "tile": "distanceVsElevation",
+      "tileHeight": 689.7,
+      "visualHeightLimit": 100,
+      "width": 820
+    }
+  ],
+  "runner": "scripts/diagnose-stats-expansion.sh",
+  "localEvidence": [
+    "/tmp/activitymap-stats-347-isolation",
+    "/tmp/activitymap-stats-347-warmed"
+  ]
+}

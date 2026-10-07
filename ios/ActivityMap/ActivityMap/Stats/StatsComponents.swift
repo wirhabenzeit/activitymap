@@ -8,14 +8,30 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     var expand: (() -> Void)? = nil
     var expanded = false
     var compactHeader = false
+    var detailScreen = false
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let content: () -> Content
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
 
     var body: some View {
+        if detailScreen {
+            tileBody.padding(12)
+        } else {
+            tileBody
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .modifier(BrowseSurface())
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius))
+        }
+    }
+    private var tileBody: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
-            if shortViewportLimit != nil && !typeSize.isAccessibilitySize {
+            if detailScreen {
+                ViewThatFits(in: .horizontal) {
+                    HStack { periodLabel; Spacer(minLength: 8); controls() }
+                    VStack(alignment: .leading, spacing: 8) { periodLabel; controls() }
+                }
+            } else if shortViewportLimit != nil && !typeSize.isAccessibilitySize {
                 // iPhone landscape: one header row where the card is wide enough.
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
@@ -33,10 +49,6 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
             }
             content()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .modifier(BrowseSurface())
-        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius))
-
     }
     @ViewBuilder private var expandButton: some View {
         if let expand {
@@ -382,6 +394,9 @@ extension EnvironmentValues {
     /// so a tile's header, controls and chart fit on one screen. Never below
     /// compact. Its presence also selects the dense one-row tile headers.
     @Entry var statsDetailHeightLimit: Double? = nil
+    @Entry var statsTileInspection: StatsTileInspection? = nil
+    @Entry var statsDetailPresentation = StatsDetailPresentation.automatic
+    @Entry var statsShellNavigation: StatsShellNavigation? = nil
 }
 
 /// Shared sizing for charts, calendar cells and any future compact/detail visual.
@@ -479,4 +494,9 @@ struct StatsActivityRow: View {
             if linked { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
         }.padding(.vertical, 12).frame(minHeight: 44).contentShape(Rectangle())
     }
+}
+
+/// Explicit presentation is useful for hosts that render an iPad-sized preview on a phone.
+enum StatsDetailPresentation {
+    case automatic, navigation, inline
 }

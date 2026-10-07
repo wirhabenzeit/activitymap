@@ -273,6 +273,85 @@ extension RenderedRoutePickingTests {
         #expect(store.selectedActivityIDs == selection)
     }
 
+    @Test(arguments: [false, true])
+    func listMapActionDoesNotPresentSheetOverPushedDetail(globe: Bool) async throws {
+        let previousToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = previousToken }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1),
+                                               ActivityStoreSelectionTests.activity(2)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        store.addToSelection([1])
+        let picker = RoutePicker(), sheets = BrowseSheetPresentation()
+        let host = try ListHarness(root: AppShell(store: store, mapPicker: picker, sheets: sheets)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: globe
+                ? Self.listOfflineStyle.replacingOccurrences(of: "\"sources\":{}", with: "\"projection\":{\"name\":\"globe\"},\"sources\":{}")
+                : Self.listOfflineStyle)),
+            size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false
+            && host.descendants(of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
+        let map = try #require(host.descendants(of: MapView.self).first)
+        let navigation = try #require(host.controllers(of: UINavigationController.self).last)
+        store.inspect(2)
+        try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        let reference = try #require(host.controllers(of: DetailBackGesture.Controller.self).last?.navigationReference)
+        #expect(reference.controller === navigation)
+        #expect(!sheets.mapResultsPresented)
+
+        try host.save("list-detail-map-trailing")
+        let captureDirectory = ProcessInfo.processInfo.environment["ACTIVITYMAP_LIST_MAP_HANDOFF_OUTPUT"]
+            .map { URL(fileURLWithPath: $0) }
+        if let directory = captureDirectory {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data().write(to: directory.appendingPathComponent("ready"))
+            let deadline = Date().addingTimeInterval(60)
+            while !FileManager.default.fileExists(atPath: directory.appendingPathComponent("recording").path), Date() < deadline {
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            try #require(FileManager.default.fileExists(atPath: directory.appendingPathComponent("recording").path))
+            try await Task.sleep(for: .seconds(1))
+        }
+        let detailController = try #require(navigation.topViewController)
+        let startZoom = map.mapboxMap.cameraState.zoom
+        var zoomSamples = [startZoom]
+        showActivityOnMapFromDetail(2, store: store, navigationController: reference.controller)
+        for _ in 0..<45 {
+            try await Task.sleep(for: .milliseconds(16))
+            zoomSamples.append(map.mapboxMap.cameraState.zoom)
+            if sheets.mapResultsPresented || host.host.presentedViewController != nil {
+                #expect(navigation.viewControllers.count == 1,
+                        "The Map sheet must never appear over a still-pushed List detail")
+                #expect(navigation.transitionCoordinator?.viewController(forKey: .from) !== detailController,
+                        "The outgoing detail must finish its transition before Map's sheet appears")
+            }
+        }
+        try await listWait { sheets.mapResultsPresented && picker.detailID == 2 }
+        try await listWait {
+            guard case .state = map.viewport.status else { return false }
+            return map.mapboxMap.cameraState.zoom > startZoom + 1
+        }
+        let end = map.mapboxMap.cameraState
+        let delta = end.zoom - startZoom
+        #expect(zoomSamples.filter { $0 > startZoom + delta * 0.1 && $0 < end.zoom - delta * 0.1 }.count >= 3,
+                "Show on map must move through intermediate cameras while opening results, instead of jumping")
+        #expect(zip(zoomSamples, zoomSamples.dropFirst()).allSatisfy { abs($1 - $0) < delta * 0.6 },
+                "No single frame may jump most of the way to the fitted zoom")
+        #expect(host.descendants(of: MapView.self).first === map, "Navigation must retain the loaded map")
+        #expect(map.mapboxMap.projection?.name == .mercator)
+        let route = try #require(store.activities.first { $0.id == 2 }).coordinates
+        let visible = map.bounds.inset(by: end.padding).insetBy(dx: -2, dy: -2)
+        #expect(map.mapboxMap.points(for: route).allSatisfy { visible.contains($0) },
+                "The animation must finish with the route framed above the opening results sheet")
+        #expect(store.selectedTab == .map && store.inspectedActivityID == nil)
+        #expect(store.activeActivityID == 2 && store.selectedActivityIDs == [1, 2])
+        #expect(host.host.presentedViewController?.sheetPresentationController != nil)
+        try host.save("list-detail-map-handoff")
+        if let directory = captureDirectory { try Data().write(to: directory.appendingPathComponent("done")) }
+    }
+
     @Test func shellHeaderStaysOutsideListDetailNavigation() async throws {
         let previousToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
@@ -286,13 +365,17 @@ extension RenderedRoutePickingTests {
             size: CGSize(width: 390, height: 844))
         defer { host.close() }
         try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
-        let navigation = try #require(host.controllers(of: UINavigationController.self).first)
+        let navigation = try #require(host.controllers(of: UINavigationController.self).last)
         let list = try #require(host.descendants(of: UICollectionView.self).first)
         list.setContentOffset(CGPoint(x: 0, y: 200), animated: false)
         try await Task.sleep(for: .milliseconds(200))
         let offset = list.contentOffset
         let navigationTop = navigation.view.convert(.zero, to: host.host.view).y
-        #expect(navigationTop >= 54, "The native stack starts below the persistent app header")
+        let shellNavigation = try #require(host.controllers(of: UINavigationController.self).first)
+        let headerBottom = shellNavigation.navigationBar.convert(shellNavigation.navigationBar.bounds, to: host.host.view).maxY
+        let listTop = list.convert(list.bounds, to: host.host.view).minY
+        #expect(!shellNavigation.isNavigationBarHidden && listTop + list.adjustedContentInset.top >= headerBottom,
+                "The retained List starts below the visible shell bar")
         store.inspect(90)
         var openingFrames: [CGRect] = []
         var openingInsets: [CGFloat] = []
@@ -303,12 +386,12 @@ extension RenderedRoutePickingTests {
             if navigation.viewControllers.count == 2, let destination = navigation.topViewController {
                 openingFrames.append(destination.view.frame)
                 openingInsets.append(destination.view.safeAreaInsets.top)
-                #expect(navigation.isNavigationBarHidden)
+                #expect(!navigation.isNavigationBarHidden)
             }
         }
         #expect(!openingFrames.isEmpty)
         #expect(openingFrames.allSatisfy { $0 == openingFrames.first })
-        #expect(openingInsets.allSatisfy { $0 == 0 }, "Native bar insets must not move the fixed Back row during the push")
+        #expect(openingInsets.allSatisfy { abs($0 - (openingInsets.first ?? $0)) < 1 }, "Root and detail keep the same native bar inset during the push")
         try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         let barFrame = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
         let contentFrame = navigation.topViewController?.view.frame
@@ -319,7 +402,7 @@ extension RenderedRoutePickingTests {
             #expect(navigation.topViewController?.view.frame == contentFrame,
                     "Detail content must not shift after the push transition completes")
         }
-        #expect(navigation.isNavigationBarHidden)
+        #expect(!navigation.isNavigationBarHidden)
         let popGesture = try #require(navigation.interactivePopGestureRecognizer)
         #expect(popGesture.isEnabled)
         #expect(popGesture.delegate?.gestureRecognizerShouldBegin?(popGesture) == true,

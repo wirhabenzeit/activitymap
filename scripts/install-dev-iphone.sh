@@ -6,18 +6,20 @@
 #   scripts/install-dev-iphone.sh --device NAME|UDID
 #   scripts/install-dev-iphone.sh --no-launch
 #   scripts/install-dev-iphone.sh --build-only     # build and verify, no install
+#   scripts/install-dev-iphone.sh --release        # optimized Dev app for performance review
 #
 # The Mapbox token comes from MAPBOX_ACCESS_TOKEN, else from Config/Local.xcconfig
 # in this checkout or the main checkout (worktrees usually have none).
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-device="" launch=1 install=1
+device="" launch=1 install=1 configuration=Debug
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --device) device="$2"; shift 2 ;;
     --no-launch) launch=""; shift ;;
     --build-only) install=""; shift ;;
-    -h|--help) sed -n '2,11p' "$0"; exit ;;
+    --release) configuration=Release; shift ;;
+    -h|--help) sed -n '2,12p' "$0"; exit ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -60,9 +62,9 @@ fi
 [[ -n "$token" ]] && settings+=("MAPBOX_ACCESS_TOKEN=$token")
 
 branch="$(git -C "$repo" branch --show-current)"
-echo "Building $(git -C "$repo" rev-parse --short HEAD) (${branch:-detached HEAD}); log: $work/build.log" >&2
+echo "Building $(git -C "$repo" rev-parse --short HEAD) (${branch:-detached HEAD}, $configuration); log: $work/build.log" >&2
 xcodebuild build -project "$repo/ios/ActivityMap/ActivityMap.xcodeproj" -scheme ActivityMap \
-  -configuration Debug -destination "platform=iOS,id=$udid" -derivedDataPath "$work/DerivedData" \
+  -configuration "$configuration" -destination "platform=iOS,id=$udid" -derivedDataPath "$work/DerivedData" \
   -allowProvisioningUpdates \
   ACTIVITYMAP_BUNDLE_ID_SUFFIX=.dev ACTIVITYMAP_DISPLAY_NAME="ActivityMap Dev" \
   ACTIVITYMAP_APP_ICON=AppIconDev ACTIVITYMAP_AUTH_CALLBACK_SCHEME=activitymap-dev \
@@ -72,7 +74,7 @@ xcodebuild build -project "$repo/ios/ActivityMap/ActivityMap.xcodeproj" -scheme 
     exit 1
   }
 
-app="$work/DerivedData/Build/Products/Debug-iphoneos/ActivityMap.app"
+app="$work/DerivedData/Build/Products/$configuration-iphoneos/ActivityMap.app"
 plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$app/Info.plist" 2>/dev/null || true; }
 # Never overwrite the TestFlight app (page.dominik.activitymap) by accident.
 [[ "$(plist CFBundleIdentifier)" == "$bundle_id" ]] || { echo "Built bundle ID is $(plist CFBundleIdentifier), not $bundle_id; not installing." >&2; exit 1; }
