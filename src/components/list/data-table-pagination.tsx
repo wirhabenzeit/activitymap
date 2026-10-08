@@ -34,22 +34,24 @@ export function DataTablePagination<TData extends RowData>({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-2 sm:gap-4 p-2 border-t border-border bg-muted',
+        '@container/list-pagination flex items-center justify-between gap-2 p-2 border-t border-border bg-muted',
         className,
       )}
     >
       <span className="min-w-0 truncate whitespace-nowrap text-sm text-muted-foreground">
-        <span className="sr-only sm:not-sr-only">{fullCount}</span>
-        <span aria-hidden className="sm:hidden">
+        <span className="sr-only @xl/list-pagination:not-sr-only @xl/list-pagination:whitespace-nowrap">
+          {fullCount}
+        </span>
+        <span aria-hidden className="@xl/list-pagination:hidden">
           {shortCount}
         </span>
       </span>
       <DataTableViewOptions table={table} hiddenByFit={hiddenByFit} />
       <div className="flex shrink-0 items-center gap-4">
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1 @xl/list-pagination:gap-2">
           <Button
             variant="outline"
-            className="hidden h-8 w-8 p-0 sm:inline-flex"
+            className="hidden h-8 w-8 p-0 @xl/list-pagination:inline-flex"
             onClick={() => table.setPageIndex(0)}
             disabled={!table.getCanPreviousPage()}
           >
@@ -79,7 +81,7 @@ export function DataTablePagination<TData extends RowData>({
           </Button>
           <Button
             variant="outline"
-            className="hidden h-8 w-8 p-0 sm:inline-flex"
+            className="hidden h-8 w-8 p-0 @xl/list-pagination:inline-flex"
             onClick={() => table.setPageIndex(table.getPageCount() - 1)}
             disabled={!table.getCanNextPage()}
           >

@@ -29,6 +29,7 @@
     "test": "tsx --conditions=react-server --test \"src/**/*.test.ts\" \"cloudflare/**/*.test.ts\"",
     "test:settings-ui": "tsx --test src/hooks/use-ingestion-status.test.tsx",
     "test:stats-ui": "tsx --test src/components/stats/tiles/*.test.tsx",
+    "test:list-ui": "node scripts/verify-list-inspection.mjs",
     "test:sync": "tsx src/scripts/test-sync-activities.ts",
     "cron:deploy": "pnpm dlx wrangler@4 deploy --config cloudflare/cron/wrangler.jsonc",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
