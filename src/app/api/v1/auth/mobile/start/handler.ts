@@ -42,6 +42,8 @@ export interface MobileAuthStartHandlerDependencies {
     /** Show Strava's consent screen even if the app is already authorised. */
     forceConsent: boolean;
     headers: Headers;
+    /** Preserves the public origin for Better Auth's OAuth proxy hooks. */
+    request: Request;
   }) => Promise<{ url: string; headers?: Headers } | null>;
 }
 
@@ -124,6 +126,7 @@ export function createMobileAuthStartHandler({
         errorCallbackURL: callbackURL,
         forceConsent,
         headers: request.headers,
+        request,
       });
       if (!result?.url) {
         throw new Error('Strava sign-in did not return an authorization URL');

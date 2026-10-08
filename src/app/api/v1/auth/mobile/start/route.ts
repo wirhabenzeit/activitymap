@@ -18,6 +18,7 @@ export const GET = withApiV1Observability(
         errorCallbackURL,
         forceConsent,
         headers,
+        request,
       }) => {
         // `asResponse: true` is required to get at the `Set-Cookie` header
         // Better Auth attaches for its own OAuth state verification -
@@ -33,6 +34,9 @@ export const GET = withApiV1Observability(
             ...(forceConsent ? { additionalParams: STRAVA_FORCE_CONSENT } : {}),
           },
           headers,
+          // The OAuth proxy inspects request.url. Headers alone make it
+          // fall back to VERCEL_URL, even for production-domain sign-ins.
+          request,
           asResponse: true,
         });
         const body: unknown = await response.json().catch(() => null);
