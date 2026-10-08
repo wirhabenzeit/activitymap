@@ -1,0 +1,2495 @@
+{
+  "title": "ActivityMap navigation reference",
+  "date": "2026-10-08",
+  "commit": "dad01984a3e30f9f59f37484b47e717396fea03e",
+  "workingTree": "Current uncommitted navigation experiment",
+  "sourceDiffHash": "8932eaaca36177bed3fcd0d6e2bcf3014c4ce6b5a401b4720a0403b5ee9cee88",
+  "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+  "activityCount": 20,
+  "layouts": [
+    {
+      "id": "ipad-portrait",
+      "title": "iPad · portrait",
+      "prefix": "",
+      "variant": "tablet",
+      "width": 834,
+      "height": 1194,
+      "group": "iPad",
+      "method": "Hosted iPad simulator viewport",
+      "behavior": {
+        "activity": "Detail opens beside the retained list. Close with X.",
+        "stats": "A chart inspector opens on the right. X closes it; the selected tile stays compact.",
+        "filters": "Left sidebar across Map, List and Stats. Portrait detail temporarily hides it; the toolbar can reveal it over the overview.",
+        "shell": "Blue Map / List / Stats picker stays available while detail is open.",
+        "returnActivity": "X returns to the full list. Show on map changes destination and selects the target route.",
+        "returnStats": "Close the inspector with X, or activate the selected tile again. The overview remains mounted.",
+        "map": "Portrait with filters uses a native results sheet; landscape fits a floating inspector on the right.",
+        "distinction": "Portrait borrows the filter column for detail. Landscape can retain filters, overview and detail together."
+      }
+    },
+    {
+      "id": "ipad-landscape",
+      "title": "iPad · landscape",
+      "prefix": "",
+      "variant": "wide",
+      "width": 1194,
+      "height": 834,
+      "group": "iPad",
+      "method": "Hosted iPad simulator viewport",
+      "behavior": {
+        "activity": "Detail opens beside the retained list. Close with X.",
+        "stats": "A chart inspector opens on the right. X closes it; the selected tile stays compact.",
+        "filters": "Left sidebar across Map, List and Stats. Portrait detail temporarily hides it; the toolbar can reveal it over the overview.",
+        "shell": "Blue Map / List / Stats picker stays available while detail is open.",
+        "returnActivity": "X returns to the full list. Show on map changes destination and selects the target route.",
+        "returnStats": "Close the inspector with X, or activate the selected tile again. The overview remains mounted.",
+        "map": "Portrait with filters uses a native results sheet; landscape fits a floating inspector on the right.",
+        "distinction": "Portrait borrows the filter column for detail. Landscape can retain filters, overview and detail together."
+      }
+    },
+    {
+      "id": "iphone-portrait",
+      "title": "iPhone · portrait",
+      "prefix": "",
+      "variant": "phone",
+      "width": 402,
+      "height": 874,
+      "group": "Native iPhone",
+      "method": "iPhone simulator; portrait scene",
+      "behavior": {
+        "activity": "Detail uses a native push and contextual blue Back / activity / Map bar.",
+        "stats": "Chart detail uses a native push with blue Back and title. This reference uses A: Push.",
+        "filters": "Native sheet. Portrait starts at a partial detent; landscape uses the full-height presentation.",
+        "shell": "Opening detail replaces the destination picker with a contextual navigation bar.",
+        "returnActivity": "Back or a completed edge swipe returns to List. Show on map changes destination.",
+        "returnStats": "Back or a completed edge swipe returns to the retained dashboard.",
+        "map": "Portrait uses the native results sheet; landscape puts the inspector beside the map.",
+        "distinction": "Landscape changes the map/filter containers but List and Stats still use navigation."
+      }
+    },
+    {
+      "id": "iphone-landscape",
+      "title": "iPhone · landscape",
+      "prefix": "",
+      "variant": "phone-landscape",
+      "width": 874,
+      "height": 402,
+      "group": "Native iPhone",
+      "method": "iPhone simulator; rotated scene",
+      "behavior": {
+        "activity": "Detail uses a native push and contextual blue Back / activity / Map bar.",
+        "stats": "Chart detail uses a native push with blue Back and title. This reference uses A: Push.",
+        "filters": "Native sheet. Portrait starts at a partial detent; landscape uses the full-height presentation.",
+        "shell": "Opening detail replaces the destination picker with a contextual navigation bar.",
+        "returnActivity": "Back or a completed edge swipe returns to List. Show on map changes destination.",
+        "returnStats": "Back or a completed edge swipe returns to the retained dashboard.",
+        "map": "Portrait uses the native results sheet; landscape puts the inspector beside the map.",
+        "distinction": "Landscape changes the map/filter containers but List and Stats still use navigation."
+      }
+    },
+    {
+      "id": "web-portrait",
+      "title": "Web · iPhone-size portrait",
+      "prefix": "web-",
+      "variant": "phone",
+      "width": 402,
+      "height": 874,
+      "group": "Phone-size web",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "behavior": {
+        "activity": "The content area pushes to an activity page; the blue app header and sidebar remain visible.",
+        "stats": "The selected tile expands inside the dashboard. The expand control becomes Collapse.",
+        "filters": "Portrait keeps a narrow icon rail and expands filters over the content with a scrim. Landscape and desktop reserve space for the full sidebar.",
+        "shell": "Map is the app-mark button. List and Stats are labeled; the blue shell stays available in detail.",
+        "returnActivity": "Back to activities closes the content detail. The map action changes the browser route to Map.",
+        "returnStats": "Collapse the selected tile, press Escape, or expand a different tile. This is not a separate chart page.",
+        "map": "A floating results panel sits over the map. Its footprint depends on viewport width.",
+        "distinction": "Phone landscape crosses into the full sidebar layout; the route panel can leave very little map visible."
+      }
+    },
+    {
+      "id": "web-landscape",
+      "title": "Web · iPhone-size landscape",
+      "prefix": "web-",
+      "variant": "phone-landscape",
+      "width": 874,
+      "height": 402,
+      "group": "Phone-size web",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "behavior": {
+        "activity": "The content area pushes to an activity page; the blue app header and sidebar remain visible.",
+        "stats": "The selected tile expands inside the dashboard. The expand control becomes Collapse.",
+        "filters": "Portrait keeps a narrow icon rail and expands filters over the content with a scrim. Landscape and desktop reserve space for the full sidebar.",
+        "shell": "Map is the app-mark button. List and Stats are labeled; the blue shell stays available in detail.",
+        "returnActivity": "Back to activities closes the content detail. The map action changes the browser route to Map.",
+        "returnStats": "Collapse the selected tile, press Escape, or expand a different tile. This is not a separate chart page.",
+        "map": "A floating results panel sits over the map. Its footprint depends on viewport width.",
+        "distinction": "Phone landscape crosses into the full sidebar layout; the route panel can leave very little map visible."
+      }
+    },
+    {
+      "id": "desktop",
+      "title": "Web · desktop browser",
+      "prefix": "web-",
+      "variant": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "group": "Desktop browser",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "behavior": {
+        "activity": "The content area pushes to an activity page; the blue app header and sidebar remain visible.",
+        "stats": "The selected tile expands inside the dashboard. The expand control becomes Collapse.",
+        "filters": "Portrait keeps a narrow icon rail and expands filters over the content with a scrim. Landscape and desktop reserve space for the full sidebar.",
+        "shell": "Map is the app-mark button. List and Stats are labeled; the blue shell stays available in detail.",
+        "returnActivity": "Back to activities closes the content detail. The map action changes the browser route to Map.",
+        "returnStats": "Collapse the selected tile, press Escape, or expand a different tile. This is not a separate chart page.",
+        "map": "A floating results panel sits over the map. Its footprint depends on viewport width.",
+        "distinction": "Phone landscape crosses into the full sidebar layout; the route panel can leave very little map visible."
+      }
+    }
+  ],
+  "collections": [
+    {
+      "id": "activity",
+      "title": "List → activity → Map",
+      "subtitle": "Inspection and selection are different actions.",
+      "scenes": [
+        "list",
+        "list-detail",
+        "list-to-map"
+      ],
+      "stages": [
+        "1 / Browse the list",
+        "2 / Inspect Lunch Ride",
+        "3 / Show that activity on Map"
+      ],
+      "arrows": [
+        "Open an activity",
+        "Show on map"
+      ]
+    },
+    {
+      "id": "map",
+      "title": "Map → selected routes → activity",
+      "subtitle": "The inspector stays attached to the map; Back and Clear have different effects.",
+      "scenes": [
+        "map",
+        "map-results",
+        "map-detail"
+      ],
+      "stages": [
+        "1 / Browse routes",
+        "2 / Four selected routes",
+        "3 / Inspect one of those routes"
+      ],
+      "arrows": [
+        "Select routes",
+        "Open a result"
+      ]
+    },
+    {
+      "id": "stats",
+      "title": "Stats overview → detail · Filters",
+      "subtitle": "The same chart opens in three different containers: push, pane or inline expansion.",
+      "scenes": [
+        "stats",
+        "stats-expanded",
+        "filters"
+      ],
+      "stages": [
+        "1 / Browse Stats",
+        "2 / Open Training volume",
+        "Reference / Filters from List"
+      ],
+      "arrows": [
+        "Open chart detail",
+        "Filter presentation"
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "id": "list--tablet",
+      "layout": "ipad-portrait",
+      "scene": "list",
+      "title": "List overview",
+      "image": "screenshots/list--tablet.jpg",
+      "width": 834,
+      "height": 1194,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.04522613065326633,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.04522613065326633,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list-detail--tablet",
+      "layout": "ipad-portrait",
+      "scene": "list-detail",
+      "title": "Activity detail",
+      "image": "screenshots/list-detail--tablet.jpg",
+      "width": 834,
+      "height": 1194,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.04522613065326633,
+          "text": "Global destinations remain available while the activity is open."
+        },
+        {
+          "n": 2,
+          "x": 0.965,
+          "y": 0.08793969849246232,
+          "text": "The right-hand activity inspector closes with X. Portrait hides filters automatically."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list-to-map--tablet",
+      "layout": "ipad-portrait",
+      "scene": "list-to-map",
+      "title": "After Show on map",
+      "image": "screenshots/list-to-map--tablet.jpg",
+      "width": 834,
+      "height": 1194,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.04522613065326633,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.5,
+          "y": 0.74,
+          "text": "The activity is selected and inspected on Map. This is a destination handoff, not Back to List."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "{{-193.5, 806}, {580, 368}}",
+        "paddedVisibleRect": "{{16, 94}, {425.5, 523.95999999999992}}",
+        "routeContained": true,
+        "routePointCount": 324,
+        "zoom": 11.545
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map--tablet",
+      "layout": "ipad-portrait",
+      "scene": "map",
+      "title": "Map overview",
+      "image": "screenshots/map--tablet.jpg",
+      "width": 834,
+      "height": 1194,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.04522613065326633,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.04522613065326633,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{16, 16}, {481.5, 1162}}",
+        "routeContained": true,
+        "routePointCount": 0,
+        "zoom": 6.5
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map-results--tablet",
+      "layout": "ipad-portrait",
+      "scene": "map-results",
+      "title": "Selected-route results",
+      "image": "screenshots/map-results--tablet.jpg",
+      "width": 834,
+      "height": 1194,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.04522613065326633,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.5,
+          "y": 0.74,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "{{-193.5, 842}, {580, 332}}",
+        "paddedVisibleRect": "{{16, 94}, {425.5, 523.95999999999992}}",
+        "routeContained": true,
+        "routePointCount": 1207,
+        "zoom": 8.744
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map-detail--tablet",
+      "layout": "ipad-portrait",
+      "scene": "map-detail",
+      "title": "Map activity inspector",
+      "image": "screenshots/map-detail--tablet.jpg",
+      "width": 834,
+      "height": 1194,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.04522613065326633,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.5,
+          "y": 0.74,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "{{-193.5, 762}, {580, 412}}",
+        "paddedVisibleRect": "{{16, 94}, {425.5, 523.95999999999992}}",
+        "routeContained": true,
+        "routePointCount": 324,
+        "zoom": 8.708
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "stats--tablet",
+      "layout": "ipad-portrait",
+      "scene": "stats",
+      "title": "Stats overview",
+      "image": "screenshots/stats--tablet.jpg",
+      "width": 834,
+      "height": 1194,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.04522613065326633,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.04522613065326633,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "stats-expanded--tablet",
+      "layout": "ipad-portrait",
+      "scene": "stats-expanded",
+      "title": "Training volume detail",
+      "image": "screenshots/stats-expanded--tablet.jpg",
+      "width": 834,
+      "height": 1194,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.04522613065326633,
+          "text": "The blue root shell remains visible; detail does not replace the destination picker."
+        },
+        {
+          "n": 2,
+          "x": 0.965,
+          "y": 0.08793969849246232,
+          "text": "A separate right-hand chart inspector opens. X closes it."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "filters--tablet",
+      "layout": "ipad-portrait",
+      "scene": "filters",
+      "title": "Filters from List",
+      "image": "screenshots/filters--tablet.jpg",
+      "width": 834,
+      "height": 1194,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.04,
+          "y": 0.04522613065326633,
+          "text": "The header control toggles the same filter presentation across all destinations."
+        },
+        {
+          "n": 2,
+          "x": 0.34172661870503596,
+          "y": 0.22,
+          "text": "Filters share space with content, or cover it on the narrow web layout. This screenshot applies search “ride”."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "ride",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list--wide",
+      "layout": "ipad-landscape",
+      "scene": "list",
+      "title": "List overview",
+      "image": "screenshots/list--wide.jpg",
+      "width": 1194,
+      "height": 834,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.06474820143884892,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.06474820143884892,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list-detail--wide",
+      "layout": "ipad-landscape",
+      "scene": "list-detail",
+      "title": "Activity detail",
+      "image": "screenshots/list-detail--wide.jpg",
+      "width": 1194,
+      "height": 834,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.06474820143884892,
+          "text": "Global destinations remain available while the activity is open."
+        },
+        {
+          "n": 2,
+          "x": 0.965,
+          "y": 0.12589928057553956,
+          "text": "The right-hand activity inspector closes with X. Portrait hides filters automatically."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list-to-map--wide",
+      "layout": "ipad-landscape",
+      "scene": "list-to-map",
+      "title": "After Show on map",
+      "image": "screenshots/list-to-map--wide.jpg",
+      "width": 1194,
+      "height": 834,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.06474820143884892,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.73,
+          "y": 0.18,
+          "text": "The activity is selected and inspected on Map. This is a destination handoff, not Back to List."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{16, 94}, {454.63, 648}}",
+        "routeContained": true,
+        "routePointCount": 324,
+        "zoom": 12.013
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map--wide",
+      "layout": "ipad-landscape",
+      "scene": "map",
+      "title": "Map overview",
+      "image": "screenshots/map--wide.jpg",
+      "width": 1194,
+      "height": 834,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.06474820143884892,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.06474820143884892,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{16, 16}, {841.5, 802}}",
+        "routeContained": true,
+        "routePointCount": 0,
+        "zoom": 6.5
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map-results--wide",
+      "layout": "ipad-landscape",
+      "scene": "map-results",
+      "title": "Selected-route results",
+      "image": "screenshots/map-results--wide.jpg",
+      "width": 1194,
+      "height": 834,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.06474820143884892,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.73,
+          "y": 0.18,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{16, 94}, {454.63, 648}}",
+        "routeContained": true,
+        "routePointCount": 1207,
+        "zoom": 9.419
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map-detail--wide",
+      "layout": "ipad-landscape",
+      "scene": "map-detail",
+      "title": "Map activity inspector",
+      "image": "screenshots/map-detail--wide.jpg",
+      "width": 1194,
+      "height": 834,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.06474820143884892,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.73,
+          "y": 0.18,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{16, 94}, {454.63, 648}}",
+        "routeContained": true,
+        "routePointCount": 324,
+        "zoom": 12.013
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "stats--wide",
+      "layout": "ipad-landscape",
+      "scene": "stats",
+      "title": "Stats overview",
+      "image": "screenshots/stats--wide.jpg",
+      "width": 1194,
+      "height": 834,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.06474820143884892,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.06474820143884892,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "stats-expanded--wide",
+      "layout": "ipad-landscape",
+      "scene": "stats-expanded",
+      "title": "Training volume detail",
+      "image": "screenshots/stats-expanded--wide.jpg",
+      "width": 1194,
+      "height": 834,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.06474820143884892,
+          "text": "The blue root shell remains visible; detail does not replace the destination picker."
+        },
+        {
+          "n": 2,
+          "x": 0.965,
+          "y": 0.12589928057553956,
+          "text": "A separate right-hand chart inspector opens. X closes it."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "filters--wide",
+      "layout": "ipad-landscape",
+      "scene": "filters",
+      "title": "Filters from List",
+      "image": "screenshots/filters--wide.jpg",
+      "width": 1194,
+      "height": 834,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.04,
+          "y": 0.06474820143884892,
+          "text": "The header control toggles the same filter presentation across all destinations."
+        },
+        {
+          "n": 2,
+          "x": 0.23869346733668342,
+          "y": 0.22,
+          "text": "Filters share space with content, or cover it on the narrow web layout. This screenshot applies search “ride”."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "ride",
+      "method": "Hosted iPad simulator viewport",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list--phone",
+      "layout": "iphone-portrait",
+      "scene": "list",
+      "title": "List overview",
+      "image": "screenshots/list--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.09496567505720824,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.09496567505720824,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; portrait scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list-detail--phone",
+      "layout": "iphone-portrait",
+      "scene": "list-detail",
+      "title": "Activity detail",
+      "image": "screenshots/list-detail--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.07,
+          "y": 0.09496567505720824,
+          "text": "Back replaces the root filter control; the blue bar now belongs to the activity."
+        },
+        {
+          "n": 2,
+          "x": 0.92,
+          "y": 0.09496567505720824,
+          "text": "Show on map changes destination and selects this route."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "iPhone simulator; portrait scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list-to-map--phone",
+      "layout": "iphone-portrait",
+      "scene": "list-to-map",
+      "title": "After Show on map",
+      "image": "screenshots/list-to-map--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.09496567505720824,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.5,
+          "y": 0.74,
+          "text": "The activity is selected and inspected on Map. This is a destination handoff, not Back to List."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "iPhone simulator; portrait scene",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "{{8, 480}, {386, 386}}",
+        "paddedVisibleRect": "{{16, 124}, {314, 313.59999999999991}}",
+        "routeContained": true,
+        "routePointCount": 324,
+        "zoom": 10.927
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map--phone",
+      "layout": "iphone-portrait",
+      "scene": "map",
+      "title": "Map overview",
+      "image": "screenshots/map--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.09496567505720824,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.09496567505720824,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; portrait scene",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{16, 16}, {370, 842}}",
+        "routeContained": true,
+        "routePointCount": 0,
+        "zoom": 6.5
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map-results--phone",
+      "layout": "iphone-portrait",
+      "scene": "map-results",
+      "title": "Selected-route results",
+      "image": "screenshots/map-results--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.09496567505720824,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.5,
+          "y": 0.74,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; portrait scene",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "{{8, 514.56716417910445}, {386, 351.43283582089555}}",
+        "paddedVisibleRect": "{{16, 124}, {314, 313.59999999999991}}",
+        "routeContained": true,
+        "routePointCount": 1207,
+        "zoom": 8.86
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map-detail--phone",
+      "layout": "iphone-portrait",
+      "scene": "map-detail",
+      "title": "Map activity inspector",
+      "image": "screenshots/map-detail--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.09496567505720824,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.5,
+          "y": 0.74,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "iPhone simulator; portrait scene",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "{{8, 437.75124378109456}, {386, 428.24875621890544}}",
+        "paddedVisibleRect": "{{16, 124}, {314, 288}}",
+        "routeContained": true,
+        "routePointCount": 324,
+        "zoom": 10.797
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "stats--phone",
+      "layout": "iphone-portrait",
+      "scene": "stats",
+      "title": "Stats overview",
+      "image": "screenshots/stats--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.09496567505720824,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.09496567505720824,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; portrait scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "stats-expanded--phone",
+      "layout": "iphone-portrait",
+      "scene": "stats-expanded",
+      "title": "Training volume detail",
+      "image": "screenshots/stats-expanded--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.07,
+          "y": 0.09496567505720824,
+          "text": "The native chart page uses the same blue Back/title navigation as activity detail."
+        },
+        {
+          "n": 2,
+          "x": 0.78,
+          "y": 0.18306636155606407,
+          "text": "Chart metrics and grouping belong to this detail page; Back restores the dashboard."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; portrait scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "filters--phone",
+      "layout": "iphone-portrait",
+      "scene": "filters",
+      "title": "Filters from List",
+      "image": "screenshots/filters--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.56,
+          "text": "Filters use a native modal sheet rather than a persistent icon rail."
+        },
+        {
+          "n": 2,
+          "x": 0.92,
+          "y": 0.56,
+          "text": "Done dismisses the sheet and returns to the browsing context."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "ride",
+      "method": "iPhone simulator; portrait scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list--phone-landscape",
+      "layout": "iphone-landscape",
+      "scene": "list",
+      "title": "List overview",
+      "image": "screenshots/list--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.05472636815920398,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.05472636815920398,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; rotated scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list-detail--phone-landscape",
+      "layout": "iphone-landscape",
+      "scene": "list-detail",
+      "title": "Activity detail",
+      "image": "screenshots/list-detail--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.07,
+          "y": 0.05472636815920398,
+          "text": "Back replaces the root filter control; the blue bar now belongs to the activity."
+        },
+        {
+          "n": 2,
+          "x": 0.92,
+          "y": 0.05472636815920398,
+          "text": "Show on map changes destination and selects this route."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "iPhone simulator; rotated scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "list-to-map--phone-landscape",
+      "layout": "iphone-landscape",
+      "scene": "list-to-map",
+      "title": "After Show on map",
+      "image": "screenshots/list-to-map--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.05472636815920398,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.73,
+          "y": 0.18,
+          "text": "The activity is selected and inspected on Map. This is a destination handoff, not Back to List."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "iPhone simulator; rotated scene",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{78, 86}, {383, 224}}",
+        "routeContained": true,
+        "routePointCount": 324,
+        "zoom": 10.41
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map--phone-landscape",
+      "layout": "iphone-landscape",
+      "scene": "map",
+      "title": "Map overview",
+      "image": "screenshots/map--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.05472636815920398,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.05472636815920398,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; rotated scene",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{16, 16}, {842, 370}}",
+        "routeContained": true,
+        "routePointCount": 0,
+        "zoom": 6.5
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map-results--phone-landscape",
+      "layout": "iphone-landscape",
+      "scene": "map-results",
+      "title": "Selected-route results",
+      "image": "screenshots/map-results--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.05472636815920398,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.73,
+          "y": 0.18,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; rotated scene",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{78, 86}, {383, 224}}",
+        "routeContained": true,
+        "routePointCount": 1207,
+        "zoom": 9.16
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "map-detail--phone-landscape",
+      "layout": "iphone-landscape",
+      "scene": "map-detail",
+      "title": "Map activity inspector",
+      "image": "screenshots/map-detail--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.05472636815920398,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.73,
+          "y": 0.18,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "iPhone simulator; rotated scene",
+      "framing": {
+        "cameraSettled": true,
+        "nativePanelFrame": "none",
+        "paddedVisibleRect": "{{78, 86}, {383, 224}}",
+        "routeContained": true,
+        "routePointCount": 324,
+        "zoom": 10.41
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "stats--phone-landscape",
+      "layout": "iphone-landscape",
+      "scene": "stats",
+      "title": "Stats overview",
+      "image": "screenshots/stats--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.05472636815920398,
+          "text": "Map / List / Stats are peer destinations in the blue shell."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.05472636815920398,
+          "text": "Filters start from the leading toolbar control. iPad can reserve a left column."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; rotated scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "stats-expanded--phone-landscape",
+      "layout": "iphone-landscape",
+      "scene": "stats-expanded",
+      "title": "Training volume detail",
+      "image": "screenshots/stats-expanded--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.07,
+          "y": 0.05472636815920398,
+          "text": "The native chart page uses the same blue Back/title navigation as activity detail."
+        },
+        {
+          "n": 2,
+          "x": 0.78,
+          "y": 0.39800995024875624,
+          "text": "Chart metrics and grouping belong to this detail page; Back restores the dashboard."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "iPhone simulator; rotated scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "filters--phone-landscape",
+      "layout": "iphone-landscape",
+      "scene": "filters",
+      "title": "Filters from List",
+      "image": "screenshots/filters--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.5,
+          "y": 0.14,
+          "text": "Filters use a native modal sheet rather than a persistent icon rail."
+        },
+        {
+          "n": 2,
+          "x": 0.92,
+          "y": 0.14,
+          "text": "Done dismisses the sheet and returns to the browsing context."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "ride",
+      "method": "iPhone simulator; rotated scene",
+      "framing": {},
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-list--phone",
+      "layout": "web-portrait",
+      "scene": "list",
+      "title": "List overview",
+      "image": "screenshots/web-list--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.31,
+          "y": 0.032036613272311214,
+          "text": "Map / List / Stats are peer destinations in the blue shell. Web represents Map with the app mark."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.032036613272311214,
+          "text": "The leading control expands/collapses the filter rail or sidebar."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-list-detail--phone",
+      "layout": "web-portrait",
+      "scene": "list-detail",
+      "title": "Activity detail",
+      "image": "screenshots/web-list-detail--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.17719060945273632,
+          "y": 0.09096109839816933,
+          "text": "Back to activities is in a white content bar below the persistent blue app header."
+        },
+        {
+          "n": 2,
+          "x": 0.82,
+          "y": 0.15217391304347827,
+          "text": "Activity actions live in the content. Show on map is a destination change."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-list-to-map--phone",
+      "layout": "web-portrait",
+      "scene": "list-to-map",
+      "title": "After Show on map",
+      "image": "screenshots/web-list-to-map--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.25,
+          "y": 0.032036613272311214,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.2401990049751244,
+          "y": 0.5130434782608695,
+          "text": "The activity is selected and inspected on Map. This is a destination handoff, not Back to List."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-map--phone",
+      "layout": "web-portrait",
+      "scene": "map",
+      "title": "Map overview",
+      "image": "screenshots/web-map--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.31,
+          "y": 0.032036613272311214,
+          "text": "Map / List / Stats are peer destinations in the blue shell. Web represents Map with the app mark."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.032036613272311214,
+          "text": "The leading control expands/collapses the filter rail or sidebar."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-map-results--phone",
+      "layout": "web-portrait",
+      "scene": "map-results",
+      "title": "Selected-route results",
+      "image": "screenshots/web-map-results--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.25,
+          "y": 0.032036613272311214,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.2401990049751244,
+          "y": 0.5130434782608695,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": {
+        "contained": true,
+        "coverage": 0.9997783049194775,
+        "zoom": 8.69571228898827,
+        "padding": {
+          "top": 32,
+          "bottom": 496,
+          "left": 24,
+          "right": 64
+        },
+        "map": {
+          "x": 48,
+          "y": 56,
+          "width": 354,
+          "height": 818,
+          "top": 56,
+          "right": 402,
+          "bottom": 874,
+          "left": 48
+        },
+        "panel": {
+          "x": 56,
+          "y": 402,
+          "width": 338,
+          "height": 464,
+          "top": 402,
+          "right": 394,
+          "bottom": 866,
+          "left": 56
+        },
+        "pointCount": 1207
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-map-detail--phone",
+      "layout": "web-portrait",
+      "scene": "map-detail",
+      "title": "Map activity inspector",
+      "image": "screenshots/web-map-detail--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.25,
+          "y": 0.032036613272311214,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.2401990049751244,
+          "y": 0.5130434782608695,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": {
+        "contained": true,
+        "coverage": 0.9986295731770926,
+        "zoom": 10.887228913954612,
+        "padding": {
+          "top": 32,
+          "bottom": 496,
+          "left": 24,
+          "right": 64
+        },
+        "map": {
+          "x": 48,
+          "y": 56,
+          "width": 354,
+          "height": 818,
+          "top": 56,
+          "right": 402,
+          "bottom": 874,
+          "left": 48
+        },
+        "panel": {
+          "x": 56,
+          "y": 402,
+          "width": 338,
+          "height": 464,
+          "top": 402,
+          "right": 394,
+          "bottom": 866,
+          "left": 56
+        },
+        "pointCount": 324
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-stats--phone",
+      "layout": "web-portrait",
+      "scene": "stats",
+      "title": "Stats overview",
+      "image": "screenshots/web-stats--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.31,
+          "y": 0.032036613272311214,
+          "text": "Map / List / Stats are peer destinations in the blue shell. Web represents Map with the app mark."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.032036613272311214,
+          "text": "The leading control expands/collapses the filter rail or sidebar."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-stats-expanded--phone",
+      "layout": "web-portrait",
+      "scene": "stats-expanded",
+      "title": "Training volume detail",
+      "image": "screenshots/web-stats-expanded--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.32,
+          "y": 0.032036613272311214,
+          "text": "The web shell and filter rail/sidebar remain available during chart expansion."
+        },
+        {
+          "n": 2,
+          "x": 0.9029850746268657,
+          "y": 0.41762013729977115,
+          "text": "Collapse lives on the expanded tile. The chart remains part of the scrolling dashboard."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-filters--phone",
+      "layout": "web-portrait",
+      "scene": "filters",
+      "title": "Filters from List",
+      "image": "screenshots/web-filters--phone.jpg",
+      "width": 402,
+      "height": 874,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.04,
+          "y": 0.032036613272311214,
+          "text": "The header control toggles the same filter presentation across all destinations."
+        },
+        {
+          "n": 2,
+          "x": 0.6068407960199005,
+          "y": 0.24,
+          "text": "Filters share space with content, or cover it on the narrow web layout. This screenshot applies search “ride”."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "ride",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-list--phone-landscape",
+      "layout": "web-landscape",
+      "scene": "list",
+      "title": "List overview",
+      "image": "screenshots/web-list--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.31,
+          "y": 0.06965174129353234,
+          "text": "Map / List / Stats are peer destinations in the blue shell. Web represents Map with the app mark."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.06965174129353234,
+          "text": "The leading control expands/collapses the filter rail or sidebar."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-list-detail--phone-landscape",
+      "layout": "web-landscape",
+      "scene": "list-detail",
+      "title": "Activity detail",
+      "image": "screenshots/web-list-detail--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.32247640160183066,
+          "y": 0.19776119402985073,
+          "text": "Back to activities is in a white content bar below the persistent blue app header."
+        },
+        {
+          "n": 2,
+          "x": 0.82,
+          "y": 0.3855721393034826,
+          "text": "Activity actions live in the content. Show on map is a destination change."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-list-to-map--phone-landscape",
+      "layout": "web-landscape",
+      "scene": "list-to-map",
+      "title": "After Show on map",
+      "image": "screenshots/web-list-to-map--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.25,
+          "y": 0.06965174129353234,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.38471395881006865,
+          "y": 0.3326648009950248,
+          "text": "The activity is selected and inspected on Map. This is a destination handoff, not Back to List."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-map--phone-landscape",
+      "layout": "web-landscape",
+      "scene": "map",
+      "title": "Map overview",
+      "image": "screenshots/web-map--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.31,
+          "y": 0.06965174129353234,
+          "text": "Map / List / Stats are peer destinations in the blue shell. Web represents Map with the app mark."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.06965174129353234,
+          "text": "The leading control expands/collapses the filter rail or sidebar."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-map-results--phone-landscape",
+      "layout": "web-landscape",
+      "scene": "map-results",
+      "title": "Selected-route results",
+      "image": "screenshots/web-map-results--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.25,
+          "y": 0.06965174129353234,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.38471395881006865,
+          "y": 0.3326648009950248,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": {
+        "contained": false,
+        "coverage": 0.09393373888368342,
+        "zoom": 6.5,
+        "padding": {
+          "top": 0,
+          "bottom": 0,
+          "left": 0,
+          "right": 0
+        },
+        "map": {
+          "x": 256,
+          "y": 56,
+          "width": 618,
+          "height": 346,
+          "top": 56,
+          "right": 874,
+          "bottom": 402,
+          "left": 256
+        },
+        "panel": {
+          "x": 264,
+          "y": 104.8125,
+          "width": 602,
+          "height": 289.1875,
+          "top": 104.8125,
+          "right": 866,
+          "bottom": 394,
+          "left": 264
+        },
+        "pointCount": 1207
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-map-detail--phone-landscape",
+      "layout": "web-landscape",
+      "scene": "map-detail",
+      "title": "Map activity inspector",
+      "image": "screenshots/web-map-detail--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.25,
+          "y": 0.06965174129353234,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.38471395881006865,
+          "y": 0.3326648009950248,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": {
+        "contained": false,
+        "coverage": 0.09393373888368342,
+        "zoom": 6.5,
+        "padding": {
+          "top": 0,
+          "bottom": 0,
+          "left": 0,
+          "right": 0
+        },
+        "map": {
+          "x": 256,
+          "y": 56,
+          "width": 618,
+          "height": 346,
+          "top": 56,
+          "right": 874,
+          "bottom": 402,
+          "left": 256
+        },
+        "panel": {
+          "x": 264,
+          "y": 104.8125,
+          "width": 602,
+          "height": 289.1875,
+          "top": 104.8125,
+          "right": 866,
+          "bottom": 394,
+          "left": 264
+        },
+        "pointCount": 1207
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-stats--phone-landscape",
+      "layout": "web-landscape",
+      "scene": "stats",
+      "title": "Stats overview",
+      "image": "screenshots/web-stats--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.31,
+          "y": 0.06965174129353234,
+          "text": "Map / List / Stats are peer destinations in the blue shell. Web represents Map with the app mark."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.06965174129353234,
+          "text": "The leading control expands/collapses the filter rail or sidebar."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-stats-expanded--phone-landscape",
+      "layout": "web-landscape",
+      "scene": "stats-expanded",
+      "title": "Training volume detail",
+      "image": "screenshots/web-stats-expanded--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.32,
+          "y": 0.06965174129353234,
+          "text": "The web shell and filter rail/sidebar remain available during chart expansion."
+        },
+        {
+          "n": 2,
+          "x": 0.9508009153318078,
+          "y": 0.19651741293532338,
+          "text": "Collapse lives on the expanded tile. The chart remains part of the scrolling dashboard."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-filters--phone-landscape",
+      "layout": "web-landscape",
+      "scene": "filters",
+      "title": "Filters from List",
+      "image": "screenshots/web-filters--phone-landscape.jpg",
+      "width": 874,
+      "height": 402,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.04,
+          "y": 0.06965174129353234,
+          "text": "The header control toggles the same filter presentation across all destinations."
+        },
+        {
+          "n": 2,
+          "x": 0.24799771167048054,
+          "y": 0.23999999999999996,
+          "text": "Filters share space with content, or cover it on the narrow web layout. This screenshot applies search “ride”."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "ride",
+      "method": "Chromium responsive viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-list--desktop",
+      "layout": "desktop",
+      "scene": "list",
+      "title": "List overview",
+      "image": "screenshots/web-list--desktop.jpg",
+      "width": 1440,
+      "height": 1000,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.31,
+          "y": 0.028,
+          "text": "Map / List / Stats are peer destinations in the blue shell. Web represents Map with the app mark."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.028,
+          "text": "The leading control expands/collapses the filter rail or sidebar."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-list-detail--desktop",
+      "layout": "desktop",
+      "scene": "list-detail",
+      "title": "Activity detail",
+      "image": "screenshots/web-list-detail--desktop.jpg",
+      "width": 1440,
+      "height": 1000,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.19572526041666669,
+          "y": 0.0795,
+          "text": "Back to activities is in a white content bar below the persistent blue app header."
+        },
+        {
+          "n": 2,
+          "x": 0.82,
+          "y": 0.155,
+          "text": "Activity actions live in the content. Show on map is a destination change."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-list-to-map--desktop",
+      "layout": "desktop",
+      "scene": "list-to-map",
+      "title": "After Show on map",
+      "image": "screenshots/web-list-to-map--desktop.jpg",
+      "width": 1440,
+      "height": 1000,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.25,
+          "y": 0.028,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.5167777777777778,
+          "y": 0.5624,
+          "text": "The activity is selected and inspected on Map. This is a destination handoff, not Back to List."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-map--desktop",
+      "layout": "desktop",
+      "scene": "map",
+      "title": "Map overview",
+      "image": "screenshots/web-map--desktop.jpg",
+      "width": 1440,
+      "height": 1000,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.31,
+          "y": 0.028,
+          "text": "Map / List / Stats are peer destinations in the blue shell. Web represents Map with the app mark."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.028,
+          "text": "The leading control expands/collapses the filter rail or sidebar."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-map-results--desktop",
+      "layout": "desktop",
+      "scene": "map-results",
+      "title": "Selected-route results",
+      "image": "screenshots/web-map-results--desktop.jpg",
+      "width": 1440,
+      "height": 1000,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.25,
+          "y": 0.028,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.5167777777777778,
+          "y": 0.5624,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "framing": {
+        "contained": true,
+        "coverage": 0.9992766191928357,
+        "zoom": 10.442838777141121,
+        "padding": {
+          "top": 32,
+          "bottom": 508,
+          "left": 24,
+          "right": 64
+        },
+        "map": {
+          "x": 256,
+          "y": 56,
+          "width": 1184,
+          "height": 944,
+          "top": 56,
+          "right": 1440,
+          "bottom": 1000,
+          "left": 256
+        },
+        "panel": {
+          "x": 652,
+          "y": 516,
+          "width": 768,
+          "height": 464,
+          "top": 516,
+          "right": 1420,
+          "bottom": 980,
+          "left": 652
+        },
+        "pointCount": 1207
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-map-detail--desktop",
+      "layout": "desktop",
+      "scene": "map-detail",
+      "title": "Map activity inspector",
+      "image": "screenshots/web-map-detail--desktop.jpg",
+      "width": 1440,
+      "height": 1000,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.25,
+          "y": 0.028,
+          "text": "Map is now the active destination. Global navigation remains available above the inspector."
+        },
+        {
+          "n": 2,
+          "x": 0.5167777777777778,
+          "y": 0.5624,
+          "text": "Results and activity detail share the map inspector. Back changes the inspector; Clear selection closes results."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [
+        20279947341,
+        20270725942,
+        20244330171,
+        20265394210
+      ],
+      "detailID": 20279947341,
+      "search": "",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "framing": {
+        "contained": true,
+        "coverage": 0.9986295731770614,
+        "zoom": 11.365531306691476,
+        "padding": {
+          "top": 32,
+          "bottom": 508,
+          "left": 24,
+          "right": 64
+        },
+        "map": {
+          "x": 256,
+          "y": 56,
+          "width": 1184,
+          "height": 944,
+          "top": 56,
+          "right": 1440,
+          "bottom": 1000,
+          "left": 256
+        },
+        "panel": {
+          "x": 652,
+          "y": 516,
+          "width": 768,
+          "height": 464,
+          "top": 516,
+          "right": 1420,
+          "bottom": 980,
+          "left": 652
+        },
+        "pointCount": 324
+      },
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-stats--desktop",
+      "layout": "desktop",
+      "scene": "stats",
+      "title": "Stats overview",
+      "image": "screenshots/web-stats--desktop.jpg",
+      "width": 1440,
+      "height": 1000,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.31,
+          "y": 0.028,
+          "text": "Map / List / Stats are peer destinations in the blue shell. Web represents Map with the app mark."
+        },
+        {
+          "n": 2,
+          "x": 0.04,
+          "y": 0.028,
+          "text": "The leading control expands/collapses the filter rail or sidebar."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-stats-expanded--desktop",
+      "layout": "desktop",
+      "scene": "stats-expanded",
+      "title": "Training volume detail",
+      "image": "screenshots/web-stats-expanded--desktop.jpg",
+      "width": 1440,
+      "height": 1000,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.32,
+          "y": 0.028,
+          "text": "The web shell and filter rail/sidebar remain available during chart expansion."
+        },
+        {
+          "n": 2,
+          "x": 0.965,
+          "y": 0.12,
+          "text": "Collapse lives on the expanded tile. The chart remains part of the scrolling dashboard."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    },
+    {
+      "id": "web-filters--desktop",
+      "layout": "desktop",
+      "scene": "filters",
+      "title": "Filters from List",
+      "image": "screenshots/web-filters--desktop.jpg",
+      "width": 1440,
+      "height": 1000,
+      "annotations": [
+        {
+          "n": 1,
+          "x": 0.04,
+          "y": 0.028,
+          "text": "The header control toggles the same filter presentation across all destinations."
+        },
+        {
+          "n": 2,
+          "x": 0.15052083333333333,
+          "y": 0.24,
+          "text": "Filters share space with content, or cover it on the narrow web layout. This screenshot applies search “ride”."
+        }
+      ],
+      "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+      "selectedIDs": [],
+      "detailID": null,
+      "search": "ride",
+      "method": "Chromium desktop viewport; no browser chrome",
+      "framing": null,
+      "developmentWarnings": []
+    }
+  ],
+  "captureNotes": [
+    "Current working tree, not a released product specification. The saved checkpoint is dad01984; recent iPad adaptations are uncommitted.",
+    "63 full-resolution renders share the committed 20-activity review dataset. Photos and stream profiles are excluded; unavailable chart placeholders are expected.",
+    "Native iPhone views are hosted on the iPhone 18 Pro simulator, with actual scene rotation for landscape. iPad views use controlled 834×1194 and 1194×834 hosted windows on the iPad Pro 11-inch simulator; they are not physical-device screenshots.",
+    "Web captures use Chromium at 402×874, 874×402 and 1440×1000. They do not include Safari/Chrome chrome or browser safe-area effects.",
+    "Review fixture account chrome is used. The development-only sign-in overlay is excluded from web captures; authentication and account transitions are outside this reference.",
+    "Collections show representative entry and destination states, not continuous recordings. Native states are staged through production stores; browser details and Show on map use real controls.",
+    "Native Push is the capture baseline. The Dev tile-zoom alternative is not pictured. Static screenshots do not establish animation smoothness or swipe behavior.",
+    "Dates, basemap style and panel blur differ between clients. Review the containers, ownership of Back/Close and visible context; numerical/pixel parity is not the purpose.",
+    "The short web landscape map leaves a narrow usable map area. Captures preserve that actual state; the route-framing limitations are recorded in capture metadata."
+  ]
+}

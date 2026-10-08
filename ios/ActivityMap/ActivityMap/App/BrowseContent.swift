@@ -111,8 +111,17 @@ private struct BrowseStatsDestinationKey: EnvironmentKey {
     static let defaultValue: BrowseStatsDestination? = nil
 }
 extension EnvironmentValues {
+    /// Full browsing width, before filters take space. Detail eligibility must
+    /// not change just because opening an inspector hides its filter sidebar.
+    @Entry var browseViewportWidth: CGFloat? = nil
+
     var browseStatsDestination: BrowseStatsDestination? {
         get { self[BrowseStatsDestinationKey.self] }
         set { self[BrowseStatsDestinationKey.self] = newValue }
     }
+}
+
+enum BrowsePaneLayout {
+    static let filterWidth: CGFloat = 320
+    static let minimumDetailWidth: CGFloat = 760
 }

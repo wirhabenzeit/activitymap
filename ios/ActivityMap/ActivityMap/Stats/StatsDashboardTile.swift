@@ -2,7 +2,7 @@ import SwiftUI
 
 extension StatsDashboardTile {
     init(tile: StatsTileDefinition, store: ActivityStore, dashboard: StatsDashboardState,
-         expanded: Bool, detailScreen: Bool = false,
+         expanded: Bool, detailScreen: Bool = false, selected: Bool = false, detailInSidebar: Bool = false,
          toggleExpansion: @escaping () -> Void, openActivity: @escaping (Int) -> Void) {
         let source = StatsDashboardSource(store)
         self.init(tile: tile, option: Binding(get: { dashboard.option(tile.id) },
@@ -10,7 +10,8 @@ extension StatsDashboardTile {
                   displayed: dashboard.face(tile.id, source: source), today: source.today,
                   expanded: expanded, filtered: store.activeStatsFilterCount > 0,
                   toggleExpansion: toggleExpansion, openActivity: openActivity,
-                  detailScreen: detailScreen, inspection: dashboard.inspection(tile.id))
+                  detailScreen: detailScreen, selected: selected, detailInSidebar: detailInSidebar,
+                  inspection: dashboard.inspection(tile.id))
     }
 }
 
@@ -24,6 +25,8 @@ struct StatsDashboardTile: View {
     let toggleExpansion: () -> Void
     var openActivity: (Int) -> Void = { _ in }
     var detailScreen = false
+    var selected = false
+    var detailInSidebar = false
     var inspection: StatsTileInspection? = nil
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -78,7 +81,8 @@ struct StatsDashboardTile: View {
     var body: some View {
         StatsTileSurface(title: tile.title, period: period,
                          expand: StatsDashboard.expandable(tile.id) ? toggleExpansion : nil,
-                         expanded: expanded, compactHeader: pilot, detailScreen: detailScreen) {
+                         expanded: expanded, compactHeader: pilot, detailScreen: detailScreen,
+                         selected: selected, detailInSidebar: detailInSidebar) {
             controls
         } content: {
             if let displayed {

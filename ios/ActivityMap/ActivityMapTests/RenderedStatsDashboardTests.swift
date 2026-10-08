@@ -28,6 +28,7 @@ import Testing
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)
+            .environment(\.statsDetailTransition, ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_TRANSITION"] == "zoom" ? .zoom : .push)
             .environment(\.horizontalSizeClass, .compact)
             .environment(\.verticalSizeClass, landscape ? .compact : .regular)
             .environment(\.colorScheme, ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_DARK"] == "1" ? .dark : .light)
@@ -141,8 +142,8 @@ import Testing
         #expect(state.expandedTile == (collapsing ? nil : tile) && frames.count == 30)
     }
 
-    @Test(arguments: ["phone", "landscape", "large-text"])
-    func phoneNavigationKeepsContentPosition(variant: String) async throws {
+    @Test(arguments: ["phone", "landscape", "large-text"], StatsDetailTransition.allCases)
+    func phoneNavigationKeepsContentPosition(variant: String, transition: StatsDetailTransition) async throws {
         try await statsWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
         let store = ActivityStore(activities: try GalleryLibrary.load().activities,
                                   listPresentation: ActivityListPresentation(defaults: nil))
@@ -157,6 +158,7 @@ import Testing
         defer { MapboxOptions.accessToken = previousToken }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)
+            .environment(\.statsDetailTransition, transition)
             .environment(\.horizontalSizeClass, .compact)
             .environment(\.verticalSizeClass, variant == "landscape" ? .compact : .regular)
             .environment(\.dynamicTypeSize, variant == "large-text" ? .accessibility3 : .large)
@@ -223,8 +225,11 @@ import Testing
             }
             // Include both the in-flight and settled destination: the old
             // native bar added 10pt only when its push finished.
-            for key in ["detailSafeAreaTop", "detailOffsetY", "detailInsetTop", "detailViewportY",
-                        "detailContentTopY", "detailViewportHeight"] {
+            // A zoom deliberately transforms the destination's screen position.
+            // Its untransformed layout/insets must still stay fixed through it.
+            let keys = ["detailSafeAreaTop", "detailOffsetY", "detailInsetTop", "detailViewportHeight"]
+                + (transition == .push ? ["detailViewportY", "detailContentTopY"] : [])
+            for key in keys {
                 let samples = frames.compactMap { $0.1[key] as? CGFloat }
                 if phase == "push" { #expect(!samples.isEmpty) }
                 if let first = samples.first {
@@ -233,7 +238,7 @@ import Testing
             }
             var metadata: [[String: Any]] = []
             if capture {
-                let directory = URL(fileURLWithPath: output).appendingPathComponent("\(variant)-\(phase)")
+                let directory = URL(fileURLWithPath: output).appendingPathComponent("\(transition.rawValue)-\(variant)-\(phase)")
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 for (index, frame) in frames.enumerated() {
                     let name = String(format: "frame-%02d.png", index)
@@ -269,6 +274,58 @@ import Testing
             }
         }
         #expect(state.expandedTile == nil && abs(root.contentOffset.y - rootOffset) < 1)
+    }
+
+    @Test(.enabled(if: StatsDetailTransition.isDevBuild), arguments: ["phone", "ipad"])
+    func devStatsAnimationCanSwitchWithoutReinstalling(device: String) async throws {
+        let defaults = UserDefaults.standard, key = StatsDetailTransition.preferenceKey
+        let previous = defaults.object(forKey: key)
+        defer {
+            if let previous { defaults.set(previous, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        defaults.set(StatsDetailTransition.push.rawValue, forKey: key)
+        let (store, _) = try StatsDashboardTests.fixture()
+        let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
+            .environment(\.statsDetailPresentation, .navigation)
+            .environment(\.horizontalSizeClass, device == "ipad" ? .regular : .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)),
+            size: device == "ipad" ? CGSize(width: 834, height: 1194) : CGSize(width: 402, height: 874))
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let root = try #require(host.descendants(UIScrollView.self).first {
+            !($0 is UICollectionView) && $0.contentSize.height > 1500
+        })
+        root.setContentOffset(CGPoint(x: 0, y: 400), animated: false)
+        try await Task.sleep(for: .milliseconds(100))
+        let offset = root.contentOffset.y
+        let calculations = store.stats.calculationCount
+        for transition in [StatsDetailTransition.push, .zoom, .push] {
+            defaults.set(transition.rawValue, forKey: key)
+            try await Task.sleep(for: .milliseconds(150))
+            state.toggleExpansion(.weeklyVolume)
+            try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+            let detail = try #require(navigation.topViewController)
+            #expect((detail.preferredTransition != nil) == (transition == .zoom),
+                    "The live Dev preference must select the native zoom transition only for B")
+            #expect(state.option(.weeklyVolume) == .distance)
+            navigation.popViewController(animated: true)
+            try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
+            #expect(host.descendants(UIScrollView.self).contains { $0 === root })
+            #expect(abs(root.contentOffset.y - offset) < 1)
+            #expect(store.stats.calculationCount == calculations)
+        }
+        sheets.accountDestination = .settings
+        try await statsWait { host.host.presentedViewController?.isBeingPresented == false }
+        try host.capture("dev-stats-animation-settings-\(device)", presented: true)
+        sheets.accountDestination = nil
+        try await statsWait { host.host.presentedViewController == nil }
     }
 
     @Test func phoneStatsHeaderCanPresentSettingsFromDetail() async throws {
@@ -830,6 +887,121 @@ import Testing
         store.clearScope()
         try await statsWait { state.expandedTile == nil && navigation.viewControllers.count == 1 && navigation.transitionCoordinator == nil }
         #expect(state.inspection(.weeklyVolume) !== volume, "Account changes discard inspection state")
+    }
+
+    @Test(arguments: ["portrait", "landscape"])
+    func tabletStatDetailKeepsOverview(orientation: String) async throws {
+        let key = "browse.filterSidebarVisible", defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: key)
+        defaults.set(true, forKey: key)
+        defer {
+            if let saved { defaults.set(saved, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        let library = try GalleryLibrary.load()
+        let store = ActivityStore(activities: library.activities,
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-10-07")), timeZone: .gmt)
+        store.selectedTab = .stats
+        let state = StatsDashboardState()
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let size = orientation == "portrait" ? CGSize(width: 834, height: 1194) : CGSize(width: 1194, height: 834)
+        let sheets = BrowseSheetPresentation()
+        let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let root = try #require(host.descendants(UIScrollView.self).first {
+            !($0 is UICollectionView) && $0.contentSize.height > 1500
+        })
+        let initialWidth = root.bounds.width
+        #expect(abs(initialWidth - (size.width - 321)) < 2)
+        root.setContentOffset(CGPoint(x: 0, y: 250), animated: false)
+        let offset = root.contentOffset.y
+        let calculations = store.stats.calculationCount
+        let inspection = try #require(state.inspection(.weeklyVolume))
+        inspection.volumeRange = .months
+        withAnimation(.easeInOut(duration: 0.2)) { state.toggleExpansion(.weeklyVolume) }
+        let availableWidth = orientation == "portrait" ? size.width : size.width - 321
+        let expectedOverviewWidth = availableWidth - min(680, max(430, availableWidth * 0.56)) - 1
+        try await statsWait {
+            abs(root.bounds.width - expectedOverviewWidth) < 2
+                && host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 } == (orientation == "landscape")
+        }
+        #expect(navigation.viewControllers.count == 1)
+        #expect(state.expandedTile == .weeklyVolume)
+        #expect(root.bounds.width >= 320 && root.bounds.width < size.width / 2)
+        let detail = try #require(host.descendants(UIScrollView.self).first {
+            !($0 is UICollectionView) && $0 !== root && $0.bounds.width >= 430
+                && $0.convert($0.bounds, to: host.host.view).minX >= root.bounds.width
+        })
+        #expect(abs(detail.bounds.width - availableWidth * 0.56) < 2)
+        #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 } == (orientation == "landscape"))
+        try host.capture("ipad-stats-pane-\(orientation)")
+        if orientation == "portrait" {
+            let detailWidth = detail.bounds.width
+            sheets.revealsFiltersOverDetail = true
+            try await Task.sleep(for: .milliseconds(250))
+            #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 })
+            #expect(abs(detail.bounds.width - detailWidth) < 1 && state.expandedTile == .weeklyVolume)
+            #expect(host.host.presentedViewController == nil)
+            try host.capture("ipad-stats-pane-portrait-filters")
+            sheets.revealsFiltersOverDetail = false
+        }
+        // A different tile replaces only detail. Its own choices and the
+        // retained overview/inspection do not get rebuilt or recalculated.
+        state.toggleExpansion(.records)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(navigation.viewControllers.count == 1 && state.expandedTile == .records)
+        state.toggleExpansion(.weeklyVolume)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(state.inspection(.weeklyVolume) === inspection && inspection.volumeRange == .months)
+        #expect(store.stats.calculationCount == calculations)
+        withAnimation(.easeInOut(duration: 0.2)) { state.expandedTile = nil }
+        // Closing portrait detail also restores the filter column. Wait for
+        // both layout animations instead of sampling their intermediate width.
+        try await statsWait { abs(root.bounds.width - initialWidth) < 2 }
+        #expect(host.descendants(UIScrollView.self).contains { $0 === root })
+        #expect(abs(root.bounds.width - initialWidth) < 2)
+        #expect(abs(root.contentOffset.y - offset) < 1)
+        #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 })
+        #expect(defaults.bool(forKey: key) && !sheets.revealsFiltersOverDetail)
+    }
+
+    @Test func tabletDetailAdaptsToNarrowWindowAndKeepsPushedDetailOnResize() async throws {
+        let (store, _) = try StatsDashboardTests.fixture()
+        let state = StatsDashboardState()
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 834, height: 1194))
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        state.toggleExpansion(.weeklyVolume)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(navigation.viewControllers.count == 1 && state.expandedTile == .weeklyVolume)
+        host.window.frame.size.width = 600
+        host.host.view.frame = host.window.bounds
+        try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        #expect(state.expandedTile == .weeklyVolume)
+        host.window.frame.size = CGSize(width: 1194, height: 834)
+        host.host.view.frame = host.window.bounds
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(navigation.viewControllers.count == 2 && state.expandedTile == .weeklyVolume)
+        navigation.popViewController(animated: true)
+        try await statsWait { navigation.viewControllers.count == 1 && state.expandedTile == nil && navigation.transitionCoordinator == nil }
+        state.toggleExpansion(.records)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(navigation.viewControllers.count == 1 && state.expandedTile == .records)
     }
 
     @Test func tabletExpansionKeepsSingleDashboardDestination() async throws {

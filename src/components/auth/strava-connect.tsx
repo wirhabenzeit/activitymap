@@ -180,11 +180,15 @@ export function SignedOutConnectPanel() {
   const signedOut = useShallowStore(
     (state) => state.isInitialized && !state.user && !state.isGuest,
   );
+  // The development screenshot bridge supplies a review dataset without an
+  // authenticated session. Keep its production navigation visible for capture.
+  const gallery = process.env.NODE_ENV === 'development'
+    && typeof window !== 'undefined' && Boolean(window.__ACTIVITYMAP_GALLERY__);
   // Nothing behind the dialog is usable without an account, so it cannot be
   // closed; connecting (which reloads the shell) is the way forward.
   const keepOpen = (event: Event) => event.preventDefault();
   return (
-    <DialogPrimitive.Root open={signedOut}>
+    <DialogPrimitive.Root open={signedOut && !gallery}>
       <DialogPortal>
         {/* Above the app header (z-[60]) so the whole app sits behind the glass. */}
         <DialogOverlay className="z-[70] bg-background/20 backdrop-blur-md" />

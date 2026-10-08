@@ -110,6 +110,10 @@ Worktrees have no ignored `Local.xcconfig`, so the script takes `MAPBOX_ACCESS_T
 
 Running the plain `ActivityMap` scheme on a device from Xcode builds `page.dominik.activitymap`, which replaces the TestFlight app. Use the script instead.
 
+For the Stats animation A/B review, the Dev app adds **Settings → Stats animation comparison**. **A: Push** is the saved baseline; **B: Tile zoom** grows the selected tile into the same detail screen. The preference persists across launches and can be switched without reinstalling. Compare opening, Back and edge swiping on iPhone or in a narrow iPad window. Reduce Motion retains cross-fade in both modes. Production keeps push and does not show this control. The pre-experiment checkpoint is `dad01984` on `codex/stats-navigation-ab`.
+
+Stats uses a right-hand detail pane in regular windows at least 760pt wide, with a highlighted compact tile retained in the dashboard. Detail takes 56% of the available width, bounded to 430–680pt. Filters use the same left sidebar across Map, List and Stats. Opening List or Stats detail temporarily collapses filters if the remaining content would be narrower than 760pt; closing detail restores the saved sidebar preference. The filter button can reveal the sidebar over the overview while detail remains visible. Wider windows keep all three columns. Windows below 760pt and accessibility text sizes use the filter sheet on every tab. Narrow windows and accessibility text sizes use navigation; a pushed detail stays open if the window becomes wider until Back is pressed. Pane and pushed detail share chart controls, metric choices and inspection state. Explicit inline preview hosts retain the original expansion layout.
+
 ### Run on a physical iPhone
 
 The simulator shares the Mac's `localhost`; an iPhone's `localhost` is the phone. `Config/Base.xcconfig` now sends simulator builds to the local server and physical-device builds to the production HTTPS deployment:

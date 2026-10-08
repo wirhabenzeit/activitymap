@@ -17,6 +17,9 @@
 /out/
 next-env.d.ts
 
+# generated review exports (canonical references live under docs/)
+/output/
+
 # map data
 *.shp
 *.shp.xml

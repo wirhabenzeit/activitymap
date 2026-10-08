@@ -9,9 +9,13 @@ struct AppShell: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var sheets: BrowseSheetPresentation
     @State private var statsNavigation = StatsShellNavigation()
+    @Namespace private var statsTransitionNamespace
+    @AppStorage(StatsDetailTransition.preferenceKey) private var devStatsTransition = StatsDetailTransition.push
+    @Environment(\.statsDetailTransition) private var statsTransitionOverride
     @Environment(\.statsDetailPresentation) private var statsDetailPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("browse.filterSidebarVisible") private var sidebarVisible = true
+    @State private var shellWidth: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -37,15 +41,22 @@ struct AppShell: View {
     private var usesPhoneNavigation: Bool {
         guard statsContent != nil else { return false }
         switch statsDetailPresentation {
-        case .automatic: return UIDevice.current.userInterfaceIdiom == .phone
+        case .automatic:
+            // Keep the blue native bar for both adaptive iPad panes and pushes
+            // in narrow windows. StatsScreen decides which detail to present.
+            return true
         case .navigation: return true
         case .inline: return false
         }
     }
 
     private var statsDetailSelection: Binding<StatsTileID?> {
-        Binding(get: { statsNavigation.dashboard?.expandedTile },
+        Binding(get: { statsNavigation.usesDetailNavigation ? statsNavigation.dashboard?.expandedTile : nil },
                 set: { statsNavigation.dashboard?.expandedTile = $0 })
+    }
+
+    private var statsTransition: StatsDetailTransition {
+        statsTransitionOverride ?? (StatsDetailTransition.isDevBuild ? devStatsTransition : .push)
     }
 
     var body: some View {
@@ -67,10 +78,19 @@ struct AppShell: View {
                         }
                 }
                 .environment(\.statsShellNavigation, statsNavigation)
+                .environment(\.statsDetailTransition, statsTransition)
+                .environment(\.statsTransitionNamespace, statsTransitionNamespace)
                 .tint(.white)
             } else {
                 shellContent
             }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { shellWidth = $0 }
+        .onChange(of: filterSidebarAvailable) { _, available in
+            if available { sheets.showsFilters = false }
+        }
+        .onChange(of: collapsesFiltersForDetail(width: shellWidth)) { _, collapses in
+            if !collapses { sheets.revealsFiltersOverDetail = false }
         }
         .overlay {
             if let connectPrompt { StravaConnectOverlay(prompt: connectPrompt).transition(.opacity) }
@@ -101,12 +121,13 @@ struct AppShell: View {
         // The phone presenter belongs to the whole stack, so Settings can
         // open from either the dashboard or a pushed stat destination.
         .sheet(item: Binding(
-            get: { usesPhoneNavigation && !sheets.mapResultsPresented ? shellRequest(sidebarAvailable: false) : nil },
+            get: { usesPhoneNavigation && shellWidth > 0 && !sheets.mapResultsPresented ? shellRequest(sidebarAvailable: filterSidebarAvailable) : nil },
             set: { if usesPhoneNavigation && !sheets.mapResultsPresented && $0 == nil { clearShellRequest() } }
         ), onDismiss: { sheets.shellSheetPresented = false }) { destination in
             shellSheet(destination).onAppear { sheets.shellSheetPresented = true }
         }
         .onChange(of: store.selectedTab) { _, tab in
+            sheets.revealsFiltersOverDetail = false
             if tab != .stats { statsNavigation.dashboard?.expandedTile = nil }
         }
         .onChange(of: store.mapContext.scopeRevision) { _, _ in
@@ -116,7 +137,7 @@ struct AppShell: View {
 
     @ToolbarContentBuilder private var phoneRootToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarLeading) {
-            filterButton(sidebarAvailable: false)
+            filterButton(sidebarAvailable: filterSidebarAvailable)
             if compactBar && store.selectedTab == .list {
                 SelectionBar(store: store, includesTotal: true, onNavigationBar: true)
             }
@@ -136,29 +157,27 @@ struct AppShell: View {
         let content = StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync)
             .tint(AppTheme.accent)
         if reduceMotion { content.navigationTransition(.crossFade) }
+        else if statsTransition == .zoom {
+            content.navigationTransition(.zoom(sourceID: tile.id, in: statsTransitionNamespace))
+        }
         else { content }
     }
 
     private var shellContent: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
-                let sidebarAvailable = sizeClass == .regular && geometry.size.width >= 760 && !typeSize.isAccessibilitySize
+                let sidebarAvailable = filterSidebarAvailable(width: geometry.size.width)
+                let collapsesFilters = collapsesFiltersForDetail(width: geometry.size.width)
+                let sidebarShown = sidebarAvailable && sidebarVisible && !collapsesFilters
                 VStack(spacing: 0) {
                     if !usesPhoneNavigation { shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1) }
                     HStack(spacing: 0) {
-                        if sidebarAvailable && sidebarVisible {
-                            VStack(spacing: 0) {
-                                Text("Filters").font(.headline)
-                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                    .padding(.horizontal, 16)
-                                FilterPanel(store: store, scope: filterScope)
-                            }
-                            .frame(width: 320)
-                            .background(Color(uiColor: .secondarySystemBackground))
-                            .accessibilityIdentifier("filter-sidebar")
+                        if sidebarShown {
+                            filterSidebar
                             Divider()
                         }
-                        content.environment(\.filterSidebarVisible, sidebarAvailable && sidebarVisible)
+                        content.environment(\.filterSidebarVisible, sidebarShown)
+                            .environment(\.browseViewportWidth, geometry.size.width)
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
                             .environment(\.mapResultsSheetSuspended, sheets.shellSheetPresented)
@@ -168,6 +187,15 @@ struct AppShell: View {
                                                  set: { if $0 == nil { clearShellRequest() } }),
                                 content: { AnyView(shellSheet($0)) }))
                     }
+                    .overlay(alignment: .leading) {
+                        if collapsesFilters && sheets.revealsFiltersOverDetail {
+                            filterSidebar
+                                .overlay(alignment: .trailing) { Divider() }
+                                .shadow(color: .black.opacity(0.15), radius: 8, x: 3)
+                                .transition(.move(edge: .leading))
+                        }
+                    }
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: sidebarShown)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 // While the map's results sheet is up, it presents these itself.
@@ -187,6 +215,34 @@ struct AppShell: View {
 
     private func shellRequest(sidebarAvailable: Bool) -> ShellSheet? {
         sheets.showsFilters && !sidebarAvailable ? .filters : sheets.accountDestination.map(ShellSheet.account)
+    }
+
+    private var filterSidebarAvailable: Bool { filterSidebarAvailable(width: shellWidth) }
+
+    private func filterSidebarAvailable(width: CGFloat) -> Bool {
+        sizeClass == .regular && width >= BrowsePaneLayout.minimumDetailWidth && !typeSize.isAccessibilitySize
+    }
+
+    private func collapsesFiltersForDetail(width: CGFloat) -> Bool {
+        guard filterSidebarAvailable(width: width),
+              width - BrowsePaneLayout.filterWidth - 1 < BrowsePaneLayout.minimumDetailWidth else { return false }
+        switch store.selectedTab {
+        case .stats: return statsDetailPresentation == .automatic && statsNavigation.dashboard?.expandedTile != nil
+        case .list: return store.inspectedActivityID != nil
+        case .map: return false
+        }
+    }
+
+    private var filterSidebar: some View {
+        VStack(spacing: 0) {
+            Text("Filters").font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .padding(.horizontal, 16)
+            FilterPanel(store: store, scope: filterScope)
+        }
+        .frame(width: BrowsePaneLayout.filterWidth)
+        .background(Color(uiColor: .secondarySystemBackground))
+        .accessibilityIdentifier("filter-sidebar")
     }
 
     private func clearShellRequest() {
@@ -266,9 +322,16 @@ struct AppShell: View {
     }
 
     private func filterButton(sidebarAvailable: Bool) -> some View {
-        let filtersOpen = sidebarAvailable ? sidebarVisible : sheets.showsFilters
+        let collapsedForDetail = collapsesFiltersForDetail(width: shellWidth)
+        let filtersOpen = sidebarAvailable ? (collapsedForDetail ? sheets.revealsFiltersOverDetail : sidebarVisible) : sheets.showsFilters
         return Button {
-            if sidebarAvailable { sidebarVisible.toggle() }
+            if sidebarAvailable {
+                sheets.showsFilters = false
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                    if collapsedForDetail { sheets.revealsFiltersOverDetail.toggle() }
+                    else { sidebarVisible.toggle() }
+                }
+            }
             else { sheets.showsFilters.toggle() }
         } label: {
             Image(systemName: activeFilterCount == 0
@@ -283,6 +346,7 @@ struct AppShell: View {
         .foregroundStyle(.white)
         .frame(width: 44, height: 44)
         .accessibilityLabel(filterButtonLabel)
+        .accessibilityIdentifier("browse-filters")
         .accessibilityValue(filtersOpen ? "Expanded" : "Collapsed")
         .accessibilityAddTraits(filtersOpen ? .isSelected : [])
     }
@@ -419,6 +483,7 @@ enum ShellSheet: Identifiable {
 @MainActor @Observable
 final class BrowseSheetPresentation {
     var showsFilters = false
+    var revealsFiltersOverDetail = false
     var accountDestination: AccountDestination?
     var mapResultsPresented = false
     var shellSheetPresented = false

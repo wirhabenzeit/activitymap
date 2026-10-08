@@ -9,6 +9,8 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     var expanded = false
     var compactHeader = false
     var detailScreen = false
+    var selected = false
+    var detailInSidebar = false
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let content: () -> Content
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -22,6 +24,13 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .modifier(BrowseSurface())
                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius))
+                .overlay {
+                    if selected {
+                        RoundedRectangle(cornerRadius: AppTheme.cornerRadius)
+                            .strokeBorder(AppTheme.accent, lineWidth: 2)
+                    }
+                }
+                .accessibilityAddTraits(selected ? .isSelected : [])
         }
     }
     private var tileBody: some View {
@@ -52,7 +61,9 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     }
     @ViewBuilder private var expandButton: some View {
         if let expand {
-            BrowseIconButton(title: "\(expanded ? "Collapse" : "Expand") \(title)", systemImage: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", action: expand)
+            BrowseIconButton(title: detailInSidebar ? "\(selected ? "Close" : "Show") \(title) details" : "\(expanded ? "Collapse" : "Expand") \(title)",
+                             systemImage: detailInSidebar ? (selected ? "xmark" : "sidebar.right") : expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                             action: expand)
         }
     }
     private var header: some View {
@@ -396,6 +407,8 @@ extension EnvironmentValues {
     @Entry var statsDetailHeightLimit: Double? = nil
     @Entry var statsTileInspection: StatsTileInspection? = nil
     @Entry var statsDetailPresentation = StatsDetailPresentation.automatic
+    @Entry var statsDetailTransition: StatsDetailTransition? = nil
+    @Entry var statsTransitionNamespace: Namespace.ID? = nil
     @Entry var statsShellNavigation: StatsShellNavigation? = nil
 }
 
@@ -499,4 +512,14 @@ struct StatsActivityRow: View {
 /// Explicit presentation is useful for hosts that render an iPad-sized preview on a phone.
 enum StatsDetailPresentation {
     case automatic, navigation, inline
+}
+
+/// Temporary device comparison. Production keeps the saved push baseline.
+enum StatsDetailTransition: String, CaseIterable {
+    case push, zoom
+
+    static let preferenceKey = "dev.statsDetailTransition"
+    nonisolated static var isDevBuild: Bool { Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true }
+
+    var title: String { self == .push ? "A: Push" : "B: Tile zoom" }
 }

@@ -8,12 +8,13 @@ struct ListScreen: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var hasPushedDetail = false
     @Environment(\.filterSidebarVisible) private var filterSidebarVisible
+    @Environment(\.browseViewportWidth) private var viewportWidth
     // iPhone landscape: the shell bar carries the status/options row (#315).
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         GeometryReader { geometry in
-            let sideBySide = sizeClass == .regular && geometry.size.width >= 760 && !typeSize.isAccessibilitySize
+            let sideBySide = sizeClass == .regular && (viewportWidth ?? geometry.size.width) >= BrowsePaneLayout.minimumDetailWidth && !typeSize.isAccessibilitySize
             let usesOverlay = filterSidebarVisible && !sideBySide && !hasPushedDetail
             let showsDetail = sideBySide && store.inspectedActivityID != nil && !hasPushedDetail
             let detailWidth = min(420, max(340, geometry.size.width * 0.42))

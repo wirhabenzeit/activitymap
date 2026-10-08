@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AccountSheet: View {
     let destination: AccountDestination
@@ -10,6 +11,7 @@ struct AccountSheet: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var ingestionStatus = IngestionStatusController()
     @Bindable private var preferences = DisplayPreferences.shared
+    @AppStorage(StatsDetailTransition.preferenceKey) private var statsTransition = StatsDetailTransition.push
     /// Profile opened while signed out is only a login presentation: once the
     /// connection is verified it closes and returns to the browsing context.
     /// Profile opened for account management stays open (#304).
@@ -242,6 +244,19 @@ struct AccountSheet: View {
                 }
             } header: { Text("Display") } footer: {
                 Text("Distance, elevation and speed use \(preferences.units == .metric ? "kilometres, metres and km/h" : "miles, feet and mph"). Preferences are saved on this device.")
+            }
+            if StatsDetailTransition.isDevBuild {
+                Section {
+                    Picker("Stats animation", selection: $statsTransition) {
+                        ForEach(StatsDetailTransition.allCases, id: \.self) { transition in
+                            Text(transition.title).tag(transition)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("dev-stats-animation")
+                } header: { Text("Stats animation comparison") } footer: {
+                    Text("Compare opening and closing the same tile on iPhone or in a narrow iPad window. Wider iPad windows show details beside the dashboard. Your choice is saved on this device.")
+                }
             }
             Section("About") {
                 NavigationLink("About ActivityMap") { aboutPage }

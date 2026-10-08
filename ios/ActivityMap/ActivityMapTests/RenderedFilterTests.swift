@@ -1,10 +1,137 @@
 import SwiftUI
 import Testing
 import UIKit
+import MapboxMaps
 @testable import ActivityMap
 
 @MainActor @Suite(.serialized)
 struct RenderedFilterTests {
+    @Test(arguments: [AppTab.map, .list, .stats])
+    func nativeTabletHeaderDoesNotPresentFiltersOverSidebar(tab: AppTab) async throws {
+        let key = "browse.filterSidebarVisible", defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: key)
+        defaults.set(true, forKey: key)
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer {
+            MapboxOptions.accessToken = token
+            if let saved { defaults.set(saved, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = tab
+        let sheets = BrowseSheetPresentation()
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 1194, height: 834))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(350))
+        let sidebar = try #require(host.descendants(of: UIScrollView.self).first { abs($0.bounds.width - 320) < 2 })
+        // A stale sheet request must never duplicate filters while the native
+        // toolbar's wide-window presentation uses the sidebar.
+        sheets.showsFilters = true
+        try await Task.sleep(for: .milliseconds(450))
+        #expect(host.host.presentedViewController == nil && !sheets.shellSheetPresented)
+        #expect(host.descendants(of: UIScrollView.self).contains { $0 === sidebar })
+        sheets.showsFilters = false
+        try host.save(host.snapshot(), name: "native-sidebar-\(tab.title.lowercased())")
+    }
+
+    @Test func resizingDismissesFilterSheetWhenSidebarBecomesAvailable() async throws {
+        let key = "browse.filterSidebarVisible", defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: key)
+        defaults.set(true, forKey: key)
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer {
+            MapboxOptions.accessToken = token
+            if let saved { defaults.set(saved, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)])
+        store.selectedTab = .list
+        let sheets = BrowseSheetPresentation()
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 600, height: 834))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(350))
+        sheets.showsFilters = true
+        try await filterWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
+        host.window.frame.size.width = 1194
+        host.host.view.frame = host.window.bounds
+        try await filterWait { host.host.presentedViewController == nil && !sheets.showsFilters && !sheets.shellSheetPresented }
+        store.selectedTab = .stats
+        try await Task.sleep(for: .milliseconds(250))
+        sheets.showsFilters = true
+        try await Task.sleep(for: .milliseconds(350))
+        #expect(host.host.presentedViewController == nil && !sheets.shellSheetPresented)
+        #expect(host.descendants(of: UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 })
+        sheets.showsFilters = false
+    }
+
+    @Test(arguments: [AppTab.map, .list, .stats])
+    func narrowTabletUsesFilterSheetAcrossTabs(tab: AppTab) async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)])
+        store.selectedTab = tab
+        let sheets = BrowseSheetPresentation()
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 600, height: 834))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(350))
+        sheets.showsFilters = true
+        try await filterWait { sheets.shellSheetPresented && host.host.presentedViewController?.isBeingPresented == false }
+        sheets.showsFilters = false
+        try await filterWait { host.host.presentedViewController == nil }
+        #expect(store.selectedTab == tab)
+    }
+
+    @Test(arguments: ["portrait", "landscape", "sidebar-hidden"])
+    func listDetailAdaptsFiltersAndRestoresPreference(layout: String) async throws {
+        let key = "browse.filterSidebarVisible", defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: key)
+        let prefersSidebar = layout != "sidebar-hidden"
+        defaults.set(prefersSidebar, forKey: key)
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer {
+            MapboxOptions.accessToken = token
+            if let saved { defaults.set(saved, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        let size = layout == "landscape" ? CGSize(width: 1194, height: 834) : CGSize(width: 834, height: 1194)
+        let host = try FilterHarness(root: AppShell(store: store)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(450))
+        let list = try #require(host.descendants(of: UICollectionView.self).first { $0.bounds.width > 400 })
+        let initialWidth = list.bounds.width
+        store.inspect(1)
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(host.host.presentedViewController == nil)
+        #expect(host.descendants(of: UICollectionView.self).contains { $0 === list })
+        let availableWidth = layout == "landscape" ? size.width - 321 : size.width
+        let expectedListWidth = availableWidth - min(420, max(340, availableWidth * 0.42)) - 1
+        #expect(abs(list.bounds.width - expectedListWidth) < 2, "Detail stays beside the retained list rather than pushing")
+        let sidebarShown = host.descendants(of: UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 }
+        #expect(sidebarShown == (layout == "landscape"))
+        #expect(defaults.bool(forKey: key) == prefersSidebar, "Automatic collapse does not change the saved preference")
+        try host.save(host.snapshot(), name: "adaptive-list-detail-\(layout)")
+        store.dismissInspection()
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(abs(list.bounds.width - initialWidth) < 2)
+        #expect(host.descendants(of: UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 } == prefersSidebar)
+    }
+
     @Test func landscapePhoneCanDismissFiltersWithoutChangingContext() async throws {
         let store = ActivityStore(activities: try GalleryLibrary.load().activities,
                                   listPresentation: ActivityListPresentation(defaults: nil))
@@ -124,6 +251,13 @@ struct RenderedFilterTests {
         #expect(applied.pngData() != host.snapshot().pngData(), "External reset must redraw the range and summary")
         try host.save(host.snapshot(), name: "numeric-\(scenario)-reset")
     }
+}
+
+@MainActor
+private func filterWait(_ condition: () -> Bool) async throws {
+    let deadline = Date().addingTimeInterval(6)
+    while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
+    try #require(condition())
 }
 
 @MainActor

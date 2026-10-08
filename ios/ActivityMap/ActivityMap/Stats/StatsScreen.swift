@@ -8,10 +8,17 @@ struct StatsScreen: View {
     var refresh: () async -> Void = {}
     @State private var inspectedActivityID: Int?
     @State var dashboard = StatsDashboardState()
+    @State private var usesDetailNavigation = true
+    @State private var hasPushedDetail = false
     @Environment(\.statsShellNavigation) private var shellNavigation
     @Environment(\.statsDetailPresentation) private var detailPresentation
+    @Environment(\.statsDetailTransition) private var detailTransition
+    @Environment(\.statsTransitionNamespace) private var shellTransitionNamespace
+    @Namespace private var transitionNamespace
     @Environment(\.localStore) private var localStore
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.browseViewportWidth) private var viewportWidth
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var presentation: StatsPresentation {
@@ -24,15 +31,8 @@ struct StatsScreen: View {
               canLoad: store.selectedTab == .stats && presentation.hasContent)
     }
 
-    private var usesDetailNavigation: Bool {
-        switch detailPresentation {
-        case .automatic: UIDevice.current.userInterfaceIdiom == .phone
-        case .navigation: true
-        case .inline: false
-        }
-    }
     private var detailSelection: Binding<StatsTileID?> {
-        Binding(get: { usesDetailNavigation ? dashboard.expandedTile : nil },
+        Binding(get: { detailPresentation != .inline && usesDetailNavigation ? dashboard.expandedTile : nil },
                 set: { dashboard.expandedTile = $0 })
     }
 
@@ -59,13 +59,13 @@ struct StatsScreen: View {
     }
 
     @ViewBuilder private var screenContent: some View {
-        if usesDetailNavigation, let shellNavigation {
-            dashboardContent.onAppear {
+        if let shellNavigation {
+            adaptiveContent.onAppear {
                 if shellNavigation.dashboard !== dashboard { shellNavigation.dashboard = dashboard }
             }
         } else {
             NavigationStack {
-                dashboardContent
+                adaptiveContent
                     .navigationTitle("Stats")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar(.hidden, for: .navigationBar)
@@ -78,7 +78,38 @@ struct StatsScreen: View {
         }
     }
 
-    private var dashboardContent: some View {
+    private var adaptiveContent: some View {
+        GeometryReader { geometry in
+            let sidebar = detailPresentation == .automatic && sizeClass == .regular
+                && (viewportWidth ?? geometry.size.width) >= BrowsePaneLayout.minimumDetailWidth && !typeSize.isAccessibilitySize && !hasPushedDetail
+            let navigates = detailPresentation != .inline && !sidebar
+            let selected = sidebar ? dashboard.expandedTile : nil
+            let detailWidth = min(680, max(430, geometry.size.width * 0.56))
+            HStack(spacing: 0) {
+                dashboardContent(sidebar: sidebar)
+                    .frame(width: selected == nil ? geometry.size.width : geometry.size.width - detailWidth - 1)
+                if let selected, let tile = StatsDashboard.tiles.first(where: { $0.id == selected }) {
+                    Divider()
+                    StatsDetailPanel(store: store, dashboard: dashboard, tile: tile, sync: sync) {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { dashboard.expandedTile = nil }
+                    }
+                    .frame(width: detailWidth)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            .onChange(of: navigates, initial: true) { _, value in
+                usesDetailNavigation = value
+                shellNavigation?.usesDetailNavigation = value
+                if value, dashboard.expandedTile != nil { hasPushedDetail = true }
+            }
+            .onChange(of: dashboard.expandedTile, initial: true) { _, id in
+                if id == nil { hasPushedDetail = false }
+                else if navigates { hasPushedDetail = true }
+            }
+        }
+    }
+
+    private func dashboardContent(sidebar: Bool) -> some View {
         GeometryReader { geometry in
             let detailLimit = detailHeightLimit(viewport: geometry.size.height)
             ScrollViewReader { proxy in
@@ -92,9 +123,9 @@ struct StatsScreen: View {
                                     let columns = !typeSize.isAccessibilitySize
                                         && geometry.size.width >= (detailLimit != nil ? 640 : 760) ? 2 : 1
                                     StatsAnimatedSection(tiles: StatsDashboard.tiles.filter { $0.group == group },
-                                                         expandedTile: usesDetailNavigation ? nil : dashboard.expandedTile,
+                                                         expandedTile: detailPresentation == .inline ? dashboard.expandedTile : nil,
                                                          columns: columns) { definition in
-                                        tile(definition)
+                                        tile(definition, sidebar: sidebar)
                                     }
                                 }
                             }
@@ -109,8 +140,8 @@ struct StatsScreen: View {
                 // Only inline expansion needs to observe this selection.
                 // On iPhone, that dependency needlessly invalidated the
                 // compact dashboard before UIKit could push the detail page.
-                .onChange(of: usesDetailNavigation ? nil : dashboard.expandedTile) { _, id in
-                    guard !usesDetailNavigation, detailLimit != nil, let id else { return }
+                .onChange(of: detailPresentation == .inline ? dashboard.expandedTile : nil) { _, id in
+                    guard detailPresentation == .inline, detailLimit != nil, let id else { return }
                     withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
                         proxy.scrollTo(id, anchor: .top)
                     }
@@ -128,18 +159,27 @@ struct StatsScreen: View {
     @ViewBuilder private func detail(_ tile: StatsTileDefinition) -> some View {
         if reduceMotion {
             detailContent(tile).navigationTransition(.crossFade)
+        } else if detailTransition == .zoom {
+            detailContent(tile).navigationTransition(.zoom(sourceID: tile.id, in: transitionNamespace))
         } else {
             detailContent(tile)
         }
     }
 
-    private func tile(_ tile: StatsTileDefinition) -> some View {
-        dashboardTile(tile, expanded: !usesDetailNavigation && dashboard.expandedTile == tile.id)
+    @ViewBuilder private func tile(_ tile: StatsTileDefinition, sidebar: Bool) -> some View {
+        let content = dashboardTile(tile, expanded: detailPresentation == .inline && dashboard.expandedTile == tile.id,
+                                    sidebar: sidebar)
             .id(tile.id)
+        if usesDetailNavigation, detailTransition == .zoom, !reduceMotion, StatsDashboard.expandable(tile.id) {
+            content.matchedTransitionSource(id: tile.id, in: shellTransitionNamespace ?? transitionNamespace)
+        } else {
+            content
+        }
     }
 
-    private func dashboardTile(_ tile: StatsTileDefinition, expanded: Bool) -> some View {
+    private func dashboardTile(_ tile: StatsTileDefinition, expanded: Bool, sidebar: Bool) -> some View {
         StatsDashboardTile(tile: tile, store: store, dashboard: dashboard, expanded: expanded,
+                           selected: sidebar && dashboard.expandedTile == tile.id, detailInSidebar: sidebar,
                            toggleExpansion: {
             if usesDetailNavigation { dashboard.toggleExpansion(tile.id) }
             else {
@@ -209,6 +249,49 @@ private struct StatsDetailDestination<Content: View>: View {
 /// The shell and standalone hosts push the same complete page. Values remain
 /// observed so changing a metric refreshes the visible destination.
 struct StatsDetailScreen: View {
+    let store: ActivityStore
+    let dashboard: StatsDashboardState
+    let tile: StatsTileDefinition
+    var sync: SyncController? = nil
+
+    var body: some View {
+        StatsDetailDestination(title: tile.title) {
+            StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync)
+        }
+    }
+}
+
+private struct StatsDetailPanel: View {
+    let store: ActivityStore
+    let dashboard: StatsDashboardState
+    let tile: StatsTileDefinition
+    var sync: SyncController? = nil
+    let close: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(tile.title).font(.headline).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close stat details")
+                    .accessibilityIdentifier("stats-detail-close")
+            }
+            .padding(.horizontal, 12)
+            Divider()
+            StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync)
+                .id(tile.id)
+        }
+        .background(AppTheme.contentBackground)
+        .tint(AppTheme.accent)
+        .accessibilityIdentifier("stats-detail-panel")
+        .accessibilityAction(.escape, close)
+    }
+}
+
+/// Charts, controls and activity inspection are shared by the pane and push.
+private struct StatsDetailContent: View {
     @Bindable var store: ActivityStore
     let dashboard: StatsDashboardState
     let tile: StatsTileDefinition
@@ -224,8 +307,7 @@ struct StatsDetailScreen: View {
     }
 
     var body: some View {
-        StatsDetailDestination(title: tile.title) {
-            GeometryReader { geometry in
+        GeometryReader { geometry in
                 ScrollView {
                     StatsDashboardTile(tile: tile, store: store, dashboard: dashboard,
                                        expanded: true, detailScreen: true,
@@ -237,7 +319,6 @@ struct StatsDetailScreen: View {
                         .transaction { $0.animation = nil }
                 }
                 .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
-            }
         }
         // The shell's pushed root is inactive. The visible destination must
         // own demand when its metric changes; the shared cache reuses values.
@@ -261,6 +342,7 @@ struct StatsDetailScreen: View {
 /// binding owns pop/cancellation and writes back to the retained Stats state.
 @MainActor @Observable final class StatsShellNavigation {
     var dashboard: StatsDashboardState?
+    var usesDetailNavigation = true
 }
 
 struct StatsRecovery {
