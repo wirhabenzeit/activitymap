@@ -44,11 +44,11 @@ export function DataTableViewOptions<TData extends RowData>({
           <Button
             variant="outline"
             size="sm"
-            className="h-8 w-8 px-0 sm:w-auto sm:px-3"
+            className="h-8 w-8 px-0 @xl/list-pagination:w-auto @xl/list-pagination:px-3"
             aria-label="View"
           >
-            <MixerHorizontalIcon className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">View</span>
+            <MixerHorizontalIcon className="h-4 w-4 @xl/list-pagination:mr-2" />
+            <span className="hidden @xl/list-pagination:inline">View</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56">
