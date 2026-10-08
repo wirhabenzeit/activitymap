@@ -178,7 +178,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
         }
         .chartLegend(.hidden)
         .chartXSelection(value: $selectedX)
-        .statsExpansionHeight(expanded: expanded, compact: compactHeight, detail: height)
+        .statsExpansionHeight(expanded: expanded, compact: compactHeight, detail: height, fillsFocus: true)
         .overlay(alignment: .topLeading) {
             if !expanded && selected == nil && !trend.isEmpty {
                 Text("4-wk avg").font(.caption2).foregroundStyle(.secondary)

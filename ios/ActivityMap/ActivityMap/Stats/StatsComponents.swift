@@ -9,8 +9,6 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     var expanded = false
     var compactHeader = false
     var detailScreen = false
-    var selected = false
-    var detailInSidebar = false
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let content: () -> Content
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -24,13 +22,6 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .modifier(BrowseSurface())
                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius))
-                .overlay {
-                    if selected {
-                        RoundedRectangle(cornerRadius: AppTheme.cornerRadius)
-                            .strokeBorder(AppTheme.accent, lineWidth: 2)
-                    }
-                }
-                .accessibilityAddTraits(selected ? .isSelected : [])
         }
     }
     private var tileBody: some View {
@@ -61,8 +52,8 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     }
     @ViewBuilder private var expandButton: some View {
         if let expand {
-            BrowseIconButton(title: detailInSidebar ? "\(selected ? "Close" : "Show") \(title) details" : "\(expanded ? "Collapse" : "Expand") \(title)",
-                             systemImage: detailInSidebar ? (selected ? "xmark" : "sidebar.right") : expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+            BrowseIconButton(title: "\(expanded ? "Collapse" : "Expand") \(title)",
+                             systemImage: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                              action: expand)
         }
     }
@@ -405,6 +396,9 @@ extension EnvironmentValues {
     /// so a tile's header, controls and chart fit on one screen. Never below
     /// compact. Its presence also selects the dense one-row tile headers.
     @Entry var statsDetailHeightLimit: Double? = nil
+    /// Set only on a wide, tall focus page (iPad): expanded charts grow to this
+    /// height instead of keeping their phone size beside empty space.
+    @Entry var statsFocusChartHeight: Double? = nil
     @Entry var statsTileInspection: StatsTileInspection? = nil
     @Entry var statsDetailPresentation = StatsDetailPresentation.automatic
     @Entry var statsDetailTransition: StatsDetailTransition? = nil
@@ -418,16 +412,21 @@ private struct StatsExpansionHeight: ViewModifier {
     let expanded: Bool
     let compact: Double
     let detail: Double
+    let fillsFocus: Bool
     @Environment(\.statsExpansionProgress) private var progress
     @Environment(\.statsDetailHeightLimit) private var limit
+    @Environment(\.statsFocusChartHeight) private var focus
     func body(content: Content) -> some View {
-        let detail = limit.map { max(compact, min(detail, $0)) } ?? detail
+        let grown = fillsFocus ? max(detail, focus ?? 0) : detail
+        let detail = limit.map { max(compact, min(grown, $0)) } ?? grown
         content.frame(height: compact + (detail - compact) * (progress ?? (expanded ? 1 : 0)))
     }
 }
 extension View {
-    func statsExpansionHeight(expanded: Bool, compact: Double, detail: Double) -> some View {
-        modifier(StatsExpansionHeight(expanded: expanded, compact: compact, detail: detail))
+    /// Charts pass `fillsFocus` to grow on a wide focus page; fixed-size
+    /// visuals such as calendar cells keep their detail height.
+    func statsExpansionHeight(expanded: Bool, compact: Double, detail: Double, fillsFocus: Bool = false) -> some View {
+        modifier(StatsExpansionHeight(expanded: expanded, compact: compact, detail: detail, fillsFocus: fillsFocus))
     }
 }
 

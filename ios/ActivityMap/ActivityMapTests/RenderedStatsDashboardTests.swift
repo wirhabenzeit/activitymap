@@ -312,8 +312,8 @@ import Testing
             state.toggleExpansion(.weeklyVolume)
             try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
             let detail = try #require(navigation.topViewController)
-            #expect((detail.preferredTransition != nil) == (transition == .zoom),
-                    "The live Dev preference must select the native zoom transition only for B")
+            #expect((detail.preferredTransition != nil) == (device == "ipad" || transition == .zoom),
+                    "Regular-width iPad always zooms; on phone the live Dev preference selects zoom only for B")
             #expect(state.option(.weeklyVolume) == .distance)
             navigation.popViewController(animated: true)
             try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
@@ -890,7 +890,7 @@ import Testing
     }
 
     @Test(arguments: ["portrait", "landscape"])
-    func tabletStatDetailKeepsOverview(orientation: String) async throws {
+    func tabletStatDetailOpensFullWidthFocusPage(orientation: String) async throws {
         let key = "browse.filterSidebarVisible", defaults = UserDefaults.standard
         let saved = defaults.object(forKey: key)
         defaults.set(true, forKey: key)
@@ -926,54 +926,44 @@ import Testing
         let calculations = store.stats.calculationCount
         let inspection = try #require(state.inspection(.weeklyVolume))
         inspection.volumeRange = .months
-        withAnimation(.easeInOut(duration: 0.2)) { state.toggleExpansion(.weeklyVolume) }
-        let availableWidth = orientation == "portrait" ? size.width : size.width - 321
-        let expectedOverviewWidth = availableWidth - min(680, max(430, availableWidth * 0.56)) - 1
-        try await statsWait {
-            abs(root.bounds.width - expectedOverviewWidth) < 2
-                && host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 } == (orientation == "landscape")
-        }
-        #expect(navigation.viewControllers.count == 1)
-        #expect(state.expandedTile == .weeklyVolume)
-        #expect(root.bounds.width >= 320 && root.bounds.width < size.width / 2)
-        let detail = try #require(host.descendants(UIScrollView.self).first {
-            !($0 is UICollectionView) && $0 !== root && $0.bounds.width >= 430
-                && $0.convert($0.bounds, to: host.host.view).minX >= root.bounds.width
-        })
-        #expect(abs(detail.bounds.width - availableWidth * 0.56) < 2)
-        #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 } == (orientation == "landscape"))
-        try host.capture("ipad-stats-pane-\(orientation)")
-        if orientation == "portrait" {
-            let detailWidth = detail.bounds.width
-            sheets.revealsFiltersOverDetail = true
-            try await Task.sleep(for: .milliseconds(250))
-            #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 })
-            #expect(abs(detail.bounds.width - detailWidth) < 1 && state.expandedTile == .weeklyVolume)
-            #expect(host.host.presentedViewController == nil)
-            try host.capture("ipad-stats-pane-portrait-filters")
-            sheets.revealsFiltersOverDetail = false
-        }
-        // A different tile replaces only detail. Its own choices and the
-        // retained overview/inspection do not get rebuilt or recalculated.
-        state.toggleExpansion(.records)
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(navigation.viewControllers.count == 1 && state.expandedTile == .records)
+
+        // The chart gets the whole shell width, never less than its compact tile.
         state.toggleExpansion(.weeklyVolume)
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(state.inspection(.weeklyVolume) === inspection && inspection.volumeRange == .months)
-        #expect(store.stats.calculationCount == calculations)
-        withAnimation(.easeInOut(duration: 0.2)) { state.expandedTile = nil }
-        // Closing portrait detail also restores the filter column. Wait for
-        // both layout animations instead of sampling their intermediate width.
-        try await statsWait { abs(root.bounds.width - initialWidth) < 2 }
+        try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        let page = try #require(navigation.topViewController)
+        #expect(page.preferredTransition != nil, "Regular-width iPad zooms the tile into its focus page")
+        let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { !($0 is UICollectionView) })
+        #expect(abs(detail.bounds.width - size.width) < 2)
+        #expect(state.expandedTile == .weeklyVolume && inspection.volumeRange == .months)
+        #expect(!sheets.revealsFiltersOverDetail)
+        try host.capture("ipad-stats-focus-\(orientation)")
+
+        // Back restores the retained dashboard, its scroll position and the
+        // filter column without rebuilding or recalculating anything.
+        navigation.popViewController(animated: true)
+        try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
         #expect(host.descendants(UIScrollView.self).contains { $0 === root })
         #expect(abs(root.bounds.width - initialWidth) < 2)
         #expect(abs(root.contentOffset.y - offset) < 1)
         #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 })
-        #expect(defaults.bool(forKey: key) && !sheets.revealsFiltersOverDetail)
+        #expect(state.inspection(.weeklyVolume) === inspection && inspection.volumeRange == .months)
+        #expect(store.stats.calculationCount == calculations)
+        #expect(defaults.bool(forKey: key))
+
+        // Every other expandable tile uses the same full-width page.
+        for tile in StatsDashboard.tiles.map(\.id) where StatsDashboard.expandable(tile) && tile != .weeklyVolume {
+            state.toggleExpansion(tile)
+            try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+            let page = try #require(navigation.topViewController)
+            let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { !($0 is UICollectionView) })
+            #expect(abs(detail.bounds.width - size.width) < 2, "\(tile.rawValue)")
+            try host.capture("ipad-stats-focus-\(orientation)-\(tile.rawValue)")
+            navigation.popViewController(animated: true)
+            try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
+        }
     }
 
-    @Test func tabletDetailAdaptsToNarrowWindowAndKeepsPushedDetailOnResize() async throws {
+    @Test func tabletFocusPageSurvivesWindowResize() async throws {
         let (store, _) = try StatsDashboardTests.fixture()
         let state = StatsDashboardState()
         let token = MapboxOptions.accessToken
@@ -987,21 +977,19 @@ import Testing
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
         let navigation = try #require(host.controllers(UINavigationController.self).first)
         state.toggleExpansion(.weeklyVolume)
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(navigation.viewControllers.count == 1 && state.expandedTile == .weeklyVolume)
-        host.window.frame.size.width = 600
-        host.host.view.frame = host.window.bounds
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
-        #expect(state.expandedTile == .weeklyVolume)
-        host.window.frame.size = CGSize(width: 1194, height: 834)
-        host.host.view.frame = host.window.bounds
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(navigation.viewControllers.count == 2 && state.expandedTile == .weeklyVolume)
+        // Crossing the 760pt threshold in either direction keeps the same page.
+        for size in [CGSize(width: 600, height: 1194), CGSize(width: 1194, height: 834)] {
+            host.window.frame.size = size
+            host.host.view.frame = host.window.bounds
+            try await Task.sleep(for: .milliseconds(200))
+            #expect(navigation.viewControllers.count == 2 && state.expandedTile == .weeklyVolume)
+        }
         navigation.popViewController(animated: true)
         try await statsWait { navigation.viewControllers.count == 1 && state.expandedTile == nil && navigation.transitionCoordinator == nil }
         state.toggleExpansion(.records)
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(navigation.viewControllers.count == 1 && state.expandedTile == .records)
+        try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        #expect(state.expandedTile == .records)
     }
 
     @Test func tabletExpansionKeepsSingleDashboardDestination() async throws {

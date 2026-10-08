@@ -40,23 +40,21 @@ struct AppShell: View {
 
     private var usesPhoneNavigation: Bool {
         guard statsContent != nil else { return false }
-        switch statsDetailPresentation {
-        case .automatic:
-            // Keep the blue native bar for both adaptive iPad panes and pushes
-            // in narrow windows. StatsScreen decides which detail to present.
-            return true
-        case .navigation: return true
-        case .inline: return false
-        }
+        // The blue native bar hosts the pushed Stats focus page at every width.
+        return statsDetailPresentation != .inline
     }
 
     private var statsDetailSelection: Binding<StatsTileID?> {
-        Binding(get: { statsNavigation.usesDetailNavigation ? statsNavigation.dashboard?.expandedTile : nil },
+        Binding(get: { statsNavigation.dashboard?.expandedTile },
                 set: { statsNavigation.dashboard?.expandedTile = $0 })
     }
 
+    /// Regular-width iPad always zooms a tile into its focus page. The Dev
+    /// Push/Tile zoom comparison covers phones and narrow windows.
     private var statsTransition: StatsDetailTransition {
-        statsTransitionOverride ?? (StatsDetailTransition.isDevBuild ? devStatsTransition : .push)
+        if let statsTransitionOverride { return statsTransitionOverride }
+        if filterSidebarAvailable { return .zoom }
+        return StatsDetailTransition.isDevBuild ? devStatsTransition : .push
     }
 
     var body: some View {
@@ -226,11 +224,8 @@ struct AppShell: View {
     private func collapsesFiltersForDetail(width: CGFloat) -> Bool {
         guard filterSidebarAvailable(width: width),
               width - BrowsePaneLayout.filterWidth - 1 < BrowsePaneLayout.minimumDetailWidth else { return false }
-        switch store.selectedTab {
-        case .stats: return statsDetailPresentation == .automatic && statsNavigation.dashboard?.expandedTile != nil
-        case .list: return store.inspectedActivityID != nil
-        case .map: return false
-        }
+        // Stats focus pages cover the whole shell, so only List borrows the column.
+        return store.selectedTab == .list && store.inspectedActivityID != nil
     }
 
     private var filterSidebar: some View {
