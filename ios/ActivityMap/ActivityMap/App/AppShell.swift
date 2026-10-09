@@ -147,14 +147,18 @@ struct AppShell: View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
                 let sidebarAvailable = filterSidebarAvailable(width: geometry.size.width)
+                // Rotation must choose the filter host and content width from
+                // the same geometry pass, before shellSize's callback arrives.
+                let panelTight = panelTight(width: geometry.size.width)
+                let panelFloats = panelTight && store.selectedTab == .list && store.inspectedActivityID != nil
                 let filterWidth = sidebarAvailable
                     ? (sheets.showsFilters && !panelFloats ? BrowsePaneLayout.filterWidth : FilterRail.width) + 1 : 0
                 VStack(spacing: 0) {
                     shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
-                    filterWorkspace(sidebarAvailable: sidebarAvailable) {
+                    filterWorkspace(sidebarAvailable: sidebarAvailable, panelFloats: panelFloats) {
                         navigableContent
                             .environment(\.browsePaneWidth, max(0, geometry.size.width - filterWidth))
-                            .environment(\.filtersCollapseForDetail, filtersCollapseForDetail)
+                            .environment(\.filtersCollapseForDetail, panelTight && sheets.showsFilters && !panelFloats)
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
                             .environment(\.mapResultsSheetSuspended, sheets.shellSheetPresented)
@@ -200,7 +204,7 @@ struct AppShell: View {
     }
 
     /// The filter host persists beside the dashboard and focused charts.
-    private func filterWorkspace<Content: View>(sidebarAvailable: Bool,
+    private func filterWorkspace<Content: View>(sidebarAvailable: Bool, panelFloats: Bool,
                                                 @ViewBuilder content: () -> Content) -> some View {
         let expanded = sidebarAvailable && sheets.showsFilters
         return HStack(spacing: 0) {
@@ -245,20 +249,11 @@ struct AppShell: View {
     /// The full panel leaves no room for List and its adjacent detail, but
     /// the rail does (11-inch portrait).
     private var panelTight: Bool {
-        BrowsePaneLayout.panelSqueezesDetail(width: shellSize.width) && filterSidebarAvailable
+        panelTight(width: shellSize.width)
     }
 
-    /// Filters never squeeze List and its detail (#354): while both columns
-    /// show, the full panel floats over them. One-column content (Map, Stats,
-    /// List without detail) keeps it as a column beside the content.
-    private var panelFloats: Bool {
-        panelTight && store.selectedTab == .list && store.inspectedActivityID != nil
-    }
-
-    /// The expanded panel is a column that List detail would not fit beside;
-    /// List waits for the rail instead of pushing its detail.
-    private var filtersCollapseForDetail: Bool {
-        panelTight && sheets.showsFilters && !panelFloats
+    private func panelTight(width: CGFloat) -> Bool {
+        BrowsePaneLayout.panelSqueezesDetail(width: width) && filterSidebarAvailable(width: width)
     }
 
     private func setFiltersExpanded(_ expanded: Bool) {

@@ -168,6 +168,43 @@ struct RenderedFilterTests {
         #expect(host.showsFilterRail, "Closing detail never shows or hides filters")
     }
 
+    @Test(arguments: [false, true])
+    func rotatingListWithFiltersAndDetailKeepsTheAdjacentDetail(filtersFirst: Bool) async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        let sheets = BrowseSheetPresentation()
+        sheets.showsFilters = filtersFirst
+        let landscape = CGSize(width: 1194, height: 834)
+        let portrait = CGSize(width: 834, height: 1194)
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: landscape)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(450))
+        let list = try #require(host.descendants(of: UICollectionView.self).first { $0.bounds.width > 400 })
+        store.inspect(1)
+        try await Task.sleep(for: .milliseconds(400))
+        sheets.showsFilters = true
+        try await Task.sleep(for: .milliseconds(400))
+        for size in [portrait, landscape, portrait, landscape] {
+            host.resize(size)
+            try await Task.sleep(for: .milliseconds(700))
+            let floating = size.width == portrait.width
+            let beside = size.width - (floating ? FilterRail.width : BrowsePaneLayout.filterWidth) - 1
+            #expect(store.inspectedActivityID == 1 && sheets.showsFilters)
+            #expect(host.showsFilterPanel && host.host.presentedViewController == nil)
+            #expect(host.navigationControllers.allSatisfy { $0.viewControllers.count == 1 },
+                    "Rotation must not push an adjacent detail into an empty destination")
+            #expect(list.window != nil && abs(list.bounds.width - Self.listWidth(beside: beside)) < 2,
+                    "List and its detail retain their columns after rotation")
+            try host.save(host.snapshot(), name: "rotated-list-detail-\(filtersFirst)-\(Int(size.width))")
+        }
+    }
+
     @Test func openingAnActivityCollapsesTheExpandedPanelInPortrait() async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
@@ -360,6 +397,12 @@ private final class FilterHarness<Content: View> {
             ((view as? T).map { [$0] } ?? []) + view.subviews.flatMap(visit)
         }
         return visit(host.view)
+    }
+    var navigationControllers: [UINavigationController] {
+        func visit(_ controller: UIViewController) -> [UINavigationController] {
+            ((controller as? UINavigationController).map { [$0] } ?? []) + controller.children.flatMap(visit)
+        }
+        return visit(host)
     }
     /// The full filter panel, as a column or floating over List and its detail.
     var showsFilterPanel: Bool {
