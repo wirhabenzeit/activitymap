@@ -10,7 +10,6 @@ struct StatsScreen: View {
     @State var dashboard = StatsDashboardState()
     @Environment(\.statsShellNavigation) private var shellNavigation
     @Environment(\.statsDetailPresentation) private var detailPresentation
-    @Environment(\.statsDetailTransition) private var detailTransition
     @Environment(\.statsTransitionNamespace) private var shellTransitionNamespace
     @Namespace private var transitionNamespace
     @Environment(\.localStore) private var localStore
@@ -129,17 +128,15 @@ struct StatsScreen: View {
     @ViewBuilder private func detail(_ tile: StatsTileDefinition) -> some View {
         if reduceMotion {
             detailContent(tile).navigationTransition(.crossFade)
-        } else if detailTransition == .zoom {
-            detailContent(tile).navigationTransition(.zoom(sourceID: tile.id, in: transitionNamespace))
         } else {
-            detailContent(tile)
+            detailContent(tile).navigationTransition(.zoom(sourceID: tile.id, in: transitionNamespace))
         }
     }
 
     @ViewBuilder private func tile(_ tile: StatsTileDefinition) -> some View {
         let content = dashboardTile(tile, expanded: detailPresentation == .inline && dashboard.expandedTile == tile.id)
             .id(tile.id)
-        if usesDetailNavigation, detailTransition == .zoom, !reduceMotion, StatsDashboard.expandable(tile.id) {
+        if usesDetailNavigation, !reduceMotion, StatsDashboard.expandable(tile.id) {
             content.matchedTransitionSource(id: tile.id, in: shellTransitionNamespace ?? transitionNamespace)
         } else {
             content

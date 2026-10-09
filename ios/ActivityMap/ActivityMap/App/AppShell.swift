@@ -10,8 +10,6 @@ struct AppShell: View {
     @State private var sheets: BrowseSheetPresentation
     @State private var statsNavigation = StatsShellNavigation()
     @Namespace private var statsTransitionNamespace
-    @AppStorage(StatsDetailTransition.preferenceKey) private var devStatsTransition = StatsDetailTransition.push
-    @Environment(\.statsDetailTransition) private var statsTransitionOverride
     @Environment(\.statsDetailPresentation) private var statsDetailPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("browse.filterSidebarVisible") private var sidebarVisible = true
@@ -49,14 +47,6 @@ struct AppShell: View {
                 set: { statsNavigation.dashboard?.expandedTile = $0 })
     }
 
-    /// Regular-width iPad always zooms a tile into its focus page. The Dev
-    /// Push/Tile zoom comparison covers phones and narrow windows.
-    private var statsTransition: StatsDetailTransition {
-        if let statsTransitionOverride { return statsTransitionOverride }
-        if filterSidebarAvailable { return .zoom }
-        return StatsDetailTransition.isDevBuild ? devStatsTransition : .push
-    }
-
     var body: some View {
         Group {
             if usesPhoneNavigation {
@@ -76,7 +66,6 @@ struct AppShell: View {
                         }
                 }
                 .environment(\.statsShellNavigation, statsNavigation)
-                .environment(\.statsDetailTransition, statsTransition)
                 .environment(\.statsTransitionNamespace, statsTransitionNamespace)
                 .tint(.white)
             } else {
@@ -154,11 +143,9 @@ struct AppShell: View {
     @ViewBuilder private func phoneStatsDetail(_ tile: StatsTileDefinition, dashboard: StatsDashboardState) -> some View {
         let content = StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync)
             .tint(AppTheme.accent)
+        // Every width zooms the tile into its focus page; Reduce Motion cross-fades.
         if reduceMotion { content.navigationTransition(.crossFade) }
-        else if statsTransition == .zoom {
-            content.navigationTransition(.zoom(sourceID: tile.id, in: statsTransitionNamespace))
-        }
-        else { content }
+        else { content.navigationTransition(.zoom(sourceID: tile.id, in: statsTransitionNamespace)) }
     }
 
     private var shellContent: some View {

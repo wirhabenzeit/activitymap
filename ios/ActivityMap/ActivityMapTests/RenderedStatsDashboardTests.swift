@@ -28,7 +28,6 @@ import Testing
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)
-            .environment(\.statsDetailTransition, ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_TRANSITION"] == "zoom" ? .zoom : .push)
             .environment(\.horizontalSizeClass, .compact)
             .environment(\.verticalSizeClass, landscape ? .compact : .regular)
             .environment(\.colorScheme, ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_DARK"] == "1" ? .dark : .light)
@@ -142,8 +141,8 @@ import Testing
         #expect(state.expandedTile == (collapsing ? nil : tile) && frames.count == 30)
     }
 
-    @Test(arguments: ["phone", "landscape", "large-text"], StatsDetailTransition.allCases)
-    func phoneNavigationKeepsContentPosition(variant: String, transition: StatsDetailTransition) async throws {
+    @Test(arguments: ["phone", "landscape", "large-text"])
+    func phoneNavigationKeepsContentPosition(variant: String) async throws {
         try await statsWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
         let store = ActivityStore(activities: try GalleryLibrary.load().activities,
                                   listPresentation: ActivityListPresentation(defaults: nil))
@@ -158,7 +157,6 @@ import Testing
         defer { MapboxOptions.accessToken = previousToken }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)
-            .environment(\.statsDetailTransition, transition)
             .environment(\.horizontalSizeClass, .compact)
             .environment(\.verticalSizeClass, variant == "landscape" ? .compact : .regular)
             .environment(\.dynamicTypeSize, variant == "large-text" ? .accessibility3 : .large)
@@ -228,7 +226,6 @@ import Testing
             // A zoom deliberately transforms the destination's screen position.
             // Its untransformed layout/insets must still stay fixed through it.
             let keys = ["detailSafeAreaTop", "detailOffsetY", "detailInsetTop", "detailViewportHeight"]
-                + (transition == .push ? ["detailViewportY", "detailContentTopY"] : [])
             for key in keys {
                 let samples = frames.compactMap { $0.1[key] as? CGFloat }
                 if phase == "push" { #expect(!samples.isEmpty) }
@@ -238,7 +235,7 @@ import Testing
             }
             var metadata: [[String: Any]] = []
             if capture {
-                let directory = URL(fileURLWithPath: output).appendingPathComponent("\(transition.rawValue)-\(variant)-\(phase)")
+                let directory = URL(fileURLWithPath: output).appendingPathComponent("zoom-\(variant)-\(phase)")
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 for (index, frame) in frames.enumerated() {
                     let name = String(format: "frame-%02d.png", index)
@@ -274,58 +271,6 @@ import Testing
             }
         }
         #expect(state.expandedTile == nil && abs(root.contentOffset.y - rootOffset) < 1)
-    }
-
-    @Test(.enabled(if: StatsDetailTransition.isDevBuild), arguments: ["phone", "ipad"])
-    func devStatsAnimationCanSwitchWithoutReinstalling(device: String) async throws {
-        let defaults = UserDefaults.standard, key = StatsDetailTransition.preferenceKey
-        let previous = defaults.object(forKey: key)
-        defer {
-            if let previous { defaults.set(previous, forKey: key) }
-            else { defaults.removeObject(forKey: key) }
-        }
-        defaults.set(StatsDetailTransition.push.rawValue, forKey: key)
-        let (store, _) = try StatsDashboardTests.fixture()
-        let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
-        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
-        let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
-            .environment(\.statsDetailPresentation, .navigation)
-            .environment(\.horizontalSizeClass, device == "ipad" ? .regular : .compact)
-            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)),
-            size: device == "ipad" ? CGSize(width: 834, height: 1194) : CGSize(width: 402, height: 874))
-        defer { host.close() }
-        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
-        let root = try #require(host.descendants(UIScrollView.self).first {
-            !($0 is UICollectionView) && $0.contentSize.height > 1500
-        })
-        root.setContentOffset(CGPoint(x: 0, y: 400), animated: false)
-        try await Task.sleep(for: .milliseconds(100))
-        let offset = root.contentOffset.y
-        let calculations = store.stats.calculationCount
-        for transition in [StatsDetailTransition.push, .zoom, .push] {
-            defaults.set(transition.rawValue, forKey: key)
-            try await Task.sleep(for: .milliseconds(150))
-            state.toggleExpansion(.weeklyVolume)
-            try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
-            let detail = try #require(navigation.topViewController)
-            #expect((detail.preferredTransition != nil) == (device == "ipad" || transition == .zoom),
-                    "Regular-width iPad always zooms; on phone the live Dev preference selects zoom only for B")
-            #expect(state.option(.weeklyVolume) == .distance)
-            navigation.popViewController(animated: true)
-            try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
-            #expect(host.descendants(UIScrollView.self).contains { $0 === root })
-            #expect(abs(root.contentOffset.y - offset) < 1)
-            #expect(store.stats.calculationCount == calculations)
-        }
-        sheets.accountDestination = .settings
-        try await statsWait { host.host.presentedViewController?.isBeingPresented == false }
-        try host.capture("dev-stats-animation-settings-\(device)", presented: true)
-        sheets.accountDestination = nil
-        try await statsWait { host.host.presentedViewController == nil }
     }
 
     @Test func phoneStatsHeaderCanPresentSettingsFromDetail() async throws {
@@ -764,6 +709,9 @@ import Testing
         let host = try StatsDashboardHarness(root: StatsSeriesChart(points: points, metric: .elevation,
             expanded: false, axis: .date, style: .volume, compact: true)
             .padding(20).frame(width: 378, height: 180).background(.white)
+            // The window sits under the status bar; ignore its device-specific
+            // inset so the sampled geometry is identical on iPhone and iPad.
+            .ignoresSafeArea()
             .environment(\.colorScheme, .light), size: CGSize(width: 378, height: 180))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(150))
@@ -781,11 +729,12 @@ import Testing
             }
             return Array(bytes.prefix(3))
         }
-        // Fixed renderer geometry: neither 4pt sample intersects an axis, a
-        // gridline (10'000 at y≈72, 5'000 at y≈115) or the tail (y≈105).
+        // Fixed renderer geometry without safe-area insets: neither 4pt sample
+        // intersects an axis, a gridline (10'000 at y≈42, 5'000 at y≈84,
+        // 0 at y≈127) or the tail (y≈74 at x=300).
         // Default stacking puts the pale area ABOVE the tail instead of below it.
-        #expect(try rgb(x: 300, y: 88).allSatisfy { $0 > 250 }, "No phantom area above the dashed tail")
-        #expect(try rgb(x: 300, y: 135).allSatisfy { $0 > 235 && $0 < 250 }, "The pale area remains below the tail")
+        #expect(try rgb(x: 300, y: 57).allSatisfy { $0 > 250 }, "No phantom area above the dashed tail")
+        #expect(try rgb(x: 300, y: 103).allSatisfy { $0 > 235 && $0 < 250 }, "The pale area remains below the tail")
     }
 
     @Test func largeTextShellKeepsStatsDestinationReachable() async throws {

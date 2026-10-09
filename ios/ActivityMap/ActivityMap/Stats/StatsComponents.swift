@@ -401,7 +401,6 @@ extension EnvironmentValues {
     @Entry var statsFocusChartHeight: Double? = nil
     @Entry var statsTileInspection: StatsTileInspection? = nil
     @Entry var statsDetailPresentation = StatsDetailPresentation.automatic
-    @Entry var statsDetailTransition: StatsDetailTransition? = nil
     @Entry var statsTransitionNamespace: Namespace.ID? = nil
     @Entry var statsShellNavigation: StatsShellNavigation? = nil
 }
@@ -511,14 +510,4 @@ struct StatsActivityRow: View {
 /// Explicit presentation is useful for hosts that render an iPad-sized preview on a phone.
 enum StatsDetailPresentation {
     case automatic, navigation, inline
-}
-
-/// Temporary device comparison. Production keeps the saved push baseline.
-enum StatsDetailTransition: String, CaseIterable {
-    case push, zoom
-
-    static let preferenceKey = "dev.statsDetailTransition"
-    nonisolated static var isDevBuild: Bool { Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true }
-
-    var title: String { self == .push ? "A: Push" : "B: Tile zoom" }
 }

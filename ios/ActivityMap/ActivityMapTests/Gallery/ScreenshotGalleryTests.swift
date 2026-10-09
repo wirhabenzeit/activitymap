@@ -13,16 +13,11 @@ struct ScreenshotGalleryTests {
     func capture(scene: GalleryScene) async throws {
         let preferences = UserDefaults.standard
         let sidebarKey = "browse.filterSidebarVisible"
-        let transitionKey = StatsDetailTransition.preferenceKey
         let savedSidebar = preferences.object(forKey: sidebarKey)
-        let savedTransition = preferences.object(forKey: transitionKey)
         preferences.set(true, forKey: sidebarKey)
-        preferences.set(StatsDetailTransition.push.rawValue, forKey: transitionKey)
         defer {
             if let savedSidebar { preferences.set(savedSidebar, forKey: sidebarKey) }
             else { preferences.removeObject(forKey: sidebarKey) }
-            if let savedTransition { preferences.set(savedTransition, forKey: transitionKey) }
-            else { preferences.removeObject(forKey: transitionKey) }
         }
         let manifest = try GalleryManifest.load()
         guard GalleryEnvironment.includes(scene.rawValue, key: "SCENES") else { return }
