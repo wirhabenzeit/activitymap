@@ -376,17 +376,22 @@ extension RenderedRoutePickingTests {
         if let directory = captureDirectory { try Data().write(to: directory.appendingPathComponent("done")) }
     }
 
-    @Test func shellHeaderStaysOutsideListDetailNavigation() async throws {
+    @Test(arguments: ["phone", "landscape", "large-text", "split-window"])
+    func pushedListDetailReplacesTheShellHeader(scenario: String) async throws {
         let previousToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = previousToken }
         let store = ActivityStore(activities: (1...100).map { ActivityStoreSelectionTests.activity($0) },
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
+        let size = scenario == "landscape" ? CGSize(width: 844, height: 390)
+            : scenario == "split-window" ? CGSize(width: 650, height: 1000) : CGSize(width: 390, height: 844)
         let host = try ListHarness(root: AppShell(store: store)
-            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.horizontalSizeClass, scenario == "split-window" ? .regular : .compact)
+            .environment(\.verticalSizeClass, scenario == "landscape" ? .compact : .regular)
+            .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility3 : .large)
             .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)),
-            size: CGSize(width: 390, height: 844))
+            size: size)
         defer { host.close() }
         try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
         let navigation = try #require(host.controllers(of: UINavigationController.self).last)
@@ -394,11 +399,10 @@ extension RenderedRoutePickingTests {
         list.setContentOffset(CGPoint(x: 0, y: 200), animated: false)
         try await Task.sleep(for: .milliseconds(200))
         let offset = list.contentOffset
-        let navigationTop = navigation.view.convert(.zero, to: host.host.view).y
-        let shellNavigation = try #require(host.controllers(of: UINavigationController.self).first)
-        let headerBottom = shellNavigation.navigationBar.convert(shellNavigation.navigationBar.bounds, to: host.host.view).maxY
+        #expect(!navigation.isNavigationBarHidden)
+        let headerBottom = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view).maxY
         let listTop = list.convert(list.bounds, to: host.host.view).minY
-        #expect(!shellNavigation.isNavigationBarHidden && listTop + list.adjustedContentInset.top >= headerBottom,
+        #expect(listTop + list.adjustedContentInset.top >= headerBottom,
                 "The retained List starts below the visible shell bar")
         store.inspect(90)
         var openingFrames: [CGRect] = []
@@ -418,7 +422,13 @@ extension RenderedRoutePickingTests {
         #expect(openingInsets.allSatisfy { abs($0 - (openingInsets.first ?? $0)) < 1 }, "Root and detail keep the same native bar inset during the push")
         try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         let barFrame = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
+        #expect(abs(barFrame.minY - host.host.view.safeAreaInsets.top) < 2,
+                "The detail's native Back/title bar occupies the top header position")
+        #expect(host.controllers(of: UINavigationController.self).filter {
+            !$0.isNavigationBarHidden && $0.navigationBar.window != nil
+        }.count == 1, "Exactly one native navigation bar is visible")
         let contentFrame = navigation.topViewController?.view.frame
+        try host.save("list-single-header-\(scenario)")
         for _ in 0..<5 {
             try await Task.sleep(for: .milliseconds(200))
             #expect(navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view) == barFrame,
@@ -432,9 +442,10 @@ extension RenderedRoutePickingTests {
         #expect(popGesture.delegate?.gestureRecognizerShouldBegin?(popGesture) == true,
                 "The native edge-swipe recognizer must accept a pop with the bar hidden")
         let detailGestureDelegate = popGesture.delegate
-        #expect(navigation.view.convert(.zero, to: host.host.view).y == navigationTop)
         store.selectedTab = .map
         try await Task.sleep(for: .milliseconds(200))
+        #expect(host.accessibilityElement(label: "Settings") != nil,
+                "The browsing header returns on Map while List retains its detail")
         store.selectedTab = .list
         try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         #expect(store.inspectedActivityID == 90)
@@ -443,6 +454,9 @@ extension RenderedRoutePickingTests {
         #expect(list.contentOffset == offset)
         #expect(store.selectedActivityIDs.isEmpty)
         #expect(popGesture.delegate !== detailGestureDelegate, "Restore UIKit's gesture delegate after leaving detail")
+        #expect(!navigation.isNavigationBarHidden && navigation.viewControllers.count == 1,
+                "Back restores the browsing toolbar in the same native header")
+        try host.save("list-single-header-back-\(scenario)")
     }
 
     @Test func largeListNavigationReusesBrowsingSnapshots() async throws {
@@ -609,6 +623,27 @@ private final class ListHarness<Content: View> {
         return visit(host)
     }
     func close() { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
+    func accessibilityElement(label: String) -> NSObject? {
+        var visited: Set<ObjectIdentifier> = []
+        func visit(_ object: NSObject) -> NSObject? {
+            guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
+            if let view = object as? UIView, view.isHidden || view.alpha == 0 { return nil }
+            if object.accessibilityLabel == label,
+               !object.accessibilityFrame.isEmpty { return object }
+            let count = object.accessibilityElementCount()
+            if count > 0, count < 1000 {
+                for index in 0..<count {
+                    if let child = object.accessibilityElement(at: index) as? NSObject,
+                       let found = visit(child) { return found }
+                }
+            }
+            if let view = object as? UIView {
+                for child in view.subviews { if let found = visit(child) { return found } }
+            }
+            return nil
+        }
+        return visit(host.view)
+    }
     func accessibilityValues() -> [String] {
         var visited: Set<ObjectIdentifier> = []
         func visit(_ object: NSObject) -> [String] {

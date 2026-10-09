@@ -7,7 +7,16 @@ struct ListScreen: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.browsePaneWidth) private var paneWidth
-    @State private var hasPushedDetail = false
+    @Environment(\.listShellNavigation) private var shellNavigation
+    @Environment(\.listRootToolbar) private var shellToolbar
+    @State private var localPushedDetail = false
+    private var hasPushedDetail: Bool {
+        get { shellNavigation?.detailPresented ?? localPushedDetail }
+        nonmutating set {
+            if let shellNavigation { shellNavigation.detailPresented = newValue }
+            else { localPushedDetail = newValue }
+        }
+    }
     /// Inspection started while the shell collapses its filter panel; the
     /// adjacent detail appears once the wider layout arrives.
     @State private var awaitingWidth = false
@@ -35,6 +44,8 @@ struct ListScreen: View {
                         .frame(maxHeight: .infinity)
                 }
             }
+            .modifier(ListRootChrome(toolbar: shellToolbar,
+                                     visible: store.selectedTab == .list && (!sideBySide || hasPushedDetail)))
             // Inspecting is ordinary navigation. Back only clears inspection;
             // the retained list and selection/camera owners remain unchanged.
             .navigationDestination(item: inspectionID(sideBySide: sideBySide || awaitingWidth)) { id in
@@ -136,6 +147,21 @@ struct ListScreen: View {
                 }
             }
         )
+    }
+}
+
+private struct ListRootChrome: ViewModifier {
+    let toolbar: ListRootToolbar?
+    let visible: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if let toolbar {
+            content
+                .toolbar(visible ? .visible : .hidden, for: .navigationBar)
+                .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
+                .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbar { toolbar }
+        } else { content }
     }
 }
 

@@ -112,6 +112,8 @@ Running the plain `ActivityMap` scheme on a device from Xcode builds `page.domin
 
 Stats opens chart detail as a focus page using the full available content width beside filters (#353), zooming the tapped tile into the page; Reduce Motion cross-fades. Filters, Map/List/Stats and Settings remain available in the persistent blue shell header. The filter panel and shell bar stay stationary during expansion and Back; only the chart content column participates in the zoom. Back and the chart title sit above the focused content. The dashboard stays mounted, and Back restores its scroll position, metric choices and cached calculations. Regular windows retain the 52pt filter rail across Map, List, Stats and Stats focus; the filter button expands it into a 320pt panel. The panel sits beside one-column content and floats over List plus detail when needed. Opening List detail collapses an expanded column to the rail; closing detail leaves it collapsed (#354). Windows below 760pt and accessibility text sizes use the filter sheet, including while focused. A focused Stats page stays open through resizing until Back or a destination switch. Explicit inline preview hosts retain the original expansion layout.
 
+Pushed List details replace the browsing header with a single native blue Back/title/Show on map bar. Back restores the browsing header. Side-by-side List details on iPad retain the browsing header.
+
 ### Run on a physical iPhone
 
 The simulator shares the Mac's `localhost`; an iPhone's `localhost` is the phone. `Config/Base.xcconfig` now sends simulator builds to the local server and physical-device builds to the production HTTPS deployment:

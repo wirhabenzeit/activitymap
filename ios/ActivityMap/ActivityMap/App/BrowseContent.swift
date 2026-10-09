@@ -19,7 +19,6 @@ struct BrowseContent: View {
                         // Establish the detail bar's inline metrics before the
                         // first push, even while the root bar is hidden.
                         .navigationBarTitleDisplayMode(.inline)
-                        .toolbar(.hidden, for: .navigationBar)
                 }
                     .id(store.mapContext.scopeRevision)
                     .refreshable {
@@ -110,7 +109,32 @@ struct BrowseStatsDestination {
 private struct BrowseStatsDestinationKey: EnvironmentKey {
     static let defaultValue: BrowseStatsDestination? = nil
 }
+
+/// Pushed List details replace the shell header with their native Back/title
+/// bar. This state follows the retained navigation page across tab and width changes.
+@MainActor @Observable final class ListShellNavigation {
+    var detailPresented = false
+}
+
+/// Root and pushed List pages share one native bar so UIKit preserves the
+/// retained List's inset and scroll position across push and Back.
+struct ListRootToolbar: ToolbarContent {
+    let leading: AnyView
+    let principal: AnyView
+    let trailing: AnyView
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarLeading) { leading }
+            .sharedBackgroundVisibility(.hidden)
+        ToolbarItem(placement: .principal) { principal }
+        ToolbarItemGroup(placement: .topBarTrailing) { trailing }
+            .sharedBackgroundVisibility(.hidden)
+    }
+}
+
 extension EnvironmentValues {
+    @Entry var listShellNavigation: ListShellNavigation? = nil
+    @Entry var listRootToolbar: ListRootToolbar? = nil
+
     /// The shell's target column width, independent of a retained native
     /// navigation root's temporarily stale frame during destination switches.
     @Entry var browsePaneWidth: CGFloat? = nil

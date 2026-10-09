@@ -9,6 +9,7 @@ struct AppShell: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var sheets: BrowseSheetPresentation
     @State private var statsNavigation = StatsShellNavigation()
+    @State private var listNavigation = ListShellNavigation()
     @Namespace private var statsTransitionNamespace
     @Environment(\.statsDetailPresentation) private var statsDetailPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -56,6 +57,7 @@ struct AppShell: View {
                 shellContent
             }
         }
+        .environment(\.listShellNavigation, listNavigation)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { old, new in
             shellSize = new
             // A resize that switches between sheet and sidebar closes the old
@@ -153,11 +155,17 @@ struct AppShell: View {
                 let panelFloats = panelTight && store.selectedTab == .list && store.inspectedActivityID != nil
                 let filterWidth = sidebarAvailable
                     ? (sheets.showsFilters && !panelFloats ? BrowsePaneLayout.filterWidth : FilterRail.width) + 1 : 0
+                let contentWidth = max(0, geometry.size.width - filterWidth)
+                let nativeListHeader = listNavigation.detailPresented || sizeClass != .regular
+                    || contentWidth < BrowsePaneLayout.minimumDetailWidth || typeSize.isAccessibilitySize
                 VStack(spacing: 0) {
-                    shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
+                    if store.selectedTab != .list || !nativeListHeader {
+                        shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
+                    }
                     filterWorkspace(sidebarAvailable: sidebarAvailable, panelFloats: panelFloats) {
-                        navigableContent
-                            .environment(\.browsePaneWidth, max(0, geometry.size.width - filterWidth))
+                        navigableContent(nativeListHeader: nativeListHeader, sidebarAvailable: sidebarAvailable)
+                            .environment(\.browsePaneWidth, contentWidth)
+                            .environment(\.listRootToolbar, usesStatsNavigation ? nil : listRootToolbar(sidebarAvailable: sidebarAvailable))
                             .environment(\.filtersCollapseForDetail, panelTight && sheets.showsFilters && !panelFloats)
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
@@ -184,13 +192,21 @@ struct AppShell: View {
         }
     }
 
-    /// Only this column participates in the focus transition. The
-    /// shell bar and the single filter host stay outside the moving page.
-    @ViewBuilder private var navigableContent: some View {
+    /// Stats focus animates only this column, with its shell bar and filters
+    /// outside the moving page. Narrow List pages share one native toolbar.
+    @ViewBuilder private func navigableContent(nativeListHeader: Bool, sidebarAvailable: Bool) -> some View {
         if usesStatsNavigation {
             NavigationStack {
                 content
-                    .toolbar(.hidden, for: .navigationBar)
+                    .toolbar(store.selectedTab == .list && nativeListHeader ? .visible : .hidden, for: .navigationBar)
+                    .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
+                    .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+                    .toolbarColorScheme(.dark, for: .navigationBar)
+                    .toolbar {
+                        if store.selectedTab == .list && nativeListHeader {
+                            listRootToolbar(sidebarAvailable: sidebarAvailable)
+                        }
+                    }
                     .navigationDestination(item: statsDetailSelection) { id in
                         if let dashboard = statsNavigation.dashboard,
                            let tile = StatsDashboard.tiles.first(where: { $0.id == id }) {
@@ -321,6 +337,16 @@ struct AppShell: View {
     /// iPhone landscape: a slimmer bar that also carries the List's status row (#315).
     private var compactBar: Bool { verticalSizeClass == .compact }
     private var syncing: Bool { sync?.status.showsLoadingIndicator == true }
+
+    private func listRootToolbar(sidebarAvailable: Bool) -> ListRootToolbar {
+        ListRootToolbar(leading: AnyView(HStack(spacing: 8) {
+            filterButton(sidebarAvailable: sidebarAvailable)
+            if compactBar { SelectionBar(store: store, includesTotal: true, onNavigationBar: true) }
+        }), principal: AnyView(destinationPicker), trailing: AnyView(HStack(spacing: 8) {
+            if compactBar { ListControls(presentation: store.listPresentation, iconOnly: true, onNavigationBar: true) }
+            accountButton
+        }))
+    }
 
     // Global destinations stay outside the List's native navigation stack.
     private func shellHeader(sidebarAvailable: Bool) -> some View {
