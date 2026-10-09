@@ -13,6 +13,9 @@ struct MapScreen: View {
     @State private var viewport: Viewport
     @State private var acceptsCameraEvents = false
     @State private var cameraTransitionID: UUID?
+    /// A resolved fit that arrived while the map was updating its content.
+    /// Valid only while its transition is still current.
+    @State private var deferredTransition: (id: UUID, viewport: Viewport)?
 
     init(store: ActivityStore, topOcclusion: CGFloat = 0, picker: RoutePicker? = nil) {
         _picker = State(initialValue: picker ?? RoutePicker())
@@ -136,6 +139,12 @@ struct MapScreen: View {
                 viewport = context.camera.viewport
                 acceptsCameraEvents = true
             }
+            if let deferred = deferredTransition {
+                deferredTransition = nil
+                if deferred.id == cameraTransitionID, store.selectedTab == .map {
+                    withViewportAnimation(.easeOut(duration: 0.5)) { viewport = deferred.viewport }
+                }
+            }
             applyNavigation(proxy: proxy, geometry: geometry)
         }
         .ignoresSafeArea()
@@ -205,8 +214,14 @@ struct MapScreen: View {
             // inside that same SwiftUI update loses its animation transaction.
             // Ease the fixed camera and final panel padding together afterwards.
             DispatchQueue.main.async {
-                guard cameraTransitionID == transitionID, store.selectedTab == .map,
-                      map.isStyleLoaded else { return }
+                guard cameraTransitionID == transitionID, store.selectedTab == .map else { return }
+                // The request is already consumed. Returning to Map can still be
+                // adding the newly active route, and a camera move started then
+                // is interrupted, so finish it at the next idle frame instead.
+                guard map.isStyleLoaded else {
+                    deferredTransition = (transitionID, target)
+                    return
+                }
                 withViewportAnimation(.easeOut(duration: 0.5)) { viewport = target }
             }
         default:
