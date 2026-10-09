@@ -838,10 +838,9 @@ import Testing
         #expect(state.inspection(.weeklyVolume) !== volume, "Account changes discard inspection state")
     }
 
-    @Test(arguments: ["portrait", "landscape", "pinned"])
+    @Test(arguments: ["portrait", "landscape", "expanded"])
     func tabletStatDetailOpensFullWidthFocusPage(orientation: String) async throws {
-        let pinned = orientation == "pinned"
-        let pinDefaults = filterDefaults(pinned: pinned ? true : nil)
+        let expanded = orientation == "expanded"
         let library = try GalleryLibrary.load()
         let store = ActivityStore(activities: library.activities,
                                   listPresentation: ActivityListPresentation(defaults: nil))
@@ -854,7 +853,8 @@ import Testing
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let size = orientation == "portrait" ? CGSize(width: 834, height: 1194) : CGSize(width: 1194, height: 834)
         let sheets = BrowseSheetPresentation()
-        let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination).defaultAppStorage(pinDefaults)
+        sheets.showsFilters = expanded
+        let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
             .environment(\.horizontalSizeClass, .regular)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
         defer { host.close() }
@@ -864,8 +864,10 @@ import Testing
             !($0 is UICollectionView) && $0.contentSize.height > 1500
         })
         let initialWidth = root.bounds.width
-        // Filters start closed; only a landscape pin gives them a column (#354).
-        #expect(abs(initialWidth - (pinned ? size.width - 321 : size.width)) < 2)
+        // The filter rail sits beside the dashboard; the expanded panel is a
+        // column because the dashboard is one column (#354).
+        let filterWidth = (expanded ? BrowsePaneLayout.filterWidth : FilterRail.width) + 1
+        #expect(abs(initialWidth - (size.width - filterWidth)) < 2)
         root.setContentOffset(CGPoint(x: 0, y: 250), animated: false)
         let offset = root.contentOffset.y
         let calculations = store.stats.calculationCount
@@ -880,7 +882,7 @@ import Testing
         let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { !($0 is UICollectionView) })
         #expect(abs(detail.bounds.width - size.width) < 2)
         #expect(state.expandedTile == .weeklyVolume && inspection.volumeRange == .months)
-        #expect(!sheets.showsFilters)
+        #expect(sheets.showsFilters == expanded)
         try host.capture("ipad-stats-focus-\(orientation)")
 
         // Back restores the retained dashboard, its scroll position and the
@@ -890,10 +892,10 @@ import Testing
         #expect(host.descendants(UIScrollView.self).contains { $0 === root })
         #expect(abs(root.bounds.width - initialWidth) < 2)
         #expect(abs(root.contentOffset.y - offset) < 1)
-        #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 } == pinned)
+        #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 } == expanded)
         #expect(state.inspection(.weeklyVolume) === inspection && inspection.volumeRange == .months)
         #expect(store.stats.calculationCount == calculations)
-        #expect(pinDefaults.bool(forKey: filterPinKey) == pinned && !sheets.showsFilters)
+        #expect(sheets.showsFilters == expanded, "Focus pages never change filter visibility")
 
         // Every other expandable tile uses the same full-width page.
         for tile in StatsDashboard.tiles.map(\.id) where StatsDashboard.expandable(tile) && tile != .weeklyVolume {

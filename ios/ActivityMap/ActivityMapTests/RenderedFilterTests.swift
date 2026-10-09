@@ -6,34 +6,34 @@ import MapboxMaps
 
 @MainActor @Suite(.serialized)
 struct RenderedFilterTests {
-    @Test func filterPinIsLandscapeOnlyAndNeedsRoomForDetail() {
-        func pins(_ width: CGFloat, _ height: CGFloat, regular: Bool = true, large: Bool = false) -> Bool {
-            BrowsePaneLayout.filtersCanPin(size: CGSize(width: width, height: height), regular: regular, accessibilityText: large)
-        }
-        // iPad mini, 11-inch and 13-inch landscape fit filters, overview and detail.
-        #expect(pins(1133, 744) && pins(1194, 834) && pins(1366, 1024))
-        // Portrait, even on the 13-inch iPad, always overlays filters.
-        #expect(!pins(744, 1133) && !pins(834, 1194) && !pins(1024, 1366))
-        // Split View, compact windows and accessibility text never pin.
-        #expect(!pins(980, 834) && !pins(1194, 834, regular: false) && !pins(1194, 834, large: true))
+    @Test func railFitsListAndDetailWhereThePanelCannot() {
+        // Portrait iPads from 10.9-inch to 13-inch: the 320pt panel leaves too
+        // little for List and its detail, the rail does not (#354).
+        #expect([820, 834, 1024].allSatisfy { BrowsePaneLayout.panelSqueezesDetail(width: $0) })
+        // Landscape fits the panel beside List and detail.
+        #expect([1133, 1180, 1194, 1366].allSatisfy { !BrowsePaneLayout.panelSqueezesDetail(width: $0) })
         #expect(BrowsePaneLayout.filtersUseSidebar(width: 834, regular: true, accessibilityText: false))
-        #expect(!BrowsePaneLayout.filtersUseSidebar(width: 700, regular: true, accessibilityText: false))
+        #expect(!BrowsePaneLayout.filtersUseSidebar(width: 744, regular: true, accessibilityText: false))
+        #expect(!BrowsePaneLayout.filtersUseSidebar(width: 1194, regular: false, accessibilityText: false))
         #expect(!BrowsePaneLayout.filtersUseSidebar(width: 1194, regular: true, accessibilityText: true))
     }
 
-    @Test func filterButtonReadsTheActiveCount() {
+    @Test func filterButtonAndRailReadTheActiveFilters() {
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
         #expect(FilterCountBadge.label(count: store.activeFilterCount) == "Filters")
+        #expect(FilterPart.allCases.allSatisfy { !$0.isActive(store) })
         store.searchText = "ride"
         store.privateFilter = false
         store.distanceFilter = NumericFilter(value: 10000, upperLimit: 80000)
         #expect(store.activeFilterCount == 3)
         #expect(FilterCountBadge.label(count: store.activeFilterCount) == "Filters, 3 active")
+        #expect(Set(FilterPart.allCases.filter { $0.isActive(store) }) == [.search, .distance, .details])
+        #expect(!FilterPart.available(in: .stats).contains(.dates))
+        #expect(FilterPart.available(in: .browsing) == FilterPart.allCases)
     }
 
     @Test(arguments: [AppTab.map, .list, .stats])
-    func tabletFiltersOpenAsOverlayAndSurviveDestinationSwitches(tab: AppTab) async throws {
-        let pinDefaults = filterDefaults(pinned: nil)
+    func tabletRailStaysAndThePanelSurvivesDestinationSwitches(tab: AppTab) async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = token }
@@ -41,57 +41,56 @@ struct RenderedFilterTests {
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = tab
         let sheets = BrowseSheetPresentation()
-        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets).defaultAppStorage(pinDefaults)
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
             .environment(\.horizontalSizeClass, .regular)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 834, height: 1194))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(350))
-        #expect(!host.showsFilterSidebar, "iPad filters start closed")
+        #expect(host.showsFilterRail && !host.showsFilterPanel, "iPad filters start as the rail")
         sheets.showsFilters = true
         try await Task.sleep(for: .milliseconds(450))
-        // The wide-window host is the overlay sidebar, never a duplicate sheet.
+        // The wide-window host is the panel, never a duplicate sheet.
         #expect(host.host.presentedViewController == nil && !sheets.shellSheetPresented)
-        #expect(host.showsFilterSidebar)
-        try host.save(host.snapshot(), name: "overlay-filters-\(tab.title.lowercased())")
+        #expect(host.showsFilterPanel)
+        try host.save(host.snapshot(), name: "filter-panel-\(tab.title.lowercased())")
         for next in [AppTab.map, .list, .stats, tab] {
             store.selectedTab = next
             try await Task.sleep(for: .milliseconds(200))
-            #expect(sheets.showsFilters && host.showsFilterSidebar, "Switching to \(next.title) keeps filters open")
+            #expect(sheets.showsFilters && host.showsFilterPanel, "Switching to \(next.title) keeps the panel")
         }
         sheets.showsFilters = false
-        try await filterWait { !host.showsFilterSidebar }
+        try await filterWait { !host.showsFilterPanel && host.showsFilterRail }
         for next in [AppTab.map, .list, .stats, tab] {
             store.selectedTab = next
             try await Task.sleep(for: .milliseconds(200))
-            #expect(!host.showsFilterSidebar, "Switching to \(next.title) keeps filters closed")
+            #expect(!host.showsFilterPanel && host.showsFilterRail, "Switching to \(next.title) keeps the rail")
         }
     }
 
     @Test func resizingDismissesFilterSheetWhenSidebarBecomesAvailable() async throws {
-        let pinDefaults = filterDefaults(pinned: nil)
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)])
         store.selectedTab = .list
         let sheets = BrowseSheetPresentation()
-        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets).defaultAppStorage(pinDefaults)
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
             .environment(\.horizontalSizeClass, .regular)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 600, height: 834))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(350))
+        #expect(!host.showsFilterRail, "Narrow windows use the sheet, not the rail")
         sheets.showsFilters = true
         try await filterWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
-        host.window.frame.size.width = 1194
-        host.host.view.frame = host.window.bounds
+        host.resize(CGSize(width: 1194, height: 834))
         try await filterWait { host.host.presentedViewController == nil && !sheets.showsFilters && !sheets.shellSheetPresented }
-        #expect(!host.showsFilterSidebar, "Resizing closes the sheet without opening the sidebar")
+        #expect(host.showsFilterRail && !host.showsFilterPanel, "Resizing closes the sheet and shows the rail")
         store.selectedTab = .stats
         try await Task.sleep(for: .milliseconds(250))
         sheets.showsFilters = true
         try await Task.sleep(for: .milliseconds(350))
         #expect(host.host.presentedViewController == nil && !sheets.shellSheetPresented)
-        #expect(host.showsFilterSidebar)
+        #expect(host.showsFilterPanel)
         sheets.showsFilters = false
     }
 
@@ -115,79 +114,92 @@ struct RenderedFilterTests {
         #expect(store.selectedTab == tab)
     }
 
-    @Test(arguments: ["portrait", "landscape", "pinned"])
-    func listDetailNeverChangesFilterVisibility(layout: String) async throws {
-        let pinDefaults = filterDefaults(pinned: layout == "pinned" ? true : nil)
+    @Test(arguments: ["portrait", "landscape"])
+    func filtersNeverSqueezeListAndDetail(layout: String) async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
-        let size = layout == "portrait" ? CGSize(width: 834, height: 1194) : CGSize(width: 1194, height: 834)
-        let pinned = layout == "pinned"
+        let portrait = layout == "portrait"
+        let size = portrait ? CGSize(width: 834, height: 1194) : CGSize(width: 1194, height: 834)
         let sheets = BrowseSheetPresentation()
-        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets).defaultAppStorage(pinDefaults)
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
             .environment(\.horizontalSizeClass, .regular)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(450))
-        #expect(host.showsFilterSidebar == pinned)
         let list = try #require(host.descendants(of: UICollectionView.self).first { $0.bounds.width > 400 })
-        let availableWidth = pinned ? size.width - 321 : size.width
-        #expect(abs(list.bounds.width - availableWidth) < 2)
+        let beside = size.width - FilterRail.width - 1
+        #expect(abs(list.bounds.width - beside) < 2)
         store.inspect(1)
         try await Task.sleep(for: .milliseconds(500))
-        #expect(host.host.presentedViewController == nil)
-        #expect(host.descendants(of: UICollectionView.self).contains { $0 === list })
-        let expectedListWidth = availableWidth - min(420, max(340, availableWidth * 0.42)) - 1
-        #expect(abs(list.bounds.width - expectedListWidth) < 2, "Detail stays beside the retained list rather than pushing")
-        #expect(host.showsFilterSidebar == pinned, "Opening detail never shows or hides filters")
-        if !pinned {
-            // The overlay covers the List and its detail without resizing them.
-            sheets.showsFilters = true
-            try await Task.sleep(for: .milliseconds(400))
-            #expect(host.showsFilterSidebar && abs(list.bounds.width - expectedListWidth) < 2)
+        #expect(host.host.presentedViewController == nil && list.window != nil)
+        let withDetail = Self.listWidth(beside: beside)
+        #expect(abs(list.bounds.width - withDetail) < 2, "Detail stays beside the retained list rather than pushing")
+        sheets.showsFilters = true
+        try await Task.sleep(for: .milliseconds(450))
+        #expect(host.showsFilterPanel && list.window != nil)
+        if portrait {
+            // The panel floats over List and its detail instead of squeezing them.
+            #expect(abs(list.bounds.width - withDetail) < 2)
+        } else {
+            // Landscape fits the panel as a column beside both.
+            let narrower = Self.listWidth(beside: size.width - BrowsePaneLayout.filterWidth - 1)
+            #expect(abs(list.bounds.width - narrower) < 2)
         }
-        try host.save(host.snapshot(), name: "list-detail-filters-\(layout)")
-        // Map and Stats do not borrow or return a filter column either (#354).
+        try host.save(host.snapshot(), name: "list-detail-panel-\(layout)")
+        // Map and Stats are one column, so the panel sits beside them; no
+        // destination shows or hides it (#354).
         for tab in [AppTab.map, .stats, .list] {
             store.selectedTab = tab
             try await Task.sleep(for: .milliseconds(250))
-            #expect(host.showsFilterSidebar == (pinned || sheets.showsFilters), "\(tab.title) keeps filter visibility")
+            #expect(sheets.showsFilters && host.showsFilterPanel, "\(tab.title) keeps the panel")
         }
+        sheets.showsFilters = false
+        try await filterWait { host.showsFilterRail && !host.showsFilterPanel }
+        #expect(abs(list.bounds.width - withDetail) < 2)
         store.dismissInspection()
         try await Task.sleep(for: .milliseconds(400))
-        #expect(host.showsFilterSidebar == (pinned || sheets.showsFilters), "Closing detail never shows or hides filters")
-        #expect(abs(list.bounds.width - availableWidth) < 2)
-        #expect(pinDefaults.bool(forKey: filterPinKey) == pinned)
-        sheets.showsFilters = false
+        #expect(abs(list.bounds.width - beside) < 2)
+        #expect(host.showsFilterRail, "Closing detail never shows or hides filters")
     }
 
-    @Test func pinnedFiltersStepAsideInPortraitAndReturnInLandscape() async throws {
-        let pinDefaults = filterDefaults(pinned: true)
+    @Test func openingAnActivityCollapsesTheExpandedPanelInPortrait() async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = token }
-        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)])
-        store.selectedTab = .map
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
         let sheets = BrowseSheetPresentation()
-        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets).defaultAppStorage(pinDefaults)
-            .environment(\.horizontalSizeClass, .regular)
-            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 1194, height: 834))
-        defer { host.close() }
-        try await filterWait { host.showsFilterSidebar }
-        host.resize(CGSize(width: 834, height: 1194))
-        try await filterWait { !host.showsFilterSidebar }
-        #expect(!sheets.showsFilters, "Portrait never keeps filters resident")
-        // Closing the portrait overlay keeps the landscape pin.
         sheets.showsFilters = true
-        try await filterWait { host.showsFilterSidebar }
-        sheets.showsFilters = false
-        try await filterWait { !host.showsFilterSidebar }
-        host.resize(CGSize(width: 1194, height: 834))
-        try await filterWait { host.showsFilterSidebar }
-        #expect(pinDefaults.bool(forKey: filterPinKey))
+        let size = CGSize(width: 834, height: 1194)
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(450))
+        let list = try #require(host.descendants(of: UICollectionView.self).first { $0.bounds.width > 400 })
+        #expect(host.showsFilterPanel)
+        #expect(abs(list.bounds.width - (size.width - BrowsePaneLayout.filterWidth - 1)) < 2,
+                "One-column List keeps the panel as a column")
+        store.inspect(1)
+        try await filterWait { !sheets.showsFilters && host.showsFilterRail }
+        try await Task.sleep(for: .milliseconds(400))
+        // List waited for the rail instead of pushing its detail full width.
+        #expect(list.window != nil && host.host.presentedViewController == nil)
+        #expect(abs(list.bounds.width - Self.listWidth(beside: size.width - FilterRail.width - 1)) < 2)
+        try host.save(host.snapshot(), name: "list-detail-collapsed-panel")
+        store.dismissInspection()
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(!sheets.showsFilters, "Closing detail leaves the rail rather than restoring the panel")
+    }
+
+    /// ListScreen's adjacent detail: 340–420pt plus a divider.
+    private static func listWidth(beside width: CGFloat) -> CGFloat {
+        width - min(420, max(340, width * 0.42)) - 1
     }
 
     @Test func landscapePhoneCanDismissFiltersWithoutChangingContext() async throws {
@@ -240,12 +252,13 @@ struct RenderedFilterTests {
     }
 
     @Test func landscapeSidebarKeepsFiltersWhileInspecting() async throws {
-        let pinDefaults = filterDefaults(pinned: true)
         let store = ActivityStore(activities: try GalleryLibrary.load().activities,
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
         store.distanceFilter = NumericFilter(value: 10000, upperLimit: 80000)
-        let root = AppShell(store: store).defaultAppStorage(pinDefaults).environment(\.horizontalSizeClass, .regular)
+        let sheets = BrowseSheetPresentation()
+        sheets.showsFilters = true
+        let root = AppShell(store: store, sheets: sheets).environment(\.horizontalSizeClass, .regular)
         let host = try FilterHarness(root: root, size: CGSize(width: 1180, height: 820))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(600))
@@ -255,6 +268,7 @@ struct RenderedFilterTests {
         #expect(store.distanceFilter == NumericFilter(value: 10000, upperLimit: 80000))
         #expect(store.selectedActivityIDs == selection)
         #expect(host.host.presentedViewController == nil, "A wide window fits filters, list and detail together")
+        #expect(sheets.showsFilters && host.showsFilterPanel)
         try host.save(host.snapshot(), name: "sidebar-landscape-detail")
     }
 
@@ -305,29 +319,6 @@ struct RenderedFilterTests {
     }
 }
 
-let filterPinKey = "browse.filterSidebarPinned"
-
-/// A private preference store, so suites running in parallel never see each
-/// other's saved pin. Pass it to the shell with `.defaultAppStorage(_:)`.
-func filterDefaults(pinned: Bool? = nil) -> UserDefaults {
-    let name = "filter-tests-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: name)!
-    defaults.removePersistentDomain(forName: name)
-    if let pinned { defaults.set(pinned, forKey: filterPinKey) }
-    return defaults
-}
-
-/// Sets the app-wide saved pin (nil removes it) for the serial gallery run,
-/// and returns a restore action.
-func setFilterPin(_ value: Bool?) -> () -> Void {
-    let defaults = UserDefaults.standard, saved = defaults.object(forKey: filterPinKey)
-    if let value { defaults.set(value, forKey: filterPinKey) } else { defaults.removeObject(forKey: filterPinKey) }
-    return {
-        if let saved { defaults.set(saved, forKey: filterPinKey) }
-        else { defaults.removeObject(forKey: filterPinKey) }
-    }
-}
-
 @MainActor
 private func filterWait(_ condition: () -> Bool) async throws {
     let deadline = Date().addingTimeInterval(6)
@@ -368,9 +359,14 @@ private final class FilterHarness<Content: View> {
         }
         return visit(host.view)
     }
-    /// The pinned column or the overlay; both are the 320pt filter panel.
-    var showsFilterSidebar: Bool {
-        descendants(of: UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 && $0.window != nil }
+    /// The full filter panel, as a column or floating over List and its detail.
+    var showsFilterPanel: Bool {
+        descendants(of: UIScrollView.self).contains {
+            abs($0.bounds.width - BrowsePaneLayout.filterWidth) < 2 && $0.window != nil
+        }
+    }
+    var showsFilterRail: Bool {
+        descendants(of: UIScrollView.self).contains { abs($0.bounds.width - FilterRail.width) < 1 && $0.window != nil }
     }
     func resize(_ size: CGSize) {
         window.frame.size = size

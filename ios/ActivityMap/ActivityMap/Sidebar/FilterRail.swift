@@ -9,7 +9,7 @@ struct FilterRail: View {
     var scope: FilterScope
     @State private var open: FilterPart?
 
-    static let width: CGFloat = 60
+    static let width: CGFloat = 52
 
     private var activeCount: Int { scope == .stats ? store.activeStatsFilterCount : store.activeFilterCount }
 

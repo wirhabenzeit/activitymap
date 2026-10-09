@@ -11,9 +11,6 @@ import UIKit
 struct ScreenshotGalleryTests {
     @Test(arguments: GalleryScene.allCases)
     func capture(scene: GalleryScene) async throws {
-        // Capture the default: iPad filters closed, opened only by the Filters scene.
-        let restorePin = setFilterPin(nil)
-        defer { restorePin() }
         let manifest = try GalleryManifest.load()
         guard GalleryEnvironment.includes(scene.rawValue, key: "SCENES") else { return }
         let scenario = try #require(manifest.scenarios.first { $0.id == scene.rawValue })

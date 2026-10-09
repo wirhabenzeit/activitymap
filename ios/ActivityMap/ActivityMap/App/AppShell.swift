@@ -71,10 +71,15 @@ struct AppShell: View {
                 shellContent
             }
         }
-        .onGeometryChange(for: CGSize.self) { $0.size } action: { shellSize = $0 }
-        // A resize that changes how filters are hosted closes the old host
-        // rather than reopening them somewhere else.
-        .onChange(of: filterSidebarAvailable) { _, _ in sheets.showsFilters = false }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { old, new in
+            shellSize = new
+            // A resize that switches between sheet and sidebar closes the old
+            // host rather than reopening filters in the other one. The first
+            // layout (from zero) keeps filters as requested.
+            if old.width > 0, filterSidebarAvailable(width: old.width) != filterSidebarAvailable(width: new.width) {
+                sheets.showsFilters = false
+            }
+        }
         .overlay {
             if let connectPrompt { StravaConnectOverlay(prompt: connectPrompt).transition(.opacity) }
         }

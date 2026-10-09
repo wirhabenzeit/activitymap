@@ -45,7 +45,9 @@ struct ListScreen: View {
             }
             .onChange(of: sideBySide) { _, wide in
                 if wide { awaitingWidth = false }
-                else if store.inspectedActivityID != nil { hasPushedDetail = true }
+                // A hidden List can narrow while Map or Stats has the filter
+                // panel beside it; that must not turn its detail into a page.
+                else if store.inspectedActivityID != nil, store.selectedTab == .list { hasPushedDetail = true }
             }
         }
     }
