@@ -471,13 +471,13 @@ export type Records = {
   biggestWeek?: { value: number; weekStart: Day };
 };
 
-// The single activities with the most distance, time and elevation over
-// `currentYear` or `allTime`. Ties go to the earlier one.
-export function records(
+// Top three positive records in the requested period; ties retain the earlier
+// activity (then stable identity), matching the compact dashboard winner.
+export function recordRankings(
   activities: readonly StatsActivity[],
   today: Day,
   range: 'currentYear' | 'allTime',
-): Records {
+) {
   const first =
     range === 'allTime'
       ? -Infinity
@@ -492,27 +492,58 @@ export function records(
       return day >= first && day <= today;
     })
     .sort(compareStatsActivities);
-  const best: Records = {};
+  const ranked: Record<'distance' | 'time' | 'elevation', ActivityRecord[]> & {
+    biggestWeek: { value: number; weekStart: Day }[];
+  } = { distance: [], time: [], elevation: [], biggestWeek: [] };
   const weeks = new Map<Day, number>();
   for (const activity of inRange) {
     const day = dayOf(activity.start_date_local);
     for (const metric of ['distance', 'time', 'elevation'] as const) {
       const value = metricValue(activity, metric);
-      if (value > (best[metric]?.value ?? 0))
-        best[metric] = {
+      if (
+        value > 0 &&
+        (ranked[metric].length < 3 || value > ranked[metric][2]!.value)
+      ) {
+        ranked[metric].push({
           value,
           day,
           sport: activity.sport,
           activityId: activity.id,
           name: activity.name,
-        };
+        });
+        // Input is chronological (then stable identity); stable sort keeps
+        // that tie rule while retaining only the three largest observations.
+        ranked[metric].sort((a, b) => b.value - a.value);
+        ranked[metric] = ranked[metric].slice(0, 3);
+      }
     }
     const week = mondayOf(day);
     weeks.set(week, (weeks.get(week) ?? 0) + metricValue(activity, 'distance'));
   }
-  for (const [weekStart, value] of [...weeks].sort(([a], [b]) => a - b))
-    if (value > (best.biggestWeek?.value ?? 0))
-      best.biggestWeek = { value, weekStart };
+  ranked.biggestWeek = [...weeks]
+    .map(([weekStart, value]) => ({ value, weekStart }))
+    .filter(({ value }) => value > 0)
+    .sort((a, b) => b.value - a.value || a.weekStart - b.weekStart)
+    .slice(0, 3);
+  return ranked;
+}
+
+export function records(
+  activities: readonly StatsActivity[],
+  today: Day,
+  range: 'currentYear' | 'allTime',
+): Records {
+  const ranked = recordRankings(activities, today, range);
+  const best: Records = {};
+  for (const metric of [
+    'distance',
+    'time',
+    'elevation',
+    'biggestWeek',
+  ] as const) {
+    const [winner] = ranked[metric];
+    if (winner) Object.assign(best, { [metric]: winner });
+  }
   return best;
 }
 

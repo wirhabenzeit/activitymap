@@ -4,22 +4,27 @@ import { type ReactNode } from 'react';
 
 import { categorySettings } from '~/settings/category';
 import { type Sport } from '~/lib/stats/tile-data';
+import { cn } from '~/lib/utils';
 
 // One row style for every activity a Stats tile lists: sport mark, name,
 // a muted summary line and an optional detail line, linked when it can be
 // opened.
 export function ActivityRow({
+  activityId,
   sport,
   name,
   summary,
   detail,
   onOpen,
+  selected = false,
 }: {
+  activityId?: number;
   sport: Sport;
   name: string | null | undefined;
   summary: ReactNode;
   detail?: ReactNode;
   onOpen?: () => void;
+  selected?: boolean;
 }) {
   const content = (
     <span className="flex min-w-0 items-start gap-2">
@@ -45,8 +50,15 @@ export function ActivityRow({
   );
   return onOpen ? (
     <button
+      data-stats-activity-id={activityId}
       type="button"
-      className="min-h-11 w-full py-3 text-left text-sm hover:bg-muted/40 focus-visible:outline-2"
+      aria-current={selected ? 'true' : undefined}
+      className={cn(
+        'min-h-11 w-full rounded px-1 py-3 text-left text-sm focus-visible:outline-2',
+        selected
+          ? 'bg-header-background/10 ring-1 ring-inset ring-header-background/40 hover:bg-header-background/15'
+          : 'hover:bg-muted/40',
+      )}
       onClick={onOpen}
     >
       {content}

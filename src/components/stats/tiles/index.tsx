@@ -7,12 +7,8 @@
 // layout's columns, so tiles widen on big screens. Only primary tiles get
 // the large headline numerals.
 //
-// Eligible tiles expand via their corner button: the card takes the full width of its
-// section in a row sized to its content, pushing the other cards down, and
-// Motion animates the reflow. Expanded, a tile is the same tile drawn
-// larger (the same headline and visual, with axes on charts), plus any
-// extra context the tile has. Escape or the collapse button returns it;
-// interacting outside the card leaves it open, including touch scrolling.
+// Expandable tiles open a URL-backed focus surface. The dashboard keeps its
+// layout, scroll position and mounted controls underneath that surface.
 
 import {
   useDisplayUnits,
@@ -21,7 +17,6 @@ import {
 import { statsFormat } from './format';
 import {
   Activity,
-  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -29,10 +24,9 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
-import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
-import { LayoutGroup, motion, useReducedMotion } from 'motion/react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { ArrowLeft, Maximize2 } from 'lucide-react';
+import { useStatsFocus } from '~/hooks/use-stats-focus';
 
 import { FilterScope, useStatsActivities } from './scope';
 import {
@@ -43,7 +37,7 @@ import {
   type StatsTileID,
 } from '~/settings/stats-tiles.generated';
 import { type StatsActivity } from '~/lib/stats/tile-data';
-import { placeExpandedBento, bentoRowMinimums } from '~/lib/stats/bento';
+import { placeBento, bentoRowMinimums } from '~/lib/stats/bento';
 import { isStatsHistoryLoading } from '~/lib/stats/loading';
 import { localToday } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
@@ -59,9 +53,7 @@ import {
   type TileView,
 } from './tiles';
 
-const ActivityDetails = dynamic(() => import('./activity-details'), {
-  ssr: false,
-});
+import { StatsActivityInspector } from './activity-inspector';
 
 type ShownTile = { tile: StatsTile; view: TileView };
 
@@ -72,16 +64,8 @@ const shownTiles: ShownTile[] = statsTiles.flatMap((tile) => {
 
 const toggleOf = (tile: StatsTile) => ('toggle' in tile ? tile.toggle : null);
 
-const layoutTransition = {
-  layout: { duration: 0.3, ease: [0.2, 0, 0, 1] as const },
-};
-
 export default function StatsTiles() {
   const { query, activities, scope, reset } = useStatsActivities();
-  const [detailId, setDetailId] = useState<number | null>(null);
-  const detailActivity = query.data?.find(
-    (activity) => activity.id === detailId,
-  );
   const empty = activities.length === 0;
   const loading = isStatsHistoryLoading(query, empty);
   return (
@@ -122,36 +106,23 @@ export default function StatsTiles() {
             </p>
           )}
           <div className="min-h-0 flex-1">
-            <StatsTileGrid
-              activities={activities}
-              filtered={scope.filtered}
-              singleSport={scope.singleSport}
-              onOpenActivity={setDetailId}
-              detailsOpen={Boolean(detailActivity)}
-            />
+            <StatsActivityInspector activities={query.data ?? []}>
+              {(open, detailsOpen, inspection) => (
+                <StatsTileGrid
+                  activities={activities}
+                  filtered={scope.filtered}
+                  singleSport={scope.singleSport}
+                  onOpenActivity={open}
+                  detailsOpen={detailsOpen}
+                  {...inspection}
+                />
+              )}
+            </StatsActivityInspector>
           </div>
         </>
       )}
-      {detailActivity && (
-        <ActivityDetails
-          activity={detailActivity}
-          onClose={() => setDetailId(null)}
-        />
-      )}
     </div>
   );
-}
-
-// offsetTop ignores Motion's temporary transforms, so this measures the final
-// layout even while desktop cards animate between their grid positions.
-function layoutTop(element: HTMLElement, container: HTMLElement) {
-  let top = 0;
-  let current: HTMLElement | null = element;
-  while (current && current !== container) {
-    top += current.offsetTop;
-    current = current.offsetParent as HTMLElement | null;
-  }
-  return top;
 }
 
 export function StatsTileGrid({
@@ -160,6 +131,8 @@ export function StatsTileGrid({
   singleSport = false,
   onOpenActivity,
   detailsOpen = false,
+  availableWidth,
+  selectedActivityId,
   reportingDay,
 }: {
   activities: StatsActivity[];
@@ -167,6 +140,8 @@ export function StatsTileGrid({
   singleSport?: boolean;
   onOpenActivity?: (id: number) => void;
   detailsOpen?: boolean;
+  availableWidth?: number;
+  selectedActivityId?: number | null;
   // Fixed reporting date for the development gallery; normal dashboards roll over daily.
   reportingDay?: number;
 }) {
@@ -192,6 +167,8 @@ export function StatsTileGrid({
       filtered,
       singleSport,
       onOpenActivity,
+      availableWidth,
+      selectedActivityId,
       palette: tilePalette(resolvedTheme === 'dark'),
     }),
     [
@@ -204,52 +181,47 @@ export function StatsTileGrid({
       filtered,
       singleSport,
       onOpenActivity,
+      availableWidth,
+      selectedActivityId,
     ],
   );
 
-  const [expandedID, setExpandedID] = useState<StatsTileID | null>(null);
+  const { activeID, open, close } = useStatsFocus();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollAnchor = useRef<{ id: StatsTileID; top: number } | null>(null);
-  const changeExpansion = useCallback(
-    (id: StatsTileID | null) => {
-      const container = scrollRef.current;
-      const anchorID = id ?? expandedID;
-      const card = container?.querySelector<HTMLElement>(
-        `[data-tile-id="${anchorID}"]`,
-      );
-      if (container && card && anchorID) {
-        scrollAnchor.current = {
-          id: anchorID,
-          top: layoutTop(card, container) - container.scrollTop,
-        };
-      }
-      setExpandedID(id);
-    },
-    [expandedID],
+  const previousID = useRef<StatsTileID | null>(null);
+  const [options, setOptions] = useState<Partial<Record<StatsTileID, string>>>(
+    {},
   );
+  const [calendarYear, setCalendarYear] = useState<number | null>(null);
+  const [calendarDay, setCalendarDay] = useState<number | null>(null);
+  const calendar = {
+    year: calendarYear,
+    setYear: setCalendarYear,
+    selectedDay: calendarDay,
+    setSelectedDay: setCalendarDay,
+  };
+  const optionFor = (tile: StatsTile) =>
+    options[tile.id] ?? toggleOf(tile)?.options[0];
+  const changeOption = (id: StatsTileID, option: string) =>
+    setOptions((previous) => ({ ...previous, [id]: option }));
 
   useLayoutEffect(() => {
-    const container = scrollRef.current;
-    const anchor = scrollAnchor.current;
-    scrollAnchor.current = null;
-    if (!container || !anchor) return;
-    const card = container.querySelector<HTMLElement>(
-      `[data-tile-id="${anchor.id}"]`,
-    );
-    if (card) {
-      // Keep the selected header under the user's finger when a previously
-      // expanded card above it shrinks. Adjust only this scroller, before paint.
-      container.scrollTop = layoutTop(card, container) - anchor.top;
+    const previous = previousID.current;
+    previousID.current = activeID;
+    if (!activeID && previous) {
+      const card = scrollRef.current?.querySelector<HTMLElement>(
+        `[data-tile-id="${previous}"]`,
+      );
+      (
+        card?.querySelector<HTMLButtonElement>('button[aria-expanded]') ?? card
+      )?.focus({ preventScroll: true });
     }
-  }, [expandedID]);
+  }, [activeID]);
 
-  // Inline details stay open while scrolling or interacting elsewhere. Only
-  // the collapse control, Escape, or opening another tile changes expansion.
   useEffect(() => {
-    if (!expandedID || detailsOpen) return;
+    if (!activeID || detailsOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      // A dialog may unmount before this event reaches window. Its original
-      // propagation path still identifies Escape as belonging to that dialog.
+      // A nested dialog can unmount before this event reaches window.
       const fromDialog = event
         .composedPath()
         .some(
@@ -257,52 +229,87 @@ export function StatsTileGrid({
             node instanceof Element && node.getAttribute('role') === 'dialog',
         );
       if (event.key === 'Escape' && !event.defaultPrevented && !fromDialog) {
-        document
-          .querySelector<HTMLButtonElement>(
-            `[data-tile-id="${expandedID}"] button[aria-expanded]`,
-          )
-          ?.focus({ preventScroll: true });
-        changeExpansion(null);
+        event.preventDefault();
+        close();
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [expandedID, detailsOpen, changeExpansion]);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeID, detailsOpen, close]);
 
   return (
-    <motion.div
-      ref={scrollRef}
-      layoutScroll
-      className="relative h-full w-full overflow-y-auto overscroll-y-contain [overflow-anchor:none]"
-    >
-      <Measure className="h-full w-full">
-        {({ width }) => {
-          const padding = width < 520 ? 12 : 16;
-          return (
-            <LayoutGroup>
-              <div className="flex flex-col gap-5" style={{ padding }}>
-                {statsTileGroups.map((group) => (
-                  <BentoGroup
-                    key={group.id}
-                    title={group.title}
-                    tiles={shownTiles.filter(
-                      ({ tile }) => tile.group === group.id,
-                    )}
-                    width={width - 2 * padding}
-                    context={context}
-                    expandedID={expandedID}
-                    onExpand={changeExpansion}
-                    onCollapse={() => changeExpansion(null)}
+    <Measure retainSize className="relative h-full min-h-0 w-full">
+      {({ width: focusWidth, height: focusHeight }) => (
+        <>
+          <div
+            ref={scrollRef}
+            data-stats-dashboard
+            inert={Boolean(activeID)}
+            aria-hidden={Boolean(activeID)}
+            className={cn(
+              'h-full w-full overflow-y-auto overscroll-y-contain [overflow-anchor:none]',
+              activeID && 'invisible',
+            )}
+          >
+            <Measure retainSize className="h-full w-full">
+              {({ width }) => {
+                const padding = width < 520 ? 12 : 16;
+                return (
+                  <div className="flex flex-col gap-5" style={{ padding }}>
+                    {statsTileGroups.map((group) => (
+                      <BentoGroup
+                        key={group.id}
+                        title={group.title}
+                        tiles={shownTiles.filter(
+                          ({ tile }) => tile.group === group.id,
+                        )}
+                        width={width - 2 * padding}
+                        context={{ ...context, calendar }}
+                        activeID={activeID}
+                        optionFor={optionFor}
+                        onOption={changeOption}
+                        onExpand={open}
+                      />
+                    ))}
+                  </div>
+                );
+              }}
+            </Measure>
+          </div>
+          {shownTiles
+            .filter(({ view }) => view.expandable)
+            .map(({ tile, view }) => (
+              <Activity
+                key={tile.id}
+                mode={activeID === tile.id ? 'visible' : 'hidden'}
+              >
+                <div className="absolute inset-0 bg-background">
+                  <TileFocusView
+                    tile={tile}
+                    view={view}
+                    context={{
+                      ...context,
+                      calendar,
+                      focusWidth,
+                      focusChartHeight: Math.max(
+                        150,
+                        Math.min(
+                          focusWidth >= 760 ? 400 : 300,
+                          focusHeight * 0.48,
+                          focusHeight - 220,
+                        ),
+                      ),
+                    }}
+                    option={optionFor(tile)}
+                    onOption={(option) => changeOption(tile.id, option)}
+                    onBack={close}
                   />
-                ))}
-              </div>
-            </LayoutGroup>
-          );
-        }}
-      </Measure>
-    </motion.div>
+                </div>
+              </Activity>
+            ))}
+        </>
+      )}
+    </Measure>
   );
 }
 
@@ -313,17 +320,19 @@ function BentoGroup({
   tiles,
   width,
   context,
-  expandedID,
+  activeID,
+  optionFor,
+  onOption,
   onExpand,
-  onCollapse,
 }: {
   title: string;
   tiles: ShownTile[];
   width: number;
   context: TileContext;
-  expandedID: StatsTileID | null;
+  activeID: StatsTileID | null;
+  optionFor: (tile: StatsTile) => string | undefined;
+  onOption: (id: StatsTileID, option: string) => void;
   onExpand: (id: StatsTileID) => void;
-  onCollapse: () => void;
 }) {
   const grid =
     width >= regular.minWidth
@@ -331,15 +340,9 @@ function BentoGroup({
       : width >= compact.minWidth
         ? compact
         : narrow;
-  const reduceMotion = useReducedMotion();
-  // A single-column list should stay anchored under the finger while changing
-  // height; there is no sideways reflow to animate on narrow screens.
-  const animateLayout = !reduceMotion && grid.columns > 1;
-  const expandedIndex = tiles.findIndex(({ tile }) => tile.id === expandedID);
-  const placements = placeExpandedBento(
+  const placements = placeBento(
     tiles.map(({ tile }) => tile.span),
     grid.columns,
-    expandedIndex,
   );
   const rowMinimums = bentoRowMinimums(
     tiles.map(({ tile }) => ({
@@ -349,17 +352,9 @@ function BentoGroup({
     grid.rowHeight,
     gap,
   );
-  // Twelve CSS subcolumns represent halves, thirds and quarters exactly on
-  // the regular grid. Logical placement still uses the manifest's 4 columns.
-  const subcolumns = grid.columns === 4 ? 3 : 1;
-  const expandedRow = expandedIndex < 0 ? null : placements[expandedIndex]!.row;
   if (tiles.length === 0) return null;
-
   return (
-    <motion.section
-      aria-label={title}
-      layout={animateLayout ? 'position' : false}
-    >
+    <section aria-label={title}>
       <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {title}
       </h2>
@@ -367,12 +362,9 @@ function BentoGroup({
         className="grid"
         style={{
           gap,
-          gridTemplateColumns: `repeat(${grid.columns * subcolumns}, minmax(0, 1fr))`,
-          // Keep equal row heights, but allow content/large text to grow.
+          gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
           gridTemplateRows: rowMinimums
-            .map((minimum, index) =>
-              index + 1 === expandedRow ? 'auto' : `minmax(${minimum}px, auto)`,
-            )
+            .map((minimum) => `minmax(${minimum}px, auto)`)
             .join(' '),
         }}
       >
@@ -383,21 +375,24 @@ function BentoGroup({
               key={tile.id}
               tile={tile}
               view={view}
-              context={context}
-              animateLayout={animateLayout}
+              context={{
+                ...context,
+                inlineDetails: tile.id === 'sportMix' && width >= 760,
+              }}
               large={'primary' in tile && tile.primary}
-              expanded={tile.id === expandedID}
+              focused={tile.id === activeID}
+              option={optionFor(tile)}
+              onOption={(option) => onOption(tile.id, option)}
               onExpand={() => onExpand(tile.id)}
-              onCollapse={onCollapse}
               style={{
-                gridColumn: `${Math.round((placement.column - 1) * subcolumns) + 1} / span ${Math.round(placement.columns * subcolumns)}`,
+                gridColumn: `${placement.column} / span ${placement.columns}`,
                 gridRow: `${placement.row} / span ${placement.rows}`,
               }}
             />
           );
         })}
       </div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -436,120 +431,167 @@ function TileCard({
   view,
   context,
   large,
-  animateLayout,
-  expanded,
+  focused,
+  option,
+  onOption,
   onExpand,
-  onCollapse,
   style,
 }: {
   tile: StatsTile;
   view: TileView;
   context: TileContext;
   large: boolean;
-  animateLayout: boolean;
-  expanded: boolean;
+  focused: boolean;
+  option: string | undefined;
+  onOption: (option: string) => void;
   onExpand: () => void;
-  onCollapse: () => void;
   style: CSSProperties;
 }) {
   const toggle = toggleOf(tile);
-  // One switch state for both sizes, so expanding keeps the chosen metric.
-  const [option, setOption] = useState<string | undefined>(
-    toggleOf(tile)?.options[0],
-  );
   const summary = view.summary(context, option);
-  const hasDetail = expanded && Boolean(view.detail);
-
-  // Keep the user's scroll position. scrollIntoView after an animation races
-  // with touch scrolling and can also scroll the app's overflow-hidden shell.
-
   return (
-    <motion.section
-      layout={animateLayout}
-      transition={layoutTransition}
+    <section
       aria-label={tile.title}
       data-tile-id={tile.id}
-      className={cn(
-        'group @container relative min-w-0 overflow-hidden rounded-lg border bg-card text-left text-card-foreground',
-        expanded ? 'shadow-md' : 'shadow-xs',
-      )}
+      tabIndex={-1}
+      className="group @container relative min-w-0 overflow-hidden rounded-lg border bg-card text-left text-card-foreground shadow-xs"
       style={style}
     >
-      <motion.div
-        layout={animateLayout ? 'position' : false}
-        className={cn(
-          'flex min-w-0 flex-col p-3.5',
-          // Collapsed, the face fills the tile; expanded, the card sizes
-          // itself to the content.
-          !expanded && 'h-full',
-        )}
-      >
+      <div className="flex h-full min-w-0 flex-col p-3.5">
         <div className="flex min-h-11 items-center justify-between gap-2">
           <h3 className="text-[13px] font-medium">{tile.title}</h3>
-          {view.expandable && (
+          {view.expandable && !context.inlineDetails && (
             <button
               type="button"
-              aria-expanded={expanded}
-              aria-label={`${expanded ? 'Collapse' : 'Expand'} ${tile.title}`}
-              title={`${expanded ? 'Collapse' : 'Expand'} ${tile.title}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                if (expanded) onCollapse();
-                else onExpand();
-              }}
+              aria-expanded={focused}
+              aria-label={`Expand ${tile.title}`}
+              title={`Expand ${tile.title}`}
+              onClick={onExpand}
               className="-mr-2 flex size-11 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {expanded ? (
-                <Minimize2 aria-hidden="true" className="size-3.5" />
-              ) : (
-                <Maximize2 aria-hidden="true" className="size-3.5" />
-              )}
+              <Maximize2 aria-hidden="true" className="size-3.5" />
             </button>
           )}
         </div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <span className="text-[11px] text-muted-foreground">
-            {expanded && view.expandedPeriod
-              ? view.expandedPeriod
-              : view.period(context, option)}
+            {view.period(context, option)}
           </span>
           {toggle && (
             <FaceSwitch
               label={`${tile.title}: ${toggle.label}`}
               options={toggle.options}
               value={option}
-              onChange={setOption}
+              onChange={onOption}
             />
           )}
         </div>
-        {!hasDetail && summary && (
+        {summary && (
           <Headline summary={summary} size={large ? 'large' : 'tile'} />
         )}
-        <Activity mode={hasDetail ? 'hidden' : 'visible'}>
-          {view.face({ ...context, onExpand }, option, expanded)}
-        </Activity>
-        {/* Preserve history controls while hidden; Activity suspends their effects. */}
-        {view.detail && (
-          <Activity mode={hasDetail ? 'visible' : 'hidden'}>
-            {view.detail(context, option)}
-          </Activity>
-        )}
-        {expanded && !hasDetail && view.more && (
-          <motion.div
-            initial={animateLayout ? { opacity: 0 } : false}
-            animate={{
-              opacity: 1,
-              transition: {
-                delay: animateLayout ? 0.2 : 0,
-                duration: animateLayout ? 0.2 : 0,
-              },
-            }}
+        {view.face({ ...context, onExpand }, option, false)}
+        {context.inlineDetails && view.more?.(context, option)}
+      </div>
+    </section>
+  );
+}
+
+export function TileFocusView({
+  tile,
+  view,
+  context,
+  option,
+  onOption,
+  onBack,
+}: {
+  tile: StatsTile;
+  view: TileView;
+  context: TileContext;
+  option: string | undefined;
+  onOption: (option: string) => void;
+  onBack: () => void;
+}) {
+  const backRef = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    backRef.current?.focus({ preventScroll: true });
+  }, []);
+  const toggle = toggleOf(tile);
+  const summary = view.summary(context, option);
+  const sideBySide =
+    (context.focusWidth ?? 0) >= 1000 &&
+    Boolean(view.insight ?? view.more) &&
+    tile.id !== 'sportMix';
+  return (
+    <section
+      data-stats-focus={tile.id}
+      aria-label={`${tile.title} focus view`}
+      className="@container flex h-full min-h-0 flex-col bg-card text-card-foreground"
+    >
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            ref={backRef}
+            type="button"
+            onClick={onBack}
+            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Back to stats dashboard"
           >
-            {view.more(context, option)}
-          </motion.div>
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Back
+          </button>
+          <h1 className="text-base font-medium">{tile.title}</h1>
+        </div>
+        {toggle && (
+          <FaceSwitch
+            label={`${tile.title}: ${toggle.label}`}
+            options={toggle.options}
+            value={option}
+            onChange={onOption}
+          />
         )}
-      </motion.div>
-    </motion.section>
+      </header>
+      <div
+        data-stats-focus-scroll
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4"
+      >
+        <div
+          className={cn(
+            'mx-auto w-full',
+            tile.id === 'sportMix'
+              ? 'max-w-3xl'
+              : tile.id === 'distanceVsElevation'
+                ? 'max-w-6xl'
+                : 'max-w-7xl',
+          )}
+        >
+          <p className="mb-2 text-xs text-muted-foreground">
+            {view.expandedPeriod ?? view.period(context, option)}
+          </p>
+          {view.detail ? (
+            view.detail(context, option)
+          ) : (
+            <div
+              className={cn(
+                'grid gap-6',
+                sideBySide &&
+                  'grid-cols-[minmax(0,3fr)_minmax(300px,2fr)] items-start',
+              )}
+            >
+              <div className="min-w-0">
+                {summary && <Headline summary={summary} size="large" />}
+                {view.face(context, option, true)}
+              </div>
+              {(view.insight ?? view.more) && (
+                <div className="min-w-0">
+                  {(view.insight ?? view.more)?.(context, option)}
+                </div>
+              )}
+            </div>
+          )}
+          {!view.detail && view.insight && view.more?.(context, option)}
+        </div>
+      </div>
+    </section>
   );
 }
 
