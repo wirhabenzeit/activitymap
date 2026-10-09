@@ -172,6 +172,7 @@ struct StatsScreen: View {
 /// The phone shell retains the bar on root and detail, keeping its inset fixed.
 private struct StatsDetailDestination<Content: View>: View {
     let title: String
+    var shellHosted = false
     @ViewBuilder let content: () -> Content
     @Environment(\.dismiss) private var dismiss
 
@@ -186,24 +187,26 @@ private struct StatsDetailDestination<Content: View>: View {
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 44, height: 44)
+            if !shellHosted {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .medium))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .accessibilityLabel("Back to Stats")
+                    .accessibilityIdentifier("stats-detail-back")
+                }.sharedBackgroundVisibility(.hidden)
+                ToolbarItem(placement: .principal) {
+                    Text(title).font(.headline).foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("stats-detail-title")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .accessibilityLabel("Back to Stats")
-                .accessibilityIdentifier("stats-detail-back")
-            }.sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .principal) {
-                Text(title).font(.headline).foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("stats-detail-title")
             }
         }
         .background(DetailBackGesture())
@@ -218,9 +221,10 @@ struct StatsDetailScreen: View {
     let dashboard: StatsDashboardState
     let tile: StatsTileDefinition
     var sync: SyncController? = nil
+    var shellHosted = false
 
     var body: some View {
-        StatsDetailDestination(title: tile.title) {
+        StatsDetailDestination(title: tile.title, shellHosted: shellHosted) {
             StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync)
         }
     }

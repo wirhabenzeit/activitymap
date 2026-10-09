@@ -151,7 +151,29 @@ struct AppShell: View {
     }
 
     @ViewBuilder private func phoneStatsDetail(_ tile: StatsTileDefinition, dashboard: StatsDashboardState) -> some View {
-        let content = StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync)
+        let content = filterWorkspace(sidebarAvailable: filterSidebarAvailable) {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Button { dashboard.expandedTile = nil } label: {
+                        Image(systemName: "chevron.left").frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back to Stats")
+                    .accessibilityIdentifier("stats-detail-back")
+                    Text(tile.title).font(.title2.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("stats-detail-title")
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .background(AppTheme.contentBackground)
+                StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync,
+                                  shellHosted: true)
+            }
+        }
+            // The same native bar as the dashboard remains available on focus.
+            .toolbar { phoneRootToolbar }
             .tint(AppTheme.accent)
         // Every width zooms the tile into its focus page; Reduce Motion cross-fades.
         if reduceMotion { content.navigationTransition(.crossFade) }
@@ -162,19 +184,9 @@ struct AppShell: View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
                 let sidebarAvailable = filterSidebarAvailable(width: geometry.size.width)
-                let expanded = sidebarAvailable && sheets.showsFilters
                 VStack(spacing: 0) {
                     if !usesPhoneNavigation { shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1) }
-                    HStack(spacing: 0) {
-                        // Dividers run under the home indicator like the List's
-                        // status bar, so the columns end flush at the bottom.
-                        if expanded && !panelFloats {
-                            filterPanel(floating: false)
-                            Divider().ignoresSafeArea(edges: .bottom)
-                        } else if sidebarAvailable {
-                            FilterRail(store: store, scope: filterScope)
-                            Divider().ignoresSafeArea(edges: .bottom)
-                        }
+                    filterWorkspace(sidebarAvailable: sidebarAvailable) {
                         content
                             .environment(\.filtersCollapseForDetail, filtersCollapseForDetail)
                             // Filters and Settings stack over the map's results sheet
@@ -186,26 +198,6 @@ struct AppShell: View {
                                                  set: { if $0 == nil { clearShellRequest() } }),
                                 content: { AnyView(shellSheet($0)) }))
                     }
-                    // While List shows its detail, the panel floats over both
-                    // columns without resizing them. Only explicit filter actions
-                    // animate: the first layout and rotations must not grow the
-                    // content from zero.
-                    .overlay(alignment: .leading) {
-                        if expanded && panelFloats {
-                            ZStack(alignment: .leading) {
-                                Color.black.opacity(0.12)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { setFiltersExpanded(false) }
-                                    .accessibilityHidden(true)
-                                    .transition(.opacity)
-                                filterPanel(floating: true)
-                                    .overlay(alignment: .trailing) { Divider() }
-                                    .shadow(color: .black.opacity(0.15), radius: 8, x: 3)
-                                    .transition(.move(edge: .leading))
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 // While the map's results sheet is up, it presents these itself.
                 .sheet(item: Binding(
@@ -220,6 +212,39 @@ struct AppShell: View {
                 }
             }
         }
+    }
+
+    /// Dashboard and focused charts share the filter workspace. Pushing a
+    /// focus page retains the filter state and the native shell controls.
+    private func filterWorkspace<Content: View>(sidebarAvailable: Bool,
+                                                @ViewBuilder content: () -> Content) -> some View {
+        let expanded = sidebarAvailable && sheets.showsFilters
+        return HStack(spacing: 0) {
+            if expanded && !panelFloats {
+                filterPanel(floating: false)
+                Divider().ignoresSafeArea(edges: .bottom)
+            } else if sidebarAvailable {
+                FilterRail(store: store, scope: filterScope)
+                Divider().ignoresSafeArea(edges: .bottom)
+            }
+            content()
+        }
+        .overlay(alignment: .leading) {
+            if expanded && panelFloats {
+                ZStack(alignment: .leading) {
+                    Color.black.opacity(0.12)
+                        .contentShape(Rectangle())
+                        .onTapGesture { setFiltersExpanded(false) }
+                        .accessibilityHidden(true)
+                        .transition(.opacity)
+                    filterPanel(floating: true)
+                        .overlay(alignment: .trailing) { Divider() }
+                        .shadow(color: .black.opacity(0.15), radius: 8, x: 3)
+                        .transition(.move(edge: .leading))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func shellRequest(sidebarAvailable: Bool) -> ShellSheet? {

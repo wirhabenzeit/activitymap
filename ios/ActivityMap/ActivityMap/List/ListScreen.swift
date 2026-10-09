@@ -55,13 +55,13 @@ struct ListScreen: View {
     private func activityList(width: CGFloat, inspectedID: Int?) -> some View {
         List {
             ForEach(store.listedActivities) { activity in
-                ActivityRowView(store: store, activity: activity, availableWidth: width)
+                ActivityRowView(store: store, activity: activity, availableWidth: width,
+                                isInspected: activity.id == inspectedID)
                     .listRowInsets(EdgeInsets(top: verticalSizeClass == .compact ? 2 : 4, leading: 8,
                                               bottom: verticalSizeClass == .compact ? 2 : 4, trailing: 8))
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 44 }
-                    .listRowBackground(activity.id == inspectedID ? AppTheme.inspectionBackground
-                        : store.selectedActivityIDs.contains(activity.id) ? AppTheme.selectionBackground
-                        : Color(uiColor: .systemBackground))
+                    .listRowBackground(ActivityRowBackground(selected: store.selectedActivityIDs.contains(activity.id),
+                                                            inspected: activity.id == inspectedID))
             }
             if let emptyState {
                 BrowsingEmptyView(state: emptyState, recover: recover, scrolls: false)

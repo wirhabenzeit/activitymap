@@ -253,8 +253,8 @@ import Testing
             if phase == "push" {
                 #expect(!navigation.isNavigationBarHidden,
                         "Root and detail share a visible blue native bar with a stable inset")
-                #expect(host.accountButton(in: navigation.navigationBar) == nil,
-                        "Stat detail shows only Back and the stat title")
+                #expect(host.accountButton(in: navigation.navigationBar) != nil,
+                        "Stat focus retains the shell's Settings control")
             } else {
                 let settledAccount = try #require(host.accountButton(in: navigation.navigationBar))
                 let settledFrame = settledAccount.convert(settledAccount.bounds, to: host.host.view)
@@ -874,13 +874,13 @@ import Testing
         let inspection = try #require(state.inspection(.weeklyVolume))
         inspection.volumeRange = .months
 
-        // The chart gets the whole shell width, never less than its compact tile.
+        // The chart uses all content width beside the retained filters.
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         let page = try #require(navigation.topViewController)
         #expect(page.preferredTransition != nil, "Regular-width iPad zooms the tile into its focus page")
-        let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { !($0 is UICollectionView) })
-        #expect(abs(detail.bounds.width - size.width) < 2)
+        let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { abs($0.bounds.width - initialWidth) < 2 })
+        #expect(abs(detail.bounds.width - initialWidth) < 2)
         #expect(state.expandedTile == .weeklyVolume && inspection.volumeRange == .months)
         #expect(sheets.showsFilters == expanded)
         try host.capture("ipad-stats-focus-\(orientation)")
@@ -902,12 +902,61 @@ import Testing
             state.toggleExpansion(tile)
             try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
             let page = try #require(navigation.topViewController)
-            let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { !($0 is UICollectionView) })
-            #expect(abs(detail.bounds.width - size.width) < 2, "\(tile.rawValue)")
+            let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { abs($0.bounds.width - initialWidth) < 2 })
+            #expect(abs(detail.bounds.width - initialWidth) < 2, "\(tile.rawValue)")
             try host.capture("ipad-stats-focus-\(orientation)-\(tile.rawValue)")
             navigation.popViewController(animated: true)
             try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
         }
+    }
+
+    @Test(arguments: ["portrait", "landscape", "phone", "split-window", "large-text"])
+    func statsFocusKeepsFiltersAndDestinationsUsable(scenario: String) async throws {
+        let (store, _) = try StatsDashboardTests.fixture()
+        let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let size: CGSize = switch scenario {
+        case "landscape": CGSize(width: 1194, height: 834)
+        case "phone": CGSize(width: 402, height: 874)
+        case "split-window": CGSize(width: 600, height: 1000)
+        default: CGSize(width: 834, height: 1194)
+        }
+        let sidebar = ["portrait", "landscape"].contains(scenario)
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
+            .environment(\.horizontalSizeClass, scenario == "phone" ? .compact : .regular)
+            .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility3 : .large)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let dates = ActivityDayRange(start: "2026-01-01", end: "2026-12-31")
+        store.dateDayRange = dates
+        state.toggleExpansion(.weeklyVolume)
+        try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        let page = try #require(navigation.topViewController)
+        #expect(host.accountButton(in: navigation.navigationBar) != nil)
+        sheets.showsFilters = true
+        if sidebar {
+            try await statsWait { host.descendants(UITextField.self, in: page.view).count == 1 }
+            #expect(host.host.presentedViewController == nil)
+            #expect(host.descendants(UIScrollView.self, in: page.view).contains { abs($0.bounds.width - 320) < 2 })
+        } else {
+            try await statsWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
+        }
+        store.searchText = "No matching activity"
+        try await statsWait { store.statsActivities.isEmpty }
+        #expect(state.expandedTile == .weeklyVolume && store.dateDayRange == dates)
+        try host.capture("stats-focus-filters-\(scenario)", presented: !sidebar)
+        store.resetStatsActivityFilters()
+        sheets.showsFilters = false
+        if !sidebar { try await statsWait { host.host.presentedViewController == nil } }
+        try host.capture("stats-focus-shell-\(scenario)")
+        store.selectedTab = .list
+        try await statsWait { state.expandedTile == nil && navigation.viewControllers.count == 1 && navigation.transitionCoordinator == nil }
+        #expect(store.selectedTab == .list && store.dateDayRange == dates)
     }
 
     @Test func tabletFocusPageSurvivesWindowResize() async throws {

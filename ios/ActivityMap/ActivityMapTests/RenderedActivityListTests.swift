@@ -6,6 +6,36 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
+    @Test(arguments: ["light", "dark"])
+    func inspectionAndSelectionHaveIndependentRowFeedback(appearance: String) async throws {
+        let store = ActivityStore(activities: (1...4).map { ActivityStoreSelectionTests.activity($0, route: false) },
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        store.replaceSelection(with: [2, 3])
+        let host = try ListHarness(root: NavigationStack { ListScreen(store: store) }
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.colorScheme, appearance == "dark" ? .dark : .light),
+            size: CGSize(width: 834, height: 1194))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.count == 4 }
+        store.inspect(1)
+        try await Task.sleep(for: .milliseconds(250))
+        let values = host.accessibilityValues()
+        #expect(values.contains { $0.contains("Inspected. Not selected") })
+        #expect(values.contains { $0.contains("Not inspected. Selected") })
+        #expect(values.contains { $0.contains("Not inspected. Not selected") })
+        try host.save("row-feedback-\(appearance)-inspected")
+        store.inspect(3)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(host.accessibilityValues().contains { $0.contains("Inspected. Selected") })
+        #expect(store.selectedActivityIDs == [2, 3], "Inspection never changes selection")
+        try host.save("row-feedback-\(appearance)-both")
+        store.dismissInspection()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(!host.accessibilityValues().contains { $0.contains("Inspected.") })
+        #expect(store.selectedActivityIDs == [2, 3])
+    }
+
     @Test func filtersAndSettingsStackOverNativeMapSheet() async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
@@ -579,6 +609,22 @@ private final class ListHarness<Content: View> {
         return visit(host)
     }
     func close() { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
+    func accessibilityValues() -> [String] {
+        var visited: Set<ObjectIdentifier> = []
+        func visit(_ object: NSObject) -> [String] {
+            guard visited.insert(ObjectIdentifier(object)).inserted else { return [] }
+            var values = object.accessibilityValue.map { [$0] } ?? []
+            if let view = object as? UIView { values += view.subviews.flatMap(visit) }
+            let count = object.accessibilityElementCount()
+            if count > 0, count < 1000 {
+                for index in 0..<count {
+                    if let child = object.accessibilityElement(at: index) as? NSObject { values += visit(child) }
+                }
+            }
+            return values
+        }
+        return visit(host.view)
+    }
 }
 
 @MainActor @Observable
