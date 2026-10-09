@@ -6,7 +6,7 @@ import {
   fourWeekVolume,
   type StatsActivity,
 } from './tile-data';
-import { volumeHistory, calendarDays } from './history';
+import { volumeHistory, calendarDays, periodComparisons } from './history';
 import { calendarMonths } from './tile-series';
 
 const activity = (
@@ -24,6 +24,45 @@ const activity = (
   total_elevation_gain: 100,
 });
 const today = dayFromISODate('2026-09-27');
+
+void test('same-date comparisons clamp short months and omit future activities', () => {
+  const rows = periodComparisons(
+    [
+      activity('2024-02-29'),
+      activity('2024-03-01'),
+      activity('2024-03-31'),
+      activity('2024-04-01'),
+    ],
+    dayFromISODate('2024-03-31'),
+    'count',
+    'months',
+  );
+  assert.equal(isoDate(rows[1]!.cutoff), '2024-02-29');
+  assert.equal(rows[1]!.elapsed, 1);
+  assert.equal(rows[0]!.elapsed, 2);
+  assert.equal(rows[0]!.total, 2);
+});
+
+void test('year comparisons use calendar date rather than day-of-year and keep final totals separate', () => {
+  const rows = periodComparisons(
+    [
+      activity('2023-02-28'),
+      activity('2023-03-01'),
+      activity('2024-02-29'),
+      { ...activity('2024-02-01'), moving_time: null },
+      activity('2024-03-01'),
+    ],
+    dayFromISODate('2024-02-29'),
+    'time',
+    'years',
+  );
+  assert.equal(isoDate(rows[1]!.cutoff), '2023-02-28');
+  assert.equal(rows[1]!.elapsed, 1);
+  assert.equal(rows[1]!.total, 2);
+  assert.equal(rows[0]!.elapsed, 1);
+  assert.equal(rows[0]!.total, 1);
+  assert.equal(periodComparisons([], today, 'count', 'years')[0]!.elapsed, 0);
+});
 
 void test('weekly history uses Monday boundaries and consecutive pages without overlap', () => {
   const current = volumeHistory([], today, 'count', 'weeks');

@@ -6,6 +6,29 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Stats navigation snapshots only the chosen tile; shell and filters stay still. */
+:root[data-stats-transition]::view-transition-group(root) {
+  animation: none;
+}
+:root[data-stats-transition]::view-transition-old(root) {
+  display: none;
+}
+:root[data-stats-transition]::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(stats-focused-tile) {
+  animation-duration: 220ms;
+  animation-timing-function: ease-out;
+}
+:root[data-stats-transition]::view-transition {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(stats-focused-tile) {
+    animation: none;
+  }
+}
+
 @theme {
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));

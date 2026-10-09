@@ -52,6 +52,7 @@ interface ActivityCardContentProps {
   onClearSelection?: () => void;
   showMapButton?: boolean;
   stickyHeader?: boolean;
+  readOnly?: boolean;
 }
 
 /**
@@ -134,6 +135,7 @@ export function ActivityCardContent({
   onClearSelection,
   showMapButton = true,
   stickyHeader = false,
+  readOnly = false,
 }: ActivityCardContentProps) {
   const dateFormat = useDateFormat();
   const [open, setOpen] = useState(false);
@@ -269,6 +271,7 @@ export function ActivityCardContent({
               size="sm"
               className="h-8 w-8 shrink-0 border p-0"
               onClick={() => row.toggleSelected()}
+              disabled={readOnly}
               aria-label={
                 row.getIsSelected() ? 'Deselect route' : 'Select route'
               }
@@ -317,7 +320,7 @@ export function ActivityCardContent({
                 size="sm"
                 className="h-7 shrink-0 px-2 text-xs"
                 onClick={() => setOpen(true)}
-                disabled={isGuest}
+                disabled={isGuest || readOnly}
               >
                 Edit
               </Button>
@@ -337,14 +340,14 @@ export function ActivityCardContent({
                 {!labelled && (
                   <DropdownMenuItem
                     onSelect={() => setOpen(true)}
-                    disabled={isGuest}
+                    disabled={isGuest || readOnly}
                   >
                     <Pencil /> Edit
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
                   onSelect={() => void handleRefresh()}
-                  disabled={loading || isGuest || !stravaConnected}
+                  disabled={loading || isGuest || readOnly || !stravaConnected}
                 >
                   <ReloadIcon /> Refresh from Strava
                 </DropdownMenuItem>

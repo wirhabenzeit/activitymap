@@ -105,6 +105,35 @@ export function volumeHistoryAverage(
   });
 }
 
+/** Compare calendar periods at the same date, clamping short months/leap days. */
+export function periodComparisons(
+  activities: readonly StatsActivity[],
+  today: number,
+  metric: StatsMetric,
+  range: 'months' | 'years',
+) {
+  const date = dateOfDay(today);
+  return volumeHistory(activities, today, metric, range)
+    .map((bucket) => {
+      const start = dateOfDay(bucket.start);
+      const year = start.getUTCFullYear();
+      const month =
+        range === 'months' ? start.getUTCMonth() : date.getUTCMonth();
+      const lastDate = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+      const cutoff = dayOf(
+        new Date(Date.UTC(year, month, Math.min(date.getUTCDate(), lastDate))),
+      );
+      const elapsed = activities.reduce((total, activity) => {
+        const day = dayOf(activity.start_date_local);
+        return day >= bucket.start && day <= Math.min(cutoff, bucket.end)
+          ? total + metricValue(activity, metric)
+          : total;
+      }, 0);
+      return { ...bucket, cutoff, elapsed };
+    })
+    .reverse();
+}
+
 export function calendarDays(
   activities: readonly StatsActivity[],
   first: number,

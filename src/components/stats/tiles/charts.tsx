@@ -36,10 +36,14 @@ import { axisTicks, formatShort, type TilePalette } from './format';
 export function Measure({
   className,
   style,
+  retainSize = false,
   children,
 }: {
   className?: string;
   style?: CSSProperties;
+  // A responsive inspector can briefly consume all available width while
+  // changing presentation. Keep mounted controls through that intermediate frame.
+  retainSize?: boolean;
   children: (size: { width: number; height: number }) => ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -47,9 +51,28 @@ export function Measure({
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
+    // Activity resumes layout effects when a retained focus view is revealed.
+    // Measure synchronously so its first navigation snapshot includes charts;
+    // ResizeObserver cannot deliver a new size while snapshotting is paused.
+    const style = getComputedStyle(element);
+    const width = Math.floor(
+      element.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight),
+    );
+    const height = Math.floor(
+      element.clientHeight -
+        parseFloat(style.paddingTop) -
+        parseFloat(style.paddingBottom),
+    );
+    setSize((previous) =>
+      retainSize && (width <= 0 || height <= 0) ? previous : { width, height },
+    );
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
       const { width, height } = entry.contentRect;
+      if (retainSize && (Math.floor(width) <= 0 || Math.floor(height) <= 0))
+        return;
       setSize((previous) =>
         previous.width === Math.floor(width) &&
         previous.height === Math.floor(height)
@@ -59,7 +82,7 @@ export function Measure({
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [retainSize]);
   return (
     <div ref={ref} className={className} style={style}>
       {size.width > 0 && size.height > 0 && children(size)}

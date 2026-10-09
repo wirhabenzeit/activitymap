@@ -19,6 +19,7 @@ interface DetailPageProps {
   backLabel: string;
   navigation?: ReactNode;
   returnFocus: RefObject<HTMLElement | null>;
+  findReturnFocus?: () => HTMLElement | null;
   presentation?: DetailPresentation;
   onStep?: (direction: -1 | 1) => void;
 }
@@ -39,6 +40,7 @@ function DetailPage({
   backLabel,
   navigation,
   returnFocus,
+  findReturnFocus,
   presentation = 'push',
 }: DetailPageProps) {
   const present = useIsPresent();
@@ -52,9 +54,10 @@ function DetailPage({
       // Stepping deliberately replaces the origin with the latest inspected row.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       const origin = returnFocus.current;
-      if (origin?.isConnected) origin.focus({ preventScroll: true });
+      const target = origin?.isConnected ? origin : findReturnFocus?.();
+      target?.focus({ preventScroll: true });
     };
-  }, [returnFocus]);
+  }, [returnFocus, findReturnFocus]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
