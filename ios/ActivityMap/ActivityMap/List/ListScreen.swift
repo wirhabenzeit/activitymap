@@ -7,23 +7,27 @@ struct ListScreen: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var hasPushedDetail = false
-    @Environment(\.filterSidebarVisible) private var filterSidebarVisible
-    @Environment(\.browseViewportWidth) private var viewportWidth
+    /// Inspection started while the shell collapses its filter panel; the
+    /// adjacent detail appears once the wider layout arrives.
+    @State private var awaitingWidth = false
+    @Environment(\.filtersCollapseForDetail) private var filtersCollapseForDetail
     // iPhone landscape: the shell bar carries the status/options row (#315).
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         GeometryReader { geometry in
-            let sideBySide = sizeClass == .regular && (viewportWidth ?? geometry.size.width) >= BrowsePaneLayout.minimumDetailWidth && !typeSize.isAccessibilitySize
-            let usesOverlay = filterSidebarVisible && !sideBySide && !hasPushedDetail
+            // Filters overlay the List or are pinned only where detail still
+            // fits beside it, so this width never changes while inspecting (#354).
+            let sideBySide = sizeClass == .regular && geometry.size.width >= BrowsePaneLayout.minimumDetailWidth && !typeSize.isAccessibilitySize
             let showsDetail = sideBySide && store.inspectedActivityID != nil && !hasPushedDetail
             let detailWidth = min(420, max(340, geometry.size.width * 0.42))
             let listWidth = showsDetail ? geometry.size.width - detailWidth - 1 : geometry.size.width
             HStack(spacing: 0) {
-                activityList(width: listWidth)
+                activityList(width: listWidth, inspectedID: showsDetail ? store.inspectedActivityID : nil)
                     .frame(width: listWidth)
                 if showsDetail {
-                    Divider()
+                    // Flush with the status bar, which extends under the home indicator.
+                    Divider().ignoresSafeArea(edges: .bottom)
                     detailColumn
                         .frame(width: detailWidth)
                         .frame(maxHeight: .infinity)
@@ -31,45 +35,31 @@ struct ListScreen: View {
             }
             // Inspecting is ordinary navigation. Back only clears inspection;
             // the retained list and selection/camera owners remain unchanged.
-            .navigationDestination(item: inspectionID(sideBySide: sideBySide || usesOverlay)) { id in
+            .navigationDestination(item: inspectionID(sideBySide: sideBySide || awaitingWidth)) { id in
                 ActivityDetailView(store: store, activityID: id)
             }
-            .sheet(isPresented: Binding(
-                get: { usesOverlay && store.selectedTab == .list && store.inspectedActivityID != nil },
-                set: { if !$0, usesOverlay, store.selectedTab == .list { store.dismissInspection() } }
-            )) {
-                if let id = store.inspectedActivityID {
-                    NavigationStack {
-                        ActivityDetailPanel(store: store, activityID: id)
-                            .navigationTitle("Activity").navigationBarTitleDisplayMode(.inline)
-                            .toolbar {
-                                ToolbarItem(placement: .confirmationAction) {
-                                    Button("Done") { store.dismissInspection() }
-                                }
-                            }
-                    }
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                }
-            }
             .onChange(of: store.inspectedActivityID, initial: true) { _, id in
-                if id == nil { hasPushedDetail = false }
-                else if !sideBySide && !usesOverlay { hasPushedDetail = true }
+                if id == nil { hasPushedDetail = false; awaitingWidth = false }
+                else if !sideBySide && filtersCollapseForDetail { awaitingWidth = true }
+                else if !sideBySide { hasPushedDetail = true }
             }
             .onChange(of: sideBySide) { _, wide in
-                if !wide, !filterSidebarVisible, store.inspectedActivityID != nil { hasPushedDetail = true }
+                if wide { awaitingWidth = false }
+                else if store.inspectedActivityID != nil { hasPushedDetail = true }
             }
         }
     }
 
-    private func activityList(width: CGFloat) -> some View {
+    private func activityList(width: CGFloat, inspectedID: Int?) -> some View {
         List {
             ForEach(store.listedActivities) { activity in
                 ActivityRowView(store: store, activity: activity, availableWidth: width)
                     .listRowInsets(EdgeInsets(top: verticalSizeClass == .compact ? 2 : 4, leading: 8,
                                               bottom: verticalSizeClass == .compact ? 2 : 4, trailing: 8))
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 44 }
-                    .listRowBackground(store.selectedActivityIDs.contains(activity.id) ? AppTheme.selectionBackground : Color(uiColor: .systemBackground))
+                    .listRowBackground(activity.id == inspectedID ? AppTheme.inspectionBackground
+                        : store.selectedActivityIDs.contains(activity.id) ? AppTheme.selectionBackground
+                        : Color(uiColor: .systemBackground))
             }
             if let emptyState {
                 BrowsingEmptyView(state: emptyState, recover: recover, scrolls: false)
@@ -119,6 +109,8 @@ struct ListScreen: View {
                     Button { store.dismissInspection() } label: {
                         Image(systemName: "xmark")
                             .frame(width: 44, height: 44)
+                            // A plain button only hits drawn pixels; keep the full target.
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .padding(.trailing, AppTheme.Spacing.large)

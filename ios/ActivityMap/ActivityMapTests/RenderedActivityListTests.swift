@@ -195,16 +195,14 @@ extension RenderedRoutePickingTests {
         try host.save("list-tablet-retained-inspection")
     }
 
-    @Test(arguments: ["phone", "large-text", "tablet", "tablet-landscape", "split-window", "tablet-large-text", "sidebar-portrait"])
+    @Test(arguments: ["phone", "large-text", "tablet", "tablet-landscape", "split-window", "tablet-large-text"])
     func listDetailUsesNavigationAndBackRetainsContext(scenario: String) async throws {
-        let overlay = scenario == "sidebar-portrait"
-        let regular = scenario.hasPrefix("tablet") || scenario == "split-window" || overlay
+        let regular = scenario.hasPrefix("tablet") || scenario == "split-window"
         let largeText = scenario.contains("large-text")
         let size: CGSize = switch scenario {
         case "tablet-landscape": CGSize(width: 1180, height: 820)
         case "tablet", "tablet-large-text": CGSize(width: 820, height: 1180)
         case "split-window": CGSize(width: 650, height: 1000)
-        case "sidebar-portrait": CGSize(width: 499, height: 1180)
         default: CGSize(width: 390, height: 844)
         }
         let tablet = regular && size.width >= 760 && !largeText
@@ -217,7 +215,6 @@ extension RenderedRoutePickingTests {
         let host = try ListHarness(root: NavigationStack {
             ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
         }
-        .environment(\.filterSidebarVisible, overlay)
         .environment(\.horizontalSizeClass, regular ? .regular : .compact)
         .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large),
         size: size)
@@ -245,9 +242,6 @@ extension RenderedRoutePickingTests {
             #expect(list.contentOffset == offset)
             #expect(list.bounds.width >= 400 && list.bounds.width <= browsingWidth - 340,
                     "Inspection must leave usable list and detail columns")
-        } else if overlay {
-            try await listWait { navigation.presentedViewController != nil }
-            #expect(navigation.viewControllers.count == 1, "The sidebar layout must remain behind the detail overlay")
         } else {
             try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
             #expect(host.host.presentedViewController == nil, "Phone detail is a navigation destination, not a modal sheet")
@@ -256,7 +250,7 @@ extension RenderedRoutePickingTests {
         try host.save("list-detail-\(scenario)")
         #expect(store.selectedActivityIDs == selection && store.activeActivityID == 3)
         #expect(cameraValues() == camera && store.mapContext.pendingRequest == request)
-        if tablet || overlay { store.dismissInspection() }
+        if tablet { store.dismissInspection() }
         else { navigation.popViewController(animated: false) }
         try await listWait { store.inspectedActivityID == nil && navigation.viewControllers.count == 1 }
         #expect(host.descendants(of: UICollectionView.self).contains { $0 === list }, "Back returns to the same retained native List")
@@ -267,7 +261,7 @@ extension RenderedRoutePickingTests {
         try host.save("list-back-\(scenario)")
         // Filter invalidation also closes the destination, with selection intact.
         store.inspect(10)
-        if !tablet && !overlay { try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil } }
+        if !tablet { try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil } }
         store.searchText = "No matching activity"
         try await listWait { store.inspectedActivityID == nil && navigation.viewControllers.count == 1 }
         #expect(store.selectedActivityIDs == selection)

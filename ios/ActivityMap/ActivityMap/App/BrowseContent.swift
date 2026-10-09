@@ -111,9 +111,9 @@ private struct BrowseStatsDestinationKey: EnvironmentKey {
     static let defaultValue: BrowseStatsDestination? = nil
 }
 extension EnvironmentValues {
-    /// Full browsing width, before filters take space. Detail eligibility must
-    /// not change just because opening an inspector hides its filter sidebar.
-    @Entry var browseViewportWidth: CGFloat? = nil
+    /// The expanded filter panel collapses to its rail as List inspection
+    /// starts, so List waits for that width instead of pushing its detail.
+    @Entry var filtersCollapseForDetail = false
 
     var browseStatsDestination: BrowseStatsDestination? {
         get { self[BrowseStatsDestinationKey.self] }
@@ -124,4 +124,16 @@ extension EnvironmentValues {
 enum BrowsePaneLayout {
     static let filterWidth: CGFloat = 320
     static let minimumDetailWidth: CGFloat = 760
+
+    /// Wide regular windows keep the filter rail beside the content; narrower
+    /// ones and accessibility text use the phone's filter sheet.
+    static func filtersUseSidebar(width: CGFloat, regular: Bool, accessibilityText: Bool) -> Bool {
+        regular && width >= minimumDetailWidth && !accessibilityText
+    }
+
+    /// The full panel leaves no room for List and its adjacent detail, but the
+    /// collapsed rail does, as in 11-inch portrait (#354).
+    static func panelSqueezesDetail(width: CGFloat) -> Bool {
+        width - filterWidth - 1 < minimumDetailWidth && width - FilterRail.width - 1 >= minimumDetailWidth
+    }
 }

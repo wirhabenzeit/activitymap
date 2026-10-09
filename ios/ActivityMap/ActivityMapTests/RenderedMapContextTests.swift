@@ -262,20 +262,15 @@ extension RenderedRoutePickingTests {
         let oldToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = oldToken }
-        let key = "browse.filterSidebarVisible"
-        let oldPreference = UserDefaults.standard.object(forKey: key)
-        UserDefaults.standard.set(true, forKey: key)
-        defer {
-            if let oldPreference { UserDefaults.standard.set(oldPreference, forKey: key) }
-            else { UserDefaults.standard.removeObject(forKey: key) }
-        }
+        // Pinned landscape filters leave the narrowest map the panel must fit beside.
+        let pinDefaults = filterDefaults(pinned: true)
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let oldWindow = scene.keyWindow
         let window = UIWindow(windowScene: scene)
         window.frame = CGRect(x: 0, y: 0, width: 1180, height: 820)
         let store = ActivityStore(activities: try GalleryLibrary.load().activities)
         let picker = RoutePicker()
-        let host = UIHostingController(rootView: AppShell(store: store, mapPicker: picker)
+        let host = UIHostingController(rootView: AppShell(store: store, mapPicker: picker).defaultAppStorage(pinDefaults)
             .environment(\.horizontalSizeClass, .regular)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)))
         window.rootViewController = host
@@ -285,6 +280,7 @@ extension RenderedRoutePickingTests {
         try await cameraWait { descendants(host.view, of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
         let map = try #require(descendants(host.view, of: MapView.self).first)
         #expect(map.bounds.width >= 650)
+        #expect(map.convert(map.bounds, to: nil).minX >= 320, "Results stay within the map, beside the pinned filters")
         store.replaceSelection(with: single ? [20279947341] : [20279947341, 20270725942, 20244330171])
         picker.reviewSelection(store: store)
         picker.detent = .expanded

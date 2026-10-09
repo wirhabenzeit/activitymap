@@ -30,6 +30,8 @@ enum AppTheme {
     // The asset also covers system controls using Color.accentColor.
     static let accent = Color("AccentColor")
     static let selectionBackground = accent.opacity(0.12)
+    /// The List row whose detail is shown beside it; stronger than selection.
+    static let inspectionBackground = accent.opacity(0.24)
     static let contentBackground = Color(uiColor: .systemGroupedBackground)
     static let secondaryText = Color(uiColor: .secondaryLabel)
     static let surface = Color(uiColor: .secondarySystemGroupedBackground)
