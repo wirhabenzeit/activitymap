@@ -111,6 +111,10 @@ private struct BrowseStatsDestinationKey: EnvironmentKey {
     static let defaultValue: BrowseStatsDestination? = nil
 }
 extension EnvironmentValues {
+    /// The shell's target column width, independent of a retained native
+    /// navigation root's temporarily stale frame during destination switches.
+    @Entry var browsePaneWidth: CGFloat? = nil
+
     /// The expanded filter panel collapses to its rail as List inspection
     /// starts, so List waits for that width instead of pushing its detail.
     @Entry var filtersCollapseForDetail = false

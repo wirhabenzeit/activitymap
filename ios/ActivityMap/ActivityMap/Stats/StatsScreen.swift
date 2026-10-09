@@ -169,7 +169,8 @@ struct StatsScreen: View {
 }
 
 /// Keep the blue chrome outside UIKit's rounded, shadowed page transition.
-/// The phone shell retains the bar on root and detail, keeping its inset fixed.
+/// Shell-hosted pages use the stationary shell header; standalone hosts use
+/// the native navigation bar.
 private struct StatsDetailDestination<Content: View>: View {
     let title: String
     var shellHosted = false
@@ -182,7 +183,7 @@ private struct StatsDetailDestination<Content: View>: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
-        .toolbar(.visible, for: .navigationBar)
+        .toolbar(shellHosted ? .hidden : .visible, for: .navigationBar)
         .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)

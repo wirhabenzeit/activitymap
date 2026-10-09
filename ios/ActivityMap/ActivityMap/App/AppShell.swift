@@ -35,9 +35,9 @@ struct AppShell: View {
         self.statsContent = statsContent
     }
 
-    private var usesPhoneNavigation: Bool {
+    private var usesStatsNavigation: Bool {
         guard statsContent != nil else { return false }
-        // The blue native bar hosts the pushed Stats focus page at every width.
+        // Chart navigation belongs to the content column at every width.
         return statsDetailPresentation != .inline
     }
 
@@ -48,25 +48,10 @@ struct AppShell: View {
 
     var body: some View {
         Group {
-            if usesPhoneNavigation {
-                NavigationStack {
-                    shellContent
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar(.visible, for: .navigationBar)
-                        .toolbar { phoneRootToolbar }
-                        .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
-                        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-                        .toolbarColorScheme(.dark, for: .navigationBar)
-                        .navigationDestination(item: statsDetailSelection) { id in
-                            if let dashboard = statsNavigation.dashboard,
-                               let tile = StatsDashboard.tiles.first(where: { $0.id == id }) {
-                                phoneStatsDetail(tile, dashboard: dashboard)
-                            }
-                        }
-                }
-                .environment(\.statsShellNavigation, statsNavigation)
-                .environment(\.statsTransitionNamespace, statsTransitionNamespace)
-                .tint(.white)
+            if usesStatsNavigation {
+                shellContent
+                    .environment(\.statsShellNavigation, statsNavigation)
+                    .environment(\.statsTransitionNamespace, statsTransitionNamespace)
             } else {
                 shellContent
             }
@@ -106,11 +91,11 @@ struct AppShell: View {
                 await refresh()
             }
         }
-        // The phone presenter belongs to the whole stack, so Settings can
-        // open from either the dashboard or a pushed stat destination.
+        // The presenter belongs to the stationary shell, so Settings can
+        // open from either the dashboard or a focused chart.
         .sheet(item: Binding(
-            get: { usesPhoneNavigation && shellSize.width > 0 && !sheets.mapResultsPresented ? shellRequest(sidebarAvailable: filterSidebarAvailable) : nil },
-            set: { if usesPhoneNavigation && !sheets.mapResultsPresented && $0 == nil { clearShellRequest() } }
+            get: { usesStatsNavigation && shellSize.width > 0 && !sheets.mapResultsPresented ? shellRequest(sidebarAvailable: filterSidebarAvailable) : nil },
+            set: { if usesStatsNavigation && !sheets.mapResultsPresented && $0 == nil { clearShellRequest() } }
         ), onDismiss: { sheets.shellSheetPresented = false }) { destination in
             shellSheet(destination).onAppear { sheets.shellSheetPresented = true }
         }
@@ -132,48 +117,26 @@ struct AppShell: View {
         }
     }
 
-    @ToolbarContentBuilder private var phoneRootToolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarLeading) {
-            filterButton(sidebarAvailable: filterSidebarAvailable)
-            if compactBar && store.selectedTab == .list {
-                SelectionBar(store: store, includesTotal: true, onNavigationBar: true)
-            }
-        }.sharedBackgroundVisibility(.hidden)
-        ToolbarItem(placement: .principal) {
-            destinationPicker.accessibilityIdentifier("browse-header")
-        }
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            if compactBar && store.selectedTab == .list {
-                ListControls(presentation: store.listPresentation, iconOnly: true, onNavigationBar: true)
-            }
-            accountButton
-        }.sharedBackgroundVisibility(.hidden)
-    }
-
-    @ViewBuilder private func phoneStatsDetail(_ tile: StatsTileDefinition, dashboard: StatsDashboardState) -> some View {
-        let content = filterWorkspace(sidebarAvailable: filterSidebarAvailable) {
-            VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    Button { dashboard.expandedTile = nil } label: {
-                        Image(systemName: "chevron.left").frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Back to Stats")
-                    .accessibilityIdentifier("stats-detail-back")
-                    Text(tile.title).font(.title2.weight(.semibold))
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityIdentifier("stats-detail-title")
-                    Spacer(minLength: 0)
+    @ViewBuilder private func statsFocusPage(_ tile: StatsTileDefinition, dashboard: StatsDashboardState) -> some View {
+        let content = VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Button { dashboard.expandedTile = nil } label: {
+                    Image(systemName: "chevron.left").frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .padding(.horizontal, 12)
-                .background(AppTheme.contentBackground)
-                StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync,
-                                  shellHosted: true)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back to Stats")
+                .accessibilityIdentifier("stats-detail-back")
+                Text(tile.title).font(.title2.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("stats-detail-title")
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 12)
+            .background(AppTheme.contentBackground)
+            StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync,
+                              shellHosted: true)
         }
-            // The same native bar as the dashboard remains available on focus.
-            .toolbar { phoneRootToolbar }
             .tint(AppTheme.accent)
         // Every width zooms the tile into its focus page; Reduce Motion cross-fades.
         if reduceMotion { content.navigationTransition(.crossFade) }
@@ -184,10 +147,13 @@ struct AppShell: View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
                 let sidebarAvailable = filterSidebarAvailable(width: geometry.size.width)
+                let filterWidth = sidebarAvailable
+                    ? (sheets.showsFilters && !panelFloats ? BrowsePaneLayout.filterWidth : FilterRail.width) + 1 : 0
                 VStack(spacing: 0) {
-                    if !usesPhoneNavigation { shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1) }
+                    shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
                     filterWorkspace(sidebarAvailable: sidebarAvailable) {
-                        content
+                        navigableContent
+                            .environment(\.browsePaneWidth, max(0, geometry.size.width - filterWidth))
                             .environment(\.filtersCollapseForDetail, filtersCollapseForDetail)
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
@@ -201,9 +167,9 @@ struct AppShell: View {
                 }
                 // While the map's results sheet is up, it presents these itself.
                 .sheet(item: Binding(
-                    get: { usesPhoneNavigation || sheets.mapResultsPresented ? nil : shellRequest(sidebarAvailable: sidebarAvailable) },
+                    get: { usesStatsNavigation || sheets.mapResultsPresented ? nil : shellRequest(sidebarAvailable: sidebarAvailable) },
                     set: { value in
-                        guard !usesPhoneNavigation, !sheets.mapResultsPresented, value == nil else { return }
+                        guard !usesStatsNavigation, !sheets.mapResultsPresented, value == nil else { return }
                         clearShellRequest()
                     }
                 ), onDismiss: { sheets.shellSheetPresented = false }) { destination in
@@ -214,8 +180,26 @@ struct AppShell: View {
         }
     }
 
-    /// Dashboard and focused charts share the filter workspace. Pushing a
-    /// focus page retains the filter state and the native shell controls.
+    /// Only this column participates in the focus transition. The
+    /// shell bar and the single filter host stay outside the moving page.
+    @ViewBuilder private var navigableContent: some View {
+        if usesStatsNavigation {
+            NavigationStack {
+                content
+                    .toolbar(.hidden, for: .navigationBar)
+                    .navigationDestination(item: statsDetailSelection) { id in
+                        if let dashboard = statsNavigation.dashboard,
+                           let tile = StatsDashboard.tiles.first(where: { $0.id == id }) {
+                            statsFocusPage(tile, dashboard: dashboard)
+                        }
+                    }
+            }
+        } else {
+            content
+        }
+    }
+
+    /// The filter host persists beside the dashboard and focused charts.
     private func filterWorkspace<Content: View>(sidebarAvailable: Bool,
                                                 @ViewBuilder content: () -> Content) -> some View {
         let expanded = sidebarAvailable && sheets.showsFilters
@@ -370,6 +354,7 @@ struct AppShell: View {
         .frame(height: compactBar ? 44 : 54)
         // Controls stay inside the safe area; only the colour reaches the edges.
         .background(AppTheme.navigationBlue.ignoresSafeArea(edges: [.top, .horizontal]))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("browse-header")
     }
 

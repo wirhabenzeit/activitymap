@@ -6,6 +6,7 @@ struct ListScreen: View {
     var recover: (BrowsingPresentation.Recovery) -> Void = { _ in }
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.browsePaneWidth) private var paneWidth
     @State private var hasPushedDetail = false
     /// Inspection started while the shell collapses its filter panel; the
     /// adjacent detail appears once the wider layout arrives.
@@ -16,12 +17,13 @@ struct ListScreen: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let width = paneWidth ?? geometry.size.width
             // Filters overlay the List or are pinned only where detail still
             // fits beside it, so this width never changes while inspecting (#354).
-            let sideBySide = sizeClass == .regular && geometry.size.width >= BrowsePaneLayout.minimumDetailWidth && !typeSize.isAccessibilitySize
+            let sideBySide = sizeClass == .regular && width >= BrowsePaneLayout.minimumDetailWidth && !typeSize.isAccessibilitySize
             let showsDetail = sideBySide && store.inspectedActivityID != nil && !hasPushedDetail
-            let detailWidth = min(420, max(340, geometry.size.width * 0.42))
-            let listWidth = showsDetail ? geometry.size.width - detailWidth - 1 : geometry.size.width
+            let detailWidth = min(420, max(340, width * 0.42))
+            let listWidth = showsDetail ? width - detailWidth - 1 : width
             HStack(spacing: 0) {
                 activityList(width: listWidth, inspectedID: showsDetail ? store.inspectedActivityID : nil)
                     .frame(width: listWidth)

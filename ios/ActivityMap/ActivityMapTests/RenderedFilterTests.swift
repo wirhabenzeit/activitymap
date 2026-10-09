@@ -158,7 +158,9 @@ struct RenderedFilterTests {
             #expect(sheets.showsFilters && host.showsFilterPanel, "\(tab.title) keeps the panel")
         }
         sheets.showsFilters = false
-        try await filterWait { host.showsFilterRail && !host.showsFilterPanel }
+        try await filterWait {
+            host.showsFilterRail && !host.showsFilterPanel && abs(list.bounds.width - withDetail) < 2
+        }
         #expect(abs(list.bounds.width - withDetail) < 2)
         store.dismissInspection()
         try await Task.sleep(for: .milliseconds(400))

@@ -163,16 +163,16 @@ import Testing
             .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)), size: size)
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(400))
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
-        #expect(!navigation.isNavigationBarHidden)
-        #expect(navigation.view.bounds.height == host.host.view.bounds.height)
+        let navigation = try #require(host.contentNavigation())
+        #expect(host.shellAccountButton() != nil)
+        #expect(navigation.view.bounds.height < host.host.view.bounds.height)
         let root = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[0].view)
             .first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
         let rootOffset = root.contentOffset.y
         try await Task.sleep(for: .milliseconds(100))
-        let account = try #require(host.accountButton(in: navigation.navigationBar))
-        let accountFrame = account.convert(account.bounds, to: host.host.view)
+        let account = try #require(host.shellAccountButton())
+        let accountFrame = host.host.view.convert(account.accessibilityFrame, from: nil)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(bounds: host.host.view.bounds, format: format)
@@ -198,9 +198,9 @@ import Testing
                 var sample: [String: Any] = ["elapsedMs": (before - start) * 1000,
                     "captureMs": (CACurrentMediaTime() - before) * 1000,
                     "transitioning": navigation.transitionCoordinator != nil]
-                if let account = host.accountButton(in: navigation.navigationBar),
-                   account.window != nil, account.bounds.width > 0 {
-                    let frame = account.convert(account.bounds, to: host.host.view)
+                if let account = host.shellAccountButton(),
+                   !account.accessibilityFrame.isEmpty {
+                    let frame = host.host.view.convert(account.accessibilityFrame, from: nil)
                     sample["accountCenterX"] = frame.midX
                     sample["accountCenterY"] = frame.midY
                     sample["accountWidth"] = frame.width
@@ -251,13 +251,11 @@ import Testing
             }
             try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (phase == "push" ? 2 : 1) }
             if phase == "push" {
-                #expect(!navigation.isNavigationBarHidden,
-                        "Root and detail share a visible blue native bar with a stable inset")
-                #expect(host.accountButton(in: navigation.navigationBar) != nil,
-                        "Stat focus retains the shell's Settings control")
+                #expect(host.shellAccountButton() != nil,
+                        "The stationary shell header retains Settings during stat focus")
             } else {
-                let settledAccount = try #require(host.accountButton(in: navigation.navigationBar))
-                let settledFrame = settledAccount.convert(settledAccount.bounds, to: host.host.view)
+                let settledAccount = try #require(host.shellAccountButton())
+                let settledFrame = host.host.view.convert(settledAccount.accessibilityFrame, from: nil)
                 #expect(abs(settledFrame.midX - accountFrame.midX) < 1 && abs(settledFrame.midY - accountFrame.midY) < 1,
                         "Returning restores the overview's profile button at its original position")
             }
@@ -285,7 +283,7 @@ import Testing
             .environment(\.horizontalSizeClass, .compact), size: CGSize(width: 402, height: 874))
         defer { host.close() }
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         try host.capture("phone-header-root")
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
@@ -325,7 +323,7 @@ import Testing
             size: CGSize(width: 402, height: 874))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(500))
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         let root = try #require(host.descendants(UIScrollView.self).first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
         let offset = root.contentOffset.y
@@ -348,7 +346,7 @@ import Testing
         try await statsWait { navigation.viewControllers.count == 1 && navigation.transitionCoordinator == nil }
         #expect(observedInteraction && cancelledInteraction)
         #expect(state.expandedTile == nil && abs(root.contentOffset.y - offset) < 1)
-        #expect(!navigation.isNavigationBarHidden)
+        #expect(host.shellAccountButton() != nil)
         try host.capture("phone-header-interaction-back")
     }
 
@@ -373,7 +371,7 @@ import Testing
             size: CGSize(width: 402, height: 874))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(500))
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         var results: [[String: Any]] = []
         // No snapshots or forced layouts while measuring. The display link
         // observes UIKit's presentation layer, rather than its target frame.
@@ -774,7 +772,7 @@ import Testing
             .environment(\.dynamicTypeSize, variant == "large-text" ? .accessibility3 : .large), size: size)
         defer { host.close() }
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         let root = try #require(host.descendants(UIScrollView.self).first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         let firstHeight = root.contentSize.height
         // Publishing the last result precedes SwiftUI's final layout commit.
@@ -800,7 +798,7 @@ import Testing
             }
             try await Task.sleep(for: .milliseconds(100))
             let detailScroll = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[1].view).first { $0.bounds.height > 100 })
-            #expect(!navigation.isNavigationBarHidden && navigation.topViewController?.navigationItem.title == StatsDashboard.tiles.first { $0.id == id }?.title)
+            #expect(host.shellAccountButton() != nil && navigation.topViewController?.navigationItem.title == StatsDashboard.tiles.first { $0.id == id }?.title)
             #expect(detailScroll !== root, "The tile opens in its own scrolling destination")
             #expect(detailScroll.contentSize.width <= detailScroll.bounds.width + 1)
             #expect(abs(root.contentSize.height - height) < 1, "Opening detail never resizes the dashboard")
@@ -859,7 +857,7 @@ import Testing
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
         defer { host.close() }
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         let root = try #require(host.descendants(UIScrollView.self).first {
             !($0 is UICollectionView) && $0.contentSize.height > 1500
         })
@@ -931,18 +929,17 @@ import Testing
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
         defer { host.close() }
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         let dates = ActivityDayRange(start: "2026-01-01", end: "2026-12-31")
         store.dateDayRange = dates
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
-        let page = try #require(navigation.topViewController)
-        #expect(host.accountButton(in: navigation.navigationBar) != nil)
+        #expect(host.shellAccountButton() != nil)
         sheets.showsFilters = true
         if sidebar {
-            try await statsWait { host.descendants(UITextField.self, in: page.view).count == 1 }
+            try await statsWait { host.descendants(UITextField.self).count == 1 }
             #expect(host.host.presentedViewController == nil)
-            #expect(host.descendants(UIScrollView.self, in: page.view).contains { abs($0.bounds.width - 320) < 2 })
+            #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 })
         } else {
             try await statsWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
         }
@@ -959,6 +956,54 @@ import Testing
         #expect(store.selectedTab == .list && store.dateDayRange == dates)
     }
 
+    @Test(arguments: ["portrait", "landscape"])
+    func filtersStayStationaryDuringStatsFocusTransition(scenario: String) async throws {
+        let (store, _) = try StatsDashboardTests.fixture()
+        let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
+        sheets.showsFilters = true
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let size = scenario == "landscape" ? CGSize(width: 1194, height: 834) : CGSize(width: 834, height: 1194)
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let navigation = try #require(host.contentNavigation())
+        let field = try #require(host.descendants(UITextField.self).first)
+        let filters = try #require(host.descendants(UIScrollView.self).first { abs($0.bounds.width - 320) < 2 })
+        let filterFrame = filters.convert(filters.bounds, to: host.host.view)
+        let filterOffset = filters.contentOffset
+        #expect(!filters.isDescendant(of: navigation.view), "Filters belong to the stationary shell")
+        #expect(abs(navigation.view.bounds.width - (size.width - 321)) < 2)
+        for phase in ["expand", "back"] {
+            if phase == "expand" { withAnimation(.default) { state.toggleExpansion(.weeklyVolume) } }
+            else { navigation.popViewController(animated: true) }
+            var transitionSamples = 0
+            for index in 0..<30 {
+                try await Task.sleep(for: .milliseconds(25))
+                if navigation.transitionCoordinator != nil { transitionSamples += 1 }
+                #expect(host.descendants(UITextField.self).count == 1,
+                        "The animation must never introduce a second filter panel")
+                #expect(host.descendants(UITextField.self).first === field)
+                let layer = filters.layer.presentation() ?? filters.layer
+                let frame = layer.convert(layer.bounds, to: host.host.view.layer.presentation() ?? host.host.view.layer)
+                #expect(abs(frame.minX - filterFrame.minX) < 1 && abs(frame.minY - filterFrame.minY) < 1)
+                #expect(abs(frame.width - filterFrame.width) < 1 && abs(frame.height - filterFrame.height) < 1)
+                #expect(filters.contentOffset == filterOffset && sheets.showsFilters)
+                if ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_FILTER_TRANSITION_FRAMES"] == "1" {
+                    try host.captureTransitionFrame("filters-\(scenario)-\(phase)", index: index)
+                }
+            }
+            #expect(transitionSamples > 0, "Observe the real in-flight transition, not only its final layout")
+            try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (phase == "expand" ? 2 : 1) }
+            try host.capture("stationary-filters-\(scenario)-\(phase)")
+        }
+        #expect(state.expandedTile == nil)
+    }
+
     @Test func tabletFocusPageSurvivesWindowResize() async throws {
         let (store, _) = try StatsDashboardTests.fixture()
         let state = StatsDashboardState()
@@ -971,7 +1016,7 @@ import Testing
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 834, height: 1194))
         defer { host.close() }
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         // Crossing the 760pt threshold in either direction keeps the same page.
@@ -1124,7 +1169,7 @@ import Testing
         #expect(store.dateDayRange == dates && store.selectedActivityIDs == [selected])
         #expect(store.mapContext.camera.zoom == camera.zoom)
         #expect(state.option(.sportMix) == .allTime)
-        let statsNavigation = try #require(host.controllers(UINavigationController.self).first)
+        let statsNavigation = try #require(host.contentNavigation())
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { statsNavigation.viewControllers.count == 2 && statsNavigation.transitionCoordinator == nil }
         store.selectedTab = .map
@@ -1211,21 +1256,36 @@ import Testing
         }
         return visit(host)
     }
-    func accountButton(in bar: UINavigationBar) -> UIView? {
-        // Stats has one trailing 44pt control. UIKit's SwiftUI toolbar hosts
-        // do not expose its identifier as a UIView accessibility property.
-        guard !bar.isHidden else { return nil }
-        let barFrame = bar.convert(bar.bounds, to: host.view)
-        return descendants(UIView.self, in: bar).first { view in
-            guard abs(view.bounds.width - 44) < 1, abs(view.bounds.height - 44) < 1,
-                  view.convert(view.bounds, to: host.view).midX > barFrame.maxX - 80 else { return false }
-            var ancestor: UIView? = view
-            while let current = ancestor, current !== bar {
-                if current.isHidden || current.alpha < 0.99 { return false }
-                ancestor = current.superview
+    func shellAccountButton() -> NSObject? {
+        var visited: Set<ObjectIdentifier> = []
+        func visit(_ object: NSObject) -> NSObject? {
+            guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
+            if object.accessibilityLabel == "Settings", !object.accessibilityFrame.isEmpty { return object }
+            let count = object.accessibilityElementCount()
+            if count > 0, count < 1000 {
+                for index in 0..<count {
+                    if let child = object.accessibilityElement(at: index) as? NSObject,
+                       let found = visit(child) { return found }
+                }
             }
-            return true
+            if let view = object as? UIView {
+                for child in view.subviews { if let found = visit(child) { return found } }
+            }
+            return nil
         }
+        return visit(host.view)
+    }
+    func contentNavigation() -> UINavigationController? {
+        controllers(UINavigationController.self).first
+    }
+    func captureTransitionFrame(_ name: String, index: Int) throws {
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1
+        let image = UIGraphicsImageRenderer(bounds: host.view.bounds, format: format).image { _ in
+            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: false)
+        }
+        let directory = URL(fileURLWithPath: "/tmp/activitymap-stats-stationary-frames/\(name)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try image.pngData()?.write(to: directory.appendingPathComponent(String(format: "frame-%02d.png", index)))
     }
     @discardableResult func capture(_ name: String, presented: Bool = false) throws -> UIImage {
         let view = presented ? try #require(host.presentedViewController?.view) : host.view!
