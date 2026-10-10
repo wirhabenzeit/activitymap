@@ -111,52 +111,57 @@ export function coverageProgress(completed: number | undefined, total: number) {
   return { value, total, percent: Math.floor((value / total) * 1000) / 10 };
 }
 
+type PipelineState = IngestionStatusDTO[
+  'history' | 'details' | 'streams' | 'photos'];
+
+/** What a pipeline's scheduler is doing, as one or two words. */
+export function schedulingLabel(state: PipelineState) {
+  if (state.scheduling === 'blocked') return 'Reconnect';
+  if (state.scheduling === 'disabled') return 'Paused';
+  if (state.scheduling === 'stalled') return 'Needs attention';
+  if (state.scheduling === 'unknown') return 'Schedule unknown';
+  if (state.scheduling === 'waiting') return 'Waiting';
+  if (state.scheduling === 'not_scheduled') return 'Refresh pending';
+  if (
+    state.scheduling === 'scheduled' &&
+    'lastOutcome' in state &&
+    state.lastOutcome?.outcome === 'deferred' &&
+    state.lastOutcome.reason === 'rate_limited'
+  )
+    return 'Waiting';
+  if (state.scheduling === 'scheduled')
+    return state.progress === 'complete'
+      ? 'Checking'
+      : state.progress === 'not_started'
+        ? 'Queued'
+        : 'Importing';
+  return state.progress === 'complete'
+    ? 'Ready'
+    : state.progress === 'unknown'
+      ? 'Unknown'
+      : 'Not started';
+}
+
 /** Short summaries for the main screen; the full read model stays in disclosures. */
 export function coverageSummaries(status: IngestionStatusDTO) {
   const { history: h, details: d, streams: s, photos: p } = status;
-  const label = (state: typeof h | typeof d | typeof s | typeof p) => {
-    if (state.scheduling === 'blocked') return 'Reconnect';
-    if (state.scheduling === 'disabled') return 'Paused';
-    if (state.scheduling === 'stalled') return 'Needs attention';
-    if (state.scheduling === 'unknown') return 'Schedule unknown';
-    if (state.scheduling === 'waiting') return 'Waiting';
-    if (state.scheduling === 'not_scheduled') return 'Refresh pending';
-    if (
-      state.scheduling === 'scheduled' &&
-      'lastOutcome' in state &&
-      state.lastOutcome?.outcome === 'deferred' &&
-      state.lastOutcome.reason === 'rate_limited'
-    )
-      return 'Waiting';
-    if (state.scheduling === 'scheduled')
-      return state.progress === 'complete'
-        ? 'Checking'
-        : state.progress === 'not_started'
-          ? 'Queued'
-          : 'Importing';
-    return state.progress === 'complete'
-      ? 'Ready'
-      : state.progress === 'unknown'
-        ? 'Unknown'
-        : 'Not started';
-  };
   return [
     {
       title: 'History',
       count: `${h.knownActivityCount.toLocaleString()} imported${h.totalActivityCount === null ? ' · total unknown' : ''}`,
-      status: label(h),
+      status: schedulingLabel(h),
       progress: null,
     },
     {
       title: 'Details',
       count: `${d.detailed.toLocaleString()} of ${h.knownActivityCount.toLocaleString()} ready`,
-      status: label(d),
+      status: schedulingLabel(d),
       progress: coverageProgress(d.detailed, h.knownActivityCount),
     },
     {
       title: 'Streams',
       count: `${(s.withData + s.withoutData).toLocaleString()} of ${h.knownActivityCount.toLocaleString()} checked`,
-      status: s.failed > 0 ? 'Needs attention' : label(s),
+      status: s.failed > 0 ? 'Needs attention' : schedulingLabel(s),
       progress: coverageProgress(
         s.withData + s.withoutData,
         h.knownActivityCount,
@@ -170,7 +175,7 @@ export function coverageSummaries(status: IngestionStatusDTO) {
           : p.activitiesWithStoredPhotos === undefined
             ? 'Photo availability not reported by this server'
             : `${p.activitiesWithStoredPhotos.toLocaleString()} of ${p.activitiesWithPhotos.toLocaleString()} activities have photos available`,
-      status: label(p),
+      status: schedulingLabel(p),
       progress: coverageProgress(
         p.activitiesWithStoredPhotos,
         p.activitiesWithPhotos,

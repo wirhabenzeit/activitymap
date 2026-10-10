@@ -23,6 +23,7 @@ import type {
   ActivityStreamType, RawActivityStreams, StreamFetchFailure,
 } from '~/server/strava/streams';
 import type { StoredStreamSummary } from '~/lib/streams/compact-summary';
+import type { JobRunSummary } from '~/lib/admin/job-run-summary';
 
 export const sportTypeEnum = pgEnum('sport_type', sportTypes);
 
@@ -835,7 +836,7 @@ export const scheduledJobLog = pgTable(
       enum: ['completed', 'failed', 'disabled'],
     }).notNull(),
     stopReason: text('stop_reason'),
-    summary: jsonb('summary').$type<Record<string, number | boolean>>(),
+    summary: jsonb('summary').$type<JobRunSummary>(),
     error: text('error'),
   },
   (table) => [

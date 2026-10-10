@@ -25,6 +25,7 @@ void test('photo cron enforces production, authorization, and rollout gates befo
           superseded: 0,
           requests: 0,
           stopReason: 'complete',
+          failures: [],
         };
       },
     });

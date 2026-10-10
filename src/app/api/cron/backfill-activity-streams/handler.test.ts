@@ -11,6 +11,7 @@ const result = {
   requests: 0,
   remainingBacklog: 0,
   stopReason: 'complete' as const,
+  failures: [],
   elapsedMs: 0,
 };
 const request = (body?: string, secret = 'secret') =>

@@ -59,6 +59,13 @@ void test('malformed streams fail as a whole, without coercion or silent truncat
     assert.throws(() => rawActivityStreamsSchema.parse(invalid), ZodError);
 });
 
+void test("Strava's -1 heart-rate placeholder is kept as returned", () => {
+  const heartrate = { ...RAW_STREAMS_FIXTURE.heartrate, data: [-1, -1, 120] };
+  assert.deepEqual(rawActivityStreamsSchema.parse({ heartrate }), {
+    heartrate,
+  });
+});
+
 void test('activity IDs retain full bigint precision and reject unsafe inputs', () => {
   for (const id of ['1', '9007199254740993', '9223372036854775807'])
     assert.equal(streamActivityIdSchema.parse(id), id);
