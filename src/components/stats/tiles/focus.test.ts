@@ -30,3 +30,20 @@ void test('invalid or non-expandable URLs leave the dashboard available', () => 
   }
   assert.equal(focusedTile(''), null);
 });
+
+void test('changing focus clears only the nested activity parameter', () => {
+  assert.equal(
+    tileFocusURL(
+      'https://example.test/stats/tiles?keep=1&tile=records&activity=42#history',
+      'weeklyVolume',
+    ),
+    '/stats/tiles?keep=1&tile=training-volume#history',
+  );
+  assert.equal(
+    tileFocusURL(
+      'https://example.test/stats/tiles?tile=records&activity=42',
+      null,
+    ),
+    '/stats/tiles',
+  );
+});

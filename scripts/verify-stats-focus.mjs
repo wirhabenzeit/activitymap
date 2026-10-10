@@ -317,6 +317,15 @@ export default function Review() {
     .click();
   const dialog = page.getByRole('region', { name: 'Activity detail panel' });
   await dialog.waitFor();
+  const activityURL = page.url();
+  assert.ok(new URL(activityURL).searchParams.get('activity'));
+  await page.goBack();
+  await dialog.waitFor({ state: 'hidden' });
+  await active('records');
+  assert.equal(new URL(page.url()).searchParams.has('activity'), false);
+  await page.goForward();
+  await dialog.waitFor();
+  assert.equal(page.url(), activityURL);
   assert.equal(
     await focus.getByRole('region', { name: 'This year records' }).count(),
     1,
@@ -339,8 +348,21 @@ export default function Review() {
     true,
     'Chart stays available beside panel',
   );
+  // Focus Back closes a pushed inspection first, even on a direct focus link.
+  await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  await active('records');
+  await page.goForward();
+  await dialog.waitFor();
+  assert.equal(page.url(), activityURL);
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
+  await page.waitForFunction(
+    () =>
+      !document.querySelector(
+        '[data-stats-focus] [data-stats-activity-id][aria-current="true"]',
+      ),
+  );
   assert.equal(
     await focus
       .locator('[data-stats-activity-id][aria-current="true"]')
@@ -377,6 +399,49 @@ export default function Review() {
   await active(null);
   await page.setViewportSize({ width: 1440, height: 1000 });
   console.log('Nested activity Escape and direct-link Back pass');
+
+  // A direct activity link never pushed a chart entry. Replacing its activity
+  // must not turn Close/Escape into browser Back to an unrelated page.
+  for (const dismiss of ['close', 'escape']) {
+    await loaded();
+    await loaded(new URL(activityURL).search);
+    await dialog.waitFor();
+    const initialID = new URL(activityURL).searchParams.get('activity');
+    await focus
+      .locator(
+        `[data-stats-activity-id]:not([data-stats-activity-id="${initialID}"])`,
+      )
+      .first()
+      .click();
+    await page.waitForFunction(
+      (id) => new URL(location.href).searchParams.get('activity') !== id,
+      initialID,
+    );
+    if (dismiss === 'close')
+      await dialog
+        .getByRole('button', { name: 'Close activity detail', exact: true })
+        .click();
+    else await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'hidden' });
+    await active('records');
+    assert.equal(new URL(page.url()).searchParams.has('activity'), false);
+  }
+  console.log('Direct-link activity replacement closes locally');
+
+  await page.setViewportSize({ width: 402, height: 874 });
+  await loaded('?tile=sport-mix');
+  const extras = focus.locator('details');
+  await extras.waitFor();
+  assert.equal(await extras.getAttribute('open'), null);
+  assert.equal(await extras.locator('dl').isVisible(), false);
+  await extras.locator('summary').click();
+  assert.equal(await extras.locator('dl').isVisible(), true);
+  assert.match(await extras.innerText(), /climbed/);
+  await page.screenshot({
+    path: join(output, 'sport-mix-phone-expanded.png'),
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
 
   await loaded('?tile=this-week');
   assert.equal(
@@ -453,9 +518,11 @@ export default function Review() {
     );
   });
   for (const [id, slug] of tiles) {
-    await card(id)
-      .getByRole('button', { name: /^Expand / })
-      .click();
+    if (id === 'sportMix') await loaded('?tile=sport-mix');
+    else
+      await card(id)
+        .getByRole('button', { name: /^Expand / })
+        .click();
     await active(slug);
     await settle();
     await page.screenshot({

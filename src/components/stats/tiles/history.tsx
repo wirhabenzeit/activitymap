@@ -283,19 +283,10 @@ export function VolumeHistory({
               ))}
           </div>
         </div>
-        {wide ? (
-          <section className="min-w-0" aria-label="Period totals">
-            <h2 className="py-2 text-sm font-medium">Period totals</h2>
-            {totals}
-          </section>
-        ) : (
-          <details>
-            <summary className="cursor-pointer py-2 text-xs">
-              Period totals
-            </summary>
-            {totals}
-          </details>
-        )}
+        <section className="min-w-0" aria-label="Period totals">
+          <h2 className="py-2 text-sm font-medium">Period totals</h2>
+          {totals}
+        </section>
       </div>
     </div>
   );

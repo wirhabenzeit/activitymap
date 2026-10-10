@@ -49,6 +49,10 @@ export const statsParitySchema = z
                       'yearPace',
                       'activityCalendar',
                       'records',
+                      'recordRankings',
+                      'monthActivityRhythm',
+                      'yearMonthlyRhythm',
+                      'periodComparisons',
                       'best30Days',
                       'sportMix',
                       'consistency',
@@ -168,11 +172,15 @@ export const statsParitySchema = z
             });
         }
         const ranges =
-          vector.operation === 'volumeHistory'
-            ? ['weeks', 'months', 'years']
-            : vector.operation === 'records' || vector.operation === 'sportMix'
-              ? ['currentYear', 'allTime']
-              : null;
+          vector.operation === 'periodComparisons'
+            ? ['months', 'years']
+            : vector.operation === 'volumeHistory'
+              ? ['weeks', 'months', 'years']
+              : vector.operation === 'records' ||
+                  vector.operation === 'recordRankings' ||
+                  vector.operation === 'sportMix'
+                ? ['currentYear', 'allTime']
+                : null;
         if (ranges && vector.args.range && !ranges.includes(vector.args.range))
           context.addIssue({
             code: 'custom',
@@ -204,7 +212,7 @@ export const statsCapabilitiesSchema = z
             compact: z.string().min(1),
             expanded: z.string().min(1),
             nativeOwner: z.number().int(),
-            uiOwner: z.literal(265),
+            uiOwner: z.union([z.literal(265), z.literal(363)]),
           })
           .strict(),
       )

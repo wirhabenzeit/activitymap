@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { mock } from 'node:test';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -615,25 +616,38 @@ async function runProof() {
   assert.equal(timed.stopReason, 'deadline');
   assert.equal(requests.length, 2);
   assert.equal(timed.fetched, 1);
-  // A truly slow upstream is cancelled by the real AbortSignal too.
+  // Trigger the deadline only once HTTP is in flight. A wall-clock timeout
+  // can expire during database setup on a busy runner, before fetch observes it.
   await cleanup();
   await seed(1, 1);
   nextHour();
   let wasAborted = false;
+  const deadlineController = new AbortController();
+  const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
+  const timeout = mock.method(AbortSignal, 'timeout', (delay: number) =>
+    delay === 250 ? deadlineController.signal : originalTimeout(delay),
+  );
   behavior = async (_url, init) =>
     new Promise<Response>((_resolve, reject) => {
+      assert.ok(init?.signal, 'the HTTP request receives the deadline signal');
       const stop = () => {
         wasAborted = true;
         reject(new DOMException('Aborted', 'AbortError'));
       };
-      if (init?.signal?.aborted) stop();
-      else init?.signal?.addEventListener('abort', stop, { once: true });
+      init.signal.addEventListener('abort', stop, { once: true });
+      deadlineController.abort(new DOMException('Timed out', 'TimeoutError'));
+      assert.ok(init.signal.aborted, 'the deadline cancels the HTTP request');
     });
-  const realStarted = Date.now();
-  const aborted = await run({ timeMs: 250 });
-  assert.equal(aborted.stopReason, 'deadline');
-  assert.ok(wasAborted);
-  assert.ok(Date.now() - realStarted < 1500);
+  try {
+    const aborted = await run({ timeMs: 250 });
+    assert.equal(timeout.mock.calls[0]?.arguments[0], 250);
+    assert.equal(aborted.stopReason, 'deadline');
+    assert.equal(requests.length, 1);
+    assert.equal(aborted.fetched, 0);
+    assert.ok(wasAborted);
+  } finally {
+    timeout.mock.restore();
+  }
 
   // Cascades remove per-account scheduling state with athlete erasure.
   await testDb.delete(users).where(eq(users.id, userIds[0]!));

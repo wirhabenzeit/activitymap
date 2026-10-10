@@ -21,14 +21,10 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     private var shownRange: StatsHistoryRange { expanded ? range : .weeks }
     private var buckets: [StatsHistoryBucket] { history[shownRange] ?? [] }
     @State private var selectedX: Double?
-    @State var showTotals = false
-    @Environment(\.statsTileInspection) private var inspection
-    private var totalsSelection: Binding<Bool> {
-        if let inspection {
-            return Binding(get: { inspection.volumeTotals }, set: { inspection.volumeTotals = $0 })
-        }
-        return $showTotals
-    }
+    @State private var width: CGFloat = 0
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var wide: Bool { expanded && width >= 760 && !typeSize.isAccessibilitySize }
+    private var sideBySide: Bool { wide && width >= 1000 }
     var expanded = true
     @Environment(\.statsExpansionProgress) private var sharedProgress
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
@@ -76,11 +72,15 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
             StatsExpansionReveal(expanded: expanded) {
                 expandedHeader.padding(.bottom, 12)
             }
-            chart
-            StatsExpansionReveal(expanded: expanded) {
-                expandedFooter.padding(.top, 12)
+            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: 24)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            layout {
+                chart.frame(maxWidth: .infinity)
+                StatsExpansionReveal(expanded: expanded) {
+                    expandedFooter.frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .onChange(of: range) { selectedX = nil }
         .onChange(of: metric) { selectedX = nil }
         .onChange(of: expanded) { selectedX = nil }
@@ -213,7 +213,11 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                 HStack(spacing: 10) { legend }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), alignment: .leading)]) { legend }
             }
-            DisclosureGroup("Period totals", isExpanded: totalsSelection) {
+            Text("Period totals").font(.subheadline.weight(.semibold))
+            periodTotals
+        }
+    }
+    private var periodTotals: some View {
                 ScrollView(.horizontal) {
                     Grid(alignment: .trailing, horizontalSpacing: 16, verticalSpacing: 10) {
                         GridRow {
@@ -238,8 +242,6 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                     .font(.caption).monospacedDigit().fixedSize(horizontal: true, vertical: false).padding(.vertical, 8)
                 }
                 .accessibilityLabel("Period totals by sport")
-            }.font(.caption)
-        }
     }
     private func segmentIndices(_ segment: Int) -> [Int] {
         guard !buckets.isEmpty else { return [] }

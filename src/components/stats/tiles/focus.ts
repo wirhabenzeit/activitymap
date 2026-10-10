@@ -20,6 +20,9 @@ export function focusedTile(search: string): StatsTileID | null {
 
 export function tileFocusURL(href: string, id: StatsTileID | null): string {
   const url = new URL(href);
+  // Activity inspection belongs to its originating focus surface.
+  // eslint-disable-next-line drizzle/enforce-delete-with-where -- URL parameter.
+  url.searchParams.delete('activity');
   const name = Object.entries(focusTiles).find(([, tile]) => tile === id)?.[0];
   if (name) url.searchParams.set('tile', name);
   // eslint-disable-next-line drizzle/enforce-delete-with-where -- URL parameters, not database rows.
