@@ -9,6 +9,7 @@ import { tileView, type TileContext } from './tiles';
 import { tilePalette, formatDailyRate, statsFormat } from './format';
 import { PlainBars } from './charts';
 import { MonthRows } from './calendar';
+import { focusTiles } from './focus';
 import { statsCapabilitiesSchema } from '../../../../scripts/lib/stats-parity-schema';
 
 void test('the shared capability matrix matches actual visible and expandable web tiles', () => {
@@ -31,6 +32,34 @@ void test('the shared capability matrix matches actual visible and expandable we
     statsTiles.filter((tile) => tileView(tile.id)).map((tile) => tile.id),
     'section and within-section order must agree with the rendered catalogue',
   );
+  assert.deepEqual(
+    Object.values(focusTiles).sort(),
+    statsTiles
+      .filter((tile) => tileView(tile.id)?.expandable)
+      .map((tile) => tile.id)
+      .sort(),
+    'every expandable tile must have a public focus URL',
+  );
+});
+
+void test('wide Training volume exposes totals and Records exposes both ranges', () => {
+  const wide = { ...context, focusWidth: 1100 };
+  const volume = renderToStaticMarkup(
+    tileView('weeklyVolume')!.detail!(wide, 'distance') as ReactElement,
+  );
+  assert.match(volume, /Period totals by sport/);
+  assert.doesNotMatch(volume, /<details/);
+  const records = renderToStaticMarkup(
+    tileView('records')!.detail!(wide, undefined) as ReactElement,
+  );
+  assert.match(records, /aria-label="This year records"/);
+  assert.match(records, /aria-label="All time records"/);
+  assert.doesNotMatch(records, /aria-label="Records period"/);
+  assert.match(records, /Best 30 days/);
+  const narrow = renderToStaticMarkup(
+    tileView('weeklyVolume')!.detail!(context, 'distance') as ReactElement,
+  );
+  assert.match(narrow, /<details/);
 });
 
 const today = dayFromISODate('2026-09-01');
@@ -96,6 +125,24 @@ void test('all-time sport mix uses the same range for summary, chart and table',
   );
   assert.match(chart, /Run/);
   assert.match(table, /Run/);
+  const inline = renderToStaticMarkup(
+    view.more!(
+      { ...context, units: 'imperial', inlineDetails: true },
+      'allTime',
+    ) as ReactElement,
+  );
+  assert.match(inline, /Run/);
+  assert.match(inline, /mi/);
+  assert.match(inline, /ft/);
+  assert.doesNotMatch(
+    renderToStaticMarkup(
+      view.more!(
+        { ...context, inlineDetails: true },
+        'currentYear',
+      ) as ReactElement,
+    ),
+    /Run/,
+  );
   assert.doesNotMatch(
     renderToStaticMarkup(
       view.face(context, 'currentYear', true) as ReactElement,
@@ -130,7 +177,112 @@ void test('expanded records retain activity identities for drill-down', () => {
       undefined,
     ) as ReactElement,
   );
-  assert.match(html, /<button[^>]*>Fixture ride<\/button>/);
+  assert.match(html, /<button[^>]*data-stats-activity-id="42"/);
+  assert.match(html, /title="Fixture ride"/);
+});
+
+void test('period insights expose daily drill-down and comparable monthly totals in preferred units', () => {
+  const sample: TileContext = {
+    ...context,
+    today: dayFromISODate('2026-08-31'),
+    units: 'imperial',
+    activities: [{ ...make('2026-08-31', 'run'), id: 10 }],
+    onOpenActivity: () => undefined,
+    selectedActivityId: 10,
+  };
+  const month = renderToStaticMarkup(
+    tileView('monthVsLastMonth')!.insight!(sample, 'distance') as ReactElement,
+  );
+  assert.match(month, /Your month, day by day/);
+  assert.match(month, /31: 1 activity, 6 mi/);
+  assert.match(month, /data-stats-activity-id="10"[^>]*aria-current="true"/);
+  const year = renderToStaticMarkup(
+    tileView('yearToDate')!.insight!(sample, 'distance') as ReactElement,
+  );
+  assert.match(year, /Your year, month by month/);
+  assert.match(year, /aria-label="Aug 2026: 6 mi"/);
+  assert.match(year, /aria-label="Aug 2025: 0 mi"/);
+  assert.doesNotMatch(year, /Sep 2026:/);
+});
+
+void test('opening an activity panel keeps both record periods available in a wide workspace', () => {
+  const view = tileView('records')!;
+  for (const focusWidth of [540, 340]) {
+    const html = renderToStaticMarkup(
+      view.detail!(
+        { ...context, availableWidth: 1000, focusWidth },
+        undefined,
+      ) as ReactElement,
+    );
+    assert.match(html, /aria-label="This year records"/);
+    assert.match(html, /aria-label="All time records"/);
+    assert.doesNotMatch(html, /aria-label="Records period"/);
+  }
+  const narrow = renderToStaticMarkup(
+    view.detail!(
+      { ...context, availableWidth: 402, focusWidth: 402 },
+      undefined,
+    ) as ReactElement,
+  );
+  assert.match(narrow, /aria-label="Records period"/);
+  assert.doesNotMatch(narrow, /aria-label="All time records"/);
+});
+
+void test('record podiums expose three linked activities with medals, retaining only the winner on the dashboard', () => {
+  const sample = {
+    ...context,
+    focusWidth: 1184,
+    activities: [30, 20, 10].map((km, index) => ({
+      ...make('2026-08-31', 'ride'),
+      id: index + 1,
+      name: `Podium ride ${index + 1}`,
+      distance: km * 1000,
+    })),
+    onOpenActivity: () => undefined,
+  };
+  const html = renderToStaticMarkup(
+    tileView('records')!.detail!(sample, undefined) as ReactElement,
+  );
+  for (const id of [1, 2, 3])
+    assert.equal(
+      (html.match(new RegExp(`data-stats-activity-id="${id}"`, 'g')) ?? [])
+        .length,
+      6,
+    );
+  assert.match(html, /Gold · personal best/);
+  assert.equal(
+    (html.match(/aria-label="Gold · personal best"/g) ?? []).length,
+    8,
+    'equal time/elevation values share gold',
+  );
+  assert.equal(
+    (html.match(/aria-label="Gold · best this year"/g) ?? []).length,
+    8,
+  );
+  assert.match(html, /Silver · second best/);
+  assert.match(html, /Bronze · third best/);
+  const selected = renderToStaticMarkup(
+    tileView('records')!.detail!(
+      { ...sample, selectedActivityId: 2 },
+      undefined,
+    ) as ReactElement,
+  );
+  const buttons = selected.match(/<button[^>]*data-stats-activity-id[^>]*>/g)!;
+  assert.equal(buttons.length, 18);
+  for (const button of buttons) {
+    if (button.includes('data-stats-activity-id="2"')) {
+      assert.match(button, /aria-current="true"/);
+      assert.match(button, /bg-header-background\/10/);
+    } else {
+      assert.doesNotMatch(button, /aria-current|bg-header-background\/10/);
+    }
+  }
+  assert.doesNotMatch(html, /aria-current="true"/);
+  const compact = renderToStaticMarkup(
+    tileView('records')!.face(sample, undefined, false) as ReactElement,
+  );
+  assert.match(compact, /30/);
+  assert.doesNotMatch(compact, /Podium ride|Medal|second best|third best/);
 });
 
 void test('records wait for a full within-year 30-day window before comparing totals', () => {

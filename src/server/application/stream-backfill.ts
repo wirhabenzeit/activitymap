@@ -25,6 +25,8 @@ import {
   validateBackfillLimits,
   type BackfillStopReason,
 } from '~/server/strava/stream-backfill-policy';
+import { logger } from '~/server/logging/logger';
+import { addRunFailure, type RunFailure } from './run-failures';
 
 export type StreamBackfillResult = {
   selected: number;
@@ -36,6 +38,8 @@ export type StreamBackfillResult = {
   remainingBacklog: number;
   stopReason: BackfillStopReason;
   elapsedMs: number;
+  /** The first few activity-level failures, with their cause. */
+  failures: RunFailure[];
 };
 
 // Extra headroom belongs to foreground/webhook/reconciliation callers, which
@@ -78,6 +82,7 @@ export async function backfillActivityStreams({
     remainingBacklog: 0,
     stopReason: 'complete',
     elapsedMs: 0,
+    failures: [],
   };
   const checkTime = () => {
     if (clock() >= deadline || signal.aborted)
@@ -151,6 +156,19 @@ export async function backfillActivityStreams({
           const failure = classifyStreamFetchFailure(error);
           // Durable safe classification only; never persist upstream bodies/tokens.
           await repository.finishAttempt(run, candidate, failure);
+          if (failure.code !== 'rate_limited') {
+            addRunFailure(
+              result.failures,
+              candidate.activityId,
+              failure.code,
+              error,
+            );
+            logger.warn('[Stream backfill] Activity failed', {
+              activityId: candidate.activityId,
+              code: failure.code,
+              error,
+            });
+          }
           if (failure.code === 'unauthorized') {
             // Credentials, not this activity, are the problem: skip the
             // account until they change instead of failing each activity.

@@ -6,9 +6,10 @@
 
 import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
 import { type UnitSystem } from '~/lib/units';
-import { useMemo, useState, type ReactNode } from 'react';
+import { Activity, useMemo, useState, type ReactNode } from 'react';
+import { Medal } from 'lucide-react';
 import { comparisonBand } from '~/lib/stats/comparison-band';
-import { volumeHistoryAverage } from '~/lib/stats/history';
+import { periodComparisons, volumeHistoryAverage } from '~/lib/stats/history';
 
 import { categorySettings } from '~/settings/category';
 import {
@@ -24,6 +25,7 @@ import {
   mondayOf,
   monthVsLastMonth,
   records,
+  recordRankings,
   sportMix,
   thisWeek,
   typicalWeek,
@@ -46,6 +48,7 @@ import { cn } from '~/lib/utils';
 
 import { ActivityRow } from './activity-row';
 import { VolumeHistory, CalendarHistory } from './history';
+import { MonthRhythm, YearRhythm } from './period-rhythm';
 import {
   CumulativeLines,
   Measure,
@@ -72,6 +75,18 @@ export type TileContext = {
   onOpenActivity?: (id: number) => void;
   onExpand?: () => void;
   palette: TilePalette;
+  focusWidth?: number;
+  // Workspace width before an activity panel takes space from the records.
+  availableWidth?: number;
+  selectedActivityId?: number | null;
+  focusChartHeight?: number;
+  inlineDetails?: boolean;
+  calendar?: {
+    year: number | null;
+    setYear: (year: number | null) => void;
+    selectedDay: number | null;
+    setSelectedDay: (day: number | null) => void;
+  };
 };
 
 export type TileSummary = { value: string; unit: string; sub: ReactNode };
@@ -96,6 +111,8 @@ export type TileView = {
   ) => ReactNode;
   // Extra context shown below the face only when the tile is expanded.
   more?: (context: TileContext, option: string | undefined) => ReactNode;
+  // A companion visual in focus; precise tables remain underneath.
+  insight?: (context: TileContext, option: string | undefined) => ReactNode;
   detail?: (context: TileContext, option: string | undefined) => ReactNode;
 };
 
@@ -173,15 +190,17 @@ function FillChart({
   expanded = false,
   pilot = false,
   overviewHeight = 110,
+  detailHeight = 300,
   children,
 }: {
   expanded?: boolean;
   pilot?: boolean;
   overviewHeight?: number;
+  detailHeight?: number;
   children: (size: { width: number; height: number }) => ReactNode;
 }) {
   return expanded ? (
-    <Measure className="mt-4 w-full" style={{ height: 300 }}>
+    <Measure className="mt-4 w-full" style={{ height: detailHeight }}>
       {children}
     </Measure>
   ) : pilot ? (
@@ -275,8 +294,98 @@ function yearSeries(
 const dayOfYearLabel = (x: number) =>
   shortDate(dateOfDay(yearStart(comparisonYear) + Math.round(x)));
 
+function PeriodComparison({
+  context,
+  option,
+  range,
+}: {
+  context: TileContext;
+  option?: string;
+  range: 'months' | 'years';
+}) {
+  const { formatWithUnit } = statsFormat(context.units);
+  const metric = asMetric(option, 'distance');
+  const date = dateOfDay(context.today);
+  const rows = periodComparisons(
+    context.activities,
+    context.today,
+    metric,
+    range,
+  );
+  const through =
+    range === 'months' ? `day ${date.getUTCDate()}` : shortDate(date);
+  return (
+    <section
+      aria-label={
+        range === 'months' ? 'Monthly comparisons' : 'Yearly comparisons'
+      }
+      className="mt-4"
+    >
+      <h2 className="mb-3 text-sm font-medium">
+        {range === 'months' ? 'Recent months' : 'Recorded years'}
+      </h2>
+      <table className="w-full text-xs tabular-nums">
+        <thead className="border-b text-muted-foreground">
+          <tr>
+            <th className="pb-2 text-left font-medium">
+              {range === 'months' ? 'Month' : 'Year'}
+            </th>
+            <th className="pb-2 pl-3 text-right font-medium">
+              Through {through}
+            </th>
+            <th className="pb-2 pl-3 text-right font-medium">
+              Full {range === 'months' ? 'month' : 'year'}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => {
+            const start = dateOfDay(row.start);
+            return (
+              <tr
+                key={row.start}
+                className={cn(
+                  'border-b border-muted',
+                  index === 0 && 'bg-muted/50 font-medium',
+                )}
+              >
+                <th scope="row" className="py-2 pr-2 text-left font-normal">
+                  {range === 'months'
+                    ? `${monthName(start)} ${start.getUTCFullYear()}`
+                    : start.getUTCFullYear()}
+                  {row.incomplete && (
+                    <span className="block text-[10px] text-muted-foreground">
+                      {index === 0 ? 'In progress' : 'Partial history'}
+                    </span>
+                  )}
+                </th>
+                <td className="py-2 pl-3 text-right">
+                  {formatWithUnit(row.elapsed, metric)}
+                </td>
+                <td className="py-2 pl-3 text-right">
+                  {index === 0 ? '–' : formatWithUnit(row.total, metric)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Same calendar date in each period; shorter months end on their last day.
+        Totals follow your activity filters.
+      </p>
+    </section>
+  );
+}
+
 const yearToDateView: TileView = {
   expandable: true,
+  insight: (context, option) => (
+    <YearRhythm context={context} metric={asMetric(option, 'distance')} />
+  ),
+  more: (context, option) => (
+    <PeriodComparison context={context} option={option} range="years" />
+  ),
   period: ({ today }) => {
     const year = dateOfDay(today).getUTCFullYear();
     return `${year} vs ${year - 1}`;
@@ -312,7 +421,12 @@ const yearToDateView: TileView = {
       'year',
     );
     return (
-      <FillChart expanded={expanded} pilot overviewHeight={130}>
+      <FillChart
+        expanded={expanded}
+        detailHeight={context.focusChartHeight}
+        pilot
+        overviewHeight={130}
+      >
         {({ width, height }) => (
           <CumulativeLines
             band={band}
@@ -485,6 +599,12 @@ function samePeriodLastMonth(today: number) {
 
 const monthVsLastMonthView: TileView = {
   expandable: true,
+  insight: (context, option) => (
+    <MonthRhythm context={context} metric={asMetric(option, 'distance')} />
+  ),
+  more: (context, option) => (
+    <PeriodComparison context={context} option={option} range="months" />
+  ),
   period: ({ today }) => {
     const date = dateOfDay(today);
     const previous = new Date(
@@ -522,7 +642,12 @@ const monthVsLastMonthView: TileView = {
       'month',
     );
     return (
-      <FillChart expanded={expanded} pilot overviewHeight={130}>
+      <FillChart
+        expanded={expanded}
+        detailHeight={context.focusChartHeight}
+        pilot
+        overviewHeight={130}
+      >
         {({ width, height }) => (
           <CumulativeLines
             band={band}
@@ -622,7 +747,7 @@ const sportMixView: TileView = {
       </div>
     );
   },
-  more: ({ activities, today, units = 'metric' }, option) => {
+  more: ({ activities, today, units = 'metric', inlineDetails }, option) => {
     const { formatMetric, formatWithUnit, metricUnit } = statsFormat(units);
 
     const range = (option ?? 'currentYear') as MixRange;
@@ -636,6 +761,48 @@ const sportMixView: TileView = {
         today,
       ).map((row) => [row.sport, row]),
     );
+    if (inlineDetails)
+      return (
+        <table
+          aria-label="Sport breakdown"
+          className="mt-3 w-full text-[11px] tabular-nums"
+        >
+          <thead className="border-b text-muted-foreground">
+            <tr>
+              <th className="pb-1 text-left font-medium">Sport</th>
+              <th className="pb-1 text-right font-medium">Acts</th>
+              <th className="pb-1 text-right font-medium">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shares.map(({ sport }) => (
+              <tr key={sport} className="border-b border-muted">
+                <th scope="row" className="py-2 text-left font-normal">
+                  {categorySettings[sport].name}
+                  <span className="block text-[10px] text-muted-foreground">
+                    {formatWithUnit(
+                      breakdown.get(sport)?.distance ?? 0,
+                      'distance',
+                    )}{' '}
+                    ·{' '}
+                    {formatWithUnit(
+                      breakdown.get(sport)?.elevation ?? 0,
+                      'elevation',
+                    )}{' '}
+                    climb
+                  </span>
+                </th>
+                <td className="text-right">
+                  {breakdown.get(sport)?.count ?? 0}
+                </td>
+                <td className="text-right">
+                  {formatWithUnit(breakdown.get(sport)?.time ?? 0, 'time')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
     return (
       <div className="mt-4">
         <ul className="divide-y divide-muted @min-[600px]:hidden">
@@ -761,7 +928,11 @@ const distanceVsElevationView: TileView = {
     const { months } = climbing(context.activities, context.today);
     return (
       <>
-        <FillChart expanded={expanded} pilot>
+        <FillChart
+          expanded={expanded}
+          detailHeight={context.focusChartHeight}
+          pilot
+        >
           {({ width, height }) => (
             <PlainBars
               // The current month is incomplete: lighter, as in Training volume.
@@ -837,6 +1008,7 @@ const distanceVsElevationView: TileView = {
           {hilliest.map((activity, index) => (
             <li key={activity.id ?? index}>
               <ActivityRow
+                activityId={activity.id}
                 sport={activity.sport}
                 name={activity.name}
                 summary={
@@ -1052,113 +1224,21 @@ const yearPaceView: TileView = {
 
 // Records --------------------------------------------------------------------
 
-// The four records side by side, with the sport and date of each.
+// The compact dashboard keeps one winner per category.
 function RecordStats({
   best,
-  dateFormat = 'system',
   units = 'metric',
-  detailed = false,
-  onOpenActivity,
 }: {
   best: ReturnType<typeof records>;
-  dateFormat?: DateFormat;
   units?: UnitSystem;
-  detailed?: boolean;
-  onOpenActivity?: (id: number) => void;
 }) {
-  const { formatMetric, formatWithUnit, metricUnit } = statsFormat(units);
-
-  const noteFor = (record: ActivityRecord | undefined) => {
-    if (!record) return undefined;
-    // Collapsed, say when and in which sport; expanded rows link the activity.
-    if (!detailed)
-      return `${categorySettings[record.sport].name} · ${shortDate(dateOfDay(record.day))}`;
-    const date = formatPreferredDate(
-      dateOfDay(record.day),
-      dateFormat,
-      undefined,
-      { month: 'short', day: 'numeric', year: 'numeric' },
-    );
-    return (
-      <>
-        {record.activityId !== undefined && onOpenActivity ? (
-          <button
-            type="button"
-            className="flex min-h-11 items-center text-left underline underline-offset-2"
-            onClick={() => onOpenActivity(record.activityId!)}
-          >
-            {record.name ?? categorySettings[record.sport].name}
-          </button>
-        ) : (
-          <span className="flex min-h-11 items-center">
-            {record.name?.trim()
-              ? record.name
-              : categorySettings[record.sport].name}
-          </span>
-        )}
-        <span className="block">
-          {categorySettings[record.sport].name} · {date}
-        </span>
-      </>
-    );
-  };
-  if (detailed)
-    return (
-      <div className="grid gap-4 @min-[600px]:grid-cols-2">
-        {(['distance', 'time', 'elevation'] as const).map((metric) => (
-          <div key={metric}>
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-xs text-muted-foreground">
-                {
-                  {
-                    distance: 'Longest distance',
-                    time: 'Longest moving time',
-                    elevation: 'Biggest climb',
-                  }[metric]
-                }
-              </span>
-              <span className="font-mono text-xl font-medium">
-                {best[metric]
-                  ? formatWithUnit(best[metric].value, metric)
-                  : '–'}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {noteFor(best[metric])}
-            </div>
-          </div>
-        ))}
-        <div>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-xs text-muted-foreground">Biggest week</span>
-            <span className="font-mono text-xl font-medium">
-              {best.biggestWeek
-                ? formatWithUnit(best.biggestWeek.value, 'distance')
-                : '–'}
-            </span>
-          </div>
-          {best.biggestWeek && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Week of{' '}
-              {formatPreferredDate(
-                dateOfDay(best.biggestWeek.weekStart),
-                dateFormat,
-                undefined,
-                { month: 'short', day: 'numeric', year: 'numeric' },
-              )}
-            </p>
-          )}
-        </div>
-      </div>
-    );
+  const { formatMetric, metricUnit } = statsFormat(units);
+  const noteFor = (record: ActivityRecord | undefined) =>
+    record
+      ? `${categorySettings[record.sport].name} · ${shortDate(dateOfDay(record.day))}`
+      : undefined;
   return (
-    <div
-      className={
-        detailed
-          ? 'grid gap-4 @min-[600px]:grid-cols-2'
-          : 'grid grid-cols-2 gap-3 @min-[600px]:grid-cols-4'
-      }
-    >
+    <div className="grid grid-cols-2 gap-3 @min-[600px]:grid-cols-4">
       <Stat
         large
         label="Longest distance"
@@ -1203,46 +1283,244 @@ function RecordStats({
   );
 }
 
-function RecordsDetail({ context }: { context: TileContext }) {
-  const [range, setRange] = useState<'currentYear' | 'allTime'>('currentYear');
-  const best = useMemo(
-    () => records(context.activities, context.today, range),
+function RecordsPodium({
+  context,
+  range,
+  onOpenActivity,
+}: {
+  context: TileContext;
+  range: 'currentYear' | 'allTime';
+  onOpenActivity?: (id: number) => void;
+}) {
+  const ranked = useMemo(
+    () => recordRankings(context.activities, context.today, range),
     [context.activities, context.today, range],
   );
+  const { formatWithUnit } = statsFormat(context.units);
+  const date = (day: number) =>
+    formatPreferredDate(
+      dateOfDay(day),
+      context.dateFormat ?? 'system',
+      undefined,
+      { month: 'short', day: 'numeric', year: 'numeric' },
+    );
+  return (
+    <div className="@container">
+      <div className="grid gap-5 @min-[600px]:grid-cols-2">
+        {(['distance', 'time', 'elevation', 'biggestWeek'] as const).map(
+          (category) => {
+            const entries = ranked[category];
+            const label = {
+              distance: 'Longest distance',
+              time: 'Longest moving time',
+              elevation: 'Biggest climb',
+              biggestWeek: 'Biggest week',
+            }[category];
+            return (
+              <section
+                key={category}
+                aria-label={`${label} podium`}
+                className="min-w-0"
+              >
+                <h3 className="border-b pb-2 text-xs font-medium text-muted-foreground">
+                  {label}
+                </h3>
+                {entries.length === 0 ? (
+                  <p className="py-3 text-xs text-muted-foreground">
+                    No record yet
+                  </p>
+                ) : (
+                  <ol className="divide-y divide-muted">
+                    {entries.map((entry, index) => {
+                      // Equal values share a medal; chronology determines which
+                      // three activities are shown when a tie crosses third place.
+                      const place = entries.findIndex(
+                        (row) => row.value === entry.value,
+                      );
+                      const award =
+                        place === 0
+                          ? range === 'currentYear'
+                            ? 'Best this year'
+                            : 'Personal best'
+                          : ['Second best', 'Third best'][place - 1]!;
+                      const activity =
+                        'activityId' in entry ? entry : undefined;
+                      const week =
+                        'weekStart' in entry ? entry.weekStart : undefined;
+                      const trimmedName = activity?.name?.trim() ?? '';
+                      const name = activity
+                        ? trimmedName.length > 0
+                          ? trimmedName
+                          : categorySettings[activity.sport].name
+                        : `Week of ${date(week!)}`;
+                      const content = (
+                        <>
+                          <span
+                            title={award}
+                            aria-label={`${['Gold', 'Silver', 'Bronze'][place]} · ${award.toLowerCase()}`}
+                            className="mt-0.5"
+                          >
+                            <Medal
+                              aria-hidden="true"
+                              strokeWidth={1.7}
+                              className={cn(
+                                'size-[18px] [&>path]:stroke-sky-600 [&>path:first-child]:fill-sky-100 dark:[&>path]:stroke-sky-400 dark:[&>path:first-child]:fill-sky-950',
+                                [
+                                  '[&>circle]:fill-yellow-400 [&>circle]:stroke-yellow-700 [&>path:last-child]:stroke-yellow-900 dark:[&>circle]:fill-yellow-300 dark:[&>path:last-child]:stroke-yellow-900',
+                                  '[&>circle]:fill-slate-200 [&>circle]:stroke-slate-500 [&>path:last-child]:stroke-slate-700 dark:[&>circle]:fill-slate-300 dark:[&>path:last-child]:stroke-slate-700',
+                                  '[&>circle]:fill-orange-300 [&>circle]:stroke-amber-800 [&>path:last-child]:stroke-amber-950 dark:[&>path:last-child]:stroke-amber-950',
+                                ][place],
+                              )}
+                            />
+                          </span>
+                          <span className="min-w-0">
+                            <span
+                              className="block truncate text-xs font-medium"
+                              title={name}
+                            >
+                              {name}
+                            </span>
+                            <span className="block text-[11px] text-muted-foreground">
+                              {activity
+                                ? `${categorySettings[activity.sport].name} · ${date(activity.day)}`
+                                : week! + 6 > context.today
+                                  ? 'In progress'
+                                  : range === 'currentYear'
+                                    ? 'Distance within this year'
+                                    : 'Total distance'}
+                            </span>
+                          </span>
+                          <span
+                            className={cn(
+                              'whitespace-nowrap font-mono text-sm tabular-nums',
+                              place === 0 && 'font-semibold',
+                            )}
+                          >
+                            {formatWithUnit(
+                              entry.value,
+                              category === 'biggestWeek'
+                                ? 'distance'
+                                : category,
+                            )}
+                          </span>
+                        </>
+                      );
+                      const rowClass =
+                        'grid min-h-11 grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-2 py-2 text-left';
+                      return (
+                        <li key={activity?.activityId ?? week ?? index}>
+                          {activity?.activityId !== undefined &&
+                          onOpenActivity ? (
+                            <button
+                              type="button"
+                              data-stats-activity-id={activity.activityId}
+                              aria-current={
+                                activity.activityId ===
+                                context.selectedActivityId
+                                  ? 'true'
+                                  : undefined
+                              }
+                              onClick={() =>
+                                onOpenActivity(activity.activityId!)
+                              }
+                              className={cn(
+                                rowClass,
+                                'w-full rounded px-1 focus-visible:outline-2',
+                                activity.activityId ===
+                                  context.selectedActivityId
+                                  ? 'bg-header-background/10 ring-1 ring-inset ring-header-background/40 hover:bg-header-background/15'
+                                  : 'hover:bg-muted/40',
+                              )}
+                            >
+                              {content}
+                            </button>
+                          ) : (
+                            <div className={rowClass}>{content}</div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </section>
+            );
+          },
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RecordsDetail({ context }: { context: TileContext }) {
+  const [range, setRange] = useState<'currentYear' | 'allTime'>('currentYear');
+  const showBothPeriods =
+    (context.availableWidth ?? context.focusWidth ?? 0) >= 760;
   return (
     <div className="space-y-4">
-      <div
-        role="group"
-        aria-label="Records period"
-        className="inline-flex rounded-md bg-muted p-0.5"
-      >
-        {(['currentYear', 'allTime'] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={range === value}
-            onClick={() => setRange(value)}
-            className={cn(
-              'min-h-11 rounded-[5px] px-3 text-xs font-medium text-muted-foreground',
-              range === value && 'bg-background text-foreground shadow-xs',
-            )}
-          >
-            {optionLabels[value]}
-          </button>
-        ))}
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {range === 'allTime'
-          ? 'All-time records'
-          : `Records · ${dateOfDay(context.today).getUTCFullYear()}`}
-      </p>
-      <RecordStats
-        units={context.units}
-        dateFormat={context.dateFormat}
-        best={best}
-        detailed
-        onOpenActivity={context.onOpenActivity}
-      />
+      <Activity mode={showBothPeriods ? 'hidden' : 'visible'}>
+        <div
+          role="group"
+          aria-label="Records period"
+          className="inline-flex rounded-md bg-muted p-0.5"
+        >
+          {(['currentYear', 'allTime'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={range === value}
+              onClick={() => setRange(value)}
+              className={cn(
+                'min-h-11 rounded-[5px] px-3 text-xs font-medium text-muted-foreground',
+                range === value && 'bg-background text-foreground shadow-xs',
+              )}
+            >
+              {optionLabels[value]}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {range === 'allTime'
+            ? 'All-time records'
+            : `Records · ${dateOfDay(context.today).getUTCFullYear()}`}
+        </p>
+        <RecordsPodium
+          context={context}
+          range={range}
+          onOpenActivity={context.onOpenActivity}
+        />
+      </Activity>
+      {showBothPeriods && (
+        <div
+          className={cn(
+            'grid gap-6',
+            (context.focusWidth ?? 0) >= 520 && 'grid-cols-2',
+          )}
+        >
+          {(['currentYear', 'allTime'] as const).map((period) => (
+            <section
+              key={period}
+              aria-label={`${optionLabels[period]} records`}
+              className="min-w-0"
+            >
+              <h2 className="mb-4 text-sm font-medium">
+                {optionLabels[period]}
+              </h2>
+              <RecordsPodium
+                context={context}
+                range={period}
+                onOpenActivity={
+                  context.onOpenActivity
+                    ? (id) => {
+                        setRange(period);
+                        context.onOpenActivity?.(id);
+                      }
+                    : undefined
+                }
+              />
+            </section>
+          ))}
+        </div>
+      )}
       <Best30DayRecords context={context} />
     </div>
   );
@@ -1253,11 +1531,10 @@ const recordsView: TileView = {
   period: () => 'This year',
   expandedPeriod: 'Personal bests',
   summary: () => null,
-  face: ({ activities, today, units, dateFormat }) => (
+  face: ({ activities, today, units }) => (
     <div className="my-auto">
       <RecordStats
         units={units}
-        dateFormat={dateFormat}
         best={records(activities, today, 'currentYear')}
       />
     </div>
@@ -1289,7 +1566,7 @@ function Best30DayRecords({ context }: { context: TileContext }) {
           The first complete 30-day window this year ends on Jan 30.
         </p>
       ) : (
-        <dl className="divide-y">
+        <dl className="divide-y @min-[760px]:grid @min-[760px]:grid-cols-3 @min-[760px]:gap-6 @min-[760px]:divide-y-0">
           {best.map(({ metric, total, start, end, current }) => (
             <div key={metric} className="py-3 text-xs">
               <div className="flex flex-wrap items-baseline justify-between gap-2">

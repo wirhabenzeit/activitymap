@@ -6,20 +6,14 @@ import { type Activity } from '~/server/db/schema';
 import { features } from '~/components/list/table-extensions';
 import { columns } from '~/components/list/columns';
 import { ActivityCardContent } from '~/components/list/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from '~/components/ui/dialog';
 
 // Reuse the existing activity detail presentation without changing map/list selection.
 export default function ActivityDetails({
   activity,
-  onClose,
+  preview = false,
 }: {
   activity: Activity;
-  onClose: () => void;
+  preview?: boolean;
 }) {
   const data = useMemo(() => [activity], [activity]);
   const table = useTable({
@@ -30,22 +24,14 @@ export default function ActivityDetails({
   });
   const row = table.getCoreRowModel().rows[0];
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent
-        className="max-h-[90dvh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto p-4"
-        data-stats-detail
-      >
-        <DialogTitle className="sr-only">{activity.name}</DialogTitle>
-        <DialogDescription className="sr-only">
-          Activity details from your stats.
-        </DialogDescription>
-        {row && <ActivityCardContent row={row} />}
-      </DialogContent>
-    </Dialog>
+    <div data-stats-detail className="p-3">
+      {row && (
+        <ActivityCardContent
+          row={row}
+          showMapButton={!preview}
+          readOnly={preview}
+        />
+      )}
+    </div>
   );
 }

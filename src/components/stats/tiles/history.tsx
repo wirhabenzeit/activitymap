@@ -130,6 +130,70 @@ export function VolumeHistory({
       value: bucket.bySport[sport],
     })),
   );
+  const wide = (context.focusWidth ?? 0) >= 760;
+  const totals = (
+    <div
+      className="overflow-x-auto"
+      tabIndex={0}
+      role="region"
+      aria-label="Period totals by sport"
+    >
+      <table className="w-full text-xs whitespace-nowrap">
+        <caption className="sr-only">
+          Period totals by sport, {metric}. Incomplete periods are marked.
+        </caption>
+        <thead>
+          <tr className="border-b">
+            <th
+              scope="col"
+              className="sticky left-0 bg-card py-2 pr-4 text-left"
+            >
+              {range === 'years'
+                ? 'Year'
+                : range === 'months'
+                  ? 'Month'
+                  : 'Week'}
+            </th>
+            {sports.map((sport) => (
+              <th scope="col" key={sport} className="px-2 text-right">
+                {categorySettings[sport].name}
+              </th>
+            ))}
+            <th scope="col" className="pl-3 text-right">
+              Total
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {buckets.map((bucket) => (
+            <tr key={bucket.start} className="border-b border-muted">
+              <th
+                scope="row"
+                className="sticky left-0 bg-card py-2 pr-4 text-left font-normal"
+              >
+                {wide && range === 'weeks'
+                  ? dateLabel(bucket.start)
+                  : label(bucket.start)}
+                {bucket.incomplete && (
+                  <span className="block text-muted-foreground">
+                    Incomplete
+                  </span>
+                )}
+              </th>
+              {sports.map((sport) => (
+                <td key={sport} className="px-2 text-right font-mono">
+                  {formatWithUnit(bucket.bySport[sport], metric)}
+                </td>
+              ))}
+              <td className="pl-3 text-right font-mono font-semibold">
+                {formatWithUnit(bucket.total, metric)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
   return (
     <div className="space-y-3 pt-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -168,110 +232,71 @@ export function VolumeHistory({
           {range === 'years' ? 'over all years' : `over 12 ${range}`}
         </span>
       </p>
-      <Measure className="w-full" style={{ height: 240 }}>
-        {({ width, height }) => (
-          <SportArea
-            rows={rows}
-            width={width}
-            height={height}
-            detail
-            incomplete={buckets.flatMap((bucket) =>
-              bucket.incomplete ? [String(bucket.start)] : [],
-            )}
-            trend={trend}
-            trendLabel={averageLabel}
-            palette={context.palette}
-            valueFormat={(value) => formatWithUnit(value, metric)}
-            axisFormat={(value, step) => formatShort(value, metric, step)}
-            xTickFormat={(value) =>
-              range === 'years'
-                ? label(Number(value))
-                : range === 'months'
-                  ? monthName(dateOfDay(Number(value)))
-                  : shortDate(dateOfDay(Number(value)))
-            }
-          />
-        )}
-      </Measure>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-        {trend.length > 0 && <span>Dashed: {averageLabel}</span>}
-        {sportOrder
-          .filter((sport) =>
-            buckets.some((bucket) => bucket.bySport[sport] > 0),
-          )
-          .map((sport) => (
-            <span key={sport} className="flex items-center gap-1">
-              <i
-                className="size-2 rounded-sm"
-                style={{ background: categorySettings[sport].color }}
-              />
-              {categorySettings[sport].name}
-            </span>
-          ))}
-      </div>
-      <details>
-        <summary className="cursor-pointer py-2 text-xs">Period totals</summary>
-        <div
-          className="overflow-x-auto"
-          tabIndex={0}
-          role="region"
-          aria-label="Period totals by sport"
-        >
-          <table className="w-full text-xs whitespace-nowrap">
-            <caption className="sr-only">
-              Period totals by sport, {metric}. Incomplete periods are marked.
-            </caption>
-            <thead>
-              <tr className="border-b">
-                <th
-                  scope="col"
-                  className="sticky left-0 bg-card py-2 pr-4 text-left"
-                >
-                  {range === 'years'
-                    ? 'Year'
+      <div className="grid min-w-0 gap-4 @min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(480px,1fr)]">
+        <div className="min-w-0 space-y-3">
+          <Measure
+            className="w-full"
+            style={{
+              height: wide
+                ? (context.focusChartHeight ?? 240)
+                : Math.min(context.focusChartHeight ?? 240, 240),
+            }}
+          >
+            {({ width, height }) => (
+              <SportArea
+                rows={rows}
+                width={width}
+                height={height}
+                detail
+                incomplete={buckets.flatMap((bucket) =>
+                  bucket.incomplete ? [String(bucket.start)] : [],
+                )}
+                trend={trend}
+                trendLabel={averageLabel}
+                palette={context.palette}
+                valueFormat={(value) => formatWithUnit(value, metric)}
+                axisFormat={(value, step) => formatShort(value, metric, step)}
+                xTickFormat={(value) =>
+                  range === 'years'
+                    ? label(Number(value))
                     : range === 'months'
-                      ? 'Month'
-                      : 'Week'}
-                </th>
-                {sports.map((sport) => (
-                  <th scope="col" key={sport} className="px-3 text-right">
-                    {categorySettings[sport].name}
-                  </th>
-                ))}
-                <th scope="col" className="pl-3 text-right">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {buckets.map((bucket) => (
-                <tr key={bucket.start} className="border-b border-muted">
-                  <th
-                    scope="row"
-                    className="sticky left-0 bg-card py-2 pr-4 text-left font-normal"
-                  >
-                    {label(bucket.start)}
-                    {bucket.incomplete && (
-                      <span className="text-muted-foreground">
-                        {' '}
-                        · incomplete
-                      </span>
-                    )}
-                  </th>
-                  {sports.map((sport) => (
-                    <td key={sport} className="px-3 text-right font-mono">
-                      {formatWithUnit(bucket.bySport[sport], metric)}
-                    </td>
-                  ))}
-                  <td className="pl-3 text-right font-mono font-semibold">
-                    {formatWithUnit(bucket.total, metric)}
-                  </td>
-                </tr>
+                      ? monthName(dateOfDay(Number(value)))
+                      : shortDate(dateOfDay(Number(value)))
+                }
+              />
+            )}
+          </Measure>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {trend.length > 0 && <span>Dashed: {averageLabel}</span>}
+            {sportOrder
+              .filter((sport) =>
+                buckets.some((bucket) => bucket.bySport[sport] > 0),
+              )
+              .map((sport) => (
+                <span key={sport} className="flex items-center gap-1">
+                  <i
+                    className="size-2 rounded-sm"
+                    style={{ background: categorySettings[sport].color }}
+                  />
+                  {categorySettings[sport].name}
+                </span>
               ))}
-            </tbody>
-          </table>
+          </div>
         </div>
-      </details>
+        {wide ? (
+          <section className="min-w-0" aria-label="Period totals">
+            <h2 className="py-2 text-sm font-medium">Period totals</h2>
+            {totals}
+          </section>
+        ) : (
+          <details>
+            <summary className="cursor-pointer py-2 text-xs">
+              Period totals
+            </summary>
+            {totals}
+          </details>
+        )}
+      </div>
     </div>
   );
 }
@@ -297,8 +322,14 @@ export function CalendarHistory({
   const earliestYear = dateOfDay(
     firstActivityDay(context.activities, context.today),
   ).getUTCFullYear();
-  const [year, setYear] = useState<number | null>(null);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [localYear, setLocalYear] = useState<number | null>(null);
+  const [localDay, setLocalDay] = useState<number | null>(null);
+  const { year, setYear, selectedDay, setSelectedDay } = context.calendar ?? {
+    year: localYear,
+    setYear: setLocalYear,
+    selectedDay: localDay,
+    setSelectedDay: setLocalDay,
+  };
   const selectedYear = expanded ? year : null;
   const first =
     selectedYear === null
@@ -404,99 +435,117 @@ export function CalendarHistory({
       )}
       <div
         className={
-          expanded ? 'flex h-[380px] flex-col' : 'flex min-h-0 flex-1 flex-col'
+          expanded
+            ? 'grid min-w-0 gap-5 @min-[1000px]:grid-cols-[minmax(0,3fr)_minmax(300px,2fr)]'
+            : 'flex min-h-0 flex-1 flex-col'
         }
       >
-        <MonthRows
-          units={context.units}
-          dateFormat={context.dateFormat}
-          key={`${first}-${last}`}
-          today={last}
-          first={first}
-          dominantSport={dominantSport}
-          secondSport={secondSport}
-          mixedDays={mixedDays}
-          totals={totals}
-          palette={context.palette}
-          colorBy={colorBy}
-          selectedDay={selectedDay}
-          onSelectDay={(day) => {
-            setSelectedDay(day);
-            if (!expanded) {
-              setYear(null);
-              context.onExpand?.();
-            }
-          }}
-          footer={
-            <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] leading-4 text-muted-foreground">
-              {sportOrder
-                .filter((sport) =>
-                  [...days.values()].some((activities) =>
-                    activities.some((activity) => activity.sport === sport),
-                  ),
-                )
-                .map((sport) => (
-                  <span key={sport} className="flex items-center gap-1">
-                    <i
-                      className="size-2"
-                      style={{ background: categorySettings[sport].color }}
-                    />
-                    {categorySettings[sport].name}
-                  </span>
-                ))}
-              {mixedDays.size > 0 && <span>Striped: multiple sports</span>}
-            </div>
+        <div
+          className={
+            expanded
+              ? 'flex h-[380px] flex-col'
+              : 'flex min-h-0 flex-1 flex-col'
           }
-        />
-      </div>
-      {selectedDay !== null && selectedDay >= first && selectedDay <= last && (
-        <section
-          className="mt-3 space-y-3 border-t pt-3"
-          aria-label="Selected day activities"
-          aria-live="polite"
         >
-          <div className="flex items-center justify-between gap-3">
-            <h4 className="text-sm font-medium">{dateLabel(selectedDay)}</h4>
-            <Button
-              variant="ghost"
-              className="h-11"
-              aria-label="Close day details"
-              onClick={() => setSelectedDay(null)}
+          <MonthRows
+            units={context.units}
+            dateFormat={context.dateFormat}
+            key={`${first}-${last}`}
+            today={last}
+            first={first}
+            dominantSport={dominantSport}
+            secondSport={secondSport}
+            mixedDays={mixedDays}
+            totals={totals}
+            palette={context.palette}
+            colorBy={colorBy}
+            selectedDay={selectedDay}
+            onSelectDay={(day) => {
+              setSelectedDay(day);
+              if (!expanded) {
+                setYear(null);
+                context.onExpand?.();
+              }
+            }}
+            footer={
+              <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] leading-4 text-muted-foreground">
+                {sportOrder
+                  .filter((sport) =>
+                    [...days.values()].some((activities) =>
+                      activities.some((activity) => activity.sport === sport),
+                    ),
+                  )
+                  .map((sport) => (
+                    <span key={sport} className="flex items-center gap-1">
+                      <i
+                        className="size-2"
+                        style={{ background: categorySettings[sport].color }}
+                      />
+                      {categorySettings[sport].name}
+                    </span>
+                  ))}
+                {mixedDays.size > 0 && <span>Striped: multiple sports</span>}
+              </div>
+            }
+          />
+        </div>
+        {selectedDay !== null &&
+          selectedDay >= first &&
+          selectedDay <= last && (
+            <section
+              className="mt-3 space-y-3 border-t pt-3"
+              aria-label="Selected day activities"
+              aria-live="polite"
             >
-              Close
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Activities matching your current filters.
-          </p>
-          {selectedActivities.length === 0 ? (
-            <p className="text-sm">No matching activities on this day.</p>
-          ) : (
-            <ul className="divide-y divide-muted">
-              {selectedActivities.map((activity, index) => (
-                <li key={activity.id ?? index}>
-                  <ActivityRow
-                    sport={activity.sport}
-                    name={activity.name}
-                    summary={`${categorySettings[activity.sport].name} · ${(
-                      ['distance', 'elevation', 'time'] as const
-                    )
-                      .map((metric) =>
-                        formatWithUnit(metricValue(activity, metric), metric),
-                      )
-                      .join(' · ')}`}
-                    onOpen={
-                      activity.id !== undefined && context.onOpenActivity
-                        ? () => context.onOpenActivity?.(activity.id!)
-                        : undefined
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="text-sm font-medium">
+                  {dateLabel(selectedDay)}
+                </h4>
+                <Button
+                  variant="ghost"
+                  className="h-11"
+                  aria-label="Close day details"
+                  onClick={() => setSelectedDay(null)}
+                >
+                  Close
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Activities matching your current filters.
+              </p>
+              {selectedActivities.length === 0 ? (
+                <p className="text-sm">No matching activities on this day.</p>
+              ) : (
+                <ul className="divide-y divide-muted">
+                  {selectedActivities.map((activity, index) => (
+                    <li key={activity.id ?? index}>
+                      <ActivityRow
+                        activityId={activity.id}
+                        sport={activity.sport}
+                        name={activity.name}
+                        summary={`${categorySettings[activity.sport].name} · ${(
+                          ['distance', 'elevation', 'time'] as const
+                        )
+                          .map((metric) =>
+                            formatWithUnit(
+                              metricValue(activity, metric),
+                              metric,
+                            ),
+                          )
+                          .join(' · ')}`}
+                        onOpen={
+                          activity.id !== undefined && context.onOpenActivity
+                            ? () => context.onOpenActivity?.(activity.id!)
+                            : undefined
+                        }
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           )}
-        </section>
-      )}
+      </div>
     </>
   );
 }

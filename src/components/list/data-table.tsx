@@ -35,6 +35,9 @@ import { cn } from '~/lib/utils';
 
 import { DataTablePagination } from './data-table-pagination';
 import { ListDetailTransition } from './list-detail-transition';
+import { inspectionStep, type DetailPresentation } from './inspection';
+import { Button } from '~/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   type DensityState,
   type SummaryRowState,
@@ -85,11 +88,14 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   headerClassName?: string;
   cellClassName?: string;
   onRowClick?: (row: Row<Features, TData>) => void;
-  /** A separate detail page; the table stays mounted behind it. */
+  /** An adaptive detail view; the table stays mounted throughout inspection. */
   renderDetails?: (row: Row<Features, TData>) => React.ReactNode;
   onDetailBack?: () => void;
   detailBackLabel?: string;
   detailNavigation?: React.ReactNode;
+  detailPresentation?: DetailPresentation;
+  /** Browse the complete filtered/sorted order, including other pages. */
+  detailStepping?: boolean;
   /** Travels with the retained list during the detail transition. */
   listHeader?: React.ReactNode;
   /** Fade the bottom edge while more rows are hidden below the fold. */
@@ -124,6 +130,8 @@ export const DataTable = React.memo(function DataTable<
   onDetailBack,
   detailBackLabel = 'Back to activities',
   detailNavigation,
+  detailPresentation = 'push',
+  detailStepping = false,
   listHeader,
   scrollHint = false,
   onOverflowChange,
@@ -138,6 +146,20 @@ export const DataTable = React.memo(function DataTable<
 }: DataTableProps<TData>) {
   const units = useDisplayUnits();
   const dateFormat = useDateFormat();
+  const panelOpen = !!(
+    renderDetails &&
+    activeId &&
+    detailPresentation === 'panel'
+  );
+  // Inspection reserves name/date without changing the chosen width mode.
+  // Width controls use the saved fitWidth and pinning state in both layouts.
+  const layoutVisibility = React.useMemo(
+    () =>
+      panelOpen
+        ? { ...columnVisibility, name: true, date: true }
+        : columnVisibility,
+    [panelOpen, columnVisibility],
+  );
   const sortedData = React.useMemo(
     () => sortActivities(data, sorting),
     [data, sorting],
@@ -145,6 +167,9 @@ export const DataTable = React.memo(function DataTable<
   const table = useTable({
     manualSorting: true,
     enableMultiSort: false,
+    // Stream/photo updates must not undo inspection's page navigation. The
+    // inspected index below keeps its page aligned with sort/filter changes.
+    autoResetPageIndex: !(detailStepping && activeId),
     features,
     data: sortedData,
     columns,
@@ -182,13 +207,13 @@ export const DataTable = React.memo(function DataTable<
         pageIndex: 0,
         pageSize: paginationControl ? 200 : Number.MAX_SAFE_INTEGER,
       },
-      columnVisibility,
+      columnVisibility: layoutVisibility,
       sorting,
       columnFilters,
       columnPinning,
     },
     state: {
-      columnVisibility,
+      columnVisibility: layoutVisibility,
       sorting,
       columnFilters,
       columnPinning,
@@ -201,6 +226,8 @@ export const DataTable = React.memo(function DataTable<
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
+  const lastInspectionRef = React.useRef(0);
+  const pendingFocusRef = React.useRef(0);
 
   // With fitWidth, keep pinned columns plus as many following columns as fit
   // at their natural width, instead of scrolling sideways. Natural widths come
@@ -244,15 +271,28 @@ export const DataTable = React.memo(function DataTable<
   const fallbackWidth = (width?: string) =>
     Number(/(\d+)px/.exec(width ?? '')?.[1] ?? 80);
   const widthOf = (column: (typeof visibleColumns)[number]) =>
-    naturalWidths[column.id] ?? fallbackWidth(column.columnDef.meta?.width);
+    Math.max(
+      panelOpen
+        ? column.id === 'name'
+          ? 200
+          : column.id === 'date'
+            ? 96
+            : 0
+        : 0,
+      naturalWidths[column.id] ?? fallbackWidth(column.columnDef.meta?.width),
+    );
   const shownColumnIds = React.useMemo(() => {
     const ids = visibleColumns.map((column) => column.id);
     if (!fitWidth || availableWidth === 0) return new Set(ids);
-    const pinned = visibleColumns.filter((column) => column.getIsPinned());
+    const pinned = visibleColumns.filter((column) =>
+      panelOpen
+        ? column.id === 'name' || column.id === 'date'
+        : column.getIsPinned(),
+    );
     let used = pinned.reduce((sum, column) => sum + widthOf(column), 0);
     const shown = new Set(pinned.map((column) => column.id));
     for (const column of visibleColumns) {
-      if (column.getIsPinned()) continue;
+      if (shown.has(column.id)) continue;
       used += widthOf(column);
       // Stop at the first column that overflows so the order stays intact.
       if (used > availableWidth) break;
@@ -261,7 +301,7 @@ export const DataTable = React.memo(function DataTable<
     return shown;
     // widthOf only reads naturalWidths and the columns' declared widths.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleColumns, fitWidth, availableWidth, naturalWidths]);
+  }, [visibleColumns, fitWidth, panelOpen, availableWidth, naturalWidths]);
   const hiddenByFit = React.useMemo(
     () =>
       new Set(
@@ -276,7 +316,7 @@ export const DataTable = React.memo(function DataTable<
     const width = column.columnDef.meta?.width;
     if (!fitWidth || naturalWidths[column.id] === undefined) return width;
     const grow = /([\d.]+fr)/.exec(width ?? '')?.[1] ?? '1fr';
-    return `minmax(${naturalWidths[column.id]}px, ${grow})`;
+    return `minmax(${widthOf(column)}px, ${grow})`;
   };
   const isShown = (columnId: string) => shownColumnIds.has(columnId);
   const [moreBelow, setMoreBelow] = React.useState(false);
@@ -302,11 +342,95 @@ export const DataTable = React.memo(function DataTable<
     return () => observer.disconnect();
   }, [scrollHint, onOverflowChange, updateMoreBelow, data.length, activeId]);
 
-  const detailRow = renderDetails
-    ? table
-        .getFilteredRowModel()
-        .rows.find((row) => Number(row.id) === activeId)
-    : undefined;
+  const inspectionRows = table.getFilteredRowModel().rows;
+  const inspectionIndex = inspectionRows.findIndex(
+    (row) => Number(row.id) === activeId,
+  );
+  const detailRow = renderDetails ? inspectionRows[inspectionIndex] : undefined;
+  const pageIndex = table.store.state.pagination.pageIndex;
+  // TanStack v9 returns a new React wrapper each render. Depend on its stable
+  // APIs so ordinary pagination does not reset back to the inspected row.
+  const {
+    setPageIndex,
+    getFilteredRowModel,
+    getRowModel,
+    store: tableStore,
+  } = table;
+  const step = (direction: -1 | 1) => {
+    const next = inspectionStep(
+      inspectionRows,
+      activeId ?? 0,
+      direction,
+      table.store.state.pagination.pageSize,
+    );
+    if (!next || !onRowClick) return;
+    table.setPageIndex(next.pageIndex);
+    onRowClick(next.row);
+  };
+
+  React.useLayoutEffect(() => {
+    if (!detailStepping) return;
+    if (activeId && inspectionIndex >= 0) {
+      lastInspectionRef.current = activeId;
+      setPageIndex(
+        Math.floor(inspectionIndex / tableStore.state.pagination.pageSize),
+      );
+    } else if (!activeId && lastInspectionRef.current) {
+      // The table remains interactive, so it may have been paged away from the
+      // inspected row. Browser Back and Close both return to that row's page.
+      const previousIndex = getFilteredRowModel().rows.findIndex(
+        (row) => Number(row.id) === lastInspectionRef.current,
+      );
+      pendingFocusRef.current =
+        previousIndex >= 0
+          ? lastInspectionRef.current
+          : Number(getRowModel().rows[0]?.id ?? 0);
+      lastInspectionRef.current = 0;
+      if (previousIndex >= 0)
+        setPageIndex(
+          Math.floor(previousIndex / tableStore.state.pagination.pageSize),
+        );
+    }
+  }, [
+    activeId,
+    inspectionIndex,
+    detailStepping,
+    setPageIndex,
+    getFilteredRowModel,
+    getRowModel,
+    tableStore,
+  ]);
+
+  React.useLayoutEffect(() => {
+    const focusId =
+      activeId !== undefined && activeId > 0
+        ? activeId
+        : pendingFocusRef.current;
+    if (!detailStepping || !focusId) return;
+    const row = containerRef.current?.querySelector<HTMLElement>(
+      `[data-activity-id="${focusId}"]`,
+    );
+    if (!row) return;
+    returnFocusRef.current = row;
+    if (!activeId) {
+      row.focus({ preventScroll: true });
+      pendingFocusRef.current = 0;
+      return;
+    }
+    // Scroll only the table, never its ancestors or the detail. Instant scrolling
+    // also respects reduced motion, including when stepping across pages.
+    const scroller =
+      containerRef.current?.querySelector('#table-main')?.parentElement;
+    if (!scroller) return;
+    const bounds = scroller.getBoundingClientRect();
+    const rowBounds = row.getBoundingClientRect();
+    const headerHeight =
+      scroller.querySelector('thead')?.getBoundingClientRect().height ?? 0;
+    if (rowBounds.top < bounds.top + headerHeight)
+      scroller.scrollTop += rowBounds.top - bounds.top - headerHeight;
+    else if (rowBounds.bottom > bounds.bottom)
+      scroller.scrollTop += rowBounds.bottom - bounds.bottom;
+  }, [activeId, pageIndex, detailStepping]);
 
   return (
     <div
@@ -321,8 +445,46 @@ export const DataTable = React.memo(function DataTable<
         detail={detailRow && renderDetails?.(detailRow)}
         onBack={onDetailBack ?? (() => undefined)}
         backLabel={detailBackLabel}
-        navigation={detailNavigation}
         returnFocus={returnFocusRef}
+        presentation={detailPresentation}
+        onStep={detailStepping ? step : undefined}
+        navigation={
+          detailStepping ? (
+            <div className="flex min-w-0 items-center gap-1 text-xs tabular-nums">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                aria-label="Previous activity"
+                disabled={inspectionIndex <= 0}
+                onClick={() => step(-1)}
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <span
+                className="whitespace-nowrap"
+                aria-label={`Activity ${inspectionIndex + 1} of ${inspectionRows.length}`}
+              >
+                {inspectionIndex + 1}/{inspectionRows.length}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                aria-label="Next activity"
+                disabled={
+                  inspectionIndex < 0 ||
+                  inspectionIndex >= inspectionRows.length - 1
+                }
+                onClick={() => step(1)}
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+          ) : (
+            detailNavigation
+          )
+        }
       >
         {listHeader}
         <Table
@@ -360,9 +522,9 @@ export const DataTable = React.memo(function DataTable<
                         className={cn(
                           'py-0 flex items-center',
                           header.column.getIsPinned() == 'start' &&
-                            'sticky left-0 bg-muted border-border border-r',
+                            'sticky left-0 z-1 bg-muted border-border border-r',
                           header.column.getIsPinned() == 'end' &&
-                            'sticky right-0 bg-muted border-border border-l',
+                            'sticky right-0 z-1 bg-muted border-border border-l',
                         )}
                         key={header.id}
                       >
@@ -394,9 +556,9 @@ export const DataTable = React.memo(function DataTable<
                         className={cn(
                           'h-8 border-b border-t border-border text-xs font-bold flex items-center',
                           footer.column.getIsPinned() == 'start' &&
-                            'sticky left-0 bg-muted border-r border-border',
+                            'sticky left-0 z-1 bg-muted border-r border-border',
                           footer.column.getIsPinned() == 'end' &&
-                            'sticky right-0 bg-muted border-l border-border',
+                            'sticky right-0 z-1 bg-muted border-l border-border',
                         )}
                       >
                         {flexRender(
@@ -414,7 +576,13 @@ export const DataTable = React.memo(function DataTable<
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
+                  data-activity-id={row.id}
                   data-detail-origin={Number(row.id) === activeId || undefined}
+                  aria-current={
+                    detailStepping && Number(row.id) === activeId
+                      ? 'true'
+                      : undefined
+                  }
                   data-state={row.getIsSelected() && 'selected'}
                   className={cn(
                     'group grid grid-cols-subgrid col-span-full',
@@ -455,10 +623,19 @@ export const DataTable = React.memo(function DataTable<
                       <TableCell
                         className={cn(
                           'bg-background group-data-[state=selected]:bg-muted flex items-center',
+                          // Blend into an opaque surface so pinned cells cover
+                          // scrolling content even when inspected or selected.
+                          detailStepping &&
+                            Number(row.id) === activeId &&
+                            'bg-[color:color-mix(in_srgb,var(--color-header-background)_10%,var(--color-background))] group-data-[state=selected]:bg-[color:color-mix(in_srgb,var(--color-header-background)_10%,var(--color-muted))] border-y border-header-background/40',
+                          detailStepping &&
+                            Number(row.id) === activeId &&
+                            cell.column.id === 'name' &&
+                            'shadow-[inset_3px_0_0_var(--color-header-background)]',
                           cell.column.getIsPinned() == 'start' &&
-                            'sticky left-0 border-border border-r',
+                            'sticky left-0 z-1 border-border border-r',
                           cell.column.getIsPinned() == 'end' &&
-                            'sticky right-0 border-border border-l',
+                            'sticky right-0 z-1 border-border border-l',
                           density == 'sm'
                             ? 'py-1 px-1'
                             : density == 'md'
