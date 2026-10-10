@@ -46,6 +46,13 @@ final class SyncController {
     private var generation = 0
     private var retryAt: Date?
     private var retryIsRateLimit = true
+    // Checkpoint timestamps/cursors can advance without any visible data change.
+    // Retain one detached snapshot so an unchanged poll does not invalidate
+    // Stats, route sources, selection caches or loaded photo images.
+    @ObservationIgnored private var publishedActivities: [ActivityMapAPI.Activity]?
+    @ObservationIgnored private var publishedActivityRevision: Int?
+    @ObservationIgnored private var publishedPhotos: [ActivityMapAPI.Photo]?
+    @ObservationIgnored private var photoCacheConfigured = false
 
     var hasCompletedCache: Bool { checkpoint?.bootstrapComplete == true && checkpoint?.lastSyncAt != nil }
     var lastSyncAt: Date? { checkpoint?.lastSyncAt }
@@ -242,29 +249,50 @@ final class SyncController {
         guard current == generation, !Task.isCancelled else { throw CancellationError() }
         checkpoint = snapshot.checkpoint
         guard let checkpoint, checkpoint.bootstrapComplete, checkpoint.lastSyncAt != nil else {
-            activities.activities = []
-            photos = []
-            activities.photos = []
+            publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil
+            photoCacheConfigured = false
+            if !activities.activities.isEmpty { activities.activities = [] }
+            if !photos.isEmpty { photos = [] }
+            if !activities.photos.isEmpty { activities.photos = [] }
             try? await activities.photoImages.configure(scope: session.scope, photos: [])
             return
         }
-        let mapped = try snapshot.activities.map(StoredModelMapper.activity)
-        // Assigning activities drops selection/focus/inspection of absent IDs
-        // (committed deletions and rebootstrap removals) inside ActivityStore.
-        activities.activities = mapped
-        let activityIDs = Set(mapped.map { String($0.id) })
-        let mappedPhotos = snapshot.photos.map(StoredModelMapper.photo).filter { photo in
-            activityIDs.contains(photo.activityID)
+        let activitiesChanged = publishedActivities != snapshot.activities
+            || publishedActivityRevision != activities.activitiesRevision
+        if activitiesChanged {
+            // Actual edits/deletions still invalidate derived data and reconcile
+            // selection/inspection. An identical cache reload leaves it intact.
+            activities.activities = try snapshot.activities.map(StoredModelMapper.activity)
+            publishedActivities = snapshot.activities
+            publishedActivityRevision = activities.activitiesRevision
         }
-        photos = mappedPhotos
-        activities.photos = mappedPhotos
+        if activitiesChanged || publishedPhotos != snapshot.photos {
+            let activityIDs = Set(activities.activities.map { String($0.id) })
+            let mappedPhotos = snapshot.photos.map(StoredModelMapper.photo).filter { photo in
+                activityIDs.contains(photo.activityID)
+            }
+            photos = mappedPhotos
+            activities.photos = mappedPhotos
+            publishedPhotos = snapshot.photos
+            photoCacheConfigured = false
+        }
         // Image-cache I/O failure must not invalidate committed metadata or sync.
-        // The image loader will show an unavailable state if its byte store fails.
-        try? await activities.photoImages.configure(scope: session.scope, photos: mappedPhotos)
+        // Retry a failed configuration even if the metadata remains unchanged.
+        if !photoCacheConfigured {
+            let configured: Bool
+            do {
+                try await activities.photoImages.configure(scope: session.scope, photos: photos)
+                configured = true
+            } catch { configured = false }
+            guard current == generation, !Task.isCancelled else { throw CancellationError() }
+            photoCacheConfigured = configured
+        }
         guard current == generation, !Task.isCancelled else { throw CancellationError() }
     }
 
     private func clearVisible() {
+        publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil
+        photoCacheConfigured = false
         summaries.reset()
         activities.clearScope()
         photos = []

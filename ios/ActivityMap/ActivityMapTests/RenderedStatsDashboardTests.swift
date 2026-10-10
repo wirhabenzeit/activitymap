@@ -1087,6 +1087,43 @@ import Testing
         #expect(state.expandedTile == .weeklyVolume)
     }
 
+    @Test func foregroundSyncWithoutChangesKeepsRenderedStats() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        try await storage.apply([.upsertActivity(try Fixtures.activity())], checkpoint: Fixtures.checkpoint, scope: Fixtures.scope)
+        let source = GatedChangesSource(unchanged: SyncFixtures.changes(next: "cursor-1"))
+        let store = ActivityStore(), state = StatsDashboardState()
+        let sync = SyncController(activities: store, source: { _ in source }, invalidate: { _ in })
+        sync.setSession(SyncFixtures.session(verified: false), storage: storage); await sync.refresh()
+        store.selectedTab = .stats
+        let host = try StatsDashboardHarness(root: StatsScreen(store: store, sync: sync, dashboard: state),
+                                              size: CGSize(width: 402, height: 874))
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let scroll = try #require(host.descendants(UIScrollView.self).first { $0.contentSize.height > 1500 })
+        scroll.setContentOffset(CGPoint(x: 0, y: 300), animated: false)
+        let offset = scroll.contentOffset, height = scroll.contentSize.height
+        let originalSource = StatsDashboardSource(store), calculations = store.stats.calculationCount
+        try host.capture("unchanged-sync-before")
+        sync.setSession(SyncFixtures.session(), storage: storage)
+        await source.waitForRequest()
+        #expect(sync.status == .syncing)
+        for _ in 0..<20 {
+            try await Task.sleep(for: .milliseconds(16))
+            #expect(StatsDashboardSource(store) == originalSource)
+            #expect(StatsDashboard.ids.allSatisfy { state.face($0, source: StatsDashboardSource(store)) != nil },
+                    "A routine sync must not replace existing charts with Calculating placeholders")
+            #expect(scroll.contentOffset == offset && abs(scroll.contentSize.height - height) < 1)
+        }
+        try host.capture("unchanged-sync-during")
+        await source.release(); await sync.refresh()
+        sync.pause(); await sync.refresh()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(sync.status == .ready && StatsDashboardSource(store) == originalSource)
+        #expect(store.stats.calculationCount == calculations && store.stats.aggregationCount == 1)
+        #expect(scroll.contentOffset == offset && abs(scroll.contentSize.height - height) < 1)
+        try host.capture("unchanged-sync-after")
+    }
+
     @Test func realOfflineFailureAndAuthorizationTransitionsKeepTruthfulContent() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         var checkpoint = Fixtures.checkpoint
