@@ -129,6 +129,12 @@ struct MapScreen: View {
         .onStyleLoaded { _ in
             if !acceptsCameraEvents { viewport = context.camera.viewport }
             acceptsCameraEvents = true
+            scheduleNavigation(proxy: proxy)
+        }
+        .onRenderFrameFinished { _ in
+            // The shell can replace a native bar when returning from List.
+            // Mapbox's fitter must see its resized viewport, not the previous
+            // tab's bounds. Keep the request until that layout has rendered.
             applyNavigation(proxy: proxy, geometry: geometry)
         }
         .onMapIdle { _ in
@@ -145,30 +151,23 @@ struct MapScreen: View {
                     withViewportAnimation(.easeOut(duration: 0.5)) { viewport = deferred.viewport }
                 }
             }
-            applyNavigation(proxy: proxy, geometry: geometry)
         }
         .ignoresSafeArea()
         .onChange(of: store.selectedTab) { _, tab in
-            if tab == .map { applyNavigation(proxy: proxy, geometry: geometry) }
+            if tab == .map { scheduleNavigation(proxy: proxy) }
         }
-        .onChange(of: context.pendingRequest?.id) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
-        .onChange(of: picker.detent) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
-        .onChange(of: picker.isPresented) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
-        .onChange(of: geometry.size) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
+        .onChange(of: context.pendingRequest?.id, initial: true) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: picker.detent) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: picker.isPresented) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: geometry.size) { _, _ in scheduleNavigation(proxy: proxy) }
         .onChange(of: store.activitiesRevision, initial: true) { _, revision in
             picker.reconcile(with: store)
             store.routeGeometry.update(activities: store.activities, revision: revision)
         }
     }
 
-    private func applyNavigation(proxy: MapProxy, geometry: GeometryProxy) {
-        guard store.selectedTab == .map, let map = proxy.map else { return }
-        if !acceptsCameraEvents {
-            // A cached style may already be ready before SwiftUI observes its
-            // load/idle event. An explicit fit must not wait for another idle.
-            guard context.pendingRequest != nil, map.isStyleLoaded else { return }
-            acceptsCameraEvents = true
-        }
+    private func scheduleNavigation(proxy: MapProxy) {
+        guard store.selectedTab == .map, context.pendingRequest != nil else { return }
         if case let .activity(id) = context.pendingRequest?.action,
            store.visibleSelectedActivityIDs.contains(id) {
             // Do not activate a different remaining result if filters/deletion
@@ -183,6 +182,15 @@ struct MapScreen: View {
             // A fully expanded phone sheet returns to its normal opening height.
             picker.detent = .medium
         }
+        // Even a fit of an unchanged selection needs a frame; there may be no
+        // style or source update to trigger one on an already idle map.
+        proxy.map?.triggerRepaint()
+    }
+
+    private func applyNavigation(proxy: MapProxy, geometry: GeometryProxy) {
+        guard store.selectedTab == .map, context.pendingRequest != nil,
+              let map = proxy.map, map.isStyleLoaded else { return }
+        acceptsCameraEvents = true
         let layout = MapResultsLayout.framing(size: geometry.size,
             topInset: max(topOcclusion, geometry.safeAreaInsets.top), bottomInset: geometry.safeAreaInsets.bottom,
             detent: picker.detent, largeText: typeSize.isAccessibilitySize)

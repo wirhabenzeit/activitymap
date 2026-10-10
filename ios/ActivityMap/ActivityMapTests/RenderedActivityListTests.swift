@@ -374,6 +374,25 @@ extension RenderedRoutePickingTests {
         #expect(host.host.presentedViewController?.sheetPresentationController != nil)
         try host.save("list-detail-map-handoff")
         if let directory = captureDirectory { try Data().write(to: directory.appendingPathComponent("done")) }
+
+        // An already-idle map must also render and consume explicit commands
+        // without a tab switch, source change or new selection to wake it up.
+        store.mapContext.request(.resetView)
+        try await listWait {
+            guard case .state = map.viewport.status else { return false }
+            return store.mapContext.pendingRequest == nil
+                && abs(map.mapboxMap.cameraState.zoom - MapCamera.initial.zoom) < 0.01
+        }
+        store.mapContext.request(.fitSelection)
+        try await listWait {
+            guard case .state = map.viewport.status else { return false }
+            return store.mapContext.pendingRequest == nil
+                && map.mapboxMap.cameraState.zoom > MapCamera.initial.zoom + 1
+        }
+        let fittedArea = map.bounds.inset(by: map.mapboxMap.cameraState.padding).insetBy(dx: -2, dy: -2)
+        let selectedRoute = store.activities.filter { store.selectedActivityIDs.contains($0.id) }.flatMap(\.coordinates)
+        #expect(map.mapboxMap.points(for: selectedRoute).allSatisfy { fittedArea.contains($0) })
+        #expect(host.descendants(of: MapView.self).first === map)
     }
 
     @Test(arguments: ["phone", "landscape", "large-text", "split-window"])
