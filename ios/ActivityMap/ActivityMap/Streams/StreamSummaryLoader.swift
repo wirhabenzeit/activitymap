@@ -12,6 +12,7 @@ nonisolated struct SummaryFailure: Equatable, Sendable {
     let retryable: Bool
     let retryAt: Date?
     let requestID: String?
+    var isOffline = false
 }
 nonisolated enum StreamSummaryState: Equatable, Sendable {
     case notRequested, loading
@@ -337,15 +338,18 @@ final class StreamSummaryLoader {
         var retryable = false
         var delay: TimeInterval?
         var requestID: String?
+        var isOffline = false
         switch error as? APIClient.RequestError {
         case .rateLimited(let seconds, let id): retryable = true; delay = seconds; requestID = id
         case .server(_, _, _, let id, let retry, let seconds): retryable = retry; delay = seconds; requestID = id
         case .serviceUnavailable(let seconds, let id): retryable = true; delay = seconds; requestID = id
-        case .transport: retryable = true
+        case .transport(_, let code):
+            retryable = true
+            isOffline = code == URLError.notConnectedToInternet.rawValue || code == URLError.dataNotAllowed.rawValue
         default: break
         }
         return .init(message: String(describing: error), retryable: retryable,
-                     retryAt: delay.map { now().addingTimeInterval(max(1, $0)) }, requestID: requestID)
+                     retryAt: delay.map { now().addingTimeInterval(max(1, $0)) }, requestID: requestID, isOffline: isOffline)
     }
 
     private func committed(_ change: SummaryStoreChange, epoch current: Int) async {
@@ -353,6 +357,7 @@ final class StreamSummaryLoader {
               change.scope == nil || change.scope == session.scope.key else { return }
         let ids = change.activityIDs ?? Set(states.keys).union(requests.keys)
         for id in ids {
+            if !change.cancelsRequests, requests[id] != nil { continue }
             let wasObserved = states[id] != nil || requests[id] != nil
             cancel(activityID: id)
             guard wasObserved else { continue }

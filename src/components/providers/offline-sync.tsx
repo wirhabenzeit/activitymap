@@ -8,15 +8,26 @@ import {
   useBrowserSyncStatus,
 } from '~/lib/sync/browser-status';
 import { SyncApiError } from '~/lib/sync/v1-client';
-import { getV1SyncState } from '~/lib/sync/v1-store';
+import {
+  getV1SyncState,
+  OfflineCacheUpgradeBlockedError,
+} from '~/lib/sync/v1-store';
 import { deleteLegacyOfflineDatabase } from '~/lib/sync/v1-store';
 import { runV1Sync } from '~/lib/sync/v1-sync';
+import {
+  clearStreamSummarySyncAttempts,
+  syncStoredStreamSummaries,
+} from '~/lib/sync/stream-summary-sync';
 import { useShallowStore } from '~/store';
 import {
   reconcileStreamSummaryMetadata,
   reloadStreamSummaryScope,
   removeStreamSummaryActivity,
   removeStreamSummaryScope,
+  StreamSummaryBatchError,
+  streamSummaryQueryKey,
+  type StreamSummaryResult,
+  mergeStoredStreamSummaryResult,
 } from '~/lib/activity-stream-summary';
 
 /**
@@ -37,12 +48,16 @@ export function OfflineSyncProvider() {
     userId: string;
   } | null>(null);
   const previousUserIdRef = useRef<string | undefined>(undefined);
+  const summaryRetryAtRef = useRef(new Map<string, number>());
   const queryClient = useQueryClient();
-  const { userId, isInitialized, isGuest } = useShallowStore((state) => ({
-    userId: state.user?.id,
-    isInitialized: state.isInitialized,
-    isGuest: state.isGuest,
-  }));
+  const { userId, isInitialized, isGuest, initializeAuth } = useShallowStore(
+    (state) => ({
+      userId: state.user?.id,
+      isInitialized: state.isInitialized,
+      isGuest: state.isGuest,
+      initializeAuth: state.initializeAuth,
+    }),
+  );
 
   const runSync = useCallback(() => {
     if (!isInitialized || isGuest || !userId) return;
@@ -75,7 +90,10 @@ export function OfflineSyncProvider() {
         return runV1Sync({
           scope,
           signal: controller.signal,
-          onScopeReset: () => reloadStreamSummaryScope(queryClient, userId),
+          onScopeReset: () => {
+            clearStreamSummarySyncAttempts(userId);
+            return reloadStreamSummaryScope(queryClient, userId);
+          },
           onActivityChanges: async (changes) => {
             for (const change of changes) {
               if (change.operation === 'delete') {
@@ -109,15 +127,72 @@ export function OfflineSyncProvider() {
             `Legacy offline cache cleanup ${cleanup}; it will be retried.`,
           );
         }
+        if (
+          controller.signal.aborted ||
+          (summaryRetryAtRef.current.get(userId) ?? 0) > Date.now()
+        )
+          return;
+        // Activity sync is already ready. Profiles are a resumable, stored-only
+        // follow-up; failed batches must not undo a successful activity cursor.
+        try {
+          await syncStoredStreamSummaries({
+            userId,
+            signal: controller.signal,
+            onResults: (results) => {
+              for (const [id, result] of results) {
+                const queryKey = streamSummaryQueryKey(userId, id);
+                // Keep library-wide data on disk, materializing only queries
+                // the current views already use in React Query's memory cache.
+                if (queryClient.getQueryState(queryKey)) {
+                  queryClient.setQueryData<StreamSummaryResult>(
+                    queryKey,
+                    (current) =>
+                      mergeStoredStreamSummaryResult(current, result),
+                  );
+                }
+              }
+            },
+          });
+          // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
+          summaryRetryAtRef.current.delete(userId);
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          if (
+            error instanceof StreamSummaryBatchError &&
+            error.status === 401
+          ) {
+            await removeStreamSummaryScope(queryClient, userId).catch(
+              () => undefined,
+            );
+            updateBrowserSyncStatus(userId, {
+              phase: 'error',
+              error: 'Sign in again to download ActivityMap changes.',
+            });
+            initializeAuth({ currentUser: null });
+            return;
+          }
+          summaryRetryAtRef.current.set(
+            userId,
+            error instanceof StreamSummaryBatchError && error.retryAt !== null
+              ? error.retryAt
+              : Date.now() + 60_000,
+          );
+          console.warn(
+            'Profile downloads paused; missing summaries will be retried on the next sync.',
+            error,
+          );
+        }
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         updateBrowserSyncStatus(userId, {
           phase: navigator.onLine ? 'error' : 'offline',
           error:
-            error instanceof SyncApiError && error.status === 401
-              ? 'Sign in again to download ActivityMap changes.'
-              : 'Could not download ActivityMap changes. Your cached data remains available; retry when connected.',
+            error instanceof OfflineCacheUpgradeBlockedError
+              ? error.message
+              : error instanceof SyncApiError && error.status === 401
+                ? 'Sign in again to download ActivityMap changes.'
+                : 'Could not download ActivityMap changes. Your cached data remains available; retry when connected.',
           retryAt: error instanceof SyncApiError ? error.retryAt : null,
         });
       })
@@ -127,14 +202,19 @@ export function OfflineSyncProvider() {
         }
       });
     inFlightRef.current = { controller, promise, token, userId };
-  }, [isInitialized, isGuest, queryClient, userId]);
+  }, [isInitialized, isGuest, queryClient, userId, initializeAuth]);
 
   useEffect(() => {
     const previous = previousUserIdRef.current;
     previousUserIdRef.current = !isGuest ? userId : undefined;
     if (previous && (previous !== userId || isGuest)) {
       inFlightRef.current?.controller.abort();
-      void removeStreamSummaryScope(queryClient, previous);
+      clearStreamSummarySyncAttempts(previous);
+      // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
+      summaryRetryAtRef.current.delete(previous);
+      void removeStreamSummaryScope(queryClient, previous).catch(
+        () => undefined,
+      );
     }
   }, [isGuest, queryClient, userId]);
 

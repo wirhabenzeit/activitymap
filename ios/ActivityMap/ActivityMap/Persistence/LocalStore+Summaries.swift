@@ -5,6 +5,15 @@ nonisolated struct SummaryStoreChange: Sendable {
     let scope: String?
     /// nil denotes scope replacement/security cleanup; only observed IDs reload.
     let activityIDs: Set<String>?
+    /// Invalidation must cancel demand. A prefetch publication must not cancel
+    /// a user-requested refresh or pending foreground fetch already in flight.
+    let cancelsRequests: Bool
+}
+
+nonisolated struct SummarySyncCandidate: Sendable {
+    let activityID: String
+    let metadata: ActivityMapAPI.StreamMetadata
+    let startDate: Date
 }
 
 extension LocalStore {
@@ -18,12 +27,32 @@ extension LocalStore {
         }
     }
     private func removeSummaryObserver(_ id: UUID) { summaryObservers[id] = nil }
-    func notifySummaryChange(scope: String?, activityIDs: Set<String>? = nil) {
+    func notifySummaryChange(scope: String?, activityIDs: Set<String>? = nil, cancelsRequests: Bool = true) {
         for observer in summaryObservers.values {
-            observer.yield(SummaryStoreChange(scope: scope, activityIDs: activityIDs))
+            observer.yield(SummaryStoreChange(scope: scope, activityIDs: activityIDs, cancelsRequests: cancelsRequests))
         }
     }
     func streamFence() -> StreamFence { streamFences.capture() }
+
+    /// Inspect identities only; compact series stay encoded during sync. This
+    /// includes indoor activities with time, heart-rate or power summaries.
+    func summarySyncCandidates(scope: StoreScope) throws -> [SummarySyncCandidate] {
+        try Task.checkCancellation()
+        let context = makeContext()
+        let key = scope.key
+        let cached = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<StoredStreamSummary>(
+            predicate: #Predicate { $0.scope == key })).map { ($0.activityID, $0) })
+        return try context.fetch(FetchDescriptor<StoredActivity>(predicate: #Predicate { $0.scope == key }))
+            .compactMap { row in
+                let activity = try row.decoded()
+                guard let metadata = activity.streams, metadata.state == .current else { return nil }
+                if let saved = cached[activity.id], !saved.invalidated, saved.summaryVersion != nil,
+                   !StreamRevision.supersedes(metadata, generation: saved.generation, revision: saved.revision) { return nil }
+                return SummarySyncCandidate(activityID: activity.id, metadata: metadata, startDate: activity.startDate)
+            }.sorted {
+                $0.startDate == $1.startDate ? $0.activityID < $1.activityID : $0.startDate > $1.startDate
+            }
+    }
 
     func cachedStreamSummary(activityID: String, scope: StoreScope) throws -> CachedStreamSummary? {
         let key = StoreScope.key([scope.key, activityID])

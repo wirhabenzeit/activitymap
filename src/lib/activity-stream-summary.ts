@@ -9,6 +9,11 @@ import {
 } from '~/contracts/v1/activity-streams';
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
+import { sameStreamMetadata as sameMetadata } from '~/lib/streams/summary-cache-record';
+import {
+  clearCachedStreamSummaries,
+  deleteCachedStreamSummary,
+} from '~/lib/sync/v1-store';
 
 import {
   decodeStreamSummary,
@@ -132,14 +137,6 @@ export function parseRetryAfterMs(
   return Math.max(0, date - now);
 }
 
-const sameMetadata = (
-  left: StreamMetadata | null | undefined,
-  right: StreamMetadata | null | undefined,
-) =>
-  (left?.generation ?? null) === (right?.generation ?? null) &&
-  (left?.revision ?? '0') === (right?.revision ?? '0') &&
-  (left?.state ?? 'not_fetched') === (right?.state ?? 'not_fetched');
-
 const revision = (metadata: StreamMetadata): bigint =>
   BigInt(metadata.revision);
 
@@ -192,13 +189,36 @@ export function isStreamSummaryResultReusable(
   );
 }
 
+/** A stored-only batch must not roll back a demand response received meanwhile. */
+export function mergeStoredStreamSummaryResult(
+  current: StreamSummaryResult | undefined,
+  incoming: StreamSummaryResult,
+): StreamSummaryResult {
+  if (
+    !current?.summary ||
+    current.metadata?.state !== 'current' ||
+    !incoming.metadata
+  )
+    return incoming;
+  if (current.metadata.generation === incoming.metadata.generation) {
+    return revision(current.metadata) >= revision(incoming.metadata)
+      ? current
+      : incoming;
+  }
+  // A demand response can replace the generation it originally observed while
+  // a stored-only request still holds that older generation's snapshot.
+  return sameMetadata(current.requestedAgainst, incoming.metadata)
+    ? current
+    : incoming;
+}
+
 const scopeFence = new Map<string, number>();
 const activityFence = new Map<string, number>();
 const observedMetadata = new Map<string, StreamMetadata | undefined>();
 const fenceKey = (userId: string, activityId: string) =>
   `${userId}\u0000${activityId}`;
 
-const rememberInitialMetadata = (
+export const rememberInitialMetadata = (
   userId: string,
   activityId: string,
   metadata: StreamMetadata | undefined,
@@ -400,6 +420,15 @@ export async function fetchActivityStreamSummary(options: {
   };
 }
 
+export class StreamSummaryBatchError extends Error {
+  constructor(
+    public readonly retryAt: number | null,
+    public readonly status: number,
+  ) {
+    super('Could not download stored stream summaries.');
+  }
+}
+
 export async function fetchStoredStreamSummaryBatch(options: {
   activityIds: string[];
   userId: string;
@@ -432,11 +461,21 @@ export async function fetchStoredStreamSummaryBatch(options: {
       signal: options.signal,
     },
   );
-  if (!response.ok) return new Map();
+  if (!response.ok) {
+    const delay = parseRetryAfterMs(
+      response.headers.get('Retry-After'),
+      options.now?.() ?? Date.now(),
+    );
+    throw new StreamSummaryBatchError(
+      delay === null ? null : (options.now?.() ?? Date.now()) + delay,
+      response.status,
+    );
+  }
   const parsed = responseEnvelope(
     activityCompactStreamSummariesDTOSchema,
   ).safeParse(await response.json());
-  if (!parsed.success) return new Map();
+  if (!parsed.success)
+    throw new Error('Could not read stored stream summaries.');
   const entries = new Map(
     parsed.data.data.summaries.map((entry) => [entry.activity_id, entry]),
   );
@@ -479,6 +518,7 @@ export async function removeStreamSummaryActivity(
   const queryKey = streamSummaryQueryKey(userId, activityId);
   await queryClient.cancelQueries({ queryKey, exact: true });
   queryClient.removeQueries({ queryKey, exact: true });
+  await deleteCachedStreamSummary(`auth:${userId}`, activityId);
 }
 
 export async function reloadStreamSummaryActivity(
@@ -489,6 +529,7 @@ export async function reloadStreamSummaryActivity(
   fenceStreamSummaryActivity(userId, activityId);
   const queryKey = streamSummaryQueryKey(userId, activityId);
   await queryClient.cancelQueries({ queryKey, exact: true });
+  await deleteCachedStreamSummary(`auth:${userId}`, activityId);
   // Reset drops invalid data immediately and refetches an active observer.
   // Inactive entries stay empty until a chart requests them again. Do not
   // make activity sync wait for an active chart's network request.
@@ -509,6 +550,7 @@ export async function removeStreamSummaryScope(
   const queryKey = [...STREAM_SUMMARY_QUERY_ROOT, userId];
   await queryClient.cancelQueries({ queryKey });
   queryClient.removeQueries({ queryKey });
+  await clearCachedStreamSummaries(`auth:${userId}`);
 }
 
 export async function reloadStreamSummaryScope(
@@ -522,6 +564,7 @@ export async function reloadStreamSummaryScope(
   }
   const queryKey = [...STREAM_SUMMARY_QUERY_ROOT, userId];
   await queryClient.cancelQueries({ queryKey });
+  await clearCachedStreamSummaries(`auth:${userId}`);
   // Cache reset happens synchronously; its active-query refetch continues
   // independently so bootstrap can clear/apply the sync scope immediately.
   void queryClient.resetQueries({ queryKey }).catch(() => undefined);
