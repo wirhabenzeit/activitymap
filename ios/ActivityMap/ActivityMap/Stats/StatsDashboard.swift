@@ -195,7 +195,12 @@ struct StatsDashboardFace {
         inspections = Dictionary(uniqueKeysWithValues: StatsDashboard.ids.map { ($0, StatsTileInspection()) })
     }
     var choices: [StatsTileID: StatsToggleOption] = [:]
-    var expandedTile: StatsTileID?
+    var expandedTile: StatsTileID? {
+        // Every way of leaving a focus page, including the interactive pop
+        // gesture, ends its activity inspection rather than handing it to
+        // the dashboard.
+        didSet { if expandedTile != oldValue { inspectedActivityID = nil } }
+    }
     private(set) var completedTiles: Set<StatsTileID> = []
     private struct Entry {
         let source: StatsDashboardSource

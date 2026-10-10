@@ -24,7 +24,7 @@ struct StatsActivityInspection<Content: View>: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if showsPanel, let id = dashboard.inspectedActivityID {
                     Divider()
-                    ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: 44, showOnMap: { id in
+                    ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: 44, hostTab: .stats, showOnMap: { id in
                         if store.showOnMap(id) == .shown { dashboard.inspectedActivityID = nil }
                     })
                     .overlay(alignment: .topTrailing) {
@@ -82,7 +82,7 @@ private struct StatsInspectionNavigation: ViewModifier {
                 ActivityDetailView(store: store, activityID: item.id, backLabel: backLabel,
                                    backIdentifier: "stats-activity-back", onMapShown: {
                     dashboard.inspectedActivityID = nil
-                })
+                }, hostTab: .stats)
             }
         } else { content }
     }
