@@ -167,8 +167,10 @@ struct AppShell: View {
                 let filterWidth = sidebarAvailable
                     ? (sheets.showsFilters && !panelFloats ? BrowsePaneLayout.filterWidth : FilterRail.width) + 1 : 0
                 let contentWidth = max(0, geometry.size.width - filterWidth)
-                let nativeListHeader = listNavigation.detailPresented || sizeClass != .regular
-                    || contentWidth < BrowsePaneLayout.minimumDetailWidth || typeSize.isAccessibilitySize
+                // Beside the filter sidebar, List keeps the full-width header
+                // like Map and Stats; a pushed detail's bar stays in its column.
+                let nativeListHeader = !sidebarAvailable && (listNavigation.detailPresented || sizeClass != .regular
+                    || contentWidth < BrowsePaneLayout.minimumDetailWidth || typeSize.isAccessibilitySize)
                 VStack(spacing: 0) {
                     if !(store.selectedTab == .list && nativeListHeader)
                         && !(store.selectedTab == .stats && nativeStatsHeader) {
