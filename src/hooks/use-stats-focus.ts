@@ -5,7 +5,10 @@ import { flushSync } from 'react-dom';
 import { focusedTile, tileFocusURL } from '~/components/stats/tiles/focus';
 import { type StatsTileID } from '~/settings/stats-tiles.generated';
 
-type FocusHistory = { statsTileFocus?: { dashboardURL: string } };
+type FocusHistory = {
+  statsTileFocus?: { dashboardURL: string };
+  statsActivityDetail?: { returnTo: string };
+};
 const changed = 'activitymap:stats-focus';
 
 let transition: ViewTransition | undefined;
@@ -109,7 +112,12 @@ export function useStatsFocus() {
   }, []);
   const close = useCallback(() => {
     const state = window.history.state as FocusHistory | null;
-    if (state?.statsTileFocus?.dashboardURL) {
+    // A pushed activity inspection closes first, whether or not the focus
+    // itself was opened from the dashboard.
+    if (
+      state?.statsActivityDetail?.returnTo ||
+      state?.statsTileFocus?.dashboardURL
+    ) {
       window.history.back();
     } else {
       // A direct/reloaded focus URL has no originating dashboard entry.

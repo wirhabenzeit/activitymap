@@ -348,6 +348,13 @@ export default function Review() {
     true,
     'Chart stays available beside panel',
   );
+  // Focus Back closes a pushed inspection first, even on a direct focus link.
+  await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  await active('records');
+  await page.goForward();
+  await dialog.waitFor();
+  assert.equal(page.url(), activityURL);
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
   await page.waitForFunction(

@@ -8,11 +8,12 @@ struct ActivityDetailView: View {
     var backLabel = "Back to activities"
     var backIdentifier = "list-detail-back"
     var onMapShown: (() -> Void)? = nil
+    var hostTab = AppTab.list
     @Environment(\.dismiss) private var dismiss
     @State private var navigationReference = DetailNavigationReference()
 
     var body: some View {
-        ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false)
+        ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false, hostTab: hostTab)
         .background(AppTheme.surface)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
@@ -91,6 +92,8 @@ struct ActivityDetailPanel: View {
     var compactMapProfile = false
     var scrollsMapHeading = false
     var mapBottomContentInset: CGFloat = 0
+    /// Only the visible tab's panel loads its elevation profile.
+    var hostTab = AppTab.list
     var showOnMap: ((Int) -> Void)? = nil
 
     private var activity: Activity? { store.activity(id: activityID) }
@@ -115,7 +118,7 @@ struct ActivityDetailPanel: View {
                             else { store.showOnMap(id) }
                         }, profile: { activity in
                             ElevationProfileView(store: store, activityID: activity.id,
-                                                 isRelevant: store.selectedTab == .list || store.selectedTab == .stats)
+                                                 isRelevant: store.selectedTab == hostTab)
                         }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
                     }
                     .accessibilityIdentifier("activity-detail-scroll")
