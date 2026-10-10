@@ -94,9 +94,10 @@ export function StatsActivityInspector({
     // replaces that entry so Back returns to the originating chart in one step.
     const metadata = {
       statsTileFocus: state?.statsTileFocus,
-      statsActivityDetail: state?.statsActivityDetail ?? {
-        returnTo: activityURL(window.location.href, 0),
-      },
+      // Replacing a direct link must not invent an originating history entry.
+      statsActivityDetail: detailId
+        ? state?.statsActivityDetail
+        : { returnTo: activityURL(window.location.href, 0) },
     };
     if (detailId)
       window.history.replaceState(
