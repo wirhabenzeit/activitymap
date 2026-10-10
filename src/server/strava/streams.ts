@@ -56,7 +56,9 @@ export const rawActivityStreamsSchema = z.strictObject({
   ).optional(),
   altitude: stream('altitude', z.number()).optional(),
   watts: stream('watts', z.number().int().nonnegative()).optional(),
-  heartrate: stream('heartrate', z.number().int().nonnegative()).optional(),
+  // Strava sends -1 for samples without a reading (seen on trainer rides with
+  // `has_heartrate: false`); store them as returned.
+  heartrate: stream('heartrate', z.number().int()).optional(),
 });
 export type RawActivityStreams = z.infer<typeof rawActivityStreamsSchema>;
 

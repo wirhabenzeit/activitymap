@@ -22,6 +22,11 @@ import {
   type DetailFailureCode,
   type IngestionOutcomeRecord,
 } from './ingestion-policy';
+import {
+  addRunFailure,
+  MAX_RUN_FAILURES,
+  type RunFailure,
+} from '~/server/application/run-failures';
 
 export type SyncActivityOptions = {
   maxActivities?: number; // Total max activities to process (default: 50)
@@ -101,6 +106,8 @@ export type SyncUserResult = {
   outcome: IngestionOutcomeRecord;
   updatedIncomplete: number;
   failedDetails: number;
+  /** The first few detail failures, with their cause. */
+  failures: RunFailure[];
   fetchedOlder: number;
   reachedOldest: boolean;
   stoppedForRateLimit: boolean;
@@ -134,6 +141,7 @@ export async function syncUser(
     outcome: { outcome: 'succeeded', reason: null },
     updatedIncomplete: 0,
     failedDetails: 0,
+    failures: [],
     fetchedOlder: 0,
     reachedOldest: false,
     stoppedForRateLimit: false,
@@ -199,6 +207,7 @@ export async function syncUser(
     );
     result.updatedIncomplete = enrichment.updated;
     result.failedDetails = enrichment.failed;
+    result.failures = enrichment.failures;
     steps.push({
       ...enrichment.outcome,
       committed: enrichment.updated + enrichment.deleted,
@@ -249,6 +258,7 @@ export async function syncActivities(
 ): Promise<{
   updatedIncomplete: number;
   failedDetails: number;
+  failures: RunFailure[];
   fetchedOlder: number;
   reachedOldest: string[];
   errors: Record<string, string>;
@@ -266,6 +276,7 @@ export async function syncActivities(
   // Tracking variables
   let updatedIncomplete = 0;
   let failedDetails = 0;
+  const failures: RunFailure[] = [];
   let fetchedOlder = 0;
   let stoppedForRateLimit = false;
   const reachedOldest: string[] = [];
@@ -309,6 +320,9 @@ export async function syncActivities(
       stoppedForRateLimit = userResult.stoppedForRateLimit;
       updatedIncomplete += userResult.updatedIncomplete;
       failedDetails += userResult.failedDetails;
+      failures.push(
+        ...userResult.failures.slice(0, MAX_RUN_FAILURES - failures.length),
+      );
       fetchedOlder += userResult.fetchedOlder;
 
       if (userResult.reachedOldest) {
@@ -344,6 +358,7 @@ export async function syncActivities(
   return {
     updatedIncomplete,
     failedDetails,
+    failures,
     fetchedOlder,
     reachedOldest,
     errors,
@@ -428,6 +443,8 @@ export type DetailEnrichmentResult = {
   deleted: number;
   /** Activities that failed individually and now back off before a retry. */
   failed: number;
+  /** The first few of those failures, with their cause. */
+  failures: RunFailure[];
   outcome: IngestionOutcomeRecord;
 };
 
@@ -453,6 +470,7 @@ export async function updateIncompleteActivities(
     updated: 0,
     deleted: 0,
     failed: 0,
+    failures: [],
     outcome: { outcome: 'succeeded', reason: null },
   };
 
@@ -489,6 +507,12 @@ export async function updateIncompleteActivities(
     const failure = classifyIngestionFailure(error);
     if (failure.scope === 'activity') {
       activityFailures.push({ activityId, code: failure.code });
+      addRunFailure(result.failures, activityId, failure.code, error);
+      logger.warn('[Detail sync] Activity failed', {
+        activityId,
+        code: failure.code,
+        error,
+      });
     } else if (!stop || failure.outcome === 'blocked') {
       stop = { outcome: failure.outcome, reason: failure.reason };
     }

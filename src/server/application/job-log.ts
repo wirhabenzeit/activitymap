@@ -7,6 +7,8 @@ import {
 } from '~/server/repositories/scheduled-job-log';
 
 import type { ScheduledJob } from '~/lib/admin/job-health';
+import type { JobRunSummary, RunFailure } from '~/lib/admin/job-run-summary';
+import { MAX_RUN_FAILURES } from './run-failures';
 
 /** How long the admin dashboard keeps run history. */
 export const JOB_LOG_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
@@ -18,26 +20,42 @@ export interface JobLogWriter {
   append(entry: NewScheduledJobLogEntry): Promise<void>;
 }
 
+const isRunFailure = (value: unknown): value is RunFailure =>
+  !!value &&
+  typeof value === 'object' &&
+  typeof (value as RunFailure).activityId === 'string' &&
+  typeof (value as RunFailure).code === 'string' &&
+  typeof (value as RunFailure).detail === 'string';
+
 /**
  * The numeric and boolean top-level fields of a job's result, such as
- * `fetched` or `stoppedForRateLimit`. Strings and nested objects are left out
- * so no activity names, tokens or upstream payloads reach the log.
+ * `fetched` or `stoppedForRateLimit`, plus its `failures` (activity ID, code
+ * and a sanitized cause; see `describeFailure`). Other strings and nested
+ * objects are left out so no activity names, tokens or upstream payloads
+ * reach the log.
  */
-export function summarizeJobResult(
-  result: unknown,
-): Record<string, number | boolean> | null {
+export function summarizeJobResult(result: unknown): JobRunSummary | null {
   if (typeof result === 'number') return { result };
   if (!result || typeof result !== 'object' || Array.isArray(result))
     return null;
-  const summary: Record<string, number | boolean> = {};
+  const summary: JobRunSummary = {};
+  let fields = 0;
   for (const [key, value] of Object.entries(result)) {
-    if (Object.keys(summary).length >= MAX_SUMMARY_FIELDS) break;
+    if (fields >= MAX_SUMMARY_FIELDS) break;
     if (
       (typeof value === 'number' && Number.isFinite(value)) ||
       typeof value === 'boolean'
-    )
+    ) {
       summary[key] = value;
+      fields++;
+    }
   }
+  const failures = (result as { failures?: unknown }).failures;
+  if (Array.isArray(failures) && failures.length > 0)
+    summary.failures = failures
+      .filter(isRunFailure)
+      .slice(0, MAX_RUN_FAILURES)
+      .map(({ activityId, code, detail }) => ({ activityId, code, detail }));
   return Object.keys(summary).length > 0 ? summary : null;
 }
 
@@ -70,7 +88,7 @@ export function withJobLog<Args extends unknown[], Result>(
   run: (...args: Args) => Promise<Result>,
   options: {
     stopReason?: (result: Result) => string | null;
-    summarize?: (result: Result) => Record<string, number | boolean> | null;
+    summarize?: (result: Result) => JobRunSummary | null;
     writer?: JobLogWriter;
     clock?: () => number;
   } = {},

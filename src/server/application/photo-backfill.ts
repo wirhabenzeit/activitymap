@@ -14,6 +14,8 @@ import {
 import type { StravaRequestBudget } from '~/server/strava/request-budget';
 import { transformStravaPhoto } from '~/server/strava/transforms';
 import type { Photo } from '~/server/db/schema';
+import { logger } from '~/server/logging/logger';
+import { addRunFailure, type RunFailure } from './run-failures';
 
 type SourceOptions = {
   claim: PhotoClaim;
@@ -49,6 +51,8 @@ export type PhotoBackfillResult = {
   superseded: number;
   requests: number;
   stopReason: string;
+  /** The first few activity-level failures, with their cause. */
+  failures: RunFailure[];
 };
 
 /** Photo-only catch-up: never downloads activity details or image binaries. */
@@ -72,6 +76,7 @@ export async function backfillActivityPhotos({
     superseded: 0,
     requests: 0,
     stopReason: 'complete',
+    failures: [],
   };
   const token = await repository.start();
   if (!token) return { ...result, stopReason: 'busy' };
@@ -151,6 +156,14 @@ export async function backfillActivityPhotos({
         if (failure.scope === 'run')
           throw new PhotoBackfillStopped('rate_limited');
         result.failed++;
+        const code =
+          failure.scope === 'activity' ? failure.code : failure.reason;
+        addRunFailure(result.failures, claim.activityId, code, error);
+        logger.warn('[Photo backfill] Activity failed', {
+          activityId: claim.activityId,
+          code,
+          error,
+        });
         if (failure.scope === 'account') excludedUsers.push(claim.userId);
       }
     }

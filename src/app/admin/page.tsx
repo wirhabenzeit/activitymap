@@ -1,10 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { loadAdminDashboard } from '~/server/application/admin-dashboard';
+import {
+  loadAdminDashboard,
+  type ActivityFailure,
+  type AdminDashboard,
+} from '~/server/application/admin-dashboard';
 import { requireAdmin } from '~/server/auth/admin';
 import { jobHealth, type JobHealth } from '~/lib/admin/job-health';
-import { coverageSummaries } from '~/lib/ingestion/presentation';
+import { runFailures, type RunFailure } from '~/lib/admin/job-run-summary';
+import {
+  coverageSummaries,
+  schedulingLabel,
+} from '~/lib/ingestion/presentation';
 import { cn } from '~/lib/utils';
 
 /**
@@ -91,6 +99,79 @@ function Section({
 const th = 'px-3 py-2 text-left font-medium text-muted-foreground';
 const td = 'px-3 py-2 align-top';
 
+type Run = AdminDashboard['runs'][number];
+
+const PIPELINE_JOB: Record<ActivityFailure['pipeline'], string> = {
+  details: 'sync-activities',
+  streams: 'backfill-activity-streams',
+  photos: 'backfill-activity-photos',
+};
+
+/** Activities a completed run failed on, from its numeric summary. */
+function itemFailures(run: Run) {
+  const summary = run.summary ?? {};
+  const count = (key: string) =>
+    typeof summary[key] === 'number' ? summary[key] : 0;
+  return Math.max(
+    count('failed'),
+    count('failedDetails'),
+    runFailures(run.summary).length,
+  );
+}
+
+/** The newest logged cause per `job:activityId`. */
+function latestCauses(runs: readonly Run[]) {
+  const causes = new Map<string, { failure: RunFailure; at: Date }>();
+  for (const run of [...runs].sort(
+    (a, b) => b.startedAt.getTime() - a.startedAt.getTime(),
+  ))
+    for (const failure of runFailures(run.summary)) {
+      const key = `${run.job}:${failure.activityId}`;
+      if (!causes.has(key)) causes.set(key, { failure, at: run.startedAt });
+    }
+  return causes;
+}
+
+const stravaActivity = (id: string) =>
+  `https://www.strava.com/activities/${id}`;
+
+function RunDetails({ run }: { run: Run }) {
+  if (run.error)
+    return <span className="text-red-700 dark:text-red-300">{run.error}</span>;
+  const failures = runFailures(run.summary);
+  const counts = Object.entries(run.summary ?? {})
+    .flatMap(([key, value]) =>
+      Array.isArray(value) ? [] : [`${key}=${String(value)}`],
+    )
+    .join(' ');
+  return (
+    <div className="space-y-1">
+      <span className="font-mono text-muted-foreground">{counts}</span>
+      {failures.length > 0 && (
+        <ul className="space-y-0.5">
+          {failures.map((failure) => (
+            <li
+              key={failure.activityId}
+              className="text-amber-700 dark:text-amber-300"
+            >
+              <a
+                href={stravaActivity(failure.activityId)}
+                className="font-mono underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {failure.activityId}
+              </a>{' '}
+              <span className="font-medium">{failure.code}</span> ·{' '}
+              {failure.detail}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default async function AdminPage({
   searchParams,
 }: {
@@ -102,10 +183,20 @@ export default async function AdminPage({
   const data = await loadAdminDashboard();
   const now = data.observedAt;
   const health = jobHealth(data.runs, now);
-  const runs = onlyFailures
-    ? data.runs.filter((run) => run.status === 'failed')
-    : data.runs;
+  const runs = onlyFailures ? data.problemRuns : data.runs;
   const counts = data.inbox.countsByStatus;
+  const causes = latestCauses([...data.problemRuns, ...data.runs]);
+  const failingByAthlete = new Map<string, ActivityFailure[]>();
+  for (const failure of data.activityFailures) {
+    const key = `${failure.athleteId}:${failure.pipeline}`;
+    failingByAthlete.set(key, [...(failingByAthlete.get(key) ?? []), failure]);
+  }
+  const itemFailuresByJob = new Map<string, number>();
+  for (const run of data.runs)
+    itemFailuresByJob.set(
+      run.job,
+      (itemFailuresByJob.get(run.job) ?? 0) + itemFailures(run),
+    );
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 bg-background px-4 py-6 text-foreground">
@@ -137,7 +228,8 @@ export default async function AdminPage({
               <th className={th}>Health</th>
               <th className={th}>Last run</th>
               <th className={th}>Last success</th>
-              <th className={th}>Failures (logged runs)</th>
+              <th className={th}>Failed runs</th>
+              <th className={th}>Activity failures</th>
             </tr>
           </thead>
           <tbody>
@@ -158,6 +250,15 @@ export default async function AdminPage({
                 <td className={td}>
                   {row.failures} of {row.runs}
                 </td>
+                <td className={cn(td, 'tabular-nums')}>
+                  {itemFailuresByJob.get(row.job) ? (
+                    <Badge tone="warn">
+                      {itemFailuresByJob.get(row.job)} in logged runs
+                    </Badge>
+                  ) : (
+                    '—'
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -165,8 +266,91 @@ export default async function AdminPage({
       </Section>
 
       <Section
-        title={onlyFailures ? 'Failed runs' : 'Recent runs'}
-        description={`Newest ${data.runs.length} runs; kept for 14 days.`}
+        title="Failing activities"
+        description="Activities whose latest fetch failed and that are still outstanding. The cause comes from the newest run log that recorded it."
+      >
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className={th}>Pipeline</th>
+              <th className={th}>Activity</th>
+              <th className={th}>Error</th>
+              <th className={th}>Attempts</th>
+              <th className={th}>Last attempt</th>
+              <th className={th}>Next retry</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.activityFailures.length === 0 && (
+              <tr>
+                <td className={cn(td, 'text-muted-foreground')} colSpan={6}>
+                  No failing activities.
+                </td>
+              </tr>
+            )}
+            {data.activityFailures.map((failure) => {
+              const cause = causes.get(
+                `${PIPELINE_JOB[failure.pipeline]}:${failure.activityId}`,
+              );
+              return (
+                <tr
+                  key={`${failure.pipeline}:${failure.activityId}`}
+                  className="border-t"
+                >
+                  <td className={td}>{failure.pipeline}</td>
+                  <td className={cn(td, 'font-mono text-xs')}>
+                    <a
+                      href={stravaActivity(failure.activityId)}
+                      className="underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {failure.activityId}
+                    </a>
+                    <div className="text-muted-foreground">
+                      athlete {failure.athleteId}
+                    </div>
+                  </td>
+                  <td className={cn(td, 'text-xs')}>
+                    <div className="font-medium">{failure.code ?? '—'}</div>
+                    <div
+                      className={cn(!cause && 'text-muted-foreground')}
+                      title={cause ? utc(cause.at) : undefined}
+                    >
+                      {cause?.failure.detail ??
+                        'Cause not in the run log (recorded before causes were logged, or older than 14 days).'}
+                    </div>
+                  </td>
+                  <td className={cn(td, 'tabular-nums')}>{failure.attempts}</td>
+                  <td
+                    className={cn(td, 'whitespace-nowrap')}
+                    title={utc(failure.lastAttemptAt)}
+                  >
+                    {failure.lastAttemptAt
+                      ? ago(failure.lastAttemptAt, now)
+                      : '—'}
+                  </td>
+                  <td className={cn(td, 'whitespace-nowrap')}>
+                    {failure.nextAttemptAt ? (
+                      utc(failure.nextAttemptAt)
+                    ) : (
+                      <Badge tone="bad">Won&apos;t retry</Badge>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Section>
+
+      <Section
+        title={onlyFailures ? 'Problem runs' : 'Recent runs'}
+        description={
+          onlyFailures
+            ? `Runs that failed or failed for some activities, newest ${runs.length} of the last 14 days.`
+            : `Newest ${data.runs.length} runs; kept for 14 days.`
+        }
       >
         <div className="flex gap-2 border-b px-3 py-2 text-sm">
           <Link
@@ -179,7 +363,7 @@ export default async function AdminPage({
             href="/admin?failures=1"
             className={cn(onlyFailures && 'font-semibold underline')}
           >
-            Failures only
+            Problems ({data.problemRuns.length})
           </Link>
         </div>
         <table className="w-full text-sm">
@@ -209,17 +393,22 @@ export default async function AdminPage({
                   {ago(run.startedAt, now)}
                 </td>
                 <td className={cn(td, 'font-mono text-xs')}>{run.job}</td>
-                <td className={td}>
+                <td className={cn(td, 'whitespace-nowrap')}>
                   <Badge
                     tone={
                       run.status === 'failed'
                         ? 'bad'
                         : run.status === 'disabled'
                           ? 'muted'
-                          : 'good'
+                          : itemFailures(run) > 0
+                            ? 'warn'
+                            : 'good'
                     }
                   >
                     {run.status}
+                    {run.status === 'completed' &&
+                      itemFailures(run) > 0 &&
+                      ` · ${itemFailures(run)} failed`}
                   </Badge>
                   {run.stopReason && (
                     <span className="ml-2 text-xs text-muted-foreground">
@@ -231,17 +420,7 @@ export default async function AdminPage({
                   {duration(run.durationMs)}
                 </td>
                 <td className={cn(td, 'text-xs')}>
-                  {run.error ? (
-                    <span className="text-red-700 dark:text-red-300">
-                      {run.error}
-                    </span>
-                  ) : (
-                    <span className="font-mono text-muted-foreground">
-                      {Object.entries(run.summary ?? {})
-                        .map(([key, value]) => `${key}=${String(value)}`)
-                        .join(' ')}
-                    </span>
-                  )}
+                  <RunDetails run={run} />
                 </td>
               </tr>
             ))}
@@ -299,7 +478,7 @@ export default async function AdminPage({
 
       <Section
         title="Import coverage"
-        description="Per athlete, from the same read model as Settings → Sync & data."
+        description="Per athlete, from the same read model as Settings → Sync & data. The status says what the scheduler is doing; failing activities are counted separately."
       >
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
@@ -329,18 +508,38 @@ export default async function AdminPage({
                       {history!.status}
                     </div>
                   </td>
-                  {rest.map((summary) => (
-                    <td key={summary.title} className={td}>
-                      <div className="tabular-nums">
-                        {summary.progress
-                          ? `${summary.progress.percent}%`
-                          : '—'}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {summary.status}
-                      </div>
-                    </td>
-                  ))}
+                  {(['details', 'streams', 'photos'] as const).map(
+                    (pipeline, index) => {
+                      const summary = rest[index]!;
+                      const failing =
+                        failingByAthlete.get(
+                          `${athlete.athleteId}:${pipeline}`,
+                        ) ?? [];
+                      const terminal = failing.filter(
+                        (failure) => !failure.nextAttemptAt,
+                      ).length;
+                      return (
+                        <td key={pipeline} className={td}>
+                          <div className="tabular-nums">
+                            {summary.progress
+                              ? `${summary.progress.percent}%`
+                              : '—'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {schedulingLabel(athlete.status[pipeline])}
+                          </div>
+                          {failing.length > 0 && (
+                            <div className="mt-1">
+                              <Badge tone={terminal ? 'bad' : 'warn'}>
+                                {failing.length} failing
+                                {terminal > 0 && ` · ${terminal} won't retry`}
+                              </Badge>
+                            </div>
+                          )}
+                        </td>
+                      );
+                    },
+                  )}
                 </tr>
               );
             })}
