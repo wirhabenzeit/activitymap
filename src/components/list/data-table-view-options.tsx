@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { getWidthMode, setWidthMode, widthModes } from './width-mode';
 import { MixerHorizontalIcon } from '@radix-ui/react-icons';
+import { useShallowStore } from '~/store';
 
 interface DataTableViewOptionsProps<TData extends RowData> {
   table: TableType<Features, TData>;
@@ -37,6 +38,7 @@ export function DataTableViewOptions<TData extends RowData>({
   table,
   hiddenByFit,
 }: DataTableViewOptionsProps<TData>) {
+  const setSelected = useShallowStore((state) => state.setSelected);
   return (
     <div className="flex shrink-0 items-center space-x-2">
       <DropdownMenu modal={false}>
@@ -58,7 +60,7 @@ export function DataTableViewOptions<TData extends RowData>({
           <DropdownMenuItem onSelect={() => table.toggleAllRowsSelected(false)}>
             Deselect all filtered activities
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => table.setRowSelection({})}>
+          <DropdownMenuItem onSelect={() => setSelected([])}>
             Clear selection
           </DropdownMenuItem>
           <DropdownMenuSub>

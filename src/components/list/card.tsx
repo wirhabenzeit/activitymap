@@ -33,12 +33,14 @@ import { useCallback, useState } from 'react';
 import { cn } from '~/lib/utils';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import { formatLocalTime } from '~/lib/local-date-time';
-import { useShallowStore } from '~/store';
+import { store, useShallowStore } from '~/store';
+import { applyFilters } from '~/store/filter';
+import { useActivities } from '~/hooks/use-activities';
+import { showActivityOnMap } from '~/lib/show-on-map';
 import { PhotoLightbox } from './photo';
 import { ElevationChart } from './elevation-chart';
 import { RouteDetailsContent } from './route-details-content';
 import { useRouter } from 'next/navigation';
-import { routeBounds, routeCoordinates } from '~/lib/route-framing';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,31 +63,32 @@ interface ActivityCardContentProps {
  */
 function useShowOnMap(row: Row<Features, Activity>) {
   const router = useRouter();
-  const { setHighlighted, requestRouteFit, setSelected, addNotification } =
-    useShallowStore((state) => ({
-      setHighlighted: state.setHighlighted,
-      requestRouteFit: state.requestRouteFit,
-      setSelected: state.setSelected,
-      addNotification: state.addNotification,
-    }));
-  return () => {
-    if (!routeBounds(routeCoordinates(row.original))) {
-      addNotification({
+  const { data: activities } = useActivities();
+  const hidden = useShallowStore((state) => !applyFilters(state, row.original));
+  const label = hidden ? 'Clear filters and show on map' : 'Show on map';
+  const show = () => {
+    const result = showActivityOnMap(
+      store,
+      row.original,
+      activities ?? [row.original],
+      hidden,
+    );
+    if (result !== 'shown') {
+      store.getState().addNotification({
         type: 'info',
         title: 'Map camera',
-        message: 'This activity has no GPS route to frame.',
+        message:
+          result === 'no-route'
+            ? 'This activity has no GPS route to frame.'
+            : result === 'unavailable'
+              ? 'This activity is no longer available.'
+              : 'This activity is hidden by filters. Clear filters and try again.',
       });
       return;
     }
-    setSelected((selected) =>
-      selected.includes(row.original.id)
-        ? selected
-        : [...selected, row.original.id],
-    );
-    setHighlighted(row.original.id);
-    requestRouteFit([row.original.id]);
     router.push('/map');
   };
+  return { show, label };
 }
 
 /** Cards this wide label "Show on map" and keep Edit beside it (as on iOS). */
@@ -148,7 +151,7 @@ export function ActivityCardContent({
   const { data: allPhotos = [] } = usePhotos();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const showOnMap = useShowOnMap(row);
+  const { show: showOnMap, label: showOnMapLabel } = useShowOnMap(row);
   const [cardRef, cardWidth] = useElementWidth();
   const labelled = cardWidth >= LABELLED_ACTIONS_WIDTH;
   const hasRoute = !!(
@@ -307,11 +310,15 @@ export function ActivityCardContent({
                 )}
                 onClick={showOnMap}
                 disabled={!hasRoute}
-                aria-label={`Show ${String(row.getValue('name'))} on map`}
-                title={hasRoute ? 'Show on map' : 'No GPS route recorded'}
+                aria-label={
+                  showOnMapLabel === 'Show on map'
+                    ? `Show ${String(row.getValue('name'))} on map`
+                    : `${showOnMapLabel}: ${String(row.getValue('name'))}`
+                }
+                title={hasRoute ? showOnMapLabel : 'No GPS route recorded'}
               >
                 <Map className="h-4 w-4" aria-hidden="true" />
-                {labelled && 'Show on map'}
+                {labelled && showOnMapLabel}
               </Button>
             )}
             {labelled && (
@@ -441,7 +448,7 @@ export function ActivityCard({
     highlighted: state.highlighted,
     isGuest: state.isGuest,
   }));
-  const handleMapClick = useShowOnMap(row);
+  const { show: handleMapClick, label: showOnMapLabel } = useShowOnMap(row);
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
@@ -481,7 +488,12 @@ export function ActivityCard({
             className="px-0 h-4"
             size="sm"
             onClick={handleMapClick}
-            aria-label={`Show ${String(row.getValue('name'))} on map`}
+            aria-label={
+              showOnMapLabel === 'Show on map'
+                ? `Show ${String(row.getValue('name'))} on map`
+                : `${showOnMapLabel}: ${String(row.getValue('name'))}`
+            }
+            title={showOnMapLabel}
           >
             <Map className="h-4 w-4" />
           </Button>
