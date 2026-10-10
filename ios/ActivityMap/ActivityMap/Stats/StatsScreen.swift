@@ -169,11 +169,11 @@ struct StatsScreen: View {
 }
 
 /// Keep the blue chrome outside UIKit's rounded, shadowed page transition.
-/// Shell-hosted pages use the stationary shell header; standalone hosts use
-/// the native navigation bar.
+/// Regular shell-hosted pages use the stationary shell header. Compact and
+/// standalone pages use the native navigation bar.
 private struct StatsDetailDestination<Content: View>: View {
     let title: String
-    var shellHosted = false
+    var usesShellHeader = false
     @ViewBuilder let content: () -> Content
     @Environment(\.dismiss) private var dismiss
 
@@ -183,12 +183,12 @@ private struct StatsDetailDestination<Content: View>: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
-        .toolbar(shellHosted ? .hidden : .visible, for: .navigationBar)
+        .toolbar(usesShellHeader ? .hidden : .visible, for: .navigationBar)
         .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
-            if !shellHosted {
+            if !usesShellHeader {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.left")
@@ -222,10 +222,10 @@ struct StatsDetailScreen: View {
     let dashboard: StatsDashboardState
     let tile: StatsTileDefinition
     var sync: SyncController? = nil
-    var shellHosted = false
+    var usesShellHeader = false
 
     var body: some View {
-        StatsDetailDestination(title: tile.title, shellHosted: shellHosted) {
+        StatsDetailDestination(title: tile.title, usesShellHeader: usesShellHeader) {
             StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync)
         }
     }

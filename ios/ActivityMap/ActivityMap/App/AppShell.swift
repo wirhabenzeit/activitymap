@@ -47,6 +47,8 @@ struct AppShell: View {
                 set: { statsNavigation.dashboard?.expandedTile = $0 })
     }
 
+    private var nativeStatsHeader: Bool { usesStatsNavigation && sizeClass == .compact }
+
     var body: some View {
         Group {
             if usesStatsNavigation {
@@ -121,23 +123,33 @@ struct AppShell: View {
 
     @ViewBuilder private func statsFocusPage(_ tile: StatsTileDefinition, dashboard: StatsDashboardState) -> some View {
         let content = VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Button { dashboard.expandedTile = nil } label: {
-                    Image(systemName: "chevron.left").frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+            if !nativeStatsHeader {
+                HStack(spacing: 8) {
+                    Button { dashboard.expandedTile = nil } label: {
+                        Image(systemName: "chevron.left").frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back to Stats")
+                    .accessibilityIdentifier("stats-detail-back")
+                    Text(tile.title).font(.title2.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("stats-detail-title")
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back to Stats")
-                .accessibilityIdentifier("stats-detail-back")
-                Text(tile.title).font(.title2.weight(.semibold))
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("stats-detail-title")
-                Spacer(minLength: 0)
+                .padding(.horizontal, 12)
+                .background(AppTheme.contentBackground)
             }
-            .padding(.horizontal, 12)
-            .background(AppTheme.contentBackground)
             StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync,
-                              shellHosted: true)
+                              usesShellHeader: !nativeStatsHeader)
+                .toolbar {
+                    if nativeStatsHeader {
+                        ToolbarItemGroup(placement: .topBarTrailing) {
+                            filterButton(sidebarAvailable: false)
+                            accountButton
+                        }.sharedBackgroundVisibility(.hidden)
+                    }
+                }
         }
             .tint(AppTheme.accent)
         // Every width zooms the tile into its focus page; Reduce Motion cross-fades.
@@ -159,13 +171,14 @@ struct AppShell: View {
                 let nativeListHeader = listNavigation.detailPresented || sizeClass != .regular
                     || contentWidth < BrowsePaneLayout.minimumDetailWidth || typeSize.isAccessibilitySize
                 VStack(spacing: 0) {
-                    if store.selectedTab != .list || !nativeListHeader {
+                    if !(store.selectedTab == .list && nativeListHeader)
+                        && !(store.selectedTab == .stats && nativeStatsHeader) {
                         shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
                     }
                     filterWorkspace(sidebarAvailable: sidebarAvailable, panelFloats: panelFloats) {
                         navigableContent(nativeListHeader: nativeListHeader, sidebarAvailable: sidebarAvailable)
                             .environment(\.browsePaneWidth, contentWidth)
-                            .environment(\.listRootToolbar, usesStatsNavigation ? nil : listRootToolbar(sidebarAvailable: sidebarAvailable))
+                            .environment(\.listRootToolbar, usesStatsNavigation ? nil : browseRootToolbar(sidebarAvailable: sidebarAvailable))
                             .environment(\.filtersCollapseForDetail, panelTight && sheets.showsFilters && !panelFloats)
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
@@ -192,19 +205,21 @@ struct AppShell: View {
         }
     }
 
-    /// Stats focus animates only this column, with its shell bar and filters
-    /// outside the moving page. Narrow List pages share one native toolbar.
+    /// Stats focus animates only this column, with its header and filters
+    /// outside the moving page. Compact List and Stats share native toolbars.
     @ViewBuilder private func navigableContent(nativeListHeader: Bool, sidebarAvailable: Bool) -> some View {
         if usesStatsNavigation {
             NavigationStack {
                 content
-                    .toolbar(store.selectedTab == .list && nativeListHeader ? .visible : .hidden, for: .navigationBar)
+                    .toolbar((store.selectedTab == .list && nativeListHeader)
+                             || (store.selectedTab == .stats && nativeStatsHeader) ? .visible : .hidden, for: .navigationBar)
                     .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
                     .toolbarBackgroundVisibility(.visible, for: .navigationBar)
                     .toolbarColorScheme(.dark, for: .navigationBar)
                     .toolbar {
-                        if store.selectedTab == .list && nativeListHeader {
-                            listRootToolbar(sidebarAvailable: sidebarAvailable)
+                        if (store.selectedTab == .list && nativeListHeader)
+                            || (store.selectedTab == .stats && nativeStatsHeader) {
+                            browseRootToolbar(sidebarAvailable: sidebarAvailable)
                         }
                     }
                     .navigationDestination(item: statsDetailSelection) { id in
@@ -338,12 +353,12 @@ struct AppShell: View {
     private var compactBar: Bool { verticalSizeClass == .compact }
     private var syncing: Bool { sync?.status.showsLoadingIndicator == true }
 
-    private func listRootToolbar(sidebarAvailable: Bool) -> ListRootToolbar {
-        ListRootToolbar(leading: AnyView(HStack(spacing: 8) {
+    private func browseRootToolbar(sidebarAvailable: Bool) -> BrowseRootToolbar {
+        BrowseRootToolbar(leading: AnyView(HStack(spacing: 8) {
             filterButton(sidebarAvailable: sidebarAvailable)
-            if compactBar { SelectionBar(store: store, includesTotal: true, onNavigationBar: true) }
+            if compactBar && store.selectedTab == .list { SelectionBar(store: store, includesTotal: true, onNavigationBar: true) }
         }), principal: AnyView(destinationPicker), trailing: AnyView(HStack(spacing: 8) {
-            if compactBar { ListControls(presentation: store.listPresentation, iconOnly: true, onNavigationBar: true) }
+            if compactBar && store.selectedTab == .list { ListControls(presentation: store.listPresentation, iconOnly: true, onNavigationBar: true) }
             accountButton
         }))
     }

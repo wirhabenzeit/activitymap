@@ -116,9 +116,9 @@ private struct BrowseStatsDestinationKey: EnvironmentKey {
     var detailPresented = false
 }
 
-/// Root and pushed List pages share one native bar so UIKit preserves the
-/// retained List's inset and scroll position across push and Back.
-struct ListRootToolbar: ToolbarContent {
+/// Compact browsing pages share one native bar so UIKit preserves retained
+/// content insets and scroll positions across push and Back.
+struct BrowseRootToolbar: ToolbarContent {
     let leading: AnyView
     let principal: AnyView
     let trailing: AnyView
@@ -133,7 +133,7 @@ struct ListRootToolbar: ToolbarContent {
 
 extension EnvironmentValues {
     @Entry var listShellNavigation: ListShellNavigation? = nil
-    @Entry var listRootToolbar: ListRootToolbar? = nil
+    @Entry var listRootToolbar: BrowseRootToolbar? = nil
 
     /// The shell's target column width, independent of a retained native
     /// navigation root's temporarily stale frame during destination switches.

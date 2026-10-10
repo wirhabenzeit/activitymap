@@ -165,7 +165,7 @@ import Testing
         try await Task.sleep(for: .milliseconds(400))
         let navigation = try #require(host.contentNavigation())
         #expect(host.shellAccountButton() != nil)
-        #expect(navigation.view.bounds.height < host.host.view.bounds.height)
+        #expect(!navigation.isNavigationBarHidden, "The phone dashboard and detail share a native header")
         let root = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[0].view)
             .first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
@@ -252,13 +252,22 @@ import Testing
             try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (phase == "push" ? 2 : 1) }
             if phase == "push" {
                 #expect(host.shellAccountButton() != nil,
-                        "The stationary shell header retains Settings during stat focus")
+                        "The focused chart retains Settings in its native header")
+                #expect(host.shellControl(label: "Filters") != nil)
+                #expect(navigation.topViewController?.navigationItem.title == "Training volume")
+                let bar = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
+                #expect(abs(bar.minY - host.host.view.safeAreaInsets.top) < 2,
+                        "Stats detail takes over the top header instead of adding another row")
+                #expect(host.controllers(UINavigationController.self).filter {
+                    !$0.isNavigationBarHidden && $0.navigationBar.window != nil
+                }.count == 1)
             } else {
                 let settledAccount = try #require(host.shellAccountButton())
                 let settledFrame = host.host.view.convert(settledAccount.accessibilityFrame, from: nil)
                 #expect(abs(settledFrame.midX - accountFrame.midX) < 1 && abs(settledFrame.midY - accountFrame.midY) < 1,
                         "Returning restores the overview's profile button at its original position")
             }
+            try host.capture("phone-single-stats-header-\(variant)-\(phase)")
             let gesture = try #require(navigation.interactivePopGestureRecognizer)
             if phase == "push" {
                 #expect(gesture.isEnabled)
@@ -1257,10 +1266,13 @@ import Testing
         return visit(host)
     }
     func shellAccountButton() -> NSObject? {
+        shellControl(label: "Settings")
+    }
+    func shellControl(label: String) -> NSObject? {
         var visited: Set<ObjectIdentifier> = []
         func visit(_ object: NSObject) -> NSObject? {
             guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
-            if object.accessibilityLabel == "Settings", !object.accessibilityFrame.isEmpty { return object }
+            if object.accessibilityLabel == label, !object.accessibilityFrame.isEmpty { return object }
             let count = object.accessibilityElementCount()
             if count > 0, count < 1000 {
                 for index in 0..<count {

@@ -151,7 +151,7 @@ struct ListScreen: View {
 }
 
 private struct ListRootChrome: ViewModifier {
-    let toolbar: ListRootToolbar?
+    let toolbar: BrowseRootToolbar?
     let visible: Bool
     @ViewBuilder func body(content: Content) -> some View {
         if let toolbar {
