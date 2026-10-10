@@ -30,6 +30,9 @@ enum AppTheme {
     // The asset also covers system controls using Color.accentColor.
     static let accent = Color("AccentColor")
     static let selectionBackground = accent.opacity(0.12)
+    /// Neutral selection and blue inspection match the web List grammar.
+    static let selectedRowBackground = Color(uiColor: .secondarySystemBackground)
+    static let inspectionBackground = accent.opacity(0.12)
     static let contentBackground = Color(uiColor: .systemGroupedBackground)
     static let secondaryText = Color(uiColor: .secondaryLabel)
     static let surface = Color(uiColor: .secondarySystemGroupedBackground)
@@ -41,6 +44,29 @@ enum AppTheme {
     static let minimumDetailColumnWidth: CGFloat = 150
 
     static let headerBackground = navigationBlue
+}
+
+/// Shared by List inspection and the active row among selected map results.
+/// The check badge continues to identify selection independently of inspection.
+struct ActivityRowBackground: View {
+    var selected: Bool
+    var inspected: Bool
+
+    var body: some View {
+        (selected ? AppTheme.selectedRowBackground : Color(uiColor: .systemBackground))
+            .overlay { if inspected { AppTheme.inspectionBackground } }
+            .overlay(alignment: .top) {
+                if inspected { AppTheme.accent.opacity(0.4).frame(height: 1) }
+            }
+            .overlay(alignment: .bottom) {
+                if inspected { AppTheme.accent.opacity(0.4).frame(height: 1) }
+            }
+            .overlay(alignment: .leading) {
+                if inspected { AppTheme.accent.frame(width: 3) }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
 }
 
 /// Regular glass provides contrast over detailed maps; clear glass does not.

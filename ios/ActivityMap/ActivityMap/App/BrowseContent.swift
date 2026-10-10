@@ -19,7 +19,6 @@ struct BrowseContent: View {
                         // Establish the detail bar's inline metrics before the
                         // first push, even while the root bar is hidden.
                         .navigationBarTitleDisplayMode(.inline)
-                        .toolbar(.hidden, for: .navigationBar)
                 }
                     .id(store.mapContext.scopeRevision)
                     .refreshable {
@@ -110,10 +109,39 @@ struct BrowseStatsDestination {
 private struct BrowseStatsDestinationKey: EnvironmentKey {
     static let defaultValue: BrowseStatsDestination? = nil
 }
+
+/// Pushed List details replace the shell header with their native Back/title
+/// bar. This state follows the retained navigation page across tab and width changes.
+@MainActor @Observable final class ListShellNavigation {
+    var detailPresented = false
+}
+
+/// Compact browsing pages share one native bar so UIKit preserves retained
+/// content insets and scroll positions across push and Back.
+struct BrowseRootToolbar: ToolbarContent {
+    let leading: AnyView
+    let principal: AnyView
+    let trailing: AnyView
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarLeading) { leading }
+            .sharedBackgroundVisibility(.hidden)
+        ToolbarItem(placement: .principal) { principal }
+        ToolbarItemGroup(placement: .topBarTrailing) { trailing }
+            .sharedBackgroundVisibility(.hidden)
+    }
+}
+
 extension EnvironmentValues {
-    /// Full browsing width, before filters take space. Detail eligibility must
-    /// not change just because opening an inspector hides its filter sidebar.
-    @Entry var browseViewportWidth: CGFloat? = nil
+    @Entry var listShellNavigation: ListShellNavigation? = nil
+    @Entry var listRootToolbar: BrowseRootToolbar? = nil
+
+    /// The shell's target column width, independent of a retained native
+    /// navigation root's temporarily stale frame during destination switches.
+    @Entry var browsePaneWidth: CGFloat? = nil
+
+    /// The expanded filter panel collapses to its rail as List inspection
+    /// starts, so List waits for that width instead of pushing its detail.
+    @Entry var filtersCollapseForDetail = false
 
     var browseStatsDestination: BrowseStatsDestination? {
         get { self[BrowseStatsDestinationKey.self] }
@@ -124,4 +152,16 @@ extension EnvironmentValues {
 enum BrowsePaneLayout {
     static let filterWidth: CGFloat = 320
     static let minimumDetailWidth: CGFloat = 760
+
+    /// Wide regular windows keep the filter rail beside the content; narrower
+    /// ones and accessibility text use the phone's filter sheet.
+    static func filtersUseSidebar(width: CGFloat, regular: Bool, accessibilityText: Bool) -> Bool {
+        regular && width >= minimumDetailWidth && !accessibilityText
+    }
+
+    /// The full panel leaves no room for List and its adjacent detail, but the
+    /// collapsed rail does, as in 11-inch portrait (#354).
+    static func panelSqueezesDetail(width: CGFloat) -> Bool {
+        width - filterWidth - 1 < minimumDetailWidth && width - FilterRail.width - 1 >= minimumDetailWidth
+    }
 }

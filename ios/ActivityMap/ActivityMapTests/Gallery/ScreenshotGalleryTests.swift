@@ -11,14 +11,6 @@ import UIKit
 struct ScreenshotGalleryTests {
     @Test(arguments: GalleryScene.allCases)
     func capture(scene: GalleryScene) async throws {
-        let preferences = UserDefaults.standard
-        let sidebarKey = "browse.filterSidebarVisible"
-        let savedSidebar = preferences.object(forKey: sidebarKey)
-        preferences.set(true, forKey: sidebarKey)
-        defer {
-            if let savedSidebar { preferences.set(savedSidebar, forKey: sidebarKey) }
-            else { preferences.removeObject(forKey: sidebarKey) }
-        }
         let manifest = try GalleryManifest.load()
         guard GalleryEnvironment.includes(scene.rawValue, key: "SCENES") else { return }
         let scenario = try #require(manifest.scenarios.first { $0.id == scene.rawValue })

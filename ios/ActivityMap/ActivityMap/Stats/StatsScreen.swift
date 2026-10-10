@@ -169,9 +169,11 @@ struct StatsScreen: View {
 }
 
 /// Keep the blue chrome outside UIKit's rounded, shadowed page transition.
-/// The phone shell retains the bar on root and detail, keeping its inset fixed.
+/// Regular shell-hosted pages use the stationary shell header. Compact and
+/// standalone pages use the native navigation bar.
 private struct StatsDetailDestination<Content: View>: View {
     let title: String
+    var usesShellHeader = false
     @ViewBuilder let content: () -> Content
     @Environment(\.dismiss) private var dismiss
 
@@ -181,29 +183,31 @@ private struct StatsDetailDestination<Content: View>: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
-        .toolbar(.visible, for: .navigationBar)
+        .toolbar(usesShellHeader ? .hidden : .visible, for: .navigationBar)
         .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 44, height: 44)
+            if !usesShellHeader {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .medium))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .accessibilityLabel("Back to Stats")
+                    .accessibilityIdentifier("stats-detail-back")
+                }.sharedBackgroundVisibility(.hidden)
+                ToolbarItem(placement: .principal) {
+                    Text(title).font(.headline).foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("stats-detail-title")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .accessibilityLabel("Back to Stats")
-                .accessibilityIdentifier("stats-detail-back")
-            }.sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .principal) {
-                Text(title).font(.headline).foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("stats-detail-title")
             }
         }
         .background(DetailBackGesture())
@@ -218,9 +222,10 @@ struct StatsDetailScreen: View {
     let dashboard: StatsDashboardState
     let tile: StatsTileDefinition
     var sync: SyncController? = nil
+    var usesShellHeader = false
 
     var body: some View {
-        StatsDetailDestination(title: tile.title) {
+        StatsDetailDestination(title: tile.title, usesShellHeader: usesShellHeader) {
             StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync)
         }
     }
@@ -235,11 +240,22 @@ private struct StatsDetailContent: View {
     @State private var inspectedActivityID: Int?
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    private var request: StatsDashboardRequest {
-        let presentation = sync.map { StatsPresentation(store: store, sync: $0) }
+    private var presentation: StatsPresentation {
+        sync.map { StatsPresentation(store: store, sync: $0) }
             ?? StatsPresentation(store: store, preparing: false)
-        return .init(source: StatsDashboardSource(store), choices: dashboard.choices,
-                     canLoad: store.selectedTab == .stats && presentation.hasContent)
+    }
+
+    private var request: StatsDashboardRequest {
+        .init(source: StatsDashboardSource(store), choices: dashboard.choices,
+              canLoad: store.selectedTab == .stats && presentation.hasContent)
+    }
+
+    private var emptyTitle: String? {
+        // A completed, authorized cache can also have no matches while offline
+        // or after a failed refresh. Neither case has a calculation to await.
+        guard presentation.historyComplete, !presentation.hasContent,
+              presentation.state != .unavailable else { return nil }
+        return store.activities.isEmpty ? "No activity history" : "No matching activities"
     }
 
     /// Wide, tall pages give the chart about half the height, leaving the
@@ -252,7 +268,10 @@ private struct StatsDetailContent: View {
 
     var body: some View {
         GeometryReader { geometry in
-                ScrollView {
+            ScrollView {
+                if let emptyTitle {
+                    ContentUnavailableView(emptyTitle, systemImage: "chart.bar")
+                } else {
                     StatsDashboardTile(tile: tile, store: store, dashboard: dashboard,
                                        expanded: true, detailScreen: true,
                                        toggleExpansion: {}, openActivity: { inspectedActivityID = $0 })
@@ -263,7 +282,8 @@ private struct StatsDetailContent: View {
                         .environment(\.statsFocusChartHeight, focusChartHeight(geometry.size))
                         .transaction { $0.animation = nil }
                 }
-                .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
+            }
+            .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
         }
         // The shell's pushed root is inactive. The visible destination must
         // own demand when its metric changes; the shared cache reuses values.

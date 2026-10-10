@@ -6,49 +6,71 @@ import MapboxMaps
 
 @MainActor @Suite(.serialized)
 struct RenderedFilterTests {
+    @Test func railFitsListAndDetailWhereThePanelCannot() {
+        // Portrait iPads from 10.9-inch to 13-inch: the 320pt panel leaves too
+        // little for List and its detail, the rail does not (#354).
+        #expect([820, 834, 1024].allSatisfy { BrowsePaneLayout.panelSqueezesDetail(width: $0) })
+        // Landscape fits the panel beside List and detail.
+        #expect([1133, 1180, 1194, 1366].allSatisfy { !BrowsePaneLayout.panelSqueezesDetail(width: $0) })
+        #expect(BrowsePaneLayout.filtersUseSidebar(width: 834, regular: true, accessibilityText: false))
+        #expect(!BrowsePaneLayout.filtersUseSidebar(width: 744, regular: true, accessibilityText: false))
+        #expect(!BrowsePaneLayout.filtersUseSidebar(width: 1194, regular: false, accessibilityText: false))
+        #expect(!BrowsePaneLayout.filtersUseSidebar(width: 1194, regular: true, accessibilityText: true))
+    }
+
+    @Test func filterButtonAndRailReadTheActiveFilters() {
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
+        #expect(FilterCountBadge.label(count: store.activeFilterCount) == "Filters")
+        #expect(FilterPart.allCases.allSatisfy { !$0.isActive(store) })
+        store.searchText = "ride"
+        store.privateFilter = false
+        store.distanceFilter = NumericFilter(value: 10000, upperLimit: 80000)
+        #expect(store.activeFilterCount == 3)
+        #expect(FilterCountBadge.label(count: store.activeFilterCount) == "Filters, 3 active")
+        #expect(Set(FilterPart.allCases.filter { $0.isActive(store) }) == [.search, .distance, .details])
+        #expect(!FilterPart.available(in: .stats).contains(.dates))
+        #expect(FilterPart.available(in: .browsing) == FilterPart.allCases)
+    }
+
     @Test(arguments: [AppTab.map, .list, .stats])
-    func nativeTabletHeaderDoesNotPresentFiltersOverSidebar(tab: AppTab) async throws {
-        let key = "browse.filterSidebarVisible", defaults = UserDefaults.standard
-        let saved = defaults.object(forKey: key)
-        defaults.set(true, forKey: key)
+    func tabletRailStaysAndThePanelSurvivesDestinationSwitches(tab: AppTab) async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
-        defer {
-            MapboxOptions.accessToken = token
-            if let saved { defaults.set(saved, forKey: key) }
-            else { defaults.removeObject(forKey: key) }
-        }
+        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = tab
         let sheets = BrowseSheetPresentation()
         let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
             .environment(\.horizontalSizeClass, .regular)
-            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 1194, height: 834))
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 834, height: 1194))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(350))
-        let sidebar = try #require(host.descendants(of: UIScrollView.self).first { abs($0.bounds.width - 320) < 2 })
-        // A stale sheet request must never duplicate filters while the native
-        // toolbar's wide-window presentation uses the sidebar.
+        #expect(host.showsFilterRail && !host.showsFilterPanel, "iPad filters start as the rail")
         sheets.showsFilters = true
         try await Task.sleep(for: .milliseconds(450))
+        // The wide-window host is the panel, never a duplicate sheet.
         #expect(host.host.presentedViewController == nil && !sheets.shellSheetPresented)
-        #expect(host.descendants(of: UIScrollView.self).contains { $0 === sidebar })
+        #expect(host.showsFilterPanel)
+        try host.save(host.snapshot(), name: "filter-panel-\(tab.title.lowercased())")
+        for next in [AppTab.map, .list, .stats, tab] {
+            store.selectedTab = next
+            try await Task.sleep(for: .milliseconds(200))
+            #expect(sheets.showsFilters && host.showsFilterPanel, "Switching to \(next.title) keeps the panel")
+        }
         sheets.showsFilters = false
-        try host.save(host.snapshot(), name: "native-sidebar-\(tab.title.lowercased())")
+        try await filterWait { !host.showsFilterPanel && host.showsFilterRail }
+        for next in [AppTab.map, .list, .stats, tab] {
+            store.selectedTab = next
+            try await Task.sleep(for: .milliseconds(200))
+            #expect(!host.showsFilterPanel && host.showsFilterRail, "Switching to \(next.title) keeps the rail")
+        }
     }
 
     @Test func resizingDismissesFilterSheetWhenSidebarBecomesAvailable() async throws {
-        let key = "browse.filterSidebarVisible", defaults = UserDefaults.standard
-        let saved = defaults.object(forKey: key)
-        defaults.set(true, forKey: key)
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
-        defer {
-            MapboxOptions.accessToken = token
-            if let saved { defaults.set(saved, forKey: key) }
-            else { defaults.removeObject(forKey: key) }
-        }
+        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)])
         store.selectedTab = .list
         let sheets = BrowseSheetPresentation()
@@ -57,17 +79,18 @@ struct RenderedFilterTests {
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 600, height: 834))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(350))
+        #expect(!host.showsFilterRail, "Narrow windows use the sheet, not the rail")
         sheets.showsFilters = true
         try await filterWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
-        host.window.frame.size.width = 1194
-        host.host.view.frame = host.window.bounds
+        host.resize(CGSize(width: 1194, height: 834))
         try await filterWait { host.host.presentedViewController == nil && !sheets.showsFilters && !sheets.shellSheetPresented }
+        #expect(host.showsFilterRail && !host.showsFilterPanel, "Resizing closes the sheet and shows the rail")
         store.selectedTab = .stats
         try await Task.sleep(for: .milliseconds(250))
         sheets.showsFilters = true
         try await Task.sleep(for: .milliseconds(350))
         #expect(host.host.presentedViewController == nil && !sheets.shellSheetPresented)
-        #expect(host.descendants(of: UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 })
+        #expect(host.showsFilterPanel)
         sheets.showsFilters = false
     }
 
@@ -91,45 +114,131 @@ struct RenderedFilterTests {
         #expect(store.selectedTab == tab)
     }
 
-    @Test(arguments: ["portrait", "landscape", "sidebar-hidden"])
-    func listDetailAdaptsFiltersAndRestoresPreference(layout: String) async throws {
-        let key = "browse.filterSidebarVisible", defaults = UserDefaults.standard
-        let saved = defaults.object(forKey: key)
-        let prefersSidebar = layout != "sidebar-hidden"
-        defaults.set(prefersSidebar, forKey: key)
+    @Test(arguments: ["portrait", "landscape"])
+    func filtersNeverSqueezeListAndDetail(layout: String) async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
-        defer {
-            MapboxOptions.accessToken = token
-            if let saved { defaults.set(saved, forKey: key) }
-            else { defaults.removeObject(forKey: key) }
-        }
+        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
-        let size = layout == "landscape" ? CGSize(width: 1194, height: 834) : CGSize(width: 834, height: 1194)
-        let host = try FilterHarness(root: AppShell(store: store)
+        let portrait = layout == "portrait"
+        let size = portrait ? CGSize(width: 834, height: 1194) : CGSize(width: 1194, height: 834)
+        let sheets = BrowseSheetPresentation()
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
             .environment(\.horizontalSizeClass, .regular)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(450))
         let list = try #require(host.descendants(of: UICollectionView.self).first { $0.bounds.width > 400 })
-        let initialWidth = list.bounds.width
+        let beside = size.width - FilterRail.width - 1
+        #expect(abs(list.bounds.width - beside) < 2)
         store.inspect(1)
         try await Task.sleep(for: .milliseconds(500))
-        #expect(host.host.presentedViewController == nil)
-        #expect(host.descendants(of: UICollectionView.self).contains { $0 === list })
-        let availableWidth = layout == "landscape" ? size.width - 321 : size.width
-        let expectedListWidth = availableWidth - min(420, max(340, availableWidth * 0.42)) - 1
-        #expect(abs(list.bounds.width - expectedListWidth) < 2, "Detail stays beside the retained list rather than pushing")
-        let sidebarShown = host.descendants(of: UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 }
-        #expect(sidebarShown == (layout == "landscape"))
-        #expect(defaults.bool(forKey: key) == prefersSidebar, "Automatic collapse does not change the saved preference")
-        try host.save(host.snapshot(), name: "adaptive-list-detail-\(layout)")
+        #expect(host.host.presentedViewController == nil && list.window != nil)
+        let withDetail = Self.listWidth(beside: beside)
+        #expect(abs(list.bounds.width - withDetail) < 2, "Detail stays beside the retained list rather than pushing")
+        sheets.showsFilters = true
+        try await Task.sleep(for: .milliseconds(450))
+        #expect(host.showsFilterPanel && list.window != nil)
+        if portrait {
+            // The panel floats over List and its detail instead of squeezing them.
+            #expect(abs(list.bounds.width - withDetail) < 2)
+        } else {
+            // Landscape fits the panel as a column beside both.
+            let narrower = Self.listWidth(beside: size.width - BrowsePaneLayout.filterWidth - 1)
+            #expect(abs(list.bounds.width - narrower) < 2)
+        }
+        try host.save(host.snapshot(), name: "list-detail-panel-\(layout)")
+        // Map and Stats are one column, so the panel sits beside them; no
+        // destination shows or hides it (#354).
+        for tab in [AppTab.map, .stats, .list] {
+            store.selectedTab = tab
+            try await Task.sleep(for: .milliseconds(250))
+            #expect(sheets.showsFilters && host.showsFilterPanel, "\(tab.title) keeps the panel")
+        }
+        sheets.showsFilters = false
+        try await filterWait {
+            host.showsFilterRail && !host.showsFilterPanel && abs(list.bounds.width - withDetail) < 2
+        }
+        #expect(abs(list.bounds.width - withDetail) < 2)
         store.dismissInspection()
         try await Task.sleep(for: .milliseconds(400))
-        #expect(abs(list.bounds.width - initialWidth) < 2)
-        #expect(host.descendants(of: UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 } == prefersSidebar)
+        #expect(abs(list.bounds.width - beside) < 2)
+        #expect(host.showsFilterRail, "Closing detail never shows or hides filters")
+    }
+
+    @Test(arguments: [false, true])
+    func rotatingListWithFiltersAndDetailKeepsTheAdjacentDetail(filtersFirst: Bool) async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        let sheets = BrowseSheetPresentation()
+        sheets.showsFilters = filtersFirst
+        let landscape = CGSize(width: 1194, height: 834)
+        let portrait = CGSize(width: 834, height: 1194)
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: landscape)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(450))
+        let list = try #require(host.descendants(of: UICollectionView.self).first { $0.bounds.width > 400 })
+        store.inspect(1)
+        try await Task.sleep(for: .milliseconds(400))
+        sheets.showsFilters = true
+        try await Task.sleep(for: .milliseconds(400))
+        for size in [portrait, landscape, portrait, landscape] {
+            host.resize(size)
+            try await Task.sleep(for: .milliseconds(700))
+            let floating = size.width == portrait.width
+            let beside = size.width - (floating ? FilterRail.width : BrowsePaneLayout.filterWidth) - 1
+            #expect(store.inspectedActivityID == 1 && sheets.showsFilters)
+            #expect(host.showsFilterPanel && host.host.presentedViewController == nil)
+            #expect(host.navigationControllers.allSatisfy { $0.viewControllers.count == 1 },
+                    "Rotation must not push an adjacent detail into an empty destination")
+            #expect(list.window != nil && abs(list.bounds.width - Self.listWidth(beside: beside)) < 2,
+                    "List and its detail retain their columns after rotation")
+            try host.save(host.snapshot(), name: "rotated-list-detail-\(filtersFirst)-\(Int(size.width))")
+        }
+    }
+
+    @Test func openingAnActivityCollapsesTheExpandedPanelInPortrait() async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        let sheets = BrowseSheetPresentation()
+        sheets.showsFilters = true
+        let size = CGSize(width: 834, height: 1194)
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(450))
+        let list = try #require(host.descendants(of: UICollectionView.self).first { $0.bounds.width > 400 })
+        #expect(host.showsFilterPanel)
+        #expect(abs(list.bounds.width - (size.width - BrowsePaneLayout.filterWidth - 1)) < 2,
+                "One-column List keeps the panel as a column")
+        store.inspect(1)
+        try await filterWait { !sheets.showsFilters && host.showsFilterRail }
+        try await Task.sleep(for: .milliseconds(400))
+        // List waited for the rail instead of pushing its detail full width.
+        #expect(list.window != nil && host.host.presentedViewController == nil)
+        #expect(abs(list.bounds.width - Self.listWidth(beside: size.width - FilterRail.width - 1)) < 2)
+        try host.save(host.snapshot(), name: "list-detail-collapsed-panel")
+        store.dismissInspection()
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(!sheets.showsFilters, "Closing detail leaves the rail rather than restoring the panel")
+    }
+
+    /// ListScreen's adjacent detail: 340–420pt plus a divider.
+    private static func listWidth(beside width: CGFloat) -> CGFloat {
+        width - min(420, max(340, width * 0.42)) - 1
     }
 
     @Test func landscapePhoneCanDismissFiltersWithoutChangingContext() async throws {
@@ -182,18 +291,13 @@ struct RenderedFilterTests {
     }
 
     @Test func landscapeSidebarKeepsFiltersWhileInspecting() async throws {
-        let key = "browse.filterSidebarVisible"
-        let previous = UserDefaults.standard.object(forKey: key)
-        UserDefaults.standard.set(true, forKey: key)
-        defer {
-            if let previous { UserDefaults.standard.set(previous, forKey: key) }
-            else { UserDefaults.standard.removeObject(forKey: key) }
-        }
         let store = ActivityStore(activities: try GalleryLibrary.load().activities,
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
         store.distanceFilter = NumericFilter(value: 10000, upperLimit: 80000)
-        let root = AppShell(store: store).environment(\.horizontalSizeClass, .regular)
+        let sheets = BrowseSheetPresentation()
+        sheets.showsFilters = true
+        let root = AppShell(store: store, sheets: sheets).environment(\.horizontalSizeClass, .regular)
         let host = try FilterHarness(root: root, size: CGSize(width: 1180, height: 820))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(600))
@@ -203,6 +307,7 @@ struct RenderedFilterTests {
         #expect(store.distanceFilter == NumericFilter(value: 10000, upperLimit: 80000))
         #expect(store.selectedActivityIDs == selection)
         #expect(host.host.presentedViewController == nil, "A wide window fits filters, list and detail together")
+        #expect(sheets.showsFilters && host.showsFilterPanel)
         try host.save(host.snapshot(), name: "sidebar-landscape-detail")
     }
 
@@ -292,6 +397,25 @@ private final class FilterHarness<Content: View> {
             ((view as? T).map { [$0] } ?? []) + view.subviews.flatMap(visit)
         }
         return visit(host.view)
+    }
+    var navigationControllers: [UINavigationController] {
+        func visit(_ controller: UIViewController) -> [UINavigationController] {
+            ((controller as? UINavigationController).map { [$0] } ?? []) + controller.children.flatMap(visit)
+        }
+        return visit(host)
+    }
+    /// The full filter panel, as a column or floating over List and its detail.
+    var showsFilterPanel: Bool {
+        descendants(of: UIScrollView.self).contains {
+            abs($0.bounds.width - BrowsePaneLayout.filterWidth) < 2 && $0.window != nil
+        }
+    }
+    var showsFilterRail: Bool {
+        descendants(of: UIScrollView.self).contains { abs($0.bounds.width - FilterRail.width) < 1 && $0.window != nil }
+    }
+    func resize(_ size: CGSize) {
+        window.frame.size = size
+        host.view.frame = window.bounds
     }
     func close() { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
 }

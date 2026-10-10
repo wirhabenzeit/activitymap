@@ -163,16 +163,16 @@ import Testing
             .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)), size: size)
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(400))
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
-        #expect(!navigation.isNavigationBarHidden)
-        #expect(navigation.view.bounds.height == host.host.view.bounds.height)
+        let navigation = try #require(host.contentNavigation())
+        #expect(host.shellAccountButton() != nil)
+        #expect(!navigation.isNavigationBarHidden, "The phone dashboard and detail share a native header")
         let root = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[0].view)
             .first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
         let rootOffset = root.contentOffset.y
         try await Task.sleep(for: .milliseconds(100))
-        let account = try #require(host.accountButton(in: navigation.navigationBar))
-        let accountFrame = account.convert(account.bounds, to: host.host.view)
+        let account = try #require(host.shellAccountButton())
+        let accountFrame = host.host.view.convert(account.accessibilityFrame, from: nil)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(bounds: host.host.view.bounds, format: format)
@@ -198,9 +198,9 @@ import Testing
                 var sample: [String: Any] = ["elapsedMs": (before - start) * 1000,
                     "captureMs": (CACurrentMediaTime() - before) * 1000,
                     "transitioning": navigation.transitionCoordinator != nil]
-                if let account = host.accountButton(in: navigation.navigationBar),
-                   account.window != nil, account.bounds.width > 0 {
-                    let frame = account.convert(account.bounds, to: host.host.view)
+                if let account = host.shellAccountButton(),
+                   !account.accessibilityFrame.isEmpty {
+                    let frame = host.host.view.convert(account.accessibilityFrame, from: nil)
                     sample["accountCenterX"] = frame.midX
                     sample["accountCenterY"] = frame.midY
                     sample["accountWidth"] = frame.width
@@ -251,16 +251,23 @@ import Testing
             }
             try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (phase == "push" ? 2 : 1) }
             if phase == "push" {
-                #expect(!navigation.isNavigationBarHidden,
-                        "Root and detail share a visible blue native bar with a stable inset")
-                #expect(host.accountButton(in: navigation.navigationBar) == nil,
-                        "Stat detail shows only Back and the stat title")
+                #expect(host.shellAccountButton() == nil,
+                        "The focused chart leaves account access on the dashboard")
+                #expect(host.shellControl(label: "Filters") != nil)
+                #expect(navigation.topViewController?.navigationItem.title == "Training volume")
+                let bar = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
+                #expect(abs(bar.minY - host.host.view.safeAreaInsets.top) < 2,
+                        "Stats detail takes over the top header instead of adding another row")
+                #expect(host.controllers(UINavigationController.self).filter {
+                    !$0.isNavigationBarHidden && $0.navigationBar.window != nil
+                }.count == 1)
             } else {
-                let settledAccount = try #require(host.accountButton(in: navigation.navigationBar))
-                let settledFrame = settledAccount.convert(settledAccount.bounds, to: host.host.view)
+                let settledAccount = try #require(host.shellAccountButton())
+                let settledFrame = host.host.view.convert(settledAccount.accessibilityFrame, from: nil)
                 #expect(abs(settledFrame.midX - accountFrame.midX) < 1 && abs(settledFrame.midY - accountFrame.midY) < 1,
                         "Returning restores the overview's profile button at its original position")
             }
+            try host.capture("phone-single-stats-header-\(variant)-\(phase)")
             let gesture = try #require(navigation.interactivePopGestureRecognizer)
             if phase == "push" {
                 #expect(gesture.isEnabled)
@@ -273,7 +280,7 @@ import Testing
         #expect(state.expandedTile == nil && abs(root.contentOffset.y - rootOffset) < 1)
     }
 
-    @Test func phoneStatsHeaderCanPresentSettingsFromDetail() async throws {
+    @Test func phoneStatsHeaderKeepsFiltersInDetailAndSettingsOnDashboard() async throws {
         let (store, _) = try StatsDashboardTests.fixture()
         let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
         let previousToken = MapboxOptions.accessToken
@@ -285,23 +292,25 @@ import Testing
             .environment(\.horizontalSizeClass, .compact), size: CGSize(width: 402, height: 874))
         defer { host.close() }
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         try host.capture("phone-header-root")
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         try host.capture("phone-header-detail")
-        sheets.accountDestination = .settings
+        #expect(host.shellAccountButton() == nil && host.shellControl(label: "Filters") != nil)
+        sheets.showsFilters = true
         try await statsWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
         #expect(state.expandedTile == .weeklyVolume && navigation.viewControllers.count == 2)
-        try host.capture("phone-header-detail-settings", presented: true)
-        sheets.accountDestination = nil
+        try host.capture("phone-header-detail-filters", presented: true)
+        sheets.showsFilters = false
         try await statsWait { host.host.presentedViewController == nil }
         navigation.popViewController(animated: true)
         try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
-        sheets.showsFilters = true
+        #expect(host.shellAccountButton() != nil)
+        sheets.accountDestination = .settings
         try await statsWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
-        try host.capture("phone-header-root-filters", presented: true)
-        sheets.showsFilters = false
+        try host.capture("phone-header-root-settings", presented: true)
+        sheets.accountDestination = nil
         try await statsWait { host.host.presentedViewController == nil }
     }
 
@@ -325,7 +334,7 @@ import Testing
             size: CGSize(width: 402, height: 874))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(500))
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         let root = try #require(host.descendants(UIScrollView.self).first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
         let offset = root.contentOffset.y
@@ -348,7 +357,7 @@ import Testing
         try await statsWait { navigation.viewControllers.count == 1 && navigation.transitionCoordinator == nil }
         #expect(observedInteraction && cancelledInteraction)
         #expect(state.expandedTile == nil && abs(root.contentOffset.y - offset) < 1)
-        #expect(!navigation.isNavigationBarHidden)
+        #expect(host.shellAccountButton() != nil)
         try host.capture("phone-header-interaction-back")
     }
 
@@ -373,7 +382,7 @@ import Testing
             size: CGSize(width: 402, height: 874))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(500))
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         var results: [[String: Any]] = []
         // No snapshots or forced layouts while measuring. The display link
         // observes UIKit's presentation layer, rather than its target frame.
@@ -774,7 +783,7 @@ import Testing
             .environment(\.dynamicTypeSize, variant == "large-text" ? .accessibility3 : .large), size: size)
         defer { host.close() }
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         let root = try #require(host.descendants(UIScrollView.self).first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         let firstHeight = root.contentSize.height
         // Publishing the last result precedes SwiftUI's final layout commit.
@@ -800,7 +809,7 @@ import Testing
             }
             try await Task.sleep(for: .milliseconds(100))
             let detailScroll = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[1].view).first { $0.bounds.height > 100 })
-            #expect(!navigation.isNavigationBarHidden && navigation.topViewController?.navigationItem.title == StatsDashboard.tiles.first { $0.id == id }?.title)
+            #expect(host.shellAccountButton() == nil && navigation.topViewController?.navigationItem.title == StatsDashboard.tiles.first { $0.id == id }?.title)
             #expect(detailScroll !== root, "The tile opens in its own scrolling destination")
             #expect(detailScroll.contentSize.width <= detailScroll.bounds.width + 1)
             #expect(abs(root.contentSize.height - height) < 1, "Opening detail never resizes the dashboard")
@@ -838,15 +847,9 @@ import Testing
         #expect(state.inspection(.weeklyVolume) !== volume, "Account changes discard inspection state")
     }
 
-    @Test(arguments: ["portrait", "landscape"])
+    @Test(arguments: ["portrait", "landscape", "expanded"])
     func tabletStatDetailOpensFullWidthFocusPage(orientation: String) async throws {
-        let key = "browse.filterSidebarVisible", defaults = UserDefaults.standard
-        let saved = defaults.object(forKey: key)
-        defaults.set(true, forKey: key)
-        defer {
-            if let saved { defaults.set(saved, forKey: key) }
-            else { defaults.removeObject(forKey: key) }
-        }
+        let expanded = orientation == "expanded"
         let library = try GalleryLibrary.load()
         let store = ActivityStore(activities: library.activities,
                                   listPresentation: ActivityListPresentation(defaults: nil))
@@ -859,57 +862,171 @@ import Testing
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let size = orientation == "portrait" ? CGSize(width: 834, height: 1194) : CGSize(width: 1194, height: 834)
         let sheets = BrowseSheetPresentation()
+        sheets.showsFilters = expanded
         let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
             .environment(\.horizontalSizeClass, .regular)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
         defer { host.close() }
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         let root = try #require(host.descendants(UIScrollView.self).first {
             !($0 is UICollectionView) && $0.contentSize.height > 1500
         })
         let initialWidth = root.bounds.width
-        #expect(abs(initialWidth - (size.width - 321)) < 2)
+        // The filter rail sits beside the dashboard; the expanded panel is a
+        // column because the dashboard is one column (#354).
+        let filterWidth = (expanded ? BrowsePaneLayout.filterWidth : FilterRail.width) + 1
+        #expect(abs(initialWidth - (size.width - filterWidth)) < 2)
         root.setContentOffset(CGPoint(x: 0, y: 250), animated: false)
         let offset = root.contentOffset.y
         let calculations = store.stats.calculationCount
         let inspection = try #require(state.inspection(.weeklyVolume))
         inspection.volumeRange = .months
 
-        // The chart gets the whole shell width, never less than its compact tile.
+        // The chart uses all content width beside the retained filters.
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         let page = try #require(navigation.topViewController)
         #expect(page.preferredTransition != nil, "Regular-width iPad zooms the tile into its focus page")
-        let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { !($0 is UICollectionView) })
-        #expect(abs(detail.bounds.width - size.width) < 2)
+        let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { abs($0.bounds.width - initialWidth) < 2 })
+        #expect(abs(detail.bounds.width - initialWidth) < 2)
         #expect(state.expandedTile == .weeklyVolume && inspection.volumeRange == .months)
-        #expect(!sheets.revealsFiltersOverDetail)
+        #expect(sheets.showsFilters == expanded)
         try host.capture("ipad-stats-focus-\(orientation)")
 
         // Back restores the retained dashboard, its scroll position and the
-        // filter column without rebuilding or recalculating anything.
+        // filter visibility without rebuilding or recalculating anything.
         navigation.popViewController(animated: true)
         try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
         #expect(host.descendants(UIScrollView.self).contains { $0 === root })
         #expect(abs(root.bounds.width - initialWidth) < 2)
         #expect(abs(root.contentOffset.y - offset) < 1)
-        #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 })
+        #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 } == expanded)
         #expect(state.inspection(.weeklyVolume) === inspection && inspection.volumeRange == .months)
         #expect(store.stats.calculationCount == calculations)
-        #expect(defaults.bool(forKey: key))
+        #expect(sheets.showsFilters == expanded, "Focus pages never change filter visibility")
 
         // Every other expandable tile uses the same full-width page.
         for tile in StatsDashboard.tiles.map(\.id) where StatsDashboard.expandable(tile) && tile != .weeklyVolume {
             state.toggleExpansion(tile)
             try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
             let page = try #require(navigation.topViewController)
-            let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { !($0 is UICollectionView) })
-            #expect(abs(detail.bounds.width - size.width) < 2, "\(tile.rawValue)")
+            let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { abs($0.bounds.width - initialWidth) < 2 })
+            #expect(abs(detail.bounds.width - initialWidth) < 2, "\(tile.rawValue)")
             try host.capture("ipad-stats-focus-\(orientation)-\(tile.rawValue)")
             navigation.popViewController(animated: true)
             try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
         }
+    }
+
+    @Test(arguments: ["portrait", "landscape", "phone", "split-window", "large-text"])
+    func statsFocusKeepsFiltersAndDestinationsUsable(scenario: String) async throws {
+        let (store, _) = try StatsDashboardTests.fixture()
+        let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let size: CGSize = switch scenario {
+        case "landscape": CGSize(width: 1194, height: 834)
+        case "phone": CGSize(width: 402, height: 874)
+        case "split-window": CGSize(width: 600, height: 1000)
+        default: CGSize(width: 834, height: 1194)
+        }
+        let sidebar = ["portrait", "landscape"].contains(scenario)
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
+            .environment(\.horizontalSizeClass, scenario == "phone" ? .compact : .regular)
+            .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility3 : .large)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let navigation = try #require(host.contentNavigation())
+        let dates = ActivityDayRange(start: "2026-01-01", end: "2026-12-31")
+        store.dateDayRange = dates
+        let volume = try #require(StatsDashboard.tiles.first { $0.id == .weeklyVolume })
+        state.select(.time, for: volume)
+        let inspection = try #require(state.inspection(.weeklyVolume))
+        inspection.volumeRange = .months
+        state.toggleExpansion(.weeklyVolume)
+        try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        #expect((host.shellAccountButton() != nil) == (scenario != "phone"),
+                "Compact focus pages keep Settings on the dashboard; iPad retains the workspace header")
+        sheets.showsFilters = true
+        if sidebar {
+            try await statsWait { host.descendants(UITextField.self).count == 1 }
+            #expect(host.host.presentedViewController == nil)
+            #expect(host.descendants(UIScrollView.self).contains { abs($0.bounds.width - 320) < 2 })
+        } else {
+            try await statsWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
+        }
+        store.searchText = "No matching activity"
+        try await statsWait { store.statsActivities.isEmpty }
+        #expect(state.expandedTile == .weeklyVolume && store.dateDayRange == dates)
+        try host.capture("stats-focus-filters-\(scenario)", presented: !sidebar)
+        sheets.showsFilters = false
+        if !sidebar { try await statsWait { host.host.presentedViewController == nil } }
+        try await statsWait { host.shellControl(label: "No matching activities") != nil }
+        #expect(host.shellControl(label: "Calculating…") == nil,
+                "An empty filter is a completed result, not a calculation still in progress")
+        #expect(state.option(.weeklyVolume) == .time && inspection.volumeRange == .months)
+        store.resetStatsActivityFilters()
+        try await statsWait { state.result(.weeklyVolume, source: StatsDashboardSource(store)) != nil
+            && host.shellControl(label: "No matching activities") == nil }
+        #expect(host.shellControl(label: "Calculating…") == nil)
+        #expect(state.expandedTile == .weeklyVolume && state.option(.weeklyVolume) == .time)
+        #expect(state.inspection(.weeklyVolume) === inspection && inspection.volumeRange == .months)
+        try host.capture("stats-focus-shell-\(scenario)")
+        store.selectedTab = .list
+        try await statsWait { state.expandedTile == nil && navigation.viewControllers.count == 1 && navigation.transitionCoordinator == nil }
+        #expect(store.selectedTab == .list && store.dateDayRange == dates)
+    }
+
+    @Test(arguments: ["portrait", "landscape"])
+    func filtersStayStationaryDuringStatsFocusTransition(scenario: String) async throws {
+        let (store, _) = try StatsDashboardTests.fixture()
+        let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
+        sheets.showsFilters = true
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let size = scenario == "landscape" ? CGSize(width: 1194, height: 834) : CGSize(width: 834, height: 1194)
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let navigation = try #require(host.contentNavigation())
+        let field = try #require(host.descendants(UITextField.self).first)
+        let filters = try #require(host.descendants(UIScrollView.self).first { abs($0.bounds.width - 320) < 2 })
+        let filterFrame = filters.convert(filters.bounds, to: host.host.view)
+        let filterOffset = filters.contentOffset
+        #expect(!filters.isDescendant(of: navigation.view), "Filters belong to the stationary shell")
+        #expect(abs(navigation.view.bounds.width - (size.width - 321)) < 2)
+        for phase in ["expand", "back"] {
+            if phase == "expand" { withAnimation(.default) { state.toggleExpansion(.weeklyVolume) } }
+            else { navigation.popViewController(animated: true) }
+            var transitionSamples = 0
+            for index in 0..<30 {
+                try await Task.sleep(for: .milliseconds(25))
+                if navigation.transitionCoordinator != nil { transitionSamples += 1 }
+                #expect(host.descendants(UITextField.self).count == 1,
+                        "The animation must never introduce a second filter panel")
+                #expect(host.descendants(UITextField.self).first === field)
+                let layer = filters.layer.presentation() ?? filters.layer
+                let frame = layer.convert(layer.bounds, to: host.host.view.layer.presentation() ?? host.host.view.layer)
+                #expect(abs(frame.minX - filterFrame.minX) < 1 && abs(frame.minY - filterFrame.minY) < 1)
+                #expect(abs(frame.width - filterFrame.width) < 1 && abs(frame.height - filterFrame.height) < 1)
+                #expect(filters.contentOffset == filterOffset && sheets.showsFilters)
+                if ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_FILTER_TRANSITION_FRAMES"] == "1" {
+                    try host.captureTransitionFrame("filters-\(scenario)-\(phase)", index: index)
+                }
+            }
+            #expect(transitionSamples > 0, "Observe the real in-flight transition, not only its final layout")
+            try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (phase == "expand" ? 2 : 1) }
+            try host.capture("stationary-filters-\(scenario)-\(phase)")
+        }
+        #expect(state.expandedTile == nil)
     }
 
     @Test func tabletFocusPageSurvivesWindowResize() async throws {
@@ -924,7 +1041,7 @@ import Testing
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 834, height: 1194))
         defer { host.close() }
         try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
-        let navigation = try #require(host.controllers(UINavigationController.self).first)
+        let navigation = try #require(host.contentNavigation())
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         // Crossing the 760pt threshold in either direction keeps the same page.
@@ -982,6 +1099,77 @@ import Testing
         try await statsWait { state.result(.weeklyVolume, source: StatsDashboardSource(store)) != nil }
         #expect(state.face(.weeklyVolume, source: StatsDashboardSource(store))?.option == .elevation)
         #expect(state.expandedTile == .weeklyVolume)
+    }
+
+    @Test func foregroundSyncWithoutChangesKeepsRenderedStats() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        try await storage.apply([.upsertActivity(try Fixtures.activity())], checkpoint: Fixtures.checkpoint, scope: Fixtures.scope)
+        let source = GatedChangesSource(unchanged: SyncFixtures.changes(next: "cursor-1"))
+        let store = ActivityStore(), state = StatsDashboardState()
+        let sync = SyncController(activities: store, source: { _ in source }, invalidate: { _ in })
+        sync.setSession(SyncFixtures.session(verified: false), storage: storage); await sync.refresh()
+        store.selectedTab = .stats
+        let host = try StatsDashboardHarness(root: StatsScreen(store: store, sync: sync, dashboard: state),
+                                              size: CGSize(width: 402, height: 874))
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let scroll = try #require(host.descendants(UIScrollView.self).first { $0.contentSize.height > 1500 })
+        scroll.setContentOffset(CGPoint(x: 0, y: 300), animated: false)
+        let offset = scroll.contentOffset, height = scroll.contentSize.height
+        let originalSource = StatsDashboardSource(store), calculations = store.stats.calculationCount
+        try host.capture("unchanged-sync-before")
+        sync.setSession(SyncFixtures.session(), storage: storage)
+        await source.waitForRequest()
+        #expect(sync.status == .syncing)
+        for _ in 0..<20 {
+            try await Task.sleep(for: .milliseconds(16))
+            #expect(StatsDashboardSource(store) == originalSource)
+            #expect(StatsDashboard.ids.allSatisfy { state.face($0, source: StatsDashboardSource(store)) != nil },
+                    "A routine sync must not replace existing charts with Calculating placeholders")
+            #expect(scroll.contentOffset == offset && abs(scroll.contentSize.height - height) < 1)
+        }
+        try host.capture("unchanged-sync-during")
+        await source.release(); await sync.refresh()
+        sync.pause(); await sync.refresh()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(sync.status == .ready && StatsDashboardSource(store) == originalSource)
+        #expect(store.stats.calculationCount == calculations && store.stats.aggregationCount == 1)
+        #expect(scroll.contentOffset == offset && abs(scroll.contentSize.height - height) < 1)
+        try host.capture("unchanged-sync-after")
+    }
+
+    @Test(arguments: [false, true])
+    func focusedChartShowsEmptyResultsWithCachedHistory(failedRefresh: Bool) async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        try await storage.apply([.upsertActivity(try Fixtures.activity())], checkpoint: Fixtures.checkpoint, scope: Fixtures.scope)
+        let source = ScriptedSyncSource([.changes("cursor-1", .failure(.server(code: "temporary", message: "Try later", status: 500, requestID: nil, retryable: false)))])
+        let store = ActivityStore(), state = StatsDashboardState()
+        let sync = SyncController(activities: store, source: { _ in source }, invalidate: { _ in })
+        sync.setSession(SyncFixtures.session(verified: false), storage: storage)
+        await sync.refresh()
+        if failedRefresh {
+            sync.setSession(SyncFixtures.session(), storage: storage)
+            await sync.refresh()
+        }
+        store.selectedTab = .stats
+        let host = try StatsDashboardHarness(root: StatsScreen(store: store, sync: sync, dashboard: state),
+                                            size: CGSize(width: 402, height: 874))
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let navigation = try #require(host.contentNavigation())
+        state.toggleExpansion(.weeklyVolume)
+        try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        store.searchText = "No matching activity"
+        try await statsWait { host.shellControl(label: "No matching activities") != nil }
+        #expect(StatsPresentation(store: store, sync: sync).state == (failedRefresh ? .error : .cached))
+        #expect(host.shellControl(label: "Calculating…") == nil)
+        store.resetStatsActivityFilters()
+        try await statsWait { state.result(.weeklyVolume, source: StatsDashboardSource(store)) != nil
+            && host.shellControl(label: "No matching activities") == nil }
+        #expect(state.expandedTile == .weeklyVolume)
+        store.activities = []
+        try await statsWait { host.shellControl(label: "No activity history") != nil }
+        #expect(host.shellControl(label: "Calculating…") == nil)
     }
 
     @Test func realOfflineFailureAndAuthorizationTransitionsKeepTruthfulContent() async throws {
@@ -1077,7 +1265,7 @@ import Testing
         #expect(store.dateDayRange == dates && store.selectedActivityIDs == [selected])
         #expect(store.mapContext.camera.zoom == camera.zoom)
         #expect(state.option(.sportMix) == .allTime)
-        let statsNavigation = try #require(host.controllers(UINavigationController.self).first)
+        let statsNavigation = try #require(host.contentNavigation())
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { statsNavigation.viewControllers.count == 2 && statsNavigation.transitionCoordinator == nil }
         store.selectedTab = .map
@@ -1164,21 +1352,39 @@ import Testing
         }
         return visit(host)
     }
-    func accountButton(in bar: UINavigationBar) -> UIView? {
-        // Stats has one trailing 44pt control. UIKit's SwiftUI toolbar hosts
-        // do not expose its identifier as a UIView accessibility property.
-        guard !bar.isHidden else { return nil }
-        let barFrame = bar.convert(bar.bounds, to: host.view)
-        return descendants(UIView.self, in: bar).first { view in
-            guard abs(view.bounds.width - 44) < 1, abs(view.bounds.height - 44) < 1,
-                  view.convert(view.bounds, to: host.view).midX > barFrame.maxX - 80 else { return false }
-            var ancestor: UIView? = view
-            while let current = ancestor, current !== bar {
-                if current.isHidden || current.alpha < 0.99 { return false }
-                ancestor = current.superview
+    func shellAccountButton() -> NSObject? {
+        shellControl(label: "Settings")
+    }
+    func shellControl(label: String) -> NSObject? {
+        var visited: Set<ObjectIdentifier> = []
+        func visit(_ object: NSObject) -> NSObject? {
+            guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
+            if object.accessibilityLabel == label, !object.accessibilityFrame.isEmpty { return object }
+            let count = object.accessibilityElementCount()
+            if count > 0, count < 1000 {
+                for index in 0..<count {
+                    if let child = object.accessibilityElement(at: index) as? NSObject,
+                       let found = visit(child) { return found }
+                }
             }
-            return true
+            if let view = object as? UIView {
+                for child in view.subviews { if let found = visit(child) { return found } }
+            }
+            return nil
         }
+        return visit(host.view)
+    }
+    func contentNavigation() -> UINavigationController? {
+        controllers(UINavigationController.self).first
+    }
+    func captureTransitionFrame(_ name: String, index: Int) throws {
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1
+        let image = UIGraphicsImageRenderer(bounds: host.view.bounds, format: format).image { _ in
+            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: false)
+        }
+        let directory = URL(fileURLWithPath: "/tmp/activitymap-stats-stationary-frames/\(name)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try image.pngData()?.write(to: directory.appendingPathComponent(String(format: "frame-%02d.png", index)))
     }
     @discardableResult func capture(_ name: String, presented: Bool = false) throws -> UIImage {
         let view = presented ? try #require(host.presentedViewController?.view) : host.view!
