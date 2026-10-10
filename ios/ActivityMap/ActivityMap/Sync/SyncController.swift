@@ -42,6 +42,11 @@ final class SyncController {
     private(set) var checkpoint: SyncCheckpoint?
     private(set) var photos: [Photo] = []
     private(set) var session: SyncSession?
+    private(set) var initialImport: ActivityMapAPI.InitialImport?
+    private(set) var initialImportError: String?
+    private var initialImportRetryAt: Date?
+    private var initialImportChecked = false
+    private let initialImportSource: ((SyncSession) -> any InitialImportSource)?
     private var storage: LocalStore?
     private var work: Task<Void, Never>?
     private var generation = 0
@@ -59,6 +64,9 @@ final class SyncController {
     var lastSyncAt: Date? { checkpoint?.lastSyncAt }
     var lastReconciliationAt: Date? { checkpoint?.freshness?.lastSummaryReconciledAt }
     var retryNotBefore: Date? { retryAt }
+    var canRetryInitialImport: Bool {
+        canRefresh && (initialImportRetryAt.map { $0 <= now() } ?? true)
+    }
     var canRefresh: Bool {
         guard let session, session.user.stravaConnected,
               session.user.authentication.sessionExpiresAt > now(), status != .syncing else { return false }
@@ -83,6 +91,7 @@ final class SyncController {
         storedSummarySource: @escaping (SyncSession) -> any StoredSummarySource = {
             StreamsAPI(baseURL: $0.deployment, token: $0.token)
         },
+        initialImportSource: ((SyncSession) -> any InitialImportSource)? = nil,
         invalidate: @escaping (String) -> Void
     ) {
         self.summaries = StreamSummaryLoader(source: summarySource, invalidate: invalidate)
@@ -91,6 +100,7 @@ final class SyncController {
         self.activities = activities
         self.now = now
         self.source = source
+        self.initialImportSource = initialImportSource
         self.invalidate = invalidate
     }
 
@@ -194,6 +204,47 @@ final class SyncController {
             if let retryAt, retryAt > now() { status = deferredStatus; return }
             status = .syncing
             let engine = SyncEngine(source: source(session), store: storage, scope: session.scope)
+            if let makeSource = initialImportSource, !initialImportChecked,
+               initialImportRetryAt.map({ $0 <= now() }) ?? true {
+                do {
+                    let importer = makeSource(session)
+                    var progress = try await importer.read()
+                    guard current == generation, !Task.isCancelled else { return }
+                    if !progress.isFinished || initialImport != nil { initialImport = progress }
+                    initialImportError = nil
+                    // Publish each committed page through ordinary scoped sync.
+                    // Browsing is usable after the first 50, before the next call.
+                    for attempt in 0..<4 {
+                        if progress.isFinished || (attempt > 0 && progress.phase == .failed) || progress.phase == .paused { break }
+                        if let retryAt = progress.retryAt, retryAt > now() { break }
+                        progress = try await importer.advance()
+                        guard current == generation, !Task.isCancelled else { return }
+                        initialImport = progress
+                        _ = try await engine.run()
+                        guard current == generation, !Task.isCancelled else { return }
+                        try await loadCache(session, storage: storage, generation: current)
+                    }
+                    initialImportChecked = progress.isFinished
+                    initialImportRetryAt = progress.retryAt
+                } catch {
+                    guard current == generation, !Task.isCancelled else { return }
+                    if AuthController.isExplicitlyUnauthenticated(error) { throw error }
+                    // Older servers can still provide their ordinary sync protocol.
+                    if case .server(_, _, 404, _, _, _) = error as? APIClient.RequestError {
+                        initialImportChecked = true
+                    } else {
+                        initialImportError = "Could not import your recent activities. Your progress is saved. Try again."
+                        if initialImport == nil && activities.activities.isEmpty {
+                            initialImport = .init(phase: .failed, importedCount: 0, target: 200,
+                                                  historyComplete: false, retryAt: nil, message: nil)
+                        }
+                        initialImportRetryAt = now().addingTimeInterval(Self.serverRetryDelay(error) ?? 60)
+                        if case .rateLimited(let delay, _) = error as? APIClient.RequestError {
+                            initialImportRetryAt = now().addingTimeInterval(delay)
+                        }
+                    }
+                }
+            }
             _ = try await engine.run()
             guard current == generation, !Task.isCancelled else { return }
             try await loadCache(session, storage: storage, generation: current)
@@ -300,6 +351,10 @@ final class SyncController {
     }
 
     private func clearVisible() {
+        initialImport = nil
+        initialImportError = nil
+        initialImportRetryAt = nil
+        initialImportChecked = false
         summarySync.pause()
         publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil
         photoCacheConfigured = false

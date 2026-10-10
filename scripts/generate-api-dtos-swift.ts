@@ -83,6 +83,10 @@ import {
   revokeSessionRequestSchema,
 } from '../src/contracts/v1/mobile-auth';
 import { SCHEMA_VERSION } from '../src/contracts/v1/primitives';
+import {
+  initialImportDTOSchema,
+  initialImportPhaseSchema,
+} from '../src/contracts/v1/initial-import';
 import { sportTypes } from '../src/server/strava/types';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -140,6 +144,8 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['IngestionPhotos', ingestionPhotosDTOSchema],
   ['IngestionStreams', ingestionStreamsDTOSchema],
   ['IngestionStatus', ingestionStatusDTOSchema],
+  ['InitialImportPhase', initialImportPhaseSchema],
+  ['InitialImport', initialImportDTOSchema],
   ['ErrorEnvelope', errorEnvelopeSchema],
   ['MobileExchangeRequest', mobileExchangeRequestSchema],
   ['MobileExchangeResponse', mobileExchangeResponseDTOSchema],

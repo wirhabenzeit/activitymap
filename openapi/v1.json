@@ -3589,6 +3589,82 @@
         ],
         "additionalProperties": false
       },
+      "InitialImportResponse": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "1"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "not_started",
+                  "importing",
+                  "paused",
+                  "failed",
+                  "ready",
+                  "empty"
+                ]
+              },
+              "importedCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200
+              },
+              "target": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 200
+              },
+              "historyComplete": {
+                "type": "boolean"
+              },
+              "retryAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "phase",
+              "importedCount",
+              "target",
+              "historyComplete",
+              "retryAt",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "serverTime",
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "CurrentUserResponse": {
         "type": "object",
         "properties": {
@@ -3912,6 +3988,128 @@
           },
           "500": {
             "description": "The server could not serialize a valid contract response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/initial-import": {
+      "get": {
+        "operationId": "getInitialImport",
+        "summary": "Read recent-activity onboarding progress",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Read-only progress for the initial 200 recent activity summaries. Ready does not mean older history, details, photos or streams are complete.",
+        "responses": {
+          "200": {
+            "description": "Current initial import progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialImportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Import status unavailable; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "advanceInitialImport",
+        "summary": "Import the next bounded batch of recent activities",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Imports at most 50 summaries per call, up to 200 per account or the end of history. Durable account-scoped progress, leases and retry deadlines prevent duplicate work across clients. No caller-supplied IDs, ranges or quotas. Complete accounts are a no-op. Other ingestion continues automatically.",
+        "responses": {
+          "200": {
+            "description": "Progress after this batch, including saved retry/error states",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialImportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-origin browser mutation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Import unavailable; see Retry-After",
             "content": {
               "application/json": {
                 "schema": {

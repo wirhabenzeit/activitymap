@@ -12,6 +12,7 @@ import { ToastManager } from '~/components/providers/toast';
 import { QueryProvider } from '~/providers/query-provider';
 import { ServiceWorkerProvider } from '~/components/providers/service-worker';
 import { OfflineSyncProvider } from '~/components/providers/offline-sync';
+import { InitialImportNotice } from '~/components/auth/initial-import';
 import {
   SignedOutConnectPanel,
   StravaConnectProvider,
@@ -65,6 +66,7 @@ export default async function AppShellLayout({
                 <AppSidebar />
                 <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
                   <div className="h-14 w-full" />
+                  <InitialImportNotice />
                   <div className="min-h-0 w-full flex-1 overflow-hidden">
                     {children}
                     <SignedOutConnectPanel />

@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "checks": [
+    "progressive browsing",
+    "four batches",
+    "completion dismissal",
+    "empty history",
+    "stored cooldown",
+    "HTTP Retry-After",
+    "returning accounts",
+    "completion in another client",
+    "account cancellation",
+    "desktop/mobile/landscape/dark geometry"
+  ]
+}
