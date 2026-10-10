@@ -273,6 +273,7 @@ struct StatsSportMixVisual: View {
     let breakdown: [ActivityCategory: StatsTotals]
     let expanded: Bool
     @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var contentWidth: CGFloat = 0
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             GeometryReader { proxy in
@@ -284,7 +285,7 @@ struct StatsSportMixVisual: View {
                 }
             }.frame(height: 10).clipShape(RoundedRectangle(cornerRadius: 2)).accessibilityHidden(true)
             StatsExpansionReveal(expanded: expanded) {
-                if typeSize.isAccessibilitySize { detailRows }
+                if typeSize.isAccessibilitySize || contentWidth < 600 { detailRows }
                 else { ViewThatFits(in: .horizontal) { detailTable.fixedSize(horizontal: true, vertical: false); detailRows } }
             }
             StatsExpansionReveal(expanded: !expanded, inverted: true) {
@@ -297,7 +298,7 @@ struct StatsSportMixVisual: View {
                     }
                 }
             }
-        }
+        }.onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
     }
     private var detailRows: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -308,12 +309,23 @@ struct StatsSportMixVisual: View {
                     LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 4) {
                         detailValue("Moving time", StatsDisplay.measurement(totals.time, metric: .time))
                         detailValue("Activities", StatsDisplay.number(totals.count))
-                        detailValue("Distance", StatsDisplay.measurement(totals.distance, metric: .distance))
-                        detailValue("Climb", StatsDisplay.measurement(totals.elevation, metric: .elevation))
                     }
                 }
                 Divider()
             }
+            DisclosureGroup("Distance and climb") {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(shares, id: \.sport) { share in
+                        let totals = breakdown[share.sport] ?? StatsTotals()
+                        VStack(alignment: .leading, spacing: 4) {
+                            sportLabel(share.sport).font(.caption.weight(.medium))
+                            detailValue("Distance", StatsDisplay.measurement(totals.distance, metric: .distance))
+                            detailValue("Climb", StatsDisplay.measurement(totals.elevation, metric: .elevation))
+                        }
+                    }
+                }.padding(.top, 8)
+            }.font(.caption)
+            .accessibilityIdentifier("stats-sport-mix-extra-totals")
         }
     }
     private func detailValue(_ label: String, _ value: String) -> some View {

@@ -1473,7 +1473,7 @@ extension RenderedStatsDashboardTests {
         try host.capture("parity-\(tileID.rawValue)-\(variant)-history")
     }
 
-    @Test(arguments: [834.0, 1194.0], [StatsTileID.weeklyVolume, .activityCalendar, .distanceVsElevation, .sportMix])
+    @Test(arguments: [402.0, 834.0, 1194.0], [StatsTileID.weeklyVolume, .activityCalendar, .distanceVsElevation, .sportMix])
     func supportingStatsDetailsAdaptToContentWidth(width: Double, tileID: StatsTileID) async throws {
         let today = StatsDates.day("2026-10-10")
         let engine = Self.rhythmPreviewEngine()
@@ -1484,12 +1484,15 @@ extension RenderedStatsDashboardTests {
         let result = engine.dashboard(tileID, option: option, today: today)
         let host = try StatsDashboardHarness(root: ScrollView {
             StatsDashboardTile(tile: tile, option: .constant(option), displayed: .init(option: option, result: result),
-                today: today, expanded: tileID != .sportMix, filtered: false, toggleExpansion: {}, detailScreen: tileID != .sportMix, inspection: inspection).padding(16)
+                today: today, expanded: tileID != .sportMix || width < 760, filtered: false, toggleExpansion: {}, detailScreen: tileID != .sportMix || width < 760, inspection: inspection).padding(16)
         }.environment(\.statsAvailableWidth, width), size: CGSize(width: width, height: 1194))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(300))
         let outer = try #require(host.descendants(UIScrollView.self).first)
         #expect(outer.contentSize.width <= outer.bounds.width + 1)
+        if tileID == .sportMix && width < 600 {
+            #expect(host.shellControl(label: "Distance and climb") != nil, "Phone Sport mix should disclose secondary totals even when a small table could fit")
+        }
         try host.capture("parity-support-\(tileID.rawValue)-\(Int(width))")
     }
 
@@ -1514,6 +1517,53 @@ extension RenderedStatsDashboardTests {
                 #expect(inspection.monthDay == StatsDates.day("2026-10-08"))
             }
             host.close()
+        }
+    }
+
+    @Test func monthRhythmKeepsZeroAndMissingActivityDaysVisible() async throws {
+        let today = StatsDates.day("2026-10-10")
+        let engine = StatsEngine(activities: [
+            .init(id: 1, name: "Flat run", sport: .run, start: StatsDates.date(today - 2), distance: 5000, movingTime: 1800, elevation: 0),
+            .init(id: 2, name: "Unmeasured run", sport: .run, start: StatsDates.date(today - 1), distance: 5000, movingTime: 1800, elevation: nil),
+        ])
+        let host = try StatsDashboardHarness(root: ScrollView {
+            StatsPeriodDetail(rhythm: .month(engine.monthActivityRhythm(today: today, metric: .elevation)),
+                              history: [], metric: .elevation, today: today, openActivity: { _ in }) { EmptyView() }.padding(16)
+        }, size: CGSize(width: 402, height: 1000))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(host.shellControl(label: "Run") != nil, "A sport with only zero/missing values still needs a legend")
+        #expect(host.shellControl(label: "Dots mark activities with zero or no recorded value.") != nil)
+        try host.capture("follow-up-month-zero-missing")
+    }
+
+    @Test func yearRhythmReadsExactMonthTotalsAndRetainsSelection() async throws {
+        let today = StatsDates.day("2026-10-10")
+        let engine = StatsEngine(activities: [
+            .init(id: 1, name: "October", sport: .run, start: StatsDates.date(StatsDates.day("2026-10-02")), distance: 20000, movingTime: 7200, elevation: 0),
+            .init(id: 2, name: "Previous October", sport: .run, start: StatsDates.date(StatsDates.day("2025-10-02")), distance: 10000, movingTime: 3600, elevation: 0),
+            .init(id: 3, name: "August", sport: .ride, start: StatsDates.date(StatsDates.day("2026-08-02")), distance: 45000, movingTime: 10800, elevation: 0),
+            .init(id: 4, name: "Previous August", sport: .ride, start: StatsDates.date(StatsDates.day("2025-08-02")), distance: 30000, movingTime: 7200, elevation: 0),
+        ])
+        let inspection = StatsTileInspection()
+        for metric in [StatsMetric.distance, .time] {
+            let host = try StatsDashboardHarness(root: ScrollView {
+                StatsPeriodDetail(rhythm: .year(engine.yearMonthlyRhythm(today: today, metric: metric)),
+                                  history: [], metric: metric, today: today, openActivity: { _ in }) { EmptyView() }
+                    .padding(16)
+            }.environment(\.statsTileInspection, inspection), size: CGSize(width: 402, height: 1000))
+            defer { host.close() }
+            try await Task.sleep(for: .milliseconds(200))
+            let start = inspection.yearMonth ?? StatsDates.day("2026-10-01")
+            let initialPrevious = StatsDisplay.measurement(metric == .distance ? 10 : 2, metric: metric)
+            let initialCurrent = StatsDisplay.measurement(metric == .distance ? 20 : 3, metric: metric)
+            #expect(host.shellControl(label: "\(StatsDisplay.month(start)): 2025, \(initialPrevious); 2026, \(initialCurrent)") != nil)
+            inspection.yearMonth = StatsDates.day("2026-08-01")
+            try await Task.sleep(for: .milliseconds(100))
+            let previous = StatsDisplay.measurement(metric == .distance ? 30 : 2, metric: metric)
+            let current = StatsDisplay.measurement(metric == .distance ? 45 : 3, metric: metric)
+            #expect(host.shellControl(label: "\(StatsDisplay.month(inspection.yearMonth!)): 2025, \(previous); 2026, \(current)") != nil)
+            try host.capture("follow-up-year-exact-\(metric.rawValue)")
         }
     }
 

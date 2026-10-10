@@ -393,6 +393,49 @@ export default function Review() {
   await page.setViewportSize({ width: 1440, height: 1000 });
   console.log('Nested activity Escape and direct-link Back pass');
 
+  // A direct activity link never pushed a chart entry. Replacing its activity
+  // must not turn Close/Escape into browser Back to an unrelated page.
+  for (const dismiss of ['close', 'escape']) {
+    await loaded();
+    await loaded(new URL(activityURL).search);
+    await dialog.waitFor();
+    const initialID = new URL(activityURL).searchParams.get('activity');
+    await focus
+      .locator(
+        `[data-stats-activity-id]:not([data-stats-activity-id="${initialID}"])`,
+      )
+      .first()
+      .click();
+    await page.waitForFunction(
+      (id) => new URL(location.href).searchParams.get('activity') !== id,
+      initialID,
+    );
+    if (dismiss === 'close')
+      await dialog
+        .getByRole('button', { name: 'Close activity detail', exact: true })
+        .click();
+    else await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'hidden' });
+    await active('records');
+    assert.equal(new URL(page.url()).searchParams.has('activity'), false);
+  }
+  console.log('Direct-link activity replacement closes locally');
+
+  await page.setViewportSize({ width: 402, height: 874 });
+  await loaded('?tile=sport-mix');
+  const extras = focus.locator('details');
+  await extras.waitFor();
+  assert.equal(await extras.getAttribute('open'), null);
+  assert.equal(await extras.locator('dl').isVisible(), false);
+  await extras.locator('summary').click();
+  assert.equal(await extras.locator('dl').isVisible(), true);
+  assert.match(await extras.innerText(), /climbed/);
+  await page.screenshot({
+    path: join(output, 'sport-mix-phone-expanded.png'),
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
   await loaded('?tile=this-week');
   assert.equal(
     await focus.count(),

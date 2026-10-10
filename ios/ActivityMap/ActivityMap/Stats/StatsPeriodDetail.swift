@@ -14,13 +14,16 @@ struct StatsPeriodDetail<Curve: View>: View {
     let openActivity: (Int) -> Void
     @ViewBuilder let curve: () -> Curve
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
     @State private var width: CGFloat = 0
     private var monthly: Bool { if case .month = rhythm { return true }; return false }
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             let layout = width >= 1000 && !typeSize.isAccessibilitySize ? AnyLayout(HStackLayout(alignment: .top, spacing: 24)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
             layout {
-                curve().environment(\.statsFocusChartHeight, 320).frame(maxWidth: .infinity, alignment: .leading)
+                curve().environment(\.statsFocusChartHeight, width >= 760 ? 320 : 200)
+                    .environment(\.statsDetailHeightLimit, width < 760 ? min(shortViewportLimit ?? 200, 200) : shortViewportLimit)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 rhythmView.frame(maxWidth: .infinity, alignment: .leading)
             }
             StatsPeriodHistoryTable(rows: history, metric: metric, monthly: monthly)
@@ -50,7 +53,7 @@ private struct StatsMonthRhythmView: View {
     }
     private var selected: StatsMonthRhythmDay? { rhythm.days.first { $0.day == focusedDay } }
     private var maximum: Double { max(1, rhythm.days.map { $0.bySport.values.reduce(0, +) }.max() ?? 0) }
-    private var sports: [ActivityCategory] { ActivityCategory.allCases.filter { sport in rhythm.days.contains { ($0.bySport[sport] ?? 0) > 0 } } }
+    private var sports: [ActivityCategory] { ActivityCategory.allCases.filter { sport in rhythm.days.contains { day in day.activities.contains { $0.sport == sport } } } }
     private var offset: Int { rhythm.days.first.map { $0.day - StatsDates.monday($0.day) } ?? 0 }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -63,7 +66,14 @@ private struct StatsMonthRhythmView: View {
             if typeSize.isAccessibilitySize || width < 314 {
                 ForEach(rhythm.days.filter { $0.day <= today }, id: \.day) { day in
                     Button { focusedDay = day.day } label: {
-                        HStack { Text(StatsDisplay.shortDate(day.day)); Spacer(); Text(StatsDisplay.measurement(day.bySport.values.reduce(0, +), metric: metric)) }.frame(minHeight: 44)
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(StatsDisplay.shortDate(day.day))
+                                Text("\(day.activities.count) activities").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(StatsDisplay.measurement(day.bySport.values.reduce(0, +), metric: metric))
+                        }.frame(minHeight: 44)
                     }.buttonStyle(.plain).accessibilityAddTraits(day.day == focusedDay ? .isSelected : [])
                 }
             } else {
@@ -74,6 +84,9 @@ private struct StatsMonthRhythmView: View {
                 }
             }
             StatsRhythmLegend(sports: sports)
+            if rhythm.days.contains(where: { !$0.activities.isEmpty && $0.bySport.values.reduce(0, +) == 0 }) {
+                Text("Dots mark activities with zero or no recorded value.").font(.caption).foregroundStyle(.secondary)
+            }
             if let selected {
                 Divider()
                 Text(StatsDisplay.date(selected.day)).font(.subheadline.weight(.semibold))
@@ -108,6 +121,13 @@ private struct StatsMonthRhythmView: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                     ForEach(sports.reversed()) { sport in Rectangle().fill(sport.color).frame(height: 30 * (day.bySport[sport] ?? 0) / maximum) }
+                    if total == 0 && !day.activities.isEmpty {
+                        HStack(spacing: 2) {
+                            ForEach(sports.filter { sport in day.activities.contains { $0.sport == sport } }) { sport in
+                                Circle().fill(sport.color).frame(width: 5, height: 5)
+                            }
+                        }.padding(.bottom, 3)
+                    }
                     Rectangle().fill(.quaternary).frame(height: 1)
                 }.frame(height: 31)
             }.frame(maxWidth: .infinity, minHeight: 60)
@@ -126,12 +146,25 @@ private struct StatsYearRhythmView: View {
     let metric: StatsMetric
     let today: Int
     @ScaledMetric private var height = 230.0
+    @State private var selectedMonth: Int?
+    @Environment(\.statsTileInspection) private var inspection
     @Environment(\.dynamicTypeSize) private var typeSize
     private var ticks: [Int] { Array(stride(from: 0, to: months.count, by: typeSize.isAccessibilitySize ? max(1, (months.count + 1) / 2) : 1)) }
     private var maximum: Double { max(1, months.flatMap { [$0.current.values.reduce(0, +), $0.previous.values.reduce(0, +)] }.max() ?? 0) * 1.08 }
     private var axisTicks: [Double] { StatsDisplay.axisTicks(maximum: maximum) }
     private var axisStep: Double { axisTicks.count > 1 ? metric.displayValue(axisTicks[1] - axisTicks[0]) : 1 }
     private var year: Int { StatsDates.parts(today).year! }
+    private var selectedIndex: Int {
+        let start = inspection?.yearMonth ?? selectedMonth
+        return months.firstIndex { $0.start == start } ?? max(0, months.count - 1)
+    }
+    private var monthSelection: Binding<Int> {
+        Binding(get: { selectedIndex }, set: { index in
+            guard months.indices.contains(index) else { return }
+            if let inspection { inspection.yearMonth = months[index].start }
+            else { selectedMonth = months[index].start }
+        })
+    }
     private var sports: [ActivityCategory] { ActivityCategory.allCases.filter { sport in months.contains { ($0.current[sport] ?? 0) > 0 || ($0.previous[sport] ?? 0) > 0 } } }
     private func lower(_ values: [ActivityCategory: Double], sport: ActivityCategory) -> Double { sports.prefix { $0 != sport }.reduce(0) { $0 + (values[$1] ?? 0) } }
     var body: some View {
@@ -147,6 +180,12 @@ private struct StatsYearRhythmView: View {
                         }
                     }
                 }
+                if !months.isEmpty {
+                    RuleMark(x: .value("Selected month", Double(selectedIndex)))
+                        .foregroundStyle(Color.secondary.opacity(0.4))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        .accessibilityHidden(true)
+                }
             }.chartXScale(domain: -0.5...(Double(max(1, months.count)) - 0.5))
             .chartYScale(domain: 0...maximum)
             .chartXAxis {
@@ -158,7 +197,29 @@ private struct StatsYearRhythmView: View {
                     AxisGridLine()
                     AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value), step: axisStep)).font(.caption2) } }
                 }
-            }.frame(height: min(height, 320))
+            }.chartXSelection(value: Binding<Double?>(
+                get: { Double(selectedIndex) },
+                set: { if let value = $0 { monthSelection.wrappedValue = min(max(0, Int(value.rounded())), max(0, months.count - 1)) } }
+            ))
+            .frame(height: min(height, 320))
+            if months.indices.contains(selectedIndex) {
+                let month = months[selectedIndex]
+                Picker("Compare month", selection: monthSelection) {
+                    ForEach(Array(months.enumerated()), id: \.offset) { index, month in
+                        Text(StatsDisplay.month(month.start)).tag(index)
+                    }
+                }.pickerStyle(.menu)
+                .accessibilityIdentifier("stats-year-rhythm-month")
+                StatsSummaryValues(items: [
+                    .init(label: String(year - 1), value: StatsDisplay.measurement(month.previous.values.reduce(0, +), metric: metric)),
+                    .init(label: String(year), value: StatsDisplay.measurement(month.current.values.reduce(0, +), metric: metric)),
+                ])
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(StatsDisplay.month(month.start)): \(String(year - 1)), \(StatsDisplay.measurement(month.previous.values.reduce(0, +), metric: metric)); \(String(year)), \(StatsDisplay.measurement(month.current.values.reduce(0, +), metric: metric))")
+                .accessibilityIdentifier("stats-year-rhythm-totals")
+                Text(month.inProgress ? "Current month totals through the same calendar date." : "Completed month totals.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             StatsRhythmLegend(sports: sports)
         }
     }

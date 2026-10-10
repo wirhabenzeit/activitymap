@@ -521,7 +521,7 @@ void test('sport mix names every represented sport and retains useful phone deta
   assert.match(detail, /Moving time/);
   assert.match(detail, /Activities/);
   assert.match(detail, /Distance/);
-  assert.match(detail, /Climb/);
+  assert.match(detail, /Distance and climb/);
   assert.equal(
     view.summary(
       { ...context, activities: [make('2026-08-31', 'ride')] },

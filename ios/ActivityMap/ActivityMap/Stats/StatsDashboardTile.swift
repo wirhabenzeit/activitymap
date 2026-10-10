@@ -164,7 +164,7 @@ struct StatsDashboardTile: View {
             note("At this year's daily average")
             StatsProjectionSummary(pace: pace, metric: metric, year: year)
         case .records(let current, let allTime, let best30):
-            StatsRecordsDetail(current: current, allTime: allTime, best30: best30, year: year, expanded: expanded, openActivity: openActivity)
+            StatsRecordsDetail(current: current, allTime: allTime, best30: best30, year: year, expanded: expanded, filtered: filtered, openActivity: openActivity)
         case .calendar(let rolling, let years):
             StatsCalendarDetail(rolling: rolling, years: years, today: today, option: displayedOption ?? .sport, expanded: expanded, openActivity: openActivity, expand: toggleExpansion)
         case .mix(let shares, let hours, let breakdown):

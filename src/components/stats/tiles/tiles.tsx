@@ -824,11 +824,6 @@ const sportMixView: TileView = {
                   {[
                     ['Moving time', formatWithUnit(row?.time ?? 0, 'time')],
                     ['Activities', String(row?.count ?? 0)],
-                    [
-                      'Distance',
-                      formatWithUnit(row?.distance ?? 0, 'distance'),
-                    ],
-                    ['Climb', formatWithUnit(row?.elevation ?? 0, 'elevation')],
                   ].map(([label, value]) => (
                     <div
                       key={label}
@@ -843,6 +838,33 @@ const sportMixView: TileView = {
             );
           })}
         </ul>
+        <details className="mt-2 text-xs @min-[600px]:hidden">
+          <summary className="min-h-11 cursor-pointer py-3 font-medium">
+            Distance and climb
+          </summary>
+          <dl className="divide-y divide-muted">
+            {shares.map(({ sport }) => (
+              <div
+                key={sport}
+                className="flex flex-wrap justify-between gap-2 py-2"
+              >
+                <dt>{categorySettings[sport].name}</dt>
+                <dd className="tabular-nums text-muted-foreground">
+                  {formatWithUnit(
+                    breakdown.get(sport)?.distance ?? 0,
+                    'distance',
+                  )}
+                  {' · '}
+                  {formatWithUnit(
+                    breakdown.get(sport)?.elevation ?? 0,
+                    'elevation',
+                  )}{' '}
+                  climbed
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </details>
         <table className="hidden w-full text-sm @min-[600px]:table">
           <thead>
             <tr className="border-b text-xs text-muted-foreground">
@@ -1457,6 +1479,10 @@ function RecordsDetail({ context }: { context: TileContext }) {
     (context.availableWidth ?? context.focusWidth ?? 0) >= 760;
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted-foreground" aria-label="Records scope">
+        {context.filtered ? 'Filtered activities' : 'Across all sports'}
+        {' · Use Filters to adjust these rankings.'}
+      </p>
       <Activity mode={showBothPeriods ? 'hidden' : 'visible'}>
         <div
           role="group"
