@@ -1,0 +1,23 @@
+{
+  "description": "5,000 synthetic compact summary DTOs validated through the production schema. UTF-8 JSON bytes, excluding database indexes/record wrappers, HTTP envelopes and compression. The largest scenario repeats the largest fixture, not a worst-case codec bound. These are payload budgets, not measured IndexedDB/SwiftData disk use or device performance.",
+  "rows": [
+    {
+      "name": "mixed-corpus",
+      "activities": 5000,
+      "batchSize": 100,
+      "requestsForInitialCatchUp": 50,
+      "encodedDTOBytes": 14529893,
+      "largestEncodedDTOBytes": 4779,
+      "largestBatchDataBytes": 290735
+    },
+    {
+      "name": "largest-corpus-summary",
+      "activities": 5000,
+      "batchSize": 100,
+      "requestsForInitialCatchUp": 50,
+      "encodedDTOBytes": 23893893,
+      "largestEncodedDTOBytes": 4779,
+      "largestBatchDataBytes": 478015
+    }
+  ]
+}

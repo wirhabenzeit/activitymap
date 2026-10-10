@@ -1,0 +1,37 @@
+{
+  "measuredAt": "2026-10-10T09:14:53.261Z",
+  "environment": {
+    "browser": "Chromium 155.0.8059.39",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpu": "Apple M4 Pro"
+  },
+  "results": [
+    "v1→v2 migration preserves activity and checkpoint",
+    "cold module reload + offline profile reads durable summary with zero requests",
+    "tombstone blocks late summary resurrection",
+    "newer activity revision blocks old response",
+    "request/session fence blocks late write",
+    "cross-tab tombstone blocks late write from first tab",
+    "blocked v1 upgrade fails clearly and recovers after old tab closes",
+    "5000 encoded summary records persisted and reread"
+  ],
+  "profile": {
+    "requests": 0,
+    "count": 20
+  },
+  "budget": {
+    "count": 5000,
+    "writeMs": 237.9000000357628,
+    "readMs": 53.19999998807907,
+    "usageBefore": 73728,
+    "usageAfter": 10383360,
+    "deltaBytes": 10309632
+  },
+  "caveats": [
+    "Synthetic compactStreamCorpus fixtures, equally repeated over 5,000 activities; not a production library.",
+    "Storage is navigator.storage.estimate origin usage delta including IndexedDB overhead and minimal activity rows, not exact summary bytes.",
+    "Fresh isolated headless Chrome context on this Mac; latency is not an iPhone or mobile storage budget.",
+    "Cold module reload verifies durable cache reuse, not service-worker support for launching the entire app offline."
+  ]
+}
