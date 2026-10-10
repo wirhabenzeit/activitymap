@@ -590,7 +590,7 @@ import Testing
             Issue.record("Missing volume"); return
         }
         let host = try StatsDashboardHarness(root: ScrollView {
-            StatsVolumeDetail(history: history, averages: averages, metric: .distance, range: .constant(.weeks), showTotals: true) { EmptyView() }.padding(12)
+            StatsVolumeDetail(history: history, averages: averages, metric: .distance, range: .constant(.weeks)) { EmptyView() }.padding(12)
         }.environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large), size: CGSize(width: 402, height: 874))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(150))
@@ -816,7 +816,6 @@ import Testing
             if id == .weeklyVolume {
                 state.select(.elevation, for: try #require(StatsDashboard.tiles.first { $0.id == id }))
                 try await statsWait { state.face(id, source: StatsDashboardSource(store))?.option == .elevation }
-                volume.volumeTotals = true
                 #expect(volume.volumeRange == .months)
             }
             if id == .records { state.inspection(id)?.recordsRange = .allTime }
@@ -839,7 +838,7 @@ import Testing
         #expect(state.inspection(.records)?.recordsRange == .allTime)
         #expect(state.inspection(.activityCalendar)?.calendarYear == StatsDates.parts(StatsDashboardSource(store).today).year!)
         #expect(state.option(.weeklyVolume) == .elevation)
-        #expect(state.inspection(.weeklyVolume) === volume && volume.volumeTotals && volume.volumeRange == .months)
+        #expect(state.inspection(.weeklyVolume) === volume && volume.volumeRange == .months)
         state.toggleExpansion(.records)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         store.clearScope()

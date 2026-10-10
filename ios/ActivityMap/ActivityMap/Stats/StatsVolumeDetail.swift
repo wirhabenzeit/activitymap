@@ -21,18 +21,10 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     private var shownRange: StatsHistoryRange { expanded ? range : .weeks }
     private var buckets: [StatsHistoryBucket] { history[shownRange] ?? [] }
     @State private var selectedX: Double?
-    @State var showTotals = false
     @State private var width: CGFloat = 0
     @Environment(\.dynamicTypeSize) private var typeSize
     private var wide: Bool { expanded && width >= 760 && !typeSize.isAccessibilitySize }
     private var sideBySide: Bool { wide && width >= 1000 }
-    @Environment(\.statsTileInspection) private var inspection
-    private var totalsSelection: Binding<Bool> {
-        if let inspection {
-            return Binding(get: { inspection.volumeTotals }, set: { inspection.volumeTotals = $0 })
-        }
-        return $showTotals
-    }
     var expanded = true
     @Environment(\.statsExpansionProgress) private var sharedProgress
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
@@ -221,12 +213,8 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                 HStack(spacing: 10) { legend }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), alignment: .leading)]) { legend }
             }
-            if wide {
-                Text("Period totals").font(.subheadline.weight(.semibold))
-                periodTotals
-            } else {
-                DisclosureGroup("Period totals", isExpanded: totalsSelection) { periodTotals }.font(.caption)
-            }
+            Text("Period totals").font(.subheadline.weight(.semibold))
+            periodTotals
         }
     }
     private var periodTotals: some View {
