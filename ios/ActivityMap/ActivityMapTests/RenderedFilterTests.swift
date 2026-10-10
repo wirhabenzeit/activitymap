@@ -67,6 +67,61 @@ struct RenderedFilterTests {
         }
     }
 
+    /// The rail and panel always sit below the full-width browsing header,
+    /// including on List where the panel leaves too little for List's detail.
+    @Test(arguments: [false, true])
+    func filterSidebarSitsBelowTheHeaderOnEveryDestination(expanded: Bool) async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        let sheets = BrowseSheetPresentation()
+        sheets.showsFilters = expanded
+        let host = try FilterHarness(root: AppShell(store: store, sheets: sheets)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 834, height: 1194))
+        defer { host.close() }
+        var tops: [AppTab: CGFloat] = [:]
+        for tab in [AppTab.map, .list, .stats] {
+            store.selectedTab = tab
+            try await Task.sleep(for: .milliseconds(350))
+            let width = expanded ? BrowsePaneLayout.filterWidth : FilterRail.width
+            let sidebar = try #require(host.descendants(of: UIScrollView.self).first {
+                abs($0.bounds.width - width) < 1 && $0.window != nil
+            })
+            tops[tab] = sidebar.convert(sidebar.bounds, to: nil).minY
+            try host.save(host.snapshot(), name: "sidebar-header-\(expanded ? "panel" : "rail")-\(tab.title.lowercased())")
+        }
+        #expect(Set(tops.values).count == 1, "Filter sidebar tops differ by destination: \(tops)")
+    }
+
+    /// A window too narrow for List's adjacent detail beside the rail pushes
+    /// the detail inside its column, still below the browsing header.
+    @Test func pushedListDetailKeepsTheHeaderAboveTheRail() async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        let size = CGSize(width: 790, height: 1100)
+        let host = try FilterHarness(root: AppShell(store: store)
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(350))
+        let rail = { host.descendants(of: UIScrollView.self).first { abs($0.bounds.width - FilterRail.width) < 1 && $0.window != nil } }
+        let top = try #require(rail()).convert(try #require(rail()).bounds, to: nil).minY
+        #expect(top > 0, "The rail starts below the header")
+        store.inspect(1)
+        try await filterWait { host.navigationControllers.contains { $0.viewControllers.count > 1 } }
+        try await Task.sleep(for: .milliseconds(400))
+        let pushedTop = try #require(rail()).convert(try #require(rail()).bounds, to: nil).minY
+        #expect(pushedTop == top, "Pushing List's detail keeps the rail below the header")
+        try host.save(host.snapshot(), name: "sidebar-header-pushed-detail")
+    }
+
     @Test func resizingDismissesFilterSheetWhenSidebarBecomesAvailable() async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
