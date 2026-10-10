@@ -294,7 +294,12 @@ export function StatsTileGrid({
                       focusChartHeight: Math.max(
                         150,
                         Math.min(
-                          focusWidth >= 760 ? 400 : 300,
+                          focusWidth >= 760
+                            ? 400
+                            : tile.id === 'monthVsLastMonth' ||
+                                tile.id === 'yearToDate'
+                              ? 200
+                              : 300,
                           focusHeight * 0.48,
                           focusHeight - 220,
                         ),

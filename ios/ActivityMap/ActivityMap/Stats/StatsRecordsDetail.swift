@@ -6,6 +6,7 @@ struct StatsRecordsDetail: View {
     let best30: [StatsMetric: StatsBestDays]
     let year: Int
     let expanded: Bool
+    var filtered = false
     var openActivity: (Int) -> Void
     @State private var range = StatsToggleOption.currentYear
     @Environment(\.statsTileInspection) private var inspection
@@ -28,6 +29,10 @@ struct StatsRecordsDetail: View {
         VStack(alignment: .leading, spacing: 0) {
             StatsExpansionReveal(expanded: expanded) {
                 VStack(alignment: .leading, spacing: 16) {
+                    Text("\(filtered ? "Filtered activities" : "Across all sports") · Use Filters to adjust these rankings.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("stats-records-scope")
                     if availableWidth < BrowsePaneLayout.minimumDetailWidth {
                         StatsRangePicker(title: "Records period", ranges: [.currentYear, .allTime], selection: periodSelection, label: StatsDisplay.option)
                     }

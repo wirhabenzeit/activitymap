@@ -182,6 +182,7 @@ struct StatsDashboardFace {
     var calendarYear: Int?
     var calendarDay: Int?
     var monthDay: Int?
+    var yearMonth: Int?
     var recordsRange = StatsToggleOption.currentYear
 }
 
