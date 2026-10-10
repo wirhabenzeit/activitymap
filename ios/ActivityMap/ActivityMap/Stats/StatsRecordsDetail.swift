@@ -15,6 +15,9 @@ struct StatsRecordsDetail: View {
         }
         return $range
     }
+    @Environment(\.statsAvailableWidth) private var availableWidth
+    @Environment(\.statsInspectedActivityID) private var inspectedID
+    @State private var contentWidth: CGFloat = 0
     @Environment(\.dynamicTypeSize) private var typeSize
     private let metrics: [StatsMetric] = [.distance, .time, .elevation]
     private var records: StatsRecords { expanded && periodSelection.wrappedValue == .allTime ? allTime : current }
@@ -24,11 +27,24 @@ struct StatsRecordsDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             StatsExpansionReveal(expanded: expanded) {
-              VStack(alignment: .leading, spacing: 16) {
-                StatsRangePicker(title: "Records period", ranges: [.currentYear, .allTime], selection: periodSelection, label: StatsDisplay.option)
-                Text(periodSelection.wrappedValue == .allTime ? "All-time records" : "Records · \(String(year))").font(.caption).foregroundStyle(.secondary)
-              }.padding(.bottom, 16)
+                VStack(alignment: .leading, spacing: 16) {
+                    if availableWidth < BrowsePaneLayout.minimumDetailWidth {
+                        StatsRangePicker(title: "Records period", ranges: [.currentYear, .allTime], selection: periodSelection, label: StatsDisplay.option)
+                    }
+                    let layout = contentWidth >= 700 && !typeSize.isAccessibilitySize
+                        ? AnyLayout(HStackLayout(alignment: .top, spacing: 24))
+                        : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
+                    layout {
+                        if availableWidth >= BrowsePaneLayout.minimumDetailWidth || periodSelection.wrappedValue == .currentYear {
+                            podium(current, label: "This year · \(String(year))", period: "currentYear")
+                        }
+                        if availableWidth >= BrowsePaneLayout.minimumDetailWidth || periodSelection.wrappedValue == .allTime {
+                            podium(allTime, label: "All time", period: "allTime")
+                        }
+                    }
+                }.padding(.bottom, 16)
             }
+            StatsExpansionReveal(expanded: !expanded, inverted: true) {
             StatsDetailGrid(expanded: expanded, compactColumns: typeSize.isAccessibilitySize ? 1 : 4) {
                 ForEach(metrics, id: \.self) { metric in
                     VStack(alignment: .leading, spacing: 4) {
@@ -63,6 +79,7 @@ struct StatsRecordsDetail: View {
                     }
                 }
             }
+            }
             StatsExpansionReveal(expanded: expanded) {
               VStack(alignment: .leading, spacing: 16) {
                 Divider()
@@ -89,7 +106,84 @@ struct StatsRecordsDetail: View {
               }.padding(.top, 16)
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
     }
+    private func podium(_ records: StatsRecords, label: String, period: String) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(label).font(.headline).accessibilityAddTraits(.isHeader)
+            ForEach(metrics, id: \.self) { metric in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title(metric)).font(.caption).foregroundStyle(.secondary)
+                    Divider()
+                    let entries = records.rankings[metric] ?? records.activities[metric].map { [$0] } ?? []
+                    if entries.isEmpty { Text("No record yet").font(.caption).foregroundStyle(.secondary) }
+                    ForEach(Array(entries.enumerated()), id: \.offset) { index, record in
+                        let rank = entries.firstIndex { $0.value == record.value } ?? index
+                        let name = record.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let id = record.activityID {
+                            Button { openActivity(id) } label: {
+                                rankedRow(rank: rank, name: name.isEmpty ? record.sport.name : name,
+                                          detail: "\(record.sport.name) · \(StatsDisplay.date(record.day))",
+                                          value: StatsDisplay.measurement(record.value, metric: metric))
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 4)
+                            .background(inspectedID == id ? AppTheme.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                            .accessibilityAddTraits(inspectedID == id ? .isSelected : [])
+                            .accessibilityIdentifier("stats-record-\(period)-\(metric.rawValue)-\(id)")
+                        } else {
+                            rankedRow(rank: rank, name: name.isEmpty ? record.sport.name : name,
+                                      detail: "\(record.sport.name) · \(StatsDisplay.date(record.day))",
+                                      value: StatsDisplay.measurement(record.value, metric: metric))
+                        }
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Biggest week").font(.caption).foregroundStyle(.secondary)
+                Divider()
+                let weeks = records.biggestWeeks.isEmpty ? records.biggestWeek.map { [$0] } ?? [] : records.biggestWeeks
+                if weeks.isEmpty { Text("No record yet").font(.caption).foregroundStyle(.secondary) }
+                ForEach(Array(weeks.enumerated()), id: \.offset) { index, week in
+                    rankedRow(rank: weeks.firstIndex { $0.value == week.value } ?? index,
+                              name: "Week of \(StatsDisplay.date(week.weekStart))",
+                              detail: period == "currentYear" ? "Distance within this year" : "Total distance",
+                              value: StatsDisplay.measurement(week.value, metric: .distance))
+                }
+            }
+        }.frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func rankedRow(rank: Int, name: String, detail: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "medal.fill")
+                .foregroundStyle([Color.yellow, Color.gray, Color.brown][min(rank, 2)])
+                .accessibilityLabel(["Gold", "Silver", "Bronze"][min(rank, 2)])
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 8) {
+                    recordIdentity(name, detail: detail)
+                    Spacer(minLength: 4)
+                    Text(value).font(.subheadline.weight(rank == 0 ? .semibold : .regular)).monospacedDigit().fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    recordIdentity(name, detail: detail)
+                    Text(value).font(.subheadline.weight(.semibold)).monospacedDigit()
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private func recordIdentity(_ name: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(name).font(.subheadline.weight(.medium))
+            Text(detail).font(.caption).foregroundStyle(.secondary)
+        }.fixedSize(horizontal: false, vertical: true)
+    }
+
     private func recordValue(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label).font(.caption).foregroundStyle(.secondary)

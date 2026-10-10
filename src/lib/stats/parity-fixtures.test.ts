@@ -14,7 +14,8 @@ import {
 } from '~/store/filter';
 import * as data from './tile-data';
 import * as series from './tile-series';
-import { calendarDays, volumeHistory } from './history';
+import { calendarDays, volumeHistory, periodComparisons } from './history';
+import { monthActivityRhythm, yearMonthlyRhythm } from './period-rhythm';
 import { filterStatsActivities } from './filter-scope';
 
 const corpus = statsParitySchema.parse(
@@ -137,6 +138,73 @@ function run(
         ]),
       );
     }
+    case 'recordRankings': {
+      const ranked = data.recordRankings(
+        activities,
+        today,
+        args.range === 'allTime' ? 'allTime' : 'currentYear',
+      );
+      return Object.fromEntries(
+        Object.entries(ranked).map(([metric, rows]) => [
+          metric,
+          rows.map((row) =>
+            'day' in row
+              ? {
+                  value: row.value,
+                  day: data.isoDate(row.day),
+                  activityId: row.activityId,
+                }
+              : { value: row.value, weekStart: data.isoDate(row.weekStart) },
+          ),
+        ]),
+      );
+    }
+    case 'monthActivityRhythm': {
+      const rhythm = monthActivityRhythm(activities, today, metric);
+      return {
+        activityCount: rhythm.activityCount,
+        activeDays: rhythm.activeDays,
+        measuredCount: rhythm.measuredCount,
+        average: rhythm.average,
+        dayCount: rhythm.days.length,
+        lastDay: data.isoDate(rhythm.days.at(-1)!.day),
+        days: rhythm.days
+          .filter((day) => day.activities.length)
+          .map((day) => ({
+            day: data.isoDate(day.day),
+            activities: day.activities.map((a) => a.id),
+            bySport: Object.fromEntries(
+              Object.entries(day.bySport).filter(([, value]) => value !== 0),
+            ),
+          })),
+      };
+    }
+    case 'yearMonthlyRhythm':
+      return yearMonthlyRhythm(activities, today, metric).map((row) => ({
+        start: data.isoDate(row.start),
+        inProgress: row.inProgress,
+        current: Object.fromEntries(
+          Object.entries(row.current).filter(([, value]) => value !== 0),
+        ),
+        previous: Object.fromEntries(
+          Object.entries(row.previous).filter(([, value]) => value !== 0),
+        ),
+      }));
+    case 'periodComparisons':
+      return periodComparisons(
+        activities,
+        today,
+        metric,
+        args.range === 'years' ? 'years' : 'months',
+      ).map((row) => ({
+        start: data.isoDate(row.start),
+        end: data.isoDate(row.end),
+        cutoff: data.isoDate(row.cutoff),
+        elapsed: row.elapsed,
+        total: row.total,
+        fullTotal: row.end === today ? null : row.total,
+        incomplete: row.incomplete,
+      }));
     case 'activityCalendar': {
       const calendar = data.activityCalendar(activities, today);
       return {

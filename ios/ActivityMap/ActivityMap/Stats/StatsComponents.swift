@@ -402,6 +402,7 @@ extension EnvironmentValues {
     @Entry var statsTileInspection: StatsTileInspection? = nil
     @Entry var statsDetailPresentation = StatsDetailPresentation.automatic
     @Entry var statsTransitionNamespace: Namespace.ID? = nil
+    @Entry var statsInspectedActivityID: Int? = nil
     @Entry var statsShellNavigation: StatsShellNavigation? = nil
 }
 

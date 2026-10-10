@@ -59,7 +59,8 @@ void test('wide Training volume exposes totals and Records exposes both ranges',
   const narrow = renderToStaticMarkup(
     tileView('weeklyVolume')!.detail!(context, 'distance') as ReactElement,
   );
-  assert.match(narrow, /<details/);
+  assert.match(narrow, /Period totals by sport/);
+  assert.doesNotMatch(narrow, /<details/);
 });
 
 const today = dayFromISODate('2026-09-01');
@@ -357,6 +358,7 @@ void test('expanded training history exposes bounded presets and period totals',
   assert.match(html, /role="combobox"/);
   assert.match(html, /2\.0 h/);
   assert.match(html, /Period totals/);
+  assert.doesNotMatch(html, /<details|<summary/);
   assert.doesNotMatch(html, /Latest week incomplete/);
   assert.match(html, /Period totals by sport/);
   assert.match(html, /scope="col"[^>]*>Ride/);

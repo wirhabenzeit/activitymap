@@ -76,6 +76,34 @@ import Testing
             let v = engine.best30Days(today: today, metric: metric)
             return ["total": v.total, "start": StatsDates.key(v.start), "end": StatsDates.key(v.end), "current": v.current] as [String: Any]
         case "records": return records(engine.records(today: today, range: range))
+        case "recordRankings":
+            let result = engine.records(today: today, range: range)
+            var output: [String: Any] = [:]
+            for metric in [StatsMetric.distance, .time, .elevation] {
+                output[metric.rawValue] = (result.rankings[metric] ?? []).map { row in
+                    ["value": row.value, "day": StatsDates.key(row.day), "activityId": row.activityID as Any] as [String: Any]
+                }
+            }
+            output["biggestWeek"] = result.biggestWeeks.map { ["value": $0.value, "weekStart": StatsDates.key($0.weekStart)] as [String: Any] }
+            return output
+        case "monthActivityRhythm":
+            let rhythm = engine.monthActivityRhythm(today: today, metric: metric)
+            return ["activityCount": rhythm.activityCount, "activeDays": rhythm.activeDays,
+                    "measuredCount": rhythm.measuredCount, "average": rhythm.average.map { $0 as Any } ?? NSNull(),
+                    "dayCount": rhythm.days.count, "lastDay": StatsDates.key(rhythm.days.last!.day),
+                    "days": rhythm.days.filter { !$0.activities.isEmpty }.map { day in
+                        ["day": StatsDates.key(day.day), "activities": day.activities.map { $0.id! },
+                         "bySport": Dictionary(uniqueKeysWithValues: day.bySport.filter { $0.value != 0 }.map { ($0.key.rawValue, $0.value) })] as [String: Any]
+                    }] as [String: Any]
+        case "yearMonthlyRhythm": return engine.yearMonthlyRhythm(today: today, metric: metric).map { row in
+            ["start": StatsDates.key(row.start), "inProgress": row.inProgress,
+             "current": Dictionary(uniqueKeysWithValues: row.current.filter { $0.value != 0 }.map { ($0.key.rawValue, $0.value) }),
+             "previous": Dictionary(uniqueKeysWithValues: row.previous.filter { $0.value != 0 }.map { ($0.key.rawValue, $0.value) })] as [String: Any]
+        }
+        case "periodComparisons": return engine.periodComparisons(today: today, metric: metric, range: args["range"] as? String == "years" ? .years : .months).map { row in
+            ["start": StatsDates.key(row.start), "end": StatsDates.key(row.end), "cutoff": StatsDates.key(row.cutoff),
+             "elapsed": row.elapsed, "total": row.total, "fullTotal": row.fullTotal.map { $0 as Any } ?? NSNull(), "incomplete": row.incomplete] as [String: Any]
+        }
         case "activityCalendar":
             let v = engine.activityCalendar(today: today)
             return ["activeDays": v.count, "dominantSport": Dictionary(uniqueKeysWithValues: v.map { (StatsDates.key($0.key), $0.value.dominantSport.rawValue) })] as [String: Any]
@@ -114,7 +142,7 @@ import Testing
             else { #expect(abs(actual.doubleValue - expected.doubleValue) <= 0.000001, "\(label): expected \(expected), actual \(actual)") }
         } else { #expect(actual as? String == expected as? String, "\(label)") }
     }
-    @Test func all54ParityVectorsUseProductionFilteringAndCalculations() async throws {
+    @Test func allParityVectorsUseProductionFilteringAndCalculations() async throws {
         let corpus = try Self.json("stats-parity-fixtures.v1.json"), fixtures = try #require(corpus["fixtures"] as? [[String: Any]])
         var count = 0
         for fixture in fixtures {
@@ -135,7 +163,7 @@ import Testing
                 count += 1
             }
         }
-        #expect(count == 54)
+        #expect(count == 75)
     }
     @Test func originalCorpusPinsEveryCalculationIncludingHilliness() async throws {
         let fixture = try Self.json("stats-fixtures/multi-sport-year.json"), expected = fixture["expected"] as! [String: Any]

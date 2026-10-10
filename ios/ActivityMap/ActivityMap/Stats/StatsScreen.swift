@@ -6,7 +6,6 @@ struct StatsScreen: View {
     @Bindable var store: ActivityStore
     var sync: SyncController? = nil
     var refresh: () async -> Void = {}
-    @State private var inspectedActivityID: Int?
     @State var dashboard = StatsDashboardState()
     @Environment(\.statsShellNavigation) private var shellNavigation
     @Environment(\.statsDetailPresentation) private var detailPresentation
@@ -41,21 +40,10 @@ struct StatsScreen: View {
         // Dashboard and destination own demand for the same state and cache.
         .task(id: request) { await dashboard.load(store: store, request: request) }
         .onChange(of: source.scope) { _, _ in
-            inspectedActivityID = nil
+            dashboard.inspectedActivityID = nil
             dashboard.resetInspection()
         }
-        .sheet(isPresented: Binding(get: { inspectedActivityID != nil }, set: { if !$0 { inspectedActivityID = nil } })) {
-            if let id = inspectedActivityID {
-                NavigationStack {
-                    ActivityDetailPanel(store: store, activityID: id, showOnMap: { activityID in
-                        inspectedActivityID = nil
-                        store.showOnMap(activityID)
-                    })
-                        .navigationTitle("Activity").navigationBarTitleDisplayMode(.inline)
-                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { inspectedActivityID = nil } } }
-                }.presentationDetents([.large]).presentationDragIndicator(.visible)
-            }
-        }
+
     }
 
     @ViewBuilder private var screenContent: some View {
@@ -81,6 +69,10 @@ struct StatsScreen: View {
     private var dashboardContent: some View {
         GeometryReader { geometry in
             let detailLimit = detailHeightLimit(viewport: geometry.size.height)
+            StatsActivityInspection(store: store, dashboard: dashboard,
+                                    active: detailPresentation == .inline || dashboard.expandedTile == nil,
+                                    registersNavigation: detailPresentation == .inline,
+                                    backLabel: "Back to Stats") {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
@@ -106,6 +98,7 @@ struct StatsScreen: View {
                     .padding(12)
                 }
                 .environment(\.statsDetailHeightLimit, detailLimit)
+                .environment(\.statsAvailableWidth, geometry.size.width)
                 // Only inline expansion needs to observe this selection.
                 // On iPhone, that dependency needlessly invalidated the
                 // compact dashboard before UIKit could push the detail page.
@@ -118,6 +111,7 @@ struct StatsScreen: View {
             }
             .background(AppTheme.contentBackground)
             .accessibilityIdentifier("stats-dashboard")
+            }
         }
     }
 
@@ -150,7 +144,7 @@ struct StatsScreen: View {
             else {
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { dashboard.toggleExpansion(tile.id) }
             }
-        }, openActivity: { inspectedActivityID = $0 })
+        }, openActivity: { dashboard.inspectedActivityID = $0 })
     }
 
     /// Short viewports (iPhone landscape) get dense tile headers and a cap on
@@ -174,6 +168,7 @@ struct StatsScreen: View {
 private struct StatsDetailDestination<Content: View>: View {
     let title: String
     var usesShellHeader = false
+    var closeInspection: (() -> Bool)? = nil
     @ViewBuilder let content: () -> Content
     @Environment(\.dismiss) private var dismiss
 
@@ -190,7 +185,7 @@ private struct StatsDetailDestination<Content: View>: View {
         .toolbar {
             if !usesShellHeader {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
+                    Button { goBack() } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 20, weight: .medium))
                             .frame(width: 44, height: 44)
@@ -211,7 +206,10 @@ private struct StatsDetailDestination<Content: View>: View {
             }
         }
         .background(DetailBackGesture())
-        .accessibilityAction(.escape) { dismiss() }
+        .accessibilityAction(.escape) { goBack() }
+    }
+    private func goBack() {
+        if closeInspection?() != true { dismiss() }
     }
 }
 
@@ -225,7 +223,11 @@ struct StatsDetailScreen: View {
     var usesShellHeader = false
 
     var body: some View {
-        StatsDetailDestination(title: tile.title, usesShellHeader: usesShellHeader) {
+        StatsDetailDestination(title: tile.title, usesShellHeader: usesShellHeader, closeInspection: {
+            guard dashboard.inspectedActivityID != nil else { return false }
+            dashboard.inspectedActivityID = nil
+            return true
+        }) {
             StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync)
         }
     }
@@ -237,7 +239,6 @@ private struct StatsDetailContent: View {
     let dashboard: StatsDashboardState
     let tile: StatsTileDefinition
     var sync: SyncController? = nil
-    @State private var inspectedActivityID: Int?
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var presentation: StatsPresentation {
@@ -267,6 +268,7 @@ private struct StatsDetailContent: View {
     }
 
     var body: some View {
+        StatsActivityInspection(store: store, dashboard: dashboard, backLabel: "Back to \(tile.title)") {
         GeometryReader { geometry in
             ScrollView {
                 if let emptyTitle {
@@ -274,7 +276,7 @@ private struct StatsDetailContent: View {
                 } else {
                     StatsDashboardTile(tile: tile, store: store, dashboard: dashboard,
                                        expanded: true, detailScreen: true,
-                                       toggleExpansion: {}, openActivity: { inspectedActivityID = $0 })
+                                       toggleExpansion: {}, openActivity: { dashboard.inspectedActivityID = $0 })
                         .environment(\.statsExpansionProgress, 1)
                         .environment(\.statsDetailHeightLimit,
                                      geometry.size.height < 480 && !typeSize.isAccessibilitySize
@@ -285,21 +287,11 @@ private struct StatsDetailContent: View {
             }
             .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
         }
+        }
         // The shell's pushed root is inactive. The visible destination must
         // own demand when its metric changes; the shared cache reuses values.
         .task(id: request) { await dashboard.load(store: store, request: request) }
-        .sheet(isPresented: Binding(get: { inspectedActivityID != nil }, set: { if !$0 { inspectedActivityID = nil } })) {
-            if let id = inspectedActivityID {
-                NavigationStack {
-                    ActivityDetailPanel(store: store, activityID: id, showOnMap: { activityID in
-                        inspectedActivityID = nil
-                        store.showOnMap(activityID)
-                    })
-                    .navigationTitle("Activity").navigationBarTitleDisplayMode(.inline)
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { inspectedActivityID = nil } } }
-                }.presentationDetents([.large]).presentationDragIndicator(.visible)
-            }
-        }
+
     }
 }
 

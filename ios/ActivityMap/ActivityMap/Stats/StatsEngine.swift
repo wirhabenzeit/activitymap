@@ -83,7 +83,12 @@ nonisolated struct StatsTypicalWeek: Sendable { let totals: StatsTotals; let act
 nonisolated struct StatsShare: Sendable { let sport: ActivityCategory; let share: Double }
 nonisolated struct StatsRecord: Sendable { let value: Double; let day: Int; let activityID: Int?; let name: String; let sport: ActivityCategory }
 nonisolated struct StatsWeekRecord: Sendable { let value: Double; let weekStart: Int }
-nonisolated struct StatsRecords: Sendable { let activities: [StatsMetric: StatsRecord]; let biggestWeek: StatsWeekRecord? }
+nonisolated struct StatsRecords: Sendable {
+    let activities: [StatsMetric: StatsRecord]
+    let biggestWeek: StatsWeekRecord?
+    var rankings: [StatsMetric: [StatsRecord]] = [:]
+    var biggestWeeks: [StatsWeekRecord] = []
+}
 nonisolated struct StatsBestDays: Sendable { let total: Double; let start: Int; let end: Int; let current: Double; var hasCompleteWindow: Bool { end - start == 29 } }
 /// `incomplete`: the current period, or the one in which the history begins partway through.
 nonisolated struct StatsHistoryBucket: Sendable { let start: Int; let end: Int; let total: Double; let bySport: [ActivityCategory: Double]; var incomplete = false }
@@ -254,20 +259,29 @@ nonisolated struct StatsEngine: Sendable {
     }
     func records(today: Int, range: StatsWindow = .currentYear) -> StatsRecords {
         let first = range == .allTime ? (orderedDays.first ?? today) : StatsDates.start(year: StatsDates.parts(today).year!)
-        var records: [StatsMetric: StatsRecord] = [:], weeks: [Int: Double] = [:]
+        var rankings: [StatsMetric: [StatsRecord]] = [:], weeks: [Int: Double] = [:]
         for activity in orderedActivities where activity.day >= first && activity.day <= today {
             for metric in [StatsMetric.distance, .time, .elevation] {
                 let value = activity.value(metric)
-                if value > (records[metric]?.value ?? 0) {
-                    records[metric] = .init(value: value, day: activity.day, activityID: activity.id, name: activity.name, sport: activity.sport)
+                guard value > 0 else { continue }
+                var rows = rankings[metric, default: []]
+                // Input order encodes wall-clock start, then stable identity.
+                // Inserting after equal values preserves the same winner in all views.
+                let index = rows.firstIndex { $0.value < value } ?? rows.count
+                if index < 3 {
+                    rows.insert(.init(value: value, day: activity.day, activityID: activity.id, name: activity.name, sport: activity.sport), at: index)
+                    rankings[metric] = Array(rows.prefix(3))
                 }
             }
             weeks[StatsDates.monday(activity.day), default: 0] += activity.value(.distance)
         }
-        var biggest: StatsWeekRecord?
-        for start in weeks.keys.sorted() where weeks[start]! > (biggest?.value ?? 0) { biggest = .init(value: weeks[start]!, weekStart: start) }
-        return .init(activities: records, biggestWeek: biggest)
+        let biggest = weeks.filter { $0.value > 0 }.sorted {
+            $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
+        }.prefix(3).map { StatsWeekRecord(value: $0.value, weekStart: $0.key) }
+        return .init(activities: rankings.compactMapValues(\.first), biggestWeek: biggest.first,
+                     rankings: rankings, biggestWeeks: biggest)
     }
+
     func best30Days(today: Int, metric: StatsMetric) -> StatsBestDays {
         let first = StatsDates.start(year: StatsDates.parts(today).year!)
         var start = first, end = min(first + 29, today), best = sum(metric, first: first, last: min(first + 29, today))

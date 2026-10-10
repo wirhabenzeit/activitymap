@@ -5,11 +5,15 @@ import UIKit
 struct ActivityDetailView: View {
     @Bindable var store: ActivityStore
     let activityID: Int
+    var backLabel = "Back to activities"
+    var backIdentifier = "list-detail-back"
+    var onMapShown: (() -> Void)? = nil
+    var hostTab = AppTab.list
     @Environment(\.dismiss) private var dismiss
     @State private var navigationReference = DetailNavigationReference()
 
     var body: some View {
-        ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false)
+        ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false, hostTab: hostTab)
         .background(AppTheme.surface)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
@@ -26,8 +30,8 @@ struct ActivityDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
-                .accessibilityLabel("Back to activities")
-                .accessibilityIdentifier("list-detail-back")
+                .accessibilityLabel(backLabel)
+                .accessibilityIdentifier(backIdentifier)
             }.sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .principal) {
                 if let activity = store.activity(id: activityID) {
@@ -37,6 +41,7 @@ struct ActivityDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showActivityOnMapFromDetail(activityID, store: store, navigationController: navigationReference.controller)
+                    onMapShown?()
                 } label: {
                     Image(systemName: "map")
                         .font(.body.weight(.semibold))
@@ -87,6 +92,8 @@ struct ActivityDetailPanel: View {
     var compactMapProfile = false
     var scrollsMapHeading = false
     var mapBottomContentInset: CGFloat = 0
+    /// Only the visible tab's panel loads its elevation profile.
+    var hostTab = AppTab.list
     var showOnMap: ((Int) -> Void)? = nil
 
     private var activity: Activity? { store.activity(id: activityID) }
@@ -111,7 +118,7 @@ struct ActivityDetailPanel: View {
                             else { store.showOnMap(id) }
                         }, profile: { activity in
                             ElevationProfileView(store: store, activityID: activity.id,
-                                                 isRelevant: store.selectedTab == .list)
+                                                 isRelevant: store.selectedTab == hostTab)
                         }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
                     }
                     .accessibilityIdentifier("activity-detail-scroll")

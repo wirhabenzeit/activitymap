@@ -317,6 +317,15 @@ export default function Review() {
     .click();
   const dialog = page.getByRole('region', { name: 'Activity detail panel' });
   await dialog.waitFor();
+  const activityURL = page.url();
+  assert.ok(new URL(activityURL).searchParams.get('activity'));
+  await page.goBack();
+  await dialog.waitFor({ state: 'hidden' });
+  await active('records');
+  assert.equal(new URL(page.url()).searchParams.has('activity'), false);
+  await page.goForward();
+  await dialog.waitFor();
+  assert.equal(page.url(), activityURL);
   assert.equal(
     await focus.getByRole('region', { name: 'This year records' }).count(),
     1,
@@ -339,8 +348,21 @@ export default function Review() {
     true,
     'Chart stays available beside panel',
   );
+  // Focus Back closes a pushed inspection first, even on a direct focus link.
+  await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  await active('records');
+  await page.goForward();
+  await dialog.waitFor();
+  assert.equal(page.url(), activityURL);
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
+  await page.waitForFunction(
+    () =>
+      !document.querySelector(
+        '[data-stats-focus] [data-stats-activity-id][aria-current="true"]',
+      ),
+  );
   assert.equal(
     await focus
       .locator('[data-stats-activity-id][aria-current="true"]')
@@ -453,9 +475,11 @@ export default function Review() {
     );
   });
   for (const [id, slug] of tiles) {
-    await card(id)
-      .getByRole('button', { name: /^Expand / })
-      .click();
+    if (id === 'sportMix') await loaded('?tile=sport-mix');
+    else
+      await card(id)
+        .getByRole('button', { name: /^Expand / })
+        .click();
     await active(slug);
     await settle();
     await page.screenshot({

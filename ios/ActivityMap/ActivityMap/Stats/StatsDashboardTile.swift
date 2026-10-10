@@ -29,6 +29,9 @@ struct StatsDashboardTile: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.statsAvailableWidth) private var availableWidth
+    @Environment(\.statsInspectedActivityID) private var inspectedActivityID
+    @State private var contentWidth: CGFloat = 0
     @State var volumeRange = StatsHistoryRange.weeks
     private var selectedVolumeRange: Binding<StatsHistoryRange> {
         if let inspection {
@@ -78,7 +81,7 @@ struct StatsDashboardTile: View {
 
     var body: some View {
         StatsTileSurface(title: tile.title, period: period,
-                         expand: StatsDashboard.expandable(tile.id) ? toggleExpansion : nil,
+                         expand: StatsDashboard.expandable(tile.id) && !(tile.id == .sportMix && availableWidth >= 760 && !expanded) ? toggleExpansion : nil,
                          expanded: expanded, compactHeader: pilot, detailScreen: detailScreen) {
             controls
         } content: {
@@ -96,6 +99,7 @@ struct StatsDashboardTile: View {
             else { ProgressView("Calculating…").frame(minHeight: 120) }
         }
         .environment(\.statsTileInspection, inspection)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
         .accessibilityIdentifier("stats-tile-\(tile.id.rawValue)")
         .zIndex(expanded ? 1 : 0)
     }
@@ -145,12 +149,16 @@ struct StatsDashboardTile: View {
                     comparison(values, context: "vs previous 28 days")
                 }
             }
-        case .comparison(let values, let current, let previous, let band):
+        case .comparison(let values, let current, let previous, let band, let rhythm, let history):
             headline(values.current, metric: metric, suffix: " so far")
             comparison(values, context: comparisonContext)
-            StatsSeriesChart(points: current.map { .init(x: $0.x, value: $0.y, series: comparisonLabels.current, partial: false) }
-                + previous.map { .init(x: $0.x, value: $0.y, series: comparisonLabels.previous, partial: false) },
-                metric: metric, expanded: expanded, axis: tile.id == .yearToDate ? .year : .day, style: .lines, compact: true, band: band)
+            if expanded {
+                StatsPeriodDetail(rhythm: rhythm, history: history, metric: metric, today: today, openActivity: openActivity) {
+                    comparisonChart(current: current, previous: previous, band: band)
+                }
+            } else {
+                comparisonChart(current: current, previous: previous, band: band)
+            }
         case .pace(let pace):
             headline(pace.projected, metric: metric, suffix: " projected")
             note("At this year's daily average")
@@ -163,17 +171,26 @@ struct StatsDashboardTile: View {
             if let top = shares.first {
                 Text("\(Text("\(StatsDisplay.number(top.share * 100))%").font(AppTheme.Typography.metric)) \(Text(top.sport.name).font(.caption).foregroundColor(.secondary))").monospacedDigit().fixedSize(horizontal: false, vertical: true)
                 note(shares.count == 1 ? "One sport represented; no mix to compare" : "of \(StatsDisplay.measurement(hours, metric: .time)) moving time")
-                StatsSportMixVisual(shares: shares, breakdown: breakdown, expanded: expanded)
+                if availableWidth >= 760 {
+                    StatsSportMixVisual(shares: shares, breakdown: breakdown, expanded: true)
+                        .environment(\.statsExpansionProgress, 1)
+                } else {
+                    StatsSportMixVisual(shares: shares, breakdown: breakdown, expanded: expanded)
+                }
             } else { note("No moving time yet") }
         case .hilliness(let climb, let activities):
             headline(DisplayPreferences.shared.units.hilliness(climb.current / 100), unit: DisplayPreferences.shared.units.hillinessUnit, decimals: 1)
             comparison(.init(current: climb.current, previous: climb.previous), context: "vs the 12 months before", unitless: true)
-            StatsPeriodBars(points: climb.months.enumerated().map { .init(x: $0.element.monthStart, value: $0.element.rate / 100, series: DisplayPreferences.shared.units.hillinessUnit, partial: $0.offset == climb.months.count - 1) }, expanded: expanded,
-                            label: { StatsDates.date($0.x).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)) },
-                            detailLabel: { StatsDisplay.month($0.x) },
-                            valueLabel: { "\(StatsDisplay.number(DisplayPreferences.shared.units.hilliness($0), decimals: 1)) \(DisplayPreferences.shared.units.hillinessUnit)" },
-                            axisValue: { DisplayPreferences.shared.units.hilliness($0) })
-            StatsExpansionReveal(expanded: expanded) { hillinessActivities(activities) }
+            if expanded && contentWidth >= 1000 && !typeSize.isAccessibilitySize {
+                HStack(alignment: .top, spacing: 24) {
+                    hillinessChart(climb)
+                        .frame(maxWidth: .infinity)
+                    hillinessActivities(activities).frame(maxWidth: .infinity)
+                }
+            } else {
+                hillinessChart(climb)
+                StatsExpansionReveal(expanded: expanded) { hillinessActivities(activities) }
+            }
         case .typical(let week):
             headline(week.totals.time, unit: "h / week", decimals: 1)
             note("\(StatsDisplay.number(week.activeDays, decimals: 1)) active days / week")
@@ -187,6 +204,20 @@ struct StatsDashboardTile: View {
         }
     }
 
+    private func comparisonChart(current: [StatsPoint], previous: [StatsPoint], band: StatsComparisonBand?) -> some View {
+        StatsSeriesChart(points: current.map { .init(x: $0.x, value: $0.y, series: comparisonLabels.current, partial: false) }
+                + previous.map { .init(x: $0.x, value: $0.y, series: comparisonLabels.previous, partial: false) },
+                metric: metric, expanded: expanded, axis: tile.id == .yearToDate ? .year : .day, style: .lines, compact: true, band: band)
+    }
+
+    private func hillinessChart(_ climb: StatsClimbing) -> some View {
+        StatsPeriodBars(points: climb.months.enumerated().map { .init(x: $0.element.monthStart, value: $0.element.rate / 100, series: DisplayPreferences.shared.units.hillinessUnit, partial: $0.offset == climb.months.count - 1) }, expanded: expanded,
+                            label: { StatsDates.date($0.x).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)) },
+                            detailLabel: { StatsDisplay.month($0.x) },
+                            valueLabel: { "\(StatsDisplay.number(DisplayPreferences.shared.units.hilliness($0), decimals: 1)) \(DisplayPreferences.shared.units.hillinessUnit)" },
+                            axisValue: { DisplayPreferences.shared.units.hilliness($0) })
+    }
+
     private func hillinessActivities(_ activities: [StatsHillPoint]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Hilliest activities (\(Formatters.distance(5000)) or more)").font(.caption).foregroundStyle(.secondary).padding(.bottom, 8)
@@ -196,6 +227,7 @@ struct StatsDashboardTile: View {
                                  summary: "\(StatsDisplay.date(point.activity.day)) · \(StatsDisplay.measurement(point.distance, metric: .distance)) · \(StatsDisplay.measurement(point.elevation, metric: .elevation)) climbed",
                                  detail: "\(StatsDisplay.number(DisplayPreferences.shared.units.hilliness(point.metersPerKm), decimals: 1)) \(DisplayPreferences.shared.units.hillinessUnit)",
                                  open: point.activity.id.map { id in { openActivity(id) } })
+                    .background(point.activity.id != nil && point.activity.id == inspectedActivityID ? Color.accentColor.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 8))
                     .accessibilityIdentifier(point.activity.id.map { "stats-hilliness-activity-\($0)" } ?? "")
                 Divider()
             }

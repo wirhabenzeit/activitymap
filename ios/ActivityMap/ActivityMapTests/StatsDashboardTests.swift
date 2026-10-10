@@ -16,6 +16,20 @@ import Testing
         await state.load(store: store, request: .init(source: StatsDashboardSource(store), choices: state.choices, canLoad: true))
     }
 
+    @Test func leavingAFocusPageEndsItsActivityInspection() {
+        let state = StatsDashboardState()
+        state.expandedTile = .records
+        state.inspectedActivityID = 7
+        state.expandedTile = .records
+        #expect(state.inspectedActivityID == 7)
+        // The interactive pop gesture clears only the navigation selection.
+        state.expandedTile = nil
+        #expect(state.inspectedActivityID == nil)
+        state.inspectedActivityID = 7
+        state.expandedTile = .activityCalendar
+        #expect(state.inspectedActivityID == nil)
+    }
+
     @Test func recordsAndCalendarKeepPeriodsAndActivityIdentities() throws {
         func row(_ id: Int, _ date: String, _ distance: Double) -> StatsActivity {
             .init(id: id, name: "Activity \(id)", sport: .ride, start: StatsDates.date(StatsDates.day(date)), distance: distance * 1000, movingTime: 3600, elevation: 100)
@@ -135,7 +149,7 @@ import Testing
                 }
                 let comparison: StatsPeriodComparison
                 switch result {
-                case .comparison(let value, _, _, _), .volume(let value, _, _, _, _): comparison = value
+                case .comparison(let value, _, _, _, _, _), .volume(let value, _, _, _, _): comparison = value
                 default: Issue.record("Wrong tile payload"); continue
                 }
                 StatsFixtureTests.equal(StatsFixtureTests.comparison(comparison), row["expected"]!, label: row["id"] as! String)

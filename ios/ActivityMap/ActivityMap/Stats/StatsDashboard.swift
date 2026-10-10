@@ -19,7 +19,7 @@ enum StatsDashboard {
 nonisolated enum StatsDashboardResult: Sendable {
     case week(StatsThisWeek)
     case volume(StatsPeriodComparison, starts: [Int], values: [Double], averages: [StatsHistoryRange: [StatsPoint]], buckets: [StatsHistoryRange: [StatsHistoryBucket]])
-    case comparison(StatsPeriodComparison, current: [StatsPoint], previous: [StatsPoint], band: StatsComparisonBand?)
+    case comparison(StatsPeriodComparison, current: [StatsPoint], previous: [StatsPoint], band: StatsComparisonBand?, rhythm: StatsComparisonRhythm, history: [StatsPeriodHistoryComparison])
     case pace(StatsPace)
     case records(StatsRecords, allTime: StatsRecords, best30: [StatsMetric: StatsBestDays])
     case calendar(rolling: StatsCalendarSnapshot, years: [Int: StatsCalendarSnapshot])
@@ -122,11 +122,15 @@ nonisolated extension StatsEngine {
                     .enumerated().map { .init(x: $0.offset + 1, y: $0.element) }
             }
             return .comparison(monthComparison(today: today, metric: metric),
-                               current: points(first, today), previous: points(previous, first - 1), band: comparisonBand(today: today, metric: metric, monthly: true))
+                               current: points(first, today), previous: points(previous, first - 1), band: comparisonBand(today: today, metric: metric, monthly: true),
+                               rhythm: .month(monthActivityRhythm(today: today, metric: metric)),
+                               history: periodComparisons(today: today, metric: metric, range: .months))
         case .yearToDate:
             return .comparison(yearToDate(today: today, metric: metric),
                 current: cumulativeYearPoints(metric: metric, year: year, last: today),
-                previous: cumulativeYearPoints(metric: metric, year: year - 1, last: StatsDates.start(year: year) - 1), band: comparisonBand(today: today, metric: metric, monthly: false))
+                previous: cumulativeYearPoints(metric: metric, year: year - 1, last: StatsDates.start(year: year) - 1), band: comparisonBand(today: today, metric: metric, monthly: false),
+                rhythm: .year(yearMonthlyRhythm(today: today, metric: metric)),
+                history: periodComparisons(today: today, metric: metric, range: .years))
         case .yearPace: return .pace(yearPace(today: today, metric: metric))
         case .records: return .records(records(today: today), allTime: records(today: today, range: .allTime),
             best30: Dictionary(uniqueKeysWithValues: [StatsMetric.distance, .time, .elevation].map { ($0, best30Days(today: today, metric: $0)) }))
@@ -175,21 +179,28 @@ struct StatsDashboardFace {
 /// Inspection choices outlive a detail destination and are shared with its source tile.
 @MainActor @Observable final class StatsTileInspection {
     var volumeRange = StatsHistoryRange.weeks
-    var volumeTotals = false
     var calendarYear: Int?
     var calendarDay: Int?
+    var monthDay: Int?
     var recordsRange = StatsToggleOption.currentYear
 }
 
 @MainActor @Observable final class StatsDashboardState {
     private var inspections = Dictionary(uniqueKeysWithValues: StatsDashboard.ids.map { ($0, StatsTileInspection()) })
     func inspection(_ id: StatsTileID) -> StatsTileInspection? { inspections[id] }
+    var inspectedActivityID: Int?
     func resetInspection() {
+        inspectedActivityID = nil
         expandedTile = nil
         inspections = Dictionary(uniqueKeysWithValues: StatsDashboard.ids.map { ($0, StatsTileInspection()) })
     }
     var choices: [StatsTileID: StatsToggleOption] = [:]
-    var expandedTile: StatsTileID?
+    var expandedTile: StatsTileID? {
+        // Every way of leaving a focus page, including the interactive pop
+        // gesture, ends its activity inspection rather than handing it to
+        // the dashboard.
+        didSet { if expandedTile != oldValue { inspectedActivityID = nil } }
+    }
     private(set) var completedTiles: Set<StatsTileID> = []
     private struct Entry {
         let source: StatsDashboardSource
