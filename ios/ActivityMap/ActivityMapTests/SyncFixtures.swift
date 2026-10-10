@@ -28,6 +28,32 @@ actor ScriptedSyncSource: SyncPageSource {
     }
 }
 
+/// Holds the first delta request so rendered tests can inspect an active sync.
+actor GatedChangesSource: SyncPageSource {
+    let unchanged: ActivityMapAPI.SyncChangesPage
+    private var response: CheckedContinuation<ActivityMapAPI.SyncChangesPage, Never>?
+    private var requested: CheckedContinuation<Void, Never>?
+    private var started = false
+
+    init(unchanged: ActivityMapAPI.SyncChangesPage) { self.unchanged = unchanged }
+    func waitForRequest() async {
+        if started { return }
+        await withCheckedContinuation { requested = $0 }
+    }
+    func release() { response?.resume(returning: unchanged); response = nil }
+    func bootstrap(resource: ActivityMapAPI.SyncResource, cursor: String?) throws -> ActivityMapAPI.SyncBootstrapPage {
+        throw ScriptedSyncSource.ScriptError.unexpectedRequest
+    }
+    func changes(cursor: String) async -> ActivityMapAPI.SyncChangesPage {
+        if started { return unchanged }
+        return await withCheckedContinuation { continuation in
+            response = continuation
+            started = true
+            requested?.resume(); requested = nil
+        }
+    }
+}
+
 @MainActor
 enum SyncFixtures {
     static let retention = ActivityMapAPI.SyncRetentionMeta(retentionDays: 30, cursorValidUntil: Date().addingTimeInterval(86400))

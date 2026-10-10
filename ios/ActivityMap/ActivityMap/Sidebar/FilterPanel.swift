@@ -3,6 +3,8 @@ import SwiftUI
 struct FilterPanel: View {
     @Bindable var store: ActivityStore
     var scope: FilterScope = .browsing
+    /// One part alone, as the iPad filter rail's popovers show it; nil is the whole panel.
+    var part: FilterPart? = nil
     @State private var editingCustomDates = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var startDate = Date()
@@ -13,31 +15,7 @@ struct FilterPanel: View {
 
     var body: some View {
         Form {
-            Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(count) of \(store.activities.count) activities")
-                            .font(.subheadline.weight(.semibold))
-                            .accessibilityIdentifier("filter-result-count")
-                        if activeCount > 0 {
-                            Text("\(activeCount) active filters").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    Button("Reset") {
-                        scope.reset(store)
-                        editingCustomDates = false
-                    }
-                    .font(.caption).frame(minHeight: 44)
-                    .disabled(activeCount == 0)
-                    .accessibilityLabel(scope == .stats ? "Reset Stats activity filters" : "Reset all filters")
-                }
-                searchField
-            }
-            activitySection
-            if scope != .stats { dateSection }
-            metricsSection.id(store.filterResetRevision)
-            binarySection
+            if let part { single(part) } else { full }
         }
         .listSectionSpacing(.compact)
         .contentMargins(.top, 8, for: .scrollContent)
@@ -46,6 +24,44 @@ struct FilterPanel: View {
             editingCustomDates = false
             loadDateDraft()
         }
+    }
+
+    @ViewBuilder private func single(_ part: FilterPart) -> some View {
+        switch part {
+        case .search: Section { searchField }
+        case .sports: activitySection
+        case .dates: dateSection
+        case .distance, .duration, .elevation: metricsSection([part]).id(store.filterResetRevision)
+        case .details: binarySection
+        }
+    }
+
+    @ViewBuilder private var full: some View {
+        Section {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(count) of \(store.activities.count) activities")
+                        .font(.subheadline.weight(.semibold))
+                        .accessibilityIdentifier("filter-result-count")
+                    if activeCount > 0 {
+                        Text("\(activeCount) active filters").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Button("Reset") {
+                    scope.reset(store)
+                    editingCustomDates = false
+                }
+                .font(.caption).frame(minHeight: 44)
+                .disabled(activeCount == 0)
+                .accessibilityLabel(scope == .stats ? "Reset Stats activity filters" : "Reset all filters")
+            }
+            searchField
+        }
+        activitySection
+        if scope != .stats { dateSection }
+        metricsSection([.distance, .duration, .elevation]).id(store.filterResetRevision)
+        binarySection
     }
 
     private var searchField: some View {
@@ -116,7 +132,8 @@ struct FilterPanel: View {
                 }
             }
         } header: {
-            Text("Sports")
+            // A popover already titles its single part.
+            if part == nil { Text("Sports") }
         }
     }
 
@@ -183,7 +200,7 @@ struct FilterPanel: View {
                 }
             }
         } header: {
-            Text("Activity-Local Dates")
+            if part == nil { Text("Activity-Local Dates") }
         } footer: {
             Text("Each activity uses the day where it took place. Full calendar periods include both ends.")
         }
@@ -191,13 +208,19 @@ struct FilterPanel: View {
         .onChange(of: store.dateDayRange) { _, _ in loadDateDraft() }
     }
 
-    private var metricsSection: some View {
+    private func metricsSection(_ metrics: [FilterPart]) -> some View {
         Section {
-            NumericFilterRow(title: "Distance", icon: "ruler", unit: DisplayPreferences.shared.units.distanceUnit, scale: DisplayPreferences.shared.units.distanceScale, filter: $store.distanceFilter, suggestedMaximum: max(100, (store.activities.compactMap(\.distance).max() ?? 0) / DisplayPreferences.shared.units.distanceScale))
-            NumericFilterRow(title: "Duration", icon: "stopwatch", unit: "h", scale: 3_600, filter: $store.durationFilter, suggestedMaximum: max(12, Double(store.activities.compactMap(\.elapsedTime).max() ?? 0) / 3600), step: 0.25)
-            NumericFilterRow(title: "Elevation", icon: "mountain.2", unit: DisplayPreferences.shared.units.elevationUnit, scale: DisplayPreferences.shared.units.elevationScale, filter: $store.elevationFilter, suggestedMaximum: max(3000, store.activities.compactMap(\.totalElevationGain).max() ?? 0) / DisplayPreferences.shared.units.elevationScale, step: 50)
+            if metrics.contains(.distance) {
+                NumericFilterRow(title: "Distance", icon: "ruler", unit: DisplayPreferences.shared.units.distanceUnit, scale: DisplayPreferences.shared.units.distanceScale, filter: $store.distanceFilter, suggestedMaximum: max(100, (store.activities.compactMap(\.distance).max() ?? 0) / DisplayPreferences.shared.units.distanceScale))
+            }
+            if metrics.contains(.duration) {
+                NumericFilterRow(title: "Duration", icon: "stopwatch", unit: "h", scale: 3_600, filter: $store.durationFilter, suggestedMaximum: max(12, Double(store.activities.compactMap(\.elapsedTime).max() ?? 0) / 3600), step: 0.25)
+            }
+            if metrics.contains(.elevation) {
+                NumericFilterRow(title: "Elevation", icon: "mountain.2", unit: DisplayPreferences.shared.units.elevationUnit, scale: DisplayPreferences.shared.units.elevationScale, filter: $store.elevationFilter, suggestedMaximum: max(3000, store.activities.compactMap(\.totalElevationGain).max() ?? 0) / DisplayPreferences.shared.units.elevationScale, step: 50)
+            }
         } header: {
-            Text("Measurements")
+            if part == nil { Text("Measurements") }
         } footer: {
             Text("Drag to an outer edge to leave that end unlimited. Active ranges exclude activities without a recorded measurement.")
         }
@@ -209,7 +232,7 @@ struct FilterPanel: View {
             binaryPicker("Private", value: $store.privateFilter)
             binaryPicker("Flagged", value: $store.flaggedFilter)
         } header: {
-            Text("Activity Details")
+            if part == nil { Text("Activity Details") }
         } footer: {
             Text("Any includes unknown values. Yes and No match only recorded true or false values.")
         }
@@ -248,6 +271,55 @@ struct FilterPanel: View {
         } else {
             endDate = Date()
             startDate = ActivityDayRange.calendar(timeZone: .current).date(byAdding: .year, value: -1, to: endDate) ?? endDate
+        }
+    }
+}
+
+/// The panel's independently usable parts, in panel order.
+enum FilterPart: CaseIterable, Identifiable {
+    case search, sports, dates, distance, duration, elevation, details
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .search: "Search"
+        case .sports: "Sports"
+        case .dates: "Dates"
+        case .distance: "Distance"
+        case .duration: "Duration"
+        case .elevation: "Elevation"
+        case .details: "Activity details"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .search: "magnifyingglass"
+        case .sports: "figure.run"
+        case .dates: "calendar"
+        case .distance: "ruler"
+        case .duration: "stopwatch"
+        case .elevation: "mountain.2"
+        case .details: "flag"
+        }
+    }
+
+    /// Stats measures its own periods, so it has no date filter.
+    static func available(in scope: FilterScope) -> [FilterPart] {
+        allCases.filter { scope != .stats || $0 != .dates }
+    }
+
+    /// Matches the parts `ActivityStore.activeFilterCount` counts.
+    @MainActor func isActive(_ store: ActivityStore) -> Bool {
+        switch self {
+        case .search: !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .sports: store.activeSportTypes != Set(SportType.allCases)
+        case .dates: store.dateDayRange != nil
+        case .distance: store.distanceFilter != nil
+        case .duration: store.durationFilter != nil
+        case .elevation: store.elevationFilter != nil
+        case .details: store.commuteOnly != nil || store.privateFilter != nil || store.flaggedFilter != nil
         }
     }
 }

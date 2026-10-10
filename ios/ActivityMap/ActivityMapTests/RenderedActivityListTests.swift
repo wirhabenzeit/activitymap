@@ -6,6 +6,36 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
+    @Test(arguments: ["light", "dark"])
+    func inspectionAndSelectionHaveIndependentRowFeedback(appearance: String) async throws {
+        let store = ActivityStore(activities: (1...4).map { ActivityStoreSelectionTests.activity($0, route: false) },
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        store.replaceSelection(with: [2, 3])
+        let host = try ListHarness(root: NavigationStack { ListScreen(store: store) }
+            .environment(\.horizontalSizeClass, .regular)
+            .environment(\.colorScheme, appearance == "dark" ? .dark : .light),
+            size: CGSize(width: 834, height: 1194))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.count == 4 }
+        store.inspect(1)
+        try await Task.sleep(for: .milliseconds(250))
+        let values = host.accessibilityValues()
+        #expect(values.contains { $0.contains("Inspected. Not selected") })
+        #expect(values.contains { $0.contains("Not inspected. Selected") })
+        #expect(values.contains { $0.contains("Not inspected. Not selected") })
+        try host.save("row-feedback-\(appearance)-inspected")
+        store.inspect(3)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(host.accessibilityValues().contains { $0.contains("Inspected. Selected") })
+        #expect(store.selectedActivityIDs == [2, 3], "Inspection never changes selection")
+        try host.save("row-feedback-\(appearance)-both")
+        store.dismissInspection()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(!host.accessibilityValues().contains { $0.contains("Inspected.") })
+        #expect(store.selectedActivityIDs == [2, 3])
+    }
+
     @Test func filtersAndSettingsStackOverNativeMapSheet() async throws {
         let token = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
@@ -195,16 +225,14 @@ extension RenderedRoutePickingTests {
         try host.save("list-tablet-retained-inspection")
     }
 
-    @Test(arguments: ["phone", "large-text", "tablet", "tablet-landscape", "split-window", "tablet-large-text", "sidebar-portrait"])
+    @Test(arguments: ["phone", "large-text", "tablet", "tablet-landscape", "split-window", "tablet-large-text"])
     func listDetailUsesNavigationAndBackRetainsContext(scenario: String) async throws {
-        let overlay = scenario == "sidebar-portrait"
-        let regular = scenario.hasPrefix("tablet") || scenario == "split-window" || overlay
+        let regular = scenario.hasPrefix("tablet") || scenario == "split-window"
         let largeText = scenario.contains("large-text")
         let size: CGSize = switch scenario {
         case "tablet-landscape": CGSize(width: 1180, height: 820)
         case "tablet", "tablet-large-text": CGSize(width: 820, height: 1180)
         case "split-window": CGSize(width: 650, height: 1000)
-        case "sidebar-portrait": CGSize(width: 499, height: 1180)
         default: CGSize(width: 390, height: 844)
         }
         let tablet = regular && size.width >= 760 && !largeText
@@ -217,7 +245,6 @@ extension RenderedRoutePickingTests {
         let host = try ListHarness(root: NavigationStack {
             ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
         }
-        .environment(\.filterSidebarVisible, overlay)
         .environment(\.horizontalSizeClass, regular ? .regular : .compact)
         .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large),
         size: size)
@@ -245,9 +272,6 @@ extension RenderedRoutePickingTests {
             #expect(list.contentOffset == offset)
             #expect(list.bounds.width >= 400 && list.bounds.width <= browsingWidth - 340,
                     "Inspection must leave usable list and detail columns")
-        } else if overlay {
-            try await listWait { navigation.presentedViewController != nil }
-            #expect(navigation.viewControllers.count == 1, "The sidebar layout must remain behind the detail overlay")
         } else {
             try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
             #expect(host.host.presentedViewController == nil, "Phone detail is a navigation destination, not a modal sheet")
@@ -256,7 +280,7 @@ extension RenderedRoutePickingTests {
         try host.save("list-detail-\(scenario)")
         #expect(store.selectedActivityIDs == selection && store.activeActivityID == 3)
         #expect(cameraValues() == camera && store.mapContext.pendingRequest == request)
-        if tablet || overlay { store.dismissInspection() }
+        if tablet { store.dismissInspection() }
         else { navigation.popViewController(animated: false) }
         try await listWait { store.inspectedActivityID == nil && navigation.viewControllers.count == 1 }
         #expect(host.descendants(of: UICollectionView.self).contains { $0 === list }, "Back returns to the same retained native List")
@@ -267,32 +291,138 @@ extension RenderedRoutePickingTests {
         try host.save("list-back-\(scenario)")
         // Filter invalidation also closes the destination, with selection intact.
         store.inspect(10)
-        if !tablet && !overlay { try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil } }
+        if !tablet { try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil } }
         store.searchText = "No matching activity"
         try await listWait { store.inspectedActivityID == nil && navigation.viewControllers.count == 1 }
         #expect(store.selectedActivityIDs == selection)
     }
 
-    @Test func shellHeaderStaysOutsideListDetailNavigation() async throws {
+    @Test(arguments: [false, true])
+    func listMapActionDoesNotPresentSheetOverPushedDetail(globe: Bool) async throws {
+        let previousToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = previousToken }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1),
+                                               ActivityStoreSelectionTests.activity(2)],
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list
+        store.addToSelection([1])
+        let picker = RoutePicker(), sheets = BrowseSheetPresentation()
+        let host = try ListHarness(root: AppShell(store: store, mapPicker: picker, sheets: sheets)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: globe
+                ? Self.listOfflineStyle.replacingOccurrences(of: "\"sources\":{}", with: "\"projection\":{\"name\":\"globe\"},\"sources\":{}")
+                : Self.listOfflineStyle)),
+            size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false
+            && host.descendants(of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
+        let map = try #require(host.descendants(of: MapView.self).first)
+        let navigation = try #require(host.controllers(of: UINavigationController.self).last)
+        store.inspect(2)
+        try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        let reference = try #require(host.controllers(of: DetailBackGesture.Controller.self).last?.navigationReference)
+        #expect(reference.controller === navigation)
+        #expect(!sheets.mapResultsPresented)
+
+        try host.save("list-detail-map-trailing")
+        let captureDirectory = ProcessInfo.processInfo.environment["ACTIVITYMAP_LIST_MAP_HANDOFF_OUTPUT"]
+            .map { URL(fileURLWithPath: $0) }
+        if let directory = captureDirectory {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data().write(to: directory.appendingPathComponent("ready"))
+            let deadline = Date().addingTimeInterval(60)
+            while !FileManager.default.fileExists(atPath: directory.appendingPathComponent("recording").path), Date() < deadline {
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            try #require(FileManager.default.fileExists(atPath: directory.appendingPathComponent("recording").path))
+            try await Task.sleep(for: .seconds(1))
+        }
+        let detailController = try #require(navigation.topViewController)
+        let startZoom = map.mapboxMap.cameraState.zoom
+        var zoomSamples = [startZoom]
+        showActivityOnMapFromDetail(2, store: store, navigationController: reference.controller)
+        for _ in 0..<45 {
+            try await Task.sleep(for: .milliseconds(16))
+            zoomSamples.append(map.mapboxMap.cameraState.zoom)
+            if sheets.mapResultsPresented || host.host.presentedViewController != nil {
+                #expect(navigation.viewControllers.count == 1,
+                        "The Map sheet must never appear over a still-pushed List detail")
+                #expect(navigation.transitionCoordinator?.viewController(forKey: .from) !== detailController,
+                        "The outgoing detail must finish its transition before Map's sheet appears")
+            }
+        }
+        try await listWait { sheets.mapResultsPresented && picker.detailID == 2 }
+        try await listWait {
+            guard case .state = map.viewport.status else { return false }
+            return map.mapboxMap.cameraState.zoom > startZoom + 1
+        }
+        let end = map.mapboxMap.cameraState
+        let delta = end.zoom - startZoom
+        #expect(zoomSamples.filter { $0 > startZoom + delta * 0.1 && $0 < end.zoom - delta * 0.1 }.count >= 3,
+                "Show on map must move through intermediate cameras while opening results, instead of jumping")
+        #expect(zip(zoomSamples, zoomSamples.dropFirst()).allSatisfy { abs($1 - $0) < delta * 0.6 },
+                "No single frame may jump most of the way to the fitted zoom")
+        #expect(host.descendants(of: MapView.self).first === map, "Navigation must retain the loaded map")
+        #expect(map.mapboxMap.projection?.name == .mercator)
+        let route = try #require(store.activities.first { $0.id == 2 }).coordinates
+        let visible = map.bounds.inset(by: end.padding).insetBy(dx: -2, dy: -2)
+        #expect(map.mapboxMap.points(for: route).allSatisfy { visible.contains($0) },
+                "The animation must finish with the route framed above the opening results sheet")
+        #expect(store.selectedTab == .map && store.inspectedActivityID == nil)
+        #expect(store.activeActivityID == 2 && store.selectedActivityIDs == [1, 2])
+        #expect(host.host.presentedViewController?.sheetPresentationController != nil)
+        try host.save("list-detail-map-handoff")
+        if let directory = captureDirectory { try Data().write(to: directory.appendingPathComponent("done")) }
+
+        // An already-idle map must also render and consume explicit commands
+        // without a tab switch, source change or new selection to wake it up.
+        store.mapContext.request(.resetView)
+        try await listWait {
+            guard case .state = map.viewport.status else { return false }
+            return store.mapContext.pendingRequest == nil
+                && abs(map.mapboxMap.cameraState.zoom - MapCamera.initial.zoom) < 0.01
+        }
+        store.mapContext.request(.fitSelection)
+        try await listWait {
+            guard case .state = map.viewport.status else { return false }
+            return store.mapContext.pendingRequest == nil
+                && map.mapboxMap.cameraState.zoom > MapCamera.initial.zoom + 1
+        }
+        let fittedArea = map.bounds.inset(by: map.mapboxMap.cameraState.padding).insetBy(dx: -2, dy: -2)
+        let selectedRoute = store.activities.filter { store.selectedActivityIDs.contains($0.id) }.flatMap(\.coordinates)
+        #expect(map.mapboxMap.points(for: selectedRoute).allSatisfy { fittedArea.contains($0) })
+        #expect(host.descendants(of: MapView.self).first === map)
+    }
+
+    @Test(arguments: ["phone", "landscape", "large-text", "split-window"])
+    func pushedListDetailReplacesTheShellHeader(scenario: String) async throws {
         let previousToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = previousToken }
         let store = ActivityStore(activities: (1...100).map { ActivityStoreSelectionTests.activity($0) },
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
+        let size = scenario == "landscape" ? CGSize(width: 844, height: 390)
+            : scenario == "split-window" ? CGSize(width: 650, height: 1000) : CGSize(width: 390, height: 844)
         let host = try ListHarness(root: AppShell(store: store)
-            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.horizontalSizeClass, scenario == "split-window" ? .regular : .compact)
+            .environment(\.verticalSizeClass, scenario == "landscape" ? .compact : .regular)
+            .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility3 : .large)
             .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)),
-            size: CGSize(width: 390, height: 844))
+            size: size)
         defer { host.close() }
         try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
-        let navigation = try #require(host.controllers(of: UINavigationController.self).first)
+        let navigation = try #require(host.controllers(of: UINavigationController.self).last)
         let list = try #require(host.descendants(of: UICollectionView.self).first)
         list.setContentOffset(CGPoint(x: 0, y: 200), animated: false)
         try await Task.sleep(for: .milliseconds(200))
         let offset = list.contentOffset
-        let navigationTop = navigation.view.convert(.zero, to: host.host.view).y
-        #expect(navigationTop >= 54, "The native stack starts below the persistent app header")
+        #expect(!navigation.isNavigationBarHidden)
+        let headerBottom = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view).maxY
+        let listTop = list.convert(list.bounds, to: host.host.view).minY
+        #expect(listTop + list.adjustedContentInset.top >= headerBottom,
+                "The retained List starts below the visible shell bar")
         store.inspect(90)
         var openingFrames: [CGRect] = []
         var openingInsets: [CGFloat] = []
@@ -303,15 +433,21 @@ extension RenderedRoutePickingTests {
             if navigation.viewControllers.count == 2, let destination = navigation.topViewController {
                 openingFrames.append(destination.view.frame)
                 openingInsets.append(destination.view.safeAreaInsets.top)
-                #expect(navigation.isNavigationBarHidden)
+                #expect(!navigation.isNavigationBarHidden)
             }
         }
         #expect(!openingFrames.isEmpty)
         #expect(openingFrames.allSatisfy { $0 == openingFrames.first })
-        #expect(openingInsets.allSatisfy { $0 == 0 }, "Native bar insets must not move the fixed Back row during the push")
+        #expect(openingInsets.allSatisfy { abs($0 - (openingInsets.first ?? $0)) < 1 }, "Root and detail keep the same native bar inset during the push")
         try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         let barFrame = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
+        #expect(abs(barFrame.minY - host.host.view.safeAreaInsets.top) < 2,
+                "The detail's native Back/title bar occupies the top header position")
+        #expect(host.controllers(of: UINavigationController.self).filter {
+            !$0.isNavigationBarHidden && $0.navigationBar.window != nil
+        }.count == 1, "Exactly one native navigation bar is visible")
         let contentFrame = navigation.topViewController?.view.frame
+        try host.save("list-single-header-\(scenario)")
         for _ in 0..<5 {
             try await Task.sleep(for: .milliseconds(200))
             #expect(navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view) == barFrame,
@@ -319,15 +455,16 @@ extension RenderedRoutePickingTests {
             #expect(navigation.topViewController?.view.frame == contentFrame,
                     "Detail content must not shift after the push transition completes")
         }
-        #expect(navigation.isNavigationBarHidden)
+        #expect(!navigation.isNavigationBarHidden)
         let popGesture = try #require(navigation.interactivePopGestureRecognizer)
         #expect(popGesture.isEnabled)
         #expect(popGesture.delegate?.gestureRecognizerShouldBegin?(popGesture) == true,
                 "The native edge-swipe recognizer must accept a pop with the bar hidden")
         let detailGestureDelegate = popGesture.delegate
-        #expect(navigation.view.convert(.zero, to: host.host.view).y == navigationTop)
         store.selectedTab = .map
         try await Task.sleep(for: .milliseconds(200))
+        #expect(host.accessibilityElement(label: "Settings") != nil,
+                "The browsing header returns on Map while List retains its detail")
         store.selectedTab = .list
         try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         #expect(store.inspectedActivityID == 90)
@@ -336,6 +473,9 @@ extension RenderedRoutePickingTests {
         #expect(list.contentOffset == offset)
         #expect(store.selectedActivityIDs.isEmpty)
         #expect(popGesture.delegate !== detailGestureDelegate, "Restore UIKit's gesture delegate after leaving detail")
+        #expect(!navigation.isNavigationBarHidden && navigation.viewControllers.count == 1,
+                "Back restores the browsing toolbar in the same native header")
+        try host.save("list-single-header-back-\(scenario)")
     }
 
     @Test func largeListNavigationReusesBrowsingSnapshots() async throws {
@@ -502,6 +642,43 @@ private final class ListHarness<Content: View> {
         return visit(host)
     }
     func close() { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
+    func accessibilityElement(label: String) -> NSObject? {
+        var visited: Set<ObjectIdentifier> = []
+        func visit(_ object: NSObject) -> NSObject? {
+            guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
+            if let view = object as? UIView, view.isHidden || view.alpha == 0 { return nil }
+            if object.accessibilityLabel == label,
+               !object.accessibilityFrame.isEmpty { return object }
+            let count = object.accessibilityElementCount()
+            if count > 0, count < 1000 {
+                for index in 0..<count {
+                    if let child = object.accessibilityElement(at: index) as? NSObject,
+                       let found = visit(child) { return found }
+                }
+            }
+            if let view = object as? UIView {
+                for child in view.subviews { if let found = visit(child) { return found } }
+            }
+            return nil
+        }
+        return visit(host.view)
+    }
+    func accessibilityValues() -> [String] {
+        var visited: Set<ObjectIdentifier> = []
+        func visit(_ object: NSObject) -> [String] {
+            guard visited.insert(ObjectIdentifier(object)).inserted else { return [] }
+            var values = object.accessibilityValue.map { [$0] } ?? []
+            if let view = object as? UIView { values += view.subviews.flatMap(visit) }
+            let count = object.accessibilityElementCount()
+            if count > 0, count < 1000 {
+                for index in 0..<count {
+                    if let child = object.accessibilityElement(at: index) as? NSObject { values += visit(child) }
+                }
+            }
+            return values
+        }
+        return visit(host.view)
+    }
 }
 
 @MainActor @Observable

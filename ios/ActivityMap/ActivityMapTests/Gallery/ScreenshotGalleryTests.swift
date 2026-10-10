@@ -115,6 +115,7 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
         case .mapDetail:
             let id = try #require(scenario.detailID)
             return Staged(root: shell(.list), usesMap: true, reveal: { picker.detent = .medium }, prepare: {
+                store.replaceSelection(with: scenario.selectedIDs)
                 store.showOnMap(id)
             }, ready: { store.mapContext.pendingRequest == nil },
                 coordinates: activities.filter { $0.id == id }.flatMap(\.coordinates),
@@ -131,21 +132,21 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
             let root = shell(.list)
             return Staged(root: root, prepare: { store.inspect(id) })
         case .filters:
-            // The shell presents this as an inspector/sheet; render its content.
             store.searchText = scenario.search ?? ""
-            return Staged(root: AnyView(NavigationStack {
-                FilterPanel(store: store).navigationTitle("Filters").navigationBarTitleDisplayMode(.inline)
-            }))
+            store.selectedTab = .list
+            let sheets = BrowseSheetPresentation()
+            return Staged(root: AnyView(AppShell(store: store, sheets: sheets).galleryMapStyle()),
+                          prepare: { sheets.showsFilters = true })
         case .stats, .statsExpanded:
             let dashboard = StatsDashboardState()
             store.selectedTab = .stats
             let root = AppShell(store: store, mapPicker: picker, statsContent: .init { store, _ in
                 AnyView(StatsScreen(store: store, dashboard: dashboard))
             })
-            guard self == .statsExpanded else { return Staged(root: AnyView(root)) }
+            guard self == .statsExpanded else { return Staged(root: AnyView(root.galleryMapStyle())) }
             // Review other expandable tiles with ACTIVITYMAP_GALLERY_STATS_TILE.
             let tile = GalleryEnvironment.values["ACTIVITYMAP_GALLERY_STATS_TILE"].flatMap(StatsTileID.init(rawValue:)) ?? .weeklyVolume
-            return Staged(root: AnyView(root), prepare: { dashboard.toggleExpansion(tile) })
+            return Staged(root: AnyView(root.galleryMapStyle()), prepare: { dashboard.toggleExpansion(tile) })
         case .settings:
             return Staged(root: AnyView(AccountSheet(destination: .settings, auth: AuthController())))
         }
@@ -179,17 +180,20 @@ private final class GalleryWindow {
         oldWindow = scene.keyWindow
         window = UIWindow(windowScene: scene)
         // Landscape windows start portrait; UIKit swaps the bounds on rotation.
-        window.frame = CGRect(origin: .zero, size: variant.landscape
+        window.frame = CGRect(origin: .zero, size: variant.landscape && GalleryEnvironment.values["ACTIVITYMAP_GALLERY_HOSTED_VIEWPORTS"] != "1"
             ? CGSize(width: variant.size.height, height: variant.size.width) : variant.size)
         window.traitOverrides.userInterfaceStyle = variant.dark ? .dark : .light
         window.traitOverrides.preferredContentSizeCategory = variant.contentSize
         window.traitOverrides.horizontalSizeClass = variant.regular ? .regular : .compact
+        window.traitOverrides.verticalSizeClass = variant.landscape && !variant.regular ? .compact : .regular
         host = UIHostingController(rootView: AnyView(root
             .environment(\.locale, Locale(identifier: "de_CH"))
             .environment(\.timeZone, TimeZone(identifier: "Europe/Zurich")!)
             .environment(\.colorScheme, variant.dark ? .dark : .light)
             .environment(\.dynamicTypeSize, variant.dynamicTypeSize)
-            .environment(\.horizontalSizeClass, variant.regular ? .regular : .compact)))
+            .environment(\.horizontalSizeClass, variant.regular ? .regular : .compact)
+            .environment(\.verticalSizeClass, variant.landscape && !variant.regular ? .compact : .regular)
+            .environment(\.statsDetailPresentation, .automatic)))
         window.rootViewController = host
         window.makeKeyAndVisible()
         host.view.frame = window.bounds
@@ -197,7 +201,9 @@ private final class GalleryWindow {
 
     /// Island-on-the-right landscape, as reported in #315; portrait otherwise.
     static func orient(landscape: Bool) async throws {
+        if GalleryEnvironment.values["ACTIVITYMAP_GALLERY_HOSTED_VIEWPORTS"] == "1" { return }
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
         guard scene.effectiveGeometry.interfaceOrientation.isLandscape != landscape else { return }
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeLeft : .portrait))
         let end = Date().addingTimeInterval(5)
@@ -317,6 +323,7 @@ private final class GalleryWindow {
             "commit": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_COMMIT"] ?? "unknown", "order": GalleryScene.allCases.firstIndex(of: scene) ?? 0,
             "variant": variant.name, "width": variant.size.width, "height": variant.size.height,
             "dark": variant.dark, "contentSize": variant.contentSize.rawValue, "library": library,
+            "orientationCapture": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_HOSTED_VIEWPORTS"] == "1" ? "hosted viewport" : "scene rotation",
             "basemap": GalleryEnvironment.mapboxToken == nil ? "offline" : "mapbox",
             "framing": framing,
         ]
@@ -359,15 +366,16 @@ struct GalleryManifest: Decodable {
         let landscape: Bool?
         var variant: GalleryVariant {
             GalleryVariant(name: name, size: CGSize(width: width, height: height), dark: dark,
-                           contentSize: largeText ? .accessibilityExtraLarge : .large, regular: width >= 768,
+                           contentSize: largeText ? .accessibilityExtraLarge : .large, regular: min(width, height) >= 600,
                            landscape: landscape ?? false)
         }
     }
     let scenarios: [Scenario]
     let variants: [Variant]
     static func load() throws -> Self {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .appendingPathComponent("../../../../shared/gallery-scenarios.json").standardized
+        let url = GalleryEnvironment.values["ACTIVITYMAP_GALLERY_MANIFEST"].map { URL(fileURLWithPath: $0) }
+            ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+                .appendingPathComponent("../../../../shared/gallery-scenarios.json").standardized
         return try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
     }
 }

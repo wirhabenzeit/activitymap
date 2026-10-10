@@ -6,7 +6,7 @@
 - `FilterPanel(scope:)` reuses the same editors for browsing and Stats. Stats uses the engine’s non-date count, excludes browsing dates from active-filter feedback, and routes Reset through `resetStatsActivityFilters`. Its period explanation discloses saved browsing dates without applying them. Search/count/reset share a compact section. The shell supplies a Done button and a full-height presentation for landscape phones and accessibility text.
 - `AccentColor` is the global system tint and explicit selection accent: #1976D2 on light surfaces, #90CAF9 on dark surfaces. The navigation background remains #1976D2. Shared sport badges have 26pt symbols within 34pt softly tinted shapes. Selected List rows add a leading mark and a checkmark; Map results retain a checkmark and separate active-route label. Inspection remains independent.
 - The approved wide-screen behavior is a bottom-right, edge-attached panel with a draggable handle, two snap positions and no expand button. Portrait phones retain their system sheet. See Map results and detail below.
-- The unused HeaderBar and FilterSidebar view wrapper are removed. The sidebar environment value remains the List detail-host input.
+- The unused HeaderBar and FilterSidebar view wrapper are removed.
 
 The original component and capture notes below are historical where explicitly marked. Continuous-drag captures and regressions describe the removed implementation; current evidence is recorded in `docs/ios-navigation-identity-review.md`.
 
@@ -122,11 +122,11 @@ Wide rows share aligned metric columns and a separate sortable local-date column
 
 ## Filter sidebar draft
 
-Regular windows at least 760pt wide show a collapsible 320pt leading filter sidebar, shared by Map and List. Its visibility is saved independently of inspection. With insufficient remaining width for adjacent List detail, inspection uses a native modal sheet over the existing layout (it currently keeps an “Activity” title and Done button, unlike the pushed and adjacent hosts; open under #257); a wide landscape window retains all three columns. Compact windows and accessibility text use a native filter sheet.
+Regular windows at least 760pt wide keep a 52pt leading filter rail, as the web's collapsed sidebar (#354). Each icon (search, sports, dates, distance, duration, elevation, activity details) opens only that filter in a popover and is marked while active; reset sits below them. Stats omits dates. The filter button expands the rail into the 320pt panel. Beside one-column content (Map, Stats, List without detail) the panel is a column; when it would squeeze List and its adjacent detail (width − 321pt < 760pt, i.e. portrait), it floats over both instead, and tapping outside closes it. Opening an activity while the panel is a column collapses it to the rail, and List waits for that width rather than pushing its detail. Switching destinations and opening or closing List detail or a Stats focus page never changes filter visibility. Compact windows and accessibility text use a native filter sheet.
 
 Measurement editors use a compact title/range summary, dual-thumb slider and labeled scale, with a reset action for active ranges. There are no text fields or Apply button. Thumb drags maintain local drafts and commit on release, avoiding repeated library filtering during movement. VoiceOver adjusts each endpoint. Scales round up from unfiltered library extents with practical minimum ranges, and retain existing bounds. Outer endpoints leave that side unlimited. Existing precise bounds remain visible until adjusted. Active ranges exclude missing measurements. Accessibility text stacks the heading and reduces scale labels to three. Existing one-sided predicates remain supported.
 
-Validation: 61 rendered navigation cases and 20 filter cases passed for this draft, plus three iPad gallery scenes. Captures include portrait detail overlay, landscape filters/list/detail, precise units and accessibility text. Touch feel and physical-device VoiceOver remain review work.
+Validation: the rendered filter suite covers the rail and panel across destinations, List detail in portrait and landscape, the collapse on inspection, and resizing between sheet and rail; the Stats focus page and wide Map results run with the panel expanded. Touch feel and physical-device VoiceOver remain review work.
 
 Sport filters appear directly after search, before dates and measurements. Five catalogue groups use the shared web symbols/colours, compact multi-select chips and explicit all/none/mixed states. All/None affects every sport type; Specific sport types exposes individual toggles and an explicit Only action. A mixed group tap selects its remaining members, matching web semantics. Accessibility text stacks the chips.
 
@@ -142,7 +142,7 @@ Column fit uses the same width budget for default and optional metrics: compact 
 
 The browsing shell uses the web brand blue (#1976d2) across the navigation/status-bar background, with white account, mode and filter controls. The mode picker uses a flat selected capsule instead of glass. Both table headings and the alternative list toolbar use opaque system backgrounds, retaining light/dark content surfaces and sport colours.
 
-Filters occupy the leading navigation position, aligned with the iPad sidebar, and Account occupies the trailing position. The account menu displays the current user image as a 32pt circular avatar within a 44pt target; absent, loading and failed images fall back to the white person icon. The menu retains its Account and Settings accessibility label.
+Filters occupy the leading navigation position, with a count badge for active filters, and Account occupies the trailing position. The account menu displays the current user image as a 32pt circular avatar within a 44pt target; absent, loading and failed images fall back to the white person icon. The menu retains its Account and Settings accessibility label.
 
 ## Native phone map sheet draft
 

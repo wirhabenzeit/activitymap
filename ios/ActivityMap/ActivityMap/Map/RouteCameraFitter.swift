@@ -59,7 +59,9 @@ enum RouteCameraFitter {
                        current: MapCamera) throws -> CameraOptions {
         // Explicit Mercator supports native camera fitting for all catalogue
         // styles, including the low-zoom default style's globe projection.
-        try map.setProjection(StyleProjection(name: .mercator))
+        if map.projection?.name != .mercator {
+            try map.setProjection(StyleProjection(name: .mercator))
+        }
         let fitted = try map.camera(
             for: extent.corners,
             camera: CameraOptions(center: extent.center, padding: padding, zoom: 0,

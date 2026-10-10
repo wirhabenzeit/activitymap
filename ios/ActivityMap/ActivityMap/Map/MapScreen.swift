@@ -12,6 +12,10 @@ struct MapScreen: View {
     @Environment(\.mapStyleOverride) private var mapStyleOverride
     @State private var viewport: Viewport
     @State private var acceptsCameraEvents = false
+    @State private var cameraTransitionID: UUID?
+    /// A resolved fit that arrived while the map was updating its content.
+    /// Valid only while its transition is still current.
+    @State private var deferredTransition: (id: UUID, viewport: Viewport)?
 
     init(store: ActivityStore, topOcclusion: CGFloat = 0, picker: RoutePicker? = nil) {
         _picker = State(initialValue: picker ?? RoutePicker())
@@ -63,21 +67,25 @@ struct MapScreen: View {
         }
         .onChange(of: store.selectedTab) { _, tab in
             if tab != .map {
+                cameraTransitionID = nil
                 picker.invalidateQuery()
             }
         }
         .onChange(of: picker.isAdding) { _, _ in picker.invalidateQuery() }
         .onChange(of: context.baseStyle) { oldStyle, newStyle in
+            cameraTransitionID = nil
             if oldStyle.styleURL != newStyle.styleURL { acceptsCameraEvents = false }
             picker.invalidateQuery()
         }
         .onChange(of: context.activeOverlays) { _, _ in picker.invalidateQuery() }
         .onChange(of: context.scopeRevision) { _, _ in
+            cameraTransitionID = nil
             picker.isPresented = false
             picker.isAdding = false
             viewport = context.camera.viewport
         }
         .onDisappear {
+            cameraTransitionID = nil
             acceptsCameraEvents = false
             picker.invalidateQuery()
         }
@@ -121,6 +129,12 @@ struct MapScreen: View {
         .onStyleLoaded { _ in
             if !acceptsCameraEvents { viewport = context.camera.viewport }
             acceptsCameraEvents = true
+            scheduleNavigation(proxy: proxy)
+        }
+        .onRenderFrameFinished { _ in
+            // The shell can replace a native bar when returning from List.
+            // Mapbox's fitter must see its resized viewport, not the previous
+            // tab's bounds. Keep the request until that layout has rendered.
             applyNavigation(proxy: proxy, geometry: geometry)
         }
         .onMapIdle { _ in
@@ -131,30 +145,29 @@ struct MapScreen: View {
                 viewport = context.camera.viewport
                 acceptsCameraEvents = true
             }
-            applyNavigation(proxy: proxy, geometry: geometry)
+            if let deferred = deferredTransition {
+                deferredTransition = nil
+                if deferred.id == cameraTransitionID, store.selectedTab == .map {
+                    withViewportAnimation(.easeOut(duration: 0.5)) { viewport = deferred.viewport }
+                }
+            }
         }
         .ignoresSafeArea()
         .onChange(of: store.selectedTab) { _, tab in
-            if tab == .map { applyNavigation(proxy: proxy, geometry: geometry) }
+            if tab == .map { scheduleNavigation(proxy: proxy) }
         }
-        .onChange(of: context.pendingRequest?.id) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
-        .onChange(of: picker.detent) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
-        .onChange(of: picker.isPresented) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
-        .onChange(of: geometry.size) { _, _ in applyNavigation(proxy: proxy, geometry: geometry) }
+        .onChange(of: context.pendingRequest?.id, initial: true) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: picker.detent) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: picker.isPresented) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: geometry.size) { _, _ in scheduleNavigation(proxy: proxy) }
         .onChange(of: store.activitiesRevision, initial: true) { _, revision in
             picker.reconcile(with: store)
             store.routeGeometry.update(activities: store.activities, revision: revision)
         }
     }
 
-    private func applyNavigation(proxy: MapProxy, geometry: GeometryProxy) {
-        guard store.selectedTab == .map, let map = proxy.map else { return }
-        if !acceptsCameraEvents {
-            // A cached style may already be ready before SwiftUI observes its
-            // load/idle event. An explicit fit must not wait for another idle.
-            guard context.pendingRequest != nil, map.isStyleLoaded else { return }
-            acceptsCameraEvents = true
-        }
+    private func scheduleNavigation(proxy: MapProxy) {
+        guard store.selectedTab == .map, context.pendingRequest != nil else { return }
         if case let .activity(id) = context.pendingRequest?.action,
            store.visibleSelectedActivityIDs.contains(id) {
             // Do not activate a different remaining result if filters/deletion
@@ -169,6 +182,15 @@ struct MapScreen: View {
             // A fully expanded phone sheet returns to its normal opening height.
             picker.detent = .medium
         }
+        // Even a fit of an unchanged selection needs a frame; there may be no
+        // style or source update to trigger one on an already idle map.
+        proxy.map?.triggerRepaint()
+    }
+
+    private func applyNavigation(proxy: MapProxy, geometry: GeometryProxy) {
+        guard store.selectedTab == .map, context.pendingRequest != nil,
+              let map = proxy.map, map.isStyleLoaded else { return }
+        acceptsCameraEvents = true
         let layout = MapResultsLayout.framing(size: geometry.size,
             topInset: max(topOcclusion, geometry.safeAreaInsets.top), bottomInset: geometry.safeAreaInsets.bottom,
             detent: picker.detent, largeText: typeSize.isAccessibilitySize)
@@ -192,12 +214,24 @@ struct MapScreen: View {
         let padding = camera.padding ?? context.camera.padding
         let target = Viewport.camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
             .padding(EdgeInsets(top: padding.top, leading: padding.left, bottom: padding.bottom, trailing: padding.right))
+        let transitionID = UUID()
+        cameraTransitionID = transitionID
         switch action {
         case .activity, .fitSelection, .fitFiltered:
-            // A fit can also change projection and panel layout. The SDK's
-            // animated transition can cancel during those updates, leaving the
-            // initial camera after the request has already been consumed.
-            viewport = target
+            // Commit navigation/results layout first. Updating the viewport
+            // inside that same SwiftUI update loses its animation transaction.
+            // Ease the fixed camera and final panel padding together afterwards.
+            DispatchQueue.main.async {
+                guard cameraTransitionID == transitionID, store.selectedTab == .map else { return }
+                // The request is already consumed. Returning to Map can still be
+                // adding the newly active route, and a camera move started then
+                // is interrupted, so finish it at the next idle frame instead.
+                guard map.isStyleLoaded else {
+                    deferredTransition = (transitionID, target)
+                    return
+                }
+                withViewportAnimation(.easeOut(duration: 0.5)) { viewport = target }
+            }
         default:
             withViewportAnimation(.default(maxDuration: 0.5)) { viewport = target }
         }

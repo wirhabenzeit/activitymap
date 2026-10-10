@@ -8,9 +8,16 @@ struct StatsRecordsDetail: View {
     let expanded: Bool
     var openActivity: (Int) -> Void
     @State private var range = StatsToggleOption.currentYear
+    @Environment(\.statsTileInspection) private var inspection
+    private var periodSelection: Binding<StatsToggleOption> {
+        if let inspection {
+            return Binding(get: { inspection.recordsRange }, set: { inspection.recordsRange = $0 })
+        }
+        return $range
+    }
     @Environment(\.dynamicTypeSize) private var typeSize
     private let metrics: [StatsMetric] = [.distance, .time, .elevation]
-    private var records: StatsRecords { expanded && range == .allTime ? allTime : current }
+    private var records: StatsRecords { expanded && periodSelection.wrappedValue == .allTime ? allTime : current }
     private func title(_ metric: StatsMetric) -> String {
         switch metric { case .distance: "Longest distance"; case .time: "Longest moving time"; case .elevation: "Biggest climb"; case .count: "Activities" }
     }
@@ -18,8 +25,8 @@ struct StatsRecordsDetail: View {
         VStack(alignment: .leading, spacing: 0) {
             StatsExpansionReveal(expanded: expanded) {
               VStack(alignment: .leading, spacing: 16) {
-                StatsRangePicker(title: "Records period", ranges: [.currentYear, .allTime], selection: $range, label: StatsDisplay.option)
-                Text(range == .allTime ? "All-time records" : "Records · \(String(year))").font(.caption).foregroundStyle(.secondary)
+                StatsRangePicker(title: "Records period", ranges: [.currentYear, .allTime], selection: periodSelection, label: StatsDisplay.option)
+                Text(periodSelection.wrappedValue == .allTime ? "All-time records" : "Records · \(String(year))").font(.caption).foregroundStyle(.secondary)
               }.padding(.bottom, 16)
             }
             StatsDetailGrid(expanded: expanded, compactColumns: typeSize.isAccessibilitySize ? 1 : 4) {

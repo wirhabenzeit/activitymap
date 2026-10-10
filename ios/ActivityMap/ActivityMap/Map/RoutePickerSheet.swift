@@ -253,9 +253,10 @@ struct RoutePickerSheet: View {
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }.buttonStyle(.plain)
+            .accessibilityValue(store.activeActivityID == activity.id ? "Inspected. Selected. Active on map" : "Not inspected. Selected")
 
         }
         .padding(.leading, 12).padding(.trailing, 8).padding(.vertical, 4)
-        .background(AppTheme.selectionBackground.opacity(store.activeActivityID == activity.id ? 1 : 0.5))
+        .background(ActivityRowBackground(selected: true, inspected: store.activeActivityID == activity.id))
     }
 }

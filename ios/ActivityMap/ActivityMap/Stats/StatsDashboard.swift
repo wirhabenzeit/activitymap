@@ -172,7 +172,22 @@ struct StatsDashboardFace {
     let result: StatsDashboardResult
 }
 
+/// Inspection choices outlive a detail destination and are shared with its source tile.
+@MainActor @Observable final class StatsTileInspection {
+    var volumeRange = StatsHistoryRange.weeks
+    var volumeTotals = false
+    var calendarYear: Int?
+    var calendarDay: Int?
+    var recordsRange = StatsToggleOption.currentYear
+}
+
 @MainActor @Observable final class StatsDashboardState {
+    private var inspections = Dictionary(uniqueKeysWithValues: StatsDashboard.ids.map { ($0, StatsTileInspection()) })
+    func inspection(_ id: StatsTileID) -> StatsTileInspection? { inspections[id] }
+    func resetInspection() {
+        expandedTile = nil
+        inspections = Dictionary(uniqueKeysWithValues: StatsDashboard.ids.map { ($0, StatsTileInspection()) })
+    }
     var choices: [StatsTileID: StatsToggleOption] = [:]
     var expandedTile: StatsTileID?
     private(set) var completedTiles: Set<StatsTileID> = []

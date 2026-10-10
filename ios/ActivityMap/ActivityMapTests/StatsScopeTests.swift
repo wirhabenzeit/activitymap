@@ -20,6 +20,43 @@ actor GatedStatsBuild {
 }
 
 @MainActor struct StatsScopeTests {
+    @Test(arguments: ["empty", "replayed-activity", "photo-only"])
+    func unchangedActivitySyncKeepsStatsAndBrowsingCaches(scenario: String) async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let dto = try Fixtures.activity(), photo = try Fixtures.photo()
+        try await storage.apply([.upsertActivity(dto)], checkpoint: Fixtures.checkpoint, scope: Fixtures.scope)
+        let changes: [ActivityMapAPI.SyncChangeItem]
+        switch scenario {
+        case "replayed-activity": changes = [SyncFixtures.upsert(dto)]
+        case "photo-only": changes = [.init(sequence: "1", entityType: .photo, operation: .upsert,
+                                            id: photo.uniqueID, activity: nil, photo: photo)]
+        default: changes = []
+        }
+        let source = ScriptedSyncSource([
+            .changes("cursor-1", .success(SyncFixtures.changes(changes, next: "polled"))),
+            .changes("polled", .success(SyncFixtures.changes(next: "polled"))),
+            .changes("polled", .success(SyncFixtures.changes(next: "polled"))),
+        ])
+        let store = ActivityStore(), sync = SyncController(activities: store, source: { _ in source }, invalidate: { _ in })
+        sync.setSession(SyncFixtures.session(verified: false), storage: storage); await sync.refresh()
+        store.replaceSelection(with: [Int(dto.id)!]); store.inspect(Int(dto.id)!)
+        _ = await store.stats.result(.totals, for: store)
+        _ = store.filteredActivities; _ = store.listedActivities
+        let revision = store.activitiesRevision, builds = store.filterBuildCount, sorts = store.sortBuildCount
+        let imageRevision = store.photoImages.revision
+        sync.setSession(SyncFixtures.session(), storage: storage); await sync.refresh()
+        sync.pause(); await sync.refresh()
+        _ = await store.stats.result(.totals, for: store)
+        _ = store.filteredActivities; _ = store.listedActivities
+        #expect(sync.status == .ready && sync.lastSyncAt != Fixtures.checkpoint.lastSyncAt)
+        #expect(store.activitiesRevision == revision && store.filterBuildCount == builds && store.sortBuildCount == sorts)
+        #expect(store.stats.aggregationCount == 1 && store.stats.calculationCount == 1)
+        #expect(store.selectedActivityIDs == [Int(dto.id)!] && store.inspectedActivityID == Int(dto.id)!)
+        #expect((store.photoImages.revision != imageRevision) == (scenario == "photo-only"))
+        #expect(store.photos.count == (scenario == "photo-only" ? 1 : 0))
+        #expect(await source.calls == 3)
+    }
+
     @Test func statsResetPreservesDatesSelectionCameraAndListSettings() async throws {
         let fixture = try StatsFixtureTests.json("stats-parity-fixtures.v1.json")
         let sparse = (fixture["fixtures"] as! [[String: Any]])[1]

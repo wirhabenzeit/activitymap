@@ -4,6 +4,7 @@ struct ActivityRowView: View {
     @Bindable var store: ActivityStore
     let activity: Activity
     var availableWidth: CGFloat = 390
+    var isInspected = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -57,13 +58,6 @@ struct ActivityRowView: View {
                 Button { store.showOnMap(activity.id) } label: {
                     Label("Show on map", systemImage: "map")
                 }.tint(AppTheme.accent)
-            }
-        }
-        .overlay(alignment: .leading) {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 2).fill(AppTheme.accent)
-                    .frame(width: 3).padding(.vertical, 5)
-                    .allowsHitTesting(false).accessibilityHidden(true)
             }
         }
         .accessibilityIdentifier("activity-list-row-\(activity.id)")
@@ -129,7 +123,8 @@ struct ActivityRowView: View {
             + settings.orderedMetrics.map { metric in
                 let value = metric.value(for: activity)
                 return "\(metric.title): \(value == Formatters.unknown ? "Not recorded" : value)"
-            } + (isActive ? ["Active on map"] : [])).joined(separator: ". ")
+            } + [isInspected ? "Inspected" : "Not inspected", isSelected ? "Selected" : "Not selected"]
+            + (isActive ? ["Active on map"] : [])).joined(separator: ". ")
     }
 
     private func inspect() {

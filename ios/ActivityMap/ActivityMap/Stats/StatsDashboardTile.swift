@@ -1,5 +1,20 @@
 import SwiftUI
 
+extension StatsDashboardTile {
+    init(tile: StatsTileDefinition, store: ActivityStore, dashboard: StatsDashboardState,
+         expanded: Bool, detailScreen: Bool = false,
+         toggleExpansion: @escaping () -> Void, openActivity: @escaping (Int) -> Void) {
+        let source = StatsDashboardSource(store)
+        self.init(tile: tile, option: Binding(get: { dashboard.option(tile.id) },
+                  set: { if let value = $0 { dashboard.select(value, for: tile) } }),
+                  displayed: dashboard.face(tile.id, source: source), today: source.today,
+                  expanded: expanded, filtered: store.activeStatsFilterCount > 0,
+                  toggleExpansion: toggleExpansion, openActivity: openActivity,
+                  detailScreen: detailScreen,
+                  inspection: dashboard.inspection(tile.id))
+    }
+}
+
 struct StatsDashboardTile: View {
     let tile: StatsTileDefinition
     @Binding var option: StatsToggleOption?
@@ -9,10 +24,18 @@ struct StatsDashboardTile: View {
     let filtered: Bool
     let toggleExpansion: () -> Void
     var openActivity: (Int) -> Void = { _ in }
+    var detailScreen = false
+    var inspection: StatsTileInspection? = nil
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
     @State var volumeRange = StatsHistoryRange.weeks
+    private var selectedVolumeRange: Binding<StatsHistoryRange> {
+        if let inspection {
+            return Binding(get: { inspection.volumeRange }, set: { inspection.volumeRange = $0 })
+        }
+        return $volumeRange
+    }
     private var pilot: Bool { [StatsTileID.thisWeek, .weeklyVolume, .monthVsLastMonth, .yearToDate, .distanceVsElevation, .sportMix, .yearPace, .typicalWeek, .records, .activityCalendar].contains(tile.id) }
     private var displayedOption: StatsToggleOption? { displayed?.option ?? option }
     private var metric: StatsMetric { displayedOption.flatMap { StatsMetric(rawValue: $0.rawValue) } ?? .distance }
@@ -56,7 +79,7 @@ struct StatsDashboardTile: View {
     var body: some View {
         StatsTileSurface(title: tile.title, period: period,
                          expand: StatsDashboard.expandable(tile.id) ? toggleExpansion : nil,
-                         expanded: expanded, compactHeader: pilot) {
+                         expanded: expanded, compactHeader: pilot, detailScreen: detailScreen) {
             controls
         } content: {
             if let displayed {
@@ -72,6 +95,7 @@ struct StatsDashboardTile: View {
             }
             else { ProgressView("Calculating…").frame(minHeight: 120) }
         }
+        .environment(\.statsTileInspection, inspection)
         .accessibilityIdentifier("stats-tile-\(tile.id.rawValue)")
         .zIndex(expanded ? 1 : 0)
     }
@@ -114,7 +138,7 @@ struct StatsDashboardTile: View {
                // Today is still the emphasised bar of the week.
                base: Color.secondary.opacity(0.45), partial: .primary)
         case .volume(let values, _, _, let averages, let buckets):
-            StatsVolumeDetail(history: buckets, averages: averages, metric: metric, range: $volumeRange,
+            StatsVolumeDetail(history: buckets, averages: averages, metric: metric, range: selectedVolumeRange,
                               expanded: expanded) {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
                     headline(values.current, metric: metric, suffix: " · last 28 days")

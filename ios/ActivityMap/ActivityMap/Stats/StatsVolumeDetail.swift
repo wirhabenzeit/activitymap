@@ -22,6 +22,13 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     private var buckets: [StatsHistoryBucket] { history[shownRange] ?? [] }
     @State private var selectedX: Double?
     @State var showTotals = false
+    @Environment(\.statsTileInspection) private var inspection
+    private var totalsSelection: Binding<Bool> {
+        if let inspection {
+            return Binding(get: { inspection.volumeTotals }, set: { inspection.volumeTotals = $0 })
+        }
+        return $showTotals
+    }
     var expanded = true
     @Environment(\.statsExpansionProgress) private var sharedProgress
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
@@ -171,7 +178,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
         }
         .chartLegend(.hidden)
         .chartXSelection(value: $selectedX)
-        .statsExpansionHeight(expanded: expanded, compact: compactHeight, detail: height)
+        .statsExpansionHeight(expanded: expanded, compact: compactHeight, detail: height, fillsFocus: true)
         .overlay(alignment: .topLeading) {
             if !expanded && selected == nil && !trend.isEmpty {
                 Text("4-wk avg").font(.caption2).foregroundStyle(.secondary)
@@ -206,7 +213,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                 HStack(spacing: 10) { legend }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), alignment: .leading)]) { legend }
             }
-            DisclosureGroup("Period totals", isExpanded: $showTotals) {
+            DisclosureGroup("Period totals", isExpanded: totalsSelection) {
                 ScrollView(.horizontal) {
                     Grid(alignment: .trailing, horizontalSpacing: 16, verticalSpacing: 10) {
                         GridRow {

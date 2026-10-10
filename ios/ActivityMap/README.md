@@ -99,13 +99,20 @@ Note that `//` starts a comment in xcconfig, so URL separators are composed from
 scripts/install-dev-iphone.sh                   # first paired, unlocked iPhone
 scripts/install-dev-iphone.sh --device "NAME"   # or a UDID
 scripts/install-dev-iphone.sh --build-only      # build and verify without installing
+scripts/install-dev-iphone.sh --release         # optimized Dev app for performance review
 ```
 
 This builds the current checkout (Debug, production server) as **ActivityMap Dev**, `page.dominik.activitymap.dev`, with the DEV-badged icon and the `activitymap-dev://auth/callback` sign-in scheme. It installs beside the TestFlight app and never replaces it: the script refuses any other bundle ID. The build overrides `ACTIVITYMAP_BUNDLE_ID_SUFFIX`, `ACTIVITYMAP_DISPLAY_NAME`, `ACTIVITYMAP_APP_ICON` and `ACTIVITYMAP_AUTH_CALLBACK_SCHEME`; their `Base.xcconfig` defaults keep Release and TestFlight builds as `page.dominik.activitymap`.
 
+Use `--release` when judging animation and navigation responsiveness on the phone. The default Debug build disables Swift optimization and can exaggerate chart preparation pauses. The optimized build keeps the same Dev identity, icon, sign-in scheme and production server.
+
 Worktrees have no ignored `Local.xcconfig`, so the script takes `MAPBOX_ACCESS_TOKEN` from the environment or from the main checkout's `Local.xcconfig`. It stops if the built app would have no token, because the map would be blank. Production's `MOBILE_AUTH_REDIRECT_ALLOWLIST` must include `activitymap-dev://auth/callback`.
 
 Running the plain `ActivityMap` scheme on a device from Xcode builds `page.dominik.activitymap`, which replaces the TestFlight app. Use the script instead.
+
+Stats opens chart detail as a focus page using the full available content width beside filters (#353), zooming the tapped tile into the page; Reduce Motion cross-fades. On iPhone, Back and the chart title take over the single blue native header, with Filters available and account access kept on the dashboard; Back restores the Map/List/Stats controls and dashboard scroll position. Regular iPad windows retain the global shell header, with Back and the chart title above the focused content. The filter panel and header stay stationary during expansion and Back; only the chart content column participates in the zoom. The dashboard stays mounted, and Back restores its scroll position, metric choices and cached calculations. Regular windows retain the 52pt filter rail across Map, List, Stats and Stats focus; the filter button expands it into a 320pt panel. The panel sits beside one-column content and floats over List plus detail when needed. Opening List detail collapses an expanded column to the rail; closing detail leaves it collapsed (#354). Windows below 760pt and accessibility text sizes use the filter sheet, including while focused. A focused Stats page stays open through resizing until Back or a destination switch. Explicit inline preview hosts retain the original expansion layout.
+
+Pushed List details replace the browsing header with a single native blue Back/title/Show on map bar. Back restores the browsing header. Side-by-side List details on iPad retain the browsing header.
 
 ### Run on a physical iPhone
 
@@ -165,7 +172,7 @@ Use Profile to sign in. `AuthController` stores the ActivityMap session in the K
 
 The detached activity model preserves unknown metrics and flags as optionals, separately from measured zero and false. Rows show an em dash for unknown distance; detail renders each available measurement independently. Activity dates use the components of `start_date_local` without applying another timezone conversion. Geometry/photo freshness, counts, stream metadata and validated bounds remain available to presentation consumers; no raw stream arrays are loaded into ordinary activity snapshots. Malformed detailed routes fall back to a valid summary, and unreadable geometry never prevents the activity's other fields from loading. These presentation changes require no SwiftData migration or new bootstrap.
 
-`ActivityMapApp` creates the disk store. `SyncController` loads committed snapshots into the UI after sign-in, on foreground entry, every minute while foregrounded, and on manual refresh (list pull-to-refresh, or Settings → Sync now). Sync status and errors live in Profile and Settings rather than a persistent bottom bar. The network engine pages activities and photos, then catches up from the first snapshot cursor. Later passes use the last committed change cursor. A `409 sync_rebootstrap_required` triggers one fresh bootstrap.
+`ActivityMapApp` creates the disk store. `SyncController` loads committed snapshots into the UI after sign-in, on foreground entry, every minute while foregrounded, and on manual refresh (list pull-to-refresh, or Settings → Sync now). Unchanged sync results preserve chart calculations, browsing caches and loaded images; checkpoint-only updates do not republish activity data. Stats refreshes its reporting day on foreground entry and each minute, recalculating date windows only when the local day changes. Sync status and errors live in Profile and Settings rather than a persistent bottom bar. The network engine pages activities and photos, then catches up from the first snapshot cursor. Later passes use the last committed change cursor. A `409 sync_rebootstrap_required` triggers one fresh bootstrap.
 
 The account sheet shows sync errors, rate-limit retry time, last successful sync and Strava reconciliation time. Offline launch uses the last verified user identity, bound to the Keychain token and deployment. The app keeps its saved activities until it next syncs: the server revalidates Strava data within seven days, and each sync applies its changes and deletions (see `docs/strava-data-policy.md`). Session expiry, logout, account changes and deauthorization clear scoped data. Transient network/server errors keep the session and usable cache.
 

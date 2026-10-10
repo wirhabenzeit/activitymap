@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import Observation
 
 struct StatsScreen: View {
     @Bindable var store: ActivityStore
@@ -6,6 +8,10 @@ struct StatsScreen: View {
     var refresh: () async -> Void = {}
     @State private var inspectedActivityID: Int?
     @State var dashboard = StatsDashboardState()
+    @Environment(\.statsShellNavigation) private var shellNavigation
+    @Environment(\.statsDetailPresentation) private var detailPresentation
+    @Environment(\.statsTransitionNamespace) private var shellTransitionNamespace
+    @Namespace private var transitionNamespace
     @Environment(\.localStore) private var localStore
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -20,41 +26,91 @@ struct StatsScreen: View {
               canLoad: store.selectedTab == .stats && presentation.hasContent)
     }
 
+    /// Every width focuses a chart on its own full-width page; only explicit
+    /// inline hosts expand within the dashboard. A side pane would show the
+    /// chart narrower than the tile that opened it.
+    private var usesDetailNavigation: Bool { detailPresentation != .inline }
+
+    private var detailSelection: Binding<StatsTileID?> {
+        Binding(get: { usesDetailNavigation ? dashboard.expandedTile : nil },
+                set: { dashboard.expandedTile = $0 })
+    }
+
     var body: some View {
+        screenContent
+        // Dashboard and destination own demand for the same state and cache.
+        .task(id: request) { await dashboard.load(store: store, request: request) }
+        .onChange(of: source.scope) { _, _ in
+            inspectedActivityID = nil
+            dashboard.resetInspection()
+        }
+        .sheet(isPresented: Binding(get: { inspectedActivityID != nil }, set: { if !$0 { inspectedActivityID = nil } })) {
+            if let id = inspectedActivityID {
+                NavigationStack {
+                    ActivityDetailPanel(store: store, activityID: id, showOnMap: { activityID in
+                        inspectedActivityID = nil
+                        store.showOnMap(activityID)
+                    })
+                        .navigationTitle("Activity").navigationBarTitleDisplayMode(.inline)
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { inspectedActivityID = nil } } }
+                }.presentationDetents([.large]).presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    @ViewBuilder private var screenContent: some View {
+        if let shellNavigation {
+            dashboardContent.onAppear {
+                if shellNavigation.dashboard !== dashboard { shellNavigation.dashboard = dashboard }
+            }
+        } else {
+            NavigationStack {
+                dashboardContent
+                    .navigationTitle("Stats")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar(.hidden, for: .navigationBar)
+                    .navigationDestination(item: detailSelection) { id in
+                        if let definition = StatsDashboard.tiles.first(where: { $0.id == id }) {
+                            detail(definition)
+                        }
+                    }
+            }
+        }
+    }
+
+    private var dashboardContent: some View {
         GeometryReader { geometry in
             let detailLimit = detailHeightLimit(viewport: geometry.size.height)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
-                        scopeSummary
-                        if let message = presentation.message {
-                            status(message)
-                        }
                         if presentation.hasContent {
                             ForEach(StatsTileGroup.allCases, id: \.self) { group in
                                 VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
                                     Text(group.title).font(.title2.weight(.semibold))
                                         .accessibilityAddTraits(.isHeader)
-                                    // iPhone landscape pairs tiles too: half its width is a phone card.
                                     let columns = !typeSize.isAccessibilitySize
                                         && geometry.size.width >= (detailLimit != nil ? 640 : 760) ? 2 : 1
-                                    // A flat, stable child list keeps local picker/day state
-                                    // alive when expansion changes row placement.
                                     StatsAnimatedSection(tiles: StatsDashboard.tiles.filter { $0.group == group },
-                                                         expandedTile: dashboard.expandedTile, columns: columns) { definition in
+                                                         expandedTile: detailPresentation == .inline ? dashboard.expandedTile : nil,
+                                                         columns: columns) { definition in
                                         tile(definition)
                                     }
                                 }
                             }
+                        } else if presentation.state == .noHistory || presentation.state == .noMatches {
+                            ContentUnavailableView(store.activities.isEmpty ? "No activity history" : "No matching activities",
+                                                   systemImage: "chart.bar")
                         }
                     }
                     .padding(12)
                 }
                 .environment(\.statsDetailHeightLimit, detailLimit)
-                .onChange(of: dashboard.expandedTile) { _, id in
-                    // A short viewport shows little more than the expanded tile.
-                    // Start it at the top rather than leaving its chart off-screen.
-                    guard detailLimit != nil, let id else { return }
+                // Only inline expansion needs to observe this selection.
+                // On iPhone, that dependency needlessly invalidated the
+                // compact dashboard before UIKit could push the detail page.
+                .onChange(of: detailPresentation == .inline ? dashboard.expandedTile : nil) { _, id in
+                    guard detailPresentation == .inline, detailLimit != nil, let id else { return }
                     withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
                         proxy.scrollTo(id, anchor: .top)
                     }
@@ -62,35 +118,39 @@ struct StatsScreen: View {
             }
             .background(AppTheme.contentBackground)
             .accessibilityIdentifier("stats-dashboard")
-            .task(id: request) { await dashboard.load(store: store, request: request) }
-            .onChange(of: source.scope) { _, _ in inspectedActivityID = nil }
-            .sheet(isPresented: Binding(get: { inspectedActivityID != nil }, set: { if !$0 { inspectedActivityID = nil } })) {
-                if let id = inspectedActivityID {
-                    NavigationStack {
-                        ActivityDetailPanel(store: store, activityID: id, showOnMap: { activityID in
-                            inspectedActivityID = nil
-                            store.showOnMap(activityID)
-                        })
-                            .navigationTitle("Activity").navigationBarTitleDisplayMode(.inline)
-                            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { inspectedActivityID = nil } } }
-                    }.presentationDetents([.large]).presentationDragIndicator(.visible)
-                }
-            }
         }
     }
 
-    private func tile(_ tile: StatsTileDefinition) -> some View {
-        StatsDashboardTile(tile: tile, option: Binding(
-            get: { dashboard.option(tile.id) },
-            set: { if let value = $0 { dashboard.select(value, for: tile) } }
-        ), displayed: dashboard.face(tile.id, source: source), today: source.today,
-           expanded: dashboard.expandedTile == tile.id, filtered: store.activeStatsFilterCount > 0,
-           toggleExpansion: {
-               withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
-                   dashboard.toggleExpansion(tile.id)
-               }
-           }, openActivity: { inspectedActivityID = $0 })
-        .id(tile.id)
+    private func detailContent(_ tile: StatsTileDefinition) -> some View {
+        StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync)
+    }
+
+    @ViewBuilder private func detail(_ tile: StatsTileDefinition) -> some View {
+        if reduceMotion {
+            detailContent(tile).navigationTransition(.crossFade)
+        } else {
+            detailContent(tile).navigationTransition(.zoom(sourceID: tile.id, in: transitionNamespace))
+        }
+    }
+
+    @ViewBuilder private func tile(_ tile: StatsTileDefinition) -> some View {
+        let content = dashboardTile(tile, expanded: detailPresentation == .inline && dashboard.expandedTile == tile.id)
+            .id(tile.id)
+        if usesDetailNavigation, !reduceMotion, StatsDashboard.expandable(tile.id) {
+            content.matchedTransitionSource(id: tile.id, in: shellTransitionNamespace ?? transitionNamespace)
+        } else {
+            content
+        }
+    }
+
+    private func dashboardTile(_ tile: StatsTileDefinition, expanded: Bool) -> some View {
+        StatsDashboardTile(tile: tile, store: store, dashboard: dashboard, expanded: expanded,
+                           toggleExpansion: {
+            if usesDetailNavigation { dashboard.toggleExpansion(tile.id) }
+            else {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { dashboard.toggleExpansion(tile.id) }
+            }
+        }, openActivity: { inspectedActivityID = $0 })
     }
 
     /// Short viewports (iPhone landscape) get dense tile headers and a cap on
@@ -106,37 +166,147 @@ struct StatsScreen: View {
         return Double(viewport) - 170
     }
 
-    @ViewBuilder private var scopeSummary: some View {
-        if store.activeStatsFilterCount > 0 {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Filtered activities")
-                    .font(.subheadline.weight(.semibold))
-                Button("Reset activity filters") { store.resetStatsActivityFilters() }
-                    .frame(minHeight: 44).accessibilityIdentifier("stats-reset-filters")
+}
+
+/// Keep the blue chrome outside UIKit's rounded, shadowed page transition.
+/// Regular shell-hosted pages use the stationary shell header. Compact and
+/// standalone pages use the native navigation bar.
+private struct StatsDetailDestination<Content: View>: View {
+    let title: String
+    var usesShellHeader = false
+    @ViewBuilder let content: () -> Content
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        content()
+        .background(AppTheme.contentBackground)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden()
+        .toolbar(usesShellHeader ? .hidden : .visible, for: .navigationBar)
+        .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
+        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            if !usesShellHeader {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .medium))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .accessibilityLabel("Back to Stats")
+                    .accessibilityIdentifier("stats-detail-back")
+                }.sharedBackgroundVisibility(.hidden)
+                ToolbarItem(placement: .principal) {
+                    Text(title).font(.headline).foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("stats-detail-title")
+                }
             }
         }
+        .background(DetailBackGesture())
+        .accessibilityAction(.escape) { dismiss() }
+    }
+}
+
+/// The shell and standalone hosts push the same complete page. Values remain
+/// observed so changing a metric refreshes the visible destination.
+struct StatsDetailScreen: View {
+    let store: ActivityStore
+    let dashboard: StatsDashboardState
+    let tile: StatsTileDefinition
+    var sync: SyncController? = nil
+    var usesShellHeader = false
+
+    var body: some View {
+        StatsDetailDestination(title: tile.title, usesShellHeader: usesShellHeader) {
+            StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync)
+        }
+    }
+}
+
+/// Charts, controls and activity inspection for the pushed focus page.
+private struct StatsDetailContent: View {
+    @Bindable var store: ActivityStore
+    let dashboard: StatsDashboardState
+    let tile: StatsTileDefinition
+    var sync: SyncController? = nil
+    @State private var inspectedActivityID: Int?
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var presentation: StatsPresentation {
+        sync.map { StatsPresentation(store: store, sync: $0) }
+            ?? StatsPresentation(store: store, preparing: false)
     }
 
-    private func status(_ message: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if presentation.state == .loading { ProgressView().accessibilityLabel("Loading activity history") }
-            Text(message).font(.subheadline).fixedSize(horizontal: false, vertical: true)
-            if presentation.historyComplete && !presentation.hasContent,
-               ![.noHistory, .noMatches, .unavailable].contains(presentation.state) {
-                Text(store.activities.isEmpty ? "No activity history" : "No matching activities")
-                    .font(.subheadline)
+    private var request: StatsDashboardRequest {
+        .init(source: StatsDashboardSource(store), choices: dashboard.choices,
+              canLoad: store.selectedTab == .stats && presentation.hasContent)
+    }
+
+    private var emptyTitle: String? {
+        // A completed, authorized cache can also have no matches while offline
+        // or after a failed refresh. Neither case has a calculation to await.
+        guard presentation.historyComplete, !presentation.hasContent,
+              presentation.state != .unavailable else { return nil }
+        return store.activities.isEmpty ? "No activity history" : "No matching activities"
+    }
+
+    /// Wide, tall pages give the chart about half the height, leaving the
+    /// header, controls and legend on screen. Phones keep their sizes.
+    private func focusChartHeight(_ size: CGSize) -> Double? {
+        guard size.width >= BrowsePaneLayout.minimumDetailWidth, size.height >= 480,
+              !typeSize.isAccessibilitySize else { return nil }
+        return min(520, Double(size.height) * 0.45)
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ScrollView {
+                if let emptyTitle {
+                    ContentUnavailableView(emptyTitle, systemImage: "chart.bar")
+                } else {
+                    StatsDashboardTile(tile: tile, store: store, dashboard: dashboard,
+                                       expanded: true, detailScreen: true,
+                                       toggleExpansion: {}, openActivity: { inspectedActivityID = $0 })
+                        .environment(\.statsExpansionProgress, 1)
+                        .environment(\.statsDetailHeightLimit,
+                                     geometry.size.height < 480 && !typeSize.isAccessibilitySize
+                                     ? Double(geometry.size.height) - 170 : nil)
+                        .environment(\.statsFocusChartHeight, focusChartHeight(geometry.size))
+                        .transaction { $0.animation = nil }
+                }
             }
-            // Signed out, expired or disconnected: the shell's overlay offers
-            // the connection (#304), so Stats only states why it is empty.
-            if presentation.state != .unavailable && presentation.retryAllowed && [.error, .cached].contains(presentation.state) {
-                Button("Retry sync") { Task { await refresh() } }.frame(minHeight: 44)
+            .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
+        }
+        // The shell's pushed root is inactive. The visible destination must
+        // own demand when its metric changes; the shared cache reuses values.
+        .task(id: request) { await dashboard.load(store: store, request: request) }
+        .sheet(isPresented: Binding(get: { inspectedActivityID != nil }, set: { if !$0 { inspectedActivityID = nil } })) {
+            if let id = inspectedActivityID {
+                NavigationStack {
+                    ActivityDetailPanel(store: store, activityID: id, showOnMap: { activityID in
+                        inspectedActivityID = nil
+                        store.showOnMap(activityID)
+                    })
+                    .navigationTitle("Activity").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { inspectedActivityID = nil } } }
+                }.presentationDetents([.large]).presentationDragIndicator(.visible)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 10))
-        .accessibilityIdentifier("stats-status-\(presentation.state)")
     }
+}
+
+/// Share the dashboard reference, not a second selection. UIKit's destination
+/// binding owns pop/cancellation and writes back to the retained Stats state.
+@MainActor @Observable final class StatsShellNavigation {
+    var dashboard: StatsDashboardState?
 }
 
 struct StatsRecovery {

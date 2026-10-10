@@ -10,10 +10,19 @@ struct StatsCalendarDetail: View {
     var expand: () -> Void = {}
     @State private var year: Int?
     @State var selectedDay: Int?
+    @Environment(\.statsTileInspection) private var inspection
+    private var shownYear: Int? {
+        get { if let inspection { return inspection.calendarYear }; return year }
+        nonmutating set { if let inspection { inspection.calendarYear = newValue } else { year = newValue } }
+    }
+    private var focusedDay: Int? {
+        get { if let inspection { return inspection.calendarDay }; return selectedDay }
+        nonmutating set { if let inspection { inspection.calendarDay = newValue } else { selectedDay = newValue } }
+    }
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
-    private var snapshot: StatsCalendarSnapshot { expanded ? year.flatMap { years[$0] } ?? rolling : rolling }
+    private var snapshot: StatsCalendarSnapshot { expanded ? shownYear.flatMap { years[$0] } ?? rolling : rolling }
     private var first: Int { snapshot.months.first?.first ?? today }
     private var last: Int { snapshot.months.last?.last ?? today }
     private var metric: StatsMetric? { StatsMetric(rawValue: option.rawValue) }
@@ -31,33 +40,33 @@ struct StatsCalendarDetail: View {
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             calendar
             legend
-            if let day = selectedDay, day >= first, day <= last { dayDetails(day) }
+            if expanded, let day = focusedDay, day >= first, day <= last { dayDetails(day) }
         }
         .onChange(of: years.keys.sorted()) { _, available in
-            if let year, !available.contains(year) { self.year = nil }
-            selectedDay = nil
+            if let shownYear, !available.contains(shownYear) { self.shownYear = nil }
+            focusedDay = nil
         }
         .onChange(of: first) { _, _ in clearOutOfRangeSelection() }
         .onChange(of: last) { _, _ in clearOutOfRangeSelection() }
     }
     private var navigation: some View {
         HStack {
-            Button { selectedDay = nil; year = (year ?? currentYear) - 1 } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
-                .disabled((year ?? currentYear) <= (years.keys.min() ?? currentYear)).accessibilityLabel("Previous calendar year")
-            Picker("Calendar period", selection: Binding(get: { year }, set: { selectedDay = nil; year = $0 })) {
+            Button { focusedDay = nil; shownYear = (shownYear ?? currentYear) - 1 } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
+                .disabled((shownYear ?? currentYear) <= (years.keys.min() ?? currentYear)).accessibilityLabel("Previous calendar year")
+            Picker("Calendar period", selection: Binding(get: { shownYear }, set: { focusedDay = nil; shownYear = $0 })) {
                 Text("Last 12 months").tag(Int?.none)
                 ForEach(years.keys.sorted(by: >), id: \.self) { Text(String($0)).tag(Optional($0)) }
             }.pickerStyle(.menu).frame(minHeight: 44).frame(maxWidth: .infinity)
-            Button { selectedDay = nil; year = min(currentYear, (year ?? currentYear) + 1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }
-                .disabled(year == nil || year! >= currentYear).accessibilityLabel("Next calendar year")
+            Button { focusedDay = nil; shownYear = min(currentYear, (shownYear ?? currentYear) + 1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }
+                .disabled(shownYear == nil || shownYear! >= currentYear).accessibilityLabel("Next calendar year")
         }
     }
     private func select(_ day: Int) {
-        selectedDay = day
-        if !expanded { year = nil; expand() }
+        focusedDay = day
+        if !expanded { shownYear = nil; expand() }
     }
     private func clearOutOfRangeSelection() {
-        if let day = selectedDay, day < first || day > last { selectedDay = nil }
+        if expanded, let day = focusedDay, day < first || day > last { focusedDay = nil }
     }
     private var calendar: some View {
         VStack(spacing: 2) {
@@ -84,12 +93,12 @@ struct StatsCalendarDetail: View {
                                         }
                                     }
                                     .overlay {
-                                        if valid && day == selectedDay {
+                                        if valid && day == focusedDay {
                                             RoundedRectangle(cornerRadius: 3).stroke(colorScheme == .dark ? Color.black : .white, lineWidth: 4)
                                             RoundedRectangle(cornerRadius: 3).stroke(Color.primary, lineWidth: 2).padding(-2)
                                         }
                                     }
-                                    .zIndex(day == selectedDay ? 1 : 0)
+                                    .zIndex(day == focusedDay ? 1 : 0)
                             }
                         }.contentShape(Rectangle())
                         .onTapGesture { location in
@@ -106,7 +115,7 @@ struct StatsCalendarDetail: View {
             VStack {
                 ForEach(Array(first...last), id: \.self) { day in
                     Button(dayDescription(day)) { select(day) }
-                        .accessibilityAddTraits(day == selectedDay ? .isSelected : [])
+                        .accessibilityAddTraits(day == focusedDay ? .isSelected : [])
                 }
             }.accessibilityLabel("Activity calendar")
         }
@@ -147,7 +156,7 @@ struct StatsCalendarDetail: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(StatsDisplay.date(day)).font(.subheadline.weight(.semibold))
                 Spacer()
-                Button("Close") { selectedDay = nil }.font(.caption).frame(minHeight: 44).accessibilityLabel("Close day details")
+                Button("Close") { focusedDay = nil }.font(.caption).frame(minHeight: 44).accessibilityLabel("Close day details")
             }
             Text("Activities matching your current filters.").font(.caption).foregroundStyle(.secondary)
             if let data = snapshot.days[day] {

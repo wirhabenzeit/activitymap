@@ -28,7 +28,7 @@ Suppressed entries are explicit: `totals` has no separate view; `best30Days` app
 ## Scope, dates and values
 
 - Use complete authorized metadata matching sport/search/numeric/binary restrictions before each reporting/comparison window, not selected IDs, GPS-only/map-visible rows, pagination or instantiated cells.
-- Retain the saved map/list date range but ignore it in Stats. Hide its picker in Stats without a permanent period disclaimer or unfiltered “All activities” banner. Show the activity-filter summary/reset only when filters are active. Clearing **activity filters** restores sport/search/numeric/binary defaults and preserves the date range, selection and camera/list context.
+- Retain the saved map/list date range but ignore it in Stats. Hide its picker in Stats without a permanent period disclaimer or unfiltered “All activities” banner. Web shows the activity-filter summary/reset only when filters are active; native keeps filter status/reset in the Filters control and panel, without a dashboard summary banner. Clearing **activity filters** restores sport/search/numeric/binary defaults and preserves the date range, selection and camera/list context.
 - `start_date_local` is wall-clock time encoded as UTC, not an instant to convert into the viewer timezone. Today is device-local. Foreground/day changes update reporting windows without changing activity dates.
 - Weeks start Monday. Reporting includes today and excludes future activities. Current-year records clip membership at January 1 even when the containing week starts in December; all-time includes older activities through today.
 - Stats time is **moving time**, seconds ÷ 3,600. Duration restrictions remain **elapsed time**. Distance is km, elevation is m. Activity count/active days include rows with missing measurements.
@@ -47,10 +47,10 @@ Full formulas, inclusive windows and colour rules remain in [shared/stats-rules.
 | Web behavior                                                     | Required native outcome                                                                                                          | Owner          |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------- |
 | Map/List/Stats routes                                            | Accepted primary navigation; returning retains camera/selection, list offset and mounted stats context                           | #252/#254/#263 |
-| Explicit corner expansion opens a URL-backed focus page, one tile at a time | Accessible full-content-width focus navigation; the dashboard stays mounted and its grid does not reflow | #353/#355 |
+| Explicit corner expansion opens a URL-backed focus page, one tile at a time | iPhone and iPad push a complete, scrolling, full-content-width Stats focus page through the shared shell navigation stack; the dashboard stays mounted. On iPhone, Back replaces Filters and the stat title replaces the tabs; Profile returns with the overview. | #350/#353/#355 |
 | Metric switches and outside interaction do not open/close focus | Controls and scrolling retain context | #264/#355 |
 | Back preserves metric/range/history and dashboard scroll while mounted | Keep choices/return position through focus and destination changes; no new cross-launch preference requirement | #263/#264/#355 |
-| Visible Back, browser Back and Escape return to the dashboard; direct focus links reload | Native navigation Back; web restores the originating expand control, and direct-link Back clears the focus URL locally | #353/#355 |
+| Visible Back, browser Back and Escape return to the dashboard; direct focus links reload | Native navigation Back and edge swipe; web restores the originating expand control, and direct-link Back clears the focus URL locally | #350/#353/#355 |
 | Escape closes the activity inspector before its focus page | Correct dismiss/back and focus ownership for nested presentations | #264/#265/#355 |
 | Hover chart values; expanded axes/tables                         | Touch inspection and accessible labelled values/table equivalents, preserving units/periods/partial markers                      | #264/#265      |
 | Desktop 4/2/1-column grid and varied spans                       | Readable adaptive phone/iPad hierarchy; complete content rather than copied fixed heights                                        | #252/#265      |
@@ -58,7 +58,7 @@ Full formulas, inclusive windows and colour rules remain in [shared/stats-rules.
 | Legend remains visible during day selection                    | Selected day is outlined; details appear inline on both platforms beside the persistent legend; mixed-sport cues                                                    | #265           |
 | Record/calendar/hilliest activity links                          | Reuse #257 detail by identity without implicit map/list selection; dismiss restores stats context                                | #257/#264      |
 | Explicit Show on map                                             | Existing hidden-filter confirmation/no-GPS behavior; no silent filter clearing                                                   | #264           |
-| Tile-to-focus snapshot transition; no zoom with reduced motion or unsupported browsers | Native reduced motion and focus/scroll return, avoiding animation that competes with user scrolling | #353/#355 |
+| Tile-to-focus snapshot transition; no zoom with reduced motion or unsupported browsers | Native tile zoom on iPhone and iPad, cross-fade with Reduce Motion, and retained focus/scroll return | #350/#353/#355 |
 
 ### Web focus layout — #355, with existing-data adaptations from #360
 
@@ -96,6 +96,8 @@ These are prototype/capture inputs for #252 and later #265/#228 review, not acce
 | S9  | Overview, expanded Training volume and Activity calendar                     | All essential controls/legends reachable at large text; touch/VoiceOver review remains #228         |
 
 Source audit pins the current query composition: error shows retry; empty error does not also claim an empty library; empty non-error loading/fetching/next-page data shows loading; complete empty data distinguishes no matches from no history; nonempty data remains visible and discloses fetching/more pages. Native cache/expiry ownership stays under existing sync lifecycle and #258. Incomplete history disclosure is not complete numeric coverage.
+
+The user revised the native presentation on 2026-10-07: Stats no longer inserts syncing, incomplete-history, offline/error, filter-summary or Retry sync banners above its tiles. Existing content retains its position through sync-status changes; sync details remain in Settings and filter status/reset stay in the Filters control/panel. Completed empty history/filter states still distinguish no history from no matches. This presentation exception leaves completeness calculations, cache/expiry ownership and web disclosures unchanged.
 
 ## Executable fixture handoff
 

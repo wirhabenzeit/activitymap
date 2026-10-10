@@ -140,7 +140,7 @@ struct StatsSeriesChart: View {
             .chartLegend(series.count > 1 && !compact ? .visible : .hidden)
             .padding(.trailing, style == .lines ? endpointPadding : 0)
             .chartXSelection(value: $selectedX)
-            .statsExpansionHeight(expanded: expanded, compact: compact ? height * 110 / 130 : height, detail: max(240, height))
+            .statsExpansionHeight(expanded: expanded, compact: compact ? height * 110 / 130 : height, detail: max(240, height), fillsFocus: true)
             .accessibilityHint(style == .volume ? "Last week is incomplete. Dashed line: four-week average of full weeks." : "")
             .overlay(alignment: .topLeading) { selectionOverlay }
             if style == .lines {
@@ -186,7 +186,9 @@ struct StatsSeriesChart: View {
         }
     }
     private func isReference(_ point: StatsChartPoint) -> Bool {
-        style == .lines && point.series != series.first
+        // The first distinct series is the first point's series. Rebuilding
+        // the full series list for every mark makes long charts quadratic.
+        style == .lines && point.series != points.first?.series
     }
     private var endpoints: [StatsChartPoint] {
         series.compactMap { name in points.last { $0.series == name && $0.value != nil } }
@@ -285,7 +287,7 @@ struct StatsPeriodBars: View {
             }
         }
         .chartXSelection(value: $selectedKey)
-        .statsExpansionHeight(expanded: expanded, compact: overviewHeight, detail: max(240, overviewHeight))
+        .statsExpansionHeight(expanded: expanded, compact: overviewHeight, detail: max(240, overviewHeight), fillsFocus: true)
         .overlay(alignment: .topLeading) {
             if let point = selected {
                 Text("\(detailLabel(point)): \(point.value.map(valueLabel) ?? "Not yet elapsed")\(point.partial ? " · incomplete" : "")")

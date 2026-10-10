@@ -1,0 +1,2 @@
+# PDFs are binary even when their streams use ASCII encoding.
+*.pdf binary
