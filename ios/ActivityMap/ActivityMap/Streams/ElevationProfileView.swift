@@ -12,6 +12,7 @@ struct ElevationProfileView: View {
     @State private var retry = 0
     @State private var refresh = false
     @ScaledMetric(relativeTo: .caption) private var reservedHeight = 200.0
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private struct Decoded {
         let cached: CachedStreamSummary
@@ -34,8 +35,8 @@ struct ElevationProfileView: View {
     }
 
     /// The server has no elevation by distance for this activity, so the
-    /// detail reserves no space for it. Loading, pending, stale and failed
-    /// states keep their placeholder, as a profile may still arrive.
+    /// detail reserves no space for it. Loading and pending states reserve
+    /// chart space; failures use a compact recovery row.
     private var hasNoProfile: Bool {
         switch state {
         case .unavailable: return true
@@ -62,6 +63,9 @@ struct ElevationProfileView: View {
                         else if store.elevationScrubOwner == owner { store.elevationScrubOwner = nil }
                     }
                     .id(cached)
+                } else if usesCompactStatus {
+                    statusTimeline
+                        .padding(.vertical, 8)
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
                         if isDecoding { ProgressView("Reading elevation samples…") }
@@ -108,6 +112,10 @@ struct ElevationProfileView: View {
 
     private var isDecoding: Bool { cached != nil && decoded?.cached != cached }
     private var state: StreamSummaryState { loader?.state(for: String(activityID)) ?? .notRequested }
+    private var usesCompactStatus: Bool {
+        guard !isDecoding else { return false }
+        switch state { case .failed, .stale: return true; default: return false }
+    }
     private var placeholder: String {
         switch state {
         case .loading, .notRequested: loader == nil ? "Elevation by distance is unavailable." : "Loading elevation samples…"
@@ -125,7 +133,16 @@ struct ElevationProfileView: View {
     @ViewBuilder private func status(now: Date) -> some View {
         let presentation = statusPresentation
         if !presentation.message.isEmpty || presentation.canRetry {
-        HStack(alignment: .top, spacing: 8) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+        layout {
+          HStack(alignment: .center, spacing: 12) {
+            if profile == nil && usesCompactStatus {
+                Image(systemName: presentation.isOffline ? "wifi.slash" : "chart.xyaxis.line")
+                    .foregroundStyle(AppTheme.secondaryText)
+                    .accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text(presentation.message).font(.caption).foregroundStyle(AppTheme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -134,11 +151,15 @@ struct ElevationProfileView: View {
                         .font(.caption).foregroundStyle(AppTheme.secondaryText)
                 }
             }
-            Spacer(minLength: 0)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
             if presentation.canRetry {
-                Button("Try again") { refresh = profile != nil; retry += 1 }
+                Button("Retry") { refresh = profile != nil; retry += 1 }
+                    .font(.caption)
+                    .accessibilityLabel("Retry elevation profile")
                     .disabled(presentation.retryAt.map { $0 > now } ?? false)
-                    .frame(minHeight: 44).fixedSize(horizontal: true, vertical: false)
+                    .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -155,10 +176,15 @@ nonisolated struct ElevationStatus {
     let message: String
     let canRetry: Bool
     let retryAt: Date?
+    let isOffline: Bool
     init(state: StreamSummaryState, hasProfile: Bool, offline: Bool) {
+        if case .failed(let failure) = state { isOffline = offline || failure.isOffline }
+        else { isOffline = offline }
         switch state {
         case .failed(let failure):
-            message = hasProfile ? "Couldn’t update the profile." : ""
+            message = isOffline
+                ? (hasProfile ? "Connect to update the saved profile." : "Elevation profile not saved offline. Connect to load it.")
+                : (hasProfile ? "Couldn’t update the profile." : "Elevation profile couldn’t be loaded.")
             canRetry = failure.retryable; retryAt = failure.retryAt
         case .pending(let date, let paused):
             message = paused ? "Profile preparation paused." : "Preparing elevation samples…"

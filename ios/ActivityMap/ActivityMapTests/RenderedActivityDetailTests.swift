@@ -381,6 +381,34 @@ private final class DetailHarness<Content: View> {
 
 
 extension RenderedRoutePickingTests {
+    @Test func offlineElevationUsesCompactRecoveryRow() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let activity = try Fixtures.activity(["id": "1"])
+        try await storage.apply([.upsertActivity(activity)], scope: Fixtures.scope)
+        let loader = StreamSummaryLoader(source: { _ in SummarySourceProbe([]) })
+        await loader.configure(SyncFixtures.session(verified: false), storage: storage)
+        await loader.load(activityID: "1")
+        let store = ActivityStore(activities: [try StoredModelMapper.activity(activity)])
+        store.streamSummaries = loader
+        for (name, size, scheme) in [("light", DynamicTypeSize.large, ColorScheme.light),
+                                      ("dark", .large, .dark), ("large-text", .accessibility3, .light)] {
+            let renderer = ImageRenderer(content: ElevationProfileView(store: store, activityID: 1, isRelevant: false)
+                .padding(.horizontal, 16).frame(width: 375)
+                .environment(\.dynamicTypeSize, size).environment(\.colorScheme, scheme)
+                .background(Color(uiColor: scheme == .dark ? .black : .white)))
+            let image = try #require(renderer.uiImage)
+            if size == .large { #expect(image.size.height < 100, "Offline status must not reserve an empty chart") }
+            let directory = URL(fileURLWithPath: "/tmp/activitymap-detail-preview")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try image.pngData()?.write(to: directory.appendingPathComponent("elevation-offline-\(name).png"))
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+            let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+            #expect(text.contains("offline") && text.contains("Retry"), "Offline explanation and recovery must remain visible: \(text)")
+        }
+    }
+
     @Test func elevationProfileLayoutsAndVisibleDemand() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let activity = try Fixtures.activity(["id": "1", "name": "Alpine morning ride"])

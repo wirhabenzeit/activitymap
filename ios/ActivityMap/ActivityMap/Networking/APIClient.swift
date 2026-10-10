@@ -12,7 +12,7 @@ nonisolated enum APIClient {
         /// The request never reached the server, or the server never
         /// responded — string rather than the original `Error` so this stays
         /// `Sendable` without depending on `URLError`/`Error` being one.
-        case transport(String)
+        case transport(String, code: Int? = nil)
         case encoding(String)
         case decoding(String)
         /// `retryAfter` is the server's `Retry-After`, when it sent one (e.g.
@@ -31,7 +31,7 @@ nonisolated enum APIClient {
 
         var description: String {
             switch self {
-            case .transport(let message):
+            case .transport(let message, _):
                 "Network error: \(message)"
             case .encoding(let message):
                 "Could not encode the request body: \(message)"
@@ -147,7 +147,7 @@ nonisolated enum APIClient {
             if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
                 throw CancellationError()
             }
-            throw RequestError.transport(String(describing: error))
+            throw RequestError.transport(String(describing: error), code: (error as? URLError)?.code.rawValue)
         }
         guard let httpResponse = response as? HTTPURLResponse else {
             throw RequestError.unexpectedStatus(-1)

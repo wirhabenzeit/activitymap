@@ -98,8 +98,10 @@ follow the payload's lifecycle: they are served only while the set is
 - `GET /api/v1/activities/{id}/streams/summary` has the same fetch, freshness
   and error semantics as `/streams`, but returns the summary.
 - `GET /api/v1/stream-summaries?ids=…` returns stored summaries for up to 100
-  owned activities without contacting Strava. The equivalent `/stream-summaries/compact` endpoint is used by the web map to
-  prefetch selected routes.
+  owned activities without contacting Strava. The equivalent `/stream-summaries/compact`
+  endpoint serves normal web/native summary sync as well as web selected-route
+  prefetch. [Summary sync](summary-sync.md) stores encoded results in IndexedDB
+  and SwiftData for offline detail opening.
 
 The web chart keeps this contract's generation, revision and state beside the
 encoded compact summary (using the `/compact` endpoints); charts decode only

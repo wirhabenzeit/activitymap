@@ -269,4 +269,19 @@ nonisolated final class SummaryClock: @unchecked Sendable {
         }
         #expect(await probe.calls == 2)
     }
+
+    @Test(arguments: [URLError.notConnectedToInternet, URLError.timedOut])
+    func connectionFailureKeepsOfflineDistinctFromServerTimeout(code: URLError.Code) async throws {
+        let probe = SummarySourceProbe([.failure(.transport("Network unavailable", code: code.rawValue))])
+        let (_, loader, _) = try await setup(probe)
+        await loader.load(activityID: id)
+        guard case .failed(let failure) = loader.state(for: id) else {
+            Issue.record("Expected a retryable connection failure"); return
+        }
+        #expect(failure.retryable)
+        #expect(failure.isOffline == (code == .notConnectedToInternet))
+        let status = ElevationStatus(state: loader.state(for: id), hasProfile: false, offline: false)
+        #expect(status.isOffline == failure.isOffline)
+        #expect(!status.message.isEmpty)
+    }
 }

@@ -9,9 +9,7 @@ import { Loader2 } from 'lucide-react';
 import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import { Button } from '~/components/ui/button';
 import {
-  fetchActivityStreamSummary,
   toElevationProfile,
-  fetchStoredStreamSummaryBatch,
   canManuallyRetryStreamSummary,
   isStreamSummaryCurrent,
   isStreamSummaryResultReusable,
@@ -22,6 +20,10 @@ import {
   streamSummaryRefetchInterval,
   type StreamSummaryResult,
 } from '~/lib/activity-stream-summary';
+import {
+  loadActivityStreamSummary,
+  loadStoredStreamSummaryBatch,
+} from '~/lib/sync/stream-summary-sync';
 
 export type StreamSummaryActivity = {
   id: number;
@@ -76,7 +78,7 @@ export function usePrefetchStreamSummaries(
         const index = nextBatch++;
         const ids = batches[index];
         if (!ids) return;
-        const results = await fetchStoredStreamSummaryBatch({
+        const results = await loadStoredStreamSummaryBatch({
           activityIds: ids,
           userId,
           signal: controller.signal,
@@ -124,7 +126,7 @@ export function ElevationChart({
   const query = useQuery({
     queryKey,
     queryFn: ({ signal }) =>
-      fetchActivityStreamSummary({
+      loadActivityStreamSummary({
         activityId,
         userId,
         signal,

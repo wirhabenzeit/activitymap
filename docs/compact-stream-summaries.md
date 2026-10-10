@@ -5,11 +5,13 @@ encoded scalar series and an interleaved geographic series. It preserves every
 value in the existing rounded, version-1 summary; it does not change the
 300-bucket sampling algorithm or the independently stored raw payload.
 
-This implements compact storage and demand/batch transport. Activity DTOs,
-bootstrap and delta sync still carry metadata only. Native demand transport and
-encoded summary persistence are implemented separately from raw caching and
-chart presentation. Production rollout, library-page delivery measurements and
-the backfill enablement goal remain separate work. This change does not close #230.
+Activity DTOs, bootstrap and delta responses carry stream metadata only.
+Normal client sync uses that metadata to download current compact summaries in
+separate stored-only batches, persisting them in web IndexedDB and native
+SwiftData. Activities remain usable during summary catch-up. Full-resolution
+raw streams stay on the server; no current client feature needs a raw-stream
+cache. Production rollout and physical-device measurements remain separate
+acceptance work under #230/#229.
 
 ## Format
 
@@ -81,8 +83,10 @@ contains both representations. The web now uses the compact endpoints and keeps
 encoded envelopes in its query cache; only mounted charts materialize arrays. Readiness checks validate the encoded
 series and require nondecreasing distance with a positive span, matching the
 chart even for stationary time-based activities.
-Decoded arrays leave memory when that chart unmounts. This does not add a web
-persistent/offline stream cache.
+Decoded arrays leave memory when that chart unmounts. Encoded summary DTOs also
+persist in the scoped IndexedDB cache, so cached charts reopen after an offline
+reload. See [ordinary summary sync](summary-sync.md) for catch-up and lifecycle
+behavior.
 
 The generated Swift DTOs include both contracts. `CompactStreamCodec` is a
 Foundation-only encoder/decoder. Its golden vectors, malformed inputs, and
@@ -94,8 +98,11 @@ summary record; codec and sampling version are tracked independently.
 `StreamSummaryLoader`, exposed as `SyncController.summaries`, deduplicates
 visible-consumer requests and bounds cancellable polling. It honors the later
 of HTTP Retry-After and body `next_retry_at`, including delays beyond its polling
-window. No ordinary sync, map, list or detail load requests summaries. Raw
-persistence remains independent work in #216.
+window. Ordinary sync additionally downloads missing or changed current summaries
+through the stored-only batch endpoint, without fetching raw data or contacting
+Strava. The visible-detail loader remains the fallback while catch-up is incomplete
+or a stored summary is unavailable. Raw client persistence (#216) is deferred
+until a feature needs full-resolution samples.
 
 The loader exposes progress/retry through `state(for:)` and keeps a valid
 last-good encoded DTO available through `currentSummary(for:)` during refresh,
@@ -189,7 +196,9 @@ a temporary table. The script also writes vectors under `/tmp` for
 `bash scripts/verify-compact-stream-codec.sh /tmp/activitymap-compact-benchmark-vectors.json`.
 Both language implementations must exactly round-trip the existing summaries.
 
-Do not infer that embedding all summaries in activity sync is affordable from
-these numbers. A later delivery must measure real compressed activity pages,
-large-library bootstrap/delta traffic, native cache size/latency and peak memory,
-and define how newly available/re-encoded summaries reach already-synced clients.
+These codec numbers do not measure whole-library client costs. The
+[summary-sync payload budget](summary-sync-payload-budget.json) separately
+measures 5,000 synthetic compact DTOs and 100-entry batches. Actual compressed
+HTTP traffic, IndexedDB/SwiftData disk allocation, cache latency and physical-device
+peak memory require their own measurements. Summary downloads remain separate
+from activity pages; committed stream metadata changes trigger later catch-up.

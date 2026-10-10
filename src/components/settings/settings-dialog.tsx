@@ -91,7 +91,7 @@ export function SettingsDialog({
       : browser.phase === 'syncing'
         ? 'Syncing…'
         : browser.phase === 'error'
-          ? 'Couldn’t sync. Please try again.'
+          ? (browser.error ?? 'Couldn’t sync. Please try again.')
           : null;
   const fetched = status
     ? [

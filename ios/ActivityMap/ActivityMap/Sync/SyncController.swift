@@ -36,6 +36,7 @@ final class SyncController {
     }
 
     let summaries: StreamSummaryLoader
+    let summarySync: StreamSummarySync
     let activities: ActivityStore
     private(set) var status: Status = .signedOut
     private(set) var checkpoint: SyncCheckpoint?
@@ -79,9 +80,13 @@ final class SyncController {
         summarySource: @escaping (SyncSession) -> any CompactSummarySource = {
             StreamsAPI(baseURL: $0.deployment, token: $0.token)
         },
+        storedSummarySource: @escaping (SyncSession) -> any StoredSummarySource = {
+            StreamsAPI(baseURL: $0.deployment, token: $0.token)
+        },
         invalidate: @escaping (String) -> Void
     ) {
         self.summaries = StreamSummaryLoader(source: summarySource, invalidate: invalidate)
+        self.summarySync = StreamSummarySync(now: now, source: storedSummarySource, invalidate: invalidate)
         activities.streamSummaries = self.summaries
         self.activities = activities
         self.now = now
@@ -97,6 +102,7 @@ final class SyncController {
         let expiredSignIn = status == .expired && next == nil
         self.storage = storage
         session = next
+        summarySync.configure(next)
         generation += 1
         let current = generation
         let previous = work
@@ -165,6 +171,7 @@ final class SyncController {
 
     func pause() {
         work?.cancel()
+        summarySync.pause()
         summaries.pause()
         if status == .syncing { status = .paused }
     }
@@ -193,9 +200,11 @@ final class SyncController {
             if current == generation {
                 retryAt = nil
                 status = .ready
+                summarySync.start(storage: storage)
             }
         } catch {
             guard current == generation, !Task.isCancelled else { return }
+            summarySync.pause()
             if AuthController.isExplicitlyUnauthenticated(error) {
                 clearVisible()
                 needsCleanup = true
@@ -291,6 +300,7 @@ final class SyncController {
     }
 
     private func clearVisible() {
+        summarySync.pause()
         publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil
         photoCacheConfigured = false
         summaries.reset()
