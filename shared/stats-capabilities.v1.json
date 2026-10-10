@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "baseline": "bfe24d852bdd89676131e43e2a6e6cf6de285319",
+  "baseline": "e55f73956531023601caaa9746398951f2fbf568",
   "tiles": [
     {
       "id": "thisWeek",
@@ -30,10 +30,10 @@
         "count"
       ],
       "defaultOption": "distance",
-      "compact": "Month-to-date comparison with prior month capped at its last day; 5th\u201395th percentile band across completed historical months.",
-      "expanded": "Current month versus previous month, with larger labelled cumulative curves, the same historical percentile band and inspection; no historical navigation.",
-      "nativeOwner": 264,
-      "uiOwner": 265
+      "compact": "Month-to-date comparison with prior month capped at its last day; 5th–95th percentile band across completed historical months.",
+      "expanded": "Current/prior-month cumulative curves and historical percentile band; daily sport bars with selected-day activity inspection; active days, activity count and measured-activity average; recent twelve same-date and completed-month totals. No past-month selector.",
+      "nativeOwner": 363,
+      "uiOwner": 363
     },
     {
       "id": "weeklyVolume",
@@ -49,8 +49,8 @@
       "defaultOption": "distance",
       "compact": "Last-28-day headline versus prior 28 days; 12-week trend with four-full-week average.",
       "expanded": "By week (last 12 weeks), By month (last 12 months), By year (all available years); stacked area by sport, four-completed-period average including offscreen history, lighter incomplete-period shading, and period totals by sport. No historical-window or chart-type picker.",
-      "nativeOwner": 264,
-      "uiOwner": 265
+      "nativeOwner": 363,
+      "uiOwner": 363
     },
     {
       "id": "yearToDate",
@@ -64,10 +64,10 @@
         "count"
       ],
       "defaultOption": "distance",
-      "compact": "Year-to-date headline versus same date last year; cumulative calendar-aligned curves with a min\u2013max band across completed prior years.",
-      "expanded": "Current year versus previous year, with larger calendar-aligned cumulative curves, the same historical min\u2013max band and inspection; no historical navigation or extra comparison curves.",
-      "nativeOwner": 264,
-      "uiOwner": 265
+      "compact": "Year-to-date headline versus same date last year; cumulative calendar-aligned curves with a min–max band across completed prior years.",
+      "expanded": "Current/prior-year calendar-aligned curves and historical min–max band; paired monthly totals by sport through the reporting month; recorded-year same-date and completed totals. Current month compares through the same date, clamping leap days.",
+      "nativeOwner": 363,
+      "uiOwner": 363
     },
     {
       "id": "yearPace",
@@ -92,10 +92,10 @@
       "expandable": true,
       "options": [],
       "defaultOption": null,
-      "compact": "Compact 2\u00d72 current-year records: longest distance, longest moving time, biggest climb and biggest distance week.",
-      "expanded": "Starts with current-year detail; explicit This year / All time choice, linked activity names, sport and full dates. Best 30 days stays a labelled current-year secondary section with compact metric rows, dates and latest-30-day share.",
-      "nativeOwner": 264,
-      "uiOwner": 265
+      "compact": "Compact 2×2 current-year records: longest distance, longest moving time, biggest climb and biggest distance week.",
+      "expanded": "Top three positive distance, moving-time and climb activities and distance weeks, with competition medals for equal values and linked identities. This year / All time appear together on wide workspaces and remain visible during inspection; narrow workspaces offer a period choice. Best 30 days remains a labelled current-year secondary section.",
+      "nativeOwner": 363,
+      "uiOwner": 363
     },
     {
       "id": "totals",
@@ -128,8 +128,8 @@
       "defaultOption": "sport",
       "compact": "Inclusive rolling year with year-qualified month labels, sport or numeric colouring, complete compact legend, striped mixed-sport days and accessible day inspection.",
       "expanded": "Rolling or selected calendar year with previous/next controls, direct cell inspection with a contrasting selected-day outline and inline activities with detail links. A collapsed-cell selection expands the tile. Keyboard/VoiceOver selection remains available; no separate date picker, popup or duplicate horizontal day strip.",
-      "nativeOwner": 264,
-      "uiOwner": 265
+      "nativeOwner": 363,
+      "uiOwner": 363
     },
     {
       "id": "consistency",
@@ -158,8 +158,8 @@
       "defaultOption": "currentYear",
       "compact": "Moving-time shares in one stacked bar, complete wrapping sport legend and single-sport explanation.",
       "expanded": "Sport share, moving time, activity count, distance and climb in phone rows or a wide table.",
-      "nativeOwner": 264,
-      "uiOwner": 265
+      "nativeOwner": 363,
+      "uiOwner": 363
     },
     {
       "id": "distanceVsElevation",
@@ -170,8 +170,8 @@
       "defaultOption": null,
       "compact": "Hilliness: m / km, labelled monthly bars and neutral comparison against the preceding rolling year.",
       "expanded": "Larger monthly chart and five hilliest activities with at least 5 km, in wrapping phone rows linked to detail.",
-      "nativeOwner": 264,
-      "uiOwner": 265
+      "nativeOwner": 363,
+      "uiOwner": 363
     },
     {
       "id": "typicalWeek",

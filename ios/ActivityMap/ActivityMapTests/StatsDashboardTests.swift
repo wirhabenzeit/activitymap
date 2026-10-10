@@ -135,7 +135,7 @@ import Testing
                 }
                 let comparison: StatsPeriodComparison
                 switch result {
-                case .comparison(let value, _, _, _), .volume(let value, _, _, _, _): comparison = value
+                case .comparison(let value, _, _, _, _, _), .volume(let value, _, _, _, _): comparison = value
                 default: Issue.record("Wrong tile payload"); continue
                 }
                 StatsFixtureTests.equal(StatsFixtureTests.comparison(comparison), row["expected"]!, label: row["id"] as! String)

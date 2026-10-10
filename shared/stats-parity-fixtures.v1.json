@@ -2244,6 +2244,974 @@
           }
         }
       ]
+    },
+    {
+      "id": "expanded-record-rankings",
+      "description": "Top three with equal starts and IDs, positive eligibility, year-clipped weeks, future exclusion and a shared filter.",
+      "today": "2026-01-15",
+      "activities": [
+        {
+          "id": 7,
+          "sportType": "Ride",
+          "startDateLocal": "2026-01-02T12:00:00",
+          "distance": 20000,
+          "movingTime": 7200,
+          "elevationGain": 200
+        },
+        {
+          "id": 2,
+          "sportType": "Ride",
+          "startDateLocal": "2026-01-02T12:00:00",
+          "distance": 20000,
+          "movingTime": 7200,
+          "elevationGain": 200
+        },
+        {
+          "id": 10,
+          "sportType": "Ride",
+          "startDateLocal": "2026-01-01T12:00:00",
+          "distance": 20000,
+          "movingTime": 7200,
+          "elevationGain": 200
+        },
+        {
+          "id": 5,
+          "sportType": "Ride",
+          "startDateLocal": "2026-01-12T12:00:00",
+          "distance": 30000,
+          "movingTime": 10800,
+          "elevationGain": 300
+        },
+        {
+          "id": 1,
+          "sportType": "Ride",
+          "startDateLocal": "2025-12-31T12:00:00",
+          "distance": 100000,
+          "movingTime": 36000,
+          "elevationGain": 1000
+        },
+        {
+          "id": 9,
+          "sportType": "Ride",
+          "startDateLocal": "2026-01-16T12:00:00",
+          "distance": 1000000,
+          "movingTime": 360000,
+          "elevationGain": 10000
+        },
+        {
+          "id": 20,
+          "sportType": "Ride",
+          "startDateLocal": "2026-01-03T12:00:00",
+          "distance": 0,
+          "movingTime": 0,
+          "elevationGain": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "this-year",
+          "operation": "recordRankings",
+          "args": {
+            "range": "currentYear"
+          },
+          "expected": {
+            "distance": [
+              {
+                "activityId": 5,
+                "day": "2026-01-12",
+                "value": 30
+              },
+              {
+                "activityId": 10,
+                "day": "2026-01-01",
+                "value": 20
+              },
+              {
+                "activityId": 2,
+                "day": "2026-01-02",
+                "value": 20
+              }
+            ],
+            "time": [
+              {
+                "activityId": 5,
+                "day": "2026-01-12",
+                "value": 3.0
+              },
+              {
+                "activityId": 10,
+                "day": "2026-01-01",
+                "value": 2.0
+              },
+              {
+                "activityId": 2,
+                "day": "2026-01-02",
+                "value": 2.0
+              }
+            ],
+            "elevation": [
+              {
+                "activityId": 5,
+                "day": "2026-01-12",
+                "value": 300
+              },
+              {
+                "activityId": 10,
+                "day": "2026-01-01",
+                "value": 200
+              },
+              {
+                "activityId": 2,
+                "day": "2026-01-02",
+                "value": 200
+              }
+            ],
+            "biggestWeek": [
+              {
+                "weekStart": "2025-12-29",
+                "value": 60
+              },
+              {
+                "weekStart": "2026-01-12",
+                "value": 30
+              }
+            ]
+          }
+        },
+        {
+          "id": "all-time",
+          "operation": "recordRankings",
+          "args": {
+            "range": "allTime"
+          },
+          "expected": {
+            "distance": [
+              {
+                "activityId": 1,
+                "day": "2025-12-31",
+                "value": 100
+              },
+              {
+                "activityId": 5,
+                "day": "2026-01-12",
+                "value": 30
+              },
+              {
+                "activityId": 10,
+                "day": "2026-01-01",
+                "value": 20
+              }
+            ],
+            "time": [
+              {
+                "activityId": 1,
+                "day": "2025-12-31",
+                "value": 10.0
+              },
+              {
+                "activityId": 5,
+                "day": "2026-01-12",
+                "value": 3.0
+              },
+              {
+                "activityId": 10,
+                "day": "2026-01-01",
+                "value": 2.0
+              }
+            ],
+            "elevation": [
+              {
+                "activityId": 1,
+                "day": "2025-12-31",
+                "value": 1000
+              },
+              {
+                "activityId": 5,
+                "day": "2026-01-12",
+                "value": 300
+              },
+              {
+                "activityId": 10,
+                "day": "2026-01-01",
+                "value": 200
+              }
+            ],
+            "biggestWeek": [
+              {
+                "weekStart": "2025-12-29",
+                "value": 160
+              },
+              {
+                "weekStart": "2026-01-12",
+                "value": 30
+              }
+            ]
+          }
+        },
+        {
+          "id": "filtered-positive",
+          "operation": "recordRankings",
+          "args": {
+            "range": "currentYear",
+            "filter": {
+              "numeric": {
+                "distance": {
+                  "operator": ">=",
+                  "value": 25000
+                }
+              }
+            }
+          },
+          "expected": {
+            "distance": [
+              {
+                "activityId": 5,
+                "day": "2026-01-12",
+                "value": 30
+              }
+            ],
+            "time": [
+              {
+                "activityId": 5,
+                "day": "2026-01-12",
+                "value": 3.0
+              }
+            ],
+            "elevation": [
+              {
+                "activityId": 5,
+                "day": "2026-01-12",
+                "value": 300
+              }
+            ],
+            "biggestWeek": [
+              {
+                "weekStart": "2026-01-12",
+                "value": 30
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "month-rhythm-known-zero-and-unknown",
+      "description": "Leap-month multi-sport days retain identities; averages exclude unknown measurements but include measured zero. Count averages use active days.",
+      "today": "2024-02-29",
+      "activities": [
+        {
+          "id": 2,
+          "sportType": "Ride",
+          "startDateLocal": "2024-02-28T12:00:00",
+          "distance": 10000,
+          "movingTime": 3600,
+          "elevationGain": 100
+        },
+        {
+          "id": 1,
+          "sportType": "Run",
+          "startDateLocal": "2024-02-28T12:00:00",
+          "distance": 20000,
+          "movingTime": 7200,
+          "elevationGain": null
+        },
+        {
+          "id": 3,
+          "sportType": "Ride",
+          "startDateLocal": "2024-02-29T12:00:00",
+          "distance": 0,
+          "movingTime": 0,
+          "elevationGain": 0
+        },
+        {
+          "id": 4,
+          "sportType": "Walk",
+          "startDateLocal": "2024-02-29T12:00:00",
+          "distance": null,
+          "movingTime": null,
+          "elevationGain": null
+        },
+        {
+          "id": 5,
+          "sportType": "Ride",
+          "startDateLocal": "2024-03-01T12:00:00",
+          "distance": 99000,
+          "movingTime": 9900,
+          "elevationGain": 999
+        },
+        {
+          "id": 6,
+          "sportType": "Ride",
+          "startDateLocal": "2024-01-31T12:00:00",
+          "distance": 99000,
+          "movingTime": 9900,
+          "elevationGain": 999
+        }
+      ],
+      "cases": [
+        {
+          "id": "distance",
+          "operation": "monthActivityRhythm",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": {
+            "activityCount": 4,
+            "activeDays": 2,
+            "measuredCount": 3,
+            "average": 10,
+            "dayCount": 29,
+            "lastDay": "2024-02-29",
+            "days": [
+              {
+                "day": "2024-02-28",
+                "activities": [1, 2],
+                "bySport": {
+                  "ride": 10,
+                  "run": 20
+                }
+              },
+              {
+                "day": "2024-02-29",
+                "activities": [3, 4],
+                "bySport": {}
+              }
+            ]
+          }
+        },
+        {
+          "id": "time",
+          "operation": "monthActivityRhythm",
+          "args": {
+            "metric": "time"
+          },
+          "expected": {
+            "activityCount": 4,
+            "activeDays": 2,
+            "measuredCount": 3,
+            "average": 1,
+            "dayCount": 29,
+            "lastDay": "2024-02-29",
+            "days": [
+              {
+                "day": "2024-02-28",
+                "activities": [1, 2],
+                "bySport": {
+                  "ride": 1,
+                  "run": 2
+                }
+              },
+              {
+                "day": "2024-02-29",
+                "activities": [3, 4],
+                "bySport": {}
+              }
+            ]
+          }
+        },
+        {
+          "id": "elevation",
+          "operation": "monthActivityRhythm",
+          "args": {
+            "metric": "elevation"
+          },
+          "expected": {
+            "activityCount": 4,
+            "activeDays": 2,
+            "measuredCount": 2,
+            "average": 50,
+            "dayCount": 29,
+            "lastDay": "2024-02-29",
+            "days": [
+              {
+                "day": "2024-02-28",
+                "activities": [1, 2],
+                "bySport": {
+                  "ride": 100
+                }
+              },
+              {
+                "day": "2024-02-29",
+                "activities": [3, 4],
+                "bySport": {}
+              }
+            ]
+          }
+        },
+        {
+          "id": "count",
+          "operation": "monthActivityRhythm",
+          "args": {
+            "metric": "count"
+          },
+          "expected": {
+            "activityCount": 4,
+            "activeDays": 2,
+            "measuredCount": 4,
+            "average": 2,
+            "dayCount": 29,
+            "lastDay": "2024-02-29",
+            "days": [
+              {
+                "day": "2024-02-28",
+                "activities": [1, 2],
+                "bySport": {
+                  "ride": 1,
+                  "run": 1
+                }
+              },
+              {
+                "day": "2024-02-29",
+                "activities": [3, 4],
+                "bySport": {
+                  "ride": 1,
+                  "misc": 1
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "only-unknown",
+          "operation": "monthActivityRhythm",
+          "args": {
+            "metric": "distance",
+            "filter": {
+              "sportTypes": ["Walk"]
+            }
+          },
+          "expected": {
+            "activityCount": 1,
+            "activeDays": 1,
+            "measuredCount": 0,
+            "average": null,
+            "dayCount": 29,
+            "lastDay": "2024-02-29",
+            "days": [
+              {
+                "day": "2024-02-29",
+                "activities": [4],
+                "bySport": {}
+              }
+            ]
+          }
+        },
+        {
+          "id": "empty-filter",
+          "operation": "monthActivityRhythm",
+          "args": {
+            "metric": "count",
+            "filter": {
+              "sportTypes": ["Swim"]
+            }
+          },
+          "expected": {
+            "activityCount": 0,
+            "activeDays": 0,
+            "measuredCount": 0,
+            "average": null,
+            "dayCount": 29,
+            "lastDay": "2024-02-29",
+            "days": []
+          }
+        },
+        {
+          "id": "future-day-is-empty",
+          "operation": "monthActivityRhythm",
+          "args": {
+            "metric": "distance",
+            "today": "2024-02-28"
+          },
+          "expected": {
+            "activityCount": 2,
+            "activeDays": 1,
+            "measuredCount": 2,
+            "average": 15,
+            "dayCount": 29,
+            "lastDay": "2024-02-29",
+            "days": [
+              {
+                "day": "2024-02-28",
+                "activities": [1, 2],
+                "bySport": {
+                  "ride": 10,
+                  "run": 20
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "year-rhythm-leap-and-history",
+      "description": "Paired month totals reconcile to same-date YTD; completed earlier months stay whole, February clamps, and historical final totals stay separate from same-date values.",
+      "today": "2024-02-29",
+      "activities": [
+        {
+          "id": 1,
+          "sportType": "Ride",
+          "startDateLocal": "2024-01-31T12:00:00",
+          "distance": 10000,
+          "movingTime": 3600,
+          "elevationGain": 100
+        },
+        {
+          "id": 2,
+          "sportType": "Run",
+          "startDateLocal": "2024-02-29T12:00:00",
+          "distance": 20000,
+          "movingTime": 7200,
+          "elevationGain": 200
+        },
+        {
+          "id": 3,
+          "sportType": "Ride",
+          "startDateLocal": "2024-03-01T12:00:00",
+          "distance": 999000,
+          "movingTime": 9999,
+          "elevationGain": 999
+        },
+        {
+          "id": 4,
+          "sportType": "Ride",
+          "startDateLocal": "2023-01-31T12:00:00",
+          "distance": 30000,
+          "movingTime": 10800,
+          "elevationGain": 300
+        },
+        {
+          "id": 5,
+          "sportType": "Run",
+          "startDateLocal": "2023-02-28T12:00:00",
+          "distance": 40000,
+          "movingTime": 14400,
+          "elevationGain": 400
+        },
+        {
+          "id": 6,
+          "sportType": "Ride",
+          "startDateLocal": "2023-03-01T12:00:00",
+          "distance": 50000,
+          "movingTime": 18000,
+          "elevationGain": 500
+        },
+        {
+          "id": 7,
+          "sportType": "Ride",
+          "startDateLocal": "2024-02-28T12:00:00",
+          "distance": 0,
+          "movingTime": null,
+          "elevationGain": null
+        }
+      ],
+      "cases": [
+        {
+          "id": "distance",
+          "operation": "yearMonthlyRhythm",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": [
+            {
+              "start": "2024-01-01",
+              "current": {
+                "ride": 10
+              },
+              "previous": {
+                "ride": 30
+              },
+              "inProgress": false
+            },
+            {
+              "start": "2024-02-01",
+              "current": {
+                "run": 20
+              },
+              "previous": {
+                "run": 40
+              },
+              "inProgress": true
+            }
+          ]
+        },
+        {
+          "id": "time",
+          "operation": "yearMonthlyRhythm",
+          "args": {
+            "metric": "time"
+          },
+          "expected": [
+            {
+              "start": "2024-01-01",
+              "current": {
+                "ride": 1
+              },
+              "previous": {
+                "ride": 3
+              },
+              "inProgress": false
+            },
+            {
+              "start": "2024-02-01",
+              "current": {
+                "run": 2
+              },
+              "previous": {
+                "run": 4
+              },
+              "inProgress": true
+            }
+          ]
+        },
+        {
+          "id": "elevation",
+          "operation": "yearMonthlyRhythm",
+          "args": {
+            "metric": "elevation"
+          },
+          "expected": [
+            {
+              "start": "2024-01-01",
+              "current": {
+                "ride": 100
+              },
+              "previous": {
+                "ride": 300
+              },
+              "inProgress": false
+            },
+            {
+              "start": "2024-02-01",
+              "current": {
+                "run": 200
+              },
+              "previous": {
+                "run": 400
+              },
+              "inProgress": true
+            }
+          ]
+        },
+        {
+          "id": "count",
+          "operation": "yearMonthlyRhythm",
+          "args": {
+            "metric": "count"
+          },
+          "expected": [
+            {
+              "start": "2024-01-01",
+              "current": {
+                "ride": 1
+              },
+              "previous": {
+                "ride": 1
+              },
+              "inProgress": false
+            },
+            {
+              "start": "2024-02-01",
+              "current": {
+                "run": 1,
+                "ride": 1
+              },
+              "previous": {
+                "run": 1
+              },
+              "inProgress": true
+            }
+          ]
+        },
+        {
+          "id": "previous-leap-day-after-cutoff",
+          "operation": "yearMonthlyRhythm",
+          "args": {
+            "metric": "distance",
+            "today": "2025-02-28"
+          },
+          "expected": [
+            {
+              "start": "2025-01-01",
+              "current": {},
+              "previous": {
+                "ride": 10
+              },
+              "inProgress": false
+            },
+            {
+              "start": "2025-02-01",
+              "current": {},
+              "previous": {},
+              "inProgress": true
+            }
+          ]
+        },
+        {
+          "id": "year-history",
+          "operation": "periodComparisons",
+          "args": {
+            "metric": "distance",
+            "range": "years"
+          },
+          "expected": [
+            {
+              "start": "2024-01-01",
+              "end": "2024-02-29",
+              "cutoff": "2024-02-29",
+              "elapsed": 30,
+              "total": 30,
+              "fullTotal": null,
+              "incomplete": true
+            },
+            {
+              "start": "2023-01-01",
+              "end": "2023-12-31",
+              "cutoff": "2023-02-28",
+              "elapsed": 70,
+              "total": 120,
+              "fullTotal": 120,
+              "incomplete": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "expanded-empty-short-month",
+      "description": "Empty short month keeps calendar shape, rankings empty, and current full-period total unavailable.",
+      "today": "2025-02-28",
+      "activities": [],
+      "cases": [
+        {
+          "id": "month",
+          "operation": "monthActivityRhythm",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": {
+            "activityCount": 0,
+            "activeDays": 0,
+            "measuredCount": 0,
+            "average": null,
+            "dayCount": 28,
+            "lastDay": "2025-02-28",
+            "days": []
+          }
+        },
+        {
+          "id": "year",
+          "operation": "yearMonthlyRhythm",
+          "args": {
+            "metric": "distance"
+          },
+          "expected": [
+            {
+              "start": "2025-01-01",
+              "current": {},
+              "previous": {},
+              "inProgress": false
+            },
+            {
+              "start": "2025-02-01",
+              "current": {},
+              "previous": {},
+              "inProgress": true
+            }
+          ]
+        },
+        {
+          "id": "records",
+          "operation": "recordRankings",
+          "args": {
+            "range": "allTime"
+          },
+          "expected": {
+            "distance": [],
+            "time": [],
+            "elevation": [],
+            "biggestWeek": []
+          }
+        },
+        {
+          "id": "year-history",
+          "operation": "periodComparisons",
+          "args": {
+            "metric": "count",
+            "range": "years"
+          },
+          "expected": [
+            {
+              "start": "2025-01-01",
+              "end": "2025-02-28",
+              "cutoff": "2025-02-28",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": null,
+              "incomplete": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "historical-short-month-cutoff",
+      "description": "Same-date table clamps March 31 to leap February, excludes future rows, distinguishes partial history and completed totals.",
+      "today": "2024-03-31",
+      "activities": [
+        {
+          "id": 1,
+          "sportType": "Ride",
+          "startDateLocal": "2024-02-29T12:00:00",
+          "distance": null,
+          "movingTime": null,
+          "elevationGain": null
+        },
+        {
+          "id": 2,
+          "sportType": "Ride",
+          "startDateLocal": "2024-03-01T12:00:00",
+          "distance": null,
+          "movingTime": null,
+          "elevationGain": null
+        },
+        {
+          "id": 3,
+          "sportType": "Ride",
+          "startDateLocal": "2024-03-31T12:00:00",
+          "distance": null,
+          "movingTime": null,
+          "elevationGain": null
+        },
+        {
+          "id": 4,
+          "sportType": "Ride",
+          "startDateLocal": "2024-04-01T12:00:00",
+          "distance": null,
+          "movingTime": null,
+          "elevationGain": null
+        }
+      ],
+      "cases": [
+        {
+          "id": "months",
+          "operation": "periodComparisons",
+          "args": {
+            "metric": "count",
+            "range": "months"
+          },
+          "expected": [
+            {
+              "start": "2024-03-01",
+              "end": "2024-03-31",
+              "cutoff": "2024-03-31",
+              "elapsed": 2,
+              "total": 2,
+              "fullTotal": null,
+              "incomplete": true
+            },
+            {
+              "start": "2024-02-01",
+              "end": "2024-02-29",
+              "cutoff": "2024-02-29",
+              "elapsed": 1,
+              "total": 1,
+              "fullTotal": 1,
+              "incomplete": true
+            },
+            {
+              "start": "2024-01-01",
+              "end": "2024-01-31",
+              "cutoff": "2024-01-31",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            },
+            {
+              "start": "2023-12-01",
+              "end": "2023-12-31",
+              "cutoff": "2023-12-31",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            },
+            {
+              "start": "2023-11-01",
+              "end": "2023-11-30",
+              "cutoff": "2023-11-30",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            },
+            {
+              "start": "2023-10-01",
+              "end": "2023-10-31",
+              "cutoff": "2023-10-31",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            },
+            {
+              "start": "2023-09-01",
+              "end": "2023-09-30",
+              "cutoff": "2023-09-30",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            },
+            {
+              "start": "2023-08-01",
+              "end": "2023-08-31",
+              "cutoff": "2023-08-31",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            },
+            {
+              "start": "2023-07-01",
+              "end": "2023-07-31",
+              "cutoff": "2023-07-31",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            },
+            {
+              "start": "2023-06-01",
+              "end": "2023-06-30",
+              "cutoff": "2023-06-30",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            },
+            {
+              "start": "2023-05-01",
+              "end": "2023-05-31",
+              "cutoff": "2023-05-31",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            },
+            {
+              "start": "2023-04-01",
+              "end": "2023-04-30",
+              "cutoff": "2023-04-30",
+              "elapsed": 0,
+              "total": 0,
+              "fullTotal": 0,
+              "incomplete": false
+            }
+          ]
+        }
+      ]
     }
   ]
 }

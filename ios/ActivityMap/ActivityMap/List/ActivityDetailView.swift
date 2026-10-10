@@ -5,6 +5,9 @@ import UIKit
 struct ActivityDetailView: View {
     @Bindable var store: ActivityStore
     let activityID: Int
+    var backLabel = "Back to activities"
+    var backIdentifier = "list-detail-back"
+    var onMapShown: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var navigationReference = DetailNavigationReference()
 
@@ -26,8 +29,8 @@ struct ActivityDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
-                .accessibilityLabel("Back to activities")
-                .accessibilityIdentifier("list-detail-back")
+                .accessibilityLabel(backLabel)
+                .accessibilityIdentifier(backIdentifier)
             }.sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .principal) {
                 if let activity = store.activity(id: activityID) {
@@ -37,6 +40,7 @@ struct ActivityDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showActivityOnMapFromDetail(activityID, store: store, navigationController: navigationReference.controller)
+                    onMapShown?()
                 } label: {
                     Image(systemName: "map")
                         .font(.body.weight(.semibold))
@@ -111,7 +115,7 @@ struct ActivityDetailPanel: View {
                             else { store.showOnMap(id) }
                         }, profile: { activity in
                             ElevationProfileView(store: store, activityID: activity.id,
-                                                 isRelevant: store.selectedTab == .list)
+                                                 isRelevant: store.selectedTab == .list || store.selectedTab == .stats)
                         }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
                     }
                     .accessibilityIdentifier("activity-detail-scroll")

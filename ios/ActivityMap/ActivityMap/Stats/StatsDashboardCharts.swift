@@ -24,6 +24,8 @@ struct StatsSeriesChart: View {
     @ScaledMetric(relativeTo: .caption2) private var endpointPadding = 34.0
 
     private var maximum: Double { style == .consistency ? 7 : max(1, points.compactMap(\.value).max() ?? 1, band?.points.map(\.high).max() ?? 0) * 1.08 }
+    private var axisTicks: [Double] { StatsDisplay.axisTicks(maximum: maximum) }
+    private var axisStep: Double { axisTicks.count > 1 ? metric.displayValue(axisTicks[1] - axisTicks[0]) : 1 }
     private var selected: [StatsChartPoint] {
         guard let selectedX, let closest = points.min(by: { abs($0.x - selectedX) < abs($1.x - selectedX) }) else { return [] }
         return points.filter { $0.x == closest.x }
@@ -131,9 +133,9 @@ struct StatsSeriesChart: View {
             }
             .chartYAxis {
                 if style == .consistency { AxisMarks(position: .leading, values: [0, 7]) }
-                else { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { tick in
+                else { AxisMarks(position: .leading, values: axisTicks) { tick in
                     AxisGridLine()
-                    AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.value(value, metric: metric)).font(.caption2) } }
+                    AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value), step: axisStep)).font(.caption2) } }
                 } }
             }
             .chartLegend(position: .bottom, alignment: .leading)

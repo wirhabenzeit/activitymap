@@ -1192,7 +1192,7 @@ import Testing
         scroll.setContentOffset(CGPoint(x: 0, y: 300), animated: false)
         let cachedOffset = scroll.contentOffset
         #expect(StatsPresentation(store: store, sync: sync).state == .cached)
-        guard case .comparison(let before, _, _, _) = state.result(.yearToDate, source: StatsDashboardSource(store)) else {
+        guard case .comparison(let before, _, _, _, _, _) = state.result(.yearToDate, source: StatsDashboardSource(store)) else {
             Issue.record("Missing cached comparison"); return
         }
         sync.setSession(SyncFixtures.session(), storage: storage)
@@ -1201,7 +1201,7 @@ import Testing
         try host.capture("error-with-content")
         #expect(StatsPresentation(store: store, sync: sync).hasContent)
         try await statsWait { state.result(.yearToDate, source: StatsDashboardSource(store)) != nil }
-        if case .comparison(let after, _, _, _) = state.result(.yearToDate, source: StatsDashboardSource(store)) {
+        if case .comparison(let after, _, _, _, _, _) = state.result(.yearToDate, source: StatsDashboardSource(store)) {
             #expect(scroll.contentOffset == cachedOffset,
                     "A sync failure preserves the user's dashboard scroll position")
             #expect(after == before, "A failed sync retains the authorized cached values")
@@ -1437,5 +1437,113 @@ private struct StatsObservedTestSection<Content: View>: View {
     @ViewBuilder let content: (StatsTileDefinition) -> Content
     var body: some View {
         StatsAnimatedSection(tiles: tiles, expandedTile: state.expandedTile, columns: columns, content: content)
+    }
+}
+
+extension RenderedStatsDashboardTests {
+    @Test(arguments: ["phone", "phone-dark", "wide", "large-text", "empty"], [StatsTileID.monthVsLastMonth, .yearToDate])
+    func richerPeriodDetailsKeepChartsAndTablesReachable(variant: String, tileID: StatsTileID) async throws {
+        let today = StatsDates.day("2026-10-10")
+        let engine = variant == "empty" ? StatsEngine(activities: []) : Self.rhythmPreviewEngine()
+        let inspection = StatsTileInspection()
+        let tile = try #require(StatsDashboard.tiles.first { $0.id == tileID })
+        let width: CGFloat = variant == "wide" ? 1194 : 375
+        let result = engine.dashboard(tileID, option: .distance, today: today)
+        let host = try StatsDashboardHarness(root: ScrollView {
+            StatsDashboardTile(tile: tile, option: .constant(.distance), displayed: .init(option: .distance, result: result),
+                today: today, expanded: true, filtered: false, toggleExpansion: {}, detailScreen: true, inspection: inspection).padding(16)
+        }.background(variant == "phone-dark" ? Color.black : Color.white)
+         .environment(\.dynamicTypeSize, variant == "large-text" ? .accessibility3 : .large)
+         .environment(\.colorScheme, variant == "phone-dark" ? .dark : .light), size: CGSize(width: width, height: 1000))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(300))
+        let outer = try #require(host.descendants(UIScrollView.self).first)
+        #expect(outer.contentSize.width <= outer.bounds.width + 1, "Only the comparison table may scroll horizontally")
+        if tileID == .monthVsLastMonth && variant != "empty" {
+            #expect(inspection.monthDay == StatsDates.day("2026-10-09"), "Latest active day is selected initially")
+        }
+        let image = try host.capture("parity-\(tileID.rawValue)-\(variant)")
+        if tileID == .yearToDate && variant != "large-text" && variant != "empty" {
+            // Regression: ratio widths on a continuous paired-bar axis can
+            // produce a valid, entirely blank chart. The legend alone must
+            // not satisfy this check for visible sport-colored bars.
+            #expect(Self.coloredRhythmPixels(image) > 5000)
+        }
+        outer.setContentOffset(CGPoint(x: 0, y: max(0, outer.contentSize.height - outer.bounds.height)), animated: false)
+        try await Task.sleep(for: .milliseconds(100))
+        try host.capture("parity-\(tileID.rawValue)-\(variant)-history")
+    }
+
+    @Test(arguments: [834.0, 1194.0], [StatsTileID.weeklyVolume, .activityCalendar, .distanceVsElevation, .sportMix])
+    func supportingStatsDetailsAdaptToContentWidth(width: Double, tileID: StatsTileID) async throws {
+        let today = StatsDates.day("2026-10-10")
+        let engine = Self.rhythmPreviewEngine()
+        let inspection = StatsTileInspection()
+        inspection.calendarDay = StatsDates.day("2026-10-09")
+        let tile = try #require(StatsDashboard.tiles.first { $0.id == tileID })
+        let option = StatsDashboard.defaultOption(tileID)
+        let result = engine.dashboard(tileID, option: option, today: today)
+        let host = try StatsDashboardHarness(root: ScrollView {
+            StatsDashboardTile(tile: tile, option: .constant(option), displayed: .init(option: option, result: result),
+                today: today, expanded: tileID != .sportMix, filtered: false, toggleExpansion: {}, detailScreen: tileID != .sportMix, inspection: inspection).padding(16)
+        }.environment(\.statsAvailableWidth, width), size: CGSize(width: width, height: 1194))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(300))
+        let outer = try #require(host.descendants(UIScrollView.self).first)
+        #expect(outer.contentSize.width <= outer.bounds.width + 1)
+        try host.capture("parity-support-\(tileID.rawValue)-\(Int(width))")
+    }
+
+    @Test func monthSelectionSurvivesDetailRemountAndMetricChanges() async throws {
+        let today = StatsDates.day("2026-10-10")
+        let inspection = StatsTileInspection()
+        let tile = try #require(StatsDashboard.tiles.first { $0.id == .monthVsLastMonth })
+        let engine = Self.rhythmPreviewEngine()
+        for metric in [StatsToggleOption.distance, .count, .time] {
+            let result = engine.dashboard(tile.id, option: metric, today: today)
+            let host = try StatsDashboardHarness(root: ScrollView {
+                StatsDashboardTile(tile: tile, option: .constant(metric), displayed: .init(option: metric, result: result),
+                    today: today, expanded: true, filtered: false, toggleExpansion: {}, detailScreen: true, inspection: inspection).padding(16)
+            }, size: CGSize(width: 402, height: 1000))
+            try await Task.sleep(for: .milliseconds(150))
+            if metric == .distance {
+                #expect(inspection.monthDay == StatsDates.day("2026-10-09"))
+                // A selected rest day is valid too, and must survive a detail
+                // destination being removed and recreated after inspection.
+                inspection.monthDay = StatsDates.day("2026-10-08")
+            } else {
+                #expect(inspection.monthDay == StatsDates.day("2026-10-08"))
+            }
+            host.close()
+        }
+    }
+
+    private static func coloredRhythmPixels(_ image: UIImage) -> Int {
+        guard let source = image.cgImage else { return 0 }
+        let width = source.width, height = source.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(data: &bytes, width: width, height: height, bitsPerComponent: 8,
+            bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return 0 }
+        context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return stride(from: 0, to: bytes.count, by: 4).reduce(0) { count, index in
+            let values = [bytes[index], bytes[index + 1], bytes[index + 2]]
+            return count + (Int(values.max()!) - Int(values.min()!) > 70 ? 1 : 0)
+        }
+    }
+
+    private static func rhythmPreviewEngine() -> StatsEngine {
+        var activities: [StatsActivity] = []
+        for year in 2023...2026 {
+            for month in 1...12 {
+                for index in 0..<3 {
+                    let day = StatsDates.start(year: year, month: month) + [1, 5, 8][index]
+                    activities.append(.init(id: year * 10000 + month * 100 + index,
+                        name: ["Morning ride", "Evening run", "Hill walk"][index], sport: [.ride, .run, .trailHike][index],
+                        start: StatsDates.date(day), distance: Double([35000, 8000, 12000][index]), movingTime: 3600, elevation: Double(100 + month * 30)))
+                }
+            }
+        }
+        return StatsEngine(activities: activities)
     }
 }

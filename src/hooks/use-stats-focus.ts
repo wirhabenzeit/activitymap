@@ -72,7 +72,8 @@ function subscribe(notify: () => void) {
   let previous = snapshot();
   const pop = () => {
     const next = snapshot();
-    changeView(next ?? previous, notify);
+    if (next === previous) notify();
+    else changeView(next ?? previous, notify);
     previous = next;
   };
   const update = () => {

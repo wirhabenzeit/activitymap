@@ -114,7 +114,10 @@ struct AppShell: View {
         }
         // Destinations never change filter visibility (#354).
         .onChange(of: store.selectedTab) { _, tab in
-            if tab != .stats { statsNavigation.dashboard?.expandedTile = nil }
+            if tab != .stats {
+                statsNavigation.dashboard?.inspectedActivityID = nil
+                statsNavigation.dashboard?.expandedTile = nil
+            }
         }
         .onChange(of: store.mapContext.scopeRevision) { _, _ in
             statsNavigation.dashboard?.resetInspection()
@@ -125,7 +128,10 @@ struct AppShell: View {
         let content = VStack(spacing: 0) {
             if !nativeStatsHeader {
                 HStack(spacing: 8) {
-                    Button { dashboard.expandedTile = nil } label: {
+                    Button {
+                        if dashboard.inspectedActivityID != nil { dashboard.inspectedActivityID = nil }
+                        else { dashboard.expandedTile = nil }
+                    } label: {
                         Image(systemName: "chevron.left").frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }

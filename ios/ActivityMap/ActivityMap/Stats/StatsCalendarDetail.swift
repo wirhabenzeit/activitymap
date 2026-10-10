@@ -10,6 +10,8 @@ struct StatsCalendarDetail: View {
     var expand: () -> Void = {}
     @State private var year: Int?
     @State var selectedDay: Int?
+    @State private var width: CGFloat = 0
+    @Environment(\.statsInspectedActivityID) private var inspectedActivityID
     @Environment(\.statsTileInspection) private var inspection
     private var shownYear: Int? {
         get { if let inspection { return inspection.calendarYear }; return year }
@@ -38,10 +40,16 @@ struct StatsCalendarDetail: View {
             Text("\(Text(StatsDisplay.number(Double(snapshot.days.count))).font(.title2.weight(.semibold))) \(Text("active days").font(.caption).foregroundColor(.secondary))").monospacedDigit()
             Text(expanded ? "\(StatsDisplay.date(first)) – \(StatsDisplay.date(last))" : "\(StatsDisplay.number(Double(snapshot.days.count) / Double(last - first + 1) * 100))% of days in the last 12 months")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            calendar
-            legend
-            if expanded, let day = focusedDay, day >= first, day <= last { dayDetails(day) }
+            let sideBySide = expanded && width >= 1000 && !typeSize.isAccessibilitySize
+            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: 24)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            layout {
+                VStack(alignment: .leading, spacing: 12) { calendar; legend }.frame(maxWidth: .infinity)
+                if expanded, let day = focusedDay, day >= first, day <= last {
+                    dayDetails(day).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .onChange(of: years.keys.sorted()) { _, available in
             if let shownYear, !available.contains(shownYear) { self.shownYear = nil }
             focusedDay = nil
@@ -166,6 +174,7 @@ struct StatsCalendarDetail: View {
                         StatsActivityRow(sport: activity.sport, name: activity.name,
                                          summary: "\(activity.sport.name) · \(StatsDisplay.measurement(activity.value(.distance), metric: .distance)) · \(StatsDisplay.measurement(activity.value(.elevation), metric: .elevation)) · \(StatsDisplay.measurement(activity.value(.time), metric: .time))",
                                          open: activity.id.map { id in { openActivity(id) } })
+                            .background(activity.id != nil && activity.id == inspectedActivityID ? Color.accentColor.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 8))
                             .accessibilityIdentifier(activity.id.map { "stats-calendar-activity-\($0)" } ?? "")
                     }
                 }
