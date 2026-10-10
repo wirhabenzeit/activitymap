@@ -146,7 +146,6 @@ struct AppShell: View {
                     if nativeStatsHeader {
                         ToolbarItemGroup(placement: .topBarTrailing) {
                             filterButton(sidebarAvailable: false)
-                            accountButton
                         }.sharedBackgroundVisibility(.hidden)
                     }
                 }

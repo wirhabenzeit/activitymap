@@ -251,8 +251,8 @@ import Testing
             }
             try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (phase == "push" ? 2 : 1) }
             if phase == "push" {
-                #expect(host.shellAccountButton() != nil,
-                        "The focused chart retains Settings in its native header")
+                #expect(host.shellAccountButton() == nil,
+                        "The focused chart leaves account access on the dashboard")
                 #expect(host.shellControl(label: "Filters") != nil)
                 #expect(navigation.topViewController?.navigationItem.title == "Training volume")
                 let bar = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
@@ -280,7 +280,7 @@ import Testing
         #expect(state.expandedTile == nil && abs(root.contentOffset.y - rootOffset) < 1)
     }
 
-    @Test func phoneStatsHeaderCanPresentSettingsFromDetail() async throws {
+    @Test func phoneStatsHeaderKeepsFiltersInDetailAndSettingsOnDashboard() async throws {
         let (store, _) = try StatsDashboardTests.fixture()
         let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
         let previousToken = MapboxOptions.accessToken
@@ -297,18 +297,20 @@ import Testing
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         try host.capture("phone-header-detail")
-        sheets.accountDestination = .settings
+        #expect(host.shellAccountButton() == nil && host.shellControl(label: "Filters") != nil)
+        sheets.showsFilters = true
         try await statsWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
         #expect(state.expandedTile == .weeklyVolume && navigation.viewControllers.count == 2)
-        try host.capture("phone-header-detail-settings", presented: true)
-        sheets.accountDestination = nil
+        try host.capture("phone-header-detail-filters", presented: true)
+        sheets.showsFilters = false
         try await statsWait { host.host.presentedViewController == nil }
         navigation.popViewController(animated: true)
         try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
-        sheets.showsFilters = true
+        #expect(host.shellAccountButton() != nil)
+        sheets.accountDestination = .settings
         try await statsWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
-        try host.capture("phone-header-root-filters", presented: true)
-        sheets.showsFilters = false
+        try host.capture("phone-header-root-settings", presented: true)
+        sheets.accountDestination = nil
         try await statsWait { host.host.presentedViewController == nil }
     }
 
@@ -807,7 +809,7 @@ import Testing
             }
             try await Task.sleep(for: .milliseconds(100))
             let detailScroll = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[1].view).first { $0.bounds.height > 100 })
-            #expect(host.shellAccountButton() != nil && navigation.topViewController?.navigationItem.title == StatsDashboard.tiles.first { $0.id == id }?.title)
+            #expect(host.shellAccountButton() == nil && navigation.topViewController?.navigationItem.title == StatsDashboard.tiles.first { $0.id == id }?.title)
             #expect(detailScroll !== root, "The tile opens in its own scrolling destination")
             #expect(detailScroll.contentSize.width <= detailScroll.bounds.width + 1)
             #expect(abs(root.contentSize.height - height) < 1, "Opening detail never resizes the dashboard")
