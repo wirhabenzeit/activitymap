@@ -1479,7 +1479,7 @@ function RecordsDetail({ context }: { context: TileContext }) {
     (context.availableWidth ?? context.focusWidth ?? 0) >= 760;
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground" aria-label="Records scope">
+      <p className="text-xs text-muted-foreground" data-stats-records-scope>
         {context.filtered ? 'Filtered activities' : 'Across all sports'}
         {' · Use Filters to adjust these rankings.'}
       </p>

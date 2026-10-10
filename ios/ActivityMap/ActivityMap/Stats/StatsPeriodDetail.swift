@@ -55,6 +55,7 @@ private struct StatsMonthRhythmView: View {
     private var maximum: Double { max(1, rhythm.days.map { $0.bySport.values.reduce(0, +) }.max() ?? 0) }
     private var sports: [ActivityCategory] { ActivityCategory.allCases.filter { sport in rhythm.days.contains { day in day.activities.contains { $0.sport == sport } } } }
     private var offset: Int { rhythm.days.first.map { $0.day - StatsDates.monday($0.day) } ?? 0 }
+    private var listsDays: Bool { typeSize.isAccessibilitySize || width < 314 }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Daily rhythm").font(.headline)
@@ -63,13 +64,13 @@ private struct StatsMonthRhythmView: View {
                 .init(label: "Active days", value: String(rhythm.activeDays)),
                 .init(label: metric == .count ? "Per active day" : "Average outing", value: average),
             ])
-            if typeSize.isAccessibilitySize || width < 314 {
+            if listsDays {
                 ForEach(rhythm.days.filter { $0.day <= today }, id: \.day) { day in
                     Button { focusedDay = day.day } label: {
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(StatsDisplay.shortDate(day.day))
-                                Text("\(day.activities.count) activities").font(.caption).foregroundStyle(.secondary)
+                                Text(activityCount(day.activities.count)).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                             Text(StatsDisplay.measurement(day.bySport.values.reduce(0, +), metric: metric))
@@ -84,7 +85,8 @@ private struct StatsMonthRhythmView: View {
                 }
             }
             StatsRhythmLegend(sports: sports)
-            if rhythm.days.contains(where: { !$0.activities.isEmpty && $0.bySport.values.reduce(0, +) == 0 }) {
+            // Only the grid draws dots; the day list states each count.
+            if !listsDays, rhythm.days.contains(where: { !$0.activities.isEmpty && $0.bySport.values.reduce(0, +) == 0 }) {
                 Text("Dots mark activities with zero or no recorded value.").font(.caption).foregroundStyle(.secondary)
             }
             if let selected {
@@ -109,6 +111,7 @@ private struct StatsMonthRhythmView: View {
         guard let average = rhythm.average else { return "—" }
         return metric == .count ? StatsDisplay.number(average, decimals: 1) : StatsDisplay.measurement(average, metric: metric)
     }
+    private func activityCount(_ count: Int) -> String { count == 1 ? "1 activity" : "\(count) activities" }
     private func reconcileSelection() {
         if let focusedDay, rhythm.days.contains(where: { $0.day == focusedDay && $0.day <= today }) { return }
         focusedDay = rhythm.days.last { $0.day <= today && !$0.activities.isEmpty }?.day
@@ -135,7 +138,7 @@ private struct StatsMonthRhythmView: View {
             .overlay { if day.day == focusedDay { RoundedRectangle(cornerRadius: 6).stroke(Color.accentColor, lineWidth: 2) } }.contentShape(Rectangle())
         }.buttonStyle(.plain).disabled(day.day > today)
         .accessibilityLabel(StatsDisplay.date(day.day))
-        .accessibilityValue(day.day > today ? "Not yet elapsed" : "\(day.activities.count) activities, \(StatsDisplay.measurement(total, metric: metric))")
+        .accessibilityValue(day.day > today ? "Not yet elapsed" : "\(activityCount(day.activities.count)), \(StatsDisplay.measurement(total, metric: metric))")
         .accessibilityAddTraits(day.day == focusedDay ? .isSelected : [])
         .accessibilityIdentifier("stats-month-day-\(day.day)")
     }

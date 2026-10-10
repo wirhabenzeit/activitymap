@@ -1535,6 +1535,14 @@ extension RenderedStatsDashboardTests {
         #expect(host.shellControl(label: "Run") != nil, "A sport with only zero/missing values still needs a legend")
         #expect(host.shellControl(label: "Dots mark activities with zero or no recorded value.") != nil)
         try host.capture("follow-up-month-zero-missing")
+        // Accessibility sizes list days with counts instead of drawing dots.
+        let listed = try StatsDashboardHarness(root: ScrollView {
+            StatsPeriodDetail(rhythm: .month(engine.monthActivityRhythm(today: today, metric: .elevation)),
+                              history: [], metric: .elevation, today: today, openActivity: { _ in }) { EmptyView() }.padding(16)
+        }.environment(\.dynamicTypeSize, .accessibility3), size: CGSize(width: 402, height: 1000))
+        defer { listed.close() }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(listed.shellControl(label: "Dots mark activities with zero or no recorded value.") == nil)
     }
 
     @Test func yearRhythmReadsExactMonthTotalsAndRetainsSelection() async throws {
