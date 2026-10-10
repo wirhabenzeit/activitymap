@@ -943,9 +943,14 @@ import Testing
         let navigation = try #require(host.contentNavigation())
         let dates = ActivityDayRange(start: "2026-01-01", end: "2026-12-31")
         store.dateDayRange = dates
+        let volume = try #require(StatsDashboard.tiles.first { $0.id == .weeklyVolume })
+        state.select(.time, for: volume)
+        let inspection = try #require(state.inspection(.weeklyVolume))
+        inspection.volumeRange = .months
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
-        #expect(host.shellAccountButton() != nil)
+        #expect((host.shellAccountButton() != nil) == (scenario != "phone"),
+                "Compact focus pages keep Settings on the dashboard; iPad retains the workspace header")
         sheets.showsFilters = true
         if sidebar {
             try await statsWait { host.descendants(UITextField.self).count == 1 }
@@ -958,9 +963,18 @@ import Testing
         try await statsWait { store.statsActivities.isEmpty }
         #expect(state.expandedTile == .weeklyVolume && store.dateDayRange == dates)
         try host.capture("stats-focus-filters-\(scenario)", presented: !sidebar)
-        store.resetStatsActivityFilters()
         sheets.showsFilters = false
         if !sidebar { try await statsWait { host.host.presentedViewController == nil } }
+        try await statsWait { host.shellControl(label: "No matching activities") != nil }
+        #expect(host.shellControl(label: "Calculating…") == nil,
+                "An empty filter is a completed result, not a calculation still in progress")
+        #expect(state.option(.weeklyVolume) == .time && inspection.volumeRange == .months)
+        store.resetStatsActivityFilters()
+        try await statsWait { state.result(.weeklyVolume, source: StatsDashboardSource(store)) != nil
+            && host.shellControl(label: "No matching activities") == nil }
+        #expect(host.shellControl(label: "Calculating…") == nil)
+        #expect(state.expandedTile == .weeklyVolume && state.option(.weeklyVolume) == .time)
+        #expect(state.inspection(.weeklyVolume) === inspection && inspection.volumeRange == .months)
         try host.capture("stats-focus-shell-\(scenario)")
         store.selectedTab = .list
         try await statsWait { state.expandedTile == nil && navigation.viewControllers.count == 1 && navigation.transitionCoordinator == nil }
@@ -1122,6 +1136,40 @@ import Testing
         #expect(store.stats.calculationCount == calculations && store.stats.aggregationCount == 1)
         #expect(scroll.contentOffset == offset && abs(scroll.contentSize.height - height) < 1)
         try host.capture("unchanged-sync-after")
+    }
+
+    @Test(arguments: [false, true])
+    func focusedChartShowsEmptyResultsWithCachedHistory(failedRefresh: Bool) async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        try await storage.apply([.upsertActivity(try Fixtures.activity())], checkpoint: Fixtures.checkpoint, scope: Fixtures.scope)
+        let source = ScriptedSyncSource([.changes("cursor-1", .failure(.server(code: "temporary", message: "Try later", status: 500, requestID: nil, retryable: false)))])
+        let store = ActivityStore(), state = StatsDashboardState()
+        let sync = SyncController(activities: store, source: { _ in source }, invalidate: { _ in })
+        sync.setSession(SyncFixtures.session(verified: false), storage: storage)
+        await sync.refresh()
+        if failedRefresh {
+            sync.setSession(SyncFixtures.session(), storage: storage)
+            await sync.refresh()
+        }
+        store.selectedTab = .stats
+        let host = try StatsDashboardHarness(root: StatsScreen(store: store, sync: sync, dashboard: state),
+                                            size: CGSize(width: 402, height: 874))
+        defer { host.close() }
+        try await statsWait { state.completedTiles.count == StatsDashboard.tiles.count }
+        let navigation = try #require(host.contentNavigation())
+        state.toggleExpansion(.weeklyVolume)
+        try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        store.searchText = "No matching activity"
+        try await statsWait { host.shellControl(label: "No matching activities") != nil }
+        #expect(StatsPresentation(store: store, sync: sync).state == (failedRefresh ? .error : .cached))
+        #expect(host.shellControl(label: "Calculating…") == nil)
+        store.resetStatsActivityFilters()
+        try await statsWait { state.result(.weeklyVolume, source: StatsDashboardSource(store)) != nil
+            && host.shellControl(label: "No matching activities") == nil }
+        #expect(state.expandedTile == .weeklyVolume)
+        store.activities = []
+        try await statsWait { host.shellControl(label: "No activity history") != nil }
+        #expect(host.shellControl(label: "Calculating…") == nil)
     }
 
     @Test func realOfflineFailureAndAuthorizationTransitionsKeepTruthfulContent() async throws {

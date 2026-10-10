@@ -240,11 +240,22 @@ private struct StatsDetailContent: View {
     @State private var inspectedActivityID: Int?
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    private var request: StatsDashboardRequest {
-        let presentation = sync.map { StatsPresentation(store: store, sync: $0) }
+    private var presentation: StatsPresentation {
+        sync.map { StatsPresentation(store: store, sync: $0) }
             ?? StatsPresentation(store: store, preparing: false)
-        return .init(source: StatsDashboardSource(store), choices: dashboard.choices,
-                     canLoad: store.selectedTab == .stats && presentation.hasContent)
+    }
+
+    private var request: StatsDashboardRequest {
+        .init(source: StatsDashboardSource(store), choices: dashboard.choices,
+              canLoad: store.selectedTab == .stats && presentation.hasContent)
+    }
+
+    private var emptyTitle: String? {
+        // A completed, authorized cache can also have no matches while offline
+        // or after a failed refresh. Neither case has a calculation to await.
+        guard presentation.historyComplete, !presentation.hasContent,
+              presentation.state != .unavailable else { return nil }
+        return store.activities.isEmpty ? "No activity history" : "No matching activities"
     }
 
     /// Wide, tall pages give the chart about half the height, leaving the
@@ -257,7 +268,10 @@ private struct StatsDetailContent: View {
 
     var body: some View {
         GeometryReader { geometry in
-                ScrollView {
+            ScrollView {
+                if let emptyTitle {
+                    ContentUnavailableView(emptyTitle, systemImage: "chart.bar")
+                } else {
                     StatsDashboardTile(tile: tile, store: store, dashboard: dashboard,
                                        expanded: true, detailScreen: true,
                                        toggleExpansion: {}, openActivity: { inspectedActivityID = $0 })
@@ -268,7 +282,8 @@ private struct StatsDetailContent: View {
                         .environment(\.statsFocusChartHeight, focusChartHeight(geometry.size))
                         .transaction { $0.animation = nil }
                 }
-                .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
+            }
+            .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
         }
         // The shell's pushed root is inactive. The visible destination must
         // own demand when its metric changes; the shared cache reuses values.
