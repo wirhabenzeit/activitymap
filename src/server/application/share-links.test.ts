@@ -10,6 +10,7 @@ import type {
 } from '~/server/repositories/share-links';
 import type { Actor } from '~/server/auth/actor';
 import { DEFAULT_SHARE_LINK_FIELD_OPTIONS } from '~/lib/sharing/fields';
+import type { StoredStreamSummary } from '~/lib/streams/compact-summary';
 import {
   MAX_SHARE_LINK_TTL_MS,
   MIN_SHARE_LINK_TTL_MS,
@@ -142,10 +143,13 @@ function fakeActivitiesRepo(activities: Activity[]): ActivitiesRepository {
   };
 }
 
-function fakeShareLinksRepo(opts: { revokedAthletes?: Set<number> } = {}): ShareLinksRepository & {
+function fakeShareLinksRepo(
+  opts: { revokedAthletes?: Set<number>; streamSummaries?: Map<number, StoredStreamSummary> } = {},
+): ShareLinksRepository & {
   rows: ShareLinkRecord[];
 } {
   const rows: ShareLinkRecord[] = [];
+  const streamSummaries = opts.streamSummaries ?? new Map<number, StoredStreamSummary>();
   let nextId = 1;
   const revokedAthletes = opts.revokedAthletes ?? new Set<number>();
 
@@ -183,6 +187,14 @@ function fakeShareLinksRepo(opts: { revokedAthletes?: Set<number> } = {}): Share
     },
     async isAthleteRevoked(athleteId) {
       return revokedAthletes.has(athleteId);
+    },
+    async findCurrentStreamSummaries(activityIds) {
+      return new Map(
+        activityIds.flatMap((id) => {
+          const summary = streamSummaries.get(id);
+          return summary ? [[id, summary] as const] : [];
+        }),
+      );
     },
   };
 }
@@ -379,10 +391,15 @@ void test('the owner can revoke their own share, and it disappears from the reci
 // getShareView - invalidation conditions
 // ---------------------------------------------------------------------------
 
-async function setupValidShare(overrides: { fields?: typeof DEFAULT_SHARE_LINK_FIELD_OPTIONS } = {}) {
+async function setupValidShare(
+  overrides: {
+    fields?: typeof DEFAULT_SHARE_LINK_FIELD_OPTIONS;
+    streamSummaries?: Map<number, StoredStreamSummary>;
+  } = {},
+) {
   const activityA = buildActivity({ id: 1, athlete: ATHLETE_A });
   const activitiesRepo = fakeActivitiesRepo([activityA]);
-  const shareLinksRepo = fakeShareLinksRepo();
+  const shareLinksRepo = fakeShareLinksRepo({ streamSummaries: overrides.streamSummaries });
 
   const created = await createShareLinkForActor(
     ACTOR_A,
@@ -504,9 +521,9 @@ void test('getShareView drops an activity that lost visibility (became private)'
   assert.deepEqual(view.activities, []);
 });
 
-void test('getShareView honors an opted-in field group end to end', async () => {
+void test('getShareView honors the start-and-finish choice end to end', async () => {
   const { activitiesRepo, shareLinksRepo, created } = await setupValidShare({
-    fields: { ...DEFAULT_SHARE_LINK_FIELD_OPTIONS, heartRate: true },
+    fields: { showRouteEnds: true },
   });
 
   const view = await getShareView(created.token, {
@@ -515,6 +532,26 @@ void test('getShareView honors an opted-in field group end to end', async () => 
     now: () => FIXED_NOW,
   });
 
-  assert.equal(view.activities[0]?.average_heartrate, 140);
-  assert.equal('average_watts' in view.activities[0], false);
+  assert.deepEqual(view.fields, { showRouteEnds: true });
+  assert.equal('average_heartrate' in view.activities[0]!, false);
+});
+
+void test('getShareView attaches the stored elevation profile of each shared activity', async () => {
+  const { activitiesRepo, shareLinksRepo, created } = await setupValidShare({
+    fields: { showRouteEnds: true },
+    streamSummaries: new Map([
+      [1, { version: 1, basis: 'distance', distance: [0, 500, 1000], altitude: [400, 420, 410], heartrate: [140, 150, 160] }],
+    ]),
+  });
+
+  const view = await getShareView(created.token, {
+    activitiesRepo,
+    shareLinksRepo,
+    now: () => FIXED_NOW,
+  });
+
+  const profile = view.activities[0]?.elevation_profile;
+  assert.ok(profile);
+  assert.equal(profile.count, 3);
+  assert.equal('heartrate' in profile, false);
 });

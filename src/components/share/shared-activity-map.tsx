@@ -7,7 +7,7 @@ import {
 import { formatMeasurement } from '~/lib/units';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
-import { Gauge, Heart, Mountain, Route, Timer, Zap } from 'lucide-react';
+import { Gauge, Mountain, Route, Timer } from 'lucide-react';
 import { LngLatBounds, type Expression } from 'mapbox-gl';
 import ReactMapGL, {
   FullscreenControl,
@@ -17,10 +17,14 @@ import ReactMapGL, {
   type MapMouseEvent,
   type MapRef,
 } from 'react-map-gl/mapbox';
+import { ElevationPlot } from '~/components/list/elevation-plot';
 import type { SharedActivityDTO } from '~/contracts/share/activity';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import { formatLocalTime } from '~/lib/local-date-time';
-import { buildSharedRouteCollection } from '~/lib/sharing/shared-map';
+import {
+  buildSharedRouteCollection,
+  sharedElevationProfile,
+} from '~/lib/sharing/shared-map';
 import { categorySettings, colorMap, iconMap } from '~/settings/category';
 import { baseMaps, defaultMapPosition } from '~/settings/map';
 
@@ -71,11 +75,14 @@ function Stat({
 function ActivityDetails({
   activity,
   expiresAt,
+  onCursor,
 }: {
   activity: SharedActivityDTO;
   expiresAt: string;
+  onCursor: (coordinate: [number, number] | null) => void;
 }) {
   const units = useDisplayUnits();
+  const profile = useMemo(() => sharedElevationProfile(activity), [activity]);
   const dateFormat = useDateFormat();
   const sportType = activity.sport_type as keyof typeof iconMap;
   const SportIcon = iconMap[sportType];
@@ -130,38 +137,20 @@ function ActivityDetails({
           label="Average speed"
           value={formatMeasurement(activity.average_speed, 'speed', units)}
         />
-        {activity.average_heartrate !== undefined && (
-          <Stat
-            icon={Heart}
-            label="Average heart rate"
-            value={
-              activity.average_heartrate === null
-                ? '—'
-                : `${Math.round(activity.average_heartrate)} bpm`
-            }
-          />
-        )}
-        {activity.average_watts !== undefined && (
-          <Stat
-            icon={Zap}
-            label="Average power"
-            value={
-              activity.average_watts === null
-                ? '—'
-                : `${Math.round(activity.average_watts)} W`
-            }
-          />
-        )}
-        {activity.kudos_count !== undefined && (
-          <Stat
-            icon={Heart}
-            label="Kudos"
-            value={
-              activity.kudos_count === null ? '—' : String(activity.kudos_count)
-            }
-          />
-        )}
       </div>
+
+      {profile && (
+        <div className="mt-4">
+          <ElevationPlot
+            key={activity.id}
+            profile={profile}
+            height={130}
+            onSelection={(index) =>
+              onCursor(index === null ? null : (profile.latlng?.[index] ?? null))
+            }
+          />
+        </div>
+      )}
 
       <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
         Shared privately via ActivityMap · expires{' '}
@@ -181,6 +170,12 @@ export function SharedActivityMap({
     [activities],
   );
   const [selectedId, setSelectedId] = useState(activities[0]?.id ?? null);
+  // [lat, lng] of the elevation-profile sample under the pointer.
+  const [cursor, setCursor] = useState<[number, number] | null>(null);
+  const selectActivity = useCallback((id: string) => {
+    setSelectedId(id);
+    setCursor(null);
+  }, []);
   const selectedActivity =
     activities.find((activity) => activity.id === selectedId) ?? activities[0];
 
@@ -195,13 +190,20 @@ export function SharedActivityMap({
       }
     }
     if (!bounds.isEmpty()) {
+      // Keep routes clear of the details card, which is taller with a profile.
+      const card = activities.some((activity) => activity.elevation_profile) ? 410 : 260;
       map.fitBounds(bounds, {
         duration: 0,
         maxZoom: 15,
-        padding: { top: 56, right: 40, bottom: 260, left: 40 },
+        padding: {
+          top: 56,
+          right: 40,
+          bottom: Math.min(card, map.getContainer().clientHeight * 0.6),
+          left: 40,
+        },
       });
     }
-  }, [routes]);
+  }, [activities, routes]);
 
   const handleRouteClick = useCallback((event: MapMouseEvent) => {
     const properties: unknown = event.features?.[0]?.properties;
@@ -209,16 +211,16 @@ export function SharedActivityMap({
       properties && typeof properties === 'object'
         ? (properties as Record<string, unknown>).id
         : undefined;
-    if (typeof id === 'string') setSelectedId(id);
-  }, []);
+    if (typeof id === 'string') selectActivity(id);
+  }, [selectActivity]);
 
   if (activities.length === 0) {
     return (
       <main className="grid h-dvh place-items-center px-6 text-center">
         <div>
-          <h1 className="text-xl font-semibold">Shared activity unavailable</h1>
+          <h1 className="text-xl font-semibold">Shared tracks unavailable</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            None of the activities in this private link are currently available.
+            None of the tracks in this private link are currently available.
           </p>
         </div>
       </main>
@@ -228,7 +230,7 @@ export function SharedActivityMap({
   return (
     <main
       className="relative h-dvh w-dvw overflow-hidden"
-      aria-label="Shared activity map"
+      aria-label="Shared track map"
     >
       <ReactMapGL
         ref={mapRef}
@@ -278,6 +280,28 @@ export function SharedActivityMap({
             layout={{ 'line-cap': 'round', 'line-join': 'round' }}
           />
         </Source>
+        {cursor && (
+          <Source
+            id="shared-elevation-cursor"
+            type="geojson"
+            data={{
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'Point', coordinates: [cursor[1], cursor[0]] },
+            }}
+          >
+            <Layer
+              id="shared-elevation-cursor"
+              type="circle"
+              paint={{
+                'circle-radius': 6,
+                'circle-color': '#ffffff',
+                'circle-stroke-color': '#111827',
+                'circle-stroke-width': 3,
+              }}
+            />
+          </Source>
+        )}
       </ReactMapGL>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-3 sm:p-5">
@@ -293,7 +317,7 @@ export function SharedActivityMap({
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
                   }`}
-                  onClick={() => setSelectedId(activity.id)}
+                  onClick={() => selectActivity(activity.id)}
                 >
                   {activity.name}
                 </button>
@@ -304,6 +328,7 @@ export function SharedActivityMap({
             <ActivityDetails
               activity={selectedActivity}
               expiresAt={expiresAt}
+              onCursor={setCursor}
             />
           )}
         </div>

@@ -38,7 +38,7 @@ import { SharedActivityMap } from '~/components/share/shared-activity-map';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Shared activities · ActivityMap',
+  title: 'Shared tracks · ActivityMap',
   description: 'A private, time-limited ActivityMap share link.',
   referrer: 'no-referrer',
   robots: {

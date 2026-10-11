@@ -2,6 +2,8 @@ import polyline from '@mapbox/polyline';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
 
 import type { SharedActivityDTO } from '~/contracts/share/activity';
+import type { ElevationProfile } from '~/lib/activity-stream-summary';
+import { decodeStreamSummary } from '~/lib/streams/compact-summary';
 
 export type SharedRouteProperties = {
   id: string;
@@ -9,9 +11,9 @@ export type SharedRouteProperties = {
 };
 
 function activityCoordinates(activity: SharedActivityDTO): [number, number][] {
-  if (!activity.map_summary_polyline) return [];
+  if (!activity.route_polyline) return [];
   return polyline
-    .decode(activity.map_summary_polyline)
+    .decode(activity.route_polyline)
     .map(([latitude, longitude]) => [longitude, latitude]);
 }
 
@@ -36,4 +38,20 @@ export function buildSharedRouteCollection(
       return [feature];
     }),
   };
+}
+
+/** Decode a shared track's elevation profile for `ElevationPlot`. */
+export function sharedElevationProfile(
+  activity: SharedActivityDTO,
+): ElevationProfile | null {
+  if (!activity.elevation_profile) return null;
+  try {
+    const { distance, altitude, latlng } = decodeStreamSummary(
+      activity.elevation_profile,
+    );
+    if (!distance || !altitude) return null;
+    return { distance, altitude, ...(latlng ? { latlng } : {}) };
+  } catch {
+    return null;
+  }
 }

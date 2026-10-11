@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from 'react';
 
-import { AlertTriangle, Check, Copy } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Check, Copy } from 'lucide-react';
 
 import { Button } from '~/components/ui/button';
 import {
+  DialogClose,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -21,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select';
-import { ScrollArea } from '~/components/ui/scroll-area';
+import { MY_SHARE_LINKS_QUERY_KEY } from '~/components/share/manage-shares-dialog';
 import { useToast } from '~/hooks/use-toast';
 import { useActivities } from '~/hooks/use-activities';
 import { formatPreferredDate } from '~/lib/date-preferences';
@@ -29,33 +31,41 @@ import { useDateFormat } from '~/hooks/use-display-preferences';
 import { useShallowStore } from '~/store';
 import {
   DEFAULT_SHARE_LINK_FIELD_OPTIONS,
-  SHARE_LINK_FIELD_GROUP_LABELS,
   type ShareLinkFieldOptions,
 } from '~/lib/sharing/fields';
+import { SHARED_ROUTE_END_TRIM_METERS } from '~/lib/sharing/route-trim';
 import { createShareLink } from '~/server/share-actions';
 
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
 const EXPIRY_OPTIONS = [
-  { label: '1 hour', ms: 60 * 60 * 1000 },
-  { label: '1 day', ms: 24 * 60 * 60 * 1000 },
-  { label: '3 days', ms: 3 * 24 * 60 * 60 * 1000 },
-  { label: '7 days', ms: 7 * 24 * 60 * 60 * 1000 },
-  { label: '14 days', ms: 14 * 24 * 60 * 60 * 1000 },
-  { label: '30 days (maximum)', ms: 30 * 24 * 60 * 60 * 1000 },
+  { label: '1 hour', ms: HOUR_MS },
+  { label: '1 day', ms: DAY_MS },
+  { label: '3 days', ms: 3 * DAY_MS },
+  { label: '7 days', ms: 7 * DAY_MS },
+  { label: '14 days', ms: 14 * DAY_MS },
+  { label: '30 days', ms: 30 * DAY_MS },
 ] as const;
 
 type Step = 'configure' | 'confirm' | 'created';
 
+function pluralizeTracks(count: number) {
+  return `${count} ${count === 1 ? 'track' : 'tracks'}`;
+}
+
 /**
  * Create-share flow (issue #132): configure -> confirm -> created-link
  * display. The "confirm" step is a deliberate, separate screen - not folded
- * into the same click as "configure" - that restates exactly which
- * activities, which fields, and which expiry were chosen, plus the warning
- * that anyone with the link can view the selection until it expires or is
- * revoked. Only that screen's own button actually creates the link.
+ * into the same click as "configure" - that restates exactly which tracks,
+ * what is shown of them, and which expiry were chosen, and that anyone with
+ * the link can view them until it expires or is revoked. Only that screen's
+ * own button actually creates the link.
  */
-export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
+export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) {
   const dateFormat = useDateFormat();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const selected = useShallowStore((state) => state.selected);
   const { data: activities = [] } = useActivities();
 
@@ -73,7 +83,7 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const hasSelection = selectedActivities.length > 0;
+  const selectionLabel = pluralizeTracks(selectedActivities.length);
 
   async function handleConfirmCreate() {
     setIsCreating(true);
@@ -86,7 +96,7 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
       const url = new URL(`/share/${result.token}`, window.location.origin).toString();
       setCreatedUrl(url);
       setStep('created');
-      onCreated?.();
+      void queryClient.invalidateQueries({ queryKey: MY_SHARE_LINKS_QUERY_KEY });
     } catch (error) {
       toast({
         title: 'Could not create share link',
@@ -102,108 +112,123 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
     if (!createdUrl) return;
     await navigator.clipboard.writeText(createdUrl);
     setCopied(true);
-    toast({ title: 'Copied!', description: 'Share link copied to clipboard.' });
   }
 
   if (step === 'created' && createdUrl) {
     return (
       <>
-        <DialogHeader>
-          <DialogTitle>Your share link is ready</DialogTitle>
+        <DialogHeader className="text-left">
+          <DialogTitle>Link created</DialogTitle>
           <DialogDescription>
-            This is the only time the full link is shown. Save it now - you
-            will not be able to view it again, only revoke it.
+            Copy it now. For your privacy, the full link is only shown once.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3">
-          <div className="flex items-center space-x-2">
-            <Input id="created-link" value={createdUrl} readOnly className="flex-1" />
-            <Button type="button" size="sm" className="px-3" onClick={handleCopy}>
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              <span className="sr-only">Copy</span>
-            </Button>
-          </div>
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              Anyone with this link can view the selected activities until it
-              expires or you revoke it. It will not be shown again - copy it
-              now.
-            </p>
-          </div>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="created-link" className="sr-only">
+            Share link
+          </Label>
+          <Input
+            id="created-link"
+            value={createdUrl}
+            readOnly
+            className="flex-1 font-mono text-xs"
+            onFocus={(event) => event.currentTarget.select()}
+          />
+          <Button type="button" variant="secondary" className="w-24" onClick={handleCopy}>
+            {copied ? <Check /> : <Copy />}
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
         </div>
+        <DialogFooter className="gap-2 sm:justify-between sm:space-x-0">
+          <Button variant="outline" onClick={onShowLinks}>
+            Your links
+          </Button>
+          <DialogClose asChild>
+            <Button>Done</Button>
+          </DialogClose>
+        </DialogFooter>
       </>
     );
   }
 
   if (step === 'confirm') {
-    const enabledGroups = (Object.keys(fields) as (keyof ShareLinkFieldOptions)[]).filter(
-      (key) => fields[key],
-    );
+    const expiryLabel =
+      EXPIRY_OPTIONS.find((option) => option.ms === expiresInMs)?.label ??
+      `${Math.round(expiresInMs / HOUR_MS)} hours`;
+
     return (
       <>
-        <DialogHeader>
-          <DialogTitle>Confirm before sharing</DialogTitle>
+        <DialogHeader className="text-left">
+          <DialogTitle>Create this link?</DialogTitle>
           <DialogDescription>
-            Review exactly what this link will disclose. Creating it is a
-            separate, explicit action from selecting activities in the app.
+            Anyone with the link can view these tracks on a map until it
+            expires or you revoke it.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 text-sm">
-          <div>
-            <p className="font-medium">
-              {selectedActivities.length} activit
-              {selectedActivities.length === 1 ? 'y' : 'ies'} will be shared
-            </p>
-            <ScrollArea className="mt-1 h-32 rounded-md border p-2">
-              <ul className="space-y-1">
+        <dl className="divide-y rounded-md border text-sm">
+          <div className="grid gap-2 px-3 py-2.5">
+            <dt className="font-medium">{selectionLabel}</dt>
+            <dd>
+              <ul className="max-h-32 space-y-1 overflow-y-auto text-xs text-muted-foreground">
                 {selectedActivities.map((activity) => (
-                  <li key={activity.id} className="truncate text-muted-foreground">
-                    {activity.name} -{' '}
-                    {formatPreferredDate(activity.start_date_local, dateFormat)}
+                  <li key={activity.id} className="flex justify-between gap-3">
+                    <span className="truncate">{activity.name}</span>
+                    <span className="shrink-0 tabular-nums">
+                      {formatPreferredDate(activity.start_date_local, dateFormat)}
+                    </span>
                   </li>
                 ))}
               </ul>
-            </ScrollArea>
+            </dd>
           </div>
-          <div>
-            <p className="font-medium">Fields disclosed</p>
-            <p className="text-muted-foreground">
-              Name, date, distance, time, elevation, speed, and route
-              {enabledGroups.length > 0 ? ', plus:' : '.'}
-            </p>
-            {enabledGroups.length > 0 && (
-              <ul className="list-inside list-disc text-muted-foreground">
-                {enabledGroups.map((key) => (
-                  <li key={key}>{SHARE_LINK_FIELD_GROUP_LABELS[key].label}</li>
-                ))}
-              </ul>
-            )}
+          <div className="grid gap-1 px-3 py-2.5">
+            <dt className="font-medium">Shown</dt>
+            <dd className="text-muted-foreground">
+              Route, elevation profile, name, date, distance, moving time,
+              elevation gain and average speed. No heart rate, power, kudos,
+              comments or photos.
+            </dd>
           </div>
-          <div>
-            <p className="font-medium">Expires</p>
-            <p className="text-muted-foreground">
-              {EXPIRY_OPTIONS.find((option) => option.ms === expiresInMs)?.label ??
-                `${Math.round(expiresInMs / (60 * 60 * 1000))} hours`}{' '}
-              from now, or immediately if you revoke it sooner.
-            </p>
+          <div className="flex items-center justify-between gap-4 px-3 py-2.5">
+            <dt className="font-medium">Start and finish</dt>
+            <dd className="text-muted-foreground">
+              {fields.showRouteEnds ? 'Shown' : `Hidden (${SHARED_ROUTE_END_TRIM_METERS} m)`}
+            </dd>
           </div>
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              Anyone who receives this link can view the activities and
-              fields listed above until it expires or you revoke it. Only
-              share it with people you intend to give access to.
-            </p>
+          <div className="flex items-center justify-between gap-4 px-3 py-2.5">
+            <dt className="font-medium">Expires in</dt>
+            <dd className="text-muted-foreground">{expiryLabel}</dd>
           </div>
-        </div>
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="ghost" onClick={() => setStep('configure')} disabled={isCreating}>
+        </dl>
+        <DialogFooter className="gap-2 sm:space-x-0">
+          <Button variant="outline" onClick={() => setStep('configure')} disabled={isCreating}>
             Back
           </Button>
           <Button onClick={handleConfirmCreate} disabled={isCreating}>
-            {isCreating ? 'Creating…' : 'I understand, create the link'}
+            {isCreating ? 'Creating…' : 'Create link'}
           </Button>
+        </DialogFooter>
+      </>
+    );
+  }
+
+  if (selectedActivities.length === 0) {
+    return (
+      <>
+        <DialogHeader className="text-left">
+          <DialogTitle>Share tracks</DialogTitle>
+          <DialogDescription>
+            Select one or more activities on the map or list, then come back
+            here to create a private link to their tracks.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:justify-between sm:space-x-0">
+          <Button variant="outline" onClick={onShowLinks}>
+            Your links
+          </Button>
+          <DialogClose asChild>
+            <Button>OK</Button>
+          </DialogClose>
         </DialogFooter>
       </>
     );
@@ -211,34 +236,22 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>Create a share link</DialogTitle>
+      <DialogHeader className="text-left">
+        <DialogTitle>Share {selectionLabel}</DialogTitle>
         <DialogDescription>
-          Share a private, expiring link to exactly the activities you have
-          selected. Whole-profile sharing has been retired - select
-          activities on the map or list first.
+          Create a private link to view these tracks on a map. It expires
+          automatically, and you can revoke it at any time.
         </DialogDescription>
       </DialogHeader>
-      <div className="grid gap-4">
-        {!hasSelection ? (
-          <p className="text-sm text-muted-foreground">
-            Select one or more activities on the map or list, then reopen
-            this dialog.
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {selectedActivities.length} activit
-            {selectedActivities.length === 1 ? 'y' : 'ies'} selected.
-          </p>
-        )}
 
-        <div className="grid gap-2">
-          <Label htmlFor="expiry">Link expires after</Label>
+      <div className="divide-y rounded-md border">
+        <div className="flex items-center justify-between gap-4 px-3 py-2">
+          <Label htmlFor="share-expiry">Expires after</Label>
           <Select
             value={String(expiresInMs)}
             onValueChange={(value) => setExpiresInMs(Number(value))}
           >
-            <SelectTrigger id="expiry">
+            <SelectTrigger id="share-expiry" className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -251,34 +264,32 @@ export function CreateShareDialog({ onCreated }: { onCreated?: () => void }) {
           </Select>
         </div>
 
-        <div className="grid gap-3">
-          <Label>Additional fields to disclose (off by default)</Label>
-          {(Object.keys(SHARE_LINK_FIELD_GROUP_LABELS) as (keyof ShareLinkFieldOptions)[]).map(
-            (key) => (
-              <div key={key} className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium">
-                    {SHARE_LINK_FIELD_GROUP_LABELS[key].label}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {SHARE_LINK_FIELD_GROUP_LABELS[key].description}
-                  </p>
-                </div>
-                <Switch
-                  checked={fields[key]}
-                  onCheckedChange={(checked) =>
-                    setFields((current) => ({ ...current, [key]: checked }))
-                  }
-                />
-              </div>
-            ),
-          )}
-        </div>
+        <label
+          htmlFor="share-route-ends"
+          className="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5"
+        >
+          <span className="grid gap-1">
+            <span className="text-sm font-medium leading-none">Show start and finish</span>
+            <span className="text-xs text-muted-foreground">
+              Otherwise the first and last {SHARED_ROUTE_END_TRIM_METERS} m are
+              hidden.
+            </span>
+          </span>
+          <Switch
+            id="share-route-ends"
+            checked={fields.showRouteEnds}
+            onCheckedChange={(checked) =>
+              setFields((current) => ({ ...current, showRouteEnds: checked }))
+            }
+          />
+        </label>
       </div>
-      <DialogFooter>
-        <Button onClick={() => setStep('confirm')} disabled={!hasSelection}>
-          Review & confirm
+
+      <DialogFooter className="gap-2 sm:justify-between sm:space-x-0">
+        <Button variant="outline" onClick={onShowLinks}>
+          Your links
         </Button>
+        <Button onClick={() => setStep('confirm')}>Continue</Button>
       </DialogFooter>
     </>
   );

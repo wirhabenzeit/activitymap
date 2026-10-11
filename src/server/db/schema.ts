@@ -18,7 +18,7 @@ import {
 import { sportTypes } from '~/server/strava/types';
 import type { SportType } from '~/server/strava/types';
 import type { WebhookRequest } from '~/types/strava';
-import type { ShareLinkFieldOptions } from '~/lib/sharing/fields';
+import type { StoredShareLinkFieldOptions } from '~/lib/sharing/fields';
 import type {
   ActivityStreamType, RawActivityStreams, StreamFetchFailure,
 } from '~/server/strava/streams';
@@ -636,11 +636,10 @@ export const shareLinks = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
     expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
     revokedAt: timestamp('revoked_at', { mode: 'date' }),
-    // Explicit, athlete-chosen field-disclosure groups
-    // (`ShareLinkFieldOptions`) - every group defaults to `false` (excluded)
-    // both here and in the creation input schema. See
+    // Athlete-chosen share options. Older rows hold the retired opt-in
+    // groups; reads go through `normalizeShareLinkFieldOptions`. See
     // `~/lib/sharing/fields.ts`.
-    fields: jsonb('fields').$type<ShareLinkFieldOptions>().notNull(),
+    fields: jsonb('fields').$type<StoredShareLinkFieldOptions>().notNull(),
   },
   (table) => [
     uniqueIndex('share_links_token_hash_idx').on(table.tokenHash),

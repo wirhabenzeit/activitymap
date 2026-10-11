@@ -253,10 +253,16 @@ export async function getShareView(
       !activity.private,
   );
 
+  const streamSummaries = await shareLinksRepo.findCurrentStreamSummaries(
+    visible.map((activity) => activity.id),
+  );
+
   return {
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     fields: record.fields,
-    activities: visible.map((activity) => toSharedActivityDTO(activity, record.fields)),
+    activities: visible.map((activity) =>
+      toSharedActivityDTO(activity, record.fields, streamSummaries.get(activity.id)),
+    ),
   };
 }
