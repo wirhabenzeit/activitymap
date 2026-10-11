@@ -1,16 +1,21 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { db as defaultDb } from '~/server/db';
 import {
   accounts,
+  activityStreams,
   shareLinkActivities,
   shareLinks,
   users,
   type ShareLink,
 } from '~/server/db/schema';
-import type { ShareLinkFieldOptions } from '~/lib/sharing/fields';
+import {
+  normalizeShareLinkFieldOptions,
+  type ShareLinkFieldOptions,
+} from '~/lib/sharing/fields';
+import type { StoredStreamSummary } from '~/lib/streams/compact-summary';
 
 type DrizzleDb = typeof defaultDb;
 
@@ -41,7 +46,7 @@ function toRecord(row: ShareLink, activityIds: number[]): ShareLinkRecord {
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
     revokedAt: row.revokedAt,
-    fields: row.fields,
+    fields: normalizeShareLinkFieldOptions(row.fields),
     activityIds,
   };
 }
@@ -70,6 +75,11 @@ export interface ShareLinksRepository {
   revoke(athleteId: number, shareId: string, now: Date): Promise<ShareLinkRecord | null>;
   /** Whether the athlete's Strava connection is currently revoked (`accounts.revokedAt` is set). */
   isAthleteRevoked(athleteId: number): Promise<boolean>;
+  /**
+   * Stored stream summaries of the given activities, only where the streams
+   * are current (fetched and not invalidated). Never contacts Strava.
+   */
+  findCurrentStreamSummaries(activityIds: number[]): Promise<Map<number, StoredStreamSummary>>;
 }
 
 export function createShareLinksRepository(
@@ -187,6 +197,26 @@ export function createShareLinksRepository(
           and(eq(users.athlete_id, athleteId), eq(accounts.providerId, 'strava')),
         );
       return Boolean(row?.revokedAt);
+    },
+
+    async findCurrentStreamSummaries(activityIds) {
+      if (activityIds.length === 0) return new Map();
+      const rows = await database
+        .select({ activityId: activityStreams.activityId, summary: activityStreams.summary })
+        .from(activityStreams)
+        .where(
+          and(
+            inArray(activityStreams.activityId, activityIds.map((id) => BigInt(id))),
+            isNotNull(activityStreams.fetchedAt),
+            isNull(activityStreams.invalidatedAt),
+            isNotNull(activityStreams.summary),
+          ),
+        );
+      return new Map(
+        rows.flatMap(({ activityId, summary }) =>
+          summary ? [[Number(activityId), summary] as const] : [],
+        ),
+      );
     },
   };
 }

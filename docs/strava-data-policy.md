@@ -42,18 +42,32 @@ Status: **Accepted**
 - Logs and analytics must redact credentials, private share tokens, and other
   secrets.
 
-## 5. Athlete-directed private sharing
+## 5. Athlete-directed private track sharing
 
-ActivityMap treats deliberate private sharing by the authenticated athlete as
-covered by the API Agreement's express-consent provisions.
+The authenticated athlete can share a private, read-only map of the tracks of
+activities they select. Shared tracks are still Strava-derived data;
+ActivityMap treats deliberate private sharing by the athlete as covered by the
+API Agreement's express-consent provisions.
+
+A share discloses a fixed, track-level allow-list for each selected activity:
+the route line, its elevation profile (elevation and position by distance),
+name, sport type, start date and time, distance, moving time, elevation gain
+and average speed. It never discloses heart rate, power or
+calories; kudos, comments, achievements or other athletes; descriptions,
+photos, gear or device metadata; or exact start and end coordinates. The
+allow-list is enforced server-side in `src/contracts/share/activity.ts`.
 
 A private share must:
 
-- contain only activities and fields explicitly selected by the athlete;
-- require a separate confirmation before creation;
+- contain only activities explicitly selected by the athlete;
+- require a separate confirmation before creation that restates what will be
+  shown;
+- hide the first and last 200 m of each route and elevation profile by
+  default, trimmed before they leave the server; showing the full route is an
+  explicit opt-in;
 - use an unguessable token stored server-side only as a hash;
-- have a finite expiry and immediate athlete-controlled revocation;
-- exclude sensitive and social fields by default;
+- have a finite expiry of at most 30 days and immediate athlete-controlled
+  revocation;
 - be non-indexed and absent from analytics, logs, and referrer headers; and
 - grant no account, API, discovery, list, or unrelated-activity access.
 

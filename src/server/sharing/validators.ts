@@ -24,19 +24,15 @@ export const MAX_SHARE_LINK_ACTIVITIES = 200;
 
 export const shareLinkFieldOptionsSchema = z
   .object({
-    heartRate: z.boolean().default(false),
-    power: z.boolean().default(false),
-    social: z.boolean().default(false),
-    preciseLocation: z.boolean().default(false),
+    showRouteEnds: z.boolean().default(false),
   })
   .strict();
 
 /**
  * Validated input for creating a share link. `activityIds` must be a
  * non-empty, explicit, bounded subset - never "all activities" - and
- * `expiresInMs` must fall within the bounds above. Every field-disclosure
- * group defaults to `false`: making one visible is a deliberate opt-in, not
- * an ambient default (see `~/lib/sharing/fields.ts`).
+ * `expiresInMs` must fall within the bounds above. Route ends are trimmed
+ * unless the athlete explicitly opts in (see `~/lib/sharing/fields.ts`).
  */
 export const createShareLinkInputSchema = z.object({
   activityIds: z

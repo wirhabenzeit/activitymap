@@ -17,7 +17,6 @@ import {
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { useToast } from '~/hooks/use-toast';
 
 import { useActivities } from '~/hooks/use-activities';
@@ -35,23 +34,23 @@ import { ManageSharesDialog } from '~/components/share/manage-shares-dialog';
  * old `/map?user=...`/`/map?activities=...` identifiers are retired
  * entirely (see `LegacyShareButton` below, kept only behind the flag).
  *
- * The two tabs correspond to the two flows the issue calls for: creating a
- * new link (`CreateShareDialog`, which itself has its own configure ->
- * confirm -> created-link-shown-once steps) and managing/revoking existing
- * ones (`ManageSharesDialog`). Reopening the dialog always lands back on
- * "Create" with fresh state - a just-created token is never re-shown, only
- * the "My links" tab's metadata about it.
+ * The dialog has two views: creating a new link (`CreateShareDialog`,
+ * which itself has its own configure -> confirm -> created-link-shown-once
+ * steps) and managing/revoking existing ones (`ManageSharesDialog`).
+ * Reopening the dialog always lands back on "create" with fresh state - a
+ * just-created token is never re-shown, only the links view's metadata
+ * about it.
  */
 function ShareLinksDialog() {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'create' | 'manage'>('create');
+  const [view, setView] = useState<'create' | 'manage'>('create');
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setTab('create');
+        if (next) setView('create');
       }}
     >
       <DialogTrigger asChild>
@@ -60,19 +59,12 @@ function ShareLinksDialog() {
           <span className="sr-only">Share</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[480px]">
-        <Tabs value={tab} onValueChange={(value) => setTab(value as 'create' | 'manage')}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="create">Create link</TabsTrigger>
-            <TabsTrigger value="manage">My links</TabsTrigger>
-          </TabsList>
-          <TabsContent value="create">
-            <CreateShareDialog onCreated={() => undefined} />
-          </TabsContent>
-          <TabsContent value="manage">
-            <ManageSharesDialog />
-          </TabsContent>
-        </Tabs>
+      <DialogContent className="w-[calc(100%-2rem)] rounded-lg sm:max-w-md">
+        {view === 'create' ? (
+          <CreateShareDialog onShowLinks={() => setView('manage')} />
+        ) : (
+          <ManageSharesDialog onBack={() => setView('create')} />
+        )}
       </DialogContent>
     </Dialog>
   );

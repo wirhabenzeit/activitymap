@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, RefreshCw } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 import { Button } from '~/components/ui/button';
 import {
@@ -11,27 +11,37 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog';
-import { ScrollArea } from '~/components/ui/scroll-area';
 import { useToast } from '~/hooks/use-toast';
-import { SHARE_LINK_FIELD_GROUP_LABELS, type ShareLinkFieldOptions } from '~/lib/sharing/fields';
+import { cn } from '~/lib/utils';
 import {
   listMyShareLinks,
   revokeShareLink,
   type ShareLinkSummaryDTO,
 } from '~/server/share-actions';
 
-const MY_SHARE_LINKS_QUERY_KEY = ['my-share-links'] as const;
+export const MY_SHARE_LINKS_QUERY_KEY = ['my-share-links'] as const;
 
-const STATUS_LABEL: Record<ShareLinkSummaryDTO['status'], string> = {
-  active: 'Active',
-  expired: 'Expired',
-  revoked: 'Revoked',
+const STATUS_STYLE: Record<ShareLinkSummaryDTO['status'], { label: string; className: string }> = {
+  active: {
+    label: 'Active',
+    className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  },
+  expired: { label: 'Expired', className: 'bg-muted text-muted-foreground' },
+  revoked: { label: 'Revoked', className: 'bg-muted text-muted-foreground' },
 };
 
-function enabledFieldLabels(fields: ShareLinkFieldOptions): string[] {
-  return (Object.keys(fields) as (keyof ShareLinkFieldOptions)[])
-    .filter((key) => fields[key])
-    .map((key) => SHARE_LINK_FIELD_GROUP_LABELS[key].label);
+function formatTimestamp(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+function describeShare(share: ShareLinkSummaryDTO) {
+  if (share.status === 'revoked') {
+    return share.revokedAt ? `Revoked ${formatTimestamp(share.revokedAt)}` : 'Revoked';
+  }
+  return `${share.status === 'expired' ? 'Expired' : 'Expires'} ${formatTimestamp(share.expiresAt)}`;
 }
 
 /**
@@ -42,7 +52,7 @@ function enabledFieldLabels(fields: ShareLinkFieldOptions): string[] {
  * component - so this view never needs (and never receives) another
  * athlete's data.
  */
-export function ManageSharesDialog() {
+export function ManageSharesDialog({ onBack }: { onBack: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [revokingId, setRevokingId] = useState<string | null>(null);
@@ -70,79 +80,82 @@ export function ManageSharesDialog() {
   });
 
   const shares = sharesQuery.data;
+  const emptyMessage = sharesQuery.isError
+    ? 'Could not load your share links.'
+    : shares === undefined
+      ? 'Loading…'
+      : shares.length === 0
+        ? 'You have not created any share links yet.'
+        : null;
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>My share links</DialogTitle>
-        <DialogDescription>
-          Every share link you have created. Revoking a link takes effect
-          immediately.
-        </DialogDescription>
+      <DialogHeader className="text-left">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="-ml-2 h-7 w-7" onClick={onBack}>
+            <ArrowLeft />
+            <span className="sr-only">Back</span>
+          </Button>
+          <DialogTitle>Your share links</DialogTitle>
+        </div>
+        <DialogDescription>Revoking a link takes effect immediately.</DialogDescription>
       </DialogHeader>
-      <div className="flex items-center justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => void sharesQuery.refetch()}
-          disabled={sharesQuery.isFetching}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${sharesQuery.isFetching ? 'animate-spin' : ''}`} />
-          <span className="ml-2">Refresh</span>
-        </Button>
-      </div>
-      <ScrollArea className="h-72 rounded-md border">
-        {sharesQuery.isError ? (
-          <p className="p-4 text-sm text-muted-foreground">
-            Could not load share links. Try refreshing.
-          </p>
-        ) : shares === undefined ? (
-          <p className="p-4 text-sm text-muted-foreground">Loading…</p>
-        ) : shares.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">
-            You have not created any share links yet.
-          </p>
-        ) : (
-          <ul className="divide-y">
-            {shares.map((share) => (
-              <li key={share.id} className="flex items-start justify-between gap-3 p-3">
-                <div className="min-w-0">
+
+      {emptyMessage !== null ? (
+        <div className="grid place-items-center gap-3 rounded-md border px-4 py-10 text-center text-sm text-muted-foreground">
+          {emptyMessage}
+          {sharesQuery.isError && (
+            <Button variant="outline" size="sm" onClick={() => void sharesQuery.refetch()}>
+              Try again
+            </Button>
+          )}
+        </div>
+      ) : (
+        <ul className="max-h-[min(22rem,60vh)] divide-y overflow-y-auto rounded-md border">
+          {shares?.map((share) => {
+            const status = STATUS_STYLE[share.status];
+            return (
+              <li key={share.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <div className="grid min-w-0 gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{STATUS_LABEL[share.status]}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {share.activityCount} activit{share.activityCount === 1 ? 'y' : 'ies'}
+                    <span
+                      className={cn(
+                        share.status !== 'active' && 'text-muted-foreground',
+                        'text-sm font-medium leading-none',
+                      )}
+                    >
+                      {share.activityCount} {share.activityCount === 1 ? 'track' : 'tracks'}
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none',
+                        status.className,
+                      )}
+                    >
+                      {status.label}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Created {new Date(share.createdAt).toLocaleString()}
+                    {describeShare(share)}
+                    {share.fields.showRouteEnds && ' · Start and finish shown'}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {share.status === 'revoked'
-                      ? `Revoked ${share.revokedAt ? new Date(share.revokedAt).toLocaleString() : ''}`
-                      : `Expires ${new Date(share.expiresAt).toLocaleString()}`}
-                  </p>
-                  {enabledFieldLabels(share.fields).length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Extra fields: {enabledFieldLabels(share.fields).join(', ')}
-                    </p>
-                  )}
                 </div>
                 {share.status === 'active' && (
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => revokeMutation.mutate(share.id)}
                     disabled={revokingId === share.id}
                   >
-                    <Ban className="mr-1 h-3.5 w-3.5" />
-                    Revoke
+                    {revokingId === share.id ? 'Revoking…' : 'Revoke'}
                   </Button>
                 )}
               </li>
-            ))}
-          </ul>
-        )}
-      </ScrollArea>
+            );
+          })}
+        </ul>
+      )}
     </>
   );
 }

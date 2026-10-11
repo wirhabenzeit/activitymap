@@ -1,55 +1,45 @@
 /**
- * Explicit opt-in field-disclosure groups for a private share link
- * (issue #132; see docs/strava-data-policy.md §5).
+ * Athlete-chosen options for a private track share (issue #132; see
+ * docs/strava-data-policy.md §5).
  *
- * Every group defaults to `false` (excluded). Disclosing any of them is a
- * deliberate, visible choice made by the athlete in the share-creation flow,
- * never an ambient default - see `~/server/sharing/validators.ts` (the
- * creation input schema, which defaults every group to `false`) and
- * `~/contracts/share/activity.ts` (the recipient-facing DTO, which is an
- * allow-list gated by these flags, not the full activity minus some
- * excluded keys).
+ * A share discloses a fixed, track-level allow-list (see
+ * `~/contracts/share/activity.ts`): route, name, sport, date and the basic
+ * distance/time/elevation/speed summary. Health, power, social and every
+ * other Strava field are never shared, so they are not options here.
+ *
+ * The one option is whether the route keeps its true start and finish. By
+ * default the server trims both ends (`~/lib/sharing/route-trim.ts`) before
+ * the route ever leaves it; showing them is a deliberate opt-in.
  *
  * This module is imported by both server code (schema, application service)
- * and client UI (the share-creation dialog's field toggles), so it stays
- * free of any `server-only`/framework import.
+ * and client UI (the share-creation dialog), so it stays free of any
+ * `server-only`/framework import.
  */
 export type ShareLinkFieldOptions = {
-  /** `has_heartrate`, `average_heartrate`, `max_heartrate`. */
-  heartRate: boolean;
-  /** `device_watts`, `average_watts`, `max_watts`, `weighted_average_watts`, `kilojoules`, `calories`. */
-  power: boolean;
-  /** `kudos_count`, `comment_count`, `achievement_count`, `athlete_count`, `pr_count`, `has_kudoed`. */
-  social: boolean;
-  /** `start_latlng`, `end_latlng`. */
-  preciseLocation: boolean;
+  /** Show each route's true start and finish instead of trimming both ends. */
+  showRouteEnds: boolean;
+};
+
+/**
+ * What a `share_links.fields` row may contain. Links created before shares
+ * were narrowed to tracks stored four opt-in groups; only `preciseLocation`
+ * still means anything (the athlete chose to reveal exact start/end points).
+ */
+export type StoredShareLinkFieldOptions = Partial<ShareLinkFieldOptions> & {
+  heartRate?: boolean;
+  power?: boolean;
+  social?: boolean;
+  preciseLocation?: boolean;
 };
 
 export const DEFAULT_SHARE_LINK_FIELD_OPTIONS: ShareLinkFieldOptions = {
-  heartRate: false,
-  power: false,
-  social: false,
-  preciseLocation: false,
+  showRouteEnds: false,
 };
 
-export const SHARE_LINK_FIELD_GROUP_LABELS: Record<
-  keyof ShareLinkFieldOptions,
-  { label: string; description: string }
-> = {
-  heartRate: {
-    label: 'Heart rate',
-    description: 'Average and max heart rate.',
-  },
-  power: {
-    label: 'Power & energy',
-    description: 'Watts, weighted average power, kilojoules, and calories.',
-  },
-  social: {
-    label: 'Comments & kudos',
-    description: 'Kudos, comments, achievements, and other athletes present.',
-  },
-  preciseLocation: {
-    label: 'Precise start/end location',
-    description: 'The exact start and end coordinates of each activity.',
-  },
-};
+export function normalizeShareLinkFieldOptions(
+  stored: StoredShareLinkFieldOptions,
+): ShareLinkFieldOptions {
+  return {
+    showRouteEnds: stored.showRouteEnds === true || stored.preciseLocation === true,
+  };
+}
