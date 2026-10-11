@@ -206,6 +206,12 @@ try {
     id(1),
     'failed activity does not starve legacy work',
   );
+  // Production has legacy rows whose athlete_id holds the activity ID; the
+  // replacement must still find and replace them.
+  await database
+    .update(photos)
+    .set({ athlete_id: id(1) })
+    .where(eq(photos.unique_id, photo(1).unique_id));
   const replacement = {
     ...photo(1),
     caption: 'Updated caption',
@@ -238,6 +244,11 @@ try {
     .from(photos)
     .where(eq(photos.unique_id, photo(1).unique_id));
   assert.equal(stored?.caption, 'Updated caption');
+  assert.equal(
+    stored?.athlete_id,
+    athlete,
+    'a legacy row with a wrong athlete_id is replaced, not duplicated',
+  );
   const [verified] = await database
     .select()
     .from(activities)
