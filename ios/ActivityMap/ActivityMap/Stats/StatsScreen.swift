@@ -72,7 +72,7 @@ struct StatsScreen: View {
             StatsActivityInspection(store: store, dashboard: dashboard,
                                     active: detailPresentation == .inline || dashboard.expandedTile == nil,
                                     registersNavigation: detailPresentation == .inline,
-                                    backLabel: "Back to Stats") {
+                                    backLabel: "Back to Stats dashboard") {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
@@ -167,6 +167,7 @@ struct StatsScreen: View {
 /// standalone pages use the native navigation bar.
 private struct StatsDetailDestination<Content: View>: View {
     let title: String
+    var backLabel = "Back to Stats dashboard"
     var usesShellHeader = false
     var closeInspection: (() -> Bool)? = nil
     @ViewBuilder let content: () -> Content
@@ -192,7 +193,7 @@ private struct StatsDetailDestination<Content: View>: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.white)
-                    .accessibilityLabel("Back to Stats")
+                    .accessibilityLabel(backLabel)
                     .accessibilityIdentifier("stats-detail-back")
                 }.sharedBackgroundVisibility(.hidden)
                 ToolbarItem(placement: .principal) {
@@ -223,7 +224,9 @@ struct StatsDetailScreen: View {
     var usesShellHeader = false
 
     var body: some View {
-        StatsDetailDestination(title: tile.title, usesShellHeader: usesShellHeader, closeInspection: {
+        StatsDetailDestination(title: tile.title,
+                               backLabel: dashboard.inspectedActivityID != nil ? "Back to \(tile.title)" : "Back to Stats dashboard",
+                               usesShellHeader: usesShellHeader, closeInspection: {
             guard dashboard.inspectedActivityID != nil else { return false }
             dashboard.inspectedActivityID = nil
             return true

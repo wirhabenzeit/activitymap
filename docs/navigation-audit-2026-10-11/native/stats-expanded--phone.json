@@ -1,0 +1,26 @@
+{
+  "basemap" : "offline",
+  "commit" : "734c23c4a7c427d61924a0725d4bb23cce1970bf",
+  "contentSize" : "UICTContentSizeCategoryL",
+  "dark" : false,
+  "detailID" : null,
+  "fixtureHash" : "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+  "framing" : {
+
+  },
+  "height" : 874,
+  "library" : "curated",
+  "listMetrics" : "distance,elapsedTime,elevationGain",
+  "listOptions" : false,
+  "listView" : "columns",
+  "order" : 7,
+  "orientationCapture" : "scene rotation",
+  "scene" : "stats-expanded",
+  "search" : "",
+  "selectedIDs" : [
+
+  ],
+  "title" : "Stats · expanded Training volume",
+  "variant" : "phone",
+  "width" : 402
+}

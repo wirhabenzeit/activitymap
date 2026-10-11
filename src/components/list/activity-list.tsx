@@ -72,6 +72,10 @@ export function ActivityListView({
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <DataTable
+        browsingKey="list"
+        browsingDataReady={
+          activities !== undefined && !hasNextPage && !isFetching
+        }
         className="h-full"
         columns={columns}
         data={rows}

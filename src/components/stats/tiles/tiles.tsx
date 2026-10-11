@@ -6,7 +6,8 @@
 
 import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
 import { type UnitSystem } from '~/lib/units';
-import { Activity, useMemo, useState, type ReactNode } from 'react';
+import { Activity, useMemo, type ReactNode } from 'react';
+import { useBrowsingState } from '~/hooks/use-browsing-context';
 import { Medal } from 'lucide-react';
 import { comparisonBand } from '~/lib/stats/comparison-band';
 import { periodComparisons, volumeHistoryAverage } from '~/lib/stats/history';
@@ -1474,7 +1475,10 @@ function RecordsPodium({
 }
 
 function RecordsDetail({ context }: { context: TileContext }) {
-  const [range, setRange] = useState<'currentYear' | 'allTime'>('currentYear');
+  const [range, setRange] = useBrowsingState<'currentYear' | 'allTime'>(
+    'stats:recordsPeriod',
+    'currentYear',
+  );
   const showBothPeriods =
     (context.availableWidth ?? context.focusWidth ?? 0) >= 760;
   return (

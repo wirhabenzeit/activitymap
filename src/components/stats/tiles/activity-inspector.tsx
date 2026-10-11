@@ -15,6 +15,8 @@ import {
   inspectedActivity,
 } from '~/components/list/inspection';
 import { Measure } from './charts';
+import { focusedTile } from './focus';
+import { statsTiles } from '~/settings/stats-tiles.generated';
 
 const ActivityDetails = dynamic(() => import('./activity-details'), {
   ssr: false,
@@ -53,6 +55,10 @@ export function StatsActivityInspector({
   ) => ReactNode;
 }) {
   const detailId = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+  const tile =
+    typeof window === 'undefined' ? null : focusedTile(window.location.search);
+  const title =
+    statsTiles.find((item) => item.id === tile)?.title ?? 'stats dashboard';
   const origin = useRef<HTMLElement | null>(null);
   const originId = useRef<number | null>(null);
   const findReturnFocus = useCallback(() => {
@@ -124,7 +130,7 @@ export function StatsActivityInspector({
             ) : undefined
           }
           onBack={close}
-          backLabel="Back to stats"
+          backLabel={`Back to ${title}`}
           returnFocus={origin}
           findReturnFocus={findReturnFocus}
           presentation={detailPresentation(width)}

@@ -4,6 +4,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { focusedTile, tileFocusURL } from '~/components/stats/tiles/focus';
 import { type StatsTileID } from '~/settings/stats-tiles.generated';
+import { activityURL, inspectedActivity } from '~/components/list/inspection';
 
 type FocusHistory = {
   statsTileFocus?: { dashboardURL: string };
@@ -112,6 +113,18 @@ export function useStatsFocus() {
   }, []);
   const close = useCallback(() => {
     const state = window.history.state as FocusHistory | null;
+    if (
+      inspectedActivity(window.location.search) &&
+      !state?.statsActivityDetail?.returnTo
+    ) {
+      window.history.replaceState(
+        { statsTileFocus: state?.statsTileFocus },
+        '',
+        activityURL(window.location.href, 0),
+      );
+      window.dispatchEvent(new Event('activitymap:stats-inspection'));
+      return;
+    }
     // A pushed activity inspection closes first, whether or not the focus
     // itself was opened from the dashboard.
     if (

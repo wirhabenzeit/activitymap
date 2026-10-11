@@ -1,0 +1,34 @@
+{
+  "basemap" : "offline",
+  "commit" : "734c23c4a7c427d61924a0725d4bb23cce1970bf",
+  "contentSize" : "UICTContentSizeCategoryAccessibilityXL",
+  "dark" : false,
+  "detailID" : null,
+  "fixtureHash" : "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+  "framing" : {
+    "cameraSettled" : true,
+    "nativePanelFrame" : "{{8, 255.79999999999995}, {359, 287.20000000000005}}",
+    "paddedVisibleRect" : "{{16, 56}, {287, 179}}",
+    "routeContained" : true,
+    "routePointCount" : 1207,
+    "zoom" : 8.7230000000000008
+  },
+  "height" : 667,
+  "library" : "curated",
+  "listMetrics" : "distance,elapsedTime,elevationGain",
+  "listOptions" : false,
+  "listView" : "columns",
+  "order" : 1,
+  "orientationCapture" : "scene rotation",
+  "scene" : "map-results",
+  "search" : "",
+  "selectedIDs" : [
+    20279947341,
+    20270725942,
+    20244330171,
+    20265394210
+  ],
+  "title" : "Map · four selected routes",
+  "variant" : "small-large-text",
+  "width" : 375
+}

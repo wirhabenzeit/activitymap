@@ -119,7 +119,7 @@ try {
       }
       if (s.id === 'filters') {
         const search = page.getByPlaceholder('Search activities');
-        if (!await search.isVisible()) await page.getByRole('button', { name: 'Toggle Sidebar', exact: true }).first().click();
+        if (!await search.isVisible()) await page.getByRole('button', { name: 'Filters', exact: true }).first().click();
         await search.waitFor();
         assert.equal(await search.inputValue(), s.search);
       }

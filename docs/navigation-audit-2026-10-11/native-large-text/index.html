@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ActivityMap gallery · navigation-audit-large-text-20261011-734c23c4</title>
+<style>
+:root { color-scheme: light dark; --bg: #f4f4f2; --fg: #1c1c1e; --muted: #6b6b70; --card: #fff; }
+@media (prefers-color-scheme: dark) { :root { --bg: #111113; --fg: #f2f2f4; --muted: #9a9aa0; --card: #1c1c1f; } }
+body { margin: 0; padding: 16px 24px 64px; background: var(--bg); color: var(--fg); font: 14px/1.4 -apple-system, system-ui, sans-serif; }
+header { position: sticky; top: 0; background: var(--bg); padding: 8px 0 12px; z-index: 1; }
+h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 32px 0 12px; }
+.meta, figcaption { color: var(--muted); font-size: 12px; }
+nav label { margin-right: 12px; user-select: none; }
+[hidden] { display: none !important; }
+.missing { width: 260px; padding: 24px; background: var(--card); color: var(--muted); }
+.shot.baseline { display: none; }
+body.baselines .shot.baseline { display: block; }
+.row { display: flex; gap: 20px; overflow-x: auto; align-items: flex-start; padding-bottom: 8px; }
+figure { margin: 0; flex: none; }
+.pair { display: flex; gap: 6px; align-items: flex-start; }
+.shot span { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+img { display: block; max-height: var(--h, 560px); max-width: calc(var(--h, 560px) * 1.7); width: auto; border-radius: 12px; background: var(--card); box-shadow: 0 1px 3px #0003; cursor: zoom-in; }
+img.baseline { opacity: .9; outline: 2px dashed var(--muted); outline-offset: -2px; }
+img.zoom { position: fixed; inset: 2vh 0 0; margin: auto; max-height: 96vh; max-width: 96vw; z-index: 2; cursor: zoom-out; }
+</style></head><body>
+<header><h1>ActivityMap gallery · navigation-audit-large-text-20261011-734c23c4</h1>
+<div class="meta">iOS library: curated · basemap: offline · generated 2026-10-11 13:37</div>
+<nav><label>Viewport <select id="variant"><option value="small-large-text">small-large-text</option></select></label>
+<label>size <input type="range" min="240" max="900" value="560" id="size"></label></nav></header>
+<section><h2>Map · four selected routes</h2><div class="row"><figure data-variant="small-large-text"><div class="pair"><div class="shot "><img loading="lazy" decoding="async" class="" src="map-results--small-large-text.jpg" alt="Map · four selected routes, small-large-text, iOS"><span>iOS</span></div><div class="missing">Web: no capture for this scenario</div></div>
+    <figcaption>small-large-text · 375×667 · iOS Dynamic Type / web 150% text (different scaling systems)</figcaption></figure></div></section><section><h2>List · activity detail</h2><div class="row"><figure data-variant="small-large-text"><div class="pair"><div class="shot "><img loading="lazy" decoding="async" class="" src="list-detail--small-large-text.jpg" alt="List · activity detail, small-large-text, iOS"><span>iOS</span></div><div class="missing">Web: no capture for this scenario</div></div>
+    <figcaption>small-large-text · 375×667 · iOS Dynamic Type / web 150% text (different scaling systems)</figcaption></figure></div></section><section><h2>Filters · search for ride</h2><div class="row"><figure data-variant="small-large-text"><div class="pair"><div class="shot "><img loading="lazy" decoding="async" class="" src="filters--small-large-text.jpg" alt="Filters · search for ride, small-large-text, iOS"><span>iOS</span></div><div class="missing">Web: no capture for this scenario</div></div>
+    <figcaption>small-large-text · 375×667 · iOS Dynamic Type / web 150% text (different scaling systems)</figcaption></figure></div></section><section><h2>Stats · expanded Training volume</h2><div class="row"><figure data-variant="small-large-text"><div class="pair"><div class="shot "><img loading="lazy" decoding="async" class="" src="stats-expanded--small-large-text.jpg" alt="Stats · expanded Training volume, small-large-text, iOS"><span>iOS</span></div><div class="missing">Web: no capture for this scenario</div></div>
+    <figcaption>small-large-text · 375×667 · iOS Dynamic Type / web 150% text (different scaling systems)</figcaption></figure></div></section>
+<script>
+document.getElementById('variant').addEventListener('change', (e) => {
+  document.querySelectorAll('figure').forEach((f) => f.hidden = f.dataset.variant !== e.target.value);
+  document.querySelectorAll('section').forEach((s) => s.hidden = !s.querySelector('figure:not([hidden])'));
+});
+document.getElementById('variant').dispatchEvent(new Event('change'));
+document.getElementById('baseline')?.addEventListener('change', (e) => document.body.classList.toggle('baselines', e.target.checked));
+document.getElementById('size').addEventListener('input', (e) => document.body.style.setProperty('--h', e.target.value + 'px'));
+document.addEventListener('click', (e) => { if (e.target.tagName === 'IMG') e.target.classList.toggle('zoom'); });
+</script></body></html>

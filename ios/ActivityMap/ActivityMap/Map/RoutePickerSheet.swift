@@ -22,7 +22,6 @@ struct RoutePickerSheet: View {
     }
     private var detail: Activity? { candidates.first { $0.id == picker.detailID } }
 
-    private var singleDetail: Bool { detail != nil && candidates.count == 1 }
     var body: some View {
         VStack(spacing: 0) {
             if isSidePanel {
@@ -70,6 +69,9 @@ struct RoutePickerSheet: View {
             topTrailingRadius: isSidePanel ? 20 : 28))
         .shadow(color: .black.opacity(nativePresentation ? 0 : 0.12), radius: 16, y: 4)
         .accessibilityIdentifier("map-results-panel")
+        .accessibilityAction(.escape) {
+            if detail != nil { picker.showResults() }
+        }
     }
 
     @ViewBuilder private var results: some View {
@@ -98,7 +100,7 @@ struct RoutePickerSheet: View {
 
     private var sidePanelHeader: some View {
         HStack(spacing: 4) {
-            if detail != nil && candidates.count > 1 && !collapsed {
+            if detail != nil && !collapsed {
                 Button { picker.showResults() } label: {
                     Image(systemName: "chevron.left").frame(width: 44, height: 44)
                 }
@@ -116,12 +118,10 @@ struct RoutePickerSheet: View {
             if detail != nil && !collapsed {
                 if candidates.count > 1, let detail { detailNavigation(detail) }
             }
-            if detail == nil {
-                selectionActions
-                    .opacity(collapsed ? 0 : 1)
-                    .allowsHitTesting(!collapsed)
-                    .accessibilityHidden(collapsed)
-            }
+            selectionActions
+                .opacity(collapsed ? 0 : 1)
+                .allowsHitTesting(!collapsed)
+                .accessibilityHidden(collapsed)
             // Always the trailing control, regardless of summary/navigation.
             panelHandle
         }
@@ -138,27 +138,25 @@ struct RoutePickerSheet: View {
             // Visual grabber clearance only. The 44pt native touch target
             // overlays the surface instead of reserving an empty row.
             Color.clear.frame(height: 13).allowsHitTesting(false)
-            if !singleDetail && !(collapsed && detail != nil) {
+            if !(collapsed && detail != nil) {
                 let layout = typeSize.isAccessibilitySize
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
                     : AnyLayout(HStackLayout(spacing: 4))
                 layout {
                     if let activity = detail {
-                        if candidates.count > 1 {
-                            Button { picker.showResults() } label: {
-                                Label("Results", systemImage: "chevron.left")
-                                    .font(.subheadline.weight(.medium))
-                                    .frame(minHeight: 44)
-                            }
-                            .accessibilityLabel("Back to selected activities")
-                            .accessibilityIdentifier("map-results-back")
+                        Button { picker.showResults() } label: {
+                            Label("Results", systemImage: "chevron.left")
+                                .font(.subheadline.weight(.medium))
+                                .frame(minHeight: 44)
                         }
+                        .accessibilityLabel("Back to selected activities")
+                        .accessibilityIdentifier("map-results-back")
                         if !typeSize.isAccessibilitySize { Spacer(minLength: 0) }
                         if candidates.count > 1 { detailNavigation(activity) }
                     } else {
                         selectionSummary
                     }
-                    if detail == nil { selectionActions }
+                    selectionActions
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 4)
@@ -183,8 +181,8 @@ struct RoutePickerSheet: View {
         Menu {
             if let activity = detail {
                 Section(activity.name) {
-                    Button("Frame route", systemImage: "map") {
-                        store.showOnMap(activity.id)
+                    Button("Fit route", systemImage: "map") {
+                        store.mapContext.request(.fitActivity(activity.id))
                     }.disabled(activity.coordinates.isEmpty)
                     Button("Deselect activity", systemImage: "minus.circle") { store.removeFromSelection([activity.id]) }
                 }

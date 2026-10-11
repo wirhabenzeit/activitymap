@@ -81,10 +81,16 @@ struct MapResultsTests {
                 #expect(layouts.allSatisfy { $0.bottomOcclusion == 0 && $0.trailingOcclusion == layouts[0].trailingOcclusion })
                 #expect(layouts.allSatisfy { $0.frame.maxY == size.height + 21 }, "Both states meet the physical bottom edge through the safe area")
                 #expect(layouts[0].frame.minY > layouts[1].frame.minY, "Expansion moves the top edge upward")
-                let fit = MapResultsLayout.framing(size: size, topInset: 44, bottomInset: 21, detent: .compact, largeText: largeText)
-                #expect(fit.frame == layouts[1].frame, "Explicit fits reserve the full edge footprint")
             }
         }
+    }
+
+    @Test func shortPhoneOpeningSheetLeavesRoomForAccessibleRouteFraming() {
+        let height: CGFloat = 551, top: CGFloat = 116
+        let opening = NativeMapResultsSizing.openingHeight(count: 4, detail: true, height: height,
+                                                         largeText: true, topInset: top)
+        #expect(opening >= 160, "Opening retains a scrolling detail surface")
+        #expect(height - top - 64 - opening - 24 >= 96, "Large text must not leave Show on map waiting for an impossible fit")
     }
 
     @Test(arguments: [CGSize(width: 390, height: 810), CGSize(width: 768, height: 990), CGSize(width: 800, height: 360)])

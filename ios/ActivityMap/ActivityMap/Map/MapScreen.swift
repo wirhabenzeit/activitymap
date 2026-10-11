@@ -176,12 +176,6 @@ struct MapScreen: View {
             picker.showDetail(id, store: store)
             picker.detent = .medium
         }
-        if let action = context.pendingRequest?.action,
-           action == .fitSelection || action == .fitFiltered {
-            // Keep the profile/results visible while leaving room for the route.
-            // A fully expanded phone sheet returns to its normal opening height.
-            picker.detent = .medium
-        }
         // Even a fit of an unchanged selection needs a frame; there may be no
         // style or source update to trigger one on an already idle map.
         proxy.map?.triggerRepaint()
@@ -191,7 +185,7 @@ struct MapScreen: View {
         guard store.selectedTab == .map, context.pendingRequest != nil,
               let map = proxy.map, map.isStyleLoaded else { return }
         acceptsCameraEvents = true
-        let layout = MapResultsLayout.framing(size: geometry.size,
+        let layout = MapResultsLayout(size: geometry.size,
             topInset: max(topOcclusion, geometry.safeAreaInsets.top), bottomInset: geometry.safeAreaInsets.bottom,
             detent: picker.detent, largeText: typeSize.isAccessibilitySize)
         let showingResults = picker.isPresented
@@ -208,7 +202,11 @@ struct MapScreen: View {
                                   bottom: safeArea.bottom, right: safeArea.trailing),
             // Fit above the panel; background controls and credits add no occlusion.
             sheetHeight: showingResults && !layout.isSidePanel
-                ? max(layout.bottomOcclusion, NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.count, detail: picker.detailID != nil, height: geometry.size.height, largeText: typeSize.isAccessibilitySize) + safeArea.bottom) : 0, topOcclusion: topOcclusion,
+                ? (picker.detent == .medium
+                    ? NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.count, detail: picker.detailID != nil,
+                        height: geometry.size.height, largeText: typeSize.isAccessibilitySize,
+                        topInset: max(topOcclusion, safeArea.top)) + safeArea.bottom
+                    : layout.bottomOcclusion) : 0, topOcclusion: topOcclusion,
             trailingOcclusion: showingResults && layout.isSidePanel ? layout.trailingOcclusion + safeArea.trailing : 0
         ) else { return }
         let padding = camera.padding ?? context.camera.padding
@@ -217,7 +215,7 @@ struct MapScreen: View {
         let transitionID = UUID()
         cameraTransitionID = transitionID
         switch action {
-        case .activity, .fitSelection, .fitFiltered:
+        case .activity, .fitActivity, .fitSelection, .fitFiltered:
             // Commit navigation/results layout first. Updating the viewport
             // inside that same SwiftUI update loses its animation transaction.
             // Ease the fixed camera and final panel padding together afterwards.

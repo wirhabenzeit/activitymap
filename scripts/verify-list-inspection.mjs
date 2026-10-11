@@ -43,7 +43,8 @@ function FixtureList() {
 }
 export default function Review() {
   const [client] = useState(() => new QueryClient());
-  return <Suspense><QueryClientProvider client={client}><SidebarProvider className="flex h-dvh flex-col"><AppHeader /><div className="flex min-h-0 flex-1 overflow-hidden"><AppSidebar /><main className="flex min-w-0 flex-1 flex-col overflow-hidden"><div className="h-14 w-full shrink-0"/><div className="min-h-0 w-full flex-1 overflow-hidden"><FixtureList /></div></main></div></SidebarProvider></QueryClientProvider></Suspense>;
+  const [shown, setShown] = useState(true);
+  return <Suspense><QueryClientProvider client={client}><SidebarProvider className="flex h-dvh flex-col"><AppHeader /><div className="flex min-h-0 flex-1 overflow-hidden"><AppSidebar /><main className="flex min-w-0 flex-1 flex-col overflow-hidden"><div className="h-14 w-full shrink-0"/><div className="min-h-0 w-full flex-1 overflow-hidden"><button id="test-peer-destination" className="sr-only" onClick={() => setShown(value => !value)}>Switch destination</button>{shown ? <FixtureList /> : <div>Map destination</div>}</div></main></div></SidebarProvider></QueryClientProvider></Suspense>;
 }
 `,
   );
@@ -113,18 +114,21 @@ export default function Review() {
     await page.setViewportSize({ width, height });
     await loaded();
     await row(firstID).focus();
-    const history = await page.evaluate(() => window.history.length);
+    const history = await page.evaluate(
+      () => window.navigation.currentEntry.index,
+    );
     await page.keyboard.press('Enter');
     await waitID(firstID);
     await assertMode(mode);
-    if (mode === 'panel')
-      assert.equal(await page.evaluate(() => window.history.length), history);
-    else
-      assert(
-        await page.evaluate(
-          () => !!window.history.state.activityListDetail?.returnTo,
-        ),
-      );
+    assert.equal(
+      await page.evaluate(() => window.navigation.currentEntry.index),
+      history + 1,
+    );
+    assert(
+      await page.evaluate(
+        () => !!window.history.state.activityListDetail?.returnTo,
+      ),
+    );
     assert.equal(
       await page
         .locator('#table-main')
@@ -489,7 +493,9 @@ export default function Review() {
     'PASS saved columns, sorted stepping order, retained scroll and focus after paging away',
   );
   await loaded('?dense=1&other=keep#anchor');
-  const history = await page.evaluate(() => window.history.length);
+  const history = await page.evaluate(
+    () => window.navigation.currentEntry.index,
+  );
   await row(6).focus(); // Last row of page 1 (descending ID, 200 per page).
   await page.keyboard.press('Enter');
   await waitID('6');
@@ -515,7 +521,10 @@ export default function Review() {
   await row(205).click();
   await waitID('205');
   assert.equal(await detail.count(), 1, 'Inspectors never stack');
-  assert.equal(await page.evaluate(() => window.history.length), history);
+  assert.equal(
+    await page.evaluate(() => window.navigation.currentEntry.index),
+    history + 1,
+  );
   assert.equal(new URL(page.url()).searchParams.get('other'), 'keep');
   assert.equal(new URL(page.url()).hash, '#anchor');
   await page.reload();
@@ -527,7 +536,10 @@ export default function Review() {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await assertMode('panel');
   assert.equal(id(), '205', 'Resizing retains the inspected activity');
-  assert.equal(await page.evaluate(() => window.history.length), history);
+  assert.equal(
+    await page.evaluate(() => window.navigation.currentEntry.index),
+    history + 1,
+  );
   assert.equal(
     await page
       .locator('#table-main')
@@ -630,6 +642,69 @@ export default function Review() {
     'PASS narrow-open Back/Forward and panel Close after stepping and widening',
   );
 
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await loaded('?dense=1');
+  await page
+    .getByRole('button', { name: 'Go to next page', exact: true })
+    .click();
+  await row(5).waitFor();
+  const togglePeer = () =>
+    page.locator('#test-peer-destination').evaluate((button) => button.click());
+  await togglePeer();
+  await page.locator('#table-main').waitFor({ state: 'detached' });
+  await togglePeer();
+  await row(5).waitFor();
+  assert.equal(
+    await row(205).count(),
+    0,
+    'Page survives a peer destination round trip',
+  );
+  await page
+    .getByRole('button', { name: 'Go to previous page', exact: true })
+    .click();
+  await row(205).waitFor();
+  const savedScroll = await page.locator('#table-main').evaluate((table) => {
+    table.parentElement.scrollTop = 600;
+    return table.parentElement.scrollTop;
+  });
+  await page.waitForTimeout(100);
+  await togglePeer();
+  await page.locator('#table-main').waitFor({ state: 'detached' });
+  await togglePeer();
+  await row(205).waitFor();
+  await page.waitForFunction(
+    (top) =>
+      Math.abs(
+        document.querySelector('#table-main').parentElement.scrollTop - top,
+      ) < 2,
+    savedScroll,
+  );
+  await row(205).click();
+  await waitID('205');
+  await page.goBack();
+  await waitID(null);
+  await page.goForward();
+  await waitID('205');
+  await page.setViewportSize({ width: 402, height: 874 });
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Filters', exact: true }).waitFor();
+  await page.keyboard.press('Escape');
+  await page
+    .getByRole('dialog', { name: 'Filters', exact: true })
+    .waitFor({ state: 'hidden' });
+  assert.equal(id(), '205', 'Filter Escape leaves inspection open');
+  assert.equal(
+    await page
+      .getByRole('button', { name: 'Filters', exact: true })
+      .evaluate((button) => button === document.activeElement),
+    true,
+  );
+  await page.keyboard.press('Escape');
+  await waitID(null);
+  console.log(
+    'PASS panel Back/Forward, peer destination page/scroll retention, filter-first Escape and focus return',
+  );
+
   assert.deepEqual(errors, [], `Browser errors: ${errors.join('; ')}`);
   await writeFile(
     join(output, 'verification.json'),
@@ -666,4 +741,8 @@ export default function Review() {
 } finally {
   await browser?.close();
   await rm(route, { recursive: true, force: true });
+  await rm(
+    resolve(import.meta.dirname, '../.next/dev/types/app/list-inspection-test'),
+    { recursive: true, force: true },
+  );
 }

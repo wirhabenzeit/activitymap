@@ -106,6 +106,7 @@ struct ActivityDetailPanel: View {
                                             scrollsHeading: scrollsMapHeading, bottomContentInset: mapBottomContentInset,
                                             trailingInset: headerTrailingInset, hasRoute: store.routableActivityIDs.contains(activityID)) { id in
                         if let showOnMap { showOnMap(id) }
+                        else if overMap { store.mapContext.request(.fitActivity(id)) }
                         else { store.showOnMap(id) }
                     }
                 } else {
@@ -115,6 +116,7 @@ struct ActivityDetailPanel: View {
                                               hasRoute: store.routableActivityIDs.contains(activityID),
                                               showOnMap: { id in
                             if let showOnMap { showOnMap(id) }
+                            else if overMap { store.mapContext.request(.fitActivity(id)) }
                             else { store.showOnMap(id) }
                         }, profile: { activity in
                             ElevationProfileView(store: store, activityID: activity.id,

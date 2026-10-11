@@ -27,6 +27,10 @@ import {
 import { useTheme } from 'next-themes';
 import { ArrowLeft, Maximize2 } from 'lucide-react';
 import { useStatsFocus } from '~/hooks/use-stats-focus';
+import {
+  useBrowsingState,
+  useRetainedScrollRef,
+} from '~/hooks/use-browsing-context';
 
 import { FilterScope, useStatsActivities } from './scope';
 import {
@@ -187,13 +191,19 @@ export function StatsTileGrid({
   );
 
   const { activeID, open, close } = useStatsFocus();
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollRef, retainScroll] = useRetainedScrollRef('stats:dashboard');
   const previousID = useRef<StatsTileID | null>(null);
-  const [options, setOptions] = useState<Partial<Record<StatsTileID, string>>>(
-    {},
+  const [options, setOptions] = useBrowsingState<
+    Partial<Record<StatsTileID, string>>
+  >('stats:options', {});
+  const [calendarYear, setCalendarYear] = useBrowsingState<number | null>(
+    'stats:calendarYear',
+    null,
   );
-  const [calendarYear, setCalendarYear] = useState<number | null>(null);
-  const [calendarDay, setCalendarDay] = useState<number | null>(null);
+  const [calendarDay, setCalendarDay] = useBrowsingState<number | null>(
+    'stats:calendarDay',
+    null,
+  );
   const calendar = {
     year: calendarYear,
     setYear: setCalendarYear,
@@ -216,7 +226,7 @@ export function StatsTileGrid({
         card?.querySelector<HTMLButtonElement>('button[aria-expanded]') ?? card
       )?.focus({ preventScroll: true });
     }
-  }, [activeID]);
+  }, [activeID, scrollRef]);
 
   useEffect(() => {
     if (!activeID || detailsOpen) return;
@@ -242,7 +252,7 @@ export function StatsTileGrid({
       {({ width: focusWidth, height: focusHeight }) => (
         <>
           <div
-            ref={scrollRef}
+            ref={retainScroll}
             data-stats-dashboard
             inert={Boolean(activeID)}
             aria-hidden={Boolean(activeID)}
@@ -517,6 +527,7 @@ export function TileFocusView({
   onBack: () => void;
 }) {
   const backRef = useRef<HTMLButtonElement>(null);
+  const [, retainScroll] = useRetainedScrollRef(`stats:focus:${tile.id}`);
   useLayoutEffect(() => {
     backRef.current?.focus({ preventScroll: true });
   }, []);
@@ -539,7 +550,11 @@ export function TileFocusView({
             type="button"
             onClick={onBack}
             className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Back to stats dashboard"
+            aria-label={
+              context.selectedActivityId
+                ? `Back to ${tile.title}`
+                : 'Back to stats dashboard'
+            }
           >
             <ArrowLeft aria-hidden="true" className="size-4" />
             Back
@@ -556,6 +571,7 @@ export function TileFocusView({
         )}
       </header>
       <div
+        ref={retainScroll}
         data-stats-focus-scroll
         className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4"
       >

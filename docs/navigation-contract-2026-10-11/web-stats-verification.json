@@ -1,0 +1,95 @@
+{
+  "tiles": [
+    [
+      "weeklyVolume",
+      "training-volume"
+    ],
+    [
+      "monthVsLastMonth",
+      "this-month"
+    ],
+    [
+      "yearToDate",
+      "year-to-date"
+    ],
+    [
+      "records",
+      "records"
+    ],
+    [
+      "activityCalendar",
+      "activity-calendar"
+    ],
+    [
+      "sportMix",
+      "sport-mix"
+    ],
+    [
+      "distanceVsElevation",
+      "hilliness"
+    ]
+  ],
+  "viewports": [
+    [
+      1440,
+      1000
+    ],
+    [
+      874,
+      402
+    ],
+    [
+      402,
+      874
+    ]
+  ],
+  "errors": [],
+  "transitionGeometry": [
+    {
+      "source": {
+        "x": 854,
+        "y": 96,
+        "width": 570,
+        "height": 300,
+        "top": 96,
+        "right": 1424,
+        "bottom": 396,
+        "left": 854
+      },
+      "target": {
+        "x": 256,
+        "y": 56,
+        "width": 1184,
+        "height": 944,
+        "top": 56,
+        "right": 1440,
+        "bottom": 1000,
+        "left": 256
+      },
+      "charts": 3
+    },
+    {
+      "source": {
+        "x": 256,
+        "y": 56,
+        "width": 1184,
+        "height": 944,
+        "top": 56,
+        "right": 1440,
+        "bottom": 1000,
+        "left": 256
+      },
+      "target": {
+        "x": 854,
+        "y": 96,
+        "width": 570,
+        "height": 300,
+        "top": 96,
+        "right": 1424,
+        "bottom": 396,
+        "left": 854
+      },
+      "charts": 2
+    }
+  ]
+}

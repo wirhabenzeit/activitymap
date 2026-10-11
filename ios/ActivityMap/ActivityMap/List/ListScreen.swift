@@ -206,7 +206,7 @@ struct SelectionBar: View {
                     store.deselectAllFiltered()
                 }
                 .disabled(selectedCount == store.hiddenSelectedCount)
-                Button("Clear Selection", role: .destructive) {
+                Button("Clear selection", role: .destructive) {
                     store.clearSelection()
                 }
                 .disabled(selectedCount == 0)

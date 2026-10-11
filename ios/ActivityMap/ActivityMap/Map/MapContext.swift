@@ -35,7 +35,7 @@ final class MapContext {
         let action: Action
     }
     enum Action: Equatable {
-        case activity(Int), fitSelection, fitFiltered, resetBearing, resetView, pitch(CGFloat)
+        case activity(Int), fitActivity(Int), fitSelection, fitFiltered, resetBearing, resetView, pitch(CGFloat)
     }
 
     func record(_ state: CameraState) {

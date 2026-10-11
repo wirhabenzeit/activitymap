@@ -1,0 +1,14 @@
+{
+  "commit": "734c23c4a7c427d61924a0725d4bb23cce1970bf",
+  "dirty": true,
+  "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+  "library": "/Users/dominik/.codex/worktrees/7f2a/activitymap/ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json",
+  "scenarios": [
+    "map-detail"
+  ],
+  "variants": [
+    "wide"
+  ],
+  "buildHash": "9ace37cabaede75085cc717f2210e4d8b7743abcd1c33303e07e9dac64339707",
+  "createdAt": "2026-10-11T17:37:40.464Z"
+}

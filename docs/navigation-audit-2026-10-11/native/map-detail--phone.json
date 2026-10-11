@@ -1,0 +1,31 @@
+{
+  "basemap" : "offline",
+  "commit" : "734c23c4a7c427d61924a0725d4bb23cce1970bf",
+  "contentSize" : "UICTContentSizeCategoryL",
+  "dark" : false,
+  "detailID" : 20279947341,
+  "fixtureHash" : "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+  "framing" : {
+    "cameraSettled" : true,
+    "nativePanelFrame" : "{{8, 369.76119402985074}, {386, 380.23880597014926}}",
+    "paddedVisibleRect" : "{{16, 56}, {314, 290}}",
+    "routeContained" : true,
+    "routePointCount" : 324,
+    "zoom" : 10.807
+  },
+  "height" : 874,
+  "library" : "curated",
+  "listMetrics" : "distance,elapsedTime,elevationGain",
+  "listOptions" : false,
+  "listView" : "columns",
+  "order" : 2,
+  "orientationCapture" : "scene rotation",
+  "scene" : "map-detail",
+  "search" : "",
+  "selectedIDs" : [
+    20279947341
+  ],
+  "title" : "Map · activity detail",
+  "variant" : "phone",
+  "width" : 402
+}

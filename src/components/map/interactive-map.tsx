@@ -13,7 +13,7 @@ import {
   Maximize2,
   Minimize2,
   Globe,
-  X,
+  MoreHorizontal,
   Scan,
   ChevronLeft,
   ChevronRight,
@@ -22,6 +22,12 @@ import { columns } from '~/components/list/columns';
 import { ActivityCard, ActivityCardContent } from '~/components/list/card';
 import { usePrefetchStreamSummaries } from '~/components/list/elevation-chart';
 import { Button } from '~/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu';
 import { activityFields } from '~/settings/activity';
 
 import ReactMapGL, {
@@ -398,6 +404,16 @@ export default function InteractiveMap() {
         panel?.width && panel.height ? panel : null,
       );
       if (
+        map.isStyleLoaded() &&
+        performance.now() - stableSince >= 200 &&
+        !padding
+      ) {
+        finish(
+          'Shrink results or collapse filters to leave room for the route, then try Fit again.',
+        );
+        return;
+      }
+      if (
         !map.isStyleLoaded() ||
         performance.now() - stableSince < 200 ||
         !padding
@@ -715,16 +731,23 @@ export default function InteractiveMap() {
           <Maximize2 className="h-4 w-4" aria-hidden="true" />
         )}
       </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="h-8 w-8"
-        aria-label="Clear selection"
-        title="Clear selection"
-        onClick={clearSelection}
-      >
-        <X className="h-4 w-4" aria-hidden="true" />
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            aria-label="Selection actions"
+          >
+            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={clearSelection}>
+            Clear selection
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 
@@ -870,7 +893,7 @@ export default function InteractiveMap() {
         ref={panelRef}
         id="map-route-panel"
         className={cn(
-          'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,48rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
+          'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,48rem)] [@media(min-width:650px)_and_(max-height:500px)]:left-auto [@media(min-width:650px)_and_(max-height:500px)]:w-[min(42vw,24rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
           { hidden: selected.length === 0 },
         )}
       >
@@ -907,7 +930,7 @@ export default function InteractiveMap() {
                   ? ` · ${hiddenSelectedCount} hidden by filters`
                   : ''}
               </span>
-              {panelControls(resultIds, 'Fit selected routes')}
+              {panelControls(resultIds, 'Fit selection')}
             </div>
           }
           detailNavigation={
@@ -944,7 +967,7 @@ export default function InteractiveMap() {
                   </Button>
                 </div>
               )}
-              {panelControls([detailId], 'Fit current route')}
+              {panelControls([detailId], 'Fit route')}
             </div>
           }
           renderDetails={(row) => (

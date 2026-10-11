@@ -1,0 +1,239 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "3E0E0C42-1356-4B6D-A140-2A1AAAB95C12",
+      "deviceName" : "iPhone 18 Pro",
+      "modelName" : "iPhone 18 Pro",
+      "osBuildNumber" : "24A434",
+      "osVersion" : "27.0",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "duration" : "0.0013s",
+                  "durationInSeconds" : 0.0013358592987060547,
+                  "name" : "resultScopeIncludesExistingSelectionAndGPSLessActivities()",
+                  "nodeIdentifier" : "MapResultsTests/resultScopeIncludesExistingSelectionAndGPSLessActivities()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/resultScopeIncludesExistingSelectionAndGPSLessActivities()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00026s",
+                  "durationInSeconds" : 0.0002627372741699219,
+                  "name" : "detentAndActiveDetailSurviveTabsAndOrdinaryUpdates()",
+                  "nodeIdentifier" : "MapResultsTests/detentAndActiveDetailSurviveTabsAndOrdinaryUpdates()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentAndActiveDetailSurviveTabsAndOrdinaryUpdates()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.000085s",
+                  "durationInSeconds" : 8.511543273925781e-05,
+                  "name" : "dragSnapsFromBothRestingPositionsAndClampsOvershoot()",
+                  "nodeIdentifier" : "MapResultsTests/dragSnapsFromBothRestingPositionsAndClampsOvershoot()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/dragSnapsFromBothRestingPositionsAndClampsOvershoot()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00024s",
+                  "durationInSeconds" : 0.00023674964904785156,
+                  "name" : "hiddenSelectionIsDisclosedWithoutReactivatingAfterFilterReset()",
+                  "nodeIdentifier" : "MapResultsTests/hiddenSelectionIsDisclosedWithoutReactivatingAfterFilterReset()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/hiddenSelectionIsDisclosedWithoutReactivatingAfterFilterReset()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00011s",
+                  "durationInSeconds" : 0.00011181831359863281,
+                  "name" : "widePanelHasOnlyCollapsedAndFullHeightWithStableCameraOcclusion()",
+                  "nodeIdentifier" : "MapResultsTests/widePanelHasOnlyCollapsedAndFullHeightWithStableCameraOcclusion()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/widePanelHasOnlyCollapsedAndFullHeightWithStableCameraOcclusion()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "children" : [
+                    {
+                      "duration" : "0.00012s",
+                      "durationInSeconds" : 0.00011610984802246094,
+                      "name" : "(390.0, 810.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)?args=81f94e79d86401d76299b1a37517eaed9891428697fca1db3774c230dfcd5049",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "0.000072s",
+                      "durationInSeconds" : 7.200241088867188e-05,
+                      "name" : "(768.0, 990.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)?args=b96cec505959879e9e3586a9e5e94ea4443c7a9d8c738be0ae6288c302e2eaa6",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "0.000074s",
+                      "durationInSeconds" : 7.390975952148438e-05,
+                      "name" : "(800.0, 360.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)?args=6e4c382c6b4aec6d8b021ef0f7c1ee27b885d00e0d47880675444bb053a74347",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "0.000087s",
+                  "durationInSeconds" : 8.734067281087239e-05,
+                  "name" : "controlsStayAtTopRightBehindExpandedResults(size:)",
+                  "nodeIdentifier" : "MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "children" : [
+                    {
+                      "duration" : "0.0001s",
+                      "durationInSeconds" : 9.989738464355469e-05,
+                      "name" : "(390.0, 810.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentsLeaveNavigationAvailable(size:)?args=81f94e79d86401d76299b1a37517eaed9891428697fca1db3774c230dfcd5049",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "0.000086s",
+                      "durationInSeconds" : 8.606910705566406e-05,
+                      "name" : "(768.0, 990.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentsLeaveNavigationAvailable(size:)?args=b96cec505959879e9e3586a9e5e94ea4443c7a9d8c738be0ae6288c302e2eaa6",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "0.000078s",
+                      "durationInSeconds" : 7.82012939453125e-05,
+                      "name" : "(800.0, 360.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentsLeaveNavigationAvailable(size:)?args=6e4c382c6b4aec6d8b021ef0f7c1ee27b885d00e0d47880675444bb053a74347",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "0.000088s",
+                  "durationInSeconds" : 8.805592854817708e-05,
+                  "name" : "detentsLeaveNavigationAvailable(size:)",
+                  "nodeIdentifier" : "MapResultsTests/detentsLeaveNavigationAvailable(size:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentsLeaveNavigationAvailable(size:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "MapResultsTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "2s",
+                  "durationInSeconds" : 2.2772581577301025,
+                  "name" : "productionShellKeepsStatsInspectionSeparateFromListNavigation()",
+                  "nodeIdentifier" : "StatsInspectionTests/productionShellKeepsStatsInspectionSeparateFromListNavigation()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/StatsInspectionTests/productionShellKeepsStatsInspectionSeparateFromListNavigation()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "children" : [
+                    {
+                      "duration" : "1s",
+                      "durationInSeconds" : 1.0652480125427246,
+                      "name" : "false",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/StatsInspectionTests/narrowInspectionReturnsToSameFocusAndChoices(largeText:)?args=fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "1s",
+                      "durationInSeconds" : 1.015484094619751,
+                      "name" : "true",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/StatsInspectionTests/narrowInspectionReturnsToSameFocusAndChoices(largeText:)?args=b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.0403660535812378,
+                  "name" : "narrowInspectionReturnsToSameFocusAndChoices(largeText:)",
+                  "nodeIdentifier" : "StatsInspectionTests/narrowInspectionReturnsToSameFocusAndChoices(largeText:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/StatsInspectionTests/narrowInspectionReturnsToSameFocusAndChoices(largeText:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "children" : [
+                    {
+                      "duration" : "1s",
+                      "durationInSeconds" : 1.7334098815917969,
+                      "name" : "\"phone\"",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/StatsInspectionTests/capturesRecordsPodiumsAndActivityInspection(width:)?args=d5511d58ae89a5136544686b7e471128789e3309c2ec9b520c217067f6abb75d",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "1s",
+                      "durationInSeconds" : 1.5508248805999756,
+                      "name" : "\"wide\"",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/StatsInspectionTests/capturesRecordsPodiumsAndActivityInspection(width:)?args=42e78373a349542e52f40531c837e1049eae09a005237e0085a0f185e6ebea82",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.6421173810958862,
+                  "name" : "capturesRecordsPodiumsAndActivityInspection(width:)",
+                  "nodeIdentifier" : "StatsInspectionTests/capturesRecordsPodiumsAndActivityInspection(width:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/StatsInspectionTests/capturesRecordsPodiumsAndActivityInspection(width:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.772481918334961,
+                  "name" : "regularPanelReflowsToPushWithoutLosingActivityOrRecordPeriod()",
+                  "nodeIdentifier" : "StatsInspectionTests/regularPanelReflowsToPushWithoutLosingActivityOrRecordPeriod()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/StatsInspectionTests/regularPanelReflowsToPushWithoutLosingActivityOrRecordPeriod()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "StatsInspectionTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/StatsInspectionTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            }
+          ],
+          "name" : "ActivityMapTests",
+          "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Passed"
+        }
+      ],
+      "name" : "ActivityMap",
+      "nodeType" : "Test Plan",
+      "result" : "Passed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { type StateCreator } from 'zustand';
 import { type RootState } from './index';
 import type { CurrentUserDTO } from '~/server/db/dto';
+import { resetBrowsingContext } from './browsing';
 
 export type InitialAuth = {
   currentUser: CurrentUserDTO | null;
@@ -54,6 +55,7 @@ export const createAuthSlice: StateCreator<
         JSON.stringify(state.guestMode) !==
           JSON.stringify(auth.guestMode ?? { type: null })
       ) {
+        resetBrowsingContext();
         state.selected = [];
         state.highlighted = 0;
         state.knownSelectionIDs = null;

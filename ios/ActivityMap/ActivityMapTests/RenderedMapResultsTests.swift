@@ -83,7 +83,14 @@ extension RenderedRoutePickingTests {
             store.mapContext.request(.fitSelection)
             try await resultsWait { store.mapContext.pendingRequest == nil }
             try await Task.sleep(for: .milliseconds(650))
-            #expect(picker.detent == .medium, "Explicit fits keep the results/profile open")
+            #expect(picker.detent == .expanded, "Fit must not resize results")
+            if scenario == "single" {
+                #expect(store.mapContext.navigationError != nil, "An occluding expanded phone sheet asks the user to shrink results")
+                picker.detent = .medium
+                store.mapContext.request(.fitSelection)
+                try await resultsWait { store.mapContext.pendingRequest == nil }
+                try await Task.sleep(for: .milliseconds(650))
+            }
             let points = map.mapboxMap.points(for: activities[0].coordinates)
             let layout = MapResultsLayout(size: host.view.bounds.size, topInset: 62, bottomInset: host.view.safeAreaInsets.bottom, detent: .medium)
             if layout.isSidePanel {
@@ -91,6 +98,17 @@ extension RenderedRoutePickingTests {
             } else {
                 #expect(points.allSatisfy { $0.y < layout.frame.minY - 16 }, "Fit must leave routes above the panel")
             }
+        }
+        if scenario == "multiple" || scenario == "wide" || scenario == "landscape" {
+            let selected = store.selectedActivityIDs
+            picker.showDetail(1, store: store)
+            let savedDetail = picker.detailID, savedActive = store.activeActivityID, savedSize = picker.detent
+            store.mapContext.request(.fitActivity(1))
+            try await resultsWait { store.mapContext.pendingRequest == nil }
+            #expect(store.selectedActivityIDs == selected && store.activeActivityID == savedActive)
+            #expect(picker.detailID == savedDetail && picker.detent == savedSize)
+            picker.showResults()
+            #expect(store.selectedActivityIDs == selected && store.activeActivityID == savedActive && picker.detailID == nil)
         }
         store.clearSelection()
         try await resultsWait { !picker.isPresented }

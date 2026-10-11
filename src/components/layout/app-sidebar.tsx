@@ -29,7 +29,7 @@ export function AppSidebar() {
   const { isMobile } = useSidebar();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar id="activity-filters" collapsible="icon">
       {!isMobile && (
         <SidebarHeader>
           <div className="h-10" />

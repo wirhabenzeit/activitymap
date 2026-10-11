@@ -109,7 +109,7 @@ struct MapActivityPager: UIViewControllerRepresentable {
                 mapExpansion: expansion, compactMapProfile: parent.compactProfile, scrollsMapHeading: parent.scrollsHeading,
                 mapBottomContentInset: parent.bottomContentInset) { [weak self] id in
                     guard let self else { return }
-                    self.parent.store.showOnMap(id)
+                    self.parent.store.mapContext.request(.fitActivity(id))
                 }
                 .environment(\.activityDetailOverMap, true)
                 .environment(\.colorScheme, parent.colorScheme)
