@@ -685,6 +685,14 @@ nonisolated extension ActivityMapAPI {
     struct RevokeSessionRequest: Codable, Hashable, Sendable {
         let token: String
     }
+
+    struct DeleteAccountRequest: Codable, Hashable, Sendable {
+        let confirmation: String
+    }
+
+    struct DeleteAccountResult: Codable, Hashable, Sendable {
+        let status: String
+    }
 }
 
 nonisolated extension ActivityMapAPI {

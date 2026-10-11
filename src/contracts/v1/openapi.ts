@@ -6,6 +6,7 @@ import {
   activityStreamsDTOSchema,
 } from './activity-streams';
 import { z } from 'zod';
+import { deleteAccountRequestSchema, deleteAccountResultSchema } from './account-deletion';
 import { SCHEMA_VERSION } from './primitives';
 import { authenticationDTOSchema } from './auth';
 import { activityDTOSchema } from './activity';
@@ -84,6 +85,8 @@ export function buildOpenApiDocument() {
     id: 'MobileSessionListResponse',
   });
   registry.add(revokeSessionRequestSchema, { id: 'RevokeSessionRequest' });
+  registry.add(deleteAccountRequestSchema, { id: 'DeleteAccountRequest' });
+  registry.add(responseEnvelope(deleteAccountResultSchema), { id: 'DeleteAccountResponse' });
 
   const { schemas: rawSchemas } = z.toJSONSchema(registry, {
     target: 'draft-2020-12',
@@ -135,6 +138,23 @@ export function buildOpenApiDocument() {
       },
     },
     paths: {
+      '/api/v1/account/delete': {
+        post: {
+          operationId: 'deleteAccount',
+          summary: 'Permanently delete the authenticated ActivityMap account and its data',
+          description: 'Deletes immediately and revokes every session. Original Strava activities are unaffected. Cookie clients must send the deployment Origin; native clients use signed bearer authentication. No target user ID is accepted.',
+          security,
+          requestBody: { required: true, content: { 'application/json': { schema: ref('DeleteAccountRequest') } } },
+          responses: {
+            '200': { description: 'Account and data deleted', content: { 'application/json': { schema: ref('DeleteAccountResponse') } } },
+            '400': errorResponse('Missing or invalid deletion confirmation'),
+            '401': errorResponse('No valid session'),
+            '403': errorResponse('Invalid or missing browser Origin'),
+            '429': errorResponse('Rate limited'),
+            '500': errorResponse('Deletion failed; the transaction was rolled back'),
+          },
+        },
+      },
       '/api/v1/me': {
         get: {
           operationId: 'getCurrentUser',

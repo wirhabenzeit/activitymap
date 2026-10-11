@@ -1,8 +1,25 @@
 /* global self, caches, fetch, Request, Response, URL */
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const SHELL_CACHE = `activitymap-shell-${CACHE_VERSION}`;
 const STATIC_CACHE = `activitymap-static-${CACHE_VERSION}`;
+let accountCacheGeneration = 0;
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'CLEAR_ACCOUNT_DATA') return;
+  accountCacheGeneration += 1;
+  event.waitUntil(
+    (async () => {
+      const names = await caches.keys();
+      await Promise.all(
+        names
+          .filter((name) => name.startsWith('activitymap-'))
+          .map((name) => caches.delete(name)),
+      );
+      event.ports[0]?.postMessage({ cleared: true });
+    })(),
+  );
+});
 
 const APP_SHELL_URLS = [
   '/map',
@@ -55,12 +72,13 @@ const isStaticAssetRequest = (request) =>
   request.destination === 'worker';
 
 const staleWhileRevalidate = async (request, cacheName) => {
+  const generation = accountCacheGeneration;
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
   const network = fetch(request)
     .then(async (response) => {
-      if (response.ok) {
+      if (response.ok && generation === accountCacheGeneration) {
         await cache.put(request, response.clone());
       }
       return response;
@@ -80,15 +98,18 @@ const staleWhileRevalidate = async (request, cacheName) => {
 };
 
 const networkFirstNavigation = async (request) => {
+  const generation = accountCacheGeneration;
   const cache = await caches.open(SHELL_CACHE);
 
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (response.ok && generation === accountCacheGeneration) {
       await cache.put(request, response.clone());
     }
     return response;
   } catch {
+    if (generation !== accountCacheGeneration)
+      return new Response('Offline', { status: 503 });
     const cachedPage = await cache.match(request);
     if (cachedPage) {
       return cachedPage;
@@ -131,7 +152,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.startsWith('/_next/static/') || isStaticAssetRequest(request)) {
+  if (
+    url.pathname.startsWith('/_next/static/') ||
+    isStaticAssetRequest(request)
+  ) {
     event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
   }
 });

@@ -26,6 +26,48 @@ actor GatedSyncSource: SyncPageSource {
 
 @MainActor
 struct SyncControllerTests {
+    @Test func deletionWaitsForCancelledSyncBeforeClearingOfflineData() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let dto = try Fixtures.activity()
+        try await storage.apply([.upsertActivity(dto)], scope: Fixtures.scope)
+        let source = GatedSyncSource()
+        let photoRoot = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: photoRoot) }
+        let activities = ActivityStore(photoImages: PhotoImageCache(bytes: PhotoByteCache(root: photoRoot)))
+        let controller = SyncController(activities: activities, source: { _ in source }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await source.waitForRequest()
+        let deletion = Task { try await controller.clearAfterAccountDeletion() }
+        while controller.session != nil { await Task.yield() }
+        await source.release(SyncFixtures.activities([dto]))
+        try await deletion.value
+        #expect(controller.session == nil && controller.status == .signedOut)
+        #expect(activities.activities.isEmpty && controller.photos.isEmpty)
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities.isEmpty)
+        #expect(try await storage.snapshot(scope: Fixtures.scope).checkpoint == nil)
+    }
+
+    @Test func deletionDiscardsPendingFirstSummaryCompletion() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let photoRoot = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: photoRoot) }
+        let activities = ActivityStore(photoImages: PhotoImageCache(bytes: PhotoByteCache(root: photoRoot)))
+        let source = SyncFixtures.complete()
+        let gate = SummaryFetchGate()
+        let controller = SyncController(activities: activities, source: { _ in source },
+                                        fetchInitialSummaries: { _ in await gate.fetch() }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await gate.waitForRequest()
+        let deletion = Task { try await controller.clearAfterAccountDeletion() }
+        while controller.session != nil { await Task.yield() }
+        await gate.release()
+        try await deletion.value
+        #expect(controller.status == .signedOut && controller.firstSummaryCount == nil)
+        #expect(controller.firstSummaryError == nil && activities.activities.isEmpty)
+        #expect(try await storage.snapshot(scope: Fixtures.scope).checkpoint == nil)
+        #expect(await source.calls == 3)
+    }
+
     @Test func failedDownloadRetainsSummaryCountForRecoveryWithoutRepeatingImport() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let imported = try Fixtures.activity(["id": "1"])

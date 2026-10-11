@@ -4,22 +4,33 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
-import { resolveMigrationTarget, verifyConnectedTarget } from '../../src/server/db/migration-tooling.ts';
+import {
+  resolveMigrationTarget,
+  verifyConnectedTarget,
+} from '../../src/server/db/migration-tooling.ts';
 import {
   accounts,
   activities,
+  activityStreams,
   activityDeletions,
   activitySync,
   mobileLoginCodes,
   photoDeletions,
   photos,
   sessions,
+  shareLinks,
+  shareLinkActivities,
   stravaWebhookEvents,
   syncChanges,
   users,
   verification,
 } from '../../src/server/db/schema.ts';
-import { createErasureRepository } from '../../src/server/repositories/erasure.ts';
+import {
+  createAccountDeletionRepository,
+  createErasureRepository,
+} from '../../src/server/repositories/erasure.ts';
+import { lockActiveStravaAccount } from '../../src/server/repositories/account-lifecycle.ts';
+import { fetchStravaActivities } from '../../src/server/strava/service.ts';
 
 const environment = process.env;
 const target = resolveMigrationTarget(environment);
@@ -42,6 +53,9 @@ const client = postgres(target.connectionString, {
 const testDb = drizzle(client);
 const repository = createErasureRepository(
   testDb as unknown as Parameters<typeof createErasureRepository>[0],
+);
+const deletion = createAccountDeletionRepository(
+  testDb as unknown as Parameters<typeof createAccountDeletionRepository>[0],
 );
 
 const NOW = new Date('2026-09-20T12:00:00.000Z');
@@ -153,6 +167,25 @@ async function seed(): Promise<void> {
     athlete_id: DUE_ATHLETE_ID,
     type: 0,
   });
+  await testDb
+    .insert(activityStreams)
+    .values({
+      activityId: 9_002_001n,
+      generation: 'erasure-proof-generation',
+      requestedTypes: ['altitude'],
+      lastAttemptAt: NOW,
+      lastAttemptStatus: 'succeeded',
+    });
+  await testDb.insert(shareLinks).values({
+    id: 'erasure-proof-share',
+    athleteId: DUE_ATHLETE_ID,
+    tokenHash: 'erasure-proof-share-token',
+    fields: { showRouteEnds: false },
+    expiresAt: new Date('2026-10-20'),
+  });
+  await testDb
+    .insert(shareLinkActivities)
+    .values({ shareId: 'erasure-proof-share', activityId: 9_002_001 });
   await testDb.insert(activityDeletions).values({
     athlete_id: DUE_ATHLETE_ID,
     activity_id: 9_002_002,
@@ -215,6 +248,9 @@ async function verifyDueAthleteWasFullyErased(): Promise<void> {
       users: number;
       verifications: number;
       webhook_events: number;
+      streams: number;
+      shares: number;
+      share_activities: number;
     }>
   >`
     SELECT
@@ -224,6 +260,9 @@ async function verifyDueAthleteWasFullyErased(): Promise<void> {
       (SELECT count(*)::int FROM activity_sync WHERE user_id = ${DUE_USER_ID}) AS activity_sync,
       (SELECT count(*)::int FROM mobile_login_codes WHERE user_id = ${DUE_USER_ID}) AS mobile_codes,
       (SELECT count(*)::int FROM activities WHERE athlete = ${DUE_ATHLETE_ID}) AS activities,
+      (SELECT count(*)::int FROM activity_streams WHERE activity_id = 9002001) AS streams,
+      (SELECT count(*)::int FROM share_links WHERE athlete_id = ${DUE_ATHLETE_ID}) AS shares,
+      (SELECT count(*)::int FROM share_link_activities WHERE share_id = 'erasure-proof-share') AS share_activities,
       (SELECT count(*)::int FROM photos WHERE athlete_id = ${DUE_ATHLETE_ID}) AS photos,
       (SELECT count(*)::int FROM sync_change WHERE athlete_id = ${DUE_ATHLETE_ID}) AS sync_changes,
       (SELECT count(*)::int FROM activity_deletions WHERE athlete_id = ${DUE_ATHLETE_ID}) AS activity_deletions,
@@ -246,6 +285,9 @@ async function verifyDueAthleteWasFullyErased(): Promise<void> {
     users: 0,
     verifications: 0,
     webhook_events: 0,
+    streams: 0,
+    shares: 0,
+    share_activities: 0,
   });
 }
 
@@ -313,6 +355,201 @@ async function main(): Promise<void> {
 
     const remainingDue = await repository.listDue(10, NOW);
     assert.deepEqual(remainingDue, []);
+
+    // Self-service deletion uses the same cleanup for an actively connected
+    // account, with no revocation or 30-day deadline.
+    await cleanup();
+    await seed();
+    await testDb
+      .update(accounts)
+      .set({
+        accessToken: 'connected-token',
+        revokedAt: null,
+        scheduledErasureAt: null,
+      })
+      .where(eq(accounts.id, 'erasure-proof-due-account'));
+    const originalIdentity = {
+      id: 'erasure-proof-due-account',
+      userId: DUE_USER_ID,
+    };
+    assert.equal(
+      await testDb.transaction((tx) =>
+        lockActiveStravaAccount(tx as never, originalIdentity),
+      ),
+      true,
+    );
+    assert.equal(
+      await deletion.deleteForSession(DUE_USER_ID, 'wrong-token', NOW),
+      false,
+    );
+    assert.equal(
+      await deletion.deleteForSession(
+        RECONNECTED_USER_ID,
+        'erasure-proof-session-token',
+        NOW,
+      ),
+      false,
+    );
+    assert.equal(
+      await deletion.deleteForSession(
+        DUE_USER_ID,
+        'erasure-proof-session-token',
+        new Date('2026-11-01'),
+      ),
+      false,
+    );
+    assert.equal(
+      (await testDb.select().from(users).where(eq(users.id, DUE_USER_ID)))
+        .length,
+      1,
+    );
+
+    // A failure at the final delete must roll back the earlier explicit cleanup.
+    await client.unsafe(
+      `CREATE FUNCTION erasure_proof_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'proof rollback'; END $$`,
+    );
+    await client.unsafe(
+      `CREATE TRIGGER erasure_proof_fail BEFORE DELETE ON "user" FOR EACH ROW WHEN (OLD.id = '${DUE_USER_ID}') EXECUTE FUNCTION erasure_proof_fail()`,
+    );
+    try {
+      await assert.rejects(
+        deletion.deleteForSession(
+          DUE_USER_ID,
+          'erasure-proof-session-token',
+          NOW,
+        ),
+        (error: unknown) =>
+          error instanceof Error &&
+          error.cause instanceof Error &&
+          error.cause.message.includes('proof rollback'),
+      );
+      assert.equal(
+        (
+          await testDb
+            .select()
+            .from(stravaWebhookEvents)
+            .where(eq(stravaWebhookEvents.ownerId, DUE_ATHLETE_ID))
+        ).length,
+        1,
+      );
+      assert.equal(
+        (
+          await testDb
+            .select()
+            .from(verification)
+            .where(eq(verification.identifier, DUE_USER_ID))
+        ).length,
+        1,
+      );
+    } finally {
+      await client.unsafe('DROP TRIGGER erasure_proof_fail ON "user"');
+      await client.unsafe('DROP FUNCTION erasure_proof_fail()');
+    }
+
+    let upstreamStarted!: () => void;
+    let finishUpstream!: () => void;
+    const started = new Promise<void>((resolve) => {
+      upstreamStarted = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      finishUpstream = resolve;
+    });
+    const staleImport = fetchStravaActivities(
+      {
+        accessToken: 'connected-token',
+        athleteId: DUE_ATHLETE_ID,
+        activityIds: [9_002_001],
+      },
+      {
+        database: testDb as never,
+        createClient: () => ({
+          getActivity: async () => {
+            upstreamStarted();
+            await release;
+            return {
+              id: 9_002_001,
+              athlete: { id: DUE_ATHLETE_ID },
+              name: 'Stale import',
+              sport_type: 'Run',
+              resource_state: 3,
+              start_date: '2026-01-01T00:00:00Z',
+              start_date_local: '2026-01-01T00:00:00Z',
+              timezone: 'UTC',
+              map: { id: 'proof-map', polyline: null, summary_polyline: null },
+            } as never;
+          },
+          getActivities: async () => [],
+          getActivityPhotos: async () => [],
+        }),
+      },
+    );
+    await started;
+    assert.deepEqual(
+      (
+        await Promise.all([
+          deletion.deleteForSession(
+            DUE_USER_ID,
+            'erasure-proof-session-token',
+            NOW,
+          ),
+          deletion.deleteForSession(
+            DUE_USER_ID,
+            'erasure-proof-session-token',
+            NOW,
+          ),
+        ])
+      ).sort(),
+      [false, true],
+    );
+    await verifyDueAthleteWasFullyErased();
+    assert.equal(
+      (
+        await testDb
+          .select()
+          .from(users)
+          .where(eq(users.id, RECONNECTED_USER_ID))
+      ).length,
+      1,
+    );
+
+    // Reusing the same athlete at a fresh signup must never revive old work.
+    await testDb
+      .insert(users)
+      .values({ id: DUE_USER_ID, athlete_id: DUE_ATHLETE_ID });
+    await testDb
+      .insert(accounts)
+      .values({
+        id: 'erasure-proof-new-account',
+        userId: DUE_USER_ID,
+        providerId: 'strava',
+        accountId: String(DUE_ATHLETE_ID),
+        accessToken: 'new-token',
+      });
+    finishUpstream();
+    assert.deepEqual((await staleImport).activities, []);
+    assert.equal(
+      await testDb.transaction((tx) =>
+        lockActiveStravaAccount(tx as never, originalIdentity),
+      ),
+      false,
+    );
+    assert.equal(
+      (
+        await testDb
+          .select()
+          .from(activities)
+          .where(eq(activities.athlete, DUE_ATHLETE_ID))
+      ).length,
+      0,
+    );
+    assert.equal(
+      await deletion.deleteForSession(
+        DUE_USER_ID,
+        'erasure-proof-session-token',
+        NOW,
+      ),
+      false,
+    );
     console.log('Erasure executor PostgreSQL proof passed.');
   } finally {
     await cleanup();

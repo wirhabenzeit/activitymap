@@ -9,7 +9,13 @@ import {
 } from '~/lib/sync/browser-status';
 import { SyncApiError } from '~/lib/sync/v1-client';
 import {
+  ACCOUNT_DELETED_STORAGE_KEY,
+  clearDeletedAccountData,
+  registerAccountDeletionCleanup,
+} from '~/lib/account-deletion';
+import {
   getV1SyncState,
+  clearV1Scope,
   OfflineCacheUpgradeBlockedError,
 } from '~/lib/sync/v1-store';
 import { deleteLegacyOfflineDatabase } from '~/lib/sync/v1-store';
@@ -61,6 +67,7 @@ export function OfflineSyncProvider() {
 
   const runSync = useCallback(() => {
     if (!isInitialized || isGuest || !userId) return;
+    if (useShallowStore.getState().user?.id !== userId) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       updateBrowserSyncStatus(userId, { phase: 'offline' });
       return;
@@ -185,6 +192,10 @@ export function OfflineSyncProvider() {
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
+        if (error instanceof SyncApiError && error.status === 401) {
+          if (useShallowStore.getState().user?.id === userId)
+            initializeAuth({ currentUser: null });
+        }
         updateBrowserSyncStatus(userId, {
           phase: navigator.onLine ? 'error' : 'offline',
           error:
@@ -205,16 +216,56 @@ export function OfflineSyncProvider() {
   }, [isInitialized, isGuest, queryClient, userId, initializeAuth]);
 
   useEffect(() => {
+    const unregister = registerAccountDeletionCleanup(async (deletedUserId) => {
+      const pending = inFlightRef.current;
+      if (pending?.userId === deletedUserId) pending.controller.abort();
+      if (useShallowStore.getState().user?.id === deletedUserId) {
+        initializeAuth({ currentUser: null });
+      }
+      await queryClient.cancelQueries();
+      if (pending?.userId === deletedUserId) await pending.promise;
+      clearStreamSummarySyncAttempts(deletedUserId);
+      await removeStreamSummaryScope(queryClient, deletedUserId);
+      await clearV1Scope(`auth:${deletedUserId}`);
+      queryClient.clear();
+    });
+    const onDeletion = (event: StorageEvent) => {
+      if (event.key !== ACCOUNT_DELETED_STORAGE_KEY || !event.newValue) return;
+      try {
+        const value: unknown = JSON.parse(event.newValue);
+        if (
+          typeof value === 'object' &&
+          value &&
+          'userId' in value &&
+          typeof value.userId === 'string'
+        ) {
+          void clearDeletedAccountData(value.userId).catch(() => undefined);
+        }
+      } catch {
+        /* Ignore malformed cross-tab notifications. */
+      }
+    };
+    window.addEventListener('storage', onDeletion);
+    return () => {
+      unregister();
+      window.removeEventListener('storage', onDeletion);
+    };
+  }, [initializeAuth, queryClient]);
+
+  useEffect(() => {
     const previous = previousUserIdRef.current;
     previousUserIdRef.current = !isGuest ? userId : undefined;
     if (previous && (previous !== userId || isGuest)) {
-      inFlightRef.current?.controller.abort();
+      const pending = inFlightRef.current;
+      pending?.controller.abort();
       clearStreamSummarySyncAttempts(previous);
       // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
       summaryRetryAtRef.current.delete(previous);
-      void removeStreamSummaryScope(queryClient, previous).catch(
-        () => undefined,
-      );
+      void (async () => {
+        if (pending?.userId === previous) await pending.promise;
+        await removeStreamSummaryScope(queryClient, previous);
+        await clearV1Scope(`auth:${previous}`);
+      })().catch(() => undefined);
     }
   }, [isGuest, queryClient, userId]);
 

@@ -6,6 +6,7 @@ import { prepareGallery } from '~/lib/gallery-fixture';
 import { useSearchParams } from 'next/navigation';
 import { useShallowStore } from '~/store';
 import type { InitialAuth } from '~/store/auth';
+import { wasAccountDeleted } from '~/lib/account-deletion';
 
 export function AuthProvider({
   initialAuth,
@@ -16,17 +17,15 @@ export function AuthProvider({
 }) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const {
-    initializeAuth,
-    isInitialized,
-  } = useShallowStore((state) => ({
+  const { initializeAuth, isInitialized } = useShallowStore((state) => ({
     initializeAuth: state.initializeAuth,
     isInitialized: state.isInitialized,
   }));
 
   useEffect(() => {
     if (!isInitialized) {
-      if (process.env.NODE_ENV === 'development' && prepareGallery(queryClient)) return;
+      if (process.env.NODE_ENV === 'development' && prepareGallery(queryClient))
+        return;
       // Handle guest mode from search params
       const userParam = searchParams.get('user');
       const activitiesParam = searchParams.get('activities');
@@ -37,9 +36,9 @@ export function AuthProvider({
           userId: userParam ?? undefined,
           activityIds: activitiesParam
             ? activitiesParam
-              .split(',')
-              .map(Number)
-              .filter((id) => !isNaN(id))
+                .split(',')
+                .map(Number)
+                .filter((id) => !isNaN(id))
             : undefined,
         } as const;
         initializeAuth({ ...initialAuth, guestMode });
@@ -47,18 +46,16 @@ export function AuthProvider({
       }
 
       // Initialize the auth state
-      initializeAuth(initialAuth);
+      initializeAuth(
+        initialAuth.currentUser && wasAccountDeleted(initialAuth.currentUser.id)
+          ? { currentUser: null }
+          : initialAuth,
+      );
 
       // Note: Data fetching is now handled by TanStack Query hooks (useActivities, usePhotos)
       // in the components that need the data, rather than batched loading here.
     }
-  }, [
-    searchParams,
-    queryClient,
-    initialAuth,
-    isInitialized,
-    initializeAuth,
-  ]);
+  }, [searchParams, queryClient, initialAuth, isInitialized, initializeAuth]);
 
   return <>{children}</>;
 }

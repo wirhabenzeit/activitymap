@@ -2,6 +2,8 @@ import 'server-only';
 
 import {
   activities as activitySchema,
+  accounts,
+  users,
   photoDeletions,
   photos as photosSchema,
   type Activity,
@@ -13,7 +15,8 @@ import { logger } from '~/server/logging/logger';
 import { isStravaActivityNotFoundError, StravaClient } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';
 import { type StravaPhoto } from './types';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { lockActiveStravaAccount } from '~/server/repositories/account-lifecycle';
 import type { StravaActivity } from './types';
 import { fetchActivitiesSchema, type FetchActivitiesInput } from './validators';
 import {
@@ -25,6 +28,19 @@ import { summaryConflictSet } from '~/server/repositories/summary-reconciliation
 type ActivityPersistenceTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0];
+
+async function lockExistingActivities(
+  tx: ActivityPersistenceTransaction,
+  athleteId: number,
+  activityIds: number[],
+): Promise<boolean> {
+  const existing = await tx
+    .select({ id: activitySchema.id })
+    .from(activitySchema)
+    .where(and(eq(activitySchema.athlete, athleteId), inArray(activitySchema.id, activityIds)))
+    .for('update');
+  return existing.length === activityIds.length;
+}
 
 /**
  * Run a refresh persistence callback only after locking every still-owned
@@ -38,17 +54,7 @@ export async function withLockedExistingActivities<T>(
   persist: (tx: ActivityPersistenceTransaction) => Promise<T>,
 ): Promise<T | null> {
   return database.transaction(async (tx) => {
-    const existing = await tx
-      .select({ id: activitySchema.id })
-      .from(activitySchema)
-      .where(
-        and(
-          eq(activitySchema.athlete, athleteId),
-          inArray(activitySchema.id, activityIds),
-        ),
-      )
-      .for('update');
-    if (existing.length !== activityIds.length) return null;
+    if (!await lockExistingActivities(tx, athleteId, activityIds)) return null;
     return persist(tx);
   });
 }
@@ -160,6 +166,15 @@ export async function fetchStravaActivities(
     persist,
     requireExisting,
   } = fetchActivitiesSchema.parse(input);
+
+  // Preserve the account identity across the upstream request. Looking up only
+  // by athlete afterwards could attach stale work to a fresh signup.
+  const persistenceAccount = persist ? (await database.select({ id: accounts.id, userId: accounts.userId })
+    .from(accounts).innerJoin(users, eq(users.id, accounts.userId))
+    .where(and(eq(users.athlete_id, athleteId), eq(accounts.providerId, 'strava'),
+      isNull(accounts.revokedAt), or(eq(accounts.accessToken, accessToken), eq(accounts.access_token, accessToken))))
+    .limit(1))[0] : null;
+  if (persist && !persistenceAccount) throw new Error('Strava account is no longer active');
 
   // Token refresh is now handled outside this function
   const client = (deps.createClient ?? StravaClient.withAccessToken)(
@@ -488,14 +503,11 @@ export async function fetchStravaActivities(
 
         return dbActivities.length > 0 ? savedStats : dbActivities;
       };
-      savedActivities = requireExisting
-        ? ((await withLockedExistingActivities(
-            database,
-            athleteId,
-            requestedActivityIds ?? [],
-            persistRows,
-          )) ?? [])
-        : await database.transaction(persistRows);
+      savedActivities = await database.transaction(async (tx) => {
+        if (!persistenceAccount || !await lockActiveStravaAccount(tx, persistenceAccount)) return [];
+        if (requireExisting && !await lockExistingActivities(tx, athleteId, requestedActivityIds ?? [])) return [];
+        return persistRows(tx);
+      });
     } catch (error) {
       throw new StravaPersistenceError({ cause: error });
     }

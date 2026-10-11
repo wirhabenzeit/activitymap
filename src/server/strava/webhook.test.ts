@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { accounts, activities, photos, syncChanges } from '~/server/db/schema';
+import { accounts, activities, photos, syncChanges, users } from '~/server/db/schema';
 
 import {
   isRegisteredStravaAthlete,
@@ -37,7 +37,10 @@ function buildFakeDb(opts: {
         return {
           from(table: unknown) {
             return {
-              where: async () => {
+              where: () => {
+                if (table === users || table === accounts) {
+                  return { for: async () => [{ id: table === users ? 'user-42' : 'account-42' }] };
+                }
                 calls.push({ method: 'select', via });
                 if (table === photos) {
                   // Both the not-found branch (`{ id }`) and the
@@ -126,7 +129,7 @@ function deps(
   overrides: Partial<ProcessWebhookEventDeps> = {},
 ): ProcessWebhookEventDeps {
   return {
-    resolveAccount: async () => ({ access_token: 'token' }) as never,
+    resolveAccount: async () => ({ id: 'account-42', userId: 'user-42', access_token: 'token' }) as never,
     ...overrides,
   };
 }

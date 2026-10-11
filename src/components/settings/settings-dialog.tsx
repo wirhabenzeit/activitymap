@@ -11,6 +11,11 @@ import {
 } from '~/components/ui/dialog';
 import { Button } from '~/components/ui/button';
 import { signOut } from '~/lib/auth-client';
+import {
+  clearDeletedAccountData,
+  deleteAccount,
+  notifyAccountDeleted,
+} from '~/lib/account-deletion';
 import { displayEmail, safeReturnPath } from '~/lib/auth-return';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { DisplaySettings } from './display-settings';
@@ -61,6 +66,11 @@ export function SettingsDialog({
   );
   const [signingOut, setSigningOut] = useState(false);
   const [signOutFailed, setSignOutFailed] = useState(false);
+  const [confirmDeletion, setConfirmDeletion] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deletionFailed, setDeletionFailed] = useState(false);
+  const [accountDeleted, setAccountDeleted] = useState<string | null>(null);
+  const [cleanupFailed, setCleanupFailed] = useState(false);
   const browser = useBrowserSyncStatus((state) =>
     userId ? (state.byUser[userId] ?? emptyBrowserStatus) : emptyBrowserStatus,
   );
@@ -142,8 +152,49 @@ export function SettingsDialog({
     }
   };
 
+  const handleDeletion = async () => {
+    const deletedUserId = accountDeleted ?? userId;
+    if (!deletedUserId) return;
+    setDeleting(true);
+    setDeletionFailed(false);
+    setCleanupFailed(false);
+    try {
+      if (!accountDeleted) {
+        await deleteAccount();
+        setAccountDeleted(deletedUserId);
+        notifyAccountDeleted(deletedUserId);
+      }
+      try {
+        await clearDeletedAccountData(deletedUserId);
+      } catch {
+        setCleanupFailed(true);
+        return;
+      }
+      // The deletion transaction already revoked every server session.
+      // Sign-out also removes the browser's authentication cookie.
+      await signOut().catch(() => undefined);
+      // Reload drops authenticated server-rendered state and in-memory caches.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign('/map');
+    } catch {
+      setDeletionFailed(true);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (deleting) return;
+        if (!value) {
+          setConfirmDeletion(false);
+          setDeletionFailed(false);
+        }
+        onOpenChange(value);
+      }}
+    >
       <DialogContent
         overlayClassName="z-[70]"
         className="z-[70] flex h-[min(30rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-md flex-col gap-0 overflow-hidden rounded-xl p-0 [@media(min-width:640px)_and_(max-height:500px)]:h-[calc(100dvh-2rem)] [@media(min-width:640px)_and_(max-height:500px)]:max-w-2xl [&>button]:right-2 [&>button]:top-2 [&>button]:flex [&>button]:size-11 [&>button]:items-center [&>button]:justify-center"
@@ -156,7 +207,9 @@ export function SettingsDialog({
         </DialogHeader>
         <Tabs
           value={tab}
-          onValueChange={setTab}
+          onValueChange={(value) => {
+            if (!deleting) setTab(value);
+          }}
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="shrink-0 border-b px-5 pb-3">
@@ -329,6 +382,23 @@ export function SettingsDialog({
             value="account"
             className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
           >
+            {accountDeleted && (
+              <div className="mb-4 space-y-3" role="status">
+                <p className="text-sm">
+                  Your ActivityMap account has been deleted.
+                </p>
+                {cleanupFailed && (
+                  <p className="text-sm text-destructive">
+                    Couldn’t clear this browser’s offline data. Retry to finish.
+                  </p>
+                )}
+                <Button disabled={deleting} onClick={handleDeletion}>
+                  {deleting
+                    ? 'Clearing local data…'
+                    : 'Finish clearing local data'}
+                </Button>
+              </div>
+            )}
             <section aria-labelledby="account-heading" className="space-y-4">
               <div className="space-y-1">
                 <h2 id="account-heading" className="text-sm font-semibold">
@@ -354,7 +424,7 @@ export function SettingsDialog({
                       : 'Strava connected'}
                 </p>
               )}
-              {showConnect && (
+              {showConnect && !accountDeleted && (
                 <div className="space-y-3">
                   {permissionNotes.length > 0 ? (
                     <p className="text-xs text-muted-foreground">
@@ -380,7 +450,7 @@ export function SettingsDialog({
                   <Button
                     variant="outline"
                     onClick={handleSignOut}
-                    disabled={signingOut}
+                    disabled={signingOut || deleting}
                   >
                     {signingOut ? 'Signing out…' : 'Sign out of ActivityMap'}
                   </Button>
@@ -392,6 +462,66 @@ export function SettingsDialog({
                   <p className="text-xs text-muted-foreground">
                     Strava stays connected.
                   </p>
+                </div>
+              )}
+              {userId && !accountDeleted && (
+                <div className="space-y-3 border-t pt-4">
+                  <h3 className="text-sm font-semibold">
+                    Delete account and data
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Permanently delete your ActivityMap account, imported
+                    activities, photos and share links. Your original Strava
+                    activities stay on Strava. Signing in again creates a new
+                    account and starts a fresh import.
+                  </p>
+                  {confirmDeletion ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">
+                        Delete your account and all ActivityMap data? This can’t
+                        be undone.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="destructive"
+                          disabled={deleting || offline}
+                          onClick={handleDeletion}
+                        >
+                          {deleting
+                            ? 'Deleting account…'
+                            : 'Permanently delete my account'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          disabled={deleting}
+                          onClick={() => setConfirmDeletion(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="destructive"
+                      disabled={signingOut || offline}
+                      onClick={() => {
+                        setConfirmDeletion(true);
+                        setDeletionFailed(false);
+                      }}
+                    >
+                      Delete account and data
+                    </Button>
+                  )}
+                  {offline && (
+                    <p className="text-xs text-muted-foreground">
+                      Go online to delete your account.
+                    </p>
+                  )}
+                  {deletionFailed && (
+                    <p role="alert" className="text-xs text-destructive">
+                      Couldn’t confirm account deletion. Please try again.
+                    </p>
+                  )}
                 </div>
               )}
             </section>

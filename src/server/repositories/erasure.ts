@@ -1,15 +1,6 @@
 import 'server-only';
 
-import {
-  and,
-  asc,
-  eq,
-  inArray,
-  isNotNull,
-  lte,
-  ne,
-  or,
-} from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, lte, ne, or } from 'drizzle-orm';
 
 import { db as defaultDb } from '~/server/db';
 import {
@@ -17,11 +8,110 @@ import {
   activityDeletions,
   photoDeletions,
   stravaWebhookEvents,
+  sessions,
   users,
   verification,
 } from '~/server/db/schema';
 
 type DrizzleDb = typeof defaultDb;
+type Transaction = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
+
+/** Shared cleanup for scheduled erasure and an explicit account deletion. */
+async function eraseUserData(
+  tx: Transaction,
+  user: { id: string; athleteId: number | null; email: string | null },
+  accountIds: string[],
+): Promise<boolean> {
+  const athleteIds = [
+    ...new Set(
+      [
+        user.athleteId,
+        ...accountIds.map((id) => athleteIdFrom(id, null)),
+      ].filter((id): id is number => id !== null),
+    ),
+  ];
+  if (athleteIds.length) {
+    // These tables have no user foreign key.
+    await tx
+      .delete(stravaWebhookEvents)
+      .where(inArray(stravaWebhookEvents.ownerId, athleteIds));
+    await tx
+      .delete(activityDeletions)
+      .where(inArray(activityDeletions.athlete_id, athleteIds));
+    await tx
+      .delete(photoDeletions)
+      .where(inArray(photoDeletions.athlete_id, athleteIds));
+  }
+  await tx
+    .delete(verification)
+    .where(
+      inArray(
+        verification.identifier,
+        user.email ? [user.id, user.email] : [user.id],
+      ),
+    );
+  // Accounts, sessions, login codes, activities, photos, streams, shares and
+  // ingestion/sync state cascade. The user lock fences concurrent FK writes:
+  // writes committed first are erased; later writes cannot reference this user.
+  const [deleted] = await tx
+    .delete(users)
+    .where(eq(users.id, user.id))
+    .returning({ id: users.id });
+  return Boolean(deleted);
+}
+
+/** Revalidate the caller's session inside the same transaction as deletion. */
+export function createAccountDeletionRepository(
+  database: DrizzleDb = defaultDb,
+) {
+  return {
+    async deleteForSession(
+      userId: string,
+      token: string,
+      now: Date,
+    ): Promise<boolean> {
+      return database.transaction(async (tx) => {
+        const [user] = await tx
+          .select({
+            id: users.id,
+            athleteId: users.athlete_id,
+            email: users.email,
+          })
+          .from(users)
+          .where(eq(users.id, userId))
+          .for('update');
+        if (!user) return false;
+        const [session] = await tx
+          .select({ id: sessions.id })
+          .from(sessions)
+          .where(
+            and(
+              eq(sessions.userId, userId),
+              eq(sessions.token, token),
+              gt(sessions.expiresAt, now),
+            ),
+          )
+          .for('update');
+        if (!session) return false;
+        const linked = await tx
+          .select({ accountId: accounts.accountId })
+          .from(accounts)
+          .where(
+            and(eq(accounts.userId, userId), eq(accounts.providerId, 'strava')),
+          )
+          .orderBy(asc(accounts.id))
+          .for('update');
+        return eraseUserData(
+          tx,
+          user,
+          linked.map((account) => account.accountId),
+        );
+      });
+    },
+  };
+}
+
+export const accountDeletionRepository = createAccountDeletionRepository();
 
 export type DueErasureCandidate = {
   accountId: string;
@@ -44,13 +134,16 @@ function hasStoredCredential(account: {
 }): boolean {
   return Boolean(
     account.accessToken ??
-      account.access_token ??
-      account.refreshToken ??
-      account.refresh_token,
+    account.access_token ??
+    account.refreshToken ??
+    account.refresh_token,
   );
 }
 
-function athleteIdFrom(accountId: string, athleteId: number | null): number | null {
+function athleteIdFrom(
+  accountId: string,
+  athleteId: number | null,
+): number | null {
   if (athleteId !== null) return athleteId;
   const parsed = Number(accountId);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
@@ -163,40 +256,9 @@ export function createErasureRepository(
           return 'cancelled';
         }
 
-        const athleteId = athleteIdFrom(due.accountId, lockedUser.athleteId);
-        if (athleteId !== null) {
-          // These tables intentionally have no user foreign key, so they
-          // must be removed explicitly before the user-row cascade below.
-          await tx
-            .delete(stravaWebhookEvents)
-            .where(eq(stravaWebhookEvents.ownerId, athleteId));
-          await tx
-            .delete(activityDeletions)
-            .where(eq(activityDeletions.athlete_id, athleteId));
-          await tx
-            .delete(photoDeletions)
-            .where(eq(photoDeletions.athlete_id, athleteId));
-        }
-
-        // Better Auth's verification table has no user foreign key. Remove
-        // the identifiers this Strava-derived user could have created.
-        const verificationIdentifiers = lockedUser.email
-          ? [due.userId, lockedUser.email]
-          : [due.userId];
-        await tx
-          .delete(verification)
-          .where(inArray(verification.identifier, verificationIdentifiers));
-
-        // account, session, activity_sync, mobile_login_codes, activities,
-        // photos, and sync_change all cascade from the user row (photos via
-        // activities). Keeping the final delete conditional makes a second
-        // overlapping worker a harmless stale no-op.
-        const [deletedUser] = await tx
-          .delete(users)
-          .where(eq(users.id, due.userId))
-          .returning({ id: users.id });
-
-        return deletedUser ? 'erased' : 'stale';
+        return (await eraseUserData(tx, lockedUser, [due.accountId]))
+          ? 'erased'
+          : 'stale';
       });
     },
   };

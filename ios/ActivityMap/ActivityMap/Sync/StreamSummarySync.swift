@@ -20,6 +20,7 @@ private actor StoredSummaryWorker {
 final class StreamSummarySync {
     private var session: SyncSession?
     private var work: Task<Void, Never>?
+    private var stopping: Task<Void, Never>?
     private var epoch = 0
     private var retryAt: Date?
     private struct Attempt {
@@ -52,9 +53,23 @@ final class StreamSummarySync {
     }
 
     func pause() {
+        let previousStop = stopping
+        let previousWork = work
         epoch &+= 1
         work?.cancel()
         work = nil
+        if previousWork != nil {
+            stopping = Task {
+                await previousStop?.value
+                await previousWork?.value
+            }
+        }
+    }
+
+    func stopAndWait() async {
+        pause()
+        await stopping?.value
+        stopping = nil
     }
 
     func start(storage: LocalStore) {
