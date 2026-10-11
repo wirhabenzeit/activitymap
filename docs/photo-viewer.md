@@ -14,15 +14,15 @@ Photo inspection leaves activity selection, list expansion, camera, filters and 
 
 ## Presentation and navigation
 
-Use a dark fullscreen modal with safe-area-aware controls, an activity title, a visible `n of total` counter and the current caption when nonblank. Wrap long captions in a bounded scrollable region. Fit the entire full image without cropping, preserving portrait, landscape and panoramic proportions. Thumbnail crops are square and stable while loading.
+Use a dark fullscreen modal with safe-area-aware controls, an activity title, a visible `n of total` counter and the current caption when nonblank. Native uses a softer near-black background (`#121212`) in both appearance modes; floating controls retain translucent black. Wrap long captions in a bounded scrollable region. Fit the entire full image without cropping, preserving portrait, landscape and panoramic proportions. Thumbnail crops are square and stable while loading.
 
-Previous/next do not wrap; disable boundary controls and omit them for a single photo. Web supports Left/Right arrows, horizontal touch swipes, Escape, an explicit Close button, focus containment and background scroll locking. Image taps and swipes never dismiss. iOS uses native paged swiping plus accessible previous/next and Close actions, VoiceOver announcements and Dynamic Type. Controls have at least 44px/44pt targets. Reduced motion disables decorative transitions. Zoom gestures are outside this first implementation.
+Previous/next do not wrap; disable boundary controls and omit them for a single photo. Web supports Left/Right arrows, horizontal touch swipes, Escape, an explicit Close button, focus containment and background scroll locking. Web image taps and swipes never dismiss. iOS uses native paged swiping plus accessible previous/next and Close actions, VoiceOver announcements and Dynamic Type. Native controls float over the image instead of reserving viewport space. Apple's `UIScrollView` supplies pinch zoom up to 4× and panning; double-tap zooms to 3× or resets to fit. Zoom resets when leaving a photo or changing viewport size. At fit size, horizontal drags page; while zoomed, they pan the image. The fullscreen presentation uses Apple's interactive zoom transition, matched to the current photo's thumbnail. The system controls interactive dismissal, completion and cancellation; there is no custom dismissal threshold or image-only drag transform. A 16-point dark gap separates pages during movement, while settled photos keep the full viewport width. Controls have at least 44px/44pt targets. Reduced motion disables custom animated page changes and double-tap zoom; the system manages the presentation transition. Web zoom remains outside this implementation.
 
 ## Image variants
 
 Resolve URL and dimensions using the **same variant key**, never independent dictionary positions. Only absolute HTTP(S) URLs are eligible. Positive finite width/height metadata determines longest edge; otherwise a positive numeric variant key estimates it. Unknown-size variants sort last, with scalar key order as the deterministic tie-breaker.
 
-Thumbnails choose the smallest known variant with longest edge at least **256px**, otherwise the largest smaller variant, otherwise the first unknown-size URL. Fullscreen chooses the largest known variant at or below **2048px**, otherwise the smallest larger variant, otherwise the first unknown-size URL. Keep intrinsic dimensions when known; unknown dimensions use containment without invented aspect ratios. Load full images only for the visible page (native may instantiate adjacent pages, but they do not request image bytes until selected). No eager full-library downloads.
+Thumbnails choose the smallest known variant with longest edge at least **256px**, otherwise the largest smaller variant, otherwise the first unknown-size URL. Fullscreen chooses the largest known variant at or below **2048px**, otherwise the smallest larger variant, otherwise the first unknown-size URL. Keep intrinsic dimensions when known; unknown dimensions use containment without invented aspect ratios. Web loads full images only for the visible page. Native prepares the current photo and its immediate previous/next neighbors, at most three photos, so the incoming image is available during a swipe. Other pages do not request or retain full images; moving the window cancels obsolete view/prefetch tasks. Existing scoped cache bounds and deletion fences still apply. No eager full-library downloads.
 
 ## Loading, failure and offline
 
@@ -58,3 +58,38 @@ The previous web lightbox is captured from the baseline source after activating 
 | Native viewer | [Phone](photo-viewer/ios-phone.png), [landscape layout](photo-viewer/ios-landscape.png), [large text](photo-viewer/ios-large-text.png), [missing image](photo-viewer/ios-missing.png) |
 
 Remaining release review: actual Safari/iPhone touch and focus behavior; native VoiceOver focus/announcements, real rotation and iPad; live-account long-offline reconciliation; and full map route picking/count screenshots against the composed app. Native map photo markers are still owned by #219. No issues are closed by this validation record.
+
+## Native paging follow-up — #373, 2026-10-11
+
+Source inspection and a rendered regression reproduced a concrete blank-page problem: the original native viewer replaced every nonselected page with `Color.clear`. Opening photo 3 in a nine-photo gallery requested only photo 3; neither swipe destination was prepared. Selection changes also changed the caption's measured height or removed it, moving the pager viewport.
+
+The viewer keeps stable page views and explicitly warms the adjacent images through the existing scoped cache. Page-style `TabView` starts image tasks as a page appears, so merely giving neighboring pages image views is insufficient to prepare their bytes before a drag. Warming both destinations is bounded and cancellable; unavailable images still use the existing honest failure/retry presentation. Native paging and its gesture thresholds remain in control of movement and settling.
+
+The subsequent floating-controls change places the current caption over the image, capped at 20% of the available height and scrollable when necessary. Short captions use only their required height. Changing the current caption does not move the image viewport. Hidden sizing text is excluded from accessibility.
+
+**Validation:** iPhone 18 Pro simulator, iOS 27.0. The focused `PhotoGalleryTests` run passes **9 tests / 17 parameterized cases**, including first/middle/last preparation without requesting all nine photos, unchanged selection, stable pager geometry when the current caption disappears on phone/landscape/large-text/tablet layouts, actual image and unavailable-state rendering, offline disk reopen, cache bounds, deletion and account-response fences. The preparation regression fails against the original source (`["/3"]` instead of `["/2", "/3", "/4"]`). The rendering checks wait for visible image bytes and tolerate OCR whitespace/letter-zero ambiguity in the counter; they do not accept an empty image area as a loaded photo.
+
+Reproduce with:
+
+```sh
+xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
+  -scheme ActivityMap -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+  -parallel-testing-enabled NO -only-testing:ActivityMapTests/PhotoGalleryTests \
+  -collect-test-diagnostics never CODE_SIGNING_ALLOWED=NO
+```
+
+**Remaining #373 acceptance:** physical iPhone verification of slow drags, quick swipes, reversals, first/last boundaries and viewer/background gesture isolation, recording device/OS/build and a short video. Simulator preparation/layout tests do not certify swipe feel. After reconnecting the device on 2026-10-11, the Release ActivityMap Dev build with the paging changes was successfully installed and launched on Dominik’s iPhone 18 Pro, iOS 27.0.1 (`page.dominik.activitymap.dev`). The user subsequently reported improved scrolling. Keep #373 and #218's detailed device acceptance open until that review.
+
+## Native floating controls and zoom — 2026-10-11
+
+The activity title, Close, previous/next buttons, caption and counter now overlay the fullscreen pager. The image retains its full fitting area regardless of captions or Dynamic Type. A small SwiftUI wrapper hosts Apple's native `UIScrollView` zoom/pan behavior and keeps the existing bounded image loading, cache and unavailable/retry states. PhotoSlider was evaluated, but its remote-image path starts every gallery download and leaves failures blank, so adopting it would require extra integration work.
+
+**Validation:** focused `PhotoGalleryTests` pass **10 tests / 20 parameterized cases**, zero failures on the iPhone 18 Pro simulator, iOS 27.0. In addition to the paging/cache regressions above, tests verify the full-height pager, native magnification, panning and zoom reset on phone, landscape and tablet layouts. Rendered phone, landscape and large-text layouts were visually reviewed. The optimized ActivityMap Dev build was successfully installed and launched on Dominik’s iPhone. Physical pinch/double-tap behavior and gesture interaction with paging remain to be checked there.
+
+### Dismissal and page spacing follow-up
+
+The initial dismissal implementation moved the image vertically and used a custom distance/velocity threshold to close the cover. The user reported that this felt unnatural, so that gesture and its transform/threshold logic were removed. The gallery now marks each thumbnail with `matchedTransitionSource`; the viewer uses `navigationTransition(.zoom(...))`, targeting the current photo ID. Apple's presentation engine owns the dismissal interaction and return animation. See [Apple's presentation demo](https://developer.apple.com/videos/play/wwdc2024/10145/), which documents support for `fullScreenCover` as well as navigation. Pages retain 8 points of black padding on either side, and the pager expands by 16 points, preserving full viewport width for the settled image while separating adjacent images during movement.
+
+**Validation:** `PhotoGalleryTests` pass **11 tests / 21 parameterized cases**, zero failures. The presentation integration test opens the production viewer from a matched source, confirms that SwiftUI configured UIKit's system transition, dismisses the cover and verifies the dismissal callback and unchanged activity selection. Existing checks cover zoom/pan/reset, bounded image loading and page stride/image width on phone, landscape, accessibility text and tablet layouts. After reconnecting the iPhone, the Release ActivityMap Dev build with the system transition was installed and launched successfully. Actual interactive touch recognition and feel still need physical-device review.
+
+After the user confirmed that the native dismissal felt substantially better, the viewer background was softened from pure black to `#121212`. The four existing rendering scenarios (phone, landscape, large text and missing image) pass, and the updated phone capture was visually reviewed.

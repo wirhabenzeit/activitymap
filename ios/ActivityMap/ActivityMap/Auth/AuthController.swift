@@ -432,7 +432,9 @@ final class AuthController: NSObject {
                 }
             }
             session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = false
+            // Each explicit sign-in allows choosing an account instead of
+            // silently restoring retained Strava browser authentication.
+            session.prefersEphemeralWebBrowserSession = true
             self.authSession = session
 
             // `start()` returns false (without ever calling the completion

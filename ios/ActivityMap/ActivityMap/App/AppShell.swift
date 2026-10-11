@@ -71,7 +71,7 @@ struct AppShell: View {
         }
         .overlay {
             if let connectPrompt { StravaConnectOverlay(prompt: connectPrompt).transition(.opacity) }
-            else if sync?.status == .syncing && store.activities.isEmpty {
+            else if sync?.isLoadingInitialActivities == true {
                 ProgressView("Loading your recent activities…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.regularMaterial)

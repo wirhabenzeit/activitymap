@@ -113,7 +113,7 @@ struct SyncControllerTests {
         #expect(controller.firstSummaryError == nil)
     }
 
-    @Test func initialBootstrapFailureAlsoSurfacesTheServerMessage() async throws {
+    @Test func initialBootstrapFailureDoesNotPretendTheServerLibraryIsEmpty() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let source = ScriptedSyncSource([
             .bootstrap(.activities, nil, .failure(.server(code: "internal_error", message: "The activities could not be downloaded.",
@@ -123,8 +123,13 @@ struct SyncControllerTests {
                                         fetchInitialSummaries: { _ in throw ScriptedSyncSource.ScriptError.unexpectedRequest }, invalidate: { _ in })
         controller.setSession(SyncFixtures.session(), storage: storage)
         await controller.refresh()
-        #expect(controller.firstSummaryError == "The activities could not be downloaded.")
-        #expect(controller.firstSummaryRetryable)
+        #expect(controller.firstSummaryError == nil)
+        #expect(!controller.isLoadingInitialActivities)
+        guard case .failed(let message) = controller.status else {
+            Issue.record("Expected the normal sync failure state")
+            return
+        }
+        #expect(message.contains("The activities could not be downloaded."))
     }
 
     @Test func emptyAccountWaitsForOneSummaryFetchAndPublishesCompletionAfterCacheRefresh() async throws {
@@ -144,12 +149,37 @@ struct SyncControllerTests {
         controller.setSession(SyncFixtures.session(), storage: storage)
         await gate.waitForRequest()
         #expect(controller.status == .syncing && controller.firstSummaryCount == nil)
+        #expect(controller.isLoadingInitialActivities)
         await gate.release()
         await controller.refresh()
         #expect(controller.status == .ready && controller.firstSummaryCount == 1)
+        #expect(!controller.isLoadingInitialActivities)
         #expect(controller.activities.activities.map(\.id) == [1])
         await controller.refresh()
         #expect(await gate.calls == 1)
+    }
+
+    @Test func returningAccountWithEmptyPhoneCacheSyncsWithoutTheFirstImportScreen() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let dto = try Fixtures.activity()
+        let source = GatedInitialActivitiesSource(
+            firstPage: SyncFixtures.activities([dto]),
+            remaining: ScriptedSyncSource([
+                .bootstrap(.photos, nil, .success(SyncFixtures.photos())),
+                .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot"))),
+            ]))
+        var imports = 0
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source },
+                                        fetchInitialSummaries: { _ in imports += 1; return 0 }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await source.waitForRequest()
+        #expect(controller.status == .syncing && controller.activities.activities.isEmpty)
+        #expect(!controller.isLoadingInitialActivities)
+        await source.release()
+        await controller.refresh()
+        #expect(controller.activities.activities.map(\.id) == [Int(dto.id)!])
+        #expect(controller.status == .ready && imports == 0)
+        #expect(!controller.isLoadingInitialActivities && controller.firstSummaryCount == nil)
     }
     @Test func reconnectingTheSameSessionPreservesSelectionAndInspection() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
@@ -410,4 +440,33 @@ actor SummaryFetchGate {
         await withCheckedContinuation { requested = $0 }
     }
     func release() { response?.resume(returning: 1); response = nil }
+}
+
+actor GatedInitialActivitiesSource: SyncPageSource {
+    let firstPage: ActivityMapAPI.SyncBootstrapPage
+    let remaining: ScriptedSyncSource
+    private var response: CheckedContinuation<ActivityMapAPI.SyncBootstrapPage, Never>?
+    private var requested: CheckedContinuation<Void, Never>?
+    private var started = false
+
+    init(firstPage: ActivityMapAPI.SyncBootstrapPage, remaining: ScriptedSyncSource) {
+        self.firstPage = firstPage
+        self.remaining = remaining
+    }
+    func waitForRequest() async {
+        if started { return }
+        await withCheckedContinuation { requested = $0 }
+    }
+    func release() { response?.resume(returning: firstPage); response = nil }
+    func bootstrap(resource: ActivityMapAPI.SyncResource, cursor: String?) async throws -> ActivityMapAPI.SyncBootstrapPage {
+        if started { return try await remaining.bootstrap(resource: resource, cursor: cursor) }
+        return await withCheckedContinuation {
+            response = $0
+            started = true
+            requested?.resume(); requested = nil
+        }
+    }
+    func changes(cursor: String) async throws -> ActivityMapAPI.SyncChangesPage {
+        try await remaining.changes(cursor: cursor)
+    }
 }
