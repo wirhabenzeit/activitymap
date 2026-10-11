@@ -902,7 +902,7 @@ export default function InteractiveMap() {
               className="flex min-h-12 shrink-0 items-center justify-between gap-1 border-b px-2 text-xs"
             >
               <span className="min-w-0 px-1 font-semibold">
-                {resultIds.length} {resultIds.length === 1 ? 'route' : 'routes'}
+                {resultIds.length} selected
                 {hiddenSelectedCount > 0
                   ? ` · ${hiddenSelectedCount} hidden by filters`
                   : ''}
