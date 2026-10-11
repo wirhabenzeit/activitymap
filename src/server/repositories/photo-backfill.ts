@@ -333,25 +333,17 @@ export function createPhotoBackfillRepository(
         throw new Error('Photo ownership mismatch');
       return database.transaction(async (tx) => {
         if (!(await lockClaim(tx, claim))) return false;
+        // The lock proved the activity is the athlete's, so its photo set is
+        // replaced by activity alone, like the detail sync does. Legacy rows
+        // stored with a wrong `athlete_id` would otherwise survive the delete
+        // and collide with the insert on `photos_pkey`.
         const existing = await tx
           .select({ id: photos.unique_id })
           .from(photos)
-          .where(
-            and(
-              eq(photos.activity_id, claim.activityId),
-              eq(photos.athlete_id, claim.athleteId),
-            ),
-          );
+          .where(eq(photos.activity_id, claim.activityId));
         const ids = new Set(incoming.map((photo) => photo.unique_id));
         const removed = existing.filter((photo) => !ids.has(photo.id));
-        await tx
-          .delete(photos)
-          .where(
-            and(
-              eq(photos.activity_id, claim.activityId),
-              eq(photos.athlete_id, claim.athleteId),
-            ),
-          );
+        await tx.delete(photos).where(eq(photos.activity_id, claim.activityId));
         if (incoming.length) await tx.insert(photos).values(incoming);
         for (const photo of removed) {
           const values = {
