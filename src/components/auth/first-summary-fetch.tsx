@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { LoaderCircle } from 'lucide-react';
 import {
   DialogDescription,
   DialogOverlay,
@@ -65,7 +66,7 @@ export function FirstSummaryFetch() {
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
           onInteractOutside={(event) => event.preventDefault()}
-          className="fixed top-1/2 left-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 space-y-4 rounded-2xl border bg-card p-6 text-card-foreground shadow-xl"
+          className="fixed top-1/2 left-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 space-y-4 rounded-2xl border border-white/20 bg-card/75 p-6 text-card-foreground shadow-2xl ring-1 ring-black/5 backdrop-blur-xl duration-200 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-white/10"
         >
           <DialogTitle className="text-lg font-semibold">
             {fetch.isFetching
@@ -86,7 +87,13 @@ export function FirstSummaryFetch() {
                   : `${fetch.data} activities fetched. Older history, details and photos continue in the background.`}
           </DialogDescription>
           {fetch.isFetching ? (
-            <p role="status">Loading…</p>
+            <div role="status" className="flex min-h-11 items-center">
+              <LoaderCircle
+                aria-hidden="true"
+                className="size-5 text-muted-foreground motion-safe:animate-spin"
+              />
+              <span className="sr-only">Loading your recent activities</span>
+            </div>
           ) : (
             <button
               className="min-h-11 font-medium underline"
