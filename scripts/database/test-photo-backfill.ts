@@ -50,6 +50,7 @@ const clock = () => new Date(now);
 const repo = createPhotoBackfillRepository(db, clock);
 const athlete = 9393001;
 const user = 'photo-proof-user';
+const accessToken = 'proof-access';
 const revoked = 'photo-proof-revoked';
 const id = (n: number) => athlete * 1000 + n;
 const photo = (n: number) => ({
@@ -89,7 +90,7 @@ async function seed() {
       userId: user,
       providerId: 'strava',
       accountId: String(athlete),
-      accessToken: 'proof-access',
+      accessToken,
       accessTokenExpiresAt: new Date('2030-01-01'),
     },
     {
@@ -454,7 +455,7 @@ try {
   const fetchDetails = () =>
     fetchStravaActivities(
       {
-        accessToken: 'proof',
+        accessToken,
         athleteId: athlete,
         activityIds: [id(4)],
         includePhotos: false,
@@ -502,7 +503,7 @@ try {
     'Changed without a count change',
   );
   await fetchStravaActivities(
-    { accessToken: 'proof', athleteId: athlete, persist: true },
+    { accessToken, athleteId: athlete, persist: true },
     {
       database: db,
       createClient: () => ({

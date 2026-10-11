@@ -59,6 +59,7 @@ const ingestion = createIngestionRepository(
 );
 const USER_ID = 'summary-reconciliation-proof-user';
 const ACCOUNT_ID = 'summary-reconciliation-proof-account';
+const ACCESS_TOKEN = 'summary-reconciliation-proof-token';
 const ATHLETE_ID = 9_101_001;
 const ACTIVITY_IDS = [9_102_001, 9_102_002, 9_102_003, 9_102_004] as const;
 
@@ -155,8 +156,8 @@ async function seed(): Promise<void> {
     userId: USER_ID,
     providerId: 'strava',
     accountId: String(ATHLETE_ID),
-    accessToken: 'summary-reconciliation-proof-token',
-    access_token: 'summary-reconciliation-proof-token',
+    accessToken: ACCESS_TOKEN,
+    access_token: ACCESS_TOKEN,
   });
   await testDb.insert(activities).values([
     {
@@ -394,7 +395,7 @@ async function run(): Promise<void> {
   const importSummaries = () =>
     fetchStravaActivities(
       {
-        accessToken: 'fixture',
+        accessToken: ACCESS_TOKEN,
         athleteId: ATHLETE_ID,
         page: 1,
         per_page: 200,
