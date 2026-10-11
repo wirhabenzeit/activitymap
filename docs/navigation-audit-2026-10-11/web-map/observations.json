@@ -1,0 +1,4233 @@
+{
+  "commit": "734c23c4a7c427d61924a0725d4bb23cce1970bf",
+  "fixtureHash": "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+  "method": "Production InteractiveMap and shell controls on a temporary fixture route; offline map style",
+  "startedAt": "2026-10-11T13:43:41.085Z",
+  "observations": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "errors": [],
+      "mapErrors": [],
+      "steps": [
+        {
+          "name": "four-selected",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 0,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 652,
+            "y": 516,
+            "width": 768,
+            "height": 464,
+            "top": 516,
+            "right": 1420,
+            "bottom": 980,
+            "left": 652
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "fit-selection",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 0,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 10.442838777141121,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 508
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 10.442838777141121,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 508,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 652,
+            "y": 516,
+            "width": 768,
+            "height": 464,
+            "top": 516,
+            "right": 1420,
+            "bottom": 980,
+            "left": 652
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "inspect-one",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 10.442838777141121,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 508
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 10.442838777141121,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 508,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 652,
+            "y": 516,
+            "width": 768,
+            "height": 464,
+            "top": 516,
+            "right": 1420,
+            "bottom": 980,
+            "left": 652
+          },
+          "detailOpen": true,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Back to 4 routes",
+              "title": "",
+              "text": "Back to 4 routes"
+            },
+            {
+              "label": "Previous activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Next activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit current route",
+              "title": "Fit current route",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Deselect route",
+              "title": "Deselect route",
+              "text": ""
+            },
+            {
+              "label": null,
+              "title": "",
+              "text": "Edit"
+            },
+            {
+              "label": "More route actions",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "expand-panel",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 10.442838777141121,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 508
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 10.442838777141121,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 508,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 652,
+            "y": 282,
+            "width": 768,
+            "height": 698,
+            "top": 282,
+            "right": 1420,
+            "bottom": 980,
+            "left": 652
+          },
+          "detailOpen": true,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Shrink route panel",
+              "title": "Shrink route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Back to 4 routes",
+              "title": "",
+              "text": "Back to 4 routes"
+            },
+            {
+              "label": "Previous activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Next activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit current route",
+              "title": "Fit current route",
+              "text": ""
+            },
+            {
+              "label": "Shrink route panel",
+              "title": "Shrink route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Deselect route",
+              "title": "Deselect route",
+              "text": ""
+            },
+            {
+              "label": null,
+              "title": "",
+              "text": "Edit"
+            },
+            {
+              "label": "More route actions",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "shrink-panel",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 10.442838777141121,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 508
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 10.442838777141121,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 508,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 652,
+            "y": 516,
+            "width": 768,
+            "height": 464,
+            "top": 516,
+            "right": 1420,
+            "bottom": 980,
+            "left": 652
+          },
+          "detailOpen": true,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Back to 4 routes",
+              "title": "",
+              "text": "Back to 4 routes"
+            },
+            {
+              "label": "Previous activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Next activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit current route",
+              "title": "Fit current route",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Deselect route",
+              "title": "Deselect route",
+              "text": ""
+            },
+            {
+              "label": null,
+              "title": "",
+              "text": "Edit"
+            },
+            {
+              "label": "More route actions",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "back-to-four",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 10.442838777141121,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 508
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 10.442838777141121,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 508,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 652,
+            "y": 516,
+            "width": 768,
+            "height": 464,
+            "top": 516,
+            "right": 1420,
+            "bottom": 980,
+            "left": 652
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "filters-toggled",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 10.442838777141121,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 508
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 10.442838777141121,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 508,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 652,
+            "y": 516,
+            "width": 768,
+            "height": 464,
+            "top": 516,
+            "right": 1420,
+            "bottom": 980,
+            "left": 652
+          },
+          "detailOpen": false,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "filters-after-escape",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 10.442838777141121,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 508
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 10.442838777141121,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 508,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 652,
+            "y": 516,
+            "width": 768,
+            "height": 464,
+            "top": 516,
+            "right": 1420,
+            "bottom": 980,
+            "left": 652
+          },
+          "detailOpen": false,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "clear-selection",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [],
+            "active": 0,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 10.442838777141121,
+              "pitch": 0,
+              "bearing": 0,
+              "padding": {
+                "top": 32,
+                "bottom": 508,
+                "left": 24,
+                "right": 64
+              },
+              "elevation": 0
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 10.442838777141121,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 508,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "width": 874,
+      "height": 402,
+      "errors": [],
+      "mapErrors": [],
+      "steps": [
+        {
+          "name": "four-selected",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 0,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 264,
+            "y": 104.8125,
+            "width": 602,
+            "height": 289.1875,
+            "top": 104.8125,
+            "right": 866,
+            "bottom": 394,
+            "left": 264
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "fit-selection",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 0,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": [
+              {
+                "type": "info",
+                "title": "Map camera",
+                "message": "The map is not ready to frame this route. Try Fit routes once it has loaded."
+              }
+            ]
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 264,
+            "y": 104.8125,
+            "width": 602,
+            "height": 289.1875,
+            "top": 104.8125,
+            "right": 866,
+            "bottom": 394,
+            "left": 264
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "inspect-one",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": [
+              {
+                "type": "info",
+                "title": "Map camera",
+                "message": "The map is not ready to frame this route. Try Fit routes once it has loaded."
+              }
+            ]
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 264,
+            "y": 104.8125,
+            "width": 602,
+            "height": 289.1875,
+            "top": 104.8125,
+            "right": 866,
+            "bottom": 394,
+            "left": 264
+          },
+          "detailOpen": true,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Back to 4 routes",
+              "title": "",
+              "text": "Back to 4 routes"
+            },
+            {
+              "label": "Previous activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Next activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit current route",
+              "title": "Fit current route",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Deselect route",
+              "title": "Deselect route",
+              "text": ""
+            },
+            {
+              "label": null,
+              "title": "",
+              "text": "Edit"
+            },
+            {
+              "label": "More route actions",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "expand-panel",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": [
+              {
+                "type": "info",
+                "title": "Map camera",
+                "message": "The map is not ready to frame this route. Try Fit routes once it has loaded."
+              }
+            ]
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 264,
+            "y": 84.703125,
+            "width": 602,
+            "height": 309.296875,
+            "top": 84.703125,
+            "right": 866,
+            "bottom": 394,
+            "left": 264
+          },
+          "detailOpen": true,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Shrink route panel",
+              "title": "Shrink route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Back to 4 routes",
+              "title": "",
+              "text": "Back to 4 routes"
+            },
+            {
+              "label": "Previous activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Next activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit current route",
+              "title": "Fit current route",
+              "text": ""
+            },
+            {
+              "label": "Shrink route panel",
+              "title": "Shrink route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Deselect route",
+              "title": "Deselect route",
+              "text": ""
+            },
+            {
+              "label": null,
+              "title": "",
+              "text": "Edit"
+            },
+            {
+              "label": "More route actions",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "shrink-panel",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": [
+              {
+                "type": "info",
+                "title": "Map camera",
+                "message": "The map is not ready to frame this route. Try Fit routes once it has loaded."
+              }
+            ]
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 264,
+            "y": 104.8125,
+            "width": 602,
+            "height": 289.1875,
+            "top": 104.8125,
+            "right": 866,
+            "bottom": 394,
+            "left": 264
+          },
+          "detailOpen": true,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Back to 4 routes",
+              "title": "",
+              "text": "Back to 4 routes"
+            },
+            {
+              "label": "Previous activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Next activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit current route",
+              "title": "Fit current route",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Deselect route",
+              "title": "Deselect route",
+              "text": ""
+            },
+            {
+              "label": null,
+              "title": "",
+              "text": "Edit"
+            },
+            {
+              "label": "More route actions",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "back-to-four",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": [
+              {
+                "type": "info",
+                "title": "Map camera",
+                "message": "The map is not ready to frame this route. Try Fit routes once it has loaded."
+              }
+            ]
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 264,
+            "y": 104.8125,
+            "width": 602,
+            "height": 289.1875,
+            "top": 104.8125,
+            "right": 866,
+            "bottom": 394,
+            "left": 264
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "filters-toggled",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": [
+              {
+                "type": "info",
+                "title": "Map camera",
+                "message": "The map is not ready to frame this route. Try Fit routes once it has loaded."
+              }
+            ]
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 229.328125,
+            "y": 104.8125,
+            "width": 636.671875,
+            "height": 289.1875,
+            "top": 104.8125,
+            "right": 866,
+            "bottom": 394,
+            "left": 229.328125
+          },
+          "detailOpen": false,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "filters-after-escape",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": [
+              {
+                "type": "info",
+                "title": "Map camera",
+                "message": "The map is not ready to frame this route. Try Fit routes once it has loaded."
+              }
+            ]
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 56,
+            "y": 104.8125,
+            "width": 810,
+            "height": 289.1875,
+            "top": 104.8125,
+            "right": 866,
+            "bottom": 394,
+            "left": 56
+          },
+          "detailOpen": false,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "clear-selection",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [],
+            "active": 0,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "pitch": 0,
+              "bearing": 0,
+              "padding": {
+                "top": 0,
+                "bottom": 0,
+                "left": 0,
+                "right": 0
+              },
+              "elevation": 0
+            },
+            "notifications": [
+              {
+                "type": "info",
+                "title": "Map camera",
+                "message": "The map is not ready to frame this route. Try Fit routes once it has loaded."
+              }
+            ]
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "width": 402,
+      "height": 874,
+      "errors": [],
+      "mapErrors": [],
+      "steps": [
+        {
+          "name": "four-selected",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 0,
+            "camera": {
+              "longitude": 9.1,
+              "latitude": 46.95,
+              "zoom": 6.5,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 9.1,
+              "lat": 46.95
+            },
+            "zoom": 6.5,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "panel": {
+            "x": 56,
+            "y": 402,
+            "width": 338,
+            "height": 464,
+            "top": 402,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "detailOpen": false,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "fit-selection",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 0,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 8.69571228898827,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 496
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 8.69571228898827,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 496,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 56,
+            "y": 402,
+            "width": 338,
+            "height": 464,
+            "top": 402,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "detailOpen": false,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "inspect-one",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 8.69571228898827,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 496
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 8.69571228898827,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 496,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 56,
+            "y": 402,
+            "width": 338,
+            "height": 464,
+            "top": 402,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "detailOpen": true,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Back to 4 routes",
+              "title": "",
+              "text": "Back to 4 routes"
+            },
+            {
+              "label": "Previous activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Next activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit current route",
+              "title": "Fit current route",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Deselect route",
+              "title": "Deselect route",
+              "text": ""
+            },
+            {
+              "label": "More route actions",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "expand-panel",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 8.69571228898827,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 496
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 8.69571228898827,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 496,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 56,
+            "y": 249.90625,
+            "width": 338,
+            "height": 616.09375,
+            "top": 249.90625,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "detailOpen": true,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Shrink route panel",
+              "title": "Shrink route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Back to 4 routes",
+              "title": "",
+              "text": "Back to 4 routes"
+            },
+            {
+              "label": "Previous activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Next activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit current route",
+              "title": "Fit current route",
+              "text": ""
+            },
+            {
+              "label": "Shrink route panel",
+              "title": "Shrink route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Deselect route",
+              "title": "Deselect route",
+              "text": ""
+            },
+            {
+              "label": "More route actions",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "shrink-panel",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 8.69571228898827,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 496
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 8.69571228898827,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 496,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 56,
+            "y": 402,
+            "width": 338,
+            "height": 464,
+            "top": 402,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "detailOpen": true,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Back to 4 routes",
+              "title": "",
+              "text": "Back to 4 routes"
+            },
+            {
+              "label": "Previous activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Next activity",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit current route",
+              "title": "Fit current route",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Deselect route",
+              "title": "Deselect route",
+              "text": ""
+            },
+            {
+              "label": "More route actions",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "back-to-four",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 8.69571228898827,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 496
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 8.69571228898827,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 496,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 56,
+            "y": 402,
+            "width": 338,
+            "height": 464,
+            "top": 402,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "detailOpen": false,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "filters-toggled",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 8.69571228898827,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 496
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 8.69571228898827,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 496,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 56,
+            "y": 402,
+            "width": 338,
+            "height": 464,
+            "top": 402,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "filters-after-escape",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [
+              20279947341,
+              20270725942,
+              20244330171,
+              20265394210
+            ],
+            "active": 20279947341,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 8.69571228898827,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 496
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 8.69571228898827,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 496,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 56,
+            "y": 402,
+            "width": 338,
+            "height": 464,
+            "top": 402,
+            "right": 394,
+            "bottom": 866,
+            "left": 56
+          },
+          "detailOpen": false,
+          "filtersExpanded": "expanded",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select row",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "name": "clear-selection",
+          "url": "/navigation-map-audit",
+          "historyLength": 2,
+          "state": {
+            "selected": [],
+            "active": 0,
+            "camera": {
+              "longitude": 8.724904999999978,
+              "latitude": 47.3613452785562,
+              "zoom": 8.69571228898827,
+              "bearing": 0,
+              "pitch": 0,
+              "padding": {
+                "top": 32,
+                "left": 24,
+                "right": 64,
+                "bottom": 496
+              }
+            },
+            "notifications": []
+          },
+          "camera": {
+            "center": {
+              "lng": 8.724904999999978,
+              "lat": 47.3613452785562
+            },
+            "zoom": 8.69571228898827,
+            "bearing": 0,
+            "pitch": 0,
+            "padding": {
+              "top": 32,
+              "bottom": 496,
+              "left": 24,
+              "right": 64
+            }
+          },
+          "panel": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "detailOpen": false,
+          "filtersExpanded": "collapsed",
+          "controls": [
+            {
+              "label": "Fit selected routes",
+              "title": "Fit selected routes",
+              "text": ""
+            },
+            {
+              "label": "Expand route panel",
+              "title": "Expand route panel",
+              "text": ""
+            },
+            {
+              "label": "Clear selection",
+              "title": "Clear selection",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Select this page",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Fit to width. Switch to: scroll, name pinned",
+              "title": "Fit to width (click to change)",
+              "text": ""
+            },
+            {
+              "label": "Sort by Name",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Distance",
+              "title": "",
+              "text": ""
+            },
+            {
+              "label": "Sort by Elevation Gain",
+              "title": "",
+              "text": ""
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "browser": "155.0.8059.39",
+  "finishedAt": "2026-10-11T13:44:05.570Z"
+}

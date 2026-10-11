@@ -12,15 +12,6 @@ struct MapResultsLayout {
     let bottomOcclusion: CGFloat
     let trailingOcclusion: CGFloat
 
-    /// Explicit fits leave room to reveal normal detail after a compact fit.
-    /// Resizing itself never changes the camera or queues another fit.
-    static func framing(size: CGSize, topInset: CGFloat, bottomInset: CGFloat,
-                        detent: MapResultsDetent, largeText: Bool) -> MapResultsLayout {
-        let target: MapResultsDetent = detent == .compact ? .medium : detent
-        return MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
-                                detent: target, largeText: largeText)
-    }
-
     static func controlsCenter(size: CGSize, topInset: CGFloat = 0) -> CGPoint {
         // Three 44×48 targets, two dividers and 4pt padding: 52×154.
         CGPoint(x: max(26, size.width - 16 - 26), y: topInset + 12 + 77)

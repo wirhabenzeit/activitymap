@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useBrowsingState } from '~/hooks/use-browsing-context';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
 import { categorySettings } from '~/settings/category';
 import { formatPreferredDate } from '~/lib/date-preferences';
@@ -49,7 +50,10 @@ export function MonthRhythm({
     () => monthActivityRhythm(context.activities, context.today, metric),
     [context.activities, context.today, metric],
   );
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedDay, setSelectedDay] = useBrowsingState<number | null>(
+    'stats:monthDay',
+    null,
+  );
   const selected =
     rhythm.days.find((day) => day.day === selectedDay) ??
     rhythm.days.filter((day) => day.activities.length > 0).at(-1);

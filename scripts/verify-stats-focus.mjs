@@ -39,7 +39,8 @@ function FixtureStats() {
 }
 export default function Review() {
   const [client] = useState(() => new QueryClient());
-  return <QueryClientProvider client={client}><SidebarProvider className="flex h-dvh flex-col"><AppHeader /><div className="flex min-h-0 flex-1 overflow-hidden"><AppSidebar /><main className="flex min-w-0 flex-1 flex-col overflow-hidden"><div className="h-14 w-full shrink-0"/><div className="min-h-0 w-full flex-1 overflow-hidden"><FixtureStats /></div></main></div></SidebarProvider></QueryClientProvider>;
+  const [shown, setShown] = useState(true);
+  return <QueryClientProvider client={client}><SidebarProvider className="flex h-dvh flex-col"><AppHeader /><div className="flex min-h-0 flex-1 overflow-hidden"><AppSidebar /><main className="flex min-w-0 flex-1 flex-col overflow-hidden"><div className="h-14 w-full shrink-0"/><div className="min-h-0 w-full flex-1 overflow-hidden"><button id="test-peer-destination" className="sr-only" onClick={() => setShown(value => !value)}>Switch destination</button>{shown ? <FixtureStats /> : <div>Map destination</div>}</div></main></div></SidebarProvider></QueryClientProvider>;
 }
 `,
   );
@@ -348,8 +349,10 @@ export default function Review() {
     true,
     'Chart stays available beside panel',
   );
-  // Focus Back closes a pushed inspection first, even on a direct focus link.
-  await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
+  // Focus Back names and returns to the immediate chart while inspecting.
+  await focus
+    .getByRole('button', { name: 'Back to Records', exact: true })
+    .click();
   await dialog.waitFor({ state: 'hidden' });
   await active('records');
   await page.goForward();
@@ -382,7 +385,7 @@ export default function Review() {
   });
   await pushedDetail.waitFor();
   await pushedDetail
-    .getByRole('button', { name: 'Back to stats', exact: true })
+    .getByRole('button', { name: 'Back to Records', exact: true })
     .click();
   await pushedDetail.waitFor({ state: 'hidden' });
   assert.equal(
@@ -402,7 +405,7 @@ export default function Review() {
 
   // A direct activity link never pushed a chart entry. Replacing its activity
   // must not turn Close/Escape into browser Back to an unrelated page.
-  for (const dismiss of ['close', 'escape']) {
+  for (const dismiss of ['close', 'escape', 'header']) {
     await loaded();
     await loaded(new URL(activityURL).search);
     await dialog.waitFor();
@@ -420,6 +423,10 @@ export default function Review() {
     if (dismiss === 'close')
       await dialog
         .getByRole('button', { name: 'Close activity detail', exact: true })
+        .click();
+    else if (dismiss === 'header')
+      await focus
+        .getByRole('button', { name: 'Back to Records', exact: true })
         .click();
     else await page.keyboard.press('Escape');
     await dialog.waitFor({ state: 'hidden' });
@@ -535,6 +542,63 @@ export default function Review() {
     await active(null);
   }
   console.log('All seven dark focus surfaces captured');
+  await page.setViewportSize({ width: 402, height: 874 });
+  await loaded('?tile=training-volume');
+  await focus.getByRole('button', { name: 'Elevation', exact: true }).click();
+  await focus.getByRole('combobox', { name: 'Volume grouping' }).click();
+  await page.getByRole('option', { name: 'By month', exact: true }).click();
+  const focusScroller = focus.locator('[data-stats-focus-scroll]');
+  const savedFocusScroll = await focusScroller.evaluate((element) => {
+    element.scrollTop = 200;
+    return element.scrollTop;
+  });
+  await page.waitForTimeout(100);
+  const togglePeer = () =>
+    page.locator('#test-peer-destination').evaluate((button) => button.click());
+  await togglePeer();
+  await page.locator('[data-stats-dashboard]').waitFor({ state: 'detached' });
+  await togglePeer();
+  await focus.waitFor();
+  assert.equal(
+    await focus
+      .getByRole('button', { name: 'Elevation', exact: true })
+      .getAttribute('aria-pressed'),
+    'true',
+  );
+  assert.equal(
+    await focus.getByRole('combobox', { name: 'Volume grouping' }).innerText(),
+    'By month',
+  );
+  await page.waitForFunction(
+    (top) =>
+      Math.abs(
+        document.querySelector('[data-stats-focus-scroll]').scrollTop - top,
+      ) < 2,
+    savedFocusScroll,
+  );
+  await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
+  await active(null);
+  const savedDashboardScroll = await dashboard.evaluate((element) => {
+    element.scrollTop = 350;
+    return element.scrollTop;
+  });
+  await page.waitForTimeout(100);
+  await togglePeer();
+  await page.locator('[data-stats-dashboard]').waitFor({ state: 'detached' });
+  await togglePeer();
+  await dashboard.waitFor();
+  await page.waitForTimeout(500);
+  await page.waitForFunction(
+    (top) =>
+      Math.abs(
+        document.querySelector('[data-stats-dashboard]').scrollTop - top,
+      ) < 2,
+    savedDashboardScroll,
+  );
+  console.log(
+    'Peer destinations retain Stats metric, grouping, chart/dashboard scroll',
+  );
+
   assert.deepEqual(errors, [], `Browser errors: ${errors.join('; ')}`);
   await writeFile(
     join(output, 'verification.json'),

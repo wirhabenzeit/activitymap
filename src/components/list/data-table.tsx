@@ -1,6 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import {
+  useBrowsingState,
+  useRetainedScroll,
+} from '~/hooks/use-browsing-context';
 import { sortActivities } from '~/lib/activity-presentation';
 import {
   useDisplayUnits,
@@ -18,6 +22,7 @@ import {
   type RowData,
   type Row,
   type TableFeatures,
+  type PaginationState,
   useTable,
   flexRender,
 } from '@tanstack/react-table';
@@ -75,6 +80,8 @@ interface ListActions {
 }
 
 interface DataTableProps<TData extends RowData> extends ListState, ListActions {
+  browsingKey?: string;
+  browsingDataReady?: boolean;
   columns: ColumnDef<Features, TData>[];
   data: TData[];
   className?: string;
@@ -143,7 +150,16 @@ export const DataTable = React.memo(function DataTable<
   setSummaryRow,
   fitWidth = false,
   setFitWidth,
+  browsingKey,
+  browsingDataReady = true,
 }: DataTableProps<TData>) {
+  const [pagination, setPagination] = useBrowsingState<PaginationState>(
+    browsingKey && `${browsingKey}:pagination`,
+    {
+      pageIndex: 0,
+      pageSize: paginationControl ? 200 : Number.MAX_SAFE_INTEGER,
+    },
+  );
   const units = useDisplayUnits();
   const dateFormat = useDateFormat();
   const panelOpen = !!(
@@ -169,12 +185,13 @@ export const DataTable = React.memo(function DataTable<
     enableMultiSort: false,
     // Stream/photo updates must not undo inspection's page navigation. The
     // inspected index below keeps its page aligned with sort/filter changes.
-    autoResetPageIndex: !(detailStepping && activeId),
+    autoResetPageIndex: !browsingKey && !(detailStepping && activeId),
     features,
     data: sortedData,
     columns,
     getRowId: (row) => row.id.toString(),
     onSortingChange: setSorting,
+    ...(browsingKey && { onPaginationChange: setPagination }),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: (updater: Updater<RowSelectionState>) => {
       const selection =
@@ -213,6 +230,7 @@ export const DataTable = React.memo(function DataTable<
       columnPinning,
     },
     state: {
+      ...(browsingKey && { pagination }),
       columnVisibility: layoutVisibility,
       sorting,
       columnFilters,
@@ -225,6 +243,11 @@ export const DataTable = React.memo(function DataTable<
   });
 
   const containerRef = React.useRef<HTMLDivElement>(null);
+  useRetainedScroll(
+    containerRef,
+    browsingKey && `${browsingKey}:scroll`,
+    '#table-main',
+  );
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
   const lastInspectionRef = React.useRef(0);
   const pendingFocusRef = React.useRef(0);
@@ -343,6 +366,23 @@ export const DataTable = React.memo(function DataTable<
   }, [scrollHint, onOverflowChange, updateMoreBelow, data.length, activeId]);
 
   const inspectionRows = table.getFilteredRowModel().rows;
+  React.useEffect(() => {
+    if (!browsingKey || !browsingDataReady) return;
+    const lastPage = Math.max(
+      0,
+      Math.ceil(inspectionRows.length / pagination.pageSize) - 1,
+    );
+    if (pagination.pageIndex > lastPage)
+      setPagination((previous) => ({ ...previous, pageIndex: lastPage }));
+  }, [
+    browsingKey,
+    browsingDataReady,
+    data.length,
+    inspectionRows.length,
+    pagination.pageSize,
+    pagination.pageIndex,
+    setPagination,
+  ]);
   const inspectionIndex = inspectionRows.findIndex(
     (row) => Number(row.id) === activeId,
   );

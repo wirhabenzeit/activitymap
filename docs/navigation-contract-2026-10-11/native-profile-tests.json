@@ -1,0 +1,98 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "3E0E0C42-1356-4B6D-A140-2A1AAAB95C12",
+      "deviceName" : "iPhone 18 Pro",
+      "modelName" : "iPhone 18 Pro",
+      "osBuildNumber" : "24A434",
+      "osVersion" : "27.0",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "children" : [
+                    {
+                      "duration" : "5s",
+                      "durationInSeconds" : 5.240288734436035,
+                      "name" : "1",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/phoneElevationSharesMediumSheetWithMap(count:)?args=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "4s",
+                      "durationInSeconds" : 4.603894233703613,
+                      "name" : "2",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/phoneElevationSharesMediumSheetWithMap(count:)?args=d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "4s",
+                  "durationInSeconds" : 4.922091484069824,
+                  "name" : "phoneElevationSharesMediumSheetWithMap(count:)",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/phoneElevationSharesMediumSheetWithMap(count:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/phoneElevationSharesMediumSheetWithMap(count:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "children" : [
+                    {
+                      "duration" : "4s",
+                      "durationInSeconds" : 4.243279933929443,
+                      "name" : "false",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/nativeSheetUsesCompactHeadingAndScrollsThroughBottom(largeText:)?args=fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "4s",
+                      "durationInSeconds" : 4.291214227676392,
+                      "name" : "true",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/nativeSheetUsesCompactHeadingAndScrollsThroughBottom(largeText:)?args=b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "4s",
+                  "durationInSeconds" : 4.2672470808029175,
+                  "name" : "nativeSheetUsesCompactHeadingAndScrollsThroughBottom(largeText:)",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/nativeSheetUsesCompactHeadingAndScrollsThroughBottom(largeText:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/nativeSheetUsesCompactHeadingAndScrollsThroughBottom(largeText:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "RenderedRoutePickingTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            }
+          ],
+          "name" : "ActivityMapTests",
+          "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Passed"
+        }
+      ],
+      "name" : "ActivityMap",
+      "nodeType" : "Test Plan",
+      "result" : "Passed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}

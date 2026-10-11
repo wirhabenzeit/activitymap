@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { type VariantProps, cva } from 'class-variance-authority';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeft, X } from 'lucide-react';
 
 import { useIsMobile } from '~/hooks/use-mobile';
 import { cn } from '~/lib/utils';
@@ -191,6 +191,78 @@ const Sidebar = React.forwardRef<
     ref,
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+    const mobileRef = React.useRef<HTMLDivElement>(null);
+    React.useEffect(() => {
+      if (!isMobile || !openMobile) return;
+      const panel = mobileRef.current;
+      if (!panel) return;
+      const origin =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      const main = panel
+        .closest('.group\\/sidebar-wrapper')
+        ?.querySelector('main');
+      const wasInert = main?.inert ?? false;
+      if (main) main.inert = true;
+      const controls = () =>
+        [
+          ...panel.querySelectorAll<HTMLElement>(
+            'button, input, select, textarea, a[href], [tabindex="0"]',
+          ),
+        ].filter(
+          (element) =>
+            element.getClientRects().length && !element.matches(':disabled'),
+        );
+      controls()[0]?.focus({ preventScroll: true });
+      const keyDown = (event: KeyboardEvent) => {
+        // Portalled menus/dialogs own their own dismissal and focus trap.
+        if (
+          event.defaultPrevented ||
+          event
+            .composedPath()
+            .some(
+              (node) =>
+                node instanceof Element &&
+                node.matches(
+                  '[role="dialog"], [role="menu"], [role="listbox"]',
+                ) &&
+                node !== panel,
+            )
+        )
+          return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          setOpenMobile(false);
+        } else if (event.key === 'Tab') {
+          const items = controls();
+          const first = items[0],
+            last = items.at(-1);
+          if (
+            event.shiftKey &&
+            (document.activeElement === first ||
+              !panel.contains(document.activeElement))
+          ) {
+            event.preventDefault();
+            last?.focus();
+          } else if (
+            !event.shiftKey &&
+            (document.activeElement === last ||
+              !panel.contains(document.activeElement))
+          ) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }
+      };
+      document.addEventListener('keydown', keyDown, true);
+      return () => {
+        document.removeEventListener('keydown', keyDown, true);
+        if (main) main.inert = wasInert;
+        if (origin?.isConnected) origin.focus({ preventScroll: true });
+      };
+    }, [isMobile, openMobile, setOpenMobile]);
 
     if (collapsible === 'none') {
       return (
@@ -226,6 +298,11 @@ const Sidebar = React.forwardRef<
               )}
             />
             <div
+              ref={mobileRef}
+              role={openMobile ? 'dialog' : undefined}
+              aria-modal={openMobile || undefined}
+              aria-label={openMobile ? 'Filters' : undefined}
+              data-filter-overlay={openMobile || undefined}
               className={cn(
                 'fixed inset-y-0 z-50 h-dvh',
                 side === 'left' ? 'left-0' : 'right-0',
@@ -235,11 +312,9 @@ const Sidebar = React.forwardRef<
                   : 'group-data-[side=left]:border-r group-data-[side=right]:border-l',
                 className,
               )}
-              style={
-                {
-                  width: openMobile ? SIDEBAR_WIDTH_MOBILE : SIDEBAR_WIDTH_ICON,
-                }
-              }
+              style={{
+                width: openMobile ? SIDEBAR_WIDTH_MOBILE : SIDEBAR_WIDTH_ICON,
+              }}
               {...props}
             >
               <div
@@ -249,6 +324,19 @@ const Sidebar = React.forwardRef<
               >
                 {/* Add top padding on mobile to account for header */}
                 <div className="h-14 w-full" />
+                {openMobile && (
+                  <div className="flex items-center justify-between px-3">
+                    <span className="font-medium">Filters</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Close filters"
+                      onClick={() => setOpenMobile(false)}
+                    >
+                      <X className="size-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                )}
                 {children}
               </div>
             </div>
@@ -321,12 +409,14 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, state } = useSidebar();
 
   return (
     <Button
       ref={ref}
       data-sidebar="trigger"
+      aria-expanded={state === 'expanded'}
+      aria-controls="activity-filters"
       variant="ghost"
       size="icon"
       className={cn('h-7 w-7', className)}
@@ -337,7 +427,7 @@ const SidebarTrigger = React.forwardRef<
       {...props}
     >
       <PanelLeft />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">Filters</span>
     </Button>
   );
 });

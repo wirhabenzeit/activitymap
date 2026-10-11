@@ -105,12 +105,12 @@ enum MapNavigation {
         }
         let activities: [Activity]
         switch request.action {
-        case let .activity(id):
+        case let .activity(id), let .fitActivity(id):
             guard let activity = store.activities.first(where: { $0.id == id }) else {
                 context.consume(request); return nil
             }
             guard store.visibleActivityIDs.contains(id) else {
-                context.hiddenTargetID = id
+                if case .activity = request.action { context.hiddenTargetID = id }
                 context.consume(request); return nil
             }
             activities = [activity]
@@ -126,10 +126,16 @@ enum MapNavigation {
         }
         let padding = RouteCameraFitter.padding(safeArea: safeArea, sheetHeight: sheetHeight, topOcclusion: topOcclusion,
                                                 leadingOcclusion: leadingOcclusion, trailingOcclusion: trailingOcclusion)
-        // Wait if the remaining viewport is unusable. The visible rectangle
-        // may sit entirely above the physical map center (e.g. a medium sheet).
+        // Fitting never resizes results. Let the user shrink an occluding sheet.
         guard size.width - padding.left - padding.right >= 80,
-              size.height - padding.top - padding.bottom >= 80 else { return nil }
+              size.height - padding.top - padding.bottom >= 80 else {
+            // Show on map can arrive during a tab/navigation-bar resize. Keep
+            // its request until the destination has a usable rendered layout.
+            if case .activity = request.action { return nil }
+            context.navigationError = "Shrink results to leave room for the route, then try Fit again."
+            context.consume(request)
+            return nil
+        }
         do {
             let camera = try RouteCameraFitter.camera(extent: extent, map: map, padding: padding, size: size, current: current)
             guard camera.center != nil, let zoom = camera.zoom, zoom.isFinite else { throw CameraError.invalidFit }

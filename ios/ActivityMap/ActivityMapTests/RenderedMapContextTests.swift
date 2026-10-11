@@ -49,23 +49,21 @@ extension RenderedRoutePickingTests {
         }
     }
 
-    @Test func compactFitLeavesRoomForMediumDetailWithoutRefitting() async throws {
+    @Test func compactFitUsesCurrentFootprintAndResizingDoesNotRefit() async throws {
         let size = CGSize(width: 402, height: 874)
         let harness = try await CameraHarness(size: size)
         defer { harness.close() }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
         store.replaceSelection(with: [1])
         let medium = MapResultsLayout(size: size, topInset: 116, bottomInset: 34, detent: .medium)
-        let framing = MapResultsLayout.framing(size: size, topInset: 116, bottomInset: 34,
-                                               detent: .compact, largeText: false)
-        #expect(framing.bottomOcclusion == medium.bottomOcclusion)
+        let compact = MapResultsLayout(size: size, topInset: 116, bottomInset: 34, detent: .compact)
         store.mapContext.request(.fitSelection)
         let options = try #require(MapNavigation.resolve(store: store, map: harness.map.mapboxMap,
             size: size, safeArea: UIEdgeInsets(top: 62, left: 0, bottom: 34, right: 0),
-            sheetHeight: framing.bottomOcclusion, topOcclusion: 116))
+            sheetHeight: compact.bottomOcclusion, topOcclusion: 116))
         harness.map.mapboxMap.setCamera(to: options)
         let padding = RouteCameraFitter.padding(safeArea: UIEdgeInsets(top: 62, left: 0, bottom: 34, right: 0),
-                                               sheetHeight: medium.bottomOcclusion, topOcclusion: 116)
+                                               sheetHeight: compact.bottomOcclusion, topOcclusion: 116)
         let visible = CGRect(origin: .zero, size: size).inset(by: padding).insetBy(dx: -2, dy: -2)
         #expect(harness.map.mapboxMap.points(for: store.activities[0].coordinates).allSatisfy { visible.contains($0) })
         #expect(MapNavigation.resolve(store: store, map: harness.map.mapboxMap, size: size,
@@ -98,6 +96,13 @@ extension RenderedRoutePickingTests {
         #expect(resolve(500) != nil && store.mapContext.pendingRequest == nil,
                 "A usable viewport above the map center must still accept an explicit fit")
         #expect(resolve(0) == nil, "Dismissing/resizing sheet must not refit a consumed request")
+        let selected = store.selectedActivityIDs, active = store.activeActivityID
+        store.mapContext.request(.fitActivity(1))
+        #expect(resolve(340) != nil && store.mapContext.pendingRequest == nil)
+        #expect(store.selectedActivityIDs == selected && store.activeActivityID == active)
+        store.mapContext.request(.fitSelection)
+        #expect(resolve(790) == nil && store.mapContext.pendingRequest == nil)
+        #expect(store.mapContext.navigationError != nil, "An occluded Fit ends with shrink guidance rather than changing the panel or waiting indefinitely")
         store.mapContext.request(.resetView)
         let reset = try #require(resolve())
         #expect(reset.center?.latitude == MapCamera.initial.center.latitude && reset.zoom == 6.5 && reset.pitch == 0)

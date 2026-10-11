@@ -1,0 +1,34 @@
+{
+  "basemap" : "offline",
+  "commit" : "734c23c4a7c427d61924a0725d4bb23cce1970bf",
+  "contentSize" : "UICTContentSizeCategoryL",
+  "dark" : false,
+  "detailID" : null,
+  "fixtureHash" : "4e111e55d17cc53769e5a38fb08c3d50e9d9109be8c208a60c7c4f0e26d0b396",
+  "framing" : {
+    "cameraSettled" : true,
+    "nativePanelFrame" : "none",
+    "paddedVisibleRect" : "{{78, 56}, {383, 210}}",
+    "routeContained" : true,
+    "routePointCount" : 1207,
+    "zoom" : 9.1600000000000001
+  },
+  "height" : 402,
+  "library" : "curated",
+  "listMetrics" : "distance,elapsedTime,elevationGain",
+  "listOptions" : false,
+  "listView" : "columns",
+  "order" : 1,
+  "orientationCapture" : "scene rotation",
+  "scene" : "map-results",
+  "search" : "",
+  "selectedIDs" : [
+    20279947341,
+    20270725942,
+    20244330171,
+    20265394210
+  ],
+  "title" : "Map · four selected routes",
+  "variant" : "phone-landscape",
+  "width" : 874
+}

@@ -7,7 +7,6 @@ import {
   MoreHorizontal,
   ExternalLink,
   Pencil,
-  X,
   Image as PhotosIcon,
 } from 'lucide-react';
 import { decode } from '@mapbox/polyline';
@@ -393,13 +392,12 @@ export function ActivityCardContent({
             {onClearSelection && (
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7"
+                size="sm"
                 onClick={onClearSelection}
                 aria-label="Clear selection"
                 title="Clear selection"
               >
-                <X className="h-4 w-4" />
+                Clear selection
               </Button>
             )}
           </div>

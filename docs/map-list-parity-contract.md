@@ -1,5 +1,7 @@
 # Map/list parity behavior contract, version 1
 
+The [accepted navigation contract](navigation-contract.md) governs containers, history, Back/Close/Clear labels and retained context on web and native. Its [control audit](navigation-contract.md#control-audit-baseline-to-accepted-implementation) compares the historical [11 October baseline](navigation-audit-2026-10-11.md) with the accepted implementation; [verification](navigation-contract-2026-10-11/README.md) records the automated results and remaining device acceptance. This does not change the selection rules below.
+
 This is the reviewable behavior contract and fixture foundation for [#196](https://github.com/wirhabenzeit/activitymap/issues/196). It distinguishes the desired cross-platform behavior from the existing implementation. Merging this document establishes the implementation reference; it does not establish that every capability is implemented or visually verified.
 
 Baseline: `5a9e213` (2026-09-26), including merged #190 (web elevation), #194 (inline list details and responsive widths), #189 and #231 (native sync/freshness). Implementation ownership remains in [#195](https://github.com/wirhabenzeit/activitymap/issues/195). This document does not close #196: comparable screenshots, physical-device/accessibility review and measured performance baselines remain to be collected.

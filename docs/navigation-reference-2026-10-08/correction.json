@@ -1,0 +1,56 @@
+{
+  "correctedAt": "2026-10-11T19:26:16.776840+00:00",
+  "captureDate": "2026-10-08",
+  "correctionDate": "2026-10-11",
+  "file": "activitymap-navigation-reference-2026-10-08.pdf",
+  "originalSHA256": "f61466bb42c10cc0da5ea1119428f31d694be6d03faaa7bc00a90c54df0bcf7d",
+  "correctedSHA256": "7e0a1405c7e00cb5d2b8816b88439177122807ead9e86f1cab58712ed0251626",
+  "method": "ReportLab regeneration of page 24, composed with original pages using pypdf; no screenshot recapture or relabelling",
+  "pageCount": 25,
+  "changedPages": [
+    24
+  ],
+  "unchangedPages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    25
+  ],
+  "unchangedPageVerification": [
+    "decoded content streams identical",
+    "extracted text identical",
+    "page dimensions identical",
+    "decoded image hashes identical"
+  ],
+  "correction": "Web and native both hide date controls in Stats. Saved Map/List dates do not constrain Stats; the pictured filter editor is from List.",
+  "acceptedContract": "../navigation-contract.md",
+  "implementationVerification": "../navigation-contract-2026-10-11/README.md",
+  "htmlSHA256": "f5d5f1bb66523d5904466a36b65063e6308a04aa46f12bff4a8615a8433649ea",
+  "screenshotManifestSHA256": "46a00d84b2cb879d331696259e3b3ea6d9453f2b57cd4a2b7ae20a771443ad94",
+  "visualVerification": {
+    "changedPage": 24,
+    "renderDPI": 100,
+    "allPagesContactSheetDPI": 40,
+    "result": "Passed: corrected page and 25-page contact sheet reviewed; no clipping or overlapping text"
+  }
+}

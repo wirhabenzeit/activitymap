@@ -56,3 +56,11 @@ not supported. Vercel Preview branches migrate automatically before their
 builds, while Production migrations are automatically queued on `main` and
 remain approval-gated. See [Database migrations](docs/database-migrations.md)
 for the complete workflow.
+
+## Behavior references
+
+- [Accepted navigation contract](docs/navigation-contract.md) — containers, history, dismissal, control meanings, baseline-to-target audit and delivery status for #358/#359.
+- [Navigation implementation verification](docs/navigation-contract-2026-10-11/README.md) — browser/simulator results, selected captures and pending device acceptance.
+- [Navigation behavior baseline](docs/navigation-audit-2026-10-11.md) — behavior and evidence captured before implementing the contract.
+- [Map/list parity contract](docs/map-list-parity-contract.md)
+- [Stats parity contract](docs/stats-parity-contract.md)

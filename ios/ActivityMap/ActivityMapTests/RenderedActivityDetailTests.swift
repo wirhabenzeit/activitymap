@@ -620,8 +620,8 @@ extension RenderedRoutePickingTests {
         store.showOnMap(1)
         try await Task.sleep(for: .milliseconds(900))
         #expect(picker.detent == .medium, "Show on map must open the elevation profile without a manual sheet expansion")
-        // The activity heading's Fit route action queues this same command.
-        store.showOnMap(1)
+        // The activity heading's Fit route moves only the camera.
+        store.mapContext.request(.fitActivity(1))
         try await Task.sleep(for: .milliseconds(600))
         #expect(picker.detent == .medium && picker.detailID == 1, "Reframing must retain visible activity detail")
         #expect(store.mapContext.pendingRequest == nil)

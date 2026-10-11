@@ -37,7 +37,7 @@ export function useListInspection() {
   const open = useCallback(
     (id: number) => {
       const href = activityURL(window.location.href, id);
-      if (!activeId && presentation === 'push') {
+      if (!activeId) {
         window.history.pushState(
           {
             activityListDetail: {
@@ -58,7 +58,7 @@ export function useListInspection() {
         );
       }
     },
-    [activeId, presentation],
+    [activeId],
   );
 
   const close = useCallback(() => {

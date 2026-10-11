@@ -33,7 +33,7 @@ struct MapResultsContainer: View {
                     .transaction { if drag != nil { $0.animation = nil } }
             }
         } else {
-            NativeMapResultsSheet(picker: picker, store: store, size: size, largeText: largeText)
+            NativeMapResultsSheet(picker: picker, store: store, size: size, topInset: topInset, largeText: largeText)
         }
     }
 
@@ -104,13 +104,14 @@ private struct NativeMapResultsSheet: View {
     @Bindable var picker: RoutePicker
     let store: ActivityStore
     let size: CGSize
+    let topInset: CGFloat
     let largeText: Bool
     @Environment(\.mapResultsSheetSuspended) private var suspended
     @Environment(\.mapResultsPresentationChanged) private var presentationChanged
     @Environment(\.stackedShellSheet) private var stacked
     private var openingHeight: CGFloat {
         NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.visibleActivityIDs.contains).count,
-                                            detail: picker.detailID != nil, height: size.height, largeText: largeText)
+                                            detail: picker.detailID != nil, height: size.height, largeText: largeText, topInset: topInset)
     }
     private var compact: PresentationDetent { .height(NativeMapResultsSizing.compactHeight(largeText: largeText)) }
     private var opening: PresentationDetent { .height(openingHeight) }
@@ -158,12 +159,15 @@ private struct NativeMapResultsSheet: View {
 enum NativeMapResultsSizing {
     static func compactHeight(largeText: Bool) -> CGFloat { largeText ? 140 : 76 }
 
-    static func openingHeight(count: Int, detail: Bool, height: CGFloat, largeText: Bool) -> CGFloat {
+    static func openingHeight(count: Int, detail: Bool, height: CGFloat, largeText: Bool, topInset: CGFloat = 0) -> CGFloat {
         // Phone detail opens with its profile visible and the map above it.
         // The smallest phones still retain a usable map instead of requiring .large.
         let minimum: CGFloat = detail ? (largeText ? 420 : 340) : (largeText ? 300 : 220)
         let content: CGFloat = detail ? (largeText ? 480 : (count > 1 ? 412 : 368))
             : 76 + CGFloat(max(1, min(count, 5))) * (largeText ? 160 : 64)
-        return max(minimum, min(content, height * 0.5))
+        // Large text on a short phone still needs a usable map above the
+        // opening sheet. Content scrolls; the user can explicitly expand it.
+        let maximum = max(160, height - topInset - 64 - 24 - 96)
+        return min(maximum, max(minimum, min(content, height * 0.5)))
     }
 }

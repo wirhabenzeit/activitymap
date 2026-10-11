@@ -129,6 +129,7 @@ import Testing
         try await inspectionWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         state.inspectedActivityID = ids[0]
         try await inspectionWait { host.accessible(label: "Close activity details") != nil }
+        try await inspectionWait { host.accessible(label: "Back to Records") != nil }
         #expect(navigation.viewControllers.count == 2, "Regular width keeps inspection alongside Records")
         state.inspectedActivityID = ids[1]
         try await Task.sleep(for: .milliseconds(100))
@@ -150,6 +151,7 @@ import Testing
         #expect(navigation.viewControllers.count == 2, "The next inspection uses the newly available wide panel")
         state.inspectedActivityID = nil
         try await inspectionWait { host.accessible(label: "Close activity details") == nil }
+        try await inspectionWait { host.accessible(label: "Back to Stats dashboard") != nil }
         #expect(state.expandedTile == .records)
     }
 }

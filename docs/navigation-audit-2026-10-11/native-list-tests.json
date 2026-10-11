@@ -1,0 +1,130 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "3E0E0C42-1356-4B6D-A140-2A1AAAB95C12",
+      "deviceName" : "iPhone 18 Pro",
+      "modelName" : "iPhone 18 Pro",
+      "osBuildNumber" : "24A434",
+      "osVersion" : "27.0",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.3320269584655762,
+                  "name" : "mapResultsBackRetainsScrollAndBrowsingContext()",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/mapResultsBackRetainsScrollAndBrowsingContext()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/mapResultsBackRetainsScrollAndBrowsingContext()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "2s",
+                  "durationInSeconds" : 2.904438018798828,
+                  "name" : "listControlsAndInspectionSurviveMapRoundTripWithLazyLargeResults()",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/listControlsAndInspectionSurviveMapRoundTripWithLazyLargeResults()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/listControlsAndInspectionSurviveMapRoundTripWithLazyLargeResults()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "children" : [
+                    {
+                      "duration" : "1s",
+                      "durationInSeconds" : 1.584826946258545,
+                      "name" : "\"large-text\"",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/listDetailUsesNavigationAndBackRetainsContext(scenario:)?args=1fc8c55818499e0c1d0c0ff8aa525d429cd5ab590209abab5365cfc4754c652c",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "1s",
+                      "durationInSeconds" : 1.6295082569122314,
+                      "name" : "\"phone\"",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/listDetailUsesNavigationAndBackRetainsContext(scenario:)?args=d5511d58ae89a5136544686b7e471128789e3309c2ec9b520c217067f6abb75d",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "1s",
+                      "durationInSeconds" : 1.823164701461792,
+                      "name" : "\"split-window\"",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/listDetailUsesNavigationAndBackRetainsContext(scenario:)?args=ce407ae794eb834da6583f266da5bd31624e472a068a75d08911cb831296076c",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "0.99s",
+                      "durationInSeconds" : 0.9850039482116699,
+                      "name" : "\"tablet-landscape\"",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/listDetailUsesNavigationAndBackRetainsContext(scenario:)?args=077c27cf3e10137dbc5f33eb39e1100b464003d71f4f4d6e9cf287020f0d122b",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "1s",
+                      "durationInSeconds" : 1.953477144241333,
+                      "name" : "\"tablet-large-text\"",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/listDetailUsesNavigationAndBackRetainsContext(scenario:)?args=a1820c9b52317407b268dd92d5b17883151882e77e4780a207f028b9840ca983",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "1s",
+                      "durationInSeconds" : 1.0450730323791504,
+                      "name" : "\"tablet\"",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/listDetailUsesNavigationAndBackRetainsContext(scenario:)?args=367b89ae8252550a32e1f175c3e8d5cf4d5e4068c4269c013bd06e38dd0bea85",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.5035090049107869,
+                  "name" : "listDetailUsesNavigationAndBackRetainsContext(scenario:)",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/listDetailUsesNavigationAndBackRetainsContext(scenario:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/listDetailUsesNavigationAndBackRetainsContext(scenario:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.48s",
+                  "durationInSeconds" : 0.4825758934020996,
+                  "name" : "listPushedDetailSurvivesWindowResizing()",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/listPushedDetailSurvivesWindowResizing()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/listPushedDetailSurvivesWindowResizing()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "RenderedRoutePickingTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            }
+          ],
+          "name" : "ActivityMapTests",
+          "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Passed"
+        }
+      ],
+      "name" : "ActivityMap",
+      "nodeType" : "Test Plan",
+      "result" : "Passed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}

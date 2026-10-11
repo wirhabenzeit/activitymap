@@ -166,7 +166,7 @@ struct AppShell: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Back to Stats")
+                    .accessibilityLabel(dashboard.inspectedActivityID != nil ? "Back to \(tile.title)" : "Back to Stats dashboard")
                     .accessibilityIdentifier("stats-detail-back")
                     Text(tile.title).font(.title2.weight(.semibold))
                         .accessibilityAddTraits(.isHeader)

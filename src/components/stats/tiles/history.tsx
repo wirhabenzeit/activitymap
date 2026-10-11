@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
+import { useBrowsingState } from '~/hooks/use-browsing-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import {
@@ -101,7 +102,10 @@ export function VolumeHistory({
       year: 'numeric',
     });
 
-  const [range, setRange] = useState<HistoryRange>('weeks');
+  const [range, setRange] = useBrowsingState<HistoryRange>(
+    'stats:volumeGrouping',
+    'weeks',
+  );
   const buckets = useMemo(
     () => volumeHistory(context.activities, context.today, metric, range),
     [context.activities, context.today, metric, range],
@@ -550,7 +554,7 @@ export function ComparisonHistory({
   period: 'year' | 'month';
   children: (context: TileContext) => ReactNode;
 }) {
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useBrowsingState(`stats:comparison:${period}`, 0);
   const date = dateOfDay(context.today);
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth();
