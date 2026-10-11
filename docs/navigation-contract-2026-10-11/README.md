@@ -2,6 +2,8 @@
 
 Verification of the [accepted contract](../navigation-contract.md) for issues #358 and #359. These captures show the implementation; the [status-quo evidence](../navigation-audit-2026-10-11.md) remains a separate, unchanged baseline.
 
+The implementation and documentation are committed in [PR #380](https://github.com/wirhabenzeit/activitymap/pull/380). After rebasing onto main `2b68d6fb` (photo/sign-in #379), the iOS app rebuilt and all 21 targeted tests / 42 parameterized executions passed with no failures or skips. [Post-rebase summary](native-pr-rebased-summary.json) records this check at implementation commit `81a03e31`; subsequent PR-link changes affect documentation only.
+
 The [control audit](../navigation-contract.md#control-audit-baseline-to-accepted-implementation) records baseline effects and the accepted target. The contract also records [decisions that revise the issue proposals](../navigation-contract.md#decisions-reconciled-with-the-issue-proposals) and [PR references/delivery status](../navigation-contract.md#implementation-references-and-delivery-status). The October 8 reference's HTML and exported PDF page 24/question 06 are corrected; [correction provenance](../navigation-reference-2026-10-08/correction.json) records the PDF update.
 
 ## Results
@@ -28,7 +30,7 @@ The browser runners exercise production components with fixture data on temporar
 - Native: run `MapResultsTests`, `StatsInspectionTests` and the rendered Map, List resize/return and detail-profile/scroll cases in `RenderedRoutePickingTests` with the ActivityMap Xcode scheme. The saved test-case reports identify the exact cases and parameters.
 - Screenshot gallery: `bash scripts/ios-gallery.sh <run> --scene map-detail --variant wide,small-large-text`.
 
-Selected screenshots are stored here alongside their result metadata. [The manifest](manifest.json) records their hashes and the source hashes of the uncommitted implementation, based on HEAD `734c23c4a7c427d61924a0725d4bb23cce1970bf`. A HEAD value in a runner's metadata identifies the underlying commit, not a committed implementation.
+Selected screenshots are stored here alongside their result metadata. [The manifest](manifest.json) records their hashes and the source hashes from the original working-tree verification, based on HEAD `734c23c4a7c427d61924a0725d4bb23cce1970bf`, plus the subsequent PR/rebase provenance. A HEAD value in a capture runner's metadata identifies its underlying commit; the recorded source hashes identify the implementation tested at that time.
 
 | Presentation | Screenshots |
 | --- | --- |

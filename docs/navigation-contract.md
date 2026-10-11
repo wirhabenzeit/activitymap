@@ -2,7 +2,7 @@
 
 Accepted on 11 October 2026 for [#358](https://github.com/wirhabenzeit/activitymap/issues/358) and [#359](https://github.com/wirhabenzeit/activitymap/issues/359), following the [status-quo audit](navigation-audit-2026-10-11.md). This governs web and native navigation. The [Map/List contract](map-list-parity-contract.md) owns selection transitions; the [Stats contract](stats-parity-contract.md) owns calculations and reporting scope.
 
-Acceptance records the product decision in this review. The implementing changes are local and have not yet been merged; physical-device acceptance remains open. This document does not claim that either GitHub issue is closed.
+Acceptance records the product decision in this review. The implementing changes are committed in [PR #380](https://github.com/wirhabenzeit/activitymap/pull/380) and have not yet been merged; physical-device acceptance remains open. This document does not claim that either GitHub issue is closed.
 
 ## Decisions reconciled with the issue proposals
 
@@ -37,7 +37,7 @@ Fit uses the available map rectangle. If an expanded sheet leaves no usable map 
 
 ## Control audit: baseline to accepted implementation
 
-The baseline column describes the 11 October status quo at commit [`734c23c4`](https://github.com/wirhabenzeit/activitymap/commit/734c23c4a7c427d61924a0725d4bb23cce1970bf), rather than the older October 8 screenshots. The target column describes the accepted, locally implemented behavior. **Retained** means the baseline already met the contract; **changed** identifies implementation work. Evidence and coverage limits are in [implementation verification](navigation-contract-2026-10-11/README.md).
+The baseline column describes the 11 October status quo at commit [`734c23c4`](https://github.com/wirhabenzeit/activitymap/commit/734c23c4a7c427d61924a0725d4bb23cce1970bf), rather than the older October 8 screenshots. The target column describes the accepted behavior implemented in PR #380. **Retained** means the baseline already met the contract; **changed** identifies implementation work. Evidence and coverage limits are in [implementation verification](navigation-contract-2026-10-11/README.md).
 
 | Surface | Platform | Control | Baseline effect/name | Accepted target and implementation |
 | --- | --- | --- | --- | --- |
@@ -120,14 +120,14 @@ Before each tap, predict what the control will change. Record device/browser, OS
 
 ## Implementation references and delivery status
 
-The merged foundations are web List [#361](https://github.com/wirhabenzeit/activitymap/pull/361), web Stats focus [#362](https://github.com/wirhabenzeit/activitymap/pull/362), native navigation [#350](https://github.com/wirhabenzeit/activitymap/pull/350) with iPad filters [#365](https://github.com/wirhabenzeit/activitymap/pull/365), native Stats inspection [#368](https://github.com/wirhabenzeit/activitymap/pull/368), native header adjustment [#371](https://github.com/wirhabenzeit/activitymap/pull/371), and web selection/Show on map [#372](https://github.com/wirhabenzeit/activitymap/pull/372). The [verification manifest](navigation-contract-2026-10-11/manifest.json) identifies source hashes for the additional implementation in this working tree. Its implementing PR link must be added when that PR exists; the foundation PRs do not claim to include these new changes.
+The merged foundations are web List [#361](https://github.com/wirhabenzeit/activitymap/pull/361), web Stats focus [#362](https://github.com/wirhabenzeit/activitymap/pull/362), native navigation [#350](https://github.com/wirhabenzeit/activitymap/pull/350) with iPad filters [#365](https://github.com/wirhabenzeit/activitymap/pull/365), native Stats inspection [#368](https://github.com/wirhabenzeit/activitymap/pull/368), native header adjustment [#371](https://github.com/wirhabenzeit/activitymap/pull/371), and web selection/Show on map [#372](https://github.com/wirhabenzeit/activitymap/pull/372). [PR #380](https://github.com/wirhabenzeit/activitymap/pull/380) contains the additional implementation and this contract. The [verification manifest](navigation-contract-2026-10-11/manifest.json) records original source hashes and the post-rebase iOS check against main `2b68d6fb`; the foundation PRs do not claim to include these new changes.
 
-| Issue requirement | Local status | Remaining before issue closure |
+| Issue requirement | PR status | Remaining before issue closure |
 | --- | --- | --- |
-| #358 contract, parity/README links and accepted decision | Documented, accepted by the user on 11 October | Commit and merge the contract with the implementing PR link. |
+| #358 contract, parity/README links and accepted decision | Documented, accepted by the user on 11 October; PR #380 linked | Review and merge the contract. |
 | #358 reference page 24 correction | HTML and exported PDF corrected; dated captures retained | Merge the corrected reference. |
-| #359 surface/platform/control/current-effect/target audit | Included above, with the agreed action table | Include this document in the implementing PR. |
-| #359 web/iOS mismatches and labels | Implemented locally; browser/simulator checks passed | Review, CI and merge. |
+| #359 surface/platform/control/current-effect/target audit | Included above and in PR #380, with the agreed action table | Review and merge. |
+| #359 web/iOS mismatches and labels | Committed in PR #380; browser/simulator checks passed, including the rebased iOS build/tests | Review, CI and merge. |
 | #359 phone/wide task check | Automated transitions passed; predict-before-tapping check is pending | Complete the human task journeys, physical gestures and VoiceOver checks. |
 
 Keep both issues open until delivery and the remaining acceptance checks are recorded. Cross-launch scroll/preferences, live-map styling and unrelated Stats/filter parity work are outside this contract's implementation claim.
