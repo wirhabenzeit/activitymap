@@ -6,8 +6,22 @@ import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
 import { logger } from '~/server/logging/logger';
 import { activitiesRepository } from '~/server/repositories/activities';
 import { createListHandler } from '../list-handler';
+import { createFetchActivitySummariesHandler } from './[id]/mutation-handler';
 
 const ROUTE = 'GET /api/v1/activities';
+export const maxDuration = 60;
+
+export const POST = withApiV1Observability(
+  withApiV1RateLimit(
+    createFetchActivitySummariesHandler({
+      resolveActor: (request) => resolveActor(request.headers),
+      onError: (error, requestId) =>
+        logger.error('Summary fetch failed', { error, requestId }),
+    }),
+    { route: 'POST /api/v1/activities', resolveUserId: resolveRateLimitUserId },
+  ),
+  { route: 'POST /api/v1/activities' },
+);
 
 export const GET = withApiV1Observability(
   withApiV1RateLimit(

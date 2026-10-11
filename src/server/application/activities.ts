@@ -119,6 +119,38 @@ export async function getUserActivities(
   return activitiesRepo.findManyByAthlete(actor.athleteId, opts);
 }
 
+/** Fetch and persist the first summary page before returning to the caller. */
+export async function fetchInitialActivitySummariesForActor(
+  actor: Actor,
+  deps: ActivitiesServiceDeps = {},
+): Promise<number> {
+  const { resolveAccount, fetchActivities } = resolveDeps(deps);
+  try {
+    const account = await resolveAccount({ userId: actor.userId });
+    if (
+      !account?.access_token ||
+      account.revokedAt ||
+      account.accountId !== String(actor.athleteId)
+    ) {
+      throw new ActivityMutationError(
+        'strava_not_connected',
+        'The connected Strava account is unavailable.',
+        409,
+      );
+    }
+    const result = await fetchActivities({
+      accessToken: account.access_token,
+      athleteId: actor.athleteId,
+      page: 1,
+      per_page: 200,
+      limit: 200,
+    });
+    return result.activities.length;
+  } catch (error) {
+    throw mutationFailure(error);
+  }
+}
+
 /**
  * Look up activities by internal id, scoped to the requesting actor.
  *

@@ -26,6 +26,89 @@ actor GatedSyncSource: SyncPageSource {
 
 @MainActor
 struct SyncControllerTests {
+    @Test func failedDownloadRetainsSummaryCountForRecoveryWithoutRepeatingImport() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let imported = try Fixtures.activity(["id": "1"])
+        let source = ScriptedSyncSource([
+            .bootstrap(.activities, nil, .success(SyncFixtures.activities())),
+            .bootstrap(.photos, nil, .success(SyncFixtures.photos())),
+            .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot"))),
+            .changes("snapshot", .failure(.transport("The connection was lost."))),
+            .changes("snapshot", .success(SyncFixtures.changes([SyncFixtures.upsert(imported)], next: "delta"))),
+            .changes("delta", .success(SyncFixtures.changes(next: "delta"))),
+            .changes("delta", .success(SyncFixtures.changes(next: "delta"))),
+        ])
+        var imports = 0
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source },
+                                        fetchInitialSummaries: { _ in imports += 1; return 1 }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        #expect(controller.status == .offline && controller.firstSummaryCount == nil)
+        #expect(controller.firstSummaryError == "Network error: The connection was lost.")
+        await controller.refresh()
+        #expect(imports == 1 && controller.firstSummaryCount == 1)
+        #expect(controller.status == .ready && controller.firstSummaryError == nil)
+        #expect(controller.activities.activities.map(\.id) == [1])
+        controller.firstSummaryCount = nil
+        await controller.refresh()
+        #expect(controller.firstSummaryCount == nil && imports == 1)
+    }
+
+    @Test func summaryFetchFailureSurfacesTheServerMessageAndConnectionRecovery() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let controller = SyncController(activities: ActivityStore(), source: { _ in SyncFixtures.complete() },
+                                        fetchInitialSummaries: { _ in
+                                            throw APIClient.RequestError.server(code: "strava_not_connected", message: "The connected Strava account is unavailable.",
+                                                                                status: 409, requestID: "r", retryable: false)
+                                        }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        #expect(controller.firstSummaryCount == nil)
+        #expect(controller.firstSummaryError == "The connected Strava account is unavailable. Connect with Strava again in Settings.")
+        #expect(!controller.firstSummaryRetryable)
+        controller.setSession(nil, storage: storage)
+        await controller.refresh()
+        #expect(controller.firstSummaryError == nil)
+    }
+
+    @Test func initialBootstrapFailureAlsoSurfacesTheServerMessage() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let source = ScriptedSyncSource([
+            .bootstrap(.activities, nil, .failure(.server(code: "internal_error", message: "The activities could not be downloaded.",
+                                                         status: 500, requestID: "r", retryable: true))),
+        ])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source },
+                                        fetchInitialSummaries: { _ in throw ScriptedSyncSource.ScriptError.unexpectedRequest }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        #expect(controller.firstSummaryError == "The activities could not be downloaded.")
+        #expect(controller.firstSummaryRetryable)
+    }
+
+    @Test func emptyAccountWaitsForOneSummaryFetchAndPublishesCompletionAfterCacheRefresh() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let imported = try Fixtures.activity(["id": "1"])
+        let source = ScriptedSyncSource([
+            .bootstrap(.activities, nil, .success(SyncFixtures.activities())),
+            .bootstrap(.photos, nil, .success(SyncFixtures.photos())),
+            .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot"))),
+            .changes("snapshot", .success(SyncFixtures.changes([SyncFixtures.upsert(imported)], next: "delta"))),
+            .changes("delta", .success(SyncFixtures.changes(next: "delta"))),
+            .changes("delta", .success(SyncFixtures.changes(next: "delta"))),
+        ])
+        let gate = SummaryFetchGate()
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source },
+                                        fetchInitialSummaries: { _ in await gate.fetch() }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await gate.waitForRequest()
+        #expect(controller.status == .syncing && controller.firstSummaryCount == nil)
+        await gate.release()
+        await controller.refresh()
+        #expect(controller.status == .ready && controller.firstSummaryCount == 1)
+        #expect(controller.activities.activities.map(\.id) == [1])
+        await controller.refresh()
+        #expect(await gate.calls == 1)
+    }
     @Test func reconnectingTheSameSessionPreservesSelectionAndInspection() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let dto = try Fixtures.activity()
@@ -270,4 +353,19 @@ struct SyncControllerTests {
         #expect(controller.status == .offline && controller.activities.activities.isEmpty)
         #expect(controller.checkpoint?.changesCursor == "deleted" && !invalidated)
     }
+}
+
+actor SummaryFetchGate {
+    private var response: CheckedContinuation<Int, Never>?
+    private var requested: CheckedContinuation<Void, Never>?
+    private(set) var calls = 0
+    func fetch() async -> Int {
+        calls += 1
+        return await withCheckedContinuation { response = $0; requested?.resume(); requested = nil }
+    }
+    func waitForRequest() async {
+        if calls > 0 { return }
+        await withCheckedContinuation { requested = $0 }
+    }
+    func release() { response?.resume(returning: 1); response = nil }
 }

@@ -55,3 +55,10 @@ export const activityRefreshResultSchema = z.object({
 });
 
 export type ActivityRefreshResult = z.infer<typeof activityRefreshResultSchema>;
+
+/** Number of summaries persisted by a single first-page fetch. */
+export const activitySummaryFetchResultSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(200);

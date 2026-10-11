@@ -20,6 +20,7 @@ import {
   createChangesRepository,
   type NewSyncChange,
 } from '~/server/repositories/changes';
+import { summaryConflictSet } from '~/server/repositories/summary-reconciliation';
 
 type ActivityPersistenceTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
@@ -353,110 +354,84 @@ export async function fetchStravaActivities(
 
         let savedStats: Activity[] = [];
         if (dbActivities.length > 0) {
-          // Prepare upsert values
-          // We want to update everything that might have changed on Strava (name, stats, etc)
-          // EXCEPT `is_complete` - we only want to set that to true if we actually fetched details.
-          // If we represent a summary fetch, we should NOT overwrite `is_complete: true` with `false`.
-          // However, the `transformStravaActivity` sets `is_complete` based on the fetch type.
-
-          // Strategy:
-          // Use onConflictDoUpdate.
-          // We need to carefully construct the `set` clause to avoid downgrading data if possible,
-          // though typically Strava summary data is "truth" for the things it contains.
-          // The only risk is overwriting a detailed activity with a summary one and losing `is_complete` status.
-
-          // Actually, if we are doing a summary fetch (`!requestedActivityIds`), checking existing is_complete status is expensive
-          // if we do it one by one. But we can just use the DB's current value for `is_complete` if we are doing a summary fetch?
-          // No, Drizzle doesn't support "use existing value" easily in `values`.
-
-          // Simpler approach for now conforming to user request "upsert immediately":
-          // Just upsert. If `is_complete` is calculated as false (summary fetch), we should ensure we don't accidentally set a true value to false.
-          // But `transformStravaActivity` was modified to set `is_complete`.
-
-          // Let's rely on the conflict target.
-
-          const valuesToInsert = dbActivities.map((act) => {
-            // If we are definitely fetching details (requestedActivityIds is set), act.is_complete is true.
-            // If we are summary fetching, act.is_complete is false.
-            return act;
-          });
-
           savedStats = await tx
             .insert(activitySchema)
-            .values(valuesToInsert)
+            .values(dbActivities)
             .onConflictDoUpdate({
               target: activitySchema.id,
-              set: {
-                name: sql`excluded.name`,
-                description: sql`COALESCE(excluded.description, ${activitySchema.description})`,
-                distance: sql`excluded.distance`,
-                moving_time: sql`excluded.moving_time`,
-                elapsed_time: sql`excluded.elapsed_time`,
-                total_elevation_gain: sql`excluded.total_elevation_gain`,
-                sport_type: sql`excluded.sport_type`,
-                start_date: sql`excluded.start_date`,
-                start_date_local: sql`excluded.start_date_local`,
-                timezone: sql`excluded.timezone`,
-                map_summary_polyline: sql`excluded.map_summary_polyline`, // Always safe to update summary
-                map_polyline: sql`COALESCE(excluded.map_polyline, ${activitySchema.map_polyline})`,
+              set: requestedActivityIds
+                ? {
+                    name: sql`excluded.name`,
+                    description: sql`COALESCE(excluded.description, ${activitySchema.description})`,
+                    distance: sql`excluded.distance`,
+                    moving_time: sql`excluded.moving_time`,
+                    elapsed_time: sql`excluded.elapsed_time`,
+                    total_elevation_gain: sql`excluded.total_elevation_gain`,
+                    sport_type: sql`excluded.sport_type`,
+                    start_date: sql`excluded.start_date`,
+                    start_date_local: sql`excluded.start_date_local`,
+                    timezone: sql`excluded.timezone`,
+                    map_summary_polyline: sql`excluded.map_summary_polyline`, // Always safe to update summary
+                    map_polyline: sql`COALESCE(excluded.map_polyline, ${activitySchema.map_polyline})`,
 
-                // Critical: is_complete
-                // If excluded.is_complete is true, set it.
-                // If excluded.is_complete is false (summary), keep existing is_complete (GREATEST logic works for booleans in some SQL but simpler: )
-                // actually `is_complete` is boolean.
-                // CASE WHEN excluded.is_complete THEN true ELSE activity.is_complete END
-                is_complete: sql`CASE WHEN excluded.is_complete THEN true ELSE ${activitySchema.is_complete} END`,
-                geometryState: sql`CASE WHEN excluded.is_complete THEN excluded.geometry_state ELSE COALESCE(${activitySchema.geometryState}, excluded.geometry_state) END`,
-                photosState: sql`CASE WHEN ${photosCurrentForRow} THEN excluded.photos_state WHEN ${requestedActivityIds !== undefined} OR ${activitySchema.photo_count} IS DISTINCT FROM excluded.photo_count OR ${activitySchema.total_photo_count} IS DISTINCT FROM excluded.total_photo_count THEN 'refresh_required'::photos_state ELSE ${activitySchema.photosState} END`,
-                lastSummarySeenAt: sql`excluded.last_summary_seen_at`,
-                lastDetailedFetchedAt: sql`COALESCE(excluded.last_detailed_fetched_at, ${activitySchema.lastDetailedFetchedAt})`,
+                    // Critical: is_complete
+                    // If excluded.is_complete is true, set it.
+                    // If excluded.is_complete is false (summary), keep existing is_complete (GREATEST logic works for booleans in some SQL but simpler: )
+                    // actually `is_complete` is boolean.
+                    // CASE WHEN excluded.is_complete THEN true ELSE activity.is_complete END
+                    is_complete: sql`CASE WHEN excluded.is_complete THEN true ELSE ${activitySchema.is_complete} END`,
+                    geometryState: sql`CASE WHEN excluded.is_complete THEN excluded.geometry_state ELSE COALESCE(${activitySchema.geometryState}, excluded.geometry_state) END`,
+                    photosState: sql`CASE WHEN ${photosCurrentForRow} THEN excluded.photos_state WHEN ${requestedActivityIds !== undefined} OR ${activitySchema.photo_count} IS DISTINCT FROM excluded.photo_count OR ${activitySchema.total_photo_count} IS DISTINCT FROM excluded.total_photo_count THEN 'refresh_required'::photos_state ELSE ${activitySchema.photosState} END`,
+                    lastSummarySeenAt: sql`excluded.last_summary_seen_at`,
+                    lastDetailedFetchedAt: sql`COALESCE(excluded.last_detailed_fetched_at, ${activitySchema.lastDetailedFetchedAt})`,
 
-                average_speed: sql`excluded.average_speed`,
-                max_speed: sql`excluded.max_speed`,
-                average_heartrate: sql`excluded.average_heartrate`,
-                max_heartrate: sql`excluded.max_heartrate`,
-                elev_high: sql`excluded.elev_high`,
-                elev_low: sql`excluded.elev_low`,
-                kilojoules: sql`excluded.kilojoules`,
-                average_watts: sql`excluded.average_watts`,
-                device_watts: sql`excluded.device_watts`,
-                calories: sql`COALESCE(excluded.calories, ${activitySchema.calories})`,
-                photo_count: sql`excluded.photo_count`,
-                total_photo_count: sql`excluded.total_photo_count`,
-                upload_id: sql`excluded.upload_id`,
-                pr_count: sql`excluded.pr_count`,
-                achievement_count: sql`excluded.achievement_count`,
-                kudos_count: sql`excluded.kudos_count`,
-                comment_count: sql`excluded.comment_count`,
-                athlete_count: sql`excluded.athlete_count`,
+                    average_speed: sql`excluded.average_speed`,
+                    max_speed: sql`excluded.max_speed`,
+                    average_heartrate: sql`excluded.average_heartrate`,
+                    max_heartrate: sql`excluded.max_heartrate`,
+                    elev_high: sql`excluded.elev_high`,
+                    elev_low: sql`excluded.elev_low`,
+                    kilojoules: sql`excluded.kilojoules`,
+                    average_watts: sql`excluded.average_watts`,
+                    device_watts: sql`excluded.device_watts`,
+                    calories: sql`COALESCE(excluded.calories, ${activitySchema.calories})`,
+                    photo_count: sql`excluded.photo_count`,
+                    total_photo_count: sql`excluded.total_photo_count`,
+                    upload_id: sql`excluded.upload_id`,
+                    pr_count: sql`excluded.pr_count`,
+                    achievement_count: sql`excluded.achievement_count`,
+                    kudos_count: sql`excluded.kudos_count`,
+                    comment_count: sql`excluded.comment_count`,
+                    athlete_count: sql`excluded.athlete_count`,
 
-                gear_id: sql`excluded.gear_id`,
-                map_bbox: sql`excluded.map_bbox`,
-                ...(requestedActivityIds
-                  ? {
-                      description: sql`excluded.description`,
-                      start_latlng: sql`excluded.start_latlng`,
-                      end_latlng: sql`excluded.end_latlng`,
-                      map_id: sql`excluded.map_id`,
-                      map_polyline: sql`excluded.map_polyline`,
-                      trainer: sql`excluded.trainer`,
-                      commute: sql`excluded.commute`,
-                      manual: sql`excluded.manual`,
-                      private: sql`excluded.private`,
-                      flagged: sql`excluded.flagged`,
-                      workout_type: sql`excluded.workout_type`,
-                      has_heartrate: sql`excluded.has_heartrate`,
-                      max_heartrate: sql`excluded.max_heartrate`,
-                      heartrate_opt_out: sql`excluded.heartrate_opt_out`,
-                      display_hide_heartrate_option: sql`excluded.display_hide_heartrate_option`,
-                      has_kudoed: sql`excluded.has_kudoed`,
-                      hide_from_home: sql`excluded.hide_from_home`,
-                      max_watts: sql`excluded.max_watts`,
-                      weighted_average_watts: sql`excluded.weighted_average_watts`,
-                      last_updated: sql`excluded.last_updated`,
-                    }
-                  : {}),
-              },
+                    gear_id: sql`excluded.gear_id`,
+                    map_bbox: sql`excluded.map_bbox`,
+                    ...(requestedActivityIds
+                      ? {
+                          description: sql`excluded.description`,
+                          start_latlng: sql`excluded.start_latlng`,
+                          end_latlng: sql`excluded.end_latlng`,
+                          map_id: sql`excluded.map_id`,
+                          map_polyline: sql`excluded.map_polyline`,
+                          trainer: sql`excluded.trainer`,
+                          commute: sql`excluded.commute`,
+                          manual: sql`excluded.manual`,
+                          private: sql`excluded.private`,
+                          flagged: sql`excluded.flagged`,
+                          workout_type: sql`excluded.workout_type`,
+                          has_heartrate: sql`excluded.has_heartrate`,
+                          max_heartrate: sql`excluded.max_heartrate`,
+                          heartrate_opt_out: sql`excluded.heartrate_opt_out`,
+                          display_hide_heartrate_option: sql`excluded.display_hide_heartrate_option`,
+                          has_kudoed: sql`excluded.has_kudoed`,
+                          hide_from_home: sql`excluded.hide_from_home`,
+                          max_watts: sql`excluded.max_watts`,
+                          weighted_average_watts: sql`excluded.weighted_average_watts`,
+                          last_updated: sql`excluded.last_updated`,
+                        }
+                      : {}),
+                  }
+                : summaryConflictSet(),
             })
             .returning();
 
