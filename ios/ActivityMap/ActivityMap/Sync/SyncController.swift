@@ -176,6 +176,15 @@ final class SyncController {
         if status == .syncing { status = .paused }
     }
 
+    func clearAfterAccountDeletion() async throws {
+        guard let storage else { return }
+        setSession(nil, storage: storage)
+        await work?.value
+        await summarySync.stopAndWait()
+        try await storage.clearExcept(scope: nil)
+        try await activities.photoImages.configure(scope: nil, photos: [])
+    }
+
 
     private func perform(_ session: SyncSession, storage: LocalStore, generation current: Int) async {
         do {

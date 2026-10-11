@@ -28,6 +28,23 @@ Status: **Accepted**
 
 ## 3. Deletion and deauthorization
 
+- Account settings on web and iOS offer **Delete account and data**, with an
+  explicit permanent-deletion confirmation. `POST /api/v1/account/delete`
+  authenticates the current session, requires `{ "confirmation": "DELETE" }`,
+  and accepts no target user ID. Cookie requests require a same-origin `Origin`;
+  native clients use signed bearer authentication.
+- User-requested deletion runs immediately through the same transactional cleanup
+  as scheduled erasure. It removes the account, all sessions, imported activities,
+  photos, streams, share links, ingestion/sync state, webhook records and associated
+  verification records. It does not delete original activities on Strava. A later
+  sign-in creates a fresh ActivityMap account and import.
+- The initiating client clears its offline data before finishing. Web also clears
+  the service-worker shell/static caches and notifies other open tabs. Other
+  devices learn of revoked sessions when they next contact the server; an offline
+  device cannot receive the deletion immediately. In-flight imports recheck the
+  original account identity before committing, so a fresh signup cannot receive
+  work started for the deleted account.
+
 - Data deleted or made unavailable on Strava must be removed promptly and no
   later than 48 hours after ActivityMap learns of the change.
 - Deauthorization stops credential use immediately, invalidates share links,

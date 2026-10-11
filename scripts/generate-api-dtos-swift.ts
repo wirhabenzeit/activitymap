@@ -32,6 +32,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
+import { deleteAccountRequestSchema, deleteAccountResultSchema } from '../src/contracts/v1/account-deletion';
 
 import { compactStreamSummarySchema } from '../src/lib/streams/compact-summary';
 import { streamSummarySchema } from '../src/server/strava/stream-summary';
@@ -146,6 +147,8 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['MobileSession', mobileSessionDTOSchema],
   ['MobileSessionList', mobileSessionListDTOSchema],
   ['RevokeSessionRequest', revokeSessionRequestSchema],
+  ['DeleteAccountRequest', deleteAccountRequestSchema],
+  ['DeleteAccountResult', deleteAccountResultSchema],
 ];
 
 /**

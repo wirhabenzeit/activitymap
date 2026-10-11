@@ -26,6 +26,24 @@ actor GatedSyncSource: SyncPageSource {
 
 @MainActor
 struct SyncControllerTests {
+    @Test func deletionWaitsForCancelledSyncBeforeClearingOfflineData() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let dto = try Fixtures.activity()
+        try await storage.apply([.upsertActivity(dto)], scope: Fixtures.scope)
+        let source = GatedSyncSource()
+        let activities = ActivityStore()
+        let controller = SyncController(activities: activities, source: { _ in source }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await source.waitForRequest()
+        let deletion = Task { try await controller.clearAfterAccountDeletion() }
+        while controller.session != nil { await Task.yield() }
+        await source.release(SyncFixtures.activities([dto]))
+        try await deletion.value
+        #expect(controller.session == nil && controller.status == .signedOut)
+        #expect(activities.activities.isEmpty && controller.photos.isEmpty)
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities.isEmpty)
+        #expect(try await storage.snapshot(scope: Fixtures.scope).checkpoint == nil)
+    }
     @Test func reconnectingTheSameSessionPreservesSelectionAndInspection() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let dto = try Fixtures.activity()

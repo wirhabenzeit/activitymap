@@ -15,6 +15,10 @@ struct AccountSheet: View {
     /// connection is verified it closes and returns to the browsing context.
     /// Profile opened for account management stays open (#304).
     @State private var openedForLogin: Bool?
+    @State private var confirmDeletion = false
+    @State private var deletionError: String?
+    @State private var accountDeleted = false
+    @State private var clearingDeletedData = false
 
     var body: some View {
         NavigationStack {
@@ -33,11 +37,21 @@ struct AccountSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .disabled(auth.deletingAccount || clearingDeletedData)
                 }
             }
         }
         .preferredColorScheme(preferences.appearance.colorScheme)
         .presentationDetents([.large])
+        .interactiveDismissDisabled(auth.deletingAccount || clearingDeletedData)
+        .alert("Delete your account and all ActivityMap data?", isPresented: $confirmDeletion) {
+            Button("Cancel", role: .cancel) {}
+            Button("Permanently delete my account", role: .destructive) {
+                Task { await deleteAccountAndData() }
+            }
+        } message: {
+            Text("This can’t be undone. Your original Strava activities stay on Strava. Signing in again creates a new account and starts a fresh import.")
+        }
         .onAppear {
             if openedForLogin == nil { openedForLogin = destination == .profile && auth.currentUser == nil }
         }
@@ -63,9 +77,27 @@ struct AccountSheet: View {
     // Section content must be hosted in a Form at each navigation destination.
     // A bare Group loses the list layout when pushed from Settings.
     var accountPage: some View {
-        Form { profileContent }
+        Form { accountContent }
             .navigationTitle("Account")
             .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private var accountContent: some View {
+        if accountDeleted {
+            Section {
+                Text("Your ActivityMap account has been deleted.")
+                if let deletionError { Text(deletionError).foregroundStyle(.red) }
+                Button(clearingDeletedData ? "Clearing local data…" : "Finish clearing local data") {
+                    Task { await deleteAccountAndData() }
+                }.disabled(clearingDeletedData)
+            }
+        } else {
+            profileContent
+            if let deletionError {
+                Section { Text(deletionError).foregroundStyle(.red) }
+            }
+        }
     }
 
     var aboutPage: some View {
@@ -160,10 +192,42 @@ struct AccountSheet: View {
                     Task { await auth.signOut() }
                 }
                 .accessibilityIdentifier("account-sign-out")
+                .disabled(auth.deletingAccount)
             } footer: {
                 Text("Strava stays connected.")
             }
 
+            Section {
+                Button(auth.deletingAccount ? "Deleting account…" : "Delete account and data", role: .destructive) {
+                    confirmDeletion = true
+                }
+                .disabled(auth.deletingAccount)
+                .accessibilityIdentifier("account-delete")
+            } footer: {
+                Text("Permanently delete your ActivityMap account, imported activities, photos and share links. Your original Strava activities stay on Strava.")
+            }
+
+        }
+    }
+
+    private func deleteAccountAndData() async {
+        deletionError = nil
+        if !accountDeleted {
+            do {
+                try await auth.deleteAccount()
+                accountDeleted = true
+            } catch {
+                deletionError = "Couldn’t confirm account deletion. Check your connection and try again."
+                return
+            }
+        }
+        clearingDeletedData = true
+        defer { clearingDeletedData = false }
+        do {
+            try await sync?.clearAfterAccountDeletion()
+            dismiss()
+        } catch {
+            deletionError = "Your account was deleted, but local data could not be cleared. Retry to finish."
         }
     }
 
@@ -223,7 +287,7 @@ struct AccountSheet: View {
                 IngestionStatusSection(session: session, controller: ingestionStatus)
             }
 
-            profileContent
+            accountContent
 
             Section {
                 Picker("Units", selection: $preferences.units) {

@@ -86,6 +86,7 @@ final class AuthController: NSObject {
     private var restoringToken: String?
     var isRestoringSession: Bool { restoringToken != nil }
     private var signingOut = false
+    private(set) var deletingAccount = false
 
     override init() {
         super.init()
@@ -124,7 +125,7 @@ final class AuthController: NSObject {
     /// to `.sessionRestoreFailed`, since merely launching the app during a
     /// transient outage must not permanently sign anyone out.
     func restoreSession() async {
-        guard !signingOut else { return }
+        guard !signingOut, !deletingAccount else { return }
         guard let token = SessionStore.load() else { return }
         guard restoringToken != token else { return }
         // Respect the server's requested wait after a rate-limited or
@@ -172,6 +173,7 @@ final class AuthController: NSObject {
     /// distinction and gives a transient failure the right retry (itself,
     /// not a fresh `signIn()`).
     func signIn() async {
+        guard !signingOut, !deletingAccount else { return }
         // Repeated taps while the hosted sheet is opening start nothing new.
         guard status != .signingIn else { return }
         revision += 1
@@ -339,7 +341,7 @@ final class AuthController: NSObject {
     /// `.signOutFailed`: clearing it anyway would abandon a still-valid
     /// server session with no copy of the token left to retry revoking it.
     func signOut() async {
-        guard !signingOut else { return }
+        guard !signingOut, !deletingAccount else { return }
         signingOut = true
         defer { signingOut = false }
         revision += 1
@@ -365,6 +367,30 @@ final class AuthController: NSObject {
                 status = .signOutFailed(Self.signOutMessage(for: error))
             }
         }
+    }
+
+    /// Only a confirmed deletion clears the credential. Failures retain it so
+    /// the person can retry; the server rechecks the session under its user lock.
+    func deleteAccount() async throws {
+        guard !signingOut, !deletingAccount, let token = SessionStore.load() else {
+            throw APIClient.RequestError.unexpectedStatus(401)
+        }
+        deletingAccount = true
+        revision += 1
+        let attempt = revision
+        defer { deletingAccount = false }
+        let result = try await APIClient.post(
+            "/api/v1/account/delete",
+            body: ActivityMapAPI.DeleteAccountRequest(confirmation: "DELETE"),
+            bearerToken: token, as: ActivityMapAPI.DeleteAccountResult.self)
+        guard result.status == "deleted" else {
+            throw APIClient.RequestError.decoding("Account deletion was not confirmed.")
+        }
+        guard attempt == revision, SessionStore.load() == token else { return }
+        SessionStore.clear()
+        SessionIdentityStore.clear()
+        currentUser = nil
+        status = .signedOut
     }
 
     private static func signOutMessage(for error: Error) -> String {

@@ -1,4 +1,5 @@
 import { db as defaultDb } from '~/server/db';
+import { lockActiveStravaAccount } from '~/server/repositories/account-lifecycle';
 import {
   accounts,
   activities,
@@ -340,6 +341,7 @@ export async function processWebhookEvent(
   // retry and skip the tombstone (and the change record) forever.
   if (notFoundIds.includes(object_id)) {
     await database.transaction(async (tx) => {
+      if (!await lockActiveStravaAccount(tx, account)) return;
       // `photos.activity_id` cascades on delete, so this also silently
       // deletes any photos for this activity. Read which ones before the
       // delete so each gets its own change record too - see the identical
@@ -402,6 +404,7 @@ export async function processWebhookEvent(
 
   // Database Operations within a transaction for atomicity
   await database.transaction(async (tx) => {
+    if (!await lockActiveStravaAccount(tx, account)) return;
     // 1. Upsert the activity
     await tx
       .insert(activities)
