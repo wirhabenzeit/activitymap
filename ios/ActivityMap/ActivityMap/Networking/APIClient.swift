@@ -107,9 +107,10 @@ nonisolated enum APIClient {
     static func post<Payload: Decodable & Sendable>(
         _ path: String,
         bearerToken: String? = nil,
+        baseURL: URL = APIConfiguration.baseURL,
         as payloadType: Payload.Type
     ) async throws -> Payload {
-        var request = URLRequest(url: APIConfiguration.endpoint(path))
+        var request = URLRequest(url: baseURL.appending(path: path))
         request.httpMethod = "POST"
         applyCommonHeaders(&request, bearerToken: bearerToken)
         return try await perform(request, as: payloadType)

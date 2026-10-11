@@ -71,19 +71,38 @@ struct AppShell: View {
         }
         .overlay {
             if let connectPrompt { StravaConnectOverlay(prompt: connectPrompt).transition(.opacity) }
+            else if sync?.status == .syncing && store.activities.isEmpty {
+                ProgressView("Loading your recent activities…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.regularMaterial)
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: connectPrompt)
         .environment(\.stravaConnect, stravaConnect)
         .task {
             guard let localStore else { return } // Xcode previews stay offline.
             if sync == nil {
-                sync = SyncController(activities: store, invalidate: { auth.invalidateSession(token: $0) })
+                sync = SyncController(activities: store,
+                                      fetchInitialSummaries: { session in
+                                          try await APIClient.post("/api/v1/activities", bearerToken: session.token,
+                                                                   baseURL: session.deployment, as: Int.self)
+                                      },
+                                      invalidate: { auth.invalidateSession(token: $0) })
             }
             sync?.setSession(auth.syncSession, storage: localStore)
             await refresh()
         }
         .onChange(of: auth.syncSession) { _, session in
             if let localStore { sync?.setSession(session, storage: localStore) }
+        }
+        .alert(sync?.firstSummaryCount == 0 ? "No activities found in Strava" : "Your recent activities are ready",
+               isPresented: Binding(get: { sync?.firstSummaryCount != nil && sync?.status == .ready },
+                                    set: { if !$0 { sync?.firstSummaryCount = nil } })) {
+            Button("Continue") { sync?.firstSummaryCount = nil }
+        } message: {
+            Text(sync?.firstSummaryCount == 0
+                 ? "New activities will appear here after you record them in Strava."
+                 : "\(sync?.firstSummaryCount ?? 0) activities fetched. Older history, details and photos continue in the background.")
         }
         .task(id: scenePhase) {
             guard scenePhase == .active else { sync?.pause(); return }

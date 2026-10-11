@@ -2,6 +2,7 @@ import { ZodError, z } from 'zod';
 
 import {
   activityRefreshResultSchema,
+  activitySummaryFetchResultSchema,
   updateActivityRequestSchema,
   type UpdateActivityRequest,
 } from '~/contracts/v1/activity-mutations';
@@ -12,6 +13,7 @@ import { toPhotoDTO } from '~/contracts/v1/photo';
 import type { Actor } from '~/server/auth/actor';
 import {
   ActivityMutationError,
+  fetchInitialActivitySummariesForActor,
   refreshActivityForActor,
   updateActivityForActor,
 } from '~/server/application/activities';
@@ -35,6 +37,7 @@ type MutationHandlerDependencies = {
     input: UpdateActivityRequest & { id: number },
   ) => Promise<UpdateResult>;
   refresh?: (actor: Actor, activityId: number) => Promise<RefreshResult>;
+  fetchSummaries?: (actor: Actor) => Promise<number>;
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
 };
@@ -85,6 +88,53 @@ function parseActivityId(request: Request): number | null {
   const match = path.exec(new URL(request.url).pathname);
   const parsed = activityIdSchema.safeParse(match?.[1]);
   return parsed.success ? Number(parsed.data) : null;
+}
+
+/** Blocking first-page summary fetch, using the same mutation/error boundary. */
+export function createFetchActivitySummariesHandler(
+  deps: MutationHandlerDependencies,
+) {
+  return async (request: Request) => {
+    const requestId = requestIdFor(request);
+    try {
+      const actor = await deps.resolveActor(request);
+      if (!actor)
+        return failure(
+          requestId,
+          401,
+          'not_authenticated',
+          'Authentication is required.',
+        );
+      const origin = request.headers.get('origin');
+      if (origin && origin !== new URL(request.url).origin)
+        return failure(
+          requestId,
+          403,
+          'forbidden',
+          'The request origin is not allowed.',
+        );
+      const count = await (
+        deps.fetchSummaries ?? fetchInitialActivitySummariesForActor
+      )(actor);
+      return Response.json(
+        responseEnvelope(activitySummaryFetchResultSchema).parse(
+          makeEnvelope(count),
+        ),
+        { headers: privateHeaders },
+      );
+    } catch (error) {
+      if (error instanceof ActivityMutationError)
+        return mutationFailure(error, requestId);
+      deps.onError?.(error, requestId);
+      return failure(
+        requestId,
+        500,
+        'internal_error',
+        'The activities could not be fetched.',
+        { retryable: true },
+      );
+    }
+  };
 }
 
 export function createUpdateActivityHandler(deps: MutationHandlerDependencies) {

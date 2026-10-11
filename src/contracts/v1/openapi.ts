@@ -11,6 +11,7 @@ import { authenticationDTOSchema } from './auth';
 import { activityDTOSchema } from './activity';
 import {
   activityRefreshResultSchema,
+  activitySummaryFetchResultSchema,
   updateActivityRequestSchema,
 } from './activity-mutations';
 import { photoDTOSchema } from './photo';
@@ -45,6 +46,7 @@ export function buildOpenApiDocument() {
   registry.add(responseEnvelope(activityRefreshResultSchema), {
     id: 'RefreshActivityResponse',
   });
+  registry.add(responseEnvelope(activitySummaryFetchResultSchema), { id: 'ActivitySummaryFetchResponse' });
   registry.add(responseEnvelope(activityStreamsDTOSchema), { id: 'ActivityStreamsResponse' });
   registry.add(responseEnvelope(activityStreamSummaryDTOSchema), {
     id: 'ActivityStreamSummaryResponse',
@@ -372,6 +374,22 @@ export function buildOpenApiDocument() {
         },
       },
       '/api/v1/activities': {
+        post: {
+          operationId: 'fetchInitialActivitySummaries',
+          summary: 'Fetch and persist up to 200 recent Strava summaries',
+          description: 'One blocking first-page fetch through the existing Strava activity service. Returns the saved count; no request body.',
+          security,
+          responses: {
+            '200': { description: 'Number of summaries fetched and persisted', content: { 'application/json': { schema: ref('ActivitySummaryFetchResponse') } } },
+            '401': errorResponse('Authentication required'),
+            '403': errorResponse('Cross-origin request rejected'),
+            '409': errorResponse('Strava account unavailable'),
+            '429': errorResponse('Too many requests; see Retry-After'),
+            '500': errorResponse('Persistence or internal failure'),
+            '502': errorResponse('Upstream request failed'),
+            '503': errorResponse('External effects disabled or service unavailable'),
+          },
+        },
         get: {
           operationId: 'listActivities',
           summary: "List the authenticated user's activities",

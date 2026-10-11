@@ -26,6 +26,30 @@ actor GatedSyncSource: SyncPageSource {
 
 @MainActor
 struct SyncControllerTests {
+    @Test func emptyAccountWaitsForOneSummaryFetchAndPublishesCompletionAfterCacheRefresh() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let imported = try Fixtures.activity(["id": "1"])
+        let source = ScriptedSyncSource([
+            .bootstrap(.activities, nil, .success(SyncFixtures.activities())),
+            .bootstrap(.photos, nil, .success(SyncFixtures.photos())),
+            .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot"))),
+            .changes("snapshot", .success(SyncFixtures.changes([SyncFixtures.upsert(imported)], next: "delta"))),
+            .changes("delta", .success(SyncFixtures.changes(next: "delta"))),
+            .changes("delta", .success(SyncFixtures.changes(next: "delta"))),
+        ])
+        let gate = SummaryFetchGate()
+        let controller = SyncController(activities: ActivityStore(), source: { _ in source },
+                                        fetchInitialSummaries: { _ in await gate.fetch() }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await gate.waitForRequest()
+        #expect(controller.status == .syncing && controller.firstSummaryCount == nil)
+        await gate.release()
+        await controller.refresh()
+        #expect(controller.status == .ready && controller.firstSummaryCount == 1)
+        #expect(controller.activities.activities.map(\.id) == [1])
+        await controller.refresh()
+        #expect(await gate.calls == 1)
+    }
     @Test func reconnectingTheSameSessionPreservesSelectionAndInspection() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let dto = try Fixtures.activity()
@@ -270,4 +294,19 @@ struct SyncControllerTests {
         #expect(controller.status == .offline && controller.activities.activities.isEmpty)
         #expect(controller.checkpoint?.changesCursor == "deleted" && !invalidated)
     }
+}
+
+actor SummaryFetchGate {
+    private var response: CheckedContinuation<Int, Never>?
+    private var requested: CheckedContinuation<Void, Never>?
+    private(set) var calls = 0
+    func fetch() async -> Int {
+        calls += 1
+        return await withCheckedContinuation { response = $0; requested?.resume(); requested = nil }
+    }
+    func waitForRequest() async {
+        if calls > 0 { return }
+        await withCheckedContinuation { requested = $0 }
+    }
+    func release() { response?.resume(returning: 1); response = nil }
 }

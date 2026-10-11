@@ -42,6 +42,9 @@ final class SyncController {
     private(set) var checkpoint: SyncCheckpoint?
     private(set) var photos: [Photo] = []
     private(set) var session: SyncSession?
+    var firstSummaryCount: Int?
+    private var fetchedInitialSummaries = false
+    private let fetchInitialSummaries: ((SyncSession) async throws -> Int)?
     private var storage: LocalStore?
     private var work: Task<Void, Never>?
     private var generation = 0
@@ -83,6 +86,7 @@ final class SyncController {
         storedSummarySource: @escaping (SyncSession) -> any StoredSummarySource = {
             StreamsAPI(baseURL: $0.deployment, token: $0.token)
         },
+        fetchInitialSummaries: ((SyncSession) async throws -> Int)? = nil,
         invalidate: @escaping (String) -> Void
     ) {
         self.summaries = StreamSummaryLoader(source: summarySource, invalidate: invalidate)
@@ -91,6 +95,7 @@ final class SyncController {
         self.activities = activities
         self.now = now
         self.source = source
+        self.fetchInitialSummaries = fetchInitialSummaries
         self.invalidate = invalidate
     }
 
@@ -197,6 +202,17 @@ final class SyncController {
             _ = try await engine.run()
             guard current == generation, !Task.isCancelled else { return }
             try await loadCache(session, storage: storage, generation: current)
+            if activities.activities.isEmpty, !fetchedInitialSummaries,
+               session.user.stravaPermissions?.activities != ActivityMapAPI.StravaActivityAccess.none,
+               let fetchInitialSummaries {
+                let count = try await fetchInitialSummaries(session)
+                guard current == generation, !Task.isCancelled else { return }
+                fetchedInitialSummaries = true
+                _ = try await engine.run()
+                guard current == generation, !Task.isCancelled else { return }
+                try await loadCache(session, storage: storage, generation: current)
+                firstSummaryCount = count
+            }
             if current == generation {
                 retryAt = nil
                 status = .ready
@@ -300,6 +316,8 @@ final class SyncController {
     }
 
     private func clearVisible() {
+        firstSummaryCount = nil
+        fetchedInitialSummaries = false
         summarySync.pause()
         publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil
         photoCacheConfigured = false

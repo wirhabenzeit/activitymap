@@ -13,6 +13,7 @@ import { EXTERNAL_EFFECTS_DISABLED_MESSAGE } from '~/server/config/external-effe
 import {
   ActivityMutationError,
   deleteActivitiesForActor,
+  fetchInitialActivitySummariesForActor,
   getActivitiesForActor,
   getPhotosForActor,
   getUserActivities,
@@ -221,6 +222,79 @@ const stubAccount = (overrides: Partial<Account> = {}): Account =>
     access_token: 'stub-token',
     ...overrides,
   }) as Account;
+
+void test('initial summary fetch awaits exactly one existing-service call for page 1 of 200', async () => {
+  let finish!: (result: {
+    activities: Activity[];
+    photos: Photo[];
+    notFoundIds: number[];
+  }) => void;
+  const page = new Promise<{
+    activities: Activity[];
+    photos: Photo[];
+    notFoundIds: number[];
+  }>((resolve) => {
+    finish = resolve;
+  });
+  let calls = 0;
+  let completed = false;
+  const request = fetchInitialActivitySummariesForActor(ACTOR_A, {
+    resolveAccount: async () => stubAccount(),
+    fetchActivities: async (input) => {
+      calls++;
+      assert.deepEqual(input, {
+        accessToken: 'stub-token',
+        athleteId: ATHLETE_A,
+        page: 1,
+        per_page: 200,
+        limit: 200,
+      });
+      return page;
+    },
+  }).then((count) => {
+    completed = true;
+    return count;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(completed, false);
+  finish({
+    activities: [buildActivity({ id: 1, athlete: ATHLETE_A })],
+    photos: [],
+    notFoundIds: [],
+  });
+  assert.equal(await request, 1);
+  assert.equal(calls, 1);
+  assert.equal(
+    await fetchInitialActivitySummariesForActor(ACTOR_A, {
+      resolveAccount: async () => stubAccount(),
+      fetchActivities: async () => ({
+        activities: [],
+        photos: [],
+        notFoundIds: [],
+      }),
+    }),
+    0,
+  );
+});
+
+void test('initial summary fetch rejects a revoked or mismatched account without fetching', async () => {
+  for (const account of [
+    stubAccount({ revokedAt: new Date() }),
+    stubAccount({ accountId: String(ATHLETE_B) }),
+  ]) {
+    await assert.rejects(
+      fetchInitialActivitySummariesForActor(ACTOR_A, {
+        resolveAccount: async () => account,
+        fetchActivities: async () => {
+          throw new Error('must not fetch');
+        },
+      }),
+      (error: unknown) =>
+        error instanceof ActivityMutationError &&
+        error.code === 'strava_not_connected',
+    );
+  }
+});
 
 function stravaActivity(
   overrides: Partial<StravaActivity> = {},
