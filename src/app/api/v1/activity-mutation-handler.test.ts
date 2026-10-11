@@ -8,6 +8,7 @@ import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
 import { userKeyFor } from '~/server/http/rate-limit';
 
 import {
+  createFetchActivitySummariesHandler,
   createRefreshActivityHandler,
   createUpdateActivityHandler,
 } from './activities/[id]/mutation-handler';
@@ -17,6 +18,44 @@ const actor: Actor = {
   athleteId: 42,
   authentication: 'bearer',
 };
+
+void test('first summary POST waits for the actor-scoped service and returns its saved count', async () => {
+  let finish!: (count: number) => void;
+  const pending = new Promise<number>((resolve) => {
+    finish = resolve;
+  });
+  const handler = createFetchActivitySummariesHandler({
+    resolveActor: async () => actor,
+    fetchSummaries: async (resolved) => {
+      assert.deepEqual(resolved, actor);
+      return pending;
+    },
+  });
+  let returned = false;
+  const request = handler(
+    new Request('https://example.test/api/v1/activities', { method: 'POST' }),
+  ).then((response) => {
+    returned = true;
+    return response;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(returned, false);
+  finish(200);
+  const response = await request;
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  assert.equal(((await response.json()) as { data: number }).data, 200);
+  assert.equal(
+    (
+      await handler(
+        new Request('https://example.test/api/v1/activities', {
+          method: 'POST',
+          headers: { Origin: 'https://elsewhere.test' },
+        }),
+      )
+    ).status,
+    403,
+  );
+});
 
 function activity(overrides: Partial<Activity> = {}): Activity {
   return {
