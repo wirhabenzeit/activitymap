@@ -296,6 +296,25 @@ void test('initial summary fetch rejects a revoked or mismatched account without
   }
 });
 
+void test('initial summary fetch classifies account resolution failures at the same error boundary', async () => {
+  await assert.rejects(
+    fetchInitialActivitySummariesForActor(ACTOR_A, {
+      resolveAccount: async () => {
+        throw new StravaBudgetExceededError(120);
+      },
+      fetchActivities: async () => {
+        throw new Error('must not fetch');
+      },
+    }),
+    (error: unknown) =>
+      error instanceof ActivityMutationError &&
+      error.code === 'rate_limited' &&
+      error.status === 429 &&
+      error.retryable &&
+      error.retryAfterSeconds === 120,
+  );
+});
+
 function stravaActivity(
   overrides: Partial<StravaActivity> = {},
 ): StravaActivity {

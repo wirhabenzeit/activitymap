@@ -19,6 +19,7 @@ import {
 import { createIngestionRepository } from '../../src/server/repositories/ingestion.ts';
 import { createSummaryReconciliationRepository } from '../../src/server/repositories/summary-reconciliation.ts';
 import { StravaApiError } from '../../src/server/strava/client.ts';
+import { fetchStravaActivities } from '../../src/server/strava/service.ts';
 import {
   reconcileStravaSummaries,
   STRAVA_FRESHNESS_LIMIT_MS,
@@ -46,7 +47,9 @@ const client = postgres(target.connectionString, {
 });
 const testDb = drizzle(client);
 const repository = createSummaryReconciliationRepository(
-  testDb as unknown as Parameters<typeof createSummaryReconciliationRepository>[0],
+  testDb as unknown as Parameters<
+    typeof createSummaryReconciliationRepository
+  >[0],
 );
 
 const NOW = new Date('2026-09-20T12:00:00.000Z');
@@ -161,6 +164,12 @@ async function seed(): Promise<void> {
       public_id: ACTIVITY_IDS[0] + 10_000,
       athlete: ATHLETE_ID,
       name: 'Existing detailed activity',
+      description: 'Detail-only description',
+      elev_high: 888,
+      elev_low: 111,
+      average_heartrate: 165,
+      max_heartrate: 184,
+      calories: 750,
       distance: 10_000,
       moving_time: 3_600,
       elapsed_time: 3_700,
@@ -185,7 +194,7 @@ async function seed(): Promise<void> {
       geometryState: 'detailed',
       photosState: 'current',
       lastSummarySeenAt: null,
-      lastDetailedFetchedAt: null,
+      lastDetailedFetchedAt: new Date('2026-09-01T00:00:00Z'),
       is_complete: true,
     },
     ...ACTIVITY_IDS.slice(1, 3).map((id) => ({
@@ -198,7 +207,10 @@ async function seed(): Promise<void> {
       start_date_local: new Date('2025-01-01T09:00:00Z'),
       timezone: '(GMT+01:00) Europe/Zurich',
       geometryState: 'detailed' as const,
-      photosState: id === ACTIVITY_IDS[2] ? 'refresh_required' as const : 'current' as const,
+      photosState:
+        id === ACTIVITY_IDS[2]
+          ? ('refresh_required' as const)
+          : ('current' as const),
       photo_count: 0,
       total_photo_count: 0,
       lastSummarySeenAt: new Date('2026-09-01T00:00:00Z'),
@@ -250,7 +262,11 @@ const source: SummaryReconciliationSource = {
       throw new StravaApiError('Record Not Found', 404);
     }
     if (activityId === ACTIVITY_IDS[2]) {
-      return stravaActivity(activityId, { description: 'Still available', photo_count: 0, total_photo_count: 0 });
+      return stravaActivity(activityId, {
+        description: 'Still available',
+        photo_count: 0,
+        total_photo_count: 0,
+      });
     }
     throw new Error('Unexpected detail confirmation request');
   },
@@ -269,7 +285,11 @@ async function run(): Promise<void> {
     repository.claim(candidate, dueBefore, NOW, 600_000),
     repository.claim(candidate, dueBefore, NOW, 600_000),
   ]);
-  assert.equal(claims.filter(Boolean).length, 1, 'only one overlapping worker may claim an athlete');
+  assert.equal(
+    claims.filter(Boolean).length,
+    1,
+    'only one overlapping worker may claim an athlete',
+  );
   const initialClaim = claims.find((claim) => claim !== null);
   assert.ok(initialClaim);
   await repository.release(initialClaim, NOW);
@@ -317,7 +337,10 @@ async function run(): Promise<void> {
     .where(eq(ingestionOutcomes.userId, USER_ID));
   assert.equal(historyOutcome?.pipeline, 'history');
   assert.equal(historyOutcome?.outcome, 'succeeded');
-  assert.equal(historyOutcome?.lastSucceededAt?.toISOString(), NOW.toISOString());
+  assert.equal(
+    historyOutcome?.lastSucceededAt?.toISOString(),
+    NOW.toISOString(),
+  );
   assert.equal(
     (await repository.lastCompletedAt(ATHLETE_ID))?.toISOString(),
     NOW.toISOString(),
@@ -347,9 +370,74 @@ async function run(): Promise<void> {
   assert.equal(byId.has(ACTIVITY_IDS[1]), false);
   assert.equal(byId.get(ACTIVITY_IDS[2])?.geometryState, 'detailed');
   assert.equal(byId.get(ACTIVITY_IDS[2])?.description, 'Still available');
-  assert.equal(byId.get(ACTIVITY_IDS[2])?.photosState, 'refresh_required', 'detail confirmation cannot clear pending photo removals without reconciling the stored collection');
+  assert.equal(
+    byId.get(ACTIVITY_IDS[2])?.photosState,
+    'refresh_required',
+    'detail confirmation cannot clear pending photo removals without reconciling the stored collection',
+  );
   assert.equal(byId.get(ACTIVITY_IDS[3])?.geometryState, 'summary');
   assert.equal(byId.get(ACTIVITY_IDS[3])?.photosState, 'current');
+
+  // The foreground import may race the background detail worker or be retried
+  // after it already saved rows. Exercise its real conflict SQL, not a fake.
+  const importPage = stravaActivity(ACTIVITY_IDS[0], {
+    description: null,
+    elev_high: null,
+    elev_low: null,
+    average_heartrate: undefined,
+    max_heartrate: undefined,
+    calories: null,
+    photo_count: 2,
+    total_photo_count: 2,
+    map: { ...stravaActivity(ACTIVITY_IDS[0]).map, polyline: null },
+  });
+  const importSummaries = () =>
+    fetchStravaActivities(
+      {
+        accessToken: 'fixture',
+        athleteId: ATHLETE_ID,
+        page: 1,
+        per_page: 200,
+        limit: 200,
+      },
+      {
+        database: testDb as unknown as NonNullable<
+          Parameters<typeof fetchStravaActivities>[1]
+        >['database'],
+        createClient: () => ({
+          getActivities: async () => [importPage],
+          getActivity: async () => {
+            throw new Error('summary import must not fetch details');
+          },
+          getActivityPhotos: async () => {
+            throw new Error('summary import must not fetch photos');
+          },
+        }),
+      },
+    );
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await importSummaries();
+    const saved = result.activities[0];
+    assert.ok(saved);
+    assert.equal(saved.geometryState, 'detailed');
+    assert.equal(saved.is_complete, true);
+    assert.equal(saved.map_polyline, 'stored-detailed-polyline');
+    assert.equal(saved.description, 'Detail-only description');
+    assert.equal(saved.elev_high, 888);
+    assert.equal(saved.elev_low, 111);
+    assert.equal(saved.average_heartrate, 165);
+    assert.equal(saved.max_heartrate, 184);
+    assert.equal(saved.calories, 750);
+    assert.equal(
+      saved.lastDetailedFetchedAt?.toISOString(),
+      '2026-09-01T00:00:00.000Z',
+    );
+  }
+  importPage.map.id = 'changed-summary-route';
+  const changedRoute = (await importSummaries()).activities[0];
+  assert.equal(changedRoute?.geometryState, 'refresh_required');
+  assert.equal(changedRoute?.is_complete, false);
+  assert.equal(changedRoute?.map_polyline, 'stored-detailed-polyline');
 
   const [activityTombstone] = await testDb
     .select()

@@ -125,19 +125,19 @@ export async function fetchInitialActivitySummariesForActor(
   deps: ActivitiesServiceDeps = {},
 ): Promise<number> {
   const { resolveAccount, fetchActivities } = resolveDeps(deps);
-  const account = await resolveAccount({ userId: actor.userId });
-  if (
-    !account?.access_token ||
-    account.revokedAt ||
-    account.accountId !== String(actor.athleteId)
-  ) {
-    throw new ActivityMutationError(
-      'strava_not_connected',
-      'The connected Strava account is unavailable.',
-      409,
-    );
-  }
   try {
+    const account = await resolveAccount({ userId: actor.userId });
+    if (
+      !account?.access_token ||
+      account.revokedAt ||
+      account.accountId !== String(actor.athleteId)
+    ) {
+      throw new ActivityMutationError(
+        'strava_not_connected',
+        'The connected Strava account is unavailable.',
+        409,
+      );
+    }
     const result = await fetchActivities({
       accessToken: account.access_token,
       athleteId: actor.athleteId,

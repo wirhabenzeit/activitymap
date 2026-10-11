@@ -95,14 +95,25 @@ struct AppShell: View {
         .onChange(of: auth.syncSession) { _, session in
             if let localStore { sync?.setSession(session, storage: localStore) }
         }
-        .alert(sync?.firstSummaryCount == 0 ? "No activities found in Strava" : "Your recent activities are ready",
-               isPresented: Binding(get: { sync?.firstSummaryCount != nil && sync?.status == .ready },
-                                    set: { if !$0 { sync?.firstSummaryCount = nil } })) {
-            Button("Continue") { sync?.firstSummaryCount = nil }
+        .alert(sync?.firstSummaryError != nil ? "Could not load your recent activities"
+               : sync?.firstSummaryCount == 0 ? "No activities found in Strava" : "Your recent activities are ready",
+               isPresented: Binding(get: { sync?.firstSummaryError != nil || (sync?.firstSummaryCount != nil && sync?.status == .ready) },
+                                    set: { if !$0 { sync?.firstSummaryCount = nil; sync?.firstSummaryError = nil } })) {
+            if sync?.firstSummaryError != nil {
+                if sync?.canRefresh == true && sync?.firstSummaryRetryable == true {
+                    Button("Retry") {
+                        sync?.firstSummaryError = nil
+                        Task { await refresh() }
+                    }
+                }
+                Button("Close", role: .cancel) { sync?.firstSummaryError = nil }
+            } else {
+                Button("Continue") { sync?.firstSummaryCount = nil }
+            }
         } message: {
-            Text(sync?.firstSummaryCount == 0
+            Text(sync?.firstSummaryError ?? (sync?.firstSummaryCount == 0
                  ? "New activities will appear here after you record them in Strava."
-                 : "\(sync?.firstSummaryCount ?? 0) activities fetched. Older history, details and photos continue in the background.")
+                 : "\(sync?.firstSummaryCount ?? 0) activities fetched. Older history, details and photos continue in the background."))
         }
         .task(id: scenePhase) {
             guard scenePhase == .active else { sync?.pause(); return }

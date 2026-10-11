@@ -43,6 +43,9 @@ final class SyncController {
     private(set) var photos: [Photo] = []
     private(set) var session: SyncSession?
     var firstSummaryCount: Int?
+    var firstSummaryError: String?
+    private(set) var firstSummaryRetryable = true
+    private var pendingFirstSummaryCount: Int?
     private var fetchedInitialSummaries = false
     private let fetchInitialSummaries: ((SyncSession) async throws -> Int)?
     private var storage: LocalStore?
@@ -183,6 +186,7 @@ final class SyncController {
 
 
     private func perform(_ session: SyncSession, storage: LocalStore, generation current: Int) async {
+        var importing = pendingFirstSummaryCount != nil
         do {
             guard session.user.authentication.sessionExpiresAt > now(), session.user.stravaConnected else {
                 clearVisible()
@@ -192,11 +196,13 @@ final class SyncController {
             }
             try await loadCache(session, storage: storage, generation: current)
             guard current == generation, !Task.isCancelled else { return }
+            importing = pendingFirstSummaryCount != nil || (!fetchedInitialSummaries && activities.activities.isEmpty && fetchInitialSummaries != nil)
             guard session.verified else {
                 status = .offline
                 return
             }
             if let retryAt, retryAt > now() { status = deferredStatus; return }
+            if importing { firstSummaryError = nil }
             status = .syncing
             let engine = SyncEngine(source: source(session), store: storage, scope: session.scope)
             _ = try await engine.run()
@@ -205,15 +211,21 @@ final class SyncController {
             if activities.activities.isEmpty, !fetchedInitialSummaries,
                session.user.stravaPermissions?.activities != ActivityMapAPI.StravaActivityAccess.none,
                let fetchInitialSummaries {
+                importing = true
                 let count = try await fetchInitialSummaries(session)
                 guard current == generation, !Task.isCancelled else { return }
                 fetchedInitialSummaries = true
+                pendingFirstSummaryCount = count
                 _ = try await engine.run()
                 guard current == generation, !Task.isCancelled else { return }
                 try await loadCache(session, storage: storage, generation: current)
-                firstSummaryCount = count
             }
             if current == generation {
+                if let count = pendingFirstSummaryCount {
+                    firstSummaryCount = count
+                    pendingFirstSummaryCount = nil
+                }
+                firstSummaryError = nil
                 retryAt = nil
                 status = .ready
                 summarySync.start(storage: storage)
@@ -234,6 +246,7 @@ final class SyncController {
                 guard current == generation else { return }
                 needsCleanup = false
                 status = .expired
+                if importing { firstSummaryError = Self.summaryErrorMessage(error) }
                 return
             }
             // Reload committed pages even on failure: already-applied tombstones
@@ -254,7 +267,22 @@ final class SyncController {
             } else {
                 status = .failed(String(describing: error))
             }
+            if importing {
+                firstSummaryError = Self.summaryErrorMessage(error)
+                if case .server(_, _, _, _, let retryable, _) = error as? APIClient.RequestError {
+                    firstSummaryRetryable = retryable
+                } else { firstSummaryRetryable = true }
+            }
         }
+    }
+
+    private static func summaryErrorMessage(_ error: Error) -> String {
+        if case .server(let code, let message, _, _, _, _) = error as? APIClient.RequestError {
+            if code == "strava_not_connected" { return message + " Connect with Strava again in Settings." }
+            if code == "not_authenticated" { return message + " Sign in again to continue." }
+            return message
+        }
+        return String(describing: error)
     }
 
     private static func serverRetryDelay(_ error: Error) -> TimeInterval? {
@@ -317,6 +345,9 @@ final class SyncController {
 
     private func clearVisible() {
         firstSummaryCount = nil
+        firstSummaryError = nil
+        firstSummaryRetryable = true
+        pendingFirstSummaryCount = nil
         fetchedInitialSummaries = false
         summarySync.pause()
         publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil

@@ -223,12 +223,19 @@ function mergeConfirmedDetail(
     photosState:
       photosChanged || incoming.photosState !== 'current'
         ? 'refresh_required'
-        : existing ? existing.photosState : incoming.photosState,
+        : existing
+          ? existing.photosState
+          : incoming.photosState,
     lastSummarySeenAt: scanStartedAt,
   };
 }
 
-function summaryConflictSet() {
+/** Summary-only updates must preserve details even if another writer inserted the row first. */
+export function summaryConflictSet() {
+  const geometryChanged = sql`(${activities.map_id} is distinct from excluded.map_id
+    or ${activities.map_summary_polyline} is distinct from excluded.map_summary_polyline)`;
+  const photosChanged = sql`(${activities.photo_count} is distinct from excluded.photo_count
+    or ${activities.total_photo_count} is distinct from excluded.total_photo_count)`;
   return {
     name: sql`excluded.name`,
     distance: sql`excluded.distance`,
@@ -267,11 +274,14 @@ function summaryConflictSet() {
     average_watts: sql`excluded.average_watts`,
     kilojoules: sql`excluded.kilojoules`,
     last_updated: sql`excluded.last_updated`,
-    geometryState: sql`excluded.geometry_state`,
-    photosState: sql`excluded.photos_state`,
+    geometryState: sql`case when ${geometryChanged}
+      then case when ${activities.geometryState} = 'summary' then 'summary'::geometry_state
+        else 'refresh_required'::geometry_state end
+      else ${activities.geometryState} end`,
+    photosState: sql`case when ${photosChanged} then 'refresh_required'::photos_state
+      else ${activities.photosState} end`,
     lastSummarySeenAt: sql`excluded.last_summary_seen_at`,
-    lastDetailedFetchedAt: sql`excluded.last_detailed_fetched_at`,
-    is_complete: sql`excluded.is_complete`,
+    is_complete: sql`case when ${geometryChanged} then false else ${activities.is_complete} end`,
   };
 }
 
@@ -295,7 +305,8 @@ export function createSummaryReconciliationRepository(
       .from(stravaSummaryReconciliations)
       .where(and(...conditions))
       .for('update');
-    if (!state) throw new Error('Summary reconciliation lease is no longer active');
+    if (!state)
+      throw new Error('Summary reconciliation lease is no longer active');
     return state;
   }
 
@@ -442,7 +453,9 @@ export function createSummaryReconciliationRepository(
         const [existingState] = await tx
           .select({ athleteId: stravaSummaryReconciliations.athleteId })
           .from(stravaSummaryReconciliations)
-          .where(eq(stravaSummaryReconciliations.athleteId, candidate.athleteId));
+          .where(
+            eq(stravaSummaryReconciliations.athleteId, candidate.athleteId),
+          );
         if (
           !existingState &&
           current.lastCompletedAt &&
@@ -479,7 +492,10 @@ export function createSummaryReconciliationRepository(
           )
           .returning();
         if (!state?.leaseToken || !state.leaseExpiresAt) return null;
-        return withState({ ...candidate, ...state, leaseToken, leaseExpiresAt }, state);
+        return withState(
+          { ...candidate, ...state, leaseToken, leaseExpiresAt },
+          state,
+        );
       });
     },
 
@@ -501,7 +517,9 @@ export function createSummaryReconciliationRepository(
             .from(activities)
             .where(inArray(activities.id, ids))
             .for('update');
-          const existingById = new Map(existingRows.map((row) => [row.id, row]));
+          const existingById = new Map(
+            existingRows.map((row) => [row.id, row]),
+          );
           for (const row of existingRows) {
             if (row.athlete !== claim.athleteId) {
               throw new Error(`Activity ${row.id} belongs to another athlete`);
@@ -516,13 +534,10 @@ export function createSummaryReconciliationRepository(
               claim.scanStartedAt,
             ),
           );
-          await tx
-            .insert(activities)
-            .values(merged)
-            .onConflictDoUpdate({
-              target: activities.id,
-              set: summaryConflictSet(),
-            });
+          await tx.insert(activities).values(merged).onConflictDoUpdate({
+            target: activities.id,
+            set: summaryConflictSet(),
+          });
           await changesRepo.record(
             merged.map((activity) => ({
               athleteId: claim.athleteId,
@@ -569,7 +584,8 @@ export function createSummaryReconciliationRepository(
             eq(stravaSummaryReconciliations.phase, 'confirming'),
           ),
         );
-      if (!state) throw new Error('Summary reconciliation lease is no longer active');
+      if (!state)
+        throw new Error('Summary reconciliation lease is no longer active');
 
       return database
         .select({ id: activities.id })
@@ -663,7 +679,10 @@ export function createSummaryReconciliationRepository(
             deleted_at: confirmedAt,
           })
           .onConflictDoUpdate({
-            target: [activityDeletions.athlete_id, activityDeletions.activity_id],
+            target: [
+              activityDeletions.athlete_id,
+              activityDeletions.activity_id,
+            ],
             set: { deleted_at: confirmedAt },
           });
         if (cascadedPhotos.length > 0) {
@@ -712,7 +731,8 @@ export function createSummaryReconciliationRepository(
             ),
           )
           .returning();
-        if (!nextState) throw new Error('Failed to checkpoint missing activity');
+        if (!nextState)
+          throw new Error('Failed to checkpoint missing activity');
         return withState(claim, nextState);
       });
     },

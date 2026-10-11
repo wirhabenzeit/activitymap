@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { LoaderCircle } from 'lucide-react';
@@ -12,8 +12,10 @@ import {
 } from '~/components/ui/dialog';
 import { useActivities } from '~/hooks/use-activities';
 import { useShallowStore } from '~/store';
-import { responseEnvelope } from '~/contracts/v1/envelope';
-import { activitySummaryFetchResultSchema } from '~/contracts/v1/activity-mutations';
+import {
+  FirstSummaryFetchError,
+  firstSummaryFetchOptions,
+} from '~/lib/first-summary-fetch';
 
 export function FirstSummaryFetch() {
   const client = useQueryClient();
@@ -26,32 +28,22 @@ export function FirstSummaryFetch() {
   const activities = useActivities();
   const [dismissed, setDismissed] = useState<string | null>(null);
   const empty = activities.isSuccess && activities.data?.length === 0;
-  const fetch = useQuery({
-    queryKey: ['first-summary-fetch', userId],
-    enabled: Boolean(userId && connected && empty),
-    retry: false,
-    staleTime: Infinity,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    queryFn: async () => {
-      const response = await window.fetch('/api/v1/activities', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok)
-        throw new Error('Could not fetch your activities. Please try again.');
-      const count = responseEnvelope(activitySummaryFetchResultSchema).parse(
-        await response.json(),
-      ).data;
-      await client.invalidateQueries({
-        predicate: (query) =>
-          query.queryKey[0] === 'activities' && query.queryKey[2] === userId,
-      });
-      window.dispatchEvent(new Event('activitymap:retry-browser-sync'));
-      return count;
-    },
-  });
+  const fetch = useQuery(
+    firstSummaryFetchOptions(client, userId, Boolean(connected && empty)),
+  );
+  const [now, setNow] = useState(Date.now);
+  const error =
+    fetch.error instanceof FirstSummaryFetchError ? fetch.error : null;
+  const retryAt = error?.retryAt;
+  useEffect(() => {
+    if (retryAt == null) return;
+    const timer = window.setTimeout(
+      () => setNow(Date.now()),
+      Math.max(0, retryAt - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [retryAt]);
+  const waiting = retryAt != null && retryAt > now;
   const open = Boolean(
     userId &&
     connected &&
@@ -59,13 +51,24 @@ export function FirstSummaryFetch() {
     (fetch.isFetching || fetch.isError || fetch.data !== undefined),
   );
   return (
-    <DialogPrimitive.Root open={open}>
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !fetch.isFetching) setDismissed(userId!);
+      }}
+    >
       <DialogPortal>
         <DialogOverlay className="z-[70] bg-background/20 backdrop-blur-md" />
         <DialogPrimitive.Content
-          onEscapeKeyDown={(event) => event.preventDefault()}
-          onPointerDownOutside={(event) => event.preventDefault()}
-          onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => {
+            if (fetch.isFetching) event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => {
+            if (fetch.isFetching) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            if (fetch.isFetching) event.preventDefault();
+          }}
           className="fixed top-1/2 left-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 space-y-4 rounded-2xl border border-white/20 bg-card/75 p-6 text-card-foreground shadow-2xl ring-1 ring-black/5 backdrop-blur-xl duration-200 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-white/10"
         >
           <DialogTitle className="text-lg font-semibold">
@@ -81,11 +84,16 @@ export function FirstSummaryFetch() {
             {fetch.isFetching
               ? 'Fetching up to 200 activity summaries from Strava. Please wait.'
               : fetch.isError
-                ? 'Please try again.'
+                ? fetch.error.message
                 : fetch.data === 0
                   ? 'New activities will appear here after you record them in Strava.'
                   : `${fetch.data} activities fetched. Older history, details and photos continue in the background.`}
           </DialogDescription>
+          {fetch.isError && waiting && (
+            <p className="text-sm text-muted-foreground">
+              Try again after {new Date(retryAt).toLocaleTimeString()}.
+            </p>
+          )}
           {fetch.isFetching ? (
             <div role="status" className="flex min-h-11 items-center">
               <LoaderCircle
@@ -95,14 +103,23 @@ export function FirstSummaryFetch() {
               <span className="sr-only">Loading your recent activities</span>
             </div>
           ) : (
-            <button
-              className="min-h-11 font-medium underline"
-              onClick={() =>
-                fetch.isError ? void fetch.refetch() : setDismissed(userId!)
-              }
-            >
-              {fetch.isError ? 'Retry' : 'Continue'}
-            </button>
+            <div className="flex gap-6">
+              {fetch.isError && error?.retryable !== false && (
+                <button
+                  className="min-h-11 font-medium underline disabled:opacity-50"
+                  disabled={waiting}
+                  onClick={() => void fetch.refetch()}
+                >
+                  Retry
+                </button>
+              )}
+              <button
+                className="min-h-11 font-medium underline"
+                onClick={() => setDismissed(userId!)}
+              >
+                {fetch.isError ? 'Close' : 'Continue'}
+              </button>
+            </div>
           )}
         </DialogPrimitive.Content>
       </DialogPortal>
