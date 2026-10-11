@@ -636,15 +636,6 @@ nonisolated extension ActivityMapAPI {
         let streams: IngestionStreams
     }
 
-    struct InitialImport: Codable, Hashable, Sendable {
-        let phase: InitialImportPhase
-        let importedCount: Int
-        let target: Int
-        let historyComplete: Bool
-        let retryAt: Date?
-        let message: String?
-    }
-
     /// The shape of `ErrorEnvelope.error`.
     struct ErrorBody: Codable, Hashable, Sendable {
         let code: String
@@ -763,15 +754,6 @@ nonisolated extension ActivityMapAPI {
         case stalled = "stalled"
         case notScheduled = "not_scheduled"
         case unknown = "unknown"
-    }
-
-    enum InitialImportPhase: String, Codable, Hashable, Sendable {
-        case notStarted = "not_started"
-        case importing = "importing"
-        case paused = "paused"
-        case failed = "failed"
-        case ready = "ready"
-        case empty = "empty"
     }
 
     enum PhotoRefreshStatus: String, Codable, Hashable, Sendable {

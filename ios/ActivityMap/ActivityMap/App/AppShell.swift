@@ -77,9 +77,7 @@ struct AppShell: View {
         .task {
             guard let localStore else { return } // Xcode previews stay offline.
             if sync == nil {
-                sync = SyncController(activities: store,
-                                      initialImportSource: { InitialImportAPI(baseURL: $0.deployment, token: $0.token) },
-                                      invalidate: { auth.invalidateSession(token: $0) })
+                sync = SyncController(activities: store, invalidate: { auth.invalidateSession(token: $0) })
             }
             sync?.setSession(auth.syncSession, storage: localStore)
             await refresh()
@@ -184,7 +182,6 @@ struct AppShell: View {
                         && !(store.selectedTab == .stats && nativeStatsHeader) {
                         shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
                     }
-                    if let sync { InitialImportNotice(sync: sync, refresh: refresh) }
                     filterWorkspace(sidebarAvailable: sidebarAvailable, panelFloats: panelFloats) {
                         navigableContent(nativeListHeader: nativeListHeader, sidebarAvailable: sidebarAvailable)
                             .environment(\.browsePaneWidth, contentWidth)

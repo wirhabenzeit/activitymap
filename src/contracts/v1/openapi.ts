@@ -18,7 +18,6 @@ import { currentUserDTOSchema } from './user';
 import { syncBootstrapPageDTOSchema, syncChangesPageDTOSchema } from './sync';
 import { errorEnvelopeSchema } from './error';
 import { ingestionStatusDTOSchema } from './ingestion-status';
-import { initialImportDTOSchema } from './initial-import';
 import { responseEnvelope } from './envelope';
 import { paginatedSchema, MAX_PAGE_SIZE } from './pagination';
 import {
@@ -66,9 +65,6 @@ export function buildOpenApiDocument() {
     id: 'IngestionStatusResponse',
   });
   registry.add(errorEnvelopeSchema, { id: 'FailureResponse' });
-  registry.add(responseEnvelope(initialImportDTOSchema), {
-    id: 'InitialImportResponse',
-  });
   registry.add(responseEnvelope(currentUserDTOSchema), {
     id: 'CurrentUserResponse',
   });
@@ -156,46 +152,6 @@ export function buildOpenApiDocument() {
             '500': errorResponse(
               'The server could not serialize a valid contract response',
             ),
-          },
-        },
-      },
-      '/api/v1/initial-import': {
-        get: {
-          operationId: 'getInitialImport',
-          summary: 'Read recent-activity onboarding progress',
-          security,
-          description:
-            'Read-only progress for the initial 200 recent activity summaries. Ready does not mean older history, details, photos or streams are complete.',
-          responses: {
-            '200': {
-              description: 'Current initial import progress',
-              content: {
-                'application/json': { schema: ref('InitialImportResponse') },
-              },
-            },
-            '401': errorResponse('Authentication required'),
-            '429': errorResponse('Too many requests; see Retry-After'),
-            '503': errorResponse('Import status unavailable; see Retry-After'),
-          },
-        },
-        post: {
-          operationId: 'advanceInitialImport',
-          summary: 'Import the next bounded batch of recent activities',
-          security,
-          description:
-            'Imports at most 50 summaries per call, up to 200 per account or the end of history. Durable account-scoped progress, leases and retry deadlines prevent duplicate work across clients. No caller-supplied IDs, ranges or quotas. Complete accounts are a no-op. Other ingestion continues automatically.',
-          responses: {
-            '200': {
-              description:
-                'Progress after this batch, including saved retry/error states',
-              content: {
-                'application/json': { schema: ref('InitialImportResponse') },
-              },
-            },
-            '401': errorResponse('Authentication required'),
-            '403': errorResponse('Cross-origin browser mutation rejected'),
-            '429': errorResponse('Too many requests; see Retry-After'),
-            '503': errorResponse('Import unavailable; see Retry-After'),
           },
         },
       },

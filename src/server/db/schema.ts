@@ -113,22 +113,6 @@ export const accounts = pgTable(
   ],
 );
 
-/** One bounded, resumable recent-history import per account, shared by devices. */
-export const initialActivityImports = pgTable('initial_activity_import', {
-  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
-  athleteId: bigint('athlete_id', { mode: 'number' }).notNull(),
-  startedAt: timestamp('started_at', { mode: 'date' }),
-  before: integer('before'),
-  nextPage: integer('next_page').notNull().default(1),
-  importedCount: integer('imported_count').notNull().default(0),
-  completedAt: timestamp('completed_at', { mode: 'date' }),
-  historyComplete: boolean('history_complete').notNull().default(false),
-  leaseToken: text('lease_token'),
-  leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }),
-  retryAt: timestamp('retry_at', { mode: 'date' }),
-  message: text('message'),
-});
-
 export const sessions = pgTable('session', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()), // Better Auth uses id
   sessionToken: text('sessionToken').unique(), // Keep for backward compat
