@@ -47,6 +47,7 @@ final class SyncController {
     private(set) var firstSummaryRetryable = true
     private var pendingFirstSummaryCount: Int?
     private var fetchedInitialSummaries = false
+    private var importingInitialSummaries = false
     private let fetchInitialSummaries: ((SyncSession) async throws -> Int)?
     private var storage: LocalStore?
     private var work: Task<Void, Never>?
@@ -62,6 +63,9 @@ final class SyncController {
     @ObservationIgnored private var photoCacheConfigured = false
 
     var hasCompletedCache: Bool { checkpoint?.bootstrapComplete == true && checkpoint?.lastSyncAt != nil }
+    var isLoadingInitialActivities: Bool {
+        importingInitialSummaries && status == .syncing && activities.activities.isEmpty
+    }
     var lastSyncAt: Date? { checkpoint?.lastSyncAt }
     var lastReconciliationAt: Date? { checkpoint?.freshness?.lastSummaryReconciledAt }
     var retryNotBefore: Date? { retryAt }
@@ -196,6 +200,7 @@ final class SyncController {
 
     private func perform(_ session: SyncSession, storage: LocalStore, generation current: Int) async {
         var importing = pendingFirstSummaryCount != nil
+        defer { if current == generation { importingInitialSummaries = false } }
         do {
             guard session.user.authentication.sessionExpiresAt > now(), session.user.stravaConnected else {
                 clearVisible()
@@ -205,13 +210,13 @@ final class SyncController {
             }
             try await loadCache(session, storage: storage, generation: current)
             guard current == generation, !Task.isCancelled else { return }
-            importing = pendingFirstSummaryCount != nil || (!fetchedInitialSummaries && activities.activities.isEmpty && fetchInitialSummaries != nil)
             guard session.verified else {
                 status = .offline
                 return
             }
             if let retryAt, retryAt > now() { status = deferredStatus; return }
             if importing { firstSummaryError = nil }
+            importingInitialSummaries = importing
             status = .syncing
             let engine = SyncEngine(source: source(session), store: storage, scope: session.scope)
             _ = try await engine.run()
@@ -221,6 +226,10 @@ final class SyncController {
                session.user.stravaPermissions?.activities != ActivityMapAPI.StravaActivityAccess.none,
                let fetchInitialSummaries {
                 importing = true
+                // Only a completed server sync with no activities starts the
+                // blocking first import. An empty phone cache is insufficient.
+                importingInitialSummaries = true
+                firstSummaryError = nil
                 let count = try await fetchInitialSummaries(session)
                 guard current == generation, !Task.isCancelled else { return }
                 fetchedInitialSummaries = true
@@ -358,6 +367,7 @@ final class SyncController {
         firstSummaryRetryable = true
         pendingFirstSummaryCount = nil
         fetchedInitialSummaries = false
+        importingInitialSummaries = false
         summarySync.pause()
         publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil
         photoCacheConfigured = false

@@ -7,6 +7,7 @@ struct PhotoGalleryView: View {
     @State private var invokingPhoto: String?
     @State private var presentation: Presentation?
     @AccessibilityFocusState private var focusedPhoto: String?
+    @Namespace private var photoTransition
     private struct Presentation: Identifiable { let id: String }
     private var photos: [Photo] { Photo.ordered(store.photos.filter { $0.activityID == String(activityID) }) }
 
@@ -29,6 +30,7 @@ struct PhotoGalleryView: View {
                             .accessibilityLabel("View photo \(index + 1) of \(photos.count)\(photo.caption.map { ": \($0)" } ?? "")")
                             .accessibilityFocused($focusedPhoto, equals: photo.id)
                             .accessibilityIdentifier("photo-thumbnail-\(photo.id)")
+                            .matchedTransitionSource(id: photo.id, in: photoTransition)
                         }
                     }
                 }
@@ -37,7 +39,8 @@ struct PhotoGalleryView: View {
                 // The opening button remains the focus return target.
                 focusedPhoto = invokingPhoto
             }) { selected in
-                PhotoViewer(store: store, activityID: activityID, initialPhotoID: selected.id)
+                PhotoViewer(store: store, activityID: activityID, initialPhotoID: selected.id,
+                            transitionNamespace: photoTransition)
             }
             .onChange(of: store.mapContext.scopeRevision) { _, _ in presentation = nil }
         }
@@ -47,45 +50,53 @@ struct PhotoGalleryView: View {
 struct PhotoViewer: View {
     let store: ActivityStore
     let activityID: Int
-    @State private var captionHeight: CGFloat = 24
+    let transitionNamespace: Namespace.ID?
     @State private var currentID: String
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var photos: [Photo] { Photo.ordered(store.photos.filter { $0.activityID == String(activityID) }) }
     private var index: Int { photos.firstIndex { $0.id == currentID } ?? 0 }
     private var current: Photo? { photos.first { $0.id == currentID } }
+    private var neighbors: [Photo] {
+        photos.enumerated().compactMap { position, photo in
+            abs(position - index) == 1 ? photo : nil
+        }
+    }
 
-    init(store: ActivityStore, activityID: Int, initialPhotoID: String) {
+    init(store: ActivityStore, activityID: Int, initialPhotoID: String, transitionNamespace: Namespace.ID? = nil) {
         self.store = store
         self.activityID = activityID
+        self.transitionNamespace = transitionNamespace
         _currentID = State(initialValue: initialPhotoID)
     }
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    Text(store.activity(id: activityID)?.name ?? "Activity photos")
-                        .font(.subheadline.weight(.medium)).lineLimit(2)
-                    Spacer(minLength: 0)
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark").frame(width: 44, height: 44)
-                            .background(.white.opacity(0.15), in: Circle())
-                    }
-                    .accessibilityLabel("Close photo viewer")
-                    .accessibilityIdentifier("photo-viewer-close")
-                }
+            ZStack {
                 TabView(selection: $currentID) {
-                    ForEach(photos) { photo in
-                        Group {
-                            if photo.id == currentID {
-                                PhotoImageView(cache: store.photoImages, photo: photo, use: .full)
-                            } else { Color.clear }
-                        }
-                        .tag(photo.id)
+                    ForEach(Array(photos.enumerated()), id: \.element.id) { position, photo in
+                        PhotoImageView(cache: store.photoImages, photo: photo, use: .full,
+                                       loadsImage: abs(position - index) <= 1,
+                                       isCurrent: photo.id == currentID)
+                            // Expand the page stride, retaining full-width images at rest.
+                            .padding(.horizontal, 8)
+                            .tag(photo.id)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                .padding(.horizontal, -8)
+                .ignoresSafeArea()
+                // Prepare both destinations before the native page drag commits.
+                .task(id: StoreScope.key([store.photoImages.revision.uuidString, currentID] + neighbors.map {
+                    StoreScope.key([$0.id, $0.variant(.full)?.url.absoluteString ?? ""])
+                })) {
+                    let cache = store.photoImages
+                    await withTaskGroup(of: Void.self) { group in
+                        for photo in neighbors {
+                            group.addTask { _ = try? await cache.image(photo: photo, use: .full) }
+                        }
+                    }
+                }
                 .accessibilityLabel("Photo \(index + 1) of \(photos.count)")
                 .accessibilityAdjustableAction { direction in
                     switch direction {
@@ -94,34 +105,63 @@ struct PhotoViewer: View {
                     @unknown default: break
                     }
                 }
-                VStack(spacing: 8) {
-                    HStack(spacing: 24) {
-                        if photos.count > 1 {
-                            Button { go(-1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
-                                .disabled(index == 0).accessibilityLabel("Previous photo")
-                        }
-                        Text("\(index + 1) of \(photos.count)")
-                            .font(.subheadline).monospacedDigit()
-                            .accessibilityIdentifier("photo-viewer-count")
-                        if photos.count > 1 {
-                            Button { go(1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }
-                                .disabled(index >= photos.count - 1).accessibilityLabel("Next photo")
-                        }
+            }
+            .overlay(alignment: .top) {
+                HStack(spacing: 12) {
+                    Text(store.activity(id: activityID)?.name ?? "Activity photos")
+                        .font(.subheadline.weight(.medium)).lineLimit(1)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(.black.opacity(0.55), in: Capsule())
+                    Spacer(minLength: 0)
+                    Button { dismiss() } label: { floatingIcon("xmark") }
+                        .accessibilityLabel("Close photo viewer")
+                        .accessibilityIdentifier("photo-viewer-close")
+                }
+                .padding(16)
+            }
+            .overlay {
+                if photos.count > 1 {
+                    HStack {
+                        Button { go(-1) } label: { floatingIcon("chevron.left") }
+                            .disabled(index == 0).accessibilityLabel("Previous photo")
+                        Spacer()
+                        Button { go(1) } label: { floatingIcon("chevron.right") }
+                            .disabled(index >= photos.count - 1).accessibilityLabel("Next photo")
                     }
-                    if let caption = current?.caption?.trimmingCharacters(in: .whitespacesAndNewlines), !caption.isEmpty {
-                        ScrollView {
-                            Text(caption).font(.body).frame(maxWidth: .infinity).multilineTextAlignment(.center)
-                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
-                        }
-                        .frame(height: min(captionHeight, geometry.size.height * 0.2))
-                        .accessibilityIdentifier("photo-viewer-caption")
-                    }
+                    .padding(.horizontal, 16)
                 }
             }
-            .padding(16)
+            .overlay(alignment: .bottom) {
+                VStack(spacing: 8) {
+                    let caption = current?.caption?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if !caption.isEmpty {
+                        // Caption layout changes only the overlay, never the pager.
+                        Text(caption).font(.subheadline).multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity).fixedSize(horizontal: false, vertical: true)
+                            .hidden().accessibilityHidden(true)
+                            .frame(maxHeight: geometry.size.height * 0.2).clipped()
+                            .overlay {
+                                ScrollView {
+                                    Text(caption).font(.subheadline).multilineTextAlignment(.center)
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .scrollBounceBehavior(.basedOnSize)
+                            }
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("photo-viewer-caption")
+                    }
+                    Text("\(index + 1) of \(photos.count)")
+                        .font(.subheadline).monospacedDigit()
+                        .accessibilityIdentifier("photo-viewer-count")
+                }
+                .padding(12)
+                .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 16))
+                .padding(16)
+            }
             .foregroundStyle(.white)
-            .background(Color.black.ignoresSafeArea())
+            .background(Color(white: 18.0 / 255).ignoresSafeArea())
             .preferredColorScheme(.dark)
+            .statusBarHidden(true)
             .buttonStyle(.plain)
             .accessibilityAction(.escape) { dismiss() }
             .onChange(of: currentID) { _, _ in
@@ -134,6 +174,12 @@ struct PhotoViewer: View {
             .onChange(of: store.activitiesRevision) { _, _ in if store.activity(id: activityID) == nil { dismiss() } }
             .onChange(of: store.mapContext.scopeRevision) { _, _ in dismiss() }
         }
+        .modifier(PhotoViewerZoomTransition(sourceID: currentID, namespace: transitionNamespace))
+    }
+
+    private func floatingIcon(_ name: String) -> some View {
+        Image(systemName: name).frame(width: 44, height: 44)
+            .background(.black.opacity(0.55), in: Circle())
     }
 
     private func go(_ delta: Int) {
@@ -142,10 +188,25 @@ struct PhotoViewer: View {
     }
 }
 
+private struct PhotoViewerZoomTransition: ViewModifier {
+    let sourceID: String
+    let namespace: Namespace.ID?
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if let namespace {
+            content.navigationTransition(.zoom(sourceID: sourceID, in: namespace))
+        } else {
+            content
+        }
+    }
+}
+
 struct PhotoImageView: View {
     let cache: PhotoImageCache
     let photo: Photo
     let use: Photo.ImageUse
+    var loadsImage = true
+    var isCurrent = true
     @State private var image: UIImage?
     @State private var failed = false
     @State private var attempt = 0
@@ -153,11 +214,17 @@ struct PhotoImageView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                if let image {
-                    Image(uiImage: image).resizable()
-                        .aspectRatio(contentMode: use == .thumbnail ? .fill : .fit)
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped().accessibilityHidden(true)
+                if !loadsImage {
+                    Color.clear
+                } else if let image {
+                    if use == .full {
+                        ZoomablePhoto(image: image, isCurrent: isCurrent)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                    } else {
+                        Image(uiImage: image).resizable().aspectRatio(contentMode: .fill)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .clipped().accessibilityHidden(true)
+                    }
                 } else if failed || photo.variant(use) == nil {
                     VStack(spacing: 12) {
                         Image(systemName: "photo.badge.exclamationmark")
@@ -178,9 +245,10 @@ struct PhotoImageView: View {
             }
         }
         // A new URL or reconciled cache invalidates the prior rendered image too.
-        .task(id: StoreScope.key([cache.revision.uuidString, photo.variant(use)?.url.absoluteString ?? "", String(attempt)])) {
+        .task(id: StoreScope.key([cache.revision.uuidString, photo.id, photo.variant(use)?.url.absoluteString ?? "", String(attempt), String(loadsImage)])) {
             image = nil
             failed = false
+            guard loadsImage else { return }
             do {
                 let result = try await cache.image(photo: photo, use: use)
                 try Task.checkCancellation()

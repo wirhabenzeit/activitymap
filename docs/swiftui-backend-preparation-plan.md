@@ -283,6 +283,25 @@ Recommended flow:
 7. The server returns an ActivityMap session token. SwiftUI stores it in the
    Keychain and sends it in the `Authorization` header.
 
+Account-switching follow-up, 2026-10-11: a physical iPhone silently returned
+to a test account even after Strava sign-out in a regular Safari tab with one
+profile. An ephemeral authentication session showed the login screen and an
+explicit login returned the real account. Explicit Connect attempts now use
+ephemeral sessions in all builds; the saved ActivityMap Keychain session still
+restores normally at launch. The exact retained-cookie behavior is unconfirmed.
+
+The blocking "Loading your recent activities…" screen is limited to the first
+Strava fetch and its download after a completed server sync finds no activities.
+An empty phone cache alone does not trigger onboarding: existing server
+libraries use the normal asynchronous sync and its status indicator. No signup
+marker, backend change, or migration is needed. A bootstrap failure uses the
+normal sync error state because it has not established that the library is empty.
+
+Validation: the focused `AuthRecoveryTests`, `SyncControllerTests` and
+`SyncEngineTests` run passed 33 tests on the iPhone 18 Pro simulator, iOS 27.0.
+The regressions cover an empty phone cache with existing server activities,
+blocking only during the first import, completion, and bootstrap failure.
+
 Implementation choices to spike before committing:
 
 - Prefer reusing Better Auth sessions with its Bearer plugin if the complete
