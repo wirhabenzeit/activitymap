@@ -66,6 +66,38 @@ function fakeIngestion(candidates: number[] = []) {
 
 const fetched = (ids: number[]) => ids.map((id) => ({ id })) as never;
 
+void test('missing activity read permission is a detail failure, not a blocked connection', async () => {
+  const { ingestion, recorded } = fakeIngestion([1, 2]);
+  const result = await updateIncompleteActivities(42, 'token', 10, {
+    activitiesRepo: fakeActivitiesRepo().repo,
+    ingestion,
+    fetchActivities: async () => ({
+      activities: fetched([2]),
+      photos: [],
+      notFoundIds: [],
+      failures: [
+        {
+          activityId: 1,
+          error: new StravaApiError('Authorization Error', 401, [
+            {
+              resource: 'AccessToken',
+              field: 'activity:read_permission',
+              code: 'missing',
+            },
+          ]),
+        },
+      ],
+    }),
+  });
+  assert.equal(result.updated, 1);
+  assert.equal(result.failed, 1);
+  assert.deepEqual(recorded, [{ activityId: 1, code: 'forbidden' }]);
+  assert.deepEqual(result.outcome, {
+    outcome: 'partial',
+    reason: 'detail_failures',
+  });
+});
+
 void test('not-found activities are delegated to deleteManyForAthlete (one atomic delete+tombstone+change-record transaction)', async () => {
   const { repo, deleteCalls } = fakeActivitiesRepo();
   const { ingestion, cleared } = fakeIngestion([1, 2, 3]);

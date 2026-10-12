@@ -62,3 +62,17 @@ the webhook inbox, per-athlete import coverage and the Strava request budget.
 Every cron route appends one row per run through `withJobLog`; writing it
 never fails the job. Access requires a Strava sign-in whose athlete id is
 listed in `ACTIVITYMAP_ADMIN_ATHLETE_IDS`; anyone else gets a 404.
+
+An activity failure does not fail the whole run: `completed` means the job
+finished, while `failed` counts its individual activity failures. Detail and
+stream retries back off from one hour to at most 24 hours. A stream run can
+report `complete` with a remaining backlog when accounts are blocked or
+activities are waiting for retry; it means no more activities were eligible
+for this run.
+
+For stream authorization errors, a stored unexpired token gets one guarded
+refresh and one retry. A repeated credential rejection pauses that account
+until its credentials change. Missing activity read permission (including
+Strava's `AccessToken.activity:read_permission.missing` 401) and activity-level
+403s back off only the affected activity. The job's failure detail retains
+recognized permission/token identifiers to help distinguish these cases.

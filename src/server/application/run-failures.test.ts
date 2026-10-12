@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { z } from 'zod';
+import { StravaApiError } from '~/server/strava/client';
 
 import { summarizeJobResult } from './job-log.ts';
 import {
@@ -44,6 +45,24 @@ void test('a wrapped database error reports its cause, not the query', () => {
   assert.equal(
     describeFailure(error),
     'Error: value "3000000000" is out of range for type integer ← DrizzleQueryError',
+  );
+});
+
+void test('Strava authorization details retain known identifiers and discard arbitrary values', () => {
+  const error = new StravaApiError('Authorization Error', 401, [
+    {
+      resource: 'AccessToken',
+      field: 'activity:read_permission',
+      code: 'missing',
+    },
+    { resource: 'Athlete', field: 'access_token', code: 'invalid' },
+    { resource: 'secret-resource', field: 'access_token', code: 'invalid' },
+    { resource: 'AccessToken', field: 'secret-field', code: 'missing' },
+    { resource: 'AccessToken', field: 'access_token', code: 'secret-code' },
+  ]);
+  assert.equal(
+    describeFailure(error),
+    'StravaApiError 401: Authorization Error (AccessToken.activity:read_permission.missing; Athlete.access_token.invalid)',
   );
 });
 

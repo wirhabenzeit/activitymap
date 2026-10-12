@@ -540,12 +540,21 @@ async function runProof() {
   await cleanup();
   await seed(1, 3);
   nextHour();
-  behavior = async () =>
-    Response.json({ message: 'Authorization Error' }, { status: 401, headers });
+  behavior = async (url) =>
+    url.pathname.endsWith('/oauth/token')
+      ? successful(url)
+      : Response.json(
+          { message: 'Authorization Error' },
+          { status: 401, headers },
+        );
   const rejected = await run();
   assert.equal(rejected.failed, 1);
   assert.equal(rejected.selected, 1, 'other activities of the account wait');
-  assert.equal(requests.length, 1);
+  assert.equal(
+    requests.length,
+    3,
+    'one guarded refresh and one retry before blocking',
+  );
   const rejectedAttempts = await testDb.select().from(streamBackfillAttempts);
   assert.equal(rejectedAttempts.length, 1);
   assert.equal(rejectedAttempts[0]?.terminal, false);
@@ -566,6 +575,53 @@ async function runProof() {
     })
     .where(eq(accounts.id, userIds[0]!));
   assert.equal((await run()).fetched, 3, 'reconnect resumes every activity');
+
+  // Missing activity permission is not a bad token: continue the account
+  // and back off just the inaccessible activity without a refresh.
+  for (const status of [401, 403]) {
+    await cleanup();
+    await seed(1, 3);
+    nextHour();
+    behavior = async (url) =>
+      url.pathname.includes(String(activityId(0, 1)))
+        ? Response.json(
+            {
+              message: 'Authorization Error',
+              errors: [
+                {
+                  resource: 'AccessToken',
+                  field: 'activity:read_permission',
+                  code: 'missing',
+                },
+              ],
+            },
+            { status, headers },
+          )
+        : successful(url);
+    const limited = await run();
+    assert.equal(limited.failed, 1);
+    assert.equal(limited.fetched, 2);
+    assert.equal(
+      requests.length,
+      3,
+      'permissions do not trigger OAuth refresh',
+    );
+    const [account] = await testDb.select().from(streamBackfillAccounts);
+    assert.equal(account?.blockedCredentials, null);
+    const [permissionAttempt] = await testDb
+      .select()
+      .from(streamBackfillAttempts)
+      .where(eq(streamBackfillAttempts.activityId, BigInt(activityId(0, 1))));
+    assert.equal(permissionAttempt?.terminal, false);
+    assert.equal(permissionAttempt?.nextAttemptAt?.getTime(), time + HOUR);
+    nextHour();
+    behavior = async (url) => successful(url);
+    assert.equal(
+      (await run()).fetched,
+      1,
+      'activity can recover after its backoff',
+    );
+  }
 
   // A generation invalidation, revocation or deletion during HTTP cannot commit.
   for (const change of ['invalidate', 'revoke', 'delete'] as const) {

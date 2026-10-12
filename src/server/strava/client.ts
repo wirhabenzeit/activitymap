@@ -102,6 +102,20 @@ export class StravaApiError extends Error {
   }
 }
 
+/** Strava can return 401 for an activity permission, even with a valid token. */
+export function isStravaActivityPermissionError(error: unknown): boolean {
+  return (
+    error instanceof StravaApiError &&
+    (error.status === 401 || error.status === 403) &&
+    Array.isArray(error.errors) &&
+    error.errors.some((detail) =>
+      detail?.resource === 'AccessToken' &&
+      detail?.field === 'activity:read_permission' &&
+      detail?.code === 'missing',
+    )
+  );
+}
+
 /**
  * Strava also uses 404 for responses that do not prove an activity was
  * deleted (for example, a private activity without activity:read_all).
@@ -211,11 +225,21 @@ export class StravaClient {
     accessToken: string,
     refreshToken: string,
     tokenRefreshCallback: (tokens: StravaTokens) => Promise<void>,
+    {
+      onRateLimit,
+      requestBudget,
+      signal,
+      beforeRequest,
+    }: StravaClientOptions = {},
   ): StravaClient {
     return new StravaClient({
       accessToken,
       refreshToken,
       tokenRefreshCallback,
+      rateLimitCallback: onRateLimit,
+      requestBudget,
+      signal,
+      beforeRequest,
     });
   }
 
@@ -318,7 +342,7 @@ export class StravaClient {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    _retryCount = 0,
+    retryCount = 0,
   ): Promise<T> {
     // Determine if this is a webhook endpoint (which doesn't need auth)
     const isWebhookEndpoint = endpoint.includes('/push_subscriptions');
@@ -411,14 +435,25 @@ export class StravaClient {
             : undefined,
       });
 
-      // Token management is now handled outside this class
-      // If we get a 401, we won't retry here as refreshing should be done before creating the client
-
-      throw new StravaApiError(
+      const error = new StravaApiError(
         errorMessage,
         response.status,
         errorDetails.errors,
       );
+      // A token can be rejected before its stored expiry. Only clients with
+      // a guarded refresh callback can recover; permission failures cannot be
+      // fixed by refreshing. Every refresh/retry uses the same budget and guard.
+      if (
+        response.status === 401 &&
+        this.refreshToken &&
+        this.tokenRefreshCallback &&
+        retryCount === 0 &&
+        !isStravaActivityPermissionError(error)
+      ) {
+        await this.refreshAccessToken();
+        return this.request<T>(endpoint, options, retryCount + 1);
+      }
+      throw error;
     }
 
     try {

@@ -272,9 +272,11 @@ export function createStreamBackfillRepository(
     ) {
       await database.transaction(async (tx) => {
         const { now } = await lockRun(tx, run);
-        // Unauthorized is gated per account (blockAccount), so it must not
-        // make the activity terminal or back it off past a reconnect.
-        const activityLevel = error && error.code !== 'unauthorized';
+        // Rejected credentials are gated per account (blockAccount). A
+        // retryable authorization failure concerns this activity's access,
+        // so it backs off without stopping the rest of the account.
+        const activityLevel =
+          error && (error.code !== 'unauthorized' || error.retryable);
         await tx
           .update(attempts)
           .set({

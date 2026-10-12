@@ -1,4 +1,5 @@
 import { ZodError } from 'zod';
+import { StravaApiError } from '~/server/strava/client';
 
 import type { RunFailure } from '~/lib/admin/job-run-summary';
 
@@ -39,6 +40,23 @@ export function describeFailure(error: unknown): string {
     text = `${firstLine(error.cause)} ← ${error.name}`;
   } else {
     text = firstLine(error);
+    if (error instanceof StravaApiError && Array.isArray(error.errors)) {
+      // Persist only recognized authorization identifiers, never arbitrary
+      // upstream strings: these distinguish a missing scope from a bad token.
+      const details = error.errors
+        .filter(
+          (detail) =>
+            detail &&
+            ['AccessToken', 'Athlete'].includes(detail.resource) &&
+            ['access_token', 'activity:read_permission'].includes(
+              detail.field,
+            ) &&
+            ['missing', 'invalid'].includes(detail.code),
+        )
+        .slice(0, 3)
+        .map((detail) => `${detail.resource}.${detail.field}.${detail.code}`);
+      if (details.length) text += ` (${details.join('; ')})`;
+    }
   }
   return text.length > MAX_DETAIL_CHARS
     ? `${text.slice(0, MAX_DETAIL_CHARS - 1)}…`

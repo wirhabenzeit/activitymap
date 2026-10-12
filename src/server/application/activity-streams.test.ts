@@ -14,7 +14,7 @@ import { rawActivityStreamsSchema } from '~/server/strava/streams';
 void test('failure state distinguishes missing data from authorization, throttling and malformed responses', () => {
   for (const [status, code, retryable] of [
     [401, 'unauthorized', false],
-    [403, 'unauthorized', false],
+    [403, 'unauthorized', true],
     [404, 'not_found', false],
     [429, 'rate_limited', true],
     [503, 'upstream_error', true],
@@ -37,6 +37,21 @@ void test('failure state distinguishes missing data from authorization, throttli
   assert.deepEqual(
     classifyStreamFetchFailure(new TypeError('network failed')),
     { code: 'upstream_error', retryable: true },
+  );
+});
+
+void test('a missing activity permission backs off the activity without rejecting the account', () => {
+  assert.deepEqual(
+    classifyStreamFetchFailure(
+      new StravaApiError('Authorization Error', 401, [
+        {
+          resource: 'AccessToken',
+          field: 'activity:read_permission',
+          code: 'missing',
+        },
+      ]),
+    ),
+    { code: 'unauthorized', retryable: true },
   );
 });
 
@@ -155,6 +170,145 @@ void test('source refreshes expired credentials through StravaClient before fetc
         tokens: { ...sourceOptions.tokens, refreshToken: null },
       }),
     StravaApiError,
+  );
+});
+
+void test('a rejected unexpired token gets one budgeted refresh and retry, after credential persistence', async (t) => {
+  const originalEnv = { ...process.env };
+  Object.assign(process.env, {
+    AUTH_STRAVA_ID: 'fixture-id',
+    AUTH_STRAVA_SECRET: 'fixture-secret',
+    ACTIVITYMAP_EXTERNAL_EFFECTS: 'enabled',
+  });
+  t.after(() => {
+    process.env = originalEnv;
+  });
+  const now = new Date('2026-10-12T12:00:00Z');
+  const order: string[] = [];
+  const observed: number[] = [];
+  let reservations = 0;
+  let guards = 0;
+  const options = {
+    tokens: {
+      accessToken: 'rejected-access',
+      refreshToken: 'old-refresh',
+      expiresAtDate: new Date('2030-01-01'),
+      expiresAtSeconds: 1893456000,
+    },
+    now,
+    signal: new AbortController().signal,
+    beforeRequest: async () => {
+      guards++;
+    },
+    requestBudget: {
+      reserve: async (read: boolean) => {
+        reservations++;
+        return { startedAt: now, read };
+      },
+      observe: async (_ticket: unknown, _usage: unknown, status: number) => {
+        observed.push(status);
+      },
+    },
+    onRefresh: async (tokens: StravaTokens) => {
+      assert.equal(tokens.access_token, 'new-access');
+      order.push('persist');
+    },
+  };
+  const tokens = {
+    access_token: 'new-access',
+    refresh_token: 'new-refresh',
+    expires_at: 2_000_000_000,
+    expires_in: 21600,
+  };
+  const mocked = t.mock.method(
+    globalThis,
+    'fetch',
+    async (url: string, init?: RequestInit) => {
+      assert.equal(init?.signal, options.signal);
+      if (url.endsWith('/oauth/token')) {
+        order.push('refresh');
+        return Response.json(tokens);
+      }
+      const authorization = new Headers(init?.headers).get('authorization');
+      order.push(authorization!);
+      return authorization === 'Bearer rejected-access'
+        ? Response.json({ message: 'Authorization Error' }, { status: 401 })
+        : Response.json({});
+    },
+  );
+  assert.deepEqual(
+    await createStreamSource(options).getActivityStreams('1'),
+    {},
+  );
+  assert.deepEqual(order, [
+    'Bearer rejected-access',
+    'refresh',
+    'persist',
+    'Bearer new-access',
+  ]);
+  assert.equal(reservations, 3);
+  assert.equal(guards, 3);
+  assert.deepEqual(observed, [401, 200, 200]);
+
+  order.length = 0;
+  mocked.mock.mockImplementation(async (url: string) => {
+    order.push(url.endsWith('/oauth/token') ? 'refresh' : 'streams');
+    return url.endsWith('/oauth/token')
+      ? Response.json(tokens)
+      : Response.json({ message: 'Authorization Error' }, { status: 401 });
+  });
+  await assert.rejects(
+    createStreamSource(options).getActivityStreams('1'),
+    (error: unknown) => error instanceof StravaApiError && error.status === 401,
+  );
+  assert.deepEqual(
+    order,
+    ['streams', 'refresh', 'persist', 'streams'],
+    'no refresh loop',
+  );
+
+  order.length = 0;
+  const superseded = new Error('credential claim superseded');
+  await assert.rejects(
+    createStreamSource({
+      ...options,
+      onRefresh: async () => {
+        throw superseded;
+      },
+    }).getActivityStreams('1'),
+    superseded,
+  );
+  assert.deepEqual(
+    order,
+    ['streams', 'refresh'],
+    'failed persistence guard prevents retry',
+  );
+
+  order.length = 0;
+  mocked.mock.mockImplementation(async (url: string) => {
+    order.push(url);
+    return Response.json(
+      {
+        message: 'Authorization Error',
+        errors: [
+          {
+            resource: 'AccessToken',
+            field: 'activity:read_permission',
+            code: 'missing',
+          },
+        ],
+      },
+      { status: 401 },
+    );
+  });
+  await assert.rejects(
+    createStreamSource(options).getActivityStreams('1'),
+    (error: unknown) => error instanceof StravaApiError && error.status === 401,
+  );
+  assert.equal(
+    order.length,
+    1,
+    'missing permissions do not trigger token refresh',
   );
 });
 
