@@ -169,7 +169,7 @@ export async function backfillActivityStreams({
               error,
             });
           }
-          if (failure.code === 'unauthorized') {
+          if (failure.code === 'unauthorized' && !failure.retryable) {
             // Credentials, not this activity, are the problem: skip the
             // account until they change instead of failing each activity.
             await repository.blockAccount(run, candidate);

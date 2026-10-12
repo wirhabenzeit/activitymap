@@ -1,5 +1,5 @@
 import { ZodError } from 'zod';
-import { StravaApiError } from './client';
+import { StravaApiError, isStravaActivityPermissionError } from './client';
 import { StravaBudgetExceededError } from './request-budget';
 import type {
   IngestionOutcome,
@@ -76,6 +76,8 @@ export function classifyIngestionFailure(error: unknown): IngestionFailure {
   if (error instanceof StravaApiError) {
     if (error.status === 429)
       return { scope: 'run', outcome: 'deferred', reason: 'rate_limited' };
+    if (isStravaActivityPermissionError(error))
+      return { scope: 'activity', code: 'forbidden' };
     if (error.status === 401)
       return { scope: 'account', outcome: 'blocked', reason: 'unauthorized' };
     if (error.status === 403) return { scope: 'activity', code: 'forbidden' };

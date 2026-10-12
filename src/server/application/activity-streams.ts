@@ -16,6 +16,7 @@ import {
 import {
   StravaApiError,
   StravaClient,
+  isStravaActivityPermissionError,
   type StravaRateLimitUsage,
 } from '~/server/strava/client';
 import {
@@ -31,8 +32,12 @@ export function classifyStreamFetchFailure(error: unknown): StreamFetchFailure {
     return { code: 'invalid_response', retryable: false };
   if (error instanceof StravaApiError) {
     if (error.status === 429) return { code: 'rate_limited', retryable: true };
-    if (error.status === 401 || error.status === 403)
-      return { code: 'unauthorized', retryable: false };
+    // A forbidden activity or missing read permission does not establish
+    // that the account's credentials are invalid. Back it off individually;
+    // it may become readable after reauthorization or a visibility change.
+    if (error.status === 403 || isStravaActivityPermissionError(error))
+      return { code: 'unauthorized', retryable: true };
+    if (error.status === 401) return { code: 'unauthorized', retryable: false };
     if (error.status === 404) return { code: 'not_found', retryable: false };
     return { code: 'upstream_error', retryable: error.status >= 500 };
   }
@@ -69,6 +74,18 @@ export const createStreamSource: StreamSourceFactory = ({
     tokens.expiresAtDate &&
     tokens.expiresAtDate > now
   ) {
+    if (tokens.refreshToken)
+      return StravaClient.withTokens(
+        tokens.accessToken,
+        tokens.refreshToken,
+        onRefresh,
+        {
+          onRateLimit,
+          requestBudget,
+          signal,
+          beforeRequest,
+        },
+      );
     return StravaClient.withAccessToken(tokens.accessToken, {
       onRateLimit,
       requestBudget,
