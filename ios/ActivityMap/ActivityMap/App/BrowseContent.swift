@@ -9,6 +9,8 @@ struct BrowseContent: View {
     @Environment(\.listFooterHostedByShell) private var footerHostedByShell
     @Environment(\.browseStatsDestination) private var statsDestination
     @Environment(\.stravaConnect) private var stravaConnect
+    @Environment(\.browsePaneWidth) private var paneWidth
+    @State private var landscapeInsets = PhoneLandscapeInsets()
 
     var body: some View {
         GeometryReader { geometry in
@@ -18,6 +20,8 @@ struct BrowseContent: View {
                 VStack(spacing: 0) {
                     NavigationStack {
                         ListScreen(store: store, emptyState: presentation.empty, recover: recover)
+                            .environment(\.browsePaneWidth, landscapeInsets == PhoneLandscapeInsets()
+                                ? paneWidth : geometry.size.width)
                             // Establish inline metrics before the first detail push.
                             .navigationBarTitleDisplayMode(.inline)
                     }
@@ -57,6 +61,12 @@ struct BrowseContent: View {
 
             }
         }
+        // Extend only the browsing pane; native navigation bars keep their
+        // system safe areas. Negative padding reclaims the unused gutter while
+        // GeometryReader and map fitting see the resulting actual viewport.
+        .padding(.leading, store.selectedTab == .stats ? 0 : -landscapeInsets.leading)
+        .padding(.trailing, store.selectedTab == .stats ? 0 : -landscapeInsets.trailing)
+        .background(PhoneLandscapeInsetsReader { landscapeInsets = $0 }.allowsHitTesting(false))
         .confirmationDialog("This activity is hidden by filters", isPresented: Binding(
             get: { store.mapContext.hiddenTargetID != nil },
             set: { if !$0 { store.mapContext.hiddenTargetID = nil } }

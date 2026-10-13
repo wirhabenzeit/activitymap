@@ -100,6 +100,7 @@ struct RoutePickerSheet: View {
                 // fixed strip masking rows as they scroll past the bottom.
                 .padding(.bottom, bottomInset)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .accessibilityIdentifier("map-results-scroll")
         }
     }
@@ -108,7 +109,7 @@ struct RoutePickerSheet: View {
         HStack(spacing: 0) {
             SelectionBar(store: store, showsClear: false, expandsCount: true)
             Button { store.mapContext.request(detail.map { .fitActivity($0.id) } ?? .fitSelection) } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right").frame(width: 44, height: 44).contentShape(Rectangle())
+                Image(systemName: "viewfinder").frame(width: 44, height: 44).contentShape(Rectangle())
             }.accessibilityLabel(detail == nil ? "Fit selection" : "Fit route")
                 .accessibilityIdentifier("map-results-fit")
                 .disabled(detail.map { !store.routableActivityIDs.contains($0.id) }

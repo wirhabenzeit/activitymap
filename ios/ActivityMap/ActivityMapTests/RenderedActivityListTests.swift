@@ -796,6 +796,8 @@ extension RenderedRoutePickingTests {
         let controller = try #require(host.host.presentedViewController)
         let sheet = try #require(controller.sheetPresentationController)
         try await listWait { controller.transitionCoordinator == nil }
+        #expect(!sheet.prefersScrollingExpandsWhenScrolledToEdge,
+                "Results swipes must scroll rather than grow the sheet")
         let identifier = try #require(sheet.selectedDetentIdentifier)
         func height() -> CGFloat {
             controller.presentationController?.presentedView?.layer.presentation()?.bounds.height ?? controller.view.bounds.height
@@ -805,6 +807,8 @@ extension RenderedRoutePickingTests {
             let before = height()
             if inspecting { picker.showDetail(try #require(picker.candidateIDs.first), store: store) }
             else { picker.showResults() }
+            #expect(!sheet.prefersScrollingExpandsWhenScrolledToEdge,
+                    "Results and detail must share scroll-first gesture arbitration")
             var samples: [CGFloat] = []
             for _ in 0..<45 {
                 try await Task.sleep(for: .milliseconds(16))
@@ -844,6 +848,63 @@ extension RenderedRoutePickingTests {
         try await listWait { sheet.selectedDetentIdentifier == identifier }
         try await Task.sleep(for: .milliseconds(800))
         #expect(abs(height() - detailHeight) < 2)
+    }
+}
+
+extension RenderedRoutePickingTests {
+    @Test func landscapeBrowsingReclaimsOnlyTheSideOppositeTheIsland() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer {
+            MapboxOptions.accessToken = token
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+        try await listWait { scene.effectiveGeometry.interfaceOrientation == .landscapeRight }
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities,
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        let picker = RoutePicker()
+        store.setCombine(true)
+        let host = try ListHarness(root: AppShell(store: store, mapPicker: picker)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.verticalSizeClass, .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)),
+            size: scene.effectiveGeometry.coordinateSpace.bounds.size)
+        defer { host.host.dismiss(animated: false); host.close() }
+        for orientation in [UIInterfaceOrientation.landscapeRight, .landscapeLeft, .landscapeRight] {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation == .landscapeRight ? .landscapeRight : .landscapeLeft))
+            try await listWait { scene.effectiveGeometry.interfaceOrientation == orientation }
+            host.window.frame = scene.effectiveGeometry.coordinateSpace.bounds
+            host.host.view.frame = host.window.bounds
+            host.host.view.layoutIfNeeded()
+            let safe = host.window.safeAreaInsets
+            let gain = PhoneLandscapeInsets.resolve(orientation: orientation, safeArea: safe, idiom: .phone)
+            store.selectedTab = .list
+            try await Task.sleep(for: .milliseconds(700))
+            // Native List cells/backgrounds extend under both safe areas.
+            // Measure the interactive detail row after its sport target/insets.
+            let activity = try #require(store.listedActivities.first)
+            let details = try #require(host.accessibilityElement(label: "Details for \(activity.name)"))
+            let listFrame = host.window.convert(details.accessibilityFrame, from: nil)
+            #expect(abs(listFrame.minX - (safe.left - gain.leading + 52)) < 2,
+                    "List should keep the Island gutter and reclaim the opposite side: \(listFrame), \(safe)")
+            #expect(abs(listFrame.maxX - (host.window.bounds.width - safe.right + gain.trailing - 8)) < 2)
+            try host.save("polish-list-\(orientation.rawValue)")
+            store.selectedTab = .map
+            try await listWait { host.accessibilityElement(label: "Map layers") != nil }
+            try await Task.sleep(for: .milliseconds(300))
+            let layers = try #require(host.accessibilityElement(label: "Map layers"))
+            let frame = host.window.convert(layers.accessibilityFrame, from: nil)
+            #expect(abs(frame.maxX - (host.window.bounds.width - safe.right + gain.trailing - 20)) < 2,
+                    "Controls follow the expanded content edge: \(frame), \(safe)")
+            store.replaceSelection(with: Array(store.activities.prefix(3).map(\.id)))
+            picker.reviewSelection(store: store)
+            picker.detent = .compact
+            try await listWait { host.accessibilityElement(label: "Fit selection") != nil }
+            try host.save("polish-map-\(orientation.rawValue)")
+            store.clearSelection()
+        }
     }
 }
 

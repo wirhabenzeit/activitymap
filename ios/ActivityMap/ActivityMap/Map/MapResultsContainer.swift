@@ -144,9 +144,9 @@ private struct NativeMapResultsSheet: View {
                 .presentationCompactAdaptation(.none)
                 .presentationDragIndicator(.visible)
                 .presentationBackgroundInteraction(.enabled(upThrough: .large))
-                // Only the detail's elevation chart needs drags to reach content
-                // first; the results list keeps swipe-to-resize.
-                .presentationContentInteraction(picker.detailID == nil ? .resizes : .scrolls)
+                // Scroll the results/detail without promoting the sheet to
+                // Large. The grabber still owns deliberate detent changes.
+                .presentationContentInteraction(.scrolls)
                 .interactiveDismissDisabled()
                 .onAppear { presentationChanged(true) }
                 .sheet(item: stacked?.request ?? .constant(nil)) { destination in

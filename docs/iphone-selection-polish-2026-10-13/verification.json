@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-13",
+  "base_commit": "e8996d6fed689c1ae64fbb204881e56a3a3112ed",
+  "scope": "Native simulator layout/sheet/camera/header regressions; physical retest and separate accessibility acceptance remain open under #228.",
+  "landscape_sequence": [
+    "Island left",
+    "Island right",
+    "Island left"
+  ],
+  "capture": "Production AppShell with the committed synthetic gallery and offline map style, normal text. Actual simulator scene rotation, not only resized hosts.",
+  "source_sha256": {
+    "ios/ActivityMap/ActivityMap/App/BrowseContent.swift": "f4641a7869b7cb44431d4ac49ffd4207add17004f885ac7c9707eda210ee7045",
+    "ios/ActivityMap/ActivityMap/App/PhoneLandscapeInsets.swift": "076a204f994a6cfa6f2d234609ebe65f61f8643d39ccbb979533289a005105cf",
+    "ios/ActivityMap/ActivityMap/List/ListScreen.swift": "dd72ac92141b842c908beca900a7aebf3abd54a0645320f327bd21ddc49ef191",
+    "ios/ActivityMap/ActivityMap/Map/MapResultsContainer.swift": "bb0f5dfe66714387cb6ad25bcdf1c5aa65ba5f6292112ef341f63781778022ab",
+    "ios/ActivityMap/ActivityMap/Map/MapScreen.swift": "7cc6680f537e549cde64c52d8c94463e3d43f4389930ecac903f3ed92b84b270",
+    "ios/ActivityMap/ActivityMap/Map/RoutePickerSheet.swift": "b278962cc495ccb000bbcad9ee0fd17db38ba302c5f13025a2011ae510051e72",
+    "ios/ActivityMap/ActivityMapTests/RenderedActivityListTests.swift": "facd52b2b9bb213d6a27e336e7c4d26df8472c87b160e48769e7dec9ca832d2f"
+  },
+  "summary": {
+    "devicesAndConfigurations": [
+      {
+        "device": {
+          "architecture": "arm64",
+          "deviceId": "3E0E0C42-1356-4B6D-A140-2A1AAAB95C12",
+          "deviceName": "iPhone 18 Pro",
+          "modelName": "iPhone 18 Pro",
+          "osBuildNumber": "24A434",
+          "osVersion": "27.0",
+          "platform": "iOS Simulator"
+        },
+        "expectedFailures": 0,
+        "failedTests": 0,
+        "passedTests": 17,
+        "skippedTests": 0,
+        "testPlanConfiguration": {
+          "configurationId": "1",
+          "configurationName": "Test Scheme Action"
+        }
+      }
+    ],
+    "environmentDescription": "ActivityMap \u00b7 Built with macOS 27.0.1",
+    "expectedFailures": 0,
+    "failedTests": 0,
+    "finishTime": 1791926218.171,
+    "passedTests": 12,
+    "result": "Passed",
+    "runtimeWarnings": [],
+    "skippedTests": 0,
+    "startTime": 1791926188.051,
+    "statistics": [
+      {
+        "subtitle": "8 test runs",
+        "title": "3 tests ran with dynamic parameters"
+      }
+    ],
+    "testFailures": [],
+    "title": "Test - ActivityMap",
+    "topInsights": [],
+    "totalTestCount": 12
+  }
+}

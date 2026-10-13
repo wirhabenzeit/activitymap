@@ -318,17 +318,17 @@ struct MapScreen: View {
             Divider().frame(width: 24, height: 1)
 
             Menu {
-                Button("Fit selection", systemImage: "selection.pin.in.out") { context.request(.fitSelection) }
+                Button("Fit selection", systemImage: "viewfinder") { context.request(.fitSelection) }
                     .disabled(!store.browsingActivities.contains {
                         store.selectedActivityIDs.contains($0.id) && !$0.coordinates.isEmpty
                     })
-                Button("Fit filtered routes", systemImage: "map") { context.request(.fitFiltered) }
+                Button("Fit filtered routes", systemImage: "viewfinder") { context.request(.fitFiltered) }
                     .disabled(!store.browsingActivities.contains { !$0.coordinates.isEmpty })
                 Divider()
                 Button("Reset bearing", systemImage: "location.north") { context.request(.resetBearing) }
                 Button("Reset map view", systemImage: "arrow.counterclockwise") { context.request(.resetView) }
             } label: {
-                BrowseIconLabel(systemImage: "scope")
+                BrowseIconLabel(systemImage: "viewfinder")
                     .frame(width: 44, height: 48)
             }
             .accessibilityLabel("Map camera")

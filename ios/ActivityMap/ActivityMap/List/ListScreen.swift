@@ -184,8 +184,9 @@ struct SelectionBar: View {
             Button { store.setCombine(!store.isCombining) } label: {
                 Image(systemName: "checklist").font(.body)
                     .foregroundStyle(onNavigationBar ? Color.white : store.isCombining ? AppTheme.accent : Color.secondary)
-                    .frame(width: 44, height: 44).contentShape(Rectangle())
+                    .frame(width: 32, height: 32)
                     .background(store.isCombining ? AppTheme.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
             }
             .accessibilityLabel("Combine selections")
             .accessibilityValue(store.isCombining ? "On" : "Off")
