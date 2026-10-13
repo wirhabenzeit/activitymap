@@ -10,7 +10,7 @@ struct FilterPanel: View {
     @State private var startDate = Date()
     @State private var endDate = Date()
 
-    private var count: Int { scope == .stats ? store.stats.matchingActivityCount(for: store) : store.filteredActivities.count }
+    private var count: Int { scope == .stats ? store.stats.matchingActivityCount(for: store) : store.browsingActivities.count }
     private var activeCount: Int { scope == .stats ? store.activeStatsFilterCount : store.activeFilterCount }
 
     var body: some View {
@@ -29,6 +29,7 @@ struct FilterPanel: View {
     @ViewBuilder private func single(_ part: FilterPart) -> some View {
         switch part {
         case .search: Section { searchField }
+        case .selection: Section { selectionFilter }
         case .sports: activitySection
         case .dates: dateSection
         case .distance, .duration, .elevation: metricsSection([part]).id(store.filterResetRevision)
@@ -57,11 +58,18 @@ struct FilterPanel: View {
                 .accessibilityLabel(scope == .stats ? "Reset Stats activity filters" : "Reset all filters")
             }
             searchField
+            if scope != .stats { selectionFilter }
         }
         activitySection
         if scope != .stats { dateSection }
         metricsSection([.distance, .duration, .elevation]).id(store.filterResetRevision)
         binarySection
+    }
+
+    private var selectionFilter: some View {
+        Toggle("Only selected activities", isOn: Binding(get: { store.onlySelected }, set: { store.setOnlySelected($0) }))
+            .disabled(store.selectedActivityIDs.isEmpty)
+            .accessibilityIdentifier("only-selected-filter")
     }
 
     private var searchField: some View {
@@ -277,13 +285,14 @@ struct FilterPanel: View {
 
 /// The panel's independently usable parts, in panel order.
 enum FilterPart: CaseIterable, Identifiable {
-    case search, sports, dates, distance, duration, elevation, details
+    case search, selection, sports, dates, distance, duration, elevation, details
 
     var id: Self { self }
 
     var title: String {
         switch self {
         case .search: "Search"
+        case .selection: "Selected activities"
         case .sports: "Sports"
         case .dates: "Dates"
         case .distance: "Distance"
@@ -296,6 +305,7 @@ enum FilterPart: CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .search: "magnifyingglass"
+        case .selection: "line.3.horizontal.decrease"
         case .sports: "figure.run"
         case .dates: "calendar"
         case .distance: "ruler"
@@ -307,12 +317,13 @@ enum FilterPart: CaseIterable, Identifiable {
 
     /// Stats measures its own periods, so it has no date filter.
     static func available(in scope: FilterScope) -> [FilterPart] {
-        allCases.filter { scope != .stats || $0 != .dates }
+        allCases.filter { scope != .stats || ($0 != .dates && $0 != .selection) }
     }
 
     /// Matches the parts `ActivityStore.activeFilterCount` counts.
     @MainActor func isActive(_ store: ActivityStore) -> Bool {
         switch self {
+        case .selection: store.onlySelected
         case .search: !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .sports: store.activeSportTypes != Set(SportType.allCases)
         case .dates: store.dateDayRange != nil

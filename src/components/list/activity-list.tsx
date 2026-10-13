@@ -8,12 +8,13 @@ import { groupBy } from '~/lib/utils';
 import { useShallowStore } from '~/store';
 
 import { type Activity, type Photo } from '~/server/db/schema';
+import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useListInspection } from '~/hooks/use-list-inspection';
 
 export function ActivityListView({
   activities,
   photos,
-  filterIDs,
+  filterIDs: ordinaryFilterIDs,
   hasNextPage = false,
   isFetching = false,
 }: {
@@ -23,6 +24,7 @@ export function ActivityListView({
   hasNextPage?: boolean;
   isFetching?: boolean;
 }) {
+  const filterIDs = useBrowsingIDs(ordinaryFilterIDs);
   const { selected, setSelected, tableState } = useShallowStore((state) => ({
     selected: state.selected,
     setSelected: state.setSelected,

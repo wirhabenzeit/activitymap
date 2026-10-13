@@ -21,6 +21,7 @@ import {
   BinaryFilter,
   ResetFilters,
   SearchFilter,
+  SelectedActivitiesFilter,
 } from './sidebar/filters';
 
 import { UserSettings } from './sidebar/user';
@@ -47,6 +48,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SearchFilter />
+              <SelectedActivitiesFilter />
               <MonthPicker />
               <InequalityFilter name="distance" />
               <InequalityFilter name="total_elevation_gain" />

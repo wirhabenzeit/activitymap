@@ -40,7 +40,7 @@ struct MapContextTests {
         store.selectedTab = .list
         store.addToSelection([2])
         #expect(store.showOnMap(1) == .shown)
-        #expect(store.selectedTab == .map && store.activeActivityID == 1 && store.selectedActivityIDs == [1, 2])
+        #expect(store.selectedTab == .map && store.activeActivityID == 1 && store.selectedActivityIDs == [1])
         #expect(store.inspectedActivityID == 2 && store.mapContext.pendingRequest?.action == .activity(1))
         let request = try #require(store.mapContext.pendingRequest)
         store.selectedTab = .list

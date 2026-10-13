@@ -44,7 +44,7 @@ final class ActivityStore {
     private(set) var activitiesRevision = 0
     private var filterRevision = 0
     @ObservationIgnored private var filteredSnapshot: (data: Int, filters: Int, activities: [Activity])?
-    @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, selected: Set<Int>?, activities: [Activity])?
+    @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, selected: Set<Int>?, restricted: Bool, activities: [Activity])?
     @ObservationIgnored private(set) var filterBuildCount = 0
     @ObservationIgnored private(set) var sortBuildCount = 0
 
@@ -154,8 +154,10 @@ final class ActivityStore {
         didSet { reconcileSelectionVisibility() }
     }
 
-    /// Switching tabs never changes selection, focus or list inspection.
-    var selectedTab: AppTab = .map
+    /// Stats ends Combine; tab changes preserve the group, scope and inspection.
+    var selectedTab: AppTab = .map {
+        didSet { if selectedTab == .stats { selection.setCombine(false) } }
+    }
 
     /// Mutate only through the operations below so the parity invariants hold.
     private(set) var selection = SelectionState() {
@@ -163,29 +165,39 @@ final class ActivityStore {
     }
 
     // The reducer includes inspection, but map/row selection observers must not.
-    // Publish only when these three values actually change; otherwise native
+    // Publish only when group, eligibility, focus or flags actually change; otherwise native
     // detail dismissal also redraws the retained map and its route filters.
     private struct SelectionSnapshot: Equatable {
         var selected: Set<Int> = []
         var visible: Set<Int> = []
         var active: Int? = nil
+        var combine = false
+        var onlySelected = false
     }
     private var selectionSnapshot = SelectionSnapshot()
 
     private func publishSelectionSnapshot() {
         let snapshot = SelectionSnapshot(selected: selection.selectedIDs,
-                                         visible: selection.visibleIDs, active: selection.activeID)
+                                         visible: selection.visibleIDs, active: selection.activeID, combine: selection.combine, onlySelected: selection.onlySelected)
         if snapshot != selectionSnapshot { selectionSnapshot = snapshot }
     }
 
     var selectedActivityIDs: Set<Int> { selectionSnapshot.selected }
-    var visibleActivityIDs: Set<Int> { selectionSnapshot.visible }
+    var ordinaryVisibleActivityIDs: Set<Int> { selectionSnapshot.visible }
+    var visibleActivityIDs: Set<Int> { onlySelected ? selectedActivityIDs.intersection(ordinaryVisibleActivityIDs) : ordinaryVisibleActivityIDs }
+    var isCombining: Bool { selectionSnapshot.combine }
+    var onlySelected: Bool { selectionSnapshot.onlySelected }
+    func setCombine(_ enabled: Bool) { selection.setCombine(enabled) }
+    func setOnlySelected(_ enabled: Bool) { selection.setOnlySelected(enabled) }
+    func pickActivities(_ ids: some Sequence<Int>) { selection.pick(existing(ids)) }
+    func toggleMember(_ id: Int) { if activityIndex.contains(id) { selection.toggleMember(id) } }
+    var browsingActivities: [Activity] { onlySelected ? filteredActivities.filter { selectedActivityIDs.contains($0.id) } : filteredActivities }
     var visibleSelectedActivityIDs: Set<Int> { selectedActivityIDs.intersection(visibleActivityIDs) }
     /// The selected, filter-visible activity emphasised on the map.
     var activeActivityID: Int? { selectionSnapshot.active }
     /// The list detail opened independently of selection.
     var inspectedActivityID: Int? { selection.inspectedID }
-    var hiddenSelectedCount: Int { selectedActivityIDs.subtracting(visibleActivityIDs).count }
+    var hiddenSelectedCount: Int { selectedActivityIDs.subtracting(ordinaryVisibleActivityIDs).count }
 
     var inspectedActivity: Activity? {
         guard let id = selection.inspectedID else { return nil }
@@ -230,19 +242,19 @@ final class ActivityStore {
     /// Sort is a list presentation concern; shared filter order stays intact.
     var listedActivities: [Activity] {
         let data = activitiesRevision, filters = filterRevision, sort = listPresentation.settings.sort
-        let selected = sort.field == .selection ? selectedActivityIDs : nil
-        if let cached = listedSnapshot, cached.data == data, cached.filters == filters, cached.sort == sort, cached.selected == selected {
+        let selected = sort.field == .selection || onlySelected ? selectedActivityIDs : nil
+        if let cached = listedSnapshot, cached.data == data, cached.filters == filters, cached.sort == sort, cached.selected == selected, cached.restricted == onlySelected {
             return cached.activities
         }
-        let result = sort.sorted(filteredActivities, selectedIDs: selected ?? [])
-        listedSnapshot = (data, filters, sort, selected, result)
+        let result = sort.sorted(browsingActivities, selectedIDs: selected ?? [])
+        listedSnapshot = (data, filters, sort, selected, onlySelected, result)
         sortBuildCount += 1
         return result
     }
 
     var activitySummary: ActivitySummary? {
         let mode = listPresentation.settings.summaryMode
-        let ids = mode == .selected ? selection.selectedIDs : selection.visibleIDs
+        let ids = mode == .selected ? selection.selectedIDs : visibleActivityIDs
         return summaryCache.summary(mode: mode, revision: activitiesRevision, activities: activities, ids: ids)
     }
 
@@ -256,10 +268,10 @@ final class ActivityStore {
         count += commuteOnly == nil ? 0 : 1
         count += privateFilter == nil ? 0 : 1
         count += flaggedFilter == nil ? 0 : 1
-        return count
+        return count + (onlySelected ? 1 : 0)
     }
 
-    var activeStatsFilterCount: Int { activeFilterCount - (dateDayRange == nil ? 0 : 1) }
+    var activeStatsFilterCount: Int { activeFilterCount - (dateDayRange == nil ? 0 : 1) - (onlySelected ? 1 : 0) }
 
     private func matches(_ filter: NumericFilter, _ value: Double?) -> Bool {
         guard let value, value.isFinite, filter.value.isFinite else { return false }
@@ -298,6 +310,7 @@ final class ActivityStore {
     private(set) var filterResetRevision = 0
 
     func resetFilters() {
+        selection.setOnlySelected(false)
         dateDayRange = nil
         resetStatsActivityFilters()
     }
@@ -347,10 +360,10 @@ final class ActivityStore {
     }
 
     /// Adds every filtered activity to the selection, keeping hidden ones.
-    func selectAllFiltered() { selection.selectAllVisible() }
+    func selectAllFiltered() { guard isCombining, !onlySelected else { return }; selection.selectAllVisible() }
 
     /// Removes every filtered activity from the selection, keeping hidden ones.
-    func deselectAllFiltered() { selection.deselectAllVisible() }
+    func deselectAllFiltered() { guard isCombining else { return }; selection.deselectAllVisible() }
 
     /// Clears the whole selection, including filter-hidden activities.
     func clearSelection() { selection.clearSelection() }

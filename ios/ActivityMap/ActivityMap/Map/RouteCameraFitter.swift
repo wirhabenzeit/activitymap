@@ -115,9 +115,9 @@ enum MapNavigation {
             }
             activities = [activity]
         case .fitSelection:
-            activities = store.filteredActivities.filter { store.selectedActivityIDs.contains($0.id) }
+            activities = store.browsingActivities.filter { store.selectedActivityIDs.contains($0.id) }
         case .fitFiltered:
-            activities = store.filteredActivities
+            activities = store.browsingActivities
         default: return nil
         }
         guard let extent = RouteExtent(coordinates: activities.flatMap(\.coordinates)) else {

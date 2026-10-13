@@ -12,6 +12,7 @@ struct SelectionFixtureTests {
         let type: String
         let id: Int?
         let ids: [Int]
+        let enabled: Bool
         let geometryAvailable: Bool
     }
 
@@ -22,6 +23,7 @@ struct SelectionFixtureTests {
         /// The scenario's events up to and including this step.
         let events: [Event]
         let expected: SelectionState
+        let displayedIDs: Set<Int>
 
         var testDescription: String { "\(scenario) / \(name)" }
     }
@@ -31,7 +33,7 @@ struct SelectionFixtureTests {
         .deletingLastPathComponent() // ActivityMap
         .deletingLastPathComponent() // ios
         .deletingLastPathComponent() // repository root
-        .appending(path: "shared/parity/state-fixtures.v1.json")
+        .appending(path: "shared/parity/state-fixtures.v2.json")
 
     nonisolated static func loadFixture() -> [String: Any] {
         guard
@@ -54,14 +56,15 @@ struct SelectionFixtureTests {
                     name: rawSteps[index]["name"] as? String ?? "?",
                     initial: initial,
                     events: Array(events[...index]),
-                    expected: state(rawSteps[index]["expected"])
+                    expected: state(rawSteps[index]["expected"]),
+                    displayedIDs: ids((rawSteps[index]["expected"] as? [String: Any])?["displayed_ids"])
                 )
             }
         }
     }()
 
     @Test func fixtureIsAvailable() {
-        #expect(Self.steps.count >= 30, "Missing shared fixture at \(Self.fixtureURL.path)")
+        #expect(Self.steps.count == 72, "Missing shared fixture at \(Self.fixtureURL.path)")
     }
 
     @Test(arguments: steps)
@@ -72,6 +75,9 @@ struct SelectionFixtureTests {
         #expect(state.activeID == step.expected.activeID)
         #expect(state.inspectedID == step.expected.inspectedID)
         #expect(state.visibleIDs == step.expected.visibleIDs)
+        #expect(state.combine == step.expected.combine)
+        #expect(state.onlySelected == step.expected.onlySelected)
+        #expect(state.browsingIDs == step.displayedIDs)
     }
 
     @Test func summaryScopeCounts() throws {
@@ -93,6 +99,11 @@ struct SelectionFixtureTests {
             return id
         }
         switch event.type {
+        case "set_combine": state.setCombine(event.enabled)
+        case "set_only_selected": state.setOnlySelected(event.enabled)
+        case "reset_scope": state.setOnlySelected(false)
+        case "pick": state.pick(event.ids)
+        case "toggle_member": state.toggleMember(try requireID())
         case "replace_selection": state.replaceSelection(with: event.ids)
         case "add_selection": state.addToSelection(event.ids)
         case "remove_selection": state.removeFromSelection(event.ids)
@@ -117,6 +128,7 @@ struct SelectionFixtureTests {
             type: fields["type"] as? String ?? "",
             id: id(fields["id"]),
             ids: idList(fields["ids"]),
+            enabled: fields["enabled"] as? Bool ?? false,
             geometryAvailable: fields["geometry_available"] as? Bool ?? true
         )
     }
@@ -127,7 +139,9 @@ struct SelectionFixtureTests {
             selectedIDs: ids(fields["selected_ids"]),
             activeID: id(fields["active_id"]),
             inspectedID: id(fields["inspected_id"]),
-            visibleIDs: ids(fields["visible_ids"])
+            visibleIDs: ids(fields["visible_ids"]),
+            combine: fields["combine"] as? Bool ?? false,
+            onlySelected: fields["only_selected"] as? Bool ?? false
         )
     }
 
@@ -206,7 +220,10 @@ struct ActivityStoreSelectionTests {
         #expect(store.selectedTab == .list && store.selectedActivityIDs == [1])
         #expect(store.showOnMap(2) == .shown)
         #expect(store.selectedTab == .map)
-        #expect(store.selectedActivityIDs == [1, 2] && store.activeActivityID == 2)
+        #expect(store.selectedActivityIDs == [2] && store.activeActivityID == 2)
+        store.setCombine(true)
+        #expect(store.showOnMap(1) == .shown)
+        #expect(store.selectedActivityIDs == [1, 2] && store.activeActivityID == 1)
         #expect(store.showOnMap(99) == .notFound)
     }
 
@@ -282,5 +299,48 @@ struct ActivityStoreSelectionTests {
         store.clearScope()
         #expect(store.activities.isEmpty && store.selectedActivityIDs.isEmpty)
         #expect(store.activeActivityID == nil && store.inspectedActivityID == nil)
+    }
+}
+
+@MainActor struct SelectionBrowsingScopeTests {
+    @Test func scopeInvalidatesListAndFilteredSummaryButRetainsOrdinaryEligibility() {
+        let store = ActivityStore(activities: (1...3).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: [1, 2]); store.setCombine(true)
+        _ = store.listedActivities
+        let sorts = store.sortBuildCount, filters = store.filterBuildCount
+        store.setOnlySelected(true)
+        #expect(Set(store.listedActivities.map(\.id)) == [1, 2])
+        #expect(store.sortBuildCount == sorts + 1 && store.filterBuildCount == filters)
+        #expect(store.ordinaryVisibleActivityIDs == [1, 2, 3])
+        #expect(store.visibleActivityIDs == [1, 2] && store.activeFilterCount == 1)
+        store.listPresentation.settings.summaryMode = .filtered
+        #expect(store.activitySummary?.activityCount == 2)
+        store.toggleMember(1)
+        #expect(store.listedActivities.map(\.id) == [2])
+        #expect(store.filteredActivities.count == 3 && store.selectedActivityIDs == [2])
+        #expect(store.activitySummary?.activityCount == 1)
+        store.searchText = "Activity 3"
+        #expect(store.activitySummary?.activityCount == 0 && store.hiddenSelectedCount == 1)
+        store.listPresentation.settings.summaryMode = .selected
+        #expect(store.activitySummary?.activityCount == 1, "Selected totals include ordinary-hidden members")
+        store.resetFilters(); store.setOnlySelected(true)
+        store.inspect(2); store.toggleMember(2)
+        #expect(!store.onlySelected && store.isCombining && store.listedActivities.count == 3)
+        #expect(store.inspectedActivityID == 2, "Final removal restores scope before validating independent inspection")
+    }
+    @Test func statsAndAccountLifetimesAreExplicit() {
+        let store = ActivityStore(activities: (1...3).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: [1]); store.setCombine(true); store.setOnlySelected(true)
+        store.selectedTab = .list; store.selectedTab = .map
+        #expect(store.isCombining)
+        store.selectedTab = .stats
+        #expect(!store.isCombining && store.onlySelected && store.selectedActivityIDs == [1])
+        #expect(store.statsActivities.count == 3 && store.activeStatsFilterCount == 0)
+        store.resetStatsActivityFilters()
+        #expect(store.onlySelected)
+        store.setCombine(true); store.resetFilters()
+        #expect(!store.onlySelected && store.isCombining && store.selectedActivityIDs == [1])
+        store.setOnlySelected(true); store.clearScope()
+        #expect(!store.onlySelected && !store.isCombining && store.selectedActivityIDs.isEmpty)
     }
 }

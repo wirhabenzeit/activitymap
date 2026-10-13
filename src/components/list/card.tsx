@@ -13,6 +13,7 @@ import { decode } from '@mapbox/polyline';
 import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
 import type { Feature, LineString } from 'geojson';
 
+import { ActivitySelectionSymbol } from '~/components/activity-selection-controls';
 import { type Activity } from '~/server/db/schema';
 import { categorySettings } from '~/settings/category';
 import { Button } from '~/components/ui/button';
@@ -39,7 +40,7 @@ import { showActivityOnMap } from '~/lib/show-on-map';
 import { PhotoLightbox } from './photo';
 import { ElevationChart } from './elevation-chart';
 import { RouteDetailsContent } from './route-details-content';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +63,7 @@ interface ActivityCardContentProps {
  */
 function useShowOnMap(row: Row<Features, Activity>) {
   const router = useRouter();
+  const pathname = usePathname();
   const { data: activities } = useActivities();
   const hidden = useShallowStore((state) => !applyFilters(state, row.original));
   const label = hidden ? 'Clear filters and show on map' : 'Show on map';
@@ -85,7 +87,11 @@ function useShowOnMap(row: Row<Features, Activity>) {
       });
       return;
     }
-    router.push('/map');
+    router.push(
+      pathname === '/selection-prototype'
+        ? '/selection-prototype?view=map'
+        : '/map',
+    );
   };
   return { show, label };
 }
@@ -268,24 +274,18 @@ export function ActivityCardContent({
           )}
         >
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 shrink-0 border p-0"
-              onClick={() => row.toggleSelected()}
+            <ActivitySelectionSymbol
+              id={row.original.id}
+              name={String(row.getValue('name'))}
               disabled={readOnly}
-              aria-label={
-                row.getIsSelected() ? 'Deselect route' : 'Select route'
-              }
-              title={row.getIsSelected() ? 'Deselect route' : 'Select route'}
             >
               {Icon && sport_group && (
                 <Icon
+                  className="size-5 shrink-0"
                   color={categorySettings[sport_group].color}
-                  className="h-5 w-5"
                 />
               )}
-            </Button>
+            </ActivitySelectionSymbol>
             <div className="min-w-0 flex-1">
               <CardTitle className="text-base leading-5">
                 {row.getValue('name')}
@@ -409,22 +409,27 @@ export function ActivityCardContent({
         >
           <ActivityDetailStats
             activity={row.original}
-            photos={photos.length > 0 ? (
-              <section className="min-w-0 border-t pt-3" aria-label="Activity photos">
-                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                  <PhotosIcon className="h-4 w-4" aria-hidden="true" />
-                  Photos
-                  <span className="text-xs font-normal tabular-nums text-muted-foreground">
-                    {photos.length}
-                  </span>
-                </h3>
-                <PhotoLightbox
-                  photos={photos}
-                  title={row.getValue('name')}
-                  className="h-24 sm:h-28"
-                />
-              </section>
-            ) : undefined}
+            photos={
+              photos.length > 0 ? (
+                <section
+                  className="min-w-0 border-t pt-3"
+                  aria-label="Activity photos"
+                >
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                    <PhotosIcon className="h-4 w-4" aria-hidden="true" />
+                    Photos
+                    <span className="text-xs font-normal tabular-nums text-muted-foreground">
+                      {photos.length}
+                    </span>
+                  </h3>
+                  <PhotoLightbox
+                    photos={photos}
+                    title={row.getValue('name')}
+                    className="h-24 sm:h-28"
+                  />
+                </section>
+              ) : undefined
+            }
           />
         </RouteDetailsContent>
       </Card>
@@ -452,9 +457,15 @@ export function ActivityCard({
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
 
+  const prototypeSelected = useShallowStore((state) =>
+    state.selected.includes(row.original.id),
+  );
   const nameClassName = cn(
     'text-left truncate justify-start max-w-full hover:underline',
-    highlighted === Number(row.id) ? 'text-header-background' : 'text-primary',
+    highlighted === Number(row.id) || prototypeSelected
+      ? 'text-header-background'
+      : 'text-primary',
+    prototypeSelected && 'font-medium',
   );
 
   return (
@@ -463,21 +474,17 @@ export function ActivityCard({
         className="flex items-center space-x-2 w-full"
         onDoubleClick={() => !isGuest && setOpen(true)}
       >
-        <Button
-          variant={row.getIsSelected() ? 'outline' : 'ghost'}
-          size="sm"
-          className="h-6 w-6 border"
-          onClick={() => row.toggleSelected()}
-          aria-label="Select row"
+        <ActivitySelectionSymbol
+          id={row.original.id}
+          name={String(row.getValue('name'))}
         >
           {Icon && sport_group && (
             <Icon
+              className="size-5 shrink-0"
               color={categorySettings[sport_group].color}
-              className="w-6 h-6"
-              height="3em"
             />
           )}
-        </Button>
+        </ActivitySelectionSymbol>
         <div className={nameClassName}>{row.getValue('name')}</div>
         <div className="flex-1" />
         {showMapButton && (

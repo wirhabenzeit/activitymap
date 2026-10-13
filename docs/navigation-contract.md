@@ -1,8 +1,18 @@
 # Navigation contract
 
+The [activity selection design and implementation plan](activity-selection-design.md) records the approved #384 interface and core interaction (13 October 2026). The local web/native implementation now follows this amendment; it governs the new selection controls without changing Back, history or camera-only commands.
+
 Accepted on 11 October 2026 for [#358](https://github.com/wirhabenzeit/activitymap/issues/358) and [#359](https://github.com/wirhabenzeit/activitymap/issues/359), following the [status-quo audit](navigation-audit-2026-10-11.md). This governs web and native navigation. The [Map/List contract](map-list-parity-contract.md) owns selection transitions; the [Stats contract](stats-parity-contract.md) owns calculations and reporting scope.
 
 Acceptance records the product decision in this review. The implementing changes are committed in [PR #380](https://github.com/wirhabenzeit/activitymap/pull/380) and have not yet been merged; physical-device acceptance remains open. This document does not claim that either GitHub issue is closed.
+
+## Approved selection update for issue 384
+
+For the implemented selection update, Map uses a persistent results-header group row and List uses its existing footer: **Combine icon before N selected**, then Clear and the surface's existing framing/display controls. Native List may retain the compact-shell status placement in short landscape. The mode and its exit remain reachable in activity details and at zero selection; Clear is no longer dependent on a context menu. Only selected activities belongs in browsing Filters, with an active indicator when Filters is closed.
+
+Combine changes future input behavior; it does not navigate, clear the group, fit the camera or resize a panel. The sport-icon checkmark and membership action appear only while Combine is enabled. Existing Back/Close, stepping, history, edge-swipe, retained context and Fit route/Fit selection rules remain in force. Changes to filtered eligibility can dismiss an inspection through its existing owner; Clear does not dismiss an independent eligible List detail.
+
+The current control audit below remains the #380 baseline. The selection implementation evidence is recorded in the selection document; the historical audit remains unchanged. Do not count the development fixture route as release/device acceptance. See the [selection plan](activity-selection-design.md#ios-interface) for the native arrangement and [delivery checks](activity-selection-design.md#shared-fixtures-and-acceptance).
 
 ## Decisions reconciled with the issue proposals
 
@@ -28,7 +38,7 @@ Web follows width in both directions without changing identity/history. A native
 | Clear selection | Clear the complete selection, including hidden IDs, and active map activity. Close Map results/detail; retain independently opened List/Stats inspection and camera. Available in Map results, Map detail and List selection menus. Use visible text or a labelled menu action, never a bare X. |
 | Deselect activity / filtered / page | Remove only the named scope. Never label a scoped removal Clear selection. |
 | Show on map | Outside Map, add and activate the target, switch to Map, and fit its route. Preserve other selected IDs. Require explicit filter-clearing recovery for hidden targets; disable/reject targets without geometry or access. |
-| Fit route / Fit selection | Move only the camera for the named geometry. Keep destination, selection, active identity, inspection and panel size. Use these labels on Map. |
+| Fit route / Fit selection | One Map header button fits the selected group in Results, or the inspected route in detail (also while collapsed). No duplicate detail-heading Fit action. Move only the camera for that geometry. Keep destination, selection, active identity, inspection and panel size. Use these labels on Map. |
 | Expand / Shrink (Collapse) results | Change only the results footprint/detent. Keep identity, selection, camera and history. Never use Collapse for returning from Stats focus. |
 
 Map detail Back keeps the active route as well as the selected IDs. Photo Close, edit dismissal and filter dismissal affect only their own presentation. Filters retain their criteria when dismissed.
@@ -57,7 +67,7 @@ The baseline column describes the 11 October status quo at commit [`734c23c4`](h
 | List selection menu | Web / iOS | Clear selection | Cleared the global set, including hidden IDs; independent List inspection remained | **Retained scope; reconciled capitalization.** Visible `Clear selection` keeps camera and independent inspection. |
 | List/Stats activity | Web / iOS | Map glyph / Show on map | Added/activated the target, changed destination and requested a fit; required explicit hidden-filter recovery | **Retained.** `Show on map` is a destination action; no-GPS/unavailable targets are disabled or rejected. |
 | Map detail | Web | Scan glyph | `Fit current route` moved the camera without changing inspection/selection | **Changed label.** `Fit route` moves only the camera. |
-| Map detail | iOS | Heading map glyph / Frame route | Reused Show on map, potentially changing active identity, presentation and detent | **Changed command and label.** `Fit route` is camera-only and retains inspection, identity, selection and detent. |
+| Map detail | iOS | Heading map glyph / Frame route | Reused Show on map, potentially changing active identity, presentation and detent | **Replaced by contextual header control.** `Fit route` is camera-only and retains inspection, identity, selection and detent. |
 | Map results | Web | Scan glyph | `Fit selected routes` requested a fit; short landscape could leave no usable map area and misleading loading feedback | **Changed label/layout/feedback.** `Fit selection` moves only the camera; a short landscape panel leaves usable space, or the message asks the user to shrink results/collapse filters. |
 | Map results | iOS | Fit selection | Fitted selected geometry, reset the results detent to medium; compact fitting reserved an opening-sheet footprint | **Changed.** Fit uses the current footprint and retains detent. An occluding expanded sheet produces guidance rather than an automatic shrink. |
 | Map results/detail | Web | Outward/inward arrows | `Expand route panel` / `Shrink route panel` changed height only | **Retained.** Resize keeps selection, active identity, camera and history; the labelled Scan control fits geometry separately. |

@@ -5,6 +5,7 @@ import {
   useDateFormat,
 } from '~/hooks/use-display-preferences';
 import { type ColumnDef, type Table } from '@tanstack/react-table';
+import { store, useShallowStore } from '~/store';
 import { Checkbox } from '~/components/ui/checkbox';
 
 import { isMissing } from '~/lib/activity-presentation';
@@ -23,6 +24,32 @@ import { EditActivity } from './edit';
 import { PhotoLightbox } from './photo';
 import { type Features } from './table-extensions';
 import { getWidthMode, setWidthMode, widthModes } from './width-mode';
+
+function PageSelectionCheckbox({
+  table,
+}: {
+  table: Table<Features, Activity>;
+}) {
+  const combine = useShallowStore((state) => state.combineSelections);
+  const onlySelected = useShallowStore((state) => state.onlySelected);
+  if (!combine) return null;
+  return (
+    <Checkbox
+      className="h-6 w-6"
+      checked={
+        table.getIsAllPageRowsSelected() ||
+        (table.getIsSomePageRowsSelected() && 'indeterminate')
+      }
+      disabled={onlySelected && !table.getIsAllPageRowsSelected()}
+      onCheckedChange={(value) => {
+        const ids = table.getRowModel().rows.map((row) => row.original.id);
+        if (value && !onlySelected) store.getState().addSelectedActivities(ids);
+        else if (!value) store.getState().removeSelectedActivities(ids);
+      }}
+      aria-label="Select this page"
+    />
+  );
+}
 
 /** Rows the summary row describes; none when the summary row is off. */
 function summaryRows(table: Table<Features, Activity>) {
@@ -168,17 +195,7 @@ export const columns: ColumnDef<Features, Activity>[] = [
     header: ({ column, table }) => (
       <DataTableColumnHeader column={column}>
         <div className="flex items-center space-x-2">
-          <Checkbox
-            className="h-6 w-6"
-            checked={
-              table.getIsAllPageRowsSelected() ||
-              (table.getIsSomePageRowsSelected() && 'indeterminate')
-            }
-            onCheckedChange={(value) =>
-              table.toggleAllPageRowsSelected(!!value)
-            }
-            aria-label="Select this page"
-          />
+          <PageSelectionCheckbox table={table} />
           <span>Name</span>
           <div className="flex-1 text-right">
             <WidthModeToggle table={table} />
@@ -227,7 +244,9 @@ export const columns: ColumnDef<Features, Activity>[] = [
     ),
     cell: ({ getValue }) => {
       const geometryState = getValue() as Activity['geometryState'];
-      return <div className="text-right w-full">{geometryState ?? 'Unknown'}</div>;
+      return (
+        <div className="text-right w-full">{geometryState ?? 'Unknown'}</div>
+      );
     },
   },
   {

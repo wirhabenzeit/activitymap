@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ListControls: View {
     @Bindable var presentation: ActivityListPresentation
+    var store: ActivityStore? = nil
     var iconOnly = false
     var onNavigationBar = false
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -15,6 +16,14 @@ struct ListControls: View {
 
     private var controls: some View {
         Menu {
+            if let store, store.isCombining {
+                Section("Selection") {
+                    Button("Select all filtered activities") { store.selectAllFiltered() }
+                        .disabled(store.onlySelected || store.browsingActivities.isEmpty)
+                    Button("Deselect all filtered activities") { store.deselectAllFiltered() }
+                        .disabled(store.visibleSelectedActivityIDs.isEmpty)
+                }
+            }
             Button { presentation.sortOpen = true } label: {
                 Label("Sort activities", systemImage: "arrow.up.arrow.down")
             }

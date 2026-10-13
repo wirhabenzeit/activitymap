@@ -10,6 +10,8 @@ struct ActivityDetailView: View {
     var onMapShown: (() -> Void)? = nil
     var hostTab = AppTab.list
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var navigationReference = DetailNavigationReference()
 
     var body: some View {
@@ -57,6 +59,12 @@ struct ActivityDetailView: View {
                 .accessibilityHint(store.routableActivityIDs.contains(activityID)
                     ? "Select this activity and frame its route" : "This activity has no GPS route")
             }.sharedBackgroundVisibility(.hidden)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if hostTab == .list && verticalSizeClass == .compact && !typeSize.isAccessibilitySize {
+                SelectionBar(store: store, includesTotal: true, expandsCount: true)
+                    .padding(.horizontal, 8).background(.bar)
+            }
         }
         .background(DetailBackGesture(navigationReference: navigationReference))
         .accessibilityAction(.escape) { dismiss() }
@@ -173,7 +181,7 @@ private struct MapActivityDetailReveal: View {
         }
     }
 
-    // The same title row and map button as List and Stats; here it fits the route.
+    // The Map title row has no duplicate Fit action; the group header owns it.
     private var heading: some View {
         ActivityDetailHeading(activity: activity, trailingInset: trailingInset,
                               titleLineLimit: compactProfile ? (expansion.progress > 0.8 ? 2 : 1) : nil,

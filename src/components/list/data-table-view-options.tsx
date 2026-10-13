@@ -38,7 +38,12 @@ export function DataTableViewOptions<TData extends RowData>({
   table,
   hiddenByFit,
 }: DataTableViewOptionsProps<TData>) {
-  const setSelected = useShallowStore((state) => state.setSelected);
+  const { combine, onlySelected, add, remove } = useShallowStore((state) => ({
+    combine: state.combineSelections,
+    onlySelected: state.onlySelected,
+    add: state.addSelectedActivities,
+    remove: state.removeSelectedActivities,
+  }));
   return (
     <div className="flex shrink-0 items-center space-x-2">
       <DropdownMenu modal={false}>
@@ -54,15 +59,33 @@ export function DataTableViewOptions<TData extends RowData>({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56">
-          <DropdownMenuItem onSelect={() => table.toggleAllRowsSelected(true)}>
-            Select all filtered activities
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => table.toggleAllRowsSelected(false)}>
-            Deselect all filtered activities
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setSelected([])}>
-            Clear selection
-          </DropdownMenuItem>
+          {combine && (
+            <>
+              <DropdownMenuItem
+                disabled={onlySelected}
+                onSelect={() =>
+                  add(
+                    table
+                      .getFilteredRowModel()
+                      .rows.map((row) => Number(row.id)),
+                  )
+                }
+              >
+                Select all filtered activities
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() =>
+                  remove(
+                    table
+                      .getFilteredRowModel()
+                      .rows.map((row) => Number(row.id)),
+                  )
+                }
+              >
+                Deselect all filtered activities
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="gap-2">
               <Columns className="size-4" />

@@ -360,6 +360,9 @@ export default function Review() {
   );
 
   await widthButton('Fit to width').click();
+  await page
+    .getByRole('button', { name: 'Combine selections', exact: true })
+    .click();
   await row(205).click();
   await waitID('205');
   for (const theme of ['light', 'dark']) {
@@ -369,7 +372,7 @@ export default function Review() {
     for (const selected of [false, true]) {
       if (selected) {
         await row(205)
-          .getByRole('button', { name: 'Select row', exact: true })
+          .getByRole('button', { name: /^(Select|Deselect) Activity 205$/ })
           .click();
         await page.waitForFunction(
           () =>
@@ -390,7 +393,7 @@ export default function Review() {
       });
     }
     await row(205)
-      .getByRole('button', { name: 'Select row', exact: true })
+      .getByRole('button', { name: /^(Select|Deselect) Activity 205$/ })
       .click();
   }
   await page.evaluate(() => {
@@ -593,8 +596,14 @@ export default function Review() {
   // stepping order, including when a saved hidden Date column is overridden.
   await page.keyboard.press('Escape');
   await waitID(null);
+  const combineControl = page.getByRole('button', {
+    name: 'Combine selections',
+    exact: true,
+  });
+  if ((await combineControl.getAttribute('aria-pressed')) !== 'true')
+    await combineControl.click();
   await row(205)
-    .getByRole('button', { name: 'Select row', exact: true })
+    .getByRole('button', { name: /^(Select|Deselect) Activity 205$/ })
     .click();
   const selectedBefore = await row(205).getAttribute('data-state');
   await page.getByPlaceholder('Search activities').fill('Activity 00');

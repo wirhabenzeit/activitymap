@@ -13,9 +13,9 @@ struct RoutePickerSheet: View {
     private var contentReveal: CGFloat { expansion }
     var nativePresentation = false
     private var collapsed: Bool { collapsedOverride ?? (picker.detent == .compact) }
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var panelHeaderHeight: CGFloat = 44
+    @State private var resultsViewportHeight: CGFloat = 0
 
     private var candidates: [Activity] {
         picker.candidateIDs.filter(store.visibleActivityIDs.contains).compactMap { store.activity(id: $0) }
@@ -34,7 +34,10 @@ struct RoutePickerSheet: View {
             // restores the exact scroll position, without a second overlay.
             GeometryReader { viewport in
                 ZStack {
-                    results
+                    Color.clear.overlay(alignment: .top) {
+                        results.frame(height: (collapsed || detail != nil) && resultsViewportHeight > 0
+                            ? resultsViewportHeight : nil)
+                    }
                         .opacity(detail == nil ? contentReveal : 0)
                         .allowsHitTesting(detail == nil && expansion > 0.8)
                         .accessibilityHidden(detail != nil || expansion < 0.8)
@@ -42,7 +45,7 @@ struct RoutePickerSheet: View {
                         MapActivityPager(store: store, picker: picker, expansion: expansion, compactProfile: !isSidePanel,
                                          scrollsHeading: isSidePanel, bottomContentInset: bottomInset)
                             .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
-                            .transition(.opacity)
+                            .transition(.identity)
                     }
                 }
                 // The two-position custom panel reveals a stable viewport.
@@ -51,15 +54,18 @@ struct RoutePickerSheet: View {
                 .frame(width: viewport.size.width,
                        height: panelExpandedHeight.map { max(0, $0 + bottomInset - panelHeaderHeight) } ?? viewport.size.height,
                        alignment: .top)
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: detail != nil)
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                // Hidden/zero-height viewports must not move the retained lazy list.
+                if !collapsed && detail == nil && height > 0 { resultsViewportHeight = height }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .frame(height: collapsed && (isSidePanel || detail == nil) ? 0 : nil)
+            .frame(height: collapsed ? 0 : nil)
             .clipped()
-            .opacity(isSidePanel && collapsed ? 0 : 1)
+            .opacity(collapsed ? 0 : 1)
             .contentShape(Rectangle())
-            .allowsHitTesting(!isSidePanel || !collapsed)
-            .accessibilityHidden(collapsed && (isSidePanel || detail == nil))
+            .allowsHitTesting(!collapsed)
+            .accessibilityHidden(collapsed)
         }
         // One continuous detail surface; only the outer host owns corners.
         .frame(maxHeight: .infinity, alignment: .top)
@@ -98,105 +104,44 @@ struct RoutePickerSheet: View {
         }
     }
 
+    private var groupHeader: some View {
+        HStack(spacing: 0) {
+            SelectionBar(store: store, showsClear: false, expandsCount: true)
+            Button { store.mapContext.request(detail.map { .fitActivity($0.id) } ?? .fitSelection) } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right").frame(width: 44, height: 44).contentShape(Rectangle())
+            }.accessibilityLabel(detail == nil ? "Fit selection" : "Fit route")
+                .accessibilityIdentifier("map-results-fit")
+                .disabled(detail.map { !store.routableActivityIDs.contains($0.id) }
+                    ?? !candidates.contains { store.routableActivityIDs.contains($0.id) })
+            Button { store.clearSelection() } label: {
+                Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
+            }.accessibilityLabel("Clear selection")
+        }.buttonStyle(.plain)
+    }
+
     private var sidePanelHeader: some View {
-        HStack(spacing: 4) {
-            if detail != nil && !collapsed {
-                Button { picker.showResults() } label: {
-                    Image(systemName: "chevron.left").frame(width: 44, height: 44)
-                }
-                .accessibilityLabel("Back to selected activities")
-                .accessibilityIdentifier("map-results-back")
-            }
-            if collapsed, let detail {
-                ActivityDetailIdentity(activity: detail, titleLineLimit: 1)
-            } else if detail == nil {
-                selectionSummary
-            }
-            if detail != nil && !collapsed {
-                Spacer(minLength: 0)
-            }
-            if detail != nil && !collapsed {
-                if candidates.count > 1, let detail { detailNavigation(detail) }
-            }
-            selectionActions
-                .opacity(collapsed ? 0 : 1)
-                .allowsHitTesting(!collapsed)
-                .accessibilityHidden(collapsed)
-            // Always the trailing control, regardless of summary/navigation.
-            panelHandle
-        }
-        // The collapsed identity aligns with portrait detail; the trailing
-        // handle keeps its inset so it stays under the same finger.
-        .padding(.leading, collapsed && detail != nil ? AppTheme.Spacing.large : 12)
-        .padding(.trailing, 12)
-        .padding(.vertical, collapsed && detail != nil ? AppTheme.Spacing.small : 0)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 0) {
+            HStack(spacing: 0) { groupHeader; panelHandle }
+            if let detail, !collapsed { resultNavigation(detail) }
+        }.padding(.horizontal, 12)
     }
 
     private var header: some View {
         VStack(spacing: 0) {
-            // Visual grabber clearance only. The 44pt native touch target
-            // overlays the surface instead of reserving an empty row.
             Color.clear.frame(height: 13).allowsHitTesting(false)
-            if !(collapsed && detail != nil) {
-                let layout = typeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                    : AnyLayout(HStackLayout(spacing: 4))
-                layout {
-                    if let activity = detail {
-                        Button { picker.showResults() } label: {
-                            Label("Results", systemImage: "chevron.left")
-                                .font(.subheadline.weight(.medium))
-                                .frame(minHeight: 44)
-                        }
-                        .accessibilityLabel("Back to selected activities")
-                        .accessibilityIdentifier("map-results-back")
-                        if !typeSize.isAccessibilitySize { Spacer(minLength: 0) }
-                        if candidates.count > 1 { detailNavigation(activity) }
-                    } else {
-                        selectionSummary
-                    }
-                    selectionActions
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 4)
-            }
-        }
+            groupHeader
+            if let detail, !collapsed { resultNavigation(detail) }
+        }.padding(.horizontal, 12)
     }
 
-    private var selectionSummary: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("\(store.selectedActivityIDs.count) selected").font(.headline)
-            if store.hiddenSelectedCount > 0 {
-                Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption).foregroundStyle(AppTheme.secondaryText)
-            } else if picker.isAdding {
-                Text("Tap routes to add").font(.caption).foregroundStyle(AppTheme.secondaryText)
-            }
+    private func resultNavigation(_ activity: Activity) -> some View {
+        HStack(spacing: 4) {
+            Button { picker.showResults() } label: {
+                Label("Results", systemImage: "chevron.left").font(.subheadline.weight(.medium)).frame(minHeight: 44)
+            }.accessibilityLabel("Back to selected activities").accessibilityIdentifier("map-results-back")
+            Spacer(minLength: 0)
+            if candidates.count > 1 { detailNavigation(activity) }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var selectionActions: some View {
-        Menu {
-            if let activity = detail {
-                Section(activity.name) {
-                    Button("Fit route", systemImage: "map") {
-                        store.mapContext.request(.fitActivity(activity.id))
-                    }.disabled(activity.coordinates.isEmpty)
-                    Button("Deselect activity", systemImage: "minus.circle") { store.removeFromSelection([activity.id]) }
-                }
-            }
-            Toggle("Add routes to selection", systemImage: "plus", isOn: $picker.isAdding)
-            Button("Fit selection", systemImage: "arrow.up.left.and.arrow.down.right") {
-                store.mapContext.request(.fitSelection)
-            }
-            .disabled(!candidates.contains { !$0.coordinates.isEmpty })
-            Button("Clear selection", systemImage: "xmark.circle", role: .destructive) { store.clearSelection() }
-        } label: {
-            BrowseIconLabel(systemImage: "ellipsis")
-        }
-        .accessibilityLabel("Selection actions")
     }
 
     private func detailNavigation(_ activity: Activity) -> some View {
@@ -215,15 +160,7 @@ struct RoutePickerSheet: View {
 
     private func resultRow(_ activity: Activity) -> some View {
         HStack(spacing: 8) {
-            Button { store.toggleSelection(activity.id) } label: {
-                BrowseSportSymbol(category: activity.category, isSelected: store.selectedActivityIDs.contains(activity.id))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Deselect \(activity.name)")
-            .accessibilityValue("Selected")
-            .accessibilityAddTraits(.isSelected)
+            ActivitySelectionSymbol(store: store, activity: activity)
             Button {
                 picker.showDetail(activity.id, store: store)
             } label: {
@@ -255,6 +192,6 @@ struct RoutePickerSheet: View {
 
         }
         .padding(.leading, 12).padding(.trailing, 8).padding(.vertical, 4)
-        .background(ActivityRowBackground(selected: true, inspected: store.activeActivityID == activity.id))
+        .background(ActivityRowBackground(selected: true, inspected: store.activeActivityID == activity.id, overMap: true))
     }
 }

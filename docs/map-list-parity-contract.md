@@ -1,5 +1,7 @@
 # Map/list parity behavior contract, version 1
 
+The [activity selection design and implementation plan](activity-selection-design.md) records the interface and core interaction approved on 13 October 2026 for issue #384. The production state owners and controls implement this update locally; release and physical-device acceptance remain open.
+
 The [accepted navigation contract](navigation-contract.md) governs containers, history, Back/Close/Clear labels and retained context on web and native. Its [control audit](navigation-contract.md#control-audit-baseline-to-accepted-implementation) compares the historical [11 October baseline](navigation-audit-2026-10-11.md) with the accepted implementation; [verification](navigation-contract-2026-10-11/README.md) records the automated results and remaining device acceptance. This does not change the selection rules below.
 
 This is the reviewable behavior contract and fixture foundation for [#196](https://github.com/wirhabenzeit/activitymap/issues/196). It distinguishes the desired cross-platform behavior from the existing implementation. Merging this document establishes the implementation reference; it does not establish that every capability is implemented or visually verified.
@@ -7,6 +9,23 @@ This is the reviewable behavior contract and fixture foundation for [#196](https
 Baseline: `5a9e213` (2026-09-26), including merged #190 (web elevation), #194 (inline list details and responsive widths), #189 and #231 (native sync/freshness). Implementation ownership remains in [#195](https://github.com/wirhabenzeit/activitymap/issues/195). This document does not close #196: comparable screenshots, physical-device/accessibility review and measured performance baselines remain to be collected.
 
 The portable examples live in [`shared/parity/`](../shared/parity/README.md). They use synthetic data and canonical string IDs. They are projection fixtures, not substitutes for complete v1 DTO validation. TypeScript and Swift implementations should run these same examples through their real predicates/transitions/reducers, rather than each implementing a second reference algorithm in the test suite.
+
+## Approved selection update for issue 384
+
+The following target governs the #384 implementation. The selection/picking clauses and v1 fixture semantics later in this document remain the foundation baseline; this amendment supersedes the listed differences for the new delivery. Version 2 transition fixtures now exercise both production state owners; this is not a release/deployment claim.
+
+| Area | Approved target |
+| --- | --- |
+| Group | One shared selected set across Map/List; ordinary map taps replace it, including overlapping hits. Inspection preserves it. |
+| Combine | Shared direct toggle, initially off; icon before selected count in Map header and List footer. On unions map hits, preserves empty-map taps, and enables sport-icon membership toggles. Off retains the group. |
+| Sport icons | Identify sport outside Combine; show overlaid selection checkmarks only inside the mode. Selected rows remain identifiable outside it. No permanent checkbox column. |
+| Show on map | Validate first, then replace by default or union in Combine, activate and frame the target. Existing ordinary-filter recovery remains explicit. |
+| Browsing scope | Only selected activities in Filters intersects the group with ordinary eligibility for Map/List and picking; preserve hidden selected IDs. Stats stays independent. |
+| Clear/reset | Clear includes hidden members and disables Only selected, while retaining Combine. Browsing filter Reset removes ordinary and selected-only restrictions, retaining the group. |
+| Controls | Persistent Map results header / List footer, including active-mode access in detail and at zero selection. Native landscape can use the existing compact-shell adaptation. |
+| Fixtures | Version the intentionally changed interactions and migrate both platform consumers together; do not silently redefine the v1 reference. |
+
+See the [delivery plan](activity-selection-design.md#delivery-plan) for state, cache, query safety, native hosts and acceptance. Stats ends Combine while preserving group/scope. Transient browsing sheets retain it. Native device/accessibility acceptance remains explicit validation work.
 
 ## Selected, active and inspected activities
 

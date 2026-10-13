@@ -4,6 +4,7 @@ import { Marker } from 'react-map-gl/mapbox';
 import { useMemo } from 'react';
 import { useShallowStore } from '~/store';
 import { usePhotos } from '~/hooks/use-photos';
+import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import type { Photo } from '~/server/db/schema';
 import { photoVariant, validPhotoLocation } from '~/lib/photo-gallery';
@@ -13,7 +14,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 export default function PhotoLayer() {
   const zoom = useShallowStore((state) => state.position.zoom);
   const { data: photos = [] } = usePhotos();
-  const { filterIDs } = useFilteredActivities();
+  const { filterIDs: eligibleIDs } = useFilteredActivities();
+  const filterIDs = useBrowsingIDs(eligibleIDs);
   const visible = useMemo(() => new Set(filterIDs), [filterIDs]);
   const galleries = useMemo(() => {
     const result = new Map<number, Photo[]>();
@@ -45,7 +47,7 @@ export default function PhotoLayer() {
 }
 
 function PhotoMarker({ photo, gallery }: { photo: Photo; gallery: Photo[] }) {
-  const setSelected = useShallowStore((state) => state.setSelected);
+  const pickActivities = useShallowStore((state) => state.pickActivities);
   if (!validPhotoLocation(photo.location)) return null;
   return (
     <Marker
@@ -63,7 +65,7 @@ function PhotoMarker({ photo, gallery }: { photo: Photo; gallery: Photo[] }) {
             aria-label={`Select ${photo.activity_name ?? 'activity'} and preview photo`}
             onClick={(e) => {
               e.stopPropagation();
-              setSelected([photo.activity_id]);
+              pickActivities([photo.activity_id]);
             }}
           >
             <PhotoImage variant={photoVariant(photo, 'thumbnail')} alt="" />

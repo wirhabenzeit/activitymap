@@ -6,6 +6,7 @@ struct BrowseContent: View {
     var sync: SyncController? = nil
     var isSigningIn = false
     var mapPicker: RoutePicker? = nil
+    @Environment(\.listFooterHostedByShell) private var footerHostedByShell
     @Environment(\.browseStatsDestination) private var statsDestination
     @Environment(\.stravaConnect) private var stravaConnect
 
@@ -14,11 +15,13 @@ struct BrowseContent: View {
             ZStack {
                 // Retaining this native List preserves the exact scroll offset,
                 // including partially visible rows. No reconstructed anchor jump.
-                NavigationStack {
-                    ListScreen(store: store, emptyState: presentation.empty, recover: recover)
-                        // Establish the detail bar's inline metrics before the
-                        // first push, even while the root bar is hidden.
-                        .navigationBarTitleDisplayMode(.inline)
+                VStack(spacing: 0) {
+                    NavigationStack {
+                        ListScreen(store: store, emptyState: presentation.empty, recover: recover)
+                            // Establish inline metrics before the first detail push.
+                            .navigationBarTitleDisplayMode(.inline)
+                    }
+                    if !footerHostedByShell { BrowseListFooter(store: store) }
                 }
                     .id(store.mapContext.scopeRevision)
                     .refreshable {
@@ -132,6 +135,7 @@ struct BrowseRootToolbar: ToolbarContent {
 }
 
 extension EnvironmentValues {
+    @Entry var listFooterHostedByShell = false
     @Entry var listShellNavigation: ListShellNavigation? = nil
     @Entry var listRootToolbar: BrowseRootToolbar? = nil
 

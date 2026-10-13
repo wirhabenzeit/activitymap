@@ -5,6 +5,10 @@ import { createStore } from 'zustand/vanilla';
 import { immer } from 'zustand/middleware/immer';
 
 import { createSelectionSlice, type SelectionSlice } from './selection';
+import { createFilterSlice } from './filter';
+import { createAuthSlice } from './auth';
+import type { RootState } from './index';
+import type { CurrentUserDTO } from '~/server/db/dto';
 
 void test('the active route is always part of the selected routes', () => {
   const store = createStore<SelectionSlice>()(
@@ -79,19 +83,23 @@ void test('shared transition fixtures exercise production web selection', async 
     selected_ids: string[];
     active_id: string | null;
     visible_ids: string[];
+    combine: boolean;
+    only_selected: boolean;
   };
   type Event = {
     type: string;
     ids?: string[];
     id?: string;
     geometry_available?: boolean;
+    enabled?: boolean;
   };
   const fixture = JSON.parse(
     readFileSync(
-      new URL('../../shared/parity/state-fixtures.v1.json', import.meta.url),
+      new URL('../../shared/parity/state-fixtures.v2.json', import.meta.url),
       'utf8',
     ),
   ) as {
+    known_ids: string[];
     selectionScenarios: {
       name: string;
       initial: Snapshot;
@@ -109,18 +117,37 @@ void test('shared transition fixtures exercise production web selection', async 
         >,
       ),
     );
-    let known = [101, 102, 103];
+    let known = fixture.known_ids.map(Number);
     let visible = scenario.initial.visible_ids.map(Number);
     const { setSelected, setHighlighted, reconcileSelection } =
       store.getState();
     reconcileSelection(known, visible);
     setSelected(scenario.initial.selected_ids.map(Number));
     setHighlighted(Number(scenario.initial.active_id));
+    store.getState().setCombineSelections(scenario.initial.combine);
+    store.getState().setOnlySelected(scenario.initial.only_selected);
     for (const step of scenario.steps) {
       const e = step.event;
       const ids = (e.ids ?? []).map(Number),
         id = Number(e.id);
       switch (e.type) {
+        case 'set_combine':
+          store.getState().setCombineSelections(e.enabled!);
+          break;
+        case 'set_only_selected':
+          store.getState().setOnlySelected(e.enabled!);
+          break;
+        case 'reset_scope':
+          store.getState().setOnlySelected(false);
+          break;
+        case 'pick':
+          store.getState().pickActivities(ids);
+          break;
+        case 'toggle_member':
+          store.getState().toggleSelectedActivity(id);
+          break;
+        case 'dismiss_inspection':
+          break;
         case 'inspect':
           break; // Independently owned by ListPage; no selection mutation.
         case 'replace_selection':
@@ -155,8 +182,7 @@ void test('shared transition fixtures exercise production web selection', async 
           break;
         case 'show_on_map':
           if (e.geometry_available && visible.includes(id)) {
-            setSelected((s) => [...new Set([...s, id])]);
-            setHighlighted(id);
+            store.getState().selectForMap(id);
           }
           break;
         case 'remove_activities':
@@ -167,7 +193,7 @@ void test('shared transition fixtures exercise production web selection', async 
         case 'clear_scope':
           known = [];
           visible = [];
-          reconcileSelection([], []);
+          store.getState().resetSelectionScope();
           break;
         default:
           throw new Error(`Unhandled event ${e.type}`);
@@ -182,6 +208,8 @@ void test('shared transition fixtures exercise production web selection', async 
         Number(step.expected.active_id),
         `${scenario.name} / ${step.name}`,
       );
+      assert.equal(store.getState().combineSelections, step.expected.combine);
+      assert.equal(store.getState().onlySelected, step.expected.only_selected);
     }
   }
 });
@@ -204,4 +232,55 @@ void test('a partial streamed library does not delete not-yet-loaded selections'
   assert.deepEqual(store.getState().selected, [1, 999]);
   store.getState().reconcileSelection([1], [1]);
   assert.deepEqual(store.getState().selected, [1]);
+});
+
+void test('browsing Reset clears scope, Stats Reset retains it, and account changes reset session selection', () => {
+  const store = createStore<RootState>()(
+    immer(
+      (...args) =>
+        ({
+          ...createSelectionSlice(...args),
+          ...createFilterSlice(...args),
+          ...createAuthSlice(...args),
+        }) as RootState,
+    ),
+  );
+  const user = { id: 'one' } as CurrentUserDTO;
+  store.getState().initializeAuth({ currentUser: user });
+  store.getState().reconcileSelection([1, 2], [1, 2]);
+  store.getState().pickActivities([1]);
+  store.getState().setCombineSelections(true);
+  store.getState().setOnlySelected(true);
+  store.getState().resetActivityFilters();
+  assert.equal(store.getState().onlySelected, true);
+  store.getState().resetFilters();
+  assert.equal(store.getState().onlySelected, false);
+  assert.equal(store.getState().combineSelections, true);
+  assert.deepEqual(store.getState().selected, [1]);
+  store.getState().setOnlySelected(true);
+  store.getState().initializeAuth({ currentUser: user });
+  assert.equal(store.getState().onlySelected, true);
+  store
+    .getState()
+    .initializeAuth({ currentUser: { id: 'two' } as CurrentUserDTO });
+  assert.equal(store.getState().onlySelected, false);
+  assert.equal(store.getState().combineSelections, false);
+  assert.deepEqual(store.getState().selected, []);
+});
+
+void test('map input returns eligible hits and rejects stale rendered features', () => {
+  const store = createStore<RootState>()(
+    immer((...args) => ({ ...createSelectionSlice(...args) }) as RootState),
+  );
+  store.getState().reconcileSelection([1, 2, 3], [1, 2]);
+  store.getState().pickActivities([1]);
+  store.getState().setCombineSelections(true);
+  assert.deepEqual(store.getState().pickActivities([3, 99]), []);
+  assert.deepEqual(store.getState().selected, [1]);
+  assert.equal(store.getState().highlighted, 1);
+  store.getState().setOnlySelected(true);
+  assert.deepEqual(store.getState().pickActivities([2]), []);
+  store.getState().setOnlySelected(false);
+  assert.deepEqual(store.getState().pickActivities([2, 2, 99]), [2]);
+  assert.deepEqual(store.getState().selected, [1, 2]);
 });

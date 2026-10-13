@@ -17,15 +17,7 @@ struct ActivityRowView: View {
 
     var body: some View {
         HStack(alignment: usesTable ? .center : .top, spacing: 0) {
-            Button { store.toggleSelection(activity.id) } label: {
-                BrowseSportSymbol(category: activity.category, isSelected: isSelected)
-                    .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(isSelected ? "Deselect" : "Select") \(activity.name)")
-            .accessibilityValue("\(activity.sportType.rawValue), \(isSelected ? "Selected" : "Not selected")")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            ActivitySelectionSymbol(store: store, activity: activity)
             Button(action: inspect) {
                 Group {
                     if usesTable {

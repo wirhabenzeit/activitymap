@@ -167,6 +167,7 @@ struct ActivityListTests {
         #expect(store.listedActivities.count == 5000)
         #expect(store.listedActivities.first?.id == 10_000 && store.listedActivities.last?.id == 2)
         #expect(Set(store.listedActivities.map(\.id)).count == 5000)
+        store.setCombine(true)
         store.selectAllFiltered()
         #expect(store.selectedActivityIDs.count == 5000)
         store.selectedTab = .map

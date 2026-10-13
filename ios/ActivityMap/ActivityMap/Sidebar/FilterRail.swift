@@ -69,7 +69,7 @@ struct FilterRail: View {
 
     private static func popoverHeight(_ part: FilterPart) -> CGFloat {
         switch part {
-        case .search: 150
+        case .search, .selection: 150
         case .sports: 560
         case .dates: 330
         case .distance, .duration, .elevation: 260

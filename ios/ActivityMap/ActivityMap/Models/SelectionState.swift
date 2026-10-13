@@ -10,8 +10,10 @@ import Foundation
 ///   dismissing it never changes selection or the active activity.
 ///
 /// All transitions are pure so they can be checked against
-/// `shared/parity/state-fixtures.v1.json` without Mapbox or SwiftUI.
+/// `shared/parity/state-fixtures.v2.json` without Mapbox or SwiftUI.
 nonisolated struct SelectionState: Equatable, Sendable {
+    private(set) var combine = false
+    private(set) var onlySelected = false
     private(set) var selectedIDs: Set<Int> = []
     private(set) var activeID: Int?
     private(set) var inspectedID: Int?
@@ -22,12 +24,16 @@ nonisolated struct SelectionState: Equatable, Sendable {
         selectedIDs: Set<Int> = [],
         activeID: Int? = nil,
         inspectedID: Int? = nil,
-        visibleIDs: Set<Int> = []
+        visibleIDs: Set<Int> = [],
+        combine: Bool = false, onlySelected: Bool = false
     ) {
         self.selectedIDs = selectedIDs
         self.visibleIDs = visibleIDs
+        self.combine = combine
+        self.onlySelected = onlySelected && !selectedIDs.isEmpty
         self.inspectedID = inspectedID.flatMap { visibleIDs.contains($0) ? $0 : nil }
         self.activeID = activeID.flatMap { selectedIDs.contains($0) && visibleIDs.contains($0) ? $0 : nil }
+        normalizeInspection()
     }
 
     enum ShowOnMapOutcome: Equatable, Sendable {
@@ -47,6 +53,23 @@ nonisolated struct SelectionState: Equatable, Sendable {
     /// Selected IDs hidden by the current filters ("H hidden by filters").
     var hiddenSelectedCount: Int { selectedIDs.subtracting(visibleIDs).count }
 
+    var browsingIDs: Set<Int> { onlySelected ? visibleSelectedIDs : visibleIDs }
+
+    mutating func setCombine(_ enabled: Bool) { combine = enabled }
+    mutating func setOnlySelected(_ enabled: Bool) {
+        onlySelected = enabled && !selectedIDs.isEmpty
+        normalizeInspection()
+    }
+    mutating func pick(_ ids: some Sequence<Int>) {
+        let hits = Set(ids).intersection(browsingIDs)
+        if combine { if !hits.isEmpty { addToSelection(hits) } }
+        else { replaceSelection(with: hits) }
+    }
+    mutating func toggleMember(_ id: Int) {
+        guard combine, browsingIDs.contains(id) else { return }
+        toggleSelection(id)
+    }
+
     // MARK: Selection
 
     /// Replace the selection. A sole visible result becomes active.
@@ -58,12 +81,14 @@ nonisolated struct SelectionState: Equatable, Sendable {
         } else {
             retainActiveIfStillValid()
         }
+        normalizeInspection()
     }
 
     /// Union into the selection. Adding alone never activates a result.
     mutating func addToSelection(_ ids: some Sequence<Int>) {
         selectedIDs.formUnion(ids)
         retainActiveIfStillValid()
+        normalizeInspection()
     }
 
     /// Subtract from the selection. If that changed the selection and exactly
@@ -98,6 +123,8 @@ nonisolated struct SelectionState: Equatable, Sendable {
     mutating func clearSelection() {
         selectedIDs = []
         activeID = nil
+        onlySelected = false
+        normalizeInspection()
     }
 
     // MARK: Active map activity
@@ -108,21 +135,21 @@ nonisolated struct SelectionState: Equatable, Sendable {
         activeID = selectedIDs.contains(id) && visibleIDs.contains(id) ? id : nil
     }
 
-    /// The explicit exception to passive addition: add the target to the
-    /// selection and activate it, keeping other selected IDs.
+    /// Explicitly activate the target, replacing by default or adding in Combine.
     @discardableResult
     mutating func showOnMap(_ id: Int, hasGeometry: Bool) -> ShowOnMapOutcome {
         guard hasGeometry else { return .noGeometry }
         guard visibleIDs.contains(id) else { return .hiddenByFilters }
-        selectedIDs.insert(id)
+        if combine { selectedIDs.insert(id) } else { selectedIDs = [id] }
         activeID = id
+        normalizeInspection()
         return .shown
     }
 
     // MARK: List inspection
 
     mutating func inspect(_ id: Int) {
-        guard visibleIDs.contains(id) else { return }
+        guard browsingIDs.contains(id) else { return }
         inspectedID = id
     }
 
@@ -137,7 +164,7 @@ nonisolated struct SelectionState: Equatable, Sendable {
     mutating func setVisible(_ ids: Set<Int>) {
         visibleIDs = ids
         retainActiveIfStillValid()
-        if let inspectedID, !ids.contains(inspectedID) { self.inspectedID = nil }
+        normalizeInspection()
     }
 
     /// Committed deletion or rebootstrap removal: drop the IDs everywhere and
@@ -169,7 +196,13 @@ nonisolated struct SelectionState: Equatable, Sendable {
 
     // MARK: Helpers
 
+    private mutating func normalizeInspection() {
+        if selectedIDs.isEmpty { onlySelected = false }
+        if let inspectedID, !browsingIDs.contains(inspectedID) { self.inspectedID = nil }
+    }
+
     private mutating func applyRemovalRule(selectionChanged: Bool) {
+        normalizeInspection()
         let candidates = visibleSelectedIDs
         if selectionChanged, candidates.count == 1 {
             activeID = candidates.first

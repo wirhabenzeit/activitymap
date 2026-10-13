@@ -763,10 +763,10 @@ export const DataTable = React.memo(function DataTable<
         {scrollHint && moreBelow && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background to-transparent" />
         )}
-        {paginationControl && (
-          <DataTablePagination table={table} hiddenByFit={hiddenByFit} />
-        )}
       </ListDetailTransition>
+      {paginationControl && (
+        <DataTablePagination table={table} hiddenByFit={hiddenByFit} />
+      )}
     </div>
   );
 }) as <TData extends RowWithId & RowData>(
