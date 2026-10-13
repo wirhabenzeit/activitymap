@@ -46,11 +46,7 @@ struct MapScreen: View {
                                         topInset: max(topOcclusion, geometry.safeAreaInsets.top),
                                         bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize)
             }
-            if store.selectedTab == .map && store.selectedActivityIDs.isEmpty {
-                SelectionBar(store: store, iconOnly: true)
-                    .padding(.horizontal, 8).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                    .padding(12)
-            }
+
         }
         .alert("Route selection", isPresented: Binding(
             get: { picker.errorMessage != nil },

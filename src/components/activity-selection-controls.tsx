@@ -111,13 +111,7 @@ export function SelectionBar({
   controls?: ReactNode;
 }) {
   const hasSelection = useShallowStore((state) => state.selected.length > 0);
-  if (!hasSelection) {
-    return (
-      <div data-selection-bar className="p-1">
-        <CombineSelectionButton />
-      </div>
-    );
-  }
+  if (!hasSelection) return null;
   return (
     <div
       data-selection-bar

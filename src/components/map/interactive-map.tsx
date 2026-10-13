@@ -867,106 +867,108 @@ export default function InteractiveMap() {
         <ElevationRouteMarker />
         {showPhotos && <PhotoLayer />}
       </ReactMapGL>
-      <div
-        ref={panelRef}
-        id="map-route-panel"
-        style={
+      {selected.length > 0 && (
+        <div
+          ref={panelRef}
+          id="map-route-panel"
+          style={
+            {
+              '--selection-results-height': `${resultIds.length * 32 + 36}px`,
+            } as React.CSSProperties
+          }
+          className={cn(
+            'z-10 absolute right-2 bottom-2 lg:right-5 lg:bottom-5 bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
+            selected.length > 0 &&
+              'left-2 lg:left-auto lg:w-[min(70vw,48rem)] [@media(min-width:650px)_and_(max-height:500px)]:left-auto [@media(min-width:650px)_and_(max-height:500px)]:w-[min(42vw,24rem)]',
+          )}
+        >
           {
-            '--selection-results-height': `${resultIds.length * 32 + 36}px`,
-          } as React.CSSProperties
-        }
-        className={cn(
-          'z-10 absolute right-2 bottom-2 lg:right-5 lg:bottom-5 bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
-          selected.length > 0 &&
-            'left-2 lg:left-auto lg:w-[min(70vw,48rem)] [@media(min-width:650px)_and_(max-height:500px)]:left-auto [@media(min-width:650px)_and_(max-height:500px)]:w-[min(42vw,24rem)]',
-        )}
-      >
-        {
-          <SelectionBar
-            filterIDs={filterIDs}
-            controls={
-              selected.length > 0
-                ? panelControls(
-                    detailId > 0 ? [detailId] : resultIds,
-                    detailId > 0 ? 'Fit route' : 'Fit selection',
-                  )
-                : undefined
-            }
-          />
-        }
-        {selected.length > 0 && (
-          <DataTable
-            key={pickCount}
-            // List and detail share a stable footprint; only the size control changes it.
-            className={
-              panelExpanded
-                ? 'h-[calc(65dvh+3rem)]'
-                : detailId
-                  ? 'h-[min(43dvh,23rem)]'
-                  : 'h-[min(43dvh,var(--selection-results-height))]'
-            }
-            scrollHint={detailId === 0}
-            columns={mapColumns}
-            data={rows}
-            selected={selected}
-            setSelected={setSelected}
-            columnFilters={columnFilters}
-            paginationControl={false}
-            headerClassName="max-lg:hidden"
-            cellClassName="max-lg:px-2 max-lg:border-r-0"
-            activeId={detailId}
-            onRowClick={(row) => openDetail(row.original.id)}
-            onDetailBack={() => setDetailId(0)}
-            detailBackLabel={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
-            detailNavigation={
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
-                {resultIds.length > 1 && (
-                  <div className="flex min-w-0 flex-1 items-center justify-center text-xs tabular-nums">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-7 shrink-0"
-                      aria-label="Previous activity"
-                      disabled={detailIndex <= 0}
-                      onClick={() => openDetail(resultIds[detailIndex - 1]!)}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span
-                      className="whitespace-nowrap px-1"
-                      aria-label={`Activity ${detailIndex + 1} of ${resultIds.length}`}
-                    >
-                      {detailIndex + 1}/{resultIds.length}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-7 shrink-0"
-                      aria-label="Next activity"
-                      disabled={
-                        detailIndex < 0 || detailIndex >= resultIds.length - 1
-                      }
-                      onClick={() => openDetail(resultIds[detailIndex + 1]!)}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            }
-            renderDetails={(row) => (
-              <ActivityCardContent
-                key={row.id}
-                row={row}
-                stickyHeader
-                showMapButton={false}
-              />
-            )}
-            {...compactList}
-            columnVisibility={mapColumnVisibility}
-          />
-        )}
-      </div>
+            <SelectionBar
+              filterIDs={filterIDs}
+              controls={
+                selected.length > 0
+                  ? panelControls(
+                      detailId > 0 ? [detailId] : resultIds,
+                      detailId > 0 ? 'Fit route' : 'Fit selection',
+                    )
+                  : undefined
+              }
+            />
+          }
+          {selected.length > 0 && (
+            <DataTable
+              key={pickCount}
+              // List and detail share a stable footprint; only the size control changes it.
+              className={
+                panelExpanded
+                  ? 'h-[calc(65dvh+3rem)]'
+                  : detailId
+                    ? 'h-[min(43dvh,23rem)]'
+                    : 'h-[min(43dvh,var(--selection-results-height))]'
+              }
+              scrollHint={detailId === 0}
+              columns={mapColumns}
+              data={rows}
+              selected={selected}
+              setSelected={setSelected}
+              columnFilters={columnFilters}
+              paginationControl={false}
+              headerClassName="max-lg:hidden"
+              cellClassName="max-lg:px-2 max-lg:border-r-0"
+              activeId={detailId}
+              onRowClick={(row) => openDetail(row.original.id)}
+              onDetailBack={() => setDetailId(0)}
+              detailBackLabel={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
+              detailNavigation={
+                <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+                  {resultIds.length > 1 && (
+                    <div className="flex min-w-0 flex-1 items-center justify-center text-xs tabular-nums">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-7 shrink-0"
+                        aria-label="Previous activity"
+                        disabled={detailIndex <= 0}
+                        onClick={() => openDetail(resultIds[detailIndex - 1]!)}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span
+                        className="whitespace-nowrap px-1"
+                        aria-label={`Activity ${detailIndex + 1} of ${resultIds.length}`}
+                      >
+                        {detailIndex + 1}/{resultIds.length}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-7 shrink-0"
+                        aria-label="Next activity"
+                        disabled={
+                          detailIndex < 0 || detailIndex >= resultIds.length - 1
+                        }
+                        onClick={() => openDetail(resultIds[detailIndex + 1]!)}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              }
+              renderDetails={(row) => (
+                <ActivityCardContent
+                  key={row.id}
+                  row={row}
+                  stickyHeader
+                  showMapButton={false}
+                />
+              )}
+              {...compactList}
+              columnVisibility={mapColumnVisibility}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -746,7 +746,7 @@ extension RenderedRoutePickingTests {
 
 extension RenderedRoutePickingTests {
     @Test(arguments: ["phone", "landscape", "large-text"])
-    func sharedModeStaysReachableInMapResultsAndEmptyDock(variant: String) async throws {
+    func mapSelectionControlsDisappearUntilAnotherPick(variant: String) async throws {
         let oldToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = oldToken }
@@ -771,10 +771,12 @@ extension RenderedRoutePickingTests {
         #expect(store.visibleActivityIDs == [1, 2])
         store.clearSelection()
         try await listWait { !picker.isPresented && host.host.presentedViewController == nil }
-        let mode = try #require(host.accessibilityElement(label: "Combine selections"))
-        #expect(mode.accessibilityValue == "On" && mode.accessibilityFrame.width >= 44)
+        #expect(host.accessibilityElement(label: "Combine selections", includingSheets: true) == nil)
         #expect(!store.onlySelected && store.isCombining)
         try host.save("selection-384-\(variant)-map-empty")
+        store.pickActivities([3])
+        try await listWait { host.accessibilityElement(label: "Combine selections", includingSheets: true) != nil }
+        #expect(store.selectedActivityIDs == [3])
     }
 }
 

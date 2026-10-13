@@ -226,15 +226,9 @@ try {
   await page
     .getByRole('button', { name: 'Clear selection', exact: true })
     .click();
-  assert.equal(await mode().getAttribute('aria-pressed'), 'true');
-  assert(await mode().isVisible());
+  await panel.waitFor({ state: 'detached' });
+  assert.equal(await mode().count(), 0, 'Empty Map has no selection controls');
   assert.equal(await rows().count(), 0);
-  assert(!(await panel.textContent()).includes('0 selected'));
-  assert.equal(await panel.getByRole('button').count(), 1);
-  assert(
-    (await panel.boundingBox()).width <= 56,
-    'Empty Map keeps only the compact Combine control',
-  );
   await page.screenshot({ path: resolve(output, 'map-empty-mobile.png') });
   await page
     .getByRole('button', { name: 'Selected activities filter', exact: true })

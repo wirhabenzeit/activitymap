@@ -34,12 +34,14 @@ The following are actual production SwiftUI captures on the iPhone 18 Pro / iOS 
 | Dark List | [Dark controls and selected rows](native/dark-list.png) |
 | Accessibility 3 text | [Stacked rows and persistent controls](native/large-text-list.png) |
 | Landscape Map | [Persistent group header with Combine before count](native/landscape-map.png) |
-| Empty Map, Combine on | [Compact dock with no empty sheet](native/phone-map-empty.png) |
+| Empty Map, Combine on | [No selection controls until a route pick](native/phone-map-empty.png) |
 | iPad-sized List detail | [Adjacent detail and shared footer](native/tablet-detail.png) |
 
 `SelectionFixtureTests` consumes 72 v2 transitions. The focused run passed 61 native tests across state, store/cache/lifetime, list behavior, route hit/query and rendered selection controls; another six tests passed for summary scope and retained navigation/Map handoff. Three isolated filter tests and twelve camera/sheet checks also passed. The native result list keeps its exact position through collapse/detail transitions; camera assertions wait for the animation to finish before checking invariance. Native sport and mode targets are checked at 44 points, with Select/Deselect labels, mode On/Off, and available exit during detail/zero selection. Automated accessibility inspection supplements physical VoiceOver acceptance.
 
-Reproduce model checks with `xcodebuild -project ios/ActivityMap/ActivityMap.xcodeproj -scheme ActivityMap -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO -only-testing:ActivityMapTests/SelectionFixtureTests -only-testing:ActivityMapTests/SelectionBrowsingScopeTests test`. The rendered cases live in `RenderedActivityListTests.swift` (`selectionControlsSurviveListInspection`, `sharedModeStaysReachableInMapResultsAndEmptyDock`) and `RenderedRoutePickingTests.swift` (offline query/projection adapter).
+Reproduce model checks with `xcodebuild -project ios/ActivityMap/ActivityMap.xcodeproj -scheme ActivityMap -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO -only-testing:ActivityMapTests/SelectionFixtureTests -only-testing:ActivityMapTests/SelectionBrowsingScopeTests test`. The rendered cases live in `RenderedActivityListTests.swift` (`selectionControlsSurviveListInspection`, `mapSelectionControlsDisappearUntilAnotherPick`) and `RenderedRoutePickingTests.swift` (offline query/projection adapter).
 
 
 Physical-device review subsequently changed the sheet policy: Results and detail now share one stable middle height, and the collapsed sheet shows only group controls. Activity content stays hidden while collapsed; opening/back no longer resize the sheet or crossfade overlapping results/detail. Frame-sampled regressions check constant height through navigation and membership changes, manual detents and retained scroll; collapsed captures check that activity titles do not leak through. The static captures above illustrate the selection controls, not the updated animation timing. Physical-device review of this refinement remains open.
+
+The empty Map now has no selection dock or Combine icon on either platform. The existing selection mode is retained across Clear, and controls return with the next nonempty group. The web journey and native phone/landscape/large-text cases verify this transition.
