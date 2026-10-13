@@ -1,0 +1,1334 @@
+{
+  "version": 2,
+  "known_ids": ["101", "102", "103", "104"],
+  "selectionScenarios": [
+    {
+      "name": "selection active and inspection are separate",
+      "initial": {
+        "selected_ids": [],
+        "active_id": null,
+        "inspected_id": null,
+        "visible_ids": ["101", "102", "103"],
+        "combine": false,
+        "only_selected": false,
+        "displayed_ids": ["101", "102", "103"]
+      },
+      "steps": [
+        {
+          "name": "list inspection does not select",
+          "event": {
+            "type": "inspect",
+            "id": "103"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "single selection activates",
+          "event": {
+            "type": "replace_selection",
+            "ids": ["101"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": "101",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "adding preserves the existing active route",
+          "event": {
+            "type": "add_selection",
+            "ids": ["102"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": "101",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "activate a selected result",
+          "event": {
+            "type": "activate",
+            "id": "102"
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": "102",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "filters preserve selection but clear hidden active route",
+          "event": {
+            "type": "set_visible",
+            "ids": ["101", "103"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": null,
+            "inspected_id": "103",
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "103"]
+          }
+        },
+        {
+          "name": "list detail still independent",
+          "event": {
+            "type": "inspect",
+            "id": "101"
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": null,
+            "inspected_id": "101",
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "103"]
+          }
+        },
+        {
+          "name": "restoring filter does not reopen map detail",
+          "event": {
+            "type": "set_visible",
+            "ids": ["101", "102", "103"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": null,
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "activate restored selection explicitly",
+          "event": {
+            "type": "activate",
+            "id": "102"
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": "102",
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "remove active leaves single remaining active",
+          "event": {
+            "type": "remove_selection",
+            "ids": ["102"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": "101",
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "clear selection does not close inspected list detail",
+          "event": {
+            "type": "clear_selection"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "GPS-less selection still supports detail",
+          "event": {
+            "type": "replace_selection",
+            "ids": ["103"]
+          },
+          "expected": {
+            "selected_ids": ["103"],
+            "active_id": "103",
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "GPS-less Show on map unavailable without state mutation",
+          "event": {
+            "type": "show_on_map",
+            "id": "103",
+            "geometry_available": false
+          },
+          "expected": {
+            "selected_ids": ["103"],
+            "active_id": "103",
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "committed deletion closes the deleted inspected detail",
+          "event": {
+            "type": "remove_activities",
+            "ids": ["101"]
+          },
+          "expected": {
+            "selected_ids": ["103"],
+            "active_id": "103",
+            "inspected_id": null,
+            "visible_ids": ["102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["102", "103"]
+          }
+        },
+        {
+          "name": "logout clears scoped view state",
+          "event": {
+            "type": "clear_scope"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "bulk filtered selection preserves hidden IDs until explicit global clear",
+      "initial": {
+        "selected_ids": ["101", "102"],
+        "active_id": "101",
+        "inspected_id": null,
+        "visible_ids": ["101", "103"],
+        "combine": false,
+        "only_selected": false,
+        "displayed_ids": ["101", "103"]
+      },
+      "steps": [
+        {
+          "name": "select all filtered uses union",
+          "event": {
+            "type": "select_all_filtered"
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "103"],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "103"]
+          }
+        },
+        {
+          "name": "deselect all filtered subtracts that scope only",
+          "event": {
+            "type": "deselect_all_filtered"
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "103"]
+          }
+        },
+        {
+          "name": "clear selection includes hidden IDs",
+          "event": {
+            "type": "clear_selection"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "103"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "filter hides inspected row without selecting another",
+      "initial": {
+        "selected_ids": ["101"],
+        "active_id": "101",
+        "inspected_id": "102",
+        "visible_ids": ["101", "102", "103"],
+        "combine": false,
+        "only_selected": false,
+        "displayed_ids": ["101", "102", "103"]
+      },
+      "steps": [
+        {
+          "name": "inspection closes when row disappears",
+          "event": {
+            "type": "set_visible",
+            "ids": ["101", "103"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "103"]
+          }
+        },
+        {
+          "name": "invalid activation never selects an ID",
+          "event": {
+            "type": "activate",
+            "id": "103"
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "103"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "addition removal and visibility use distinct activation rules",
+      "initial": {
+        "selected_ids": [],
+        "active_id": null,
+        "inspected_id": null,
+        "visible_ids": ["101", "102", "103"],
+        "combine": false,
+        "only_selected": false,
+        "displayed_ids": ["101", "102", "103"]
+      },
+      "steps": [
+        {
+          "name": "adding to empty selection does not open detail",
+          "event": {
+            "type": "add_selection",
+            "ids": ["101"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "duplicate addition stays a no-op",
+          "event": {
+            "type": "add_selection",
+            "ids": ["101", "101"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "explicit Show on map adds and activates",
+          "event": {
+            "type": "show_on_map",
+            "id": "101",
+            "geometry_available": true
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "adding multiple results preserves focus",
+          "event": {
+            "type": "add_selection",
+            "ids": ["102", "103"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "103"],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "explicit activation changes focus",
+          "event": {
+            "type": "activate",
+            "id": "102"
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "103"],
+            "active_id": "102",
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "removing active with multiple survivors clears focus",
+          "event": {
+            "type": "remove_selection",
+            "ids": ["102"]
+          },
+          "expected": {
+            "selected_ids": ["101", "103"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "removing to one visible survivor activates it",
+          "event": {
+            "type": "remove_selection",
+            "ids": ["103"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "hiding the active selection clears focus",
+          "event": {
+            "type": "set_visible",
+            "ids": ["102", "103"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["102", "103"]
+          }
+        },
+        {
+          "name": "restoring sole selection visibility does not open detail",
+          "event": {
+            "type": "set_visible",
+            "ids": ["101", "102", "103"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "removing an unselected ID does not reopen sole selection",
+          "event": {
+            "type": "remove_selection",
+            "ids": ["102"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "explicit replacement does reopen sole selection",
+          "event": {
+            "type": "replace_selection",
+            "ids": ["101"]
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103"]
+          }
+        },
+        {
+          "name": "deleting the active selection removes visibility and focus",
+          "event": {
+            "type": "remove_activities",
+            "ids": ["101"]
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["102", "103"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "bulk addition and toggle do not imply replacement",
+      "initial": {
+        "selected_ids": [],
+        "active_id": null,
+        "inspected_id": null,
+        "visible_ids": ["101"],
+        "combine": false,
+        "only_selected": false,
+        "displayed_ids": ["101"]
+      },
+      "steps": [
+        {
+          "name": "select all with one visible result does not open detail",
+          "event": {
+            "type": "select_all_filtered"
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101"]
+          }
+        },
+        {
+          "name": "deselect all clears the selected scope",
+          "event": {
+            "type": "deselect_all_filtered"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101"]
+          }
+        },
+        {
+          "name": "toggle adds without opening detail",
+          "event": {
+            "type": "toggle_selection",
+            "id": "101"
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101"]
+          }
+        },
+        {
+          "name": "toggle removes without opening another result",
+          "event": {
+            "type": "toggle_selection",
+            "id": "101"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "default picking replaces the whole group while inspection remains independent",
+      "initial": {
+        "selected_ids": ["104"],
+        "active_id": "104",
+        "inspected_id": "103",
+        "visible_ids": ["101", "102", "103", "104"],
+        "combine": false,
+        "only_selected": false,
+        "displayed_ids": ["101", "102", "103", "104"]
+      },
+      "steps": [
+        {
+          "name": "overlaps are deduplicated and replace",
+          "event": {
+            "type": "pick",
+            "ids": ["101", "102", "101"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": null,
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "default sport control is inert",
+          "event": {
+            "type": "toggle_member",
+            "id": "103"
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": null,
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "show on map replaces and activates",
+          "event": {
+            "type": "show_on_map",
+            "id": "103",
+            "geometry_available": true
+          },
+          "expected": {
+            "selected_ids": ["103"],
+            "active_id": "103",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "empty pick clears map group, not List detail",
+          "event": {
+            "type": "pick",
+            "ids": []
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Combine adds routes and preserves empty and repeated picks",
+      "initial": {
+        "selected_ids": ["101"],
+        "active_id": "101",
+        "inspected_id": "103",
+        "visible_ids": ["101", "102", "103", "104"],
+        "combine": false,
+        "only_selected": false,
+        "displayed_ids": ["101", "102", "103", "104"]
+      },
+      "steps": [
+        {
+          "name": "enter mode without changing focus",
+          "event": {
+            "type": "set_combine",
+            "enabled": true
+          },
+          "expected": {
+            "selected_ids": ["101"],
+            "active_id": "101",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "union overlaps",
+          "event": {
+            "type": "pick",
+            "ids": ["102", "103", "102"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "103"],
+            "active_id": "101",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "repeat hit is not a deselection",
+          "event": {
+            "type": "pick",
+            "ids": ["101"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "103"],
+            "active_id": "101",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "empty hit does not change anything",
+          "event": {
+            "type": "pick",
+            "ids": []
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "103"],
+            "active_id": "101",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "show on map adds and activates",
+          "event": {
+            "type": "show_on_map",
+            "id": "104",
+            "geometry_available": true
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "103", "104"],
+            "active_id": "104",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "exit keeps group",
+          "event": {
+            "type": "set_combine",
+            "enabled": false
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "103", "104"],
+            "active_id": "104",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "next pick replaces",
+          "event": {
+            "type": "pick",
+            "ids": ["102"]
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": "102",
+            "inspected_id": "103",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "restriction is a live projection and preserves hidden IDs",
+      "initial": {
+        "selected_ids": ["101", "102", "104"],
+        "active_id": "101",
+        "inspected_id": "103",
+        "visible_ids": ["101", "102", "103", "104"],
+        "combine": false,
+        "only_selected": false,
+        "displayed_ids": ["101", "102", "103", "104"]
+      },
+      "steps": [
+        {
+          "name": "restrict closes unrelated inspection",
+          "event": {
+            "type": "set_only_selected",
+            "enabled": true
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "104"],
+            "active_id": "101",
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": true,
+            "displayed_ids": ["101", "102", "104"]
+          }
+        },
+        {
+          "name": "ordinary filters hide but do not remove members",
+          "event": {
+            "type": "set_visible",
+            "ids": ["102", "103"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "104"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["102", "103"],
+            "combine": false,
+            "only_selected": true,
+            "displayed_ids": ["102"]
+          }
+        },
+        {
+          "name": "scope off restores ordinary eligibility",
+          "event": {
+            "type": "set_only_selected",
+            "enabled": false
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "104"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["102", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["102", "103"]
+          }
+        },
+        {
+          "name": "filter restored does not reopen focus",
+          "event": {
+            "type": "set_visible",
+            "ids": ["101", "102", "103", "104"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "104"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "restrict again",
+          "event": {
+            "type": "set_only_selected",
+            "enabled": true
+          },
+          "expected": {
+            "selected_ids": ["101", "102", "104"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": true,
+            "displayed_ids": ["101", "102", "104"]
+          }
+        },
+        {
+          "name": "Show on map may choose ordinary-eligible nonmember",
+          "event": {
+            "type": "show_on_map",
+            "id": "103",
+            "geometry_available": true
+          },
+          "expected": {
+            "selected_ids": ["103"],
+            "active_id": "103",
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": true,
+            "displayed_ids": ["103"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "last removal disables restriction before validating inspection and keeps mode",
+      "initial": {
+        "selected_ids": ["101"],
+        "active_id": "101",
+        "inspected_id": "101",
+        "visible_ids": ["101", "102", "103", "104"],
+        "combine": true,
+        "only_selected": true,
+        "displayed_ids": ["101"]
+      },
+      "steps": [
+        {
+          "name": "remove last selected member",
+          "event": {
+            "type": "toggle_member",
+            "id": "101"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "empty group cannot enable restriction",
+          "event": {
+            "type": "set_only_selected",
+            "enabled": true
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "add via sport control remains passive",
+          "event": {
+            "type": "toggle_member",
+            "id": "102"
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": null,
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "restrict excludes unrelated inspection",
+          "event": {
+            "type": "set_only_selected",
+            "enabled": true
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": true,
+            "displayed_ids": ["102"]
+          }
+        },
+        {
+          "name": "inspect current member",
+          "event": {
+            "type": "inspect",
+            "id": "102"
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": null,
+            "inspected_id": "102",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": true,
+            "displayed_ids": ["102"]
+          }
+        },
+        {
+          "name": "global clear restores eligible inspected detail",
+          "event": {
+            "type": "clear_selection"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": "102",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "restricted Combine cannot add invisible targets and reset retains group",
+      "initial": {
+        "selected_ids": ["101", "102"],
+        "active_id": "101",
+        "inspected_id": "101",
+        "visible_ids": ["101", "102", "103", "104"],
+        "combine": true,
+        "only_selected": true,
+        "displayed_ids": ["101", "102"]
+      },
+      "steps": [
+        {
+          "name": "invisible direct hit is rejected",
+          "event": {
+            "type": "pick",
+            "ids": ["103"]
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": "101",
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": true,
+            "displayed_ids": ["101", "102"]
+          }
+        },
+        {
+          "name": "invisible sport control is rejected",
+          "event": {
+            "type": "toggle_member",
+            "id": "103"
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": "101",
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": true,
+            "displayed_ids": ["101", "102"]
+          }
+        },
+        {
+          "name": "inspection does not narrow membership",
+          "event": {
+            "type": "inspect",
+            "id": "102"
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": "101",
+            "inspected_id": "102",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": true,
+            "displayed_ids": ["101", "102"]
+          }
+        },
+        {
+          "name": "remove one then survivor activates",
+          "event": {
+            "type": "toggle_member",
+            "id": "101"
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": "102",
+            "inspected_id": "102",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": true,
+            "displayed_ids": ["102"]
+          }
+        },
+        {
+          "name": "reset only browsing scope",
+          "event": {
+            "type": "reset_scope"
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": "102",
+            "inspected_id": "102",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        },
+        {
+          "name": "can now add outside group",
+          "event": {
+            "type": "toggle_member",
+            "id": "103"
+          },
+          "expected": {
+            "selected_ids": ["102", "103"],
+            "active_id": "102",
+            "inspected_id": "102",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["101", "102", "103", "104"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "default scoped picking is replacement and failed targets leave state unchanged",
+      "initial": {
+        "selected_ids": ["101", "102"],
+        "active_id": "101",
+        "inspected_id": "101",
+        "visible_ids": ["101", "102", "103", "104"],
+        "combine": false,
+        "only_selected": true,
+        "displayed_ids": ["101", "102"]
+      },
+      "steps": [
+        {
+          "name": "GPS-less target is refused",
+          "event": {
+            "type": "show_on_map",
+            "id": "103",
+            "geometry_available": false
+          },
+          "expected": {
+            "selected_ids": ["101", "102"],
+            "active_id": "101",
+            "inspected_id": "101",
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": true,
+            "displayed_ids": ["101", "102"]
+          }
+        },
+        {
+          "name": "default scoped tap selects one",
+          "event": {
+            "type": "pick",
+            "ids": ["102"]
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": "102",
+            "inspected_id": null,
+            "visible_ids": ["101", "102", "103", "104"],
+            "combine": false,
+            "only_selected": true,
+            "displayed_ids": ["102"]
+          }
+        },
+        {
+          "name": "hidden target is refused",
+          "event": {
+            "type": "set_visible",
+            "ids": ["101", "103"]
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": true,
+            "displayed_ids": []
+          }
+        },
+        {
+          "name": "show hidden member is no-op",
+          "event": {
+            "type": "show_on_map",
+            "id": "102",
+            "geometry_available": true
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": true,
+            "displayed_ids": []
+          }
+        },
+        {
+          "name": "clear ends scope even with zero visible members",
+          "event": {
+            "type": "clear_selection"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["101", "103"],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": ["101", "103"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "committed deletion and scope transitions normalize flags",
+      "initial": {
+        "selected_ids": ["101", "102"],
+        "active_id": "101",
+        "inspected_id": "101",
+        "visible_ids": ["101", "102", "103", "104"],
+        "combine": true,
+        "only_selected": true,
+        "displayed_ids": ["101", "102"]
+      },
+      "steps": [
+        {
+          "name": "delete active member",
+          "event": {
+            "type": "remove_activities",
+            "ids": ["101"]
+          },
+          "expected": {
+            "selected_ids": ["102"],
+            "active_id": "102",
+            "inspected_id": null,
+            "visible_ids": ["102", "103", "104"],
+            "combine": true,
+            "only_selected": true,
+            "displayed_ids": ["102"]
+          }
+        },
+        {
+          "name": "delete last member",
+          "event": {
+            "type": "remove_activities",
+            "ids": ["102"]
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": ["103", "104"],
+            "combine": true,
+            "only_selected": false,
+            "displayed_ids": ["103", "104"]
+          }
+        },
+        {
+          "name": "account transition resets all",
+          "event": {
+            "type": "clear_scope"
+          },
+          "expected": {
+            "selected_ids": [],
+            "active_id": null,
+            "inspected_id": null,
+            "visible_ids": [],
+            "combine": false,
+            "only_selected": false,
+            "displayed_ids": []
+          }
+        }
+      ]
+    }
+  ],
+  "summaryScopeCase": {
+    "selected_ids": ["101", "102", "103"],
+    "filtered_ids": ["101", "104"],
+    "page_ids": ["101"],
+    "expected": {
+      "selected": ["101", "102", "103"],
+      "filtered": ["101", "104"],
+      "page": ["101"],
+      "selected_count": 3,
+      "hidden_selected_count": 2
+    }
+  }
+}

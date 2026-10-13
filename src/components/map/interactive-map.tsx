@@ -13,21 +13,17 @@ import {
   Maximize2,
   Minimize2,
   Globe,
-  MoreHorizontal,
   Scan,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
+import { store } from '~/store';
+import { SelectionBar } from '~/components/activity-selection-controls';
 import { columns } from '~/components/list/columns';
 import { ActivityCard, ActivityCardContent } from '~/components/list/card';
 import { usePrefetchStreamSummaries } from '~/components/list/elevation-chart';
 import { Button } from '~/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu';
 import { activityFields } from '~/settings/activity';
 
 import ReactMapGL, {
@@ -115,7 +111,8 @@ const RouteLayer = React.memo(function RouteLayer() {
   }));
 
   const { data: activities = [] } = useActivities();
-  const { filterIDs } = useFilteredActivities(activities);
+  const { filterIDs: ordinaryFilterIDs } = useFilteredActivities(activities);
+  const filterIDs = useBrowsingIDs(ordinaryFilterIDs);
   const geoJson = useActivityGeoJsonFromActivities(activities);
 
   const color: mapboxgl.Expression = ['match', ['get', 'sport_type']];
@@ -321,7 +318,6 @@ export default function InteractiveMap() {
     () => selected.filter((id) => filterIDs.includes(id) && activityDict[id]),
     [selected, filterIDs, activityDict],
   );
-  const hiddenSelectedCount = selected.length - visibleSelected.length;
   // Closing details retains the highlighted map route and the results table.
   const [detailId, setDetailId] = useState(highlighted);
   const [previousHighlight, setPreviousHighlight] = useState(highlighted);
@@ -350,6 +346,17 @@ export default function InteractiveMap() {
   const mapRefLoc = useRef<MapRef>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  useEffect(() => {
+    // A reused map can fire load before React attaches its ref. Publish the
+    // fixture bridge after commit so Map/List switches keep it available.
+    if (
+      mapLoaded &&
+      process.env.NODE_ENV === 'development' &&
+      window.__ACTIVITYMAP_GALLERY__
+    ) {
+      window.__ACTIVITYMAP_GALLERY_MAP__ = mapRefLoc.current?.getMap();
+    }
+  }, [mapLoaded]);
   const columnFilters = useMemo(
     () => [{ id: 'id', value: filterIDs }],
     [filterIDs],
@@ -697,18 +704,12 @@ export default function InteractiveMap() {
     }),
     [],
   );
-  const clearSelection = () => {
-    setSelected([]);
-    setDetailId(0);
-    setPanelExpanded(false);
-  };
-
   const panelControls = (fitIds: number[], fitLabel: string) => (
     <div className="flex shrink-0 items-center gap-0.5">
       <Button
         size="icon"
         variant="ghost"
-        className="h-8 w-8"
+        className="size-10"
         aria-label={fitLabel}
         title={fitLabel}
         onClick={() => requestRouteFit(fitIds)}
@@ -718,7 +719,7 @@ export default function InteractiveMap() {
       <Button
         size="icon"
         variant="ghost"
-        className="h-8 w-8"
+        className="size-10"
         aria-label={panelExpanded ? 'Shrink route panel' : 'Expand route panel'}
         title={panelExpanded ? 'Shrink route panel' : 'Expand route panel'}
         aria-expanded={panelExpanded}
@@ -731,23 +732,6 @@ export default function InteractiveMap() {
           <Maximize2 className="h-4 w-4" aria-hidden="true" />
         )}
       </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            aria-label="Selection actions"
-          >
-            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={clearSelection}>
-            Clear selection
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   );
 
@@ -784,21 +768,12 @@ export default function InteractiveMap() {
         onLoad={() => {
           setMapLoaded(true);
           tryAutoCenterOnLatestActivity();
-          if (
-            process.env.NODE_ENV === 'development' &&
-            window.__ACTIVITYMAP_GALLERY__
-          ) {
-            window.__ACTIVITYMAP_GALLERY_MAP__ = mapRefLoc.current?.getMap();
-          }
         }}
         projection={'globe'}
         mapStyle={
           mapSettingBase?.type === 'vector' ? mapSettingBase.url : undefined
         }
-        terrain={{
-          source: 'mapbox-dem',
-          exaggeration: threeDim ? 1.5 : 0,
-        }}
+        terrain={{ source: 'mapbox-dem', exaggeration: threeDim ? 1.5 : 0 }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
@@ -834,9 +809,12 @@ export default function InteractiveMap() {
         </Overlay>
         <Selection
           onSelection={(ids) => {
-            setSelected(ids);
-            setHighlighted(ids.length === 1 ? ids[0]! : 0);
-            setDetailId(ids.length === 1 ? ids[0]! : 0);
+            const state = store.getState();
+            const hits = state.pickActivities(ids);
+            if (state.combineSelections && !hits.length) return;
+            setDetailId(
+              !state.combineSelections && hits.length === 1 ? hits[0]! : 0,
+            );
             setPanelExpanded(false);
             setPickCount((count) => count + 1);
           }}
@@ -892,95 +870,100 @@ export default function InteractiveMap() {
       <div
         ref={panelRef}
         id="map-route-panel"
+        style={
+          {
+            '--selection-results-height': `${resultIds.length * 32 + 36}px`,
+          } as React.CSSProperties
+        }
         className={cn(
           'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,48rem)] [@media(min-width:650px)_and_(max-height:500px)]:left-auto [@media(min-width:650px)_and_(max-height:500px)]:w-[min(42vw,24rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
-          { hidden: selected.length === 0 },
         )}
       >
-        <DataTable
-          key={pickCount}
-          // List and detail share a stable footprint; only the size control changes it.
-          className={
-            panelExpanded
-              ? 'h-[calc(65dvh+3rem)]'
-              : 'h-[calc(min(60dvh,26rem)+3rem)]'
-          }
-          scrollHint={detailId === 0}
-          columns={mapColumns}
-          data={rows}
-          selected={selected}
-          setSelected={setSelected}
-          columnFilters={columnFilters}
-          paginationControl={false}
-          headerClassName="max-lg:hidden"
-          cellClassName="max-lg:px-2 max-lg:border-r-0"
-          activeId={detailId}
-          onRowClick={(row) => openDetail(row.original.id)}
-          onDetailBack={() => setDetailId(0)}
-          detailBackLabel={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
-          listHeader={
-            <div
-              role="toolbar"
-              aria-label="Route results"
-              className="flex min-h-12 shrink-0 items-center justify-between gap-1 border-b px-2 text-xs"
-            >
-              <span className="min-w-0 px-1 font-semibold">
-                {resultIds.length} selected
-                {hiddenSelectedCount > 0
-                  ? ` · ${hiddenSelectedCount} hidden by filters`
-                  : ''}
-              </span>
-              {panelControls(resultIds, 'Fit selection')}
-            </div>
-          }
-          detailNavigation={
-            <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
-              {resultIds.length > 1 && (
-                <div className="flex min-w-0 flex-1 items-center justify-center text-xs tabular-nums">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-7 shrink-0"
-                    aria-label="Previous activity"
-                    disabled={detailIndex <= 0}
-                    onClick={() => openDetail(resultIds[detailIndex - 1]!)}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span
-                    className="whitespace-nowrap px-1"
-                    aria-label={`Activity ${detailIndex + 1} of ${resultIds.length}`}
-                  >
-                    {detailIndex + 1}/{resultIds.length}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-7 shrink-0"
-                    aria-label="Next activity"
-                    disabled={
-                      detailIndex < 0 || detailIndex >= resultIds.length - 1
-                    }
-                    onClick={() => openDetail(resultIds[detailIndex + 1]!)}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-              {panelControls([detailId], 'Fit route')}
-            </div>
-          }
-          renderDetails={(row) => (
-            <ActivityCardContent
-              key={row.id}
-              row={row}
-              stickyHeader
-              showMapButton={false}
-            />
-          )}
-          {...compactList}
-          columnVisibility={mapColumnVisibility}
-        />
+        {
+          <SelectionBar
+            filterIDs={filterIDs}
+            controls={
+              selected.length > 0
+                ? panelControls(
+                    detailId > 0 ? [detailId] : resultIds,
+                    detailId > 0 ? 'Fit route' : 'Fit selection',
+                  )
+                : undefined
+            }
+          />
+        }
+        {selected.length > 0 && (
+          <DataTable
+            key={pickCount}
+            // List and detail share a stable footprint; only the size control changes it.
+            className={
+              panelExpanded
+                ? 'h-[calc(65dvh+3rem)]'
+                : detailId
+                  ? 'h-[min(43dvh,23rem)]'
+                  : 'h-[min(43dvh,var(--selection-results-height))]'
+            }
+            scrollHint={detailId === 0}
+            columns={mapColumns}
+            data={rows}
+            selected={selected}
+            setSelected={setSelected}
+            columnFilters={columnFilters}
+            paginationControl={false}
+            headerClassName="max-lg:hidden"
+            cellClassName="max-lg:px-2 max-lg:border-r-0"
+            activeId={detailId}
+            onRowClick={(row) => openDetail(row.original.id)}
+            onDetailBack={() => setDetailId(0)}
+            detailBackLabel={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
+            detailNavigation={
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+                {resultIds.length > 1 && (
+                  <div className="flex min-w-0 flex-1 items-center justify-center text-xs tabular-nums">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-7 shrink-0"
+                      aria-label="Previous activity"
+                      disabled={detailIndex <= 0}
+                      onClick={() => openDetail(resultIds[detailIndex - 1]!)}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span
+                      className="whitespace-nowrap px-1"
+                      aria-label={`Activity ${detailIndex + 1} of ${resultIds.length}`}
+                    >
+                      {detailIndex + 1}/{resultIds.length}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-7 shrink-0"
+                      aria-label="Next activity"
+                      disabled={
+                        detailIndex < 0 || detailIndex >= resultIds.length - 1
+                      }
+                      onClick={() => openDetail(resultIds[detailIndex + 1]!)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            }
+            renderDetails={(row) => (
+              <ActivityCardContent
+                key={row.id}
+                row={row}
+                stickyHeader
+                showMapButton={false}
+              />
+            )}
+            {...compactList}
+            columnVisibility={mapColumnVisibility}
+          />
+        )}
       </div>
     </div>
   );

@@ -46,7 +46,11 @@ struct MapScreen: View {
                                         topInset: max(topOcclusion, geometry.safeAreaInsets.top),
                                         bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize)
             }
-
+            if store.selectedTab == .map && store.selectedActivityIDs.isEmpty {
+                SelectionBar(store: store, iconOnly: true)
+                    .padding(.horizontal, 8).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .padding(12)
+            }
         }
         .alert("Route selection", isPresented: Binding(
             get: { picker.errorMessage != nil },
@@ -61,7 +65,6 @@ struct MapScreen: View {
         .onChange(of: store.selectedActivityIDs) { _, ids in
             picker.reconcile(with: store)
             if ids.isEmpty {
-                picker.isAdding = false
                 picker.isPresented = false
             }
         }
@@ -71,7 +74,8 @@ struct MapScreen: View {
                 picker.invalidateQuery()
             }
         }
-        .onChange(of: picker.isAdding) { _, _ in picker.invalidateQuery() }
+        .onChange(of: store.isCombining) { _, _ in picker.invalidateQuery() }
+        .onChange(of: store.onlySelected) { _, _ in picker.invalidateQuery() }
         .onChange(of: context.baseStyle) { oldStyle, newStyle in
             cameraTransitionID = nil
             if oldStyle.styleURL != newStyle.styleURL { acceptsCameraEvents = false }
@@ -81,7 +85,6 @@ struct MapScreen: View {
         .onChange(of: context.scopeRevision) { _, _ in
             cameraTransitionID = nil
             picker.isPresented = false
-            picker.isAdding = false
             viewport = context.camera.viewport
         }
         .onDisappear {
@@ -203,8 +206,7 @@ struct MapScreen: View {
             // Fit above the panel; background controls and credits add no occlusion.
             sheetHeight: showingResults && !layout.isSidePanel
                 ? (picker.detent == .medium
-                    ? NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.count, detail: picker.detailID != nil,
-                        height: geometry.size.height, largeText: typeSize.isAccessibilitySize,
+                    ? NativeMapResultsSizing.openingHeight(height: geometry.size.height, largeText: typeSize.isAccessibilitySize,
                         topInset: max(topOcclusion, safeArea.top)) + safeArea.bottom
                     : layout.bottomOcclusion) : 0, topOcclusion: topOcclusion,
             trailingOcclusion: showingResults && layout.isSidePanel ? layout.trailingOcclusion + safeArea.trailing : 0
@@ -321,11 +323,11 @@ struct MapScreen: View {
 
             Menu {
                 Button("Fit selection", systemImage: "selection.pin.in.out") { context.request(.fitSelection) }
-                    .disabled(!store.filteredActivities.contains {
+                    .disabled(!store.browsingActivities.contains {
                         store.selectedActivityIDs.contains($0.id) && !$0.coordinates.isEmpty
                     })
                 Button("Fit filtered routes", systemImage: "map") { context.request(.fitFiltered) }
-                    .disabled(!store.filteredActivities.contains { !$0.coordinates.isEmpty })
+                    .disabled(!store.browsingActivities.contains { !$0.coordinates.isEmpty })
                 Divider()
                 Button("Reset bearing", systemImage: "location.north") { context.request(.resetBearing) }
                 Button("Reset map view", systemImage: "arrow.counterclockwise") { context.request(.resetView) }

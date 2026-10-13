@@ -33,7 +33,10 @@ struct MapResultsContainer: View {
                     .transaction { if drag != nil { $0.animation = nil } }
             }
         } else {
-            NativeMapResultsSheet(picker: picker, store: store, size: size, topInset: topInset, largeText: largeText)
+            let openingHeight = NativeMapResultsSizing.openingHeight(
+                height: size.height, largeText: largeText, topInset: topInset)
+            NativeMapResultsSheet(picker: picker, store: store, openingHeight: openingHeight, largeText: largeText)
+
         }
     }
 
@@ -103,16 +106,13 @@ struct StackedShellSheet {
 private struct NativeMapResultsSheet: View {
     @Bindable var picker: RoutePicker
     let store: ActivityStore
-    let size: CGSize
-    let topInset: CGFloat
+    let openingHeight: CGFloat
     let largeText: Bool
     @Environment(\.mapResultsSheetSuspended) private var suspended
     @Environment(\.mapResultsPresentationChanged) private var presentationChanged
     @Environment(\.stackedShellSheet) private var stacked
-    private var openingHeight: CGFloat {
-        NativeMapResultsSizing.openingHeight(count: picker.candidateIDs.filter(store.visibleActivityIDs.contains).count,
-                                            detail: picker.detailID != nil, height: size.height, largeText: largeText, topInset: topInset)
-    }
+    // Geometry alone defines the stops: results, detail and selection changes
+    // never replace the selected detent or resize the user's map viewport.
     private var compact: PresentationDetent { .height(NativeMapResultsSizing.compactHeight(largeText: largeText)) }
     private var opening: PresentationDetent { .height(openingHeight) }
     private var detents: Set<PresentationDetent> { [compact, opening, .large] }
@@ -137,6 +137,7 @@ private struct NativeMapResultsSheet: View {
                         .ignoresSafeArea(.container, edges: .bottom)
                 }
                 .presentationDetents(detents, selection: selection)
+
                 // While rotating to landscape, size classes change before the side
                 // panel replaces this sheet; iOS would otherwise adapt it to full
                 // screen for that moment (device review, 2026-10-06).
@@ -157,17 +158,12 @@ private struct NativeMapResultsSheet: View {
 }
 
 enum NativeMapResultsSizing {
-    static func compactHeight(largeText: Bool) -> CGFloat { largeText ? 140 : 76 }
+    static func compactHeight(largeText: Bool) -> CGFloat { largeText ? 140 : 64 }
 
-    static func openingHeight(count: Int, detail: Bool, height: CGFloat, largeText: Bool, topInset: CGFloat = 0) -> CGFloat {
-        // Phone detail opens with its profile visible and the map above it.
-        // The smallest phones still retain a usable map instead of requiring .large.
-        let minimum: CGFloat = detail ? (largeText ? 420 : 340) : (largeText ? 300 : 220)
-        let content: CGFloat = detail ? (largeText ? 480 : (count > 1 ? 412 : 368))
-            : 76 + CGFloat(max(1, min(count, 5))) * (largeText ? 160 : 64)
-        // Large text on a short phone still needs a usable map above the
-        // opening sheet. Content scrolls; the user can explicitly expand it.
+    static func openingHeight(height: CGFloat, largeText: Bool, topInset: CGFloat = 0) -> CGFloat {
+        // One middle stop for results and detail. Short phones retain enough
+        // map for route framing; content scrolls and Large is always available.
         let maximum = max(160, height - topInset - 64 - 24 - 96)
-        return min(maximum, max(minimum, min(content, height * 0.5)))
+        return min(maximum, height * (largeText ? 0.55 : 0.5))
     }
 }

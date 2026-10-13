@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
-import { MoreHorizontal, Search, FunnelX } from 'lucide-react';
+import { MoreHorizontal, Search, FunnelX, ListFilter } from 'lucide-react';
+import { Switch } from '~/components/ui/switch';
 
 import { useShallowStore } from '~/store';
 
@@ -515,6 +516,48 @@ export function SearchFilter() {
   );
 }
 
+export function SelectedActivitiesFilter() {
+  const pathname = usePathname();
+  const { onlySelected, setOnlySelected } = useShallowStore((state) => ({
+    onlySelected: state.onlySelected,
+    setOnlySelected: state.setOnlySelected,
+  }));
+  const count = useShallowStore((state) => state.selected.length);
+  const { state } = useSidebar();
+  if (pathname?.startsWith('/stats')) return null;
+  const content = (
+    <label className="flex min-h-10 cursor-pointer items-center justify-between gap-2 text-sm">
+      Only selected activities
+      <Switch
+        aria-label="Only selected activities"
+        checked={onlySelected}
+        disabled={!count}
+        onCheckedChange={(checked) => setOnlySelected(checked)}
+      />
+    </label>
+  );
+  if (state === 'collapsed')
+    return (
+      <CollapsedFilter
+        label="Selected activities filter"
+        icon={
+          <ListFilter
+            className={onlySelected ? 'text-header-background' : undefined}
+          />
+        }
+        active={onlySelected}
+      >
+        {content}
+        {!count && (
+          <p className="text-xs text-muted-foreground">
+            Select activities first.
+          </p>
+        )}
+      </CollapsedFilter>
+    );
+  return <SidebarMenuItem className="mx-2">{content}</SidebarMenuItem>;
+}
+
 export function ResetFilters() {
   const pathname = usePathname();
   const resetFilters = useShallowStore((state) =>
@@ -529,7 +572,9 @@ export function ResetFilters() {
         variant="outline"
         aria-label="Clear filters"
         tooltip="Clear filters"
-        onClick={resetFilters}
+        onClick={() => {
+          resetFilters();
+        }}
       >
         <FunnelX />
         <span className="group-data-[collapsible=icon]:hidden">

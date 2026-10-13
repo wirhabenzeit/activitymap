@@ -620,7 +620,7 @@ extension RenderedRoutePickingTests {
         store.showOnMap(1)
         try await Task.sleep(for: .milliseconds(900))
         #expect(picker.detent == .medium, "Show on map must open the elevation profile without a manual sheet expansion")
-        // The activity heading's Fit route moves only the camera.
+        // The contextual header Fit route moves only the camera.
         store.mapContext.request(.fitActivity(1))
         try await Task.sleep(for: .milliseconds(600))
         #expect(picker.detent == .medium && picker.detailID == 1, "Reframing must retain visible activity detail")
@@ -766,13 +766,13 @@ extension RenderedRoutePickingTests {
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
         #expect(text.contains("Landscape ride") && text.contains("Elevation (m)") && text.contains("Distance (km)"),
                 "The scrolling heading and complete chart axes must fit in the opening landscape panel: \(text)")
-        #expect(!text.contains("Fit route"), "Fit is the title-row icon, not a footer")
+        #expect(!text.contains("Fit route"), "Detail content must not add another Fit action")
     }
 }
 
 extension RenderedRoutePickingTests {
     @Test(arguments: [false, true])
-    func nativeSheetUsesCompactHeadingAndScrollsThroughBottom(largeText: Bool) async throws {
+    func nativeSheetShowsOnlyControlsWhenCollapsedAndRetainsScroll(largeText: Bool) async throws {
         var activities = (1...20).map { ActivityStoreSelectionTests.activity($0) }
         activities[0].name = "Alpine morning ride with a very long title"
         let store = ActivityStore(activities: activities)
@@ -814,7 +814,9 @@ extension RenderedRoutePickingTests {
             #expect(sheet.view.bounds.height < (largeText ? 220 : 150), "Collapsed sheets should fit only their heading")
             let text = try screenshot(detail ? "compact-detail" : "compact-results")
             #expect(!text.contains("activities to explore") && !text.contains("Expand to review"))
-            #expect(detail ? text.contains("Alpine") : text.contains("20 selected"), "Compact heading must stay visible: \(text)")
+            #expect(text.contains("20 selected"), "Selection count must stay visible: \(text)")
+            #expect(!text.contains("Alpine") && !text.contains("Activity") && !text.contains("Results"),
+                    "Collapsed sheet must not leak activity headings or detail content: \(text)")
             picker.detent = .medium
             try await Task.sleep(for: .milliseconds(400))
             #expect(list.contentOffset == offset, "Collapsing must preserve the list position")

@@ -101,19 +101,6 @@ struct ListScreen: View {
                 .background(AppTheme.surface)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if verticalSizeClass != .compact {
-                HStack(spacing: AppTheme.Spacing.small) {
-                    SelectionBar(store: store, includesTotal: true)
-                    Spacer(minLength: 8)
-                    ListControls(presentation: store.listPresentation, iconOnly: true)
-                }
-                .padding(.horizontal, AppTheme.Spacing.small)
-                .background(.bar)
-                .overlay(alignment: .top) { Color(uiColor: .separator).frame(height: 0.5) }
-                .accessibilityIdentifier("list-status-bar")
-            }
-        }
         .modifier(ListOptionsSheets(presentation: store.listPresentation, availableWidth: width))
     }
 
@@ -165,78 +152,84 @@ private struct ListRootChrome: ViewModifier {
     }
 }
 
-/// Selection count and scoped bulk actions for the list.
+/// Hosted outside the owning navigation stack, including the outer Stats shell.
+struct BrowseListFooter: View {
+    @Bindable var store: ActivityStore
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
+    var body: some View {
+        if store.selectedTab == .list && (verticalSizeClass != .compact || typeSize.isAccessibilitySize) {
+            HStack(spacing: 8) {
+                SelectionBar(store: store, includesTotal: true, expandsCount: true)
+                ListControls(presentation: store.listPresentation, store: store, iconOnly: true)
+            }
+            .padding(.horizontal, 8).background(.bar)
+            .overlay(alignment: .top) { Color(uiColor: .separator).frame(height: 0.5) }
+            .accessibilityIdentifier("list-status-bar")
+        }
+    }
+}
+
+/// Shared native group controls; the mode is a direct button, not a menu.
 struct SelectionBar: View {
     @Bindable var store: ActivityStore
     var iconOnly = false
     var includesTotal = false
-    /// White on the blue shell bar instead of the List's own status bar.
     var onNavigationBar = false
-
-    private var selectedCount: Int { store.selectedActivityIDs.count }
-
-    private var summary: String {
-        let filteredCount = store.visibleActivityIDs.count
-        let visibleCount = selectedCount - store.hiddenSelectedCount
-        let hidden = store.hiddenSelectedCount
-        let scope = "\(visibleCount) of \(filteredCount) filtered activities selected"
-        return hidden > 0 ? "\(scope) · \(hidden) hidden by filters" : scope
-    }
-
-    private var visibleSummary: String {
-        let count = selectedCount - store.hiddenSelectedCount
-        let total = store.visibleActivityIDs.count
-        let scope = selectedCount == 0 ? "\(total) activities"
-            : includesTotal ? "\(count) selected · \(total) activities" : "\(count) selected"
-        return store.hiddenSelectedCount > 0 ? "\(scope) · \(store.hiddenSelectedCount) hidden" : scope
-    }
+    var showsClear = true
+    var expandsCount = false
 
     var body: some View {
-        // iOS grows a menu out of its button and absorbs the button's label,
-        // so only the icon is the menu: the count stays readable beside it (#283).
         HStack(spacing: 2) {
-            Menu {
-                Text(visibleSummary)
-                Divider()
-                Button("Select All Filtered Activities") {
-                    store.selectAllFiltered()
-                }
-                .disabled(store.visibleActivityIDs.isEmpty)
-                Button("Deselect All Filtered Activities") {
-                    store.deselectAllFiltered()
-                }
-                .disabled(selectedCount == store.hiddenSelectedCount)
-                Button("Clear selection", role: .destructive) {
-                    store.clearSelection()
-                }
-                .disabled(selectedCount == 0)
-            } label: {
-                Group {
-                    if iconOnly {
-                        Image(systemName: selectedCount > 0 ? "checkmark.square.fill" : "square")
-                            .font(.body)
-                            .foregroundStyle(selectedCount > 0 ? AppTheme.accent : Color.secondary)
-                    } else {
-                        HStack(spacing: 3) {
-                            Image(systemName: selectedCount > 0 ? "checkmark.circle.fill" : "checklist")
-                                .foregroundStyle(onNavigationBar ? Color.white : selectedCount > 0 ? AppTheme.accent : Color.secondary)
-                            Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(onNavigationBar ? AnyShapeStyle(Color.white.opacity(0.9)) : AnyShapeStyle(.secondary))
-                        }
-                    }
-                }
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
+            Button { store.setCombine(!store.isCombining) } label: {
+                Image(systemName: "checklist").font(.body)
+                    .foregroundStyle(onNavigationBar ? Color.white : store.isCombining ? AppTheme.accent : Color.secondary)
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+                    .background(store.isCombining ? AppTheme.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
             }
-            .accessibilityLabel("Selection actions for all filtered activities")
-            .accessibilityValue(summary)
+            .accessibilityLabel("Combine selections")
+            .accessibilityValue(store.isCombining ? "On" : "Off")
+            .accessibilityAddTraits(store.isCombining ? .isSelected : [])
+            .accessibilityIdentifier("combine-selection")
             if !iconOnly {
-                Text(visibleSummary).font(.caption.weight(.medium))
-                    .foregroundStyle(onNavigationBar ? AnyShapeStyle(Color.white.opacity(0.9)) : AnyShapeStyle(.secondary))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityHidden(true) // read as the menu's value
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 4) {
+                        Text("\(store.selectedActivityIDs.count) selected").font(.caption.weight(.medium))
+                        if store.onlySelected { Image(systemName: "line.3.horizontal.decrease").font(.caption2) }
+                    }
+                    if store.hiddenSelectedCount > 0 { Text("\(store.hiddenSelectedCount) hidden by filters").font(.caption2) }
+                    if store.isCombining { Text("Combine on").font(.caption2) }
+                    else if store.onlySelected { Text("Selected only").font(.caption2) }
+                    else if includesTotal { Text("\(store.browsingActivities.count) activities").font(.caption2) }
+                }.foregroundStyle(onNavigationBar ? AnyShapeStyle(Color.white) : AnyShapeStyle(.secondary))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: expandsCount ? .infinity : nil, alignment: .leading)
             }
+            if showsClear && !store.selectedActivityIDs.isEmpty {
+                Button { store.clearSelection() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                    .accessibilityLabel("Clear selection").accessibilityIdentifier("clear-selection")
+            }
+        }.buttonStyle(.plain)
+    }
+}
+
+struct ActivitySelectionSymbol: View {
+    @Bindable var store: ActivityStore
+    let activity: Activity
+    private var selected: Bool { store.selectedActivityIDs.contains(activity.id) }
+    var body: some View {
+        if store.isCombining {
+            Button { store.toggleMember(activity.id) } label: {
+                BrowseSportSymbol(category: activity.category, isSelected: selected)
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+            }.buttonStyle(.plain)
+                .accessibilityLabel("\(selected ? "Deselect" : "Select") \(activity.name)")
+                .accessibilityValue(selected ? "Selected" : "Not selected")
+                .accessibilityAddTraits(selected ? .isSelected : [])
+        } else {
+            BrowseSportSymbol(category: activity.category)
+                .frame(width: 44, height: 44)
+                .accessibilityHidden(false).accessibilityLabel(activity.sportType.rawValue)
         }
-        .buttonStyle(.plain)
     }
 }

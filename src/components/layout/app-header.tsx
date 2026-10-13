@@ -1,5 +1,7 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
+import { store } from '~/store';
 import { MainNav } from './main-nav';
 import { SidebarTrigger } from '~/components/ui/sidebar';
 import { Separator } from '~/components/ui/separator';
@@ -9,6 +11,11 @@ import * as React from 'react';
 import { ShareButton } from '../share-button';
 
 export const AppHeader = () => {
+  const pathname = usePathname();
+  React.useEffect(() => {
+    if (pathname?.startsWith('/stats'))
+      store.getState().setCombineSelections(false);
+  }, [pathname]);
   return (
     <header className="fixed inset-x-0 top-0 z-[60] border-border/40 bg-header-background px-2 text-header-foreground">
       <div className="flex h-14 items-center">

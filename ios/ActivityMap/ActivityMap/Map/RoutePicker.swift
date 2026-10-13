@@ -8,7 +8,6 @@ import Observation
 final class RoutePicker {
     private static let unavailableMessage = "Routes could not be selected. Wait for the map to load and try again."
 
-    var isAdding = false
     var isPresented = false
     var detent = MapResultsDetent.medium
     enum NavigationMotion { case forward, backward, none }
@@ -37,7 +36,9 @@ final class RoutePicker {
             return
         }
         let visibleIDs = store.visibleActivityIDs
-        let adding = isAdding
+        let adding = store.isCombining
+        let restriction = store.onlySelected
+        let selected = store.selectedActivityIDs
         let rect = CGRect(x: point.x - RouteHitTesting.radius, y: point.y - RouteHitTesting.radius,
                           width: RouteHitTesting.radius * 2, height: RouteHitTesting.radius * 2)
         // Query only the ordinary route layer: no raster/POI/photo feature can
@@ -49,7 +50,7 @@ final class RoutePicker {
             guard let self, let map, let store,
                   request == self.generation,
                   revision == store.activitiesRevision,
-                  visibleIDs == store.visibleActivityIDs else { return }
+                  visibleIDs == store.visibleActivityIDs, adding == store.isCombining, restriction == store.onlySelected, selected == store.selectedActivityIDs else { return }
             self.pendingQuery = nil
             switch result {
             case let .success(features):
@@ -67,25 +68,17 @@ final class RoutePicker {
 
     /// The query token also fences late callbacks after gestures or tab changes.
     func apply(ids: [Int], adding: Bool, request: Int, store: ActivityStore) {
-        guard request == generation else { return }
-        let eligible = Set(store.filteredActivities.filter { $0.coordinates.count > 1 }.map(\.id))
+        guard request == generation, adding == store.isCombining else { return }
+        let eligible = Set(store.browsingActivities.filter { $0.coordinates.count > 1 }.map(\.id))
         var seen = Set<Int>()
         let hits = ids.filter { eligible.contains($0) && seen.insert($0).inserted }
         errorMessage = nil
+        if hits.isEmpty && adding { return }
         navigationMotion = .none
         detailID = nil
-        if hits.isEmpty {
-            // Explicit contract: empty-map taps clear, including in Add mode.
-            store.clearSelection()
-            reconcile(with: store)
-            return
-        }
-        if adding {
-            store.addToSelection(hits)
-        } else {
-            store.replaceSelection(with: hits)
-            if hits.count == 1 { detailID = hits.first }
-        }
+        store.pickActivities(hits)
+        if hits.isEmpty { reconcile(with: store); return }
+        if !adding && hits.count == 1 { detailID = hits.first }
         candidateIDs = hits
         reconcile(with: store)
         isPresented = true
@@ -104,7 +97,6 @@ final class RoutePicker {
         if store.selectedActivityIDs.isEmpty {
             isPresented = false
             detailID = nil
-            isAdding = false
             detent = .medium
         } else if !isPresented {
             // A selection always has its results panel, including one made in

@@ -98,6 +98,7 @@ struct RoutePickerTests {
         store.replaceSelection(with: [1, 3])
         store.activate(1)
         store.activeSportTypes.remove(.ride)
+        store.setCombine(true)
         picker.apply(ids: [2], adding: true, request: picker.invalidateQuery(), store: store)
         #expect(store.selectedActivityIDs == [1, 2, 3] && store.activeActivityID == 1)
         #expect(picker.detailID == nil)
@@ -106,13 +107,19 @@ struct RoutePickerTests {
         #expect(store.activeActivityID == nil && picker.detailID == nil)
     }
 
-    @Test(arguments: [true, false]) func emptyTapClearsEvenHiddenSelection(adding: Bool) {
+    @Test(arguments: [true, false]) func emptyTapRespectsCombine(adding: Bool) {
         let store = store(), picker = RoutePicker()
         store.replaceSelection(with: [1, 3])
         store.inspect(2)
+        picker.reconcile(with: store)
+        picker.showDetail(1, store: store)
+        store.setCombine(adding)
         picker.apply(ids: [], adding: adding, request: picker.invalidateQuery(), store: store)
-        #expect(store.selectedActivityIDs.isEmpty && store.activeActivityID == nil)
-        #expect(store.inspectedActivityID == 2 && !picker.isPresented)
+        #expect(store.selectedActivityIDs == (adding ? [1, 3] : []))
+        #expect(store.activeActivityID == (adding ? 1 : nil))
+        #expect(picker.detailID == (adding ? 1 : nil))
+        #expect(store.isCombining == adding)
+        #expect(store.inspectedActivityID == 2 && picker.isPresented == adding)
     }
 
     @Test func staleTapCannotOverwriteNewTapOrGesture() {

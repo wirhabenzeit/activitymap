@@ -9,6 +9,7 @@ struct MapResultsTests {
         let picker = RoutePicker()
         store.addToSelection([1, 4])
         store.inspect(4)
+        store.setCombine(true)
         picker.apply(ids: [3, 2], adding: true, request: picker.invalidateQuery(), store: store)
         #expect(picker.candidateIDs == [3, 2, 4, 1])
         picker.showDetail(4, store: store)
@@ -87,7 +88,7 @@ struct MapResultsTests {
 
     @Test func shortPhoneOpeningSheetLeavesRoomForAccessibleRouteFraming() {
         let height: CGFloat = 551, top: CGFloat = 116
-        let opening = NativeMapResultsSizing.openingHeight(count: 4, detail: true, height: height,
+        let opening = NativeMapResultsSizing.openingHeight(height: height,
                                                          largeText: true, topInset: top)
         #expect(opening >= 160, "Opening retains a scrolling detail surface")
         #expect(height - top - 64 - opening - 24 >= 96, "Large text must not leave Show on map waiting for an impossible fit")

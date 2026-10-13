@@ -28,10 +28,7 @@ export function showActivityOnMap(
       .filter((item) => applyFilters(state, item))
       .map((item) => item.id),
   );
-  state.setSelected((selected) =>
-    selected.includes(activity.id) ? selected : [...selected, activity.id],
-  );
-  state.setHighlighted(activity.id);
+  state.selectForMap(activity.id);
   state.requestRouteFit([activity.id]);
   return 'shown';
 }

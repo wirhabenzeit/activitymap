@@ -164,7 +164,7 @@ struct ActivityDetailHeading: View {
     /// sizes show the icon alone.
     static let labelledWidth: CGFloat = 520
     private var labelled: Bool { width >= Self.labelledWidth && !typeSize.isAccessibilitySize }
-    // One map symbol everywhere; over the map the same action frames the route.
+    // Map sheets own their contextual Fit button in the persistent group header.
     private var title: String { overMap ? "Fit route" : "Show on map" }
     private let icon = "map"
 
@@ -172,7 +172,7 @@ struct ActivityDetailHeading: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
             HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
                 ActivityDetailIdentity(activity: activity, titleLineLimit: titleLineLimit, onNavigationBar: onNavigationBar)
-                if let showOnMap {
+                if let showOnMap, !overMap {
                     Button { showOnMap(activity.id) } label: {
                         if labelled {
                             Label(title, systemImage: icon)

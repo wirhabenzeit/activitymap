@@ -71,7 +71,7 @@ extension RenderedRoutePickingTests {
         try await listWait { !stacked() && sheets.mapResultsPresented }
     }
 
-    @Test func nativeMapSheetUsesContentHeightAndRetainsPaging() async throws {
+    @Test func nativeMapSheetUsesStableHeightAndRetainsPaging() async throws {
         let store = ActivityStore(activities: try GalleryLibrary.load().activities)
         store.selectedTab = .map
         store.replaceSelection(with: Array(store.activities.prefix(2).map(\.id)))
@@ -86,13 +86,13 @@ extension RenderedRoutePickingTests {
         try await listWait { host.host.presentedViewController?.sheetPresentationController != nil }
         let controller = try #require(host.host.presentedViewController)
         let sheet = try #require(controller.sheetPresentationController)
-        #expect(sheet.selectedDetentIdentifier != .large, "Initial presentation must start at its content height")
+        #expect(sheet.selectedDetentIdentifier != .large, "Initial presentation must start at the middle stop")
         var animatedEntrance = controller.transitionCoordinator?.isAnimated == true
         for _ in 0..<8 {
             animatedEntrance = animatedEntrance || controller.transitionCoordinator?.isAnimated == true
             let height = controller.presentationController?.presentedView?.layer.presentation()?.bounds.height
                 ?? controller.view.bounds.height
-            #expect(height < 360, "Two-route entrance must not animate down from full height: \(height)")
+            #expect(height < 520, "Entrance must not animate down from full height: \(height)")
             try await Task.sleep(for: .milliseconds(30))
         }
         #expect(animatedEntrance, "Opening selection must use an animated native presentation")
@@ -103,8 +103,6 @@ extension RenderedRoutePickingTests {
         try image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/native-map-two-routes.png"))
         #expect(sheet.detents.count == 3)
         #expect(sheet.largestUndimmedDetentIdentifier != nil, "Map remains interactive behind the sheet")
-        #expect(NativeMapResultsSizing.openingHeight(count: 2, detail: false, height: 844, largeText: false)
-                < NativeMapResultsSizing.openingHeight(count: 20, detail: false, height: 844, largeText: false))
         picker.detent = .expanded
         try await Task.sleep(for: .milliseconds(300))
         #expect(sheet.selectedDetentIdentifier == .large)
@@ -370,7 +368,7 @@ extension RenderedRoutePickingTests {
         #expect(map.mapboxMap.points(for: route).allSatisfy { visible.contains($0) },
                 "The animation must finish with the route framed above the opening results sheet")
         #expect(store.selectedTab == .map && store.inspectedActivityID == nil)
-        #expect(store.activeActivityID == 2 && store.selectedActivityIDs == [1, 2])
+        #expect(store.activeActivityID == 2 && store.selectedActivityIDs == [2])
         #expect(host.host.presentedViewController?.sheetPresentationController != nil)
         try host.save("list-detail-map-handoff")
         if let directory = captureDirectory { try Data().write(to: directory.appendingPathComponent("done")) }
@@ -580,6 +578,7 @@ extension RenderedRoutePickingTests {
         ]))
         let store = ActivityStore(activities: [activity], listPresentation: presentation)
         store.selectedTab = .list
+        store.setCombine(true)
         store.selectAllFiltered()
         let size = tablet ? CGSize(width: 768, height: 1024) : CGSize(width: 320, height: 700)
         let root = NavigationStack { ListScreen(store: store).navigationTitle("Activities") }
@@ -641,14 +640,18 @@ private final class ListHarness<Content: View> {
         }
         return visit(host)
     }
-    func close() { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
-    func accessibilityElement(label: String) -> NSObject? {
+    func close() {
+        window.isHidden = true
+        window.rootViewController = nil
+        oldWindow?.makeKeyAndVisible()
+    }
+    func accessibilityElement(label: String = "", identifier: String? = nil, includingSheets: Bool = false) -> NSObject? {
         var visited: Set<ObjectIdentifier> = []
         func visit(_ object: NSObject) -> NSObject? {
             guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
             if let view = object as? UIView, view.isHidden || view.alpha == 0 { return nil }
-            if object.accessibilityLabel == label,
-               !object.accessibilityFrame.isEmpty { return object }
+            if (identifier.map { (object as? UIAccessibilityIdentification)?.accessibilityIdentifier == $0 }
+                ?? (object.accessibilityLabel == label)), !object.accessibilityFrame.isEmpty { return object }
             let count = object.accessibilityElementCount()
             if count > 0, count < 1000 {
                 for index in 0..<count {
@@ -661,7 +664,7 @@ private final class ListHarness<Content: View> {
             }
             return nil
         }
-        return visit(host.view)
+        return visit(includingSheets ? window : host.view)
     }
     func accessibilityValues() -> [String] {
         var visited: Set<ObjectIdentifier> = []
@@ -693,5 +696,190 @@ private struct AdaptiveListFixture: View {
         NavigationStack {
             ListScreen(store: store).navigationTitle("Activities").navigationBarTitleDisplayMode(.inline)
         }.environment(\.horizontalSizeClass, layout.sizeClass)
+    }
+}
+
+
+extension RenderedRoutePickingTests {
+    @Test(arguments: ["phone", "dark", "landscape", "tablet", "large-text"])
+    func selectionControlsSurviveListInspection(variant: String) async throws {
+        let oldToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = oldToken }
+        let store = ActivityStore(activities: (1...4).map { ActivityStoreSelectionTests.activity($0) },
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .list; store.replaceSelection(with: [2, 4])
+        let landscape = variant == "landscape", tablet = variant == "tablet"
+        let size = landscape ? CGSize(width: 844, height: 390) : tablet ? CGSize(width: 834, height: 1194) : CGSize(width: 390, height: 844)
+        let host = try ListHarness(root: AppShell(store: store)
+            .environment(\.horizontalSizeClass, tablet ? .regular : .compact)
+            .environment(\.verticalSizeClass, landscape ? .compact : .regular)
+            .environment(\.dynamicTypeSize, variant == "large-text" ? .accessibility3 : .large)
+            .environment(\.colorScheme, variant == "dark" ? .dark : .light)
+            .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)), size: size)
+        defer { host.close() }
+        try await listWait { host.accessibilityElement(label: "Combine selections") != nil }
+        #expect(host.accessibilityElement(label: "Deselect Activity 4") == nil)
+        let control = try #require(host.accessibilityElement(label: "Combine selections"))
+        #expect(control.accessibilityFrame.width >= 44 && control.accessibilityFrame.height >= 44)
+        store.setCombine(true)
+        try await listWait { host.accessibilityElement(label: "Deselect Activity 4") != nil }
+        #expect(host.accessibilityElement(label: "Select Activity 3") != nil)
+        try host.save("selection-384-\(variant)-list")
+        store.inspect(2)
+        try await listWait { store.inspectedActivityID == 2 && host.accessibilityElement(label: "Combine selections") != nil }
+        if !tablet {
+            let navigation = try #require(host.controllers(of: UINavigationController.self).last)
+            try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        }
+        #expect(host.accessibilityElement(label: "Combine selections") != nil, "Mode must be reachable in pushed detail")
+        try host.save("selection-384-\(variant)-detail")
+        store.setOnlySelected(true)
+        #expect(store.listedActivities.count == 2)
+        store.clearSelection()
+        #expect(!store.onlySelected && store.isCombining && store.inspectedActivityID == 2)
+        store.setCombine(false)
+        try await listWait { host.accessibilityElement(label: "Combine selections")?.accessibilityValue == "Off" }
+    }
+}
+
+
+extension RenderedRoutePickingTests {
+    @Test(arguments: ["phone", "landscape", "large-text"])
+    func sharedModeStaysReachableInMapResultsAndEmptyDock(variant: String) async throws {
+        let oldToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = oldToken }
+        let store = ActivityStore(activities: (1...3).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: [1, 2])
+        let picker = RoutePicker()
+        let landscape = variant == "landscape"
+        let host = try ListHarness(root: AppShell(store: store, mapPicker: picker)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.verticalSizeClass, landscape ? .compact : .regular)
+            .environment(\.dynamicTypeSize, variant == "large-text" ? .accessibility3 : .large)
+            .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)),
+            size: landscape ? CGSize(width: 844, height: 390) : CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await listWait { host.accessibilityElement(label: "Combine selections", includingSheets: true) != nil }
+        store.setCombine(true)
+        try await listWait { host.accessibilityElement(label: "Deselect Activity 2", includingSheets: true) != nil }
+        try host.save("selection-384-\(variant)-map")
+        picker.showDetail(2, store: store)
+        try await listWait { host.accessibilityElement(label: "Combine selections", includingSheets: true)?.accessibilityValue == "On" }
+        store.setOnlySelected(true)
+        #expect(store.visibleActivityIDs == [1, 2])
+        store.clearSelection()
+        try await listWait { !picker.isPresented && host.host.presentedViewController == nil }
+        let mode = try #require(host.accessibilityElement(label: "Combine selections"))
+        #expect(mode.accessibilityValue == "On" && mode.accessibilityFrame.width >= 44)
+        #expect(!store.onlySelected && store.isCombining)
+        try host.save("selection-384-\(variant)-map-empty")
+    }
+}
+
+
+extension RenderedRoutePickingTests {
+    @Test func nativeMiddleDetentStaysStillWhenSwitchingResultsAndDetail() async throws {
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities)
+        store.replaceSelection(with: Array(store.activities.prefix(3).map(\.id)))
+        store.setCombine(true)
+        let picker = RoutePicker()
+        let host = try ListHarness(root: MapResultsContainer(picker: picker, store: store,
+            size: CGSize(width: 390, height: 844), topInset: 0, bottomInset: 34, largeText: false),
+            size: CGSize(width: 390, height: 844))
+        defer { host.host.dismiss(animated: false); host.close() }
+        picker.reviewSelection(store: store)
+        try await listWait { host.host.presentedViewController?.sheetPresentationController != nil }
+        let controller = try #require(host.host.presentedViewController)
+        let sheet = try #require(controller.sheetPresentationController)
+        try await listWait { controller.transitionCoordinator == nil }
+        let identifier = try #require(sheet.selectedDetentIdentifier)
+        func height() -> CGFloat {
+            controller.presentationController?.presentedView?.layer.presentation()?.bounds.height ?? controller.view.bounds.height
+        }
+        var detailHeight: CGFloat = 0
+        for inspecting in [true, false, true, false] {
+            let before = height()
+            if inspecting { picker.showDetail(try #require(picker.candidateIDs.first), store: store) }
+            else { picker.showResults() }
+            var samples: [CGFloat] = []
+            for _ in 0..<45 {
+                try await Task.sleep(for: .milliseconds(16))
+                samples.append(height())
+                #expect(sheet.selectedDetentIdentifier == identifier, "Middle detent identity must remain stable in every frame")
+                #expect(picker.detent == .medium, "UIKit must not feed an unintended compact/large fallback into the model")
+                #expect(host.host.presentedViewController === controller)
+            }
+            let after = height()
+            if inspecting { detailHeight = after }
+            #expect(samples.allSatisfy { abs($0 - before) < 2 } && abs(after - before) < 2,
+                    "Results/detail navigation must not resize the sheet: \(samples)")
+        }
+        // Adding/removing candidates also keeps the middle stop still.
+        let beforeSelectionChange = height()
+        store.replaceSelection(with: Array(store.activities.prefix(1).map(\.id)))
+        picker.reconcile(with: store)
+        for _ in 0..<30 {
+            try await Task.sleep(for: .milliseconds(16))
+            #expect(abs(height() - beforeSelectionChange) < 2)
+            #expect(sheet.selectedDetentIdentifier == identifier)
+        }
+        picker.detent = .expanded
+        try await listWait { sheet.selectedDetentIdentifier == .large }
+        picker.showDetail(try #require(picker.candidateIDs.first), store: store)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(sheet.selectedDetentIdentifier == .large && picker.detent == .expanded)
+        picker.detent = .medium
+        try await listWait { sheet.selectedDetentIdentifier == identifier }
+        try await Task.sleep(for: .milliseconds(800))
+        #expect(abs(height() - detailHeight) < 2, "Returning from Large must use the current middle height")
+        picker.detent = .compact
+        try await listWait { sheet.selectedDetentIdentifier != identifier && sheet.selectedDetentIdentifier != .large }
+        try await Task.sleep(for: .milliseconds(800))
+        #expect(picker.detent == .compact && height() < 150)
+        picker.detent = .medium
+        try await listWait { sheet.selectedDetentIdentifier == identifier }
+        try await Task.sleep(for: .milliseconds(800))
+        #expect(abs(height() - detailHeight) < 2)
+    }
+}
+
+
+extension RenderedRoutePickingTests {
+    @Test func mapHeaderFitFollowsResultsAndDetail() async throws {
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1),
+            ActivityStoreSelectionTests.activity(2), ActivityStoreSelectionTests.activity(3, route: false)])
+        store.replaceSelection(with: [1, 2, 3])
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let host = try ListHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: true),
+                                   size: CGSize(width: 390, height: 700))
+        defer { host.close() }
+        for id in [0, 1, 2, 0] {
+            if id == 0 { picker.showResults() }
+            else { picker.showDetail(id, store: store) }
+            let label = id == 0 ? "Fit selection" : "Fit route"
+            try await listWait { host.accessibilityElement(label: label) != nil }
+            #expect(host.accessibilityElement(label: id == 0 ? "Fit route" : "Fit selection") == nil)
+            #expect(host.accessibilityElement(identifier: "activity-show-on-map") == nil,
+                    "The Map detail heading must not offer a duplicate Fit button")
+            let fit = try #require(host.accessibilityElement(label: label))
+            #expect(fit.accessibilityActivate())
+            try await listWait { store.mapContext.pendingRequest != nil }
+            let request = try #require(store.mapContext.pendingRequest)
+            #expect(request.action == (id == 0 ? .fitSelection : .fitActivity(id)))
+            #expect(store.selectedActivityIDs == [1, 2, 3])
+            #expect(picker.detailID == (id == 0 ? nil : id))
+            store.mapContext.consume(request)
+        }
+        picker.showDetail(3, store: store)
+        try await listWait { host.accessibilityElement(label: "Fit route")?.accessibilityTraits.contains(.notEnabled) == true }
+        picker.detent = .compact
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(host.accessibilityElement(label: "Fit route")?.accessibilityTraits.contains(.notEnabled) == true,
+                "Collapsed detail retains its fit target, including no-GPS disabling")
+        picker.showResults()
+        try await listWait { host.accessibilityElement(label: "Fit selection")?.accessibilityTraits.contains(.notEnabled) == false }
     }
 }

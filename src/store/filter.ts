@@ -427,6 +427,7 @@ export const createFilterSlice: StateCreator<
 
     resetFilters: () => {
       set((state) => {
+        state.onlySelected = false;
         state.sportType = initializeSportType();
         state.sportGroup = initializeSportGroup();
         state.dateRange = undefined;

@@ -46,7 +46,7 @@ struct RenderedRoutePickingTests {
             let event = map.mapboxMap.onMapIdle.observe { _ in idle = true }
             defer { event.cancel() }
             map.mapboxMap.setMapStyleContent {
-                RouteLayers(data: store.routeGeometry.data, visibleIDs: store.selection.visibleIDs,
+                RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
                             selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
             }
             try await waitUntil { idle }
@@ -73,6 +73,21 @@ struct RenderedRoutePickingTests {
         #expect(picker.candidateIDs == [10] && picker.detailID == 10)
         #expect(store.selectedActivityIDs == [10])
 
+        // A late query from the previous mode cannot replace the group.
+        picker.pick(at: point, map: map.mapboxMap, store: store)
+        store.setCombine(true)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(store.selectedActivityIDs == [10] && store.isCombining)
+        store.resetFilters()
+        try await render()
+        store.setOnlySelected(true)
+        try await render()
+        #expect(store.ordinaryVisibleActivityIDs == [9, 10] && store.visibleActivityIDs == [10])
+        // A Combine miss preserves the group, active route and result detail.
+        picker.pick(at: CGPoint(x: 5, y: 5), map: map.mapboxMap, store: store)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(store.selectedActivityIDs == [10] && picker.detailID == 10)
+        store.setCombine(false)
         // Rendered-map miss clears selection instead of selecting raster/POIs.
         picker.pick(at: CGPoint(x: 5, y: 5), map: map.mapboxMap, store: store)
         try await waitUntil { !picker.isPresented || picker.errorMessage != nil }

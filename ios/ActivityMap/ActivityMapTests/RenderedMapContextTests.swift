@@ -291,8 +291,10 @@ extension RenderedRoutePickingTests {
         picker.reviewSelection(store: store)
         picker.detent = .expanded
         store.mapContext.request(.fitSelection)
-        try await cameraWait { store.mapContext.pendingRequest == nil }
-        try await Task.sleep(for: .milliseconds(500))
+        try await cameraWait {
+            guard case .state = map.viewport.status else { return false }
+            return store.mapContext.pendingRequest == nil && map.mapboxMap.cameraState.padding.right > 300
+        }
         let camera = map.mapboxMap.cameraState
         #expect(camera.padding.right > 300, "Framing reserves the actual edge panel")
         #expect(host.presentedViewController == nil, "Wide results remain at the map edge")

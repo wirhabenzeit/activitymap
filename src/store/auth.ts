@@ -56,6 +56,8 @@ export const createAuthSlice: StateCreator<
           JSON.stringify(auth.guestMode ?? { type: null })
       ) {
         resetBrowsingContext();
+        state.combineSelections = false;
+        state.onlySelected = false;
         state.selected = [];
         state.highlighted = 0;
         state.knownSelectionIDs = null;

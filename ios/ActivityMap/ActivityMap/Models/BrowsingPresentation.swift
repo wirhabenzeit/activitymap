@@ -39,7 +39,7 @@ struct BrowsingPresentation: Equatable {
     let isSyncing: Bool
 
     init(store: ActivityStore, sync: SyncController?, isSigningIn: Bool = false) {
-        let filtered = store.filteredActivities
+        let filtered = store.browsingActivities
         self.init(tab: store.selectedTab, activityCount: store.activities.count,
                   filteredCount: filtered.count,
                   routeCount: store.selectedTab == .map && !store.routableActivityIDs.isDisjoint(with: store.visibleActivityIDs) ? 1 : 0,

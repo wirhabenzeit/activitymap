@@ -61,7 +61,7 @@ void test('Show on map refuses hidden targets without explicit filter clearing',
   assert.equal(store.getState().routeFitRequest, null);
 });
 
-void test('explicit clear-and-show activates immediately and preserves other selections', () => {
+void test('default clear-and-show replaces the group and activates immediately', () => {
   const store = setup();
   store.getState().setSelected((ids) => [...ids, 2]);
   assert.equal(
@@ -69,7 +69,7 @@ void test('explicit clear-and-show activates immediately and preserves other sel
     'shown',
   );
   assert.equal(store.getState().search, '');
-  assert.deepEqual(store.getState().selected, [1, 2]);
+  assert.deepEqual(store.getState().selected, [2]);
   assert.equal(store.getState().highlighted, 2);
   assert.deepEqual(store.getState().routeFitRequest?.activityIDs, [2]);
   store.getState().reconcileSelection([1, 2, 3], [1, 2, 3]);
@@ -100,4 +100,19 @@ void test('a deleted activity cannot clear filters, activate or request a camera
     'unavailable',
   );
   assert.equal(store.getState(), before);
+});
+
+void test('Combine Show on map adds an ordinary-eligible nonmember through selected-only scope', () => {
+  const store = setup();
+  store.getState().setSearch('');
+  store.getState().reconcileSelection([1, 2, 3], [1, 2, 3]);
+  store.getState().setCombineSelections(true);
+  store.getState().setOnlySelected(true);
+  assert.equal(
+    showActivityOnMap(store, activities[1]!, activities, false),
+    'shown',
+  );
+  assert.deepEqual(store.getState().selected, [1, 2]);
+  assert.equal(store.getState().onlySelected, true);
+  assert.equal(store.getState().highlighted, 2);
 });
