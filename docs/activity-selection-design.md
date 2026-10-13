@@ -30,7 +30,7 @@ Several routes found by one tap are ordinary exploration. Combining several inde
 | Active scope | A funnel indicator beside the selected count, and active feedback on the Filters control. The restriction must remain apparent with Filters closed. |
 | Combine on | Highlight the icon, expose its On/Off state accessibly, and show **Combine on** beside/below the count. Tapping it again ends the mode without discarding the group. |
 | Activity rows | Keep the existing sport-icon footprint. Outside Combine it identifies the sport; inside Combine it toggles membership and overlays a small checkmark on selected icons. Keep selected names/backgrounds identifiable in both modes. |
-| Zero selection | Keep Combine reachable. Map shows a small selection header/dock rather than a tall empty results surface; List keeps its existing footer. Hide or disable unavailable Clear/Fit actions. |
+| Zero selection | Keep Combine reachable. Map shows only the Combine icon, without “0 selected” text or an empty results bar; List keeps its existing footer. Hide or disable unavailable Clear/Fit actions. |
 
 Combine is a direct toggle, not a menu of input modes. Clear is directly available and includes hidden members. Camera fitting remains independent of selection, restriction, Back and sheet sizing. One persistent header button uses **Fit selection** in Results and **Fit route** in detail; this work does not introduce another framing vocabulary.
 

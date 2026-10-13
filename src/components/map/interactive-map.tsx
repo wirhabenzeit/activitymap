@@ -876,7 +876,9 @@ export default function InteractiveMap() {
           } as React.CSSProperties
         }
         className={cn(
-          'z-10 absolute left-2 right-2 bottom-2 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[min(70vw,48rem)] [@media(min-width:650px)_and_(max-height:500px)]:left-auto [@media(min-width:650px)_and_(max-height:500px)]:w-[min(42vw,24rem)] bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
+          'z-10 absolute right-2 bottom-2 lg:right-5 lg:bottom-5 bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
+          selected.length > 0 &&
+            'left-2 lg:left-auto lg:w-[min(70vw,48rem)] [@media(min-width:650px)_and_(max-height:500px)]:left-auto [@media(min-width:650px)_and_(max-height:500px)]:w-[min(42vw,24rem)]',
         )}
       >
         {
