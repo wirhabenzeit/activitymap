@@ -885,3 +885,49 @@ extension RenderedRoutePickingTests {
         try await listWait { host.accessibilityElement(label: "Fit selection")?.accessibilityTraits.contains(.notEnabled) == false }
     }
 }
+
+
+extension RenderedRoutePickingTests {
+    @Test(arguments: [false, true])
+    func phoneTabsKeepHeaderGeometryAndStatusStyle(hasSelection: Bool) async throws {
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let store = ActivityStore(activities: (1...6).map { ActivityStoreSelectionTests.activity($0) })
+        let picker = RoutePicker()
+        if hasSelection { store.replaceSelection(with: Array(1...6)); picker.detent = .compact }
+        let host = try ListHarness(root: AppShell(store: store, mapPicker: picker)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#81b77c"}}]}"##)),
+            size: CGSize(width: 390, height: 844))
+        defer { host.host.dismiss(animated: false); host.close() }
+        var frames: [CGRect] = []
+        var styles: [UIStatusBarStyle] = []
+        let status = try #require(host.window.windowScene?.statusBarManager)
+        for tab in [AppTab.stats, .list, .map, .stats, .map, .list] {
+            store.selectedTab = tab
+            try await Task.sleep(for: .milliseconds(600))
+            let settings = try #require(host.accessibilityElement(label: "Settings"))
+            frames.append(settings.accessibilityFrame)
+            styles.append(status.statusBarStyle)
+            try host.save("shell-header-\(tab)-\(hasSelection)")
+        }
+        #expect(frames.allSatisfy { abs($0.midY - frames[0].midY) < 1 }, "All tabs must keep the toolbar at the same height: \(frames)")
+        #expect(styles.allSatisfy { $0 == styles[0] }, "Switching to Map must not change the clock/battery appearance: \(styles)")
+        if hasSelection {
+            store.selectedTab = .map
+            picker.detent = .medium
+            try await Task.sleep(for: .milliseconds(700))
+            func saveSheet(_ name: String) throws {
+                let image = UIGraphicsImageRenderer(bounds: host.window.bounds).image { _ in
+                    host.window.drawHierarchy(in: host.window.bounds, afterScreenUpdates: true)
+                }
+                try image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/activitymap-jump-review/\(name).png"))
+            }
+            try saveSheet("translucent-results")
+            picker.showDetail(1, store: store)
+            try await Task.sleep(for: .milliseconds(300))
+            try saveSheet("translucent-detail")
+        }
+    }
+}

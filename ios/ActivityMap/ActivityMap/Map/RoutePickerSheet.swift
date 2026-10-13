@@ -192,6 +192,6 @@ struct RoutePickerSheet: View {
 
         }
         .padding(.leading, 12).padding(.trailing, 8).padding(.vertical, 4)
-        .background(ActivityRowBackground(selected: true, inspected: store.activeActivityID == activity.id))
+        .background(ActivityRowBackground(selected: true, inspected: store.activeActivityID == activity.id, overMap: true))
     }
 }

@@ -51,9 +51,10 @@ enum AppTheme {
 struct ActivityRowBackground: View {
     var selected: Bool
     var inspected: Bool
+    var overMap = false
 
     var body: some View {
-        (selected ? AppTheme.selectedRowBackground : Color(uiColor: .systemBackground))
+        (overMap ? Color.clear : selected ? AppTheme.selectedRowBackground : Color(uiColor: .systemBackground))
             .overlay { if inspected { AppTheme.inspectionBackground } }
             .overlay(alignment: .top) {
                 if inspected { AppTheme.accent.opacity(0.4).frame(height: 1) }

@@ -190,3 +190,12 @@ The prior dynamic-height UIKit bridge is removed. The native presenter uses ordi
 The persistent Map group header owns the only Fit control on web and iOS. Results fits the selected group; activity detail fits the currently inspected route, including after paging or collapsing. The accessible label/title follows that target (Fit selection / Fit route). Native no-GPS detail disables the action instead of fitting a different selected route. List/Stats Show on map remains a navigation action.
 
 The rendered native regression activates the real control through Results → activity 1 → activity 2 → Results and checks camera commands and retained selection/inspection, plus disabled no-GPS/collapsed behavior. It and the frame-sampled stable-height regression pass. The web browser journey checks a single Fit control, the changing target label, and selection retention after fitting; the complete responsive selection journey, TypeScript and scoped ESLint pass.
+
+
+### Device follow-up: consistent phone header and translucent results
+
+Map used a custom 54-point shell header while List/Stats used the native navigation bar, changing toolbar position and status-bar ownership during tab switches. Compact phones now use the same inline native navigation header on all three tabs. Existing wide-window headers and pushed detail navigation remain in place.
+
+Map result rows now let the sheet material show through instead of painting the opaque selected-List background over it. The active-route tint and edge highlight remain visible. Ordinary List row backgrounds are unchanged.
+
+Five targeted native test methods pass, including repeated tab switches with/without a collapsed selection (checking toolbar geometry and the system status-bar style), retained List pushes, Stats navigation, stacked sheets and empty selection controls. Synthetic colored-map captures verify matching Results/detail translucency. Physical-device confirmation remains open.

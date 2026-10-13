@@ -48,6 +48,7 @@ struct AppShell: View {
     }
 
     private var nativeStatsHeader: Bool { usesStatsNavigation && sizeClass == .compact }
+    private var nativeMapHeader: Bool { usesStatsNavigation && sizeClass == .compact }
 
     var body: some View {
         Group {
@@ -209,7 +210,8 @@ struct AppShell: View {
                     || contentWidth < BrowsePaneLayout.minimumDetailWidth || typeSize.isAccessibilitySize)
                 VStack(spacing: 0) {
                     if !(store.selectedTab == .list && nativeListHeader)
-                        && !(store.selectedTab == .stats && nativeStatsHeader) {
+                        && !(store.selectedTab == .stats && nativeStatsHeader)
+                        && !(store.selectedTab == .map && nativeMapHeader) {
                         shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
                     }
                     filterWorkspace(sidebarAvailable: sidebarAvailable, panelFloats: panelFloats) {
@@ -249,14 +251,17 @@ struct AppShell: View {
             VStack(spacing: 0) {
                 NavigationStack {
                     content
+                        .navigationBarTitleDisplayMode(.inline)
                         .toolbar((store.selectedTab == .list && nativeListHeader)
-                                 || (store.selectedTab == .stats && nativeStatsHeader) ? .visible : .hidden, for: .navigationBar)
+                                 || (store.selectedTab == .stats && nativeStatsHeader)
+                                 || (store.selectedTab == .map && nativeMapHeader) ? .visible : .hidden, for: .navigationBar)
                         .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
                         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
                         .toolbarColorScheme(.dark, for: .navigationBar)
                         .toolbar {
                             if (store.selectedTab == .list && nativeListHeader)
-                                || (store.selectedTab == .stats && nativeStatsHeader) {
+                                || (store.selectedTab == .stats && nativeStatsHeader)
+                                || (store.selectedTab == .map && nativeMapHeader) {
                                 browseRootToolbar(sidebarAvailable: sidebarAvailable)
                             }
                         }
