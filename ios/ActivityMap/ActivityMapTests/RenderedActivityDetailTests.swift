@@ -659,8 +659,15 @@ extension RenderedRoutePickingTests {
                 "The visible hierarchy must be title, graph, description, then stats")
         #expect(observations.filter { $0.topCandidates(1).first?.string.contains("42.7") == true }.count == 1,
                 "Distance must appear in one stats row only")
-        #expect(!map.viewAnnotations.allAnnotations.isEmpty,
+        #expect(host.descendants(of: UIView.self).contains { $0.accessibilityIdentifier == "map-route-position" },
                 "The route cursor is drawn above the map and retains its color under dark lighting")
+        store.elevationCursor = .init(owner: UUID(), activityID: 1, cached: cached, point: profile.points[0])
+        try await Task.sleep(for: .milliseconds(200))
+        let cursor = try #require(host.descendants(of: UIView.self).first { $0.accessibilityIdentifier == "map-route-position" })
+        let cursorFrame = cursor.convert(cursor.bounds, to: map)
+        let projected = map.mapboxMap.point(for: activity.coordinates[0])
+        #expect(abs(cursorFrame.midX - projected.x) < 1 && abs(cursorFrame.midY - projected.y) < 1,
+                "Scrubbing updates the dot without moving the camera")
         picker.detent = .expanded
         try await Task.sleep(for: .milliseconds(600))
         let expanded = UIGraphicsImageRenderer(bounds: host.window.bounds).image { _ in

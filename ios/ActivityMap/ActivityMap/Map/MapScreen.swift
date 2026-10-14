@@ -22,6 +22,7 @@ struct MapScreen: View {
     @State private var location = MapLocationController()
     @State private var terrain = MapTerrainState()
     @State private var compass: MapCompassState
+    @State private var positions = MapPositionState()
 
     init(store: ActivityStore, topOcclusion: CGFloat = 0, picker: RoutePicker? = nil) {
         _picker = State(initialValue: picker ?? RoutePicker())
@@ -204,17 +205,6 @@ struct MapScreen: View {
                 }
             }
 
-            if let coordinate = context.locatedPosition {
-                MapPositionAnnotation(coordinate: coordinate, label: "Last located position",
-                                      identifier: "map-located-position")
-            }
-
-            if picker.isPresented, picker.detailID == store.activeActivityID,
-               let coordinate = store.elevationCoordinate {
-                MapPositionAnnotation(coordinate: coordinate, label: "Position on activity route",
-                                      identifier: "map-route-position")
-            }
-
             routeInteraction(proxy: proxy)
             TapInteraction { context in
                 if let map = proxy.map, !handlePhotoTap(at: context.point, map: map) {
@@ -250,6 +240,7 @@ struct MapScreen: View {
             clearInactiveTerrain(proxy: proxy)
         }
         .onRenderFrameFinished { _ in
+            refreshPositions(proxy: proxy)
             // The shell can replace a native bar when returning from List.
             // Mapbox's fitter must see its resized viewport, not the previous
             // tab's bounds. Keep the request until that layout has rendered.
@@ -285,9 +276,11 @@ struct MapScreen: View {
                 terrain.failed(sourceID: terrain.sourceID)
             }
         }
+        .overlay { MapPositionOverlay(state: positions) }
         .ignoresSafeArea()
         .onChange(of: store.selectedTab) { _, tab in
             if tab == .map { scheduleNavigation(proxy: proxy) }
+            refreshPositions(proxy: proxy)
         }
         .onChange(of: context.pendingRequest?.id, initial: true) { _, _ in
             location.cancel()
@@ -297,7 +290,14 @@ struct MapScreen: View {
             if !enabled { clearInactiveTerrain(proxy: proxy) }
         }
         .onChange(of: picker.detent) { _, _ in scheduleNavigation(proxy: proxy) }
-        .onChange(of: picker.isPresented) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: picker.isPresented) { _, _ in
+            scheduleNavigation(proxy: proxy)
+            refreshPositions(proxy: proxy)
+        }
+        .onChange(of: context.locatedPosition.map { [$0.latitude, $0.longitude] }) { _, _ in refreshPositions(proxy: proxy) }
+        .onChange(of: store.elevationCursor) { _, _ in refreshPositions(proxy: proxy) }
+        .onChange(of: picker.detailID) { _, _ in refreshPositions(proxy: proxy) }
+        .onChange(of: store.activeActivityID) { _, _ in refreshPositions(proxy: proxy) }
         .onChange(of: geometry.size) { _, _ in
             scheduleNavigation(proxy: proxy)
             refreshPhotos(proxy: proxy, geometry: geometry)
@@ -312,6 +312,12 @@ struct MapScreen: View {
             picker.reconcile(with: store)
             store.routeGeometry.update(activities: store.activities, revision: revision)
         }
+    }
+
+    private func refreshPositions(proxy: MapProxy) {
+        guard let map = proxy.map else { return }
+        positions.update(map: map, located: context.locatedPosition,
+            route: picker.isPresented && picker.detailID == store.activeActivityID ? store.elevationCoordinate : nil)
     }
 
     private func refreshPhotos(proxy: MapProxy, geometry: GeometryProxy) {

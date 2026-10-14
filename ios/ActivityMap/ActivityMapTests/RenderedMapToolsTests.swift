@@ -30,7 +30,7 @@ struct RenderedMapToolsTests {
         try await mapToolsWait { store.mapContext.pendingRequest == nil }
         try await Task.sleep(for: .milliseconds(650))
         store.mapContext.request(.locate(latitude: 46.005, longitude: 8.005))
-        try await mapToolsWait { store.mapContext.pendingRequest == nil && map.viewAnnotations.allAnnotations.count == 1 }
+        try await mapToolsWait { store.mapContext.pendingRequest == nil && mapToolsPosition(in: host.view) != nil }
         try await Task.sleep(for: .milliseconds(650))
         #expect(abs(map.mapboxMap.cameraState.zoom - 15) < 0.1, "Locate me animates from the overview to nearby streets")
         let coordinate = try #require(store.mapContext.locatedPosition)
@@ -41,13 +41,15 @@ struct RenderedMapToolsTests {
                 map.viewport.idle()
                 map.mapboxMap.setCamera(to: CameraOptions(center: coordinate, zoom: zoom, bearing: 25, pitch: pitch))
                 try await mapToolsWait {
-                    guard let view = map.viewAnnotations.allAnnotations.first?.view else { return false }
+                    guard let view = mapToolsPosition(in: host.view) else { return false }
                     let frame = view.convert(view.bounds, to: map)
+                    let projected = map.mapboxMap.point(for: coordinate)
                     return !view.isHidden && view.alpha > 0 && frame.width >= 26 && frame.height >= 26
                         && map.bounds.contains(CGPoint(x: frame.midX, y: frame.midY))
+                        && abs(frame.midX - projected.x) < 1 && abs(frame.midY - projected.y) < 1
                         && abs(map.mapboxMap.cameraState.zoom - zoom) < 0.1
                 }
-                let view = try #require(map.viewAnnotations.allAnnotations.first?.view)
+                let view = try #require(mapToolsPosition(in: host.view))
                 #expect(abs(view.bounds.width - 26) < 0.1 && abs(view.bounds.height - 26) < 0.1,
                         "Marker stays 26 points at zoom \(zoom), pitch \(pitch)")
                 #expect(store.selectedActivityIDs == selection && store.activeSportTypes == filters)
@@ -60,12 +62,17 @@ struct RenderedMapToolsTests {
         fixture.json = CameraHarness.style.replacingOccurrences(of: "#e5e8df", with: "#cfded8")
         store.mapContext.baseStyle = BaseStyle.all[1]
         try await mapToolsWait {
-            map.mapboxMap.isStyleLoaded && map.viewAnnotations.allAnnotations.count == 1
-                && map.viewAnnotations.allAnnotations.first?.view.isHidden == false
+            map.mapboxMap.isStyleLoaded && mapToolsPosition(in: host.view) != nil
+                && mapToolsPosition(in: host.view)?.isHidden == false
         }
         #expect(store.mapContext.locatedPosition?.latitude == coordinate.latitude)
+        map.viewport.idle()
+        map.mapboxMap.setCamera(to: CameraOptions(center: .init(latitude: 47, longitude: 9), zoom: 18))
+        try await mapToolsWait { mapToolsPosition(in: host.view) == nil }
+        map.mapboxMap.setCamera(to: CameraOptions(center: coordinate, zoom: 18))
+        try await mapToolsWait { mapToolsPosition(in: host.view) != nil }
         store.clearScope()
-        try await mapToolsWait { map.viewAnnotations.allAnnotations.isEmpty }
+        try await mapToolsWait { mapToolsPosition(in: host.view) == nil }
         #expect(store.mapContext.locatedPosition == nil)
     }
 
@@ -233,8 +240,12 @@ private func mapToolsWait(sourceLocation: SourceLocation = #_sourceLocation, _ c
 }
 
 @MainActor
+private func mapToolsPosition(in view: UIView) -> UIView? {
+    mapToolsDescendants(view, of: UIView.self).first { $0.accessibilityIdentifier == "map-located-position" }
+}
+
 private func mapToolsDescendants<T: UIView>(_ view: UIView, of type: T.Type) -> [T] {
-    (view as? T).map { [$0] } ?? view.subviews.flatMap { mapToolsDescendants($0, of: type) }
+    ((view as? T).map { [$0] } ?? []) + view.subviews.flatMap { mapToolsDescendants($0, of: type) }
 }
 
 @MainActor
@@ -285,7 +296,7 @@ struct LiveMapTerrainTests {
         try await mapToolsWait { store.mapContext.pendingRequest == nil }
         try await Task.sleep(for: .milliseconds(650))
         store.mapContext.request(.locate(latitude: center.latitude, longitude: center.longitude))
-        try await mapToolsWait { store.mapContext.pendingRequest == nil && map.viewAnnotations.allAnnotations.count == 1 }
+        try await mapToolsWait { store.mapContext.pendingRequest == nil && mapToolsPosition(in: host.view) != nil }
         try await Task.sleep(for: .milliseconds(650))
         var previousSource = ""
         for style in BaseStyle.all {
@@ -306,7 +317,7 @@ struct LiveMapTerrainTests {
                 #expect(abs(camera.center.longitude - center.longitude) < 0.001, "Center retained for \(style.id)")
                 #expect(abs(camera.zoom - 15) < 0.01 && abs(camera.bearing - 25) < 0.1, "Camera retained for \(style.id)")
                 #expect(map.mapboxMap.sourceExists(withId: RouteSource.id))
-                let marker = try #require(map.viewAnnotations.allAnnotations.first?.view)
+                let marker = try #require(mapToolsPosition(in: host.view))
                 #expect(!marker.isHidden && marker.bounds.size == CGSize(width: 26, height: 26),
                         "Position remains visible above real terrain for \(style.id)")
                 try mapToolsSnapshot(window, name: "live-terrain-\(style.id)")
