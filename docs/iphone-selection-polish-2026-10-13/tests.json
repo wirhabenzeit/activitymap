@@ -1,0 +1,230 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "3E0E0C42-1356-4B6D-A140-2A1AAAB95C12",
+      "deviceName" : "iPhone 18 Pro",
+      "modelName" : "iPhone 18 Pro",
+      "osBuildNumber" : "24A434",
+      "osVersion" : "27.0",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "duration" : "0.0036s",
+                  "durationInSeconds" : 0.0036427974700927734,
+                  "name" : "resultScopeIncludesExistingSelectionAndGPSLessActivities()",
+                  "nodeIdentifier" : "MapResultsTests/resultScopeIncludesExistingSelectionAndGPSLessActivities()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/resultScopeIncludesExistingSelectionAndGPSLessActivities()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00023s",
+                  "durationInSeconds" : 0.000232696533203125,
+                  "name" : "detentAndActiveDetailSurviveTabsAndOrdinaryUpdates()",
+                  "nodeIdentifier" : "MapResultsTests/detentAndActiveDetailSurviveTabsAndOrdinaryUpdates()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentAndActiveDetailSurviveTabsAndOrdinaryUpdates()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00006s",
+                  "durationInSeconds" : 6.008148193359375e-05,
+                  "name" : "dragSnapsFromBothRestingPositionsAndClampsOvershoot()",
+                  "nodeIdentifier" : "MapResultsTests/dragSnapsFromBothRestingPositionsAndClampsOvershoot()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/dragSnapsFromBothRestingPositionsAndClampsOvershoot()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00022s",
+                  "durationInSeconds" : 0.00021600723266601562,
+                  "name" : "hiddenSelectionIsDisclosedWithoutReactivatingAfterFilterReset()",
+                  "nodeIdentifier" : "MapResultsTests/hiddenSelectionIsDisclosedWithoutReactivatingAfterFilterReset()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/hiddenSelectionIsDisclosedWithoutReactivatingAfterFilterReset()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.00011s",
+                  "durationInSeconds" : 0.00011324882507324219,
+                  "name" : "widePanelHasOnlyCollapsedAndFullHeightWithStableCameraOcclusion()",
+                  "nodeIdentifier" : "MapResultsTests/widePanelHasOnlyCollapsedAndFullHeightWithStableCameraOcclusion()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/widePanelHasOnlyCollapsedAndFullHeightWithStableCameraOcclusion()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.000068s",
+                  "durationInSeconds" : 6.794929504394531e-05,
+                  "name" : "shortPhoneOpeningSheetLeavesRoomForAccessibleRouteFraming()",
+                  "nodeIdentifier" : "MapResultsTests/shortPhoneOpeningSheetLeavesRoomForAccessibleRouteFraming()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/shortPhoneOpeningSheetLeavesRoomForAccessibleRouteFraming()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "children" : [
+                    {
+                      "duration" : "0.00014s",
+                      "durationInSeconds" : 0.00013899803161621094,
+                      "name" : "(390.0, 810.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)?args=81f94e79d86401d76299b1a37517eaed9891428697fca1db3774c230dfcd5049",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "0.000085s",
+                      "durationInSeconds" : 8.511543273925781e-05,
+                      "name" : "(768.0, 990.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)?args=b96cec505959879e9e3586a9e5e94ea4443c7a9d8c738be0ae6288c302e2eaa6",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "0.000085s",
+                      "durationInSeconds" : 8.511543273925781e-05,
+                      "name" : "(800.0, 360.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)?args=6e4c382c6b4aec6d8b021ef0f7c1ee27b885d00e0d47880675444bb053a74347",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "0.0001s",
+                  "durationInSeconds" : 0.00010307629903157552,
+                  "name" : "controlsStayAtTopRightBehindExpandedResults(size:)",
+                  "nodeIdentifier" : "MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/controlsStayAtTopRightBehindExpandedResults(size:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "children" : [
+                    {
+                      "duration" : "0.0001s",
+                      "durationInSeconds" : 0.000102996826171875,
+                      "name" : "(390.0, 810.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentsLeaveNavigationAvailable(size:)?args=81f94e79d86401d76299b1a37517eaed9891428697fca1db3774c230dfcd5049",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "0.000088s",
+                      "durationInSeconds" : 8.797645568847656e-05,
+                      "name" : "(768.0, 990.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentsLeaveNavigationAvailable(size:)?args=b96cec505959879e9e3586a9e5e94ea4443c7a9d8c738be0ae6288c302e2eaa6",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "0.000083s",
+                      "durationInSeconds" : 8.296966552734375e-05,
+                      "name" : "(800.0, 360.0)",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentsLeaveNavigationAvailable(size:)?args=6e4c382c6b4aec6d8b021ef0f7c1ee27b885d00e0d47880675444bb053a74347",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "0.000091s",
+                  "durationInSeconds" : 9.131431579589844e-05,
+                  "name" : "detentsLeaveNavigationAvailable(size:)",
+                  "nodeIdentifier" : "MapResultsTests/detentsLeaveNavigationAvailable(size:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests/detentsLeaveNavigationAvailable(size:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "MapResultsTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/MapResultsTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            },
+            {
+              "children" : [
+                {
+                  "duration" : "7s",
+                  "durationInSeconds" : 7.305854797363281,
+                  "name" : "nativeMiddleDetentStaysStillWhenSwitchingResultsAndDetail()",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/nativeMiddleDetentStaysStillWhenSwitchingResultsAndDetail()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/nativeMiddleDetentStaysStillWhenSwitchingResultsAndDetail()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "5s",
+                  "durationInSeconds" : 5.3263750076293945,
+                  "name" : "landscapeBrowsingReclaimsOnlyTheSideOppositeTheIsland()",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/landscapeBrowsingReclaimsOnlyTheSideOppositeTheIsland()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/landscapeBrowsingReclaimsOnlyTheSideOppositeTheIsland()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "0.44s",
+                  "durationInSeconds" : 0.43639397621154785,
+                  "name" : "mapHeaderFitFollowsResultsAndDetail()",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/mapHeaderFitFollowsResultsAndDetail()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/mapHeaderFitFollowsResultsAndDetail()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "children" : [
+                    {
+                      "duration" : "5s",
+                      "durationInSeconds" : 5.806045293807983,
+                      "name" : "false",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/phoneTabsKeepHeaderGeometryAndStatusStyle(hasSelection:)?args=fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "duration" : "7s",
+                      "durationInSeconds" : 7.183307886123657,
+                      "name" : "true",
+                      "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/phoneTabsKeepHeaderGeometryAndStatusStyle(hasSelection:)?args=b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "6s",
+                  "durationInSeconds" : 6.49467658996582,
+                  "name" : "phoneTabsKeepHeaderGeometryAndStatusStyle(hasSelection:)",
+                  "nodeIdentifier" : "RenderedRoutePickingTests/phoneTabsKeepHeaderGeometryAndStatusStyle(hasSelection:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests/phoneTabsKeepHeaderGeometryAndStatusStyle(hasSelection:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "RenderedRoutePickingTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests/RenderedRoutePickingTests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            }
+          ],
+          "name" : "ActivityMapTests",
+          "nodeIdentifierURL" : "test://com.apple.xcode/ActivityMap/ActivityMapTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Passed"
+        }
+      ],
+      "name" : "ActivityMap",
+      "nodeType" : "Test Plan",
+      "result" : "Passed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}

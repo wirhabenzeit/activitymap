@@ -9,7 +9,6 @@ import React, {
 } from 'react';
 import { useSidebar } from '~/components/ui/sidebar';
 import {
-  Camera,
   Maximize2,
   Minimize2,
   Globe,
@@ -278,7 +277,6 @@ export default function InteractiveMap() {
     threeDim,
     toggleThreeDim,
     showPhotos,
-    togglePhotos,
     compactList,
     uploadedGeoJson,
     isGuest,
@@ -300,7 +298,6 @@ export default function InteractiveMap() {
     hydrateMapState: state.hydrateMapState,
     threeDim: state.threeDim,
     showPhotos: state.showPhotos,
-    togglePhotos: state.togglePhotos,
     toggleThreeDim: state.toggleThreeDim,
     compactList: state.compactList,
     uploadedGeoJson: state.uploadedGeoJson,
@@ -832,16 +829,6 @@ export default function InteractiveMap() {
           >
             <Globe
               color={threeDim ? 'hsl(var(--header-background))' : 'gray'}
-            />
-          </MapControlIconButton>
-        </Overlay>
-        <Overlay position="top-left">
-          <MapControlIconButton
-            onClick={togglePhotos}
-            aria-label="Toggle photos"
-          >
-            <Camera
-              color={showPhotos ? 'hsl(var(--header-background))' : 'gray'}
             />
           </MapControlIconButton>
         </Overlay>

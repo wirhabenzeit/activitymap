@@ -82,6 +82,10 @@ await writeFile(
   'export function usePhotos(){ return {data:window.photoFixtures}; }',
 );
 await writeFile(
+  join(directory, 'navigation.ts'),
+  'export function useRouter(){return {push:path=>window.navigationTarget=path};}',
+);
+await writeFile(
   join(directory, 'activities.ts'),
   'export function useFilteredActivities(){ return {filterIDs:[1]}; }',
 );
@@ -95,6 +99,7 @@ const bundleConfig = {
   outfile: join(directory, 'fixture.js'),
   alias: {
     '~': join(repo, 'src'),
+    'next/navigation': join(directory, 'navigation.ts'),
     'next/image': join(
       repo,
       'node_modules/next/dist/esm/shared/lib/image-external.js',
@@ -131,7 +136,7 @@ function App(){
  <h1>Activity photos</h1><div data-testid="row" onClick={()=>window.rowClicks=(window.rowClicks||0)+1}>
  <PhotoLightbox photos={photos} title="Afternoon on the ridge" className="h-20" /></div>
  <Dialog><DialogTrigger>Open activity detail</DialogTrigger><DialogContent><DialogTitle>Activity detail</DialogTitle><PhotoLightbox photos={photos} title="Detail photos"/></DialogContent></Dialog>
- <div style={{height:260,marginTop:32}}><Map onIdle={()=>window.mapReady=true} initialViewState={{latitude:0,longitude:0,zoom:10}} mapboxAccessToken="pk.offline-test"
+ <div style={{height:260,marginTop:32}}><Map ref={ref=>window.photoMap=ref} onIdle={()=>window.mapReady=true} initialViewState={{latitude:0,longitude:0,zoom:10}} mapboxAccessToken="pk.offline-test"
  mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e6e9e3'}}]}}><PhotoLayer/></Map></div>
  <button onClick={()=>window.underlyingClicks=(window.underlyingClicks||0)+1}>Underlying action</button>
  </div>;
@@ -219,6 +224,16 @@ try {
   await page.screenshot({ path: join(evidence, 'web-portrait-phone.png') });
   await page.keyboard.press('ArrowRight');
   await viewer.getByText('3 of 5', { exact: true }).waitFor();
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-photo-slide]').length === 1,
+  );
+  assert.equal(
+    await viewer
+      .locator('[data-photo-slide]')
+      .evaluate((element) => getComputedStyle(element).transform),
+    'none',
+    'Reduced motion switches photos without sliding',
+  );
   const cdp = await context.newCDPSession(page);
   async function swipe(from, to) {
     await cdp.send('Input.dispatchTouchEvent', {
@@ -316,34 +331,115 @@ try {
   );
   await page.keyboard.press('Escape');
   await detail.waitFor({ state: 'hidden' });
-  await page.waitForFunction(() => window.mapReady === true);
-  const marker = page
-    .getByRole('button', {
-      name: 'Select Afternoon on the ridge and preview photo',
-    })
-    .last();
-  await marker.click();
-  assert.deepEqual(
-    await page.evaluate(() => window.store.getState().selected),
-    [1],
+
+  // Observe real intermediate positions, rather than just checking animation props.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.reload();
+  await thumbnail(2).click();
+  await viewer.waitFor();
+  async function observeSlide(action, outgoing, incoming, direction) {
+    await page.evaluate(() => {
+      window.slideFrames = [];
+      window.observeSlides = true;
+      const sample = () => {
+        window.slideFrames.push(
+          [...document.querySelectorAll('[data-photo-slide]')].map(
+            (element) => ({
+              id: element.dataset.photoSlide,
+              x: new DOMMatrixReadOnly(getComputedStyle(element).transform).m41,
+            }),
+          ),
+        );
+        if (window.observeSlides) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+    await action();
+    await page.waitForFunction((id) => {
+      const slides = document.querySelectorAll('[data-photo-slide]');
+      return (
+        slides.length === 1 &&
+        slides[0].dataset.photoSlide === id &&
+        Math.abs(
+          new DOMMatrixReadOnly(getComputedStyle(slides[0]).transform).m41,
+        ) < 0.1
+      );
+    }, incoming);
+    const frames = await page.evaluate(() => {
+      window.observeSlides = false;
+      return window.slideFrames;
+    });
+    await writeFile(
+      join(evidence, `web-slide-${outgoing}-${incoming}.json`),
+      JSON.stringify(frames, null, 2),
+    );
+    assert(
+      frames.some(
+        (frame) =>
+          frame.some(
+            (slide) => slide.id === outgoing && slide.x * direction < -1,
+          ) &&
+          frame.some(
+            (slide) => slide.id === incoming && slide.x * direction > 1,
+          ),
+      ),
+      'Incoming and outgoing photos slide in the navigation direction',
+    );
+  }
+  await observeSlide(
+    () =>
+      viewer.getByRole('button', { name: 'Next photo', exact: true }).click(),
+    '2',
+    '3',
+    1,
   );
-  const preview = page.getByText('View photos', { exact: true });
-  await preview.waitFor();
-  await page
-    .getByRole('button', { name: /^View photo 5 of 5:/ })
-    .last()
+  await observeSlide(() => page.keyboard.press('ArrowLeft'), '3', '2', -1);
+  await observeSlide(() => swipe(280, 100), '2', '3', 1);
+  await page.screenshot({
+    path: join(evidence, 'web-animated-viewer-desktop.png'),
+  });
+  await viewer
+    .getByRole('button', { name: 'Previous photo', exact: true })
     .click();
-  await viewer.getByText('5 of 5', { exact: true }).waitFor();
-  await viewer.getByRole('button', { name: 'Previous photo' }).click();
-  await viewer.getByText('4 of 5', { exact: true }).waitFor();
+  await page.evaluate(() => {
+    window.removePhoto('3');
+    return new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+  });
+  assert.equal(
+    await viewer.locator('[data-photo-slide="3"]').count(),
+    0,
+    'Deleted outgoing photo is removed during its transition',
+  );
   await page.keyboard.press('Escape');
   await viewer.waitFor({ state: 'hidden' });
-  assert.equal(
-    await preview.isVisible(),
-    true,
-    'Viewer close restores marker preview',
+  await page.evaluate(() => window.resetPhotos());
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.waitForFunction(() => window.mapReady === true);
+  const marker = page.getByRole('button', {
+    name: 'Zoom into 5 photos',
+    exact: true,
+  });
+  const selection = await page.evaluate(() => window.store.getState().selected);
+  await marker.click();
+  const stack = page.getByRole('button', {
+    name: 'View 5 photos: Afternoon on the ridge',
+    exact: true,
+  });
+  await stack.waitFor();
+  await stack.click();
+  await viewer.getByText('1 of 5', { exact: true }).waitFor();
+  assert.deepEqual(
+    await page.evaluate(() => window.store.getState().selected),
+    selection,
+    'Map photos preserve selection',
   );
-  await page.keyboard.press('Escape'); // dismiss marker preview
+  await viewer.getByRole('button', { name: 'Next photo' }).click();
+  await viewer.getByText('2 of 5', { exact: true }).waitFor();
+  await page.keyboard.press('Escape');
+  await viewer.waitFor({ state: 'hidden' });
+  assert.equal(await stack.isVisible(), true);
   await page.evaluate(() => window.onlyPhoto('2'));
   const only = row.getByRole('button', { name: /^View photo 1 of 1:/ });
   await only.click();
@@ -379,6 +475,9 @@ try {
           'image click',
           'keyboard',
           'touch swipes',
+          'directional sliding via button, keyboard and touch',
+          'reduced motion without sliding',
+          'outgoing photo deletion during transition',
           'single/empty galleries',
           'focus return/containment',
           'scroll lock',
@@ -386,7 +485,7 @@ try {
           'deletion',
           'account switch',
           'nested detail',
-          'origin marker/selection/preview',
+          'map pin zoom / stack viewer / selection preservation',
         ],
       },
       null,
@@ -396,10 +495,14 @@ try {
   const legacyPath = join(directory, 'legacy-photo.tsx');
   await writeFile(
     legacyPath,
-    execFileSync('git', ['show', `${baselineRevision}:src/components/list/photo.tsx`], {
-      cwd: repo,
-      encoding: 'utf8',
-    }),
+    execFileSync(
+      'git',
+      ['show', `${baselineRevision}:src/components/list/photo.tsx`],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+      },
+    ),
   );
   await build({
     ...bundleConfig,

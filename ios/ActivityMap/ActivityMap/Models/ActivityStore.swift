@@ -81,7 +81,8 @@ final class ActivityStore {
         }
         return routeAvailabilityIDs
     }
-    var photos: [Photo] = []
+    private(set) var photosRevision = 0
+    var photos: [Photo] = [] { didSet { photosRevision += 1 } }
     let photoImages: PhotoImageCache
     var streamSummaries: StreamSummaryLoader?
     var elevationCursor: ElevationCursor?
