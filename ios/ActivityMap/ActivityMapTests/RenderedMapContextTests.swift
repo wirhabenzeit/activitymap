@@ -91,6 +91,34 @@ extension RenderedRoutePickingTests {
         store.mapContext.request(.resetBearing)
         let north = try #require(resolve())
         #expect(north.zoom == recorded.zoom && north.pitch == recorded.pitch && north.bearing == 0)
+        store.replaceSelection(with: [1])
+        let selection = store.selectedActivityIDs
+        let filters = store.activeSportTypes
+        store.mapContext.request(.locate(latitude: 46.8, longitude: 8.2))
+        let located = try #require(resolve())
+        #expect(located.center?.latitude == 46.8 && located.center?.longitude == 8.2)
+        #expect(located.zoom == 15 && located.pitch == recorded.pitch && located.bearing == recorded.bearing)
+        #expect(located.padding == recorded.padding)
+        #expect(store.mapContext.locatedPosition?.latitude == 46.8 && store.mapContext.locatedPosition?.longitude == 8.2)
+        #expect(store.selectedActivityIDs == selection && store.activeSportTypes == filters)
+        #expect(resolve() == nil, "Locate me is consumed once")
+        for zoom: CGFloat in [2, 15, 18] {
+            map.setCamera(to: CameraOptions(center: recorded.center, padding: recorded.padding,
+                                           zoom: zoom, bearing: recorded.bearing, pitch: recorded.pitch))
+            store.mapContext.record(map.cameraState)
+            store.mapContext.request(.locate(latitude: 46.8, longitude: 8.2))
+            let nearby = try #require(resolve())
+            #expect(nearby.zoom == (zoom < 15 ? 15 : zoom), "Locate me shows nearby streets and preserves closer views")
+            #expect(nearby.padding == recorded.padding && nearby.pitch == recorded.pitch && nearby.bearing == recorded.bearing)
+            #expect(store.selectedActivityIDs == selection && store.activeSportTypes == filters)
+        }
+        map.setCamera(to: moved)
+        store.mapContext.record(map.cameraState)
+        store.mapContext.request(.locate(latitude: .nan, longitude: 8))
+        #expect(resolve() == nil && store.mapContext.navigationError != nil)
+        store.mapContext.request(.locate(latitude: 46, longitude: 8))
+        store.mapContext.cancelLocationRequest()
+        #expect(resolve() == nil)
         store.showOnMap(1)
         #expect(resolve(790) == nil && store.mapContext.pendingRequest != nil)
         #expect(resolve(500) != nil && store.mapContext.pendingRequest == nil,

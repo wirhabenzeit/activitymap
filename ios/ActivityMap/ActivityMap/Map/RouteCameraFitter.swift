@@ -90,6 +90,17 @@ enum MapNavigation {
               size.width > 0, size.height > 0 else { return nil }
         let current = context.camera
         switch request.action {
+        case let .locate(latitude, longitude):
+            context.consume(request)
+            let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            guard latitude.isFinite, longitude.isFinite, CLLocationCoordinate2DIsValid(coordinate) else {
+                context.navigationError = "Your current location is unavailable. Try again outdoors."
+                return nil
+            }
+            context.recordLocatedPosition(coordinate)
+            // Show the nearby streets without pulling an already closer view back out.
+            return CameraOptions(center: coordinate, padding: current.padding, zoom: max(current.zoom, 15),
+                                 bearing: current.bearing, pitch: current.pitch)
         case .resetView:
             context.consume(request)
             let initial = MapCamera.initial

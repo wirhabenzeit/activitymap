@@ -166,6 +166,26 @@ Production universal links can replace the custom scheme once there is a final b
 
 Use Profile to sign in. `AuthController` stores the ActivityMap session in the Keychain, confirms it through `/api/v1/me`, and supports restoration and revocation.
 
+## Map controls and terrain
+
+The last map control is **Locate me**. It asks for foreground location access only when tapped and requests one fresh fix. It centers at street-level zoom 15, retaining a closer zoom if already set, and preserves bearing, pitch, camera padding, selection and filters. A blue 26-point marker with a white border remains at the last located position until the next successful fix or scope reset. It does not follow the user. Both this marker and the elevation route cursor are overlays following the map’s projected coordinates above map layers and terrain, so their size and visibility remain stable while zooming or tilting. Panning, another camera command, switching away from Map, or backgrounding the app cancels a pending fix. Denied access offers Settings; restricted access, unavailable fixes and a 15-second fix timeout explain how to retry. Fit selection and Fit route remain available in results.
+
+A 28-point compass appears beyond two degrees from north and hides within one degree, with a 44-point touch target labelled **Reset bearing**. Resetting animates bearing alone. The compass sits beside the control stack and moves outside the iPad/landscape results panel. A fully expanded phone sheet hides it because no usable map target remains.
+
+**3D map** adds a separate Mapbox Terrain-DEM source (`mapbox://mapbox.mapbox-terrain-dem-v1`, padded 514-pixel tiles, maximum source zoom 14) and terrain with 1.5× exaggeration. All 15 current native choices support this source: native Standard, the seven Mapbox catalogue styles and the Swisstopo/Kartverket vector/raster choices. Elevation is independent of the selected basemap, so no shared catalogue or generated catalogue change is needed. The source and terrain are restored after style reloads; 2D also removes terrain embedded in a base style. The button shows loading until tiles arrive or the renderer reaches idle. Failure or a 20-second loading timeout explains that the map remains tilted, then removes elevation; turn 3D off/on to retry. Unknown styles show an unsupported message.
+
+`MapToolsTests` covers permission/fix states, timeouts, cancellation, compass tolerance/layout and terrain event fencing. `RenderedMapToolsTests` uses a local synthetic DEM to check style reloading, camera preservation, terrain errors/retry, fixed marker visibility at zooms 2–22 in 2D/3D, and iPhone/iPad layouts. The opt-in network check uses the public token from the built app's `MBXAccessToken` configuration, verifies nonzero mountain elevation and camera retention across every catalogue style, and captures settled frames under `/tmp/activitymap-map-tools-preview`:
+
+```sh
+TEST_RUNNER_ACTIVITYMAP_LIVE_MAP_TOOLS=1 xcodebuild test \
+  -project ios/ActivityMap/ActivityMap.xcodeproj -scheme ActivityMap \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+  -parallel-testing-enabled NO -only-testing:ActivityMapTests/LiveMapTerrainTests \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+Issues #391–#393 still require physical-device acceptance: grant and deny the location prompt, retry from Settings, exercise restricted/disabled Location Services and foreground re-entry, confirm compass rotation/reset with touch and VoiceOver, and view mountain relief on a network-connected device while toggling 2D/3D and switching styles. Simulator tests and captures do not certify those device checks. Heading and follow-location behavior in broader #223 remain separate work.
+
 ## Local persistence and tests
 
 `LocalStore` owns all SwiftData reads and writes. Records are scoped by deployment URL and authenticated user ID. Activities and photos retain the complete generated DTO as encoded data, with unique scoped keys; UI mappers consume detached values. Each page and its optional sync checkpoint commit in one explicit save, with autosave disabled and rollback on failure. CloudKit is disabled.

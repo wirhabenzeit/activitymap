@@ -23,9 +23,8 @@
 	</array>
 	<key>MBXAccessToken</key>
 	<string>$(MAPBOX_ACCESS_TOKEN)</string>
-	<!-- Mapbox links location APIs even though this app does not request live location. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>ActivityMap does not require access to your current location. Your activity routes are displayed using location data from your synced activities.</string>
+	<string>ActivityMap uses your current location to center the map when you tap Locate me.</string>
 	<!-- HTTPS, authentication and storage use platform-provided/exempt encryption. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>

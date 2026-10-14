@@ -10,12 +10,19 @@ struct MapScreen: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.mapStyleOverride) private var mapStyleOverride
+    @Environment(\.mapTerrainOverride) private var mapTerrainOverride
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
     @State private var viewport: Viewport
     @State private var acceptsCameraEvents = false
     @State private var cameraTransitionID: UUID?
     /// A resolved fit that arrived while the map was updating its content.
     /// Valid only while its transition is still current.
     @State private var deferredTransition: (id: UUID, viewport: Viewport)?
+    @State private var location = MapLocationController()
+    @State private var terrain = MapTerrainState()
+    @State private var compass: MapCompassState
+    @State private var positions = MapPositionState()
 
     init(store: ActivityStore, topOcclusion: CGFloat = 0, picker: RoutePicker? = nil) {
         _picker = State(initialValue: picker ?? RoutePicker())
@@ -23,6 +30,7 @@ struct MapScreen: View {
         self.store = store
         self.context = store.mapContext
         _viewport = State(initialValue: store.mapContext.camera.viewport)
+        _compass = State(initialValue: MapCompassState(bearing: store.mapContext.camera.bearing))
     }
 
     @Namespace private var photoTransition
@@ -47,6 +55,13 @@ struct MapScreen: View {
                     .position(MapResultsLayout.controlsCenter(size: geometry.size,
                         topInset: max(topOcclusion, geometry.safeAreaInsets.top)))
                     .accessibilityIdentifier("map-controls")
+                if let center = MapCompassLayout.center(size: geometry.size,
+                    topInset: max(topOcclusion, geometry.safeAreaInsets.top),
+                    bottomInset: geometry.safeAreaInsets.bottom, showingResults: picker.isPresented,
+                    detent: picker.detent, largeText: typeSize.isAccessibilitySize) {
+                    MapCompassButton(state: compass) { context.request(.resetBearing) }
+                        .position(center)
+                }
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
                 // Keep the native presenter mounted before selection changes,
@@ -81,6 +96,23 @@ struct MapScreen: View {
         } message: {
             Text(picker.errorMessage ?? "")
         }
+        .alert("Locate me", isPresented: Binding(
+            get: { location.errorMessage != nil },
+            set: { if !$0 { location.errorMessage = nil } }
+        )) {
+            if location.offersSettings {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                }
+            }
+            Button("OK", role: .cancel) { location.errorMessage = nil }
+        } message: { Text(location.errorMessage ?? "") }
+        .alert("3D terrain", isPresented: Binding(
+            get: { terrain.errorMessage != nil },
+            set: { if !$0 { terrain.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { terrain.errorMessage = nil }
+        } message: { Text(terrain.errorMessage ?? "") }
         .onChange(of: store.visibleActivityIDs) { _, _ in picker.reconcile(with: store) }
         .onChange(of: store.activeActivityID) { _, _ in picker.reconcile(with: store) }
         .onChange(of: store.selectedActivityIDs) { _, ids in
@@ -92,6 +124,8 @@ struct MapScreen: View {
         .onChange(of: store.selectedTab) { _, tab in
             if tab != .map {
                 cameraTransitionID = nil
+                location.cancel()
+                context.cancelLocationRequest()
                 picker.invalidateQuery()
             }
         }
@@ -100,6 +134,7 @@ struct MapScreen: View {
         .onChange(of: context.baseStyle) { oldStyle, newStyle in
             cameraTransitionID = nil
             if oldStyle.styleURL != newStyle.styleURL { acceptsCameraEvents = false }
+            configureTerrain(restart: true)
             picker.invalidateQuery()
         }
         .onChange(of: context.activeOverlays) { _, _ in picker.invalidateQuery() }
@@ -113,9 +148,35 @@ struct MapScreen: View {
             pendingPhotoActivity = nil
             lastPhotoAction = nil
             viewport = context.camera.viewport
+            location.cancel()
+            compass.record(context.camera.bearing)
+            terrain.configure(enabled: false, supported: terrainConfiguration != nil)
+        }
+        .onChange(of: context.isPitched) { _, _ in
+            configureTerrain()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // A permission prompt can make the scene inactive. Only leaving
+            // the foreground cancels the request that caused that prompt.
+            if phase == .background {
+                location.cancel()
+                context.cancelLocationRequest()
+            }
+        }
+        .onAppear {
+            compass.record(context.camera.bearing)
+            configureTerrain()
+        }
+        .task(id: terrain.includesTerrain ? terrain.sourceID : nil) {
+            guard terrain.status == .loading else { return }
+            let sourceID = terrain.sourceID
+            do { try await Task.sleep(for: .seconds(20)) } catch { return }
+            if terrain.status == .loading { terrain.failed(sourceID: sourceID) }
         }
         .onDisappear {
             cameraTransitionID = nil
+            location.cancel()
+            context.cancelLocationRequest()
             acceptsCameraEvents = false
             picker.invalidateQuery()
         }
@@ -124,20 +185,11 @@ struct MapScreen: View {
     private func mapView(proxy: MapProxy, geometry: GeometryProxy) -> some View {
         Map(viewport: $viewport) {
             baseContent
+            if terrain.includesTerrain, let configuration = terrainConfiguration {
+                MapTerrainContent(configuration: configuration, sourceID: terrain.sourceID)
+            }
             RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
                         selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
-
-            if picker.isPresented, picker.detailID == store.activeActivityID,
-               let coordinate = store.elevationCoordinate {
-                CircleAnnotationGroup {
-                    CircleAnnotation(centerCoordinate: coordinate)
-                        .circleRadius(6)
-                        .circleColor(UIColor(AppTheme.accent).resolvedColor(with: UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)))
-                        .circleStrokeColor(.white)
-                        .circleStrokeWidth(2)
-                }
-                .circleEmissiveStrength(1)
-            }
 
             if context.showPhotos {
                 ForEvery(photoGroups) { group in
@@ -166,19 +218,29 @@ struct MapScreen: View {
         .mapStyle(mapStyle)
         .ornamentOptions(attributionLayout(in: geometry).ornamentOptions)
         .gestureHandlers(MapGestureHandlers(onBegin: { gesture in
-            if gesture != .singleTap { picker.invalidateQuery() }
+            if gesture != .singleTap {
+                location.cancel()
+                context.cancelLocationRequest()
+                picker.invalidateQuery()
+            }
         }))
         .onCameraChanged { event in
             picker.invalidateQuery()
-            if acceptsCameraEvents, store.selectedTab == .map { context.record(event.cameraState) }
+            if acceptsCameraEvents, store.selectedTab == .map {
+                context.record(event.cameraState)
+                compass.record(event.cameraState.bearing)
+            }
         }
         .onStyleLoaded { _ in
+            configureTerrain(restart: true)
             if !acceptsCameraEvents { viewport = context.camera.viewport }
             acceptsCameraEvents = true
             refreshPhotos(proxy: proxy, geometry: geometry)
             scheduleNavigation(proxy: proxy)
+            clearInactiveTerrain(proxy: proxy)
         }
         .onRenderFrameFinished { _ in
+            refreshPositions(proxy: proxy)
             // The shell can replace a native bar when returning from List.
             // Mapbox's fitter must see its resized viewport, not the previous
             // tab's bounds. Keep the request until that layout has rendered.
@@ -199,14 +261,43 @@ struct MapScreen: View {
                     withViewportAnimation(.easeOut(duration: 0.5)) { viewport = deferred.viewport }
                 }
             }
+            clearInactiveTerrain(proxy: proxy)
+            if terrain.status == .loading, let map = proxy.map,
+               map.sourceExists(withId: terrain.sourceID),
+               map.terrainProperty("source").value as? String == terrain.sourceID {
+                terrain.loaded(sourceID: terrain.sourceID)
+            }
         }
+        .onSourceDataLoaded { event in
+            if event.type == .tile, event.loaded == true { terrain.loaded(sourceID: event.sourceId) }
+        }
+        .onMapLoadingError { error in
+            if error.sourceId == terrain.sourceID || error.type == .style {
+                terrain.failed(sourceID: terrain.sourceID)
+            }
+        }
+        .overlay { MapPositionOverlay(state: positions) }
         .ignoresSafeArea()
         .onChange(of: store.selectedTab) { _, tab in
             if tab == .map { scheduleNavigation(proxy: proxy) }
+            refreshPositions(proxy: proxy)
         }
-        .onChange(of: context.pendingRequest?.id, initial: true) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: context.pendingRequest?.id, initial: true) { _, _ in
+            location.cancel()
+            scheduleNavigation(proxy: proxy)
+        }
+        .onChange(of: terrain.includesTerrain) { _, enabled in
+            if !enabled { clearInactiveTerrain(proxy: proxy) }
+        }
         .onChange(of: picker.detent) { _, _ in scheduleNavigation(proxy: proxy) }
-        .onChange(of: picker.isPresented) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: picker.isPresented) { _, _ in
+            scheduleNavigation(proxy: proxy)
+            refreshPositions(proxy: proxy)
+        }
+        .onChange(of: context.locatedPosition.map { [$0.latitude, $0.longitude] }) { _, _ in refreshPositions(proxy: proxy) }
+        .onChange(of: store.elevationCursor) { _, _ in refreshPositions(proxy: proxy) }
+        .onChange(of: picker.detailID) { _, _ in refreshPositions(proxy: proxy) }
+        .onChange(of: store.activeActivityID) { _, _ in refreshPositions(proxy: proxy) }
         .onChange(of: geometry.size) { _, _ in
             scheduleNavigation(proxy: proxy)
             refreshPhotos(proxy: proxy, geometry: geometry)
@@ -221,6 +312,12 @@ struct MapScreen: View {
             picker.reconcile(with: store)
             store.routeGeometry.update(activities: store.activities, revision: revision)
         }
+    }
+
+    private func refreshPositions(proxy: MapProxy) {
+        guard let map = proxy.map else { return }
+        positions.update(map: map, located: context.locatedPosition,
+            route: picker.isPresented && picker.detailID == store.activeActivityID ? store.elevationCoordinate : nil)
     }
 
     private func refreshPhotos(proxy: MapProxy, geometry: GeometryProxy) {
@@ -374,6 +471,15 @@ struct MapScreen: View {
         MapAttributionLayout(bottomInset: geometry.safeAreaInsets.bottom)
     }
 
+    private func clearInactiveTerrain(proxy: MapProxy) {
+        guard !terrain.includesTerrain, let map = proxy.map, map.isStyleLoaded else { return }
+        // Unmounting declarative Terrain restores the style's original value.
+        // Custom catalogue styles can already contain terrain, so explicitly
+        // flatten that too when 2D is chosen or our elevation request fails.
+        let source: StylePropertyValue = map.terrainProperty("source")
+        if let id = source.value as? String, !id.isEmpty { map.removeTerrain() }
+    }
+
     private func routeInteraction(proxy: MapProxy) -> TapInteraction {
         // Route hits take priority over external feature overlays. Photo
         // annotations consume their own taps before this layer interaction.
@@ -459,31 +565,39 @@ struct MapScreen: View {
             Divider().frame(width: 24, height: 1)
 
             Button {
-                context.request(.pitch(context.isPitched ? 0 : 50))
+                if context.isPitched {
+                    context.request(.pitch(0))
+                } else if terrainConfiguration != nil {
+                    context.request(.pitch(50))
+                } else {
+                    terrain.configure(enabled: true, supported: false)
+                }
             } label: {
-                BrowseIconLabel(systemImage: "view.3d", isSelected: context.isPitched)
-                    .frame(width: 44, height: 48)
+                ZStack {
+                    BrowseIconLabel(systemImage: "view.3d", isSelected: terrain.status == .ready)
+                        .opacity(terrain.status == .loading ? 0 : 1)
+                    if terrain.status == .loading { ProgressView().controlSize(.small) }
+                }.frame(width: 44, height: 48)
             }
             .accessibilityLabel("3D map")
-            .accessibilityValue(context.isPitched ? "On" : "Off")
+            .accessibilityValue(terrain.accessibilityValue)
 
             Divider().frame(width: 24, height: 1)
 
-            Menu {
-                Button("Fit selection", systemImage: "viewfinder") { context.request(.fitSelection) }
-                    .disabled(!store.browsingActivities.contains {
-                        store.selectedActivityIDs.contains($0.id) && !$0.coordinates.isEmpty
-                    })
-                Button("Fit filtered routes", systemImage: "viewfinder") { context.request(.fitFiltered) }
-                    .disabled(!store.browsingActivities.contains { !$0.coordinates.isEmpty })
-                Divider()
-                Button("Reset bearing", systemImage: "location.north") { context.request(.resetBearing) }
-                Button("Reset map view", systemImage: "arrow.counterclockwise") { context.request(.resetView) }
+            Button {
+                location.locate { coordinate in
+                    context.request(.locate(latitude: coordinate.latitude, longitude: coordinate.longitude))
+                }
             } label: {
-                BrowseIconLabel(systemImage: "viewfinder")
-                    .frame(width: 44, height: 48)
+                ZStack {
+                    BrowseIconLabel(systemImage: "location.fill").opacity(location.isRequesting ? 0 : 1)
+                    if location.isRequesting { ProgressView().controlSize(.small) }
+                }.frame(width: 44, height: 48)
             }
-            .accessibilityLabel("Map camera")
+            .disabled(location.isRequesting)
+            .accessibilityLabel("Locate me")
+            .accessibilityValue(location.isRequesting ? "Finding your location" : "")
+            .accessibilityIdentifier("map-locate-me")
         }
         .buttonStyle(.plain)
         .font(.body)
@@ -501,6 +615,18 @@ struct MapScreen: View {
         }
 
         return .standard(lightPreset: colorScheme == .dark ? .night : .day)
+    }
+
+    private var terrainConfiguration: MapTerrainConfiguration? {
+        if let mapTerrainOverride { return mapTerrainOverride }
+        if mapStyleOverride != nil { return nil }
+        return context.baseStyle.terrainConfiguration
+    }
+
+    private func configureTerrain(restart: Bool = false) {
+        let usesTerrain = mapStyleOverride == nil || mapTerrainOverride != nil
+        terrain.configure(enabled: usesTerrain && context.isPitched,
+                          supported: terrainConfiguration != nil, restart: restart)
     }
 
     private func toggleOverlay(_ overlay: SharedRasterOverlayDefinition) {
