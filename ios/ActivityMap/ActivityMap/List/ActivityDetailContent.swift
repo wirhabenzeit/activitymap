@@ -11,6 +11,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     /// Puts the route action beside the title (List, iPad pane, Stats sheet).
     var hasRoute = true
     var showOnMap: ((Int) -> Void)? = nil
+    var editing: ActivityEditingService? = nil
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -23,7 +24,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
             if showsHeading {
                 ActivityDetailHeading(activity: activity, trailingInset: headerTrailingInset,
-                                      hasRoute: hasRoute, showOnMap: showOnMap)
+                                      hasRoute: hasRoute, showOnMap: showOnMap, editing: editing)
             }
             profile(activity)
             if showsDescription { ActivityDetailDescription(activity: activity) }
@@ -146,8 +147,7 @@ struct ActivityDetailIdentity: View {
 }
 
 /// An activity's title row. The route action sits beside the title rather
-/// than in a footer row; Edit, Strava refresh, GPX and Open in Strava
-/// (#220–#222) join it as a ••• menu once they exist.
+/// than in a footer row. Edit lives in the adjacent activity-actions menu.
 struct ActivityDetailHeading: View {
     let activity: Activity
     var trailingInset: CGFloat = 0
@@ -155,6 +155,7 @@ struct ActivityDetailHeading: View {
     var onNavigationBar = false
     var hasRoute = true
     var showOnMap: ((Int) -> Void)? = nil
+    var editing: ActivityEditingService? = nil
     @Environment(\.activityDetailOverMap) private var overMap
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var width: CGFloat = 0
@@ -172,6 +173,9 @@ struct ActivityDetailHeading: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
             HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
                 ActivityDetailIdentity(activity: activity, titleLineLimit: titleLineLimit, onNavigationBar: onNavigationBar)
+                if let editing {
+                    ActivityEditButton(activity: activity, service: editing, onNavigationBar: onNavigationBar, labelled: labelled)
+                }
                 if let showOnMap, !overMap {
                     Button { showOnMap(activity.id) } label: {
                         if labelled {

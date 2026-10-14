@@ -41,6 +41,11 @@ struct ActivityDetailView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
+                if let editing = store.activityEditing, let activity = store.activity(id: activityID) {
+                    ActivityEditButton(activity: activity, service: editing, onNavigationBar: true)
+                }
+            }.sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showActivityOnMapFromDetail(activityID, store: store, navigationController: navigationReference.controller)
                     onMapShown?()
@@ -126,7 +131,7 @@ struct ActivityDetailPanel: View {
                             if let showOnMap { showOnMap(id) }
                             else if overMap { store.mapContext.request(.fitActivity(id)) }
                             else { store.showOnMap(id) }
-                        }, profile: { activity in
+                        }, editing: store.activityEditing, profile: { activity in
                             ElevationProfileView(store: store, activityID: activity.id,
                                                  isRelevant: store.selectedTab == hostTab)
                         }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
@@ -185,7 +190,7 @@ private struct MapActivityDetailReveal: View {
     private var heading: some View {
         ActivityDetailHeading(activity: activity, trailingInset: trailingInset,
                               titleLineLimit: compactProfile ? (expansion.progress > 0.8 ? 2 : 1) : nil,
-                              hasRoute: hasRoute, showOnMap: showOnMap)
+                              hasRoute: hasRoute, showOnMap: showOnMap, editing: store.activityEditing)
             .padding(.horizontal, AppTheme.Spacing.large)
             .padding(.vertical, AppTheme.Spacing.small)
     }

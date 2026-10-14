@@ -49,6 +49,8 @@ Short labels are scoped by their visible group heading. Accessibility combines t
 - Omit internal activity IDs from user-facing details. Keep Edit as a top-level action, without duplicating it in the overflow menu.
 - Retain recording/context fields in the final Activity group. Do not silently drop previously accessible fields to make the card shorter.
 
+Native editing is available from the shared heading and the pushed List/Stats navigation toolbar. Wide headings show Edit directly; compact headings and pushed toolbars use the activity-actions menu. The form edits name, description and sport, with validation, explicit saving/error states, unchanged-field omission and deliberate empty-description clearing. Its submitted write finishes even if the committed sport/name makes the source detail filter-hidden. Cancel confirms discarding a changed draft; saving blocks dismissal and duplicate submission. See [the native editing behavior](../ios/ActivityMap/README.md#edit-an-activity-in-strava).
+
 Implementation: `ActivityMetricGroup` / `ActivityHeadlineStats` on iOS and `activityDetailStats` / `ActivityDetailStats` on web. Group IDs and field IDs are shared across implementations and covered by data tests.
 
 ## Elevation graph

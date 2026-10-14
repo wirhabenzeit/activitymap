@@ -180,7 +180,17 @@ The account sheet shows sync errors, rate-limit retry time, last successful sync
 
 Summary caches reopen offline for a still-valid scoped session regardless of cache/reconciliation age. Committed metadata/source invalidations remove current presentation; deletion/security cleanup removes records and fences late writes. Atomic authoritative replacement retains matching/newer direct results, handles reset generations and deletes orphan summaries only when the replacement commits. Legacy store upgrade, disk reopen, cancellation/deduplication, 202/429/503 timing, stale-source publication and actual replacement/rollback paths have simulator integration coverage. Raw stream persistence remains #216.
 
-A store-open error is displayed without deleting data or falling back silently to memory. Native writes and background refresh tasks are still pending; this client reads activity data.
+A store-open error is displayed without deleting data or falling back silently to memory. Activity editing is supported; per-activity Strava refresh and background refresh tasks remain pending.
+
+### Edit an activity in Strava
+
+Open an activity from Map, List or Stats, then choose **Edit activity** in the **•••** menu beside its title (wide detail headings show **Edit** directly). The native form prefills name, description and sport. Save sends only changed fields through the authenticated v1 PATCH endpoint; clearing the description sends an explicit empty string. Cancel offers to discard a changed draft. Submitted saves cannot be dismissed or submitted twice.
+
+Editing requires a verified, connected session and Strava write permission. Offline drafts remain on screen, and rate-limited/server-unavailable saves keep the input and honor Retry-After. An ambiguous connection failure or a result accepted upstream but not reconciled locally asks the user to close and sync before another write; there is no automatic submission or offline queue.
+
+The edit coordinator waits for an existing activity sync, commits the returned DTO through the scoped LocalStore without advancing the change cursor, and reloads the visible cache. Delayed older feed/snapshot rows cannot replace a newer committed activity. Sport/name changes use normal filter and selection reconciliation; source changes invalidate elevation summaries. Deletion, session expiry and account/deployment changes fence late results.
+
+`ActivityEditingTests`, `ActivityEditsAPITests` and `RenderedActivityEditingTests` cover drafts/validation, explicit empty descriptions, request transport, retry timing, disk reopen, older feed/snapshot protection, duplicate submissions, deletion/recreation, account changes, authentication failure and phone/tablet/large-text/error presentation. Real Strava writes and physical-device/VoiceOver acceptance remain an owner review; tests use synthetic responses.
 
 Run the `ActivityMap` scheme's tests in Xcode, or select an installed iOS 27 simulator:
 
