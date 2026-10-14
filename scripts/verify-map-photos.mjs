@@ -109,7 +109,6 @@ import Map, {Source,Layer} from 'react-map-gl/mapbox';
 import {MapPhotos} from '~/components/map/photo';
 import {Selection} from '~/components/map/selection-control';
 import {LayerSwitcher} from '~/components/map/layer-switcher';
-import {MapControlIconButton} from '~/components/map/map-control-icon-button';
 import {store,useShallowStore} from '~/store';
 import 'mapbox-gl/dist/mapbox-gl.css';
 const photo=(id,activity,location)=>({unique_id:id,activity_id:activity,athlete_id:1,activity_name:'Activity '+activity,caption:'Caption '+id,created_at:new Date('2026-01-01'),location,
@@ -128,7 +127,7 @@ function App(){
  <Source id="routeSource" type="geojson" data={{type:'FeatureCollection',features:[{type:'Feature',id:1,properties:{},geometry:{type:'LineString',coordinates:[[7.9,46],[8.1,46]]}}]}}>
  <Layer id="routeLayerBG" type="line" paint={{'line-color':'#237b4b','line-width':12}}/></Source>
  <Selection onSelection={ids=>{window.routeClicks=(window.routeClicks||0)+1;store.getState().pickActivities(ids);}}/>
- <div style={{position:'absolute',top:8,left:8}}><LayerSwitcher/><MapControlIconButton aria-label="Show photos on map" aria-pressed={show} onClick={store.getState().togglePhotos}>Photos</MapControlIconButton></div>
+ <div style={{position:'absolute',top:8,left:8}}><LayerSwitcher/></div>
  {show&&<MapPhotos key={revision} photos={photos} visibleIDs={visible}/>}
  </Map>;
 }
@@ -309,13 +308,13 @@ try {
   await photoToggle.waitFor();
   assert.equal(await photoToggle.getAttribute('aria-checked'), 'true');
   await photoToggle.click();
+  await page.getByRole('menu').waitFor({ state: 'hidden' });
   await page.locator('[data-map-photo]').waitFor({ state: 'hidden' });
-  const cameraToggle = page.getByRole('button', {
-    name: 'Show photos on map',
-    exact: true,
-  });
-  assert.equal(await cameraToggle.getAttribute('aria-pressed'), 'false');
-  await cameraToggle.click();
+  await page.getByRole('button', { name: 'Map layers', exact: true }).click();
+  await photoToggle.waitFor();
+  assert.equal(await photoToggle.getAttribute('aria-checked'), 'false');
+  await photoToggle.click();
+  await page.getByRole('menu').waitFor({ state: 'hidden' });
   await stack.waitFor();
   await page.getByRole('button', { name: 'Map layers', exact: true }).click();
   await photoToggle.waitFor();
@@ -368,7 +367,7 @@ try {
           'deletion',
           'scope reset',
           'visibility without camera move',
-          'layer menu and camera control share photo visibility',
+          'photo visibility controlled through layer menu',
           'phone/tablet sizing',
           'zero coordinates',
           'viewport refresh',
