@@ -116,6 +116,21 @@ nonisolated enum APIClient {
         return try await perform(request, as: payloadType)
     }
 
+    static func patch<Body: Encodable, Payload: Decodable & Sendable>(
+        _ path: String, body: Body, bearerToken: String,
+        baseURL: URL = APIConfiguration.baseURL, session: URLSession = .shared,
+        as payloadType: Payload.Type
+    ) async throws -> Payload {
+        var request = URLRequest(url: baseURL.appending(path: path),
+                                 cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        request.httpMethod = "PATCH"
+        applyCommonHeaders(&request, bearerToken: bearerToken)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        do { request.httpBody = try ActivityMapAPI.makeEncoder().encode(body) }
+        catch { throw RequestError.encoding(String(describing: error)) }
+        return try await perform(request, session: session, as: payloadType)
+    }
+
     private static func applyCommonHeaders(_ request: inout URLRequest, bearerToken: String?) {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let bearerToken {

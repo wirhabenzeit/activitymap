@@ -37,6 +37,8 @@ final class SyncController {
 
     let summaries: StreamSummaryLoader
     let summarySync: StreamSummarySync
+    let editing = ActivityEditingService()
+    private(set) var editingInProgress = false
     let activities: ActivityStore
     private(set) var status: Status = .signedOut
     private(set) var checkpoint: SyncCheckpoint?
@@ -82,6 +84,7 @@ final class SyncController {
     private let now: () -> Date
     private let source: (SyncSession) -> any SyncPageSource
     private let invalidate: (String) -> Void
+    private let editSource: (SyncSession) -> any ActivityEditSource
 
     init(
         activities: ActivityStore,
@@ -94,6 +97,9 @@ final class SyncController {
             StreamsAPI(baseURL: $0.deployment, token: $0.token)
         },
         fetchInitialSummaries: ((SyncSession) async throws -> Int)? = nil,
+        editSource: @escaping (SyncSession) -> any ActivityEditSource = {
+            ActivityEditsAPI(baseURL: $0.deployment, token: $0.token)
+        },
         invalidate: @escaping (String) -> Void
     ) {
         self.summaries = StreamSummaryLoader(source: summarySource, invalidate: invalidate)
@@ -104,6 +110,9 @@ final class SyncController {
         self.source = source
         self.fetchInitialSummaries = fetchInitialSummaries
         self.invalidate = invalidate
+        self.editSource = editSource
+        editing.coordinator = self
+        activities.activityEditing = editing
     }
 
     /// Cancellation and a generation check protect both disk and visible state.
@@ -116,6 +125,7 @@ final class SyncController {
         session = next
         summarySync.configure(next)
         generation += 1
+        editingInProgress = false
         let current = generation
         let previous = work
         previous?.cancel()
@@ -159,6 +169,9 @@ final class SyncController {
 
     func refresh() async {
         guard !Task.isCancelled else { return }
+        // An edit waits for the existing reader, then owns the write interval.
+        // The next normal sync catches up from the unchanged cursor afterwards.
+        guard !editingInProgress else { return }
         if let pending = work {
             await pending.value
             if pending.isCancelled { await refresh() }
@@ -186,6 +199,47 @@ final class SyncController {
         summarySync.pause()
         summaries.pause()
         if status == .syncing { status = .paused }
+    }
+
+    func updateActivity(activityID: Int, fields: ActivityMapAPI.UpdateActivityRequest) async throws {
+        if let reason = editing.unavailableReason { throw ActivityEditingError.unavailable(reason) }
+        guard !editingInProgress, let session, let storage else {
+            throw ActivityEditingError.unavailable("Another save is in progress. Please wait.")
+        }
+        let current = generation
+        editingInProgress = true
+        defer { if current == generation { editingInProgress = false } }
+        await work?.value
+        try Task.checkCancellation()
+        guard current == generation, self.session == session else { throw CancellationError() }
+        if let reason = editing.unavailableReason { throw ActivityEditingError.unavailable(reason) }
+        let id = String(activityID)
+        guard try await storage.summaryActivityExists(activityID: id, scope: session.scope) else {
+            throw ActivityEditingError.unavailable("This activity is no longer available. Sync to update your library.")
+        }
+        let fence = await storage.streamFence()
+        guard current == generation else { throw CancellationError() }
+        do {
+            let updated = try await editSource(session).update(activityID: id, fields: fields)
+            try Task.checkCancellation()
+            guard current == generation, self.session == session else { throw CancellationError() }
+            guard updated.id == id else { throw ActivityEditingError.reconciliation }
+            do {
+                try await storage.commitActivityEdit(updated, scope: session.scope, fence: fence,
+                    sessionExpiresAt: session.user.authentication.sessionExpiresAt, now: now())
+                try await loadCache(session, storage: storage, generation: current)
+            } catch is CancellationError { throw CancellationError() }
+            catch { throw ActivityEditingError.reconciliation }
+        } catch {
+            guard current == generation else { throw CancellationError() }
+            if AuthController.isExplicitlyUnauthenticated(error) {
+                clearVisible()
+                status = .expired
+                invalidate(session.token)
+                try await storage.clear(scope: session.scope)
+            }
+            throw error
+        }
     }
 
     func clearAfterAccountDeletion() async throws {

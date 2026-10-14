@@ -14,7 +14,6 @@ extension LocalStore {
         let context = makeContext()
         let key = scope.key
         do {
-            try reconcileSummaryReplacement(snapshot.activities, scopeKey: key, context: context)
             let existingActivities = try context.fetch(FetchDescriptor<StoredActivity>(
                 predicate: #Predicate { $0.scope == key }))
             let existingPhotos = try context.fetch(FetchDescriptor<StoredPhoto>(
@@ -25,10 +24,18 @@ extension LocalStore {
             // Update retained rows in place to avoid unique-key collisions
             // between pending deletes and inserts in a single SwiftData save.
             let activitiesByID = Dictionary(uniqueKeysWithValues: existingActivities.map { ($0.activityID, $0) })
+            let currentActivities = try snapshot.activities.map { dto in
+                if let row = activitiesByID[dto.id] {
+                    let saved = try row.decoded()
+                    if Self.activityIsOlder(dto, than: saved) { return saved }
+                }
+                return dto
+            }
+            try reconcileSummaryReplacement(currentActivities, scopeKey: key, context: context)
             let photosByID = Dictionary(uniqueKeysWithValues: existingPhotos.map { ($0.photoID, $0) })
             for row in existingActivities where !activityIDs.contains(row.activityID) { context.delete(row) }
             for row in existingPhotos where !photoIDs.contains(row.photoID) { context.delete(row) }
-            for dto in snapshot.activities {
+            for dto in currentActivities {
                 if let row = activitiesByID[dto.id] { row.payload = try StoreCodec.encode(dto) }
                 else { context.insert(try StoredActivity(scope: key, dto: dto)) }
             }

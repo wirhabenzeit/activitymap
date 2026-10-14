@@ -81,6 +81,7 @@ actor LocalStore {
                     if let row = try context.fetch(FetchDescriptor<StoredActivity>(
                         predicate: #Predicate { $0.key == key })).first {
                         let previous = try row.decoded()
+                        if Self.activityIsOlder(dto, than: previous) { continue }
                         if try reconcileSummaryUpsert(dto, previous: previous, scopeKey: scopeKey, context: context) {
                             invalidatedIDs.insert(dto.id)
                         }

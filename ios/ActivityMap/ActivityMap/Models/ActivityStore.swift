@@ -85,6 +85,7 @@ final class ActivityStore {
     var photos: [Photo] = [] { didSet { photosRevision += 1 } }
     let photoImages: PhotoImageCache
     var streamSummaries: StreamSummaryLoader?
+    var activityEditing: ActivityEditingService?
     var elevationCursor: ElevationCursor?
     /// The profile whose chart is being dragged. Only an active drag suspends
     /// pager paging; an accessibility-adjusted cursor must not.
