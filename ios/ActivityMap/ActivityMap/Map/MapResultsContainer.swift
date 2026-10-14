@@ -91,6 +91,7 @@ extension EnvironmentValues {
         get { self[MapResultsSheetSuspendedKey.self] }
         set { self[MapResultsSheetSuspendedKey.self] = newValue }
     }
+    @Entry var stackedMapPhotoViewer: StackedMapPhotoViewer? = nil
     @Entry var stackedShellSheet: StackedShellSheet? = nil
 }
 
@@ -110,6 +111,7 @@ private struct NativeMapResultsSheet: View {
     let largeText: Bool
     @Environment(\.mapResultsSheetSuspended) private var suspended
     @Environment(\.mapResultsPresentationChanged) private var presentationChanged
+    @Environment(\.stackedMapPhotoViewer) private var photoViewer
     @Environment(\.stackedShellSheet) private var stacked
     // Geometry alone defines the stops: results, detail and selection changes
     // never replace the selected detent or resize the user's map viewport.
@@ -149,6 +151,9 @@ private struct NativeMapResultsSheet: View {
                 .presentationContentInteraction(.scrolls)
                 .interactiveDismissDisabled()
                 .onAppear { presentationChanged(true) }
+                .fullScreenCover(item: photoViewer?.request ?? .constant(nil), onDismiss: { photoViewer?.onDismiss() }) { destination in
+                    photoViewer?.content(destination)
+                }
                 .sheet(item: stacked?.request ?? .constant(nil)) { destination in
                     stacked?.content(destination)
                 }

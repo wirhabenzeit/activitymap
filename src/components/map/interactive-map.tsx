@@ -838,7 +838,8 @@ export default function InteractiveMap() {
         <Overlay position="top-left">
           <MapControlIconButton
             onClick={togglePhotos}
-            aria-label="Toggle photos"
+            aria-label="Show photos on map"
+            aria-pressed={showPhotos}
           >
             <Camera
               color={showPhotos ? 'hsl(var(--header-background))' : 'gray'}

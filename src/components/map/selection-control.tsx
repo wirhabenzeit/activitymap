@@ -80,6 +80,11 @@ export class SelectionControl implements IControl {
 
   click = (e: MapMouseEvent) => {
     if (!this.map) return;
+    if (
+      e.originalEvent.target instanceof Element &&
+      e.originalEvent.target.closest('[data-map-photo]')
+    )
+      return;
     if (Date.now() < this.suppressClickUntil) return;
     if (e.originalEvent.shiftKey) return;
 
@@ -117,6 +122,11 @@ export class SelectionControl implements IControl {
   }
 
   mouseDown = (e: MapMouseEvent) => {
+    if (
+      e.originalEvent.target instanceof Element &&
+      e.originalEvent.target.closest('[data-map-photo]')
+    )
+      return;
     if (!(e.originalEvent.shiftKey && e.originalEvent.button === 0)) return;
 
     this.map?.dragPan.disable();

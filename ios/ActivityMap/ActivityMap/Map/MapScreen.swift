@@ -25,6 +25,14 @@ struct MapScreen: View {
         _viewport = State(initialValue: store.mapContext.camera.viewport)
     }
 
+    @State private var photoGroups: [MapPhotoLayout.Group] = []
+    @State private var photoModels: [String: Photo] = [:]
+    @State private var photoMetadataRevision: Int?
+    @State private var photoVisibleIDs: Set<Int> = []
+    @State private var photoThumbnails = false
+    @State private var photoPresentation: MapPhotoPresentation?
+    @State private var pendingPhotoActivity: Int?
+    @State private var lastPhotoAction: (id: String, time: Date)?
     @State private var picker: RoutePicker
 
     var body: some View {
@@ -45,6 +53,22 @@ struct MapScreen: View {
                 MapResultsContainer(picker: picker, store: store, size: geometry.size,
                                         topInset: max(topOcclusion, geometry.safeAreaInsets.top),
                                         bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize)
+                    .environment(\.stackedMapPhotoViewer, StackedMapPhotoViewer(
+                        request: $photoPresentation, content: photoViewer, onDismiss: finishPhotoPresentation))
+                // A wide map without selected routes has no results panel.
+                // Keep its viewer presenter mounted on a separate map anchor.
+                Color.clear.allowsHitTesting(false)
+                    .fullScreenCover(item: Binding(
+                        get: {
+                            let sidePanel = MapResultsLayout(size: geometry.size,
+                                topInset: max(topOcclusion, geometry.safeAreaInsets.top),
+                                bottomInset: geometry.safeAreaInsets.bottom, detent: picker.detent,
+                                largeText: typeSize.isAccessibilitySize).isSidePanel
+                            return sidePanel || !picker.isPresented ? photoPresentation : nil
+                        }, set: { photoPresentation = $0 }
+                    ), onDismiss: finishPhotoPresentation) { selected in
+                        photoViewer(selected)
+                    }
             }
 
         }
@@ -81,6 +105,12 @@ struct MapScreen: View {
         .onChange(of: context.scopeRevision) { _, _ in
             cameraTransitionID = nil
             picker.isPresented = false
+            photoGroups = []
+            photoModels = [:]
+            photoMetadataRevision = nil
+            photoPresentation = nil
+            pendingPhotoActivity = nil
+            lastPhotoAction = nil
             viewport = context.camera.viewport
         }
         .onDisappear {
@@ -108,9 +138,24 @@ struct MapScreen: View {
                 .circleEmissiveStrength(1)
             }
 
+            if context.showPhotos {
+                ForEvery(photoGroups) { group in
+                    if let photo = photoModels[group.id], let coordinate = photo.location,
+                       Int(photo.activityID).map(store.visibleActivityIDs.contains) == true {
+                        MapViewAnnotation(coordinate: coordinate) {
+                            MapPhotoMarker(store: store, photo: photo, count: group.photoIDs.count,
+                                thumbnails: photoThumbnails) { openPhotoGroup(group) }
+                        }
+                        .allowOverlap(true)
+                    }
+                }
+            }
+
             routeInteraction(proxy: proxy)
             TapInteraction { context in
-                if let map = proxy.map { picker.pick(at: context.point, map: map, store: store) }
+                if let map = proxy.map, !handlePhotoTap(at: context.point, map: map) {
+                    picker.pick(at: context.point, map: map, store: store)
+                }
                 return true
             }
         }
@@ -128,6 +173,7 @@ struct MapScreen: View {
         .onStyleLoaded { _ in
             if !acceptsCameraEvents { viewport = context.camera.viewport }
             acceptsCameraEvents = true
+            refreshPhotos(proxy: proxy, geometry: geometry)
             scheduleNavigation(proxy: proxy)
         }
         .onRenderFrameFinished { _ in
@@ -137,6 +183,7 @@ struct MapScreen: View {
             applyNavigation(proxy: proxy, geometry: geometry)
         }
         .onMapIdle { _ in
+            refreshPhotos(proxy: proxy, geometry: geometry)
             // A local/cached style can finish before SwiftUI installs its
             // onStyleLoaded subscription. Recover readiness at the first idle
             // frame as well, or camera persistence and queued fits stay blocked.
@@ -158,11 +205,102 @@ struct MapScreen: View {
         .onChange(of: context.pendingRequest?.id, initial: true) { _, _ in scheduleNavigation(proxy: proxy) }
         .onChange(of: picker.detent) { _, _ in scheduleNavigation(proxy: proxy) }
         .onChange(of: picker.isPresented) { _, _ in scheduleNavigation(proxy: proxy) }
-        .onChange(of: geometry.size) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: geometry.size) { _, _ in
+            scheduleNavigation(proxy: proxy)
+            refreshPhotos(proxy: proxy, geometry: geometry)
+        }
+        .onChange(of: context.showPhotos, initial: true) { _, _ in
+            refreshPhotos(proxy: proxy, geometry: geometry)
+            if !context.showPhotos { photoPresentation = nil }
+        }
+        .onChange(of: store.photosRevision) { _, _ in refreshPhotos(proxy: proxy, geometry: geometry) }
+        .onChange(of: store.visibleActivityIDs) { _, _ in refreshPhotos(proxy: proxy, geometry: geometry) }
         .onChange(of: store.activitiesRevision, initial: true) { _, revision in
             picker.reconcile(with: store)
             store.routeGeometry.update(activities: store.activities, revision: revision)
         }
+    }
+
+    private func refreshPhotos(proxy: MapProxy, geometry: GeometryProxy) {
+        guard context.showPhotos, let map = proxy.map, map.isStyleLoaded else {
+            photoGroups = []
+            if !photoModels.isEmpty { photoModels = [:] }
+            photoMetadataRevision = nil
+            return
+        }
+        let eligible = store.photos.filter {
+            Int($0.activityID).map(store.visibleActivityIDs.contains) == true && MapPhotoLayout.validLocation($0.location)
+        }
+        if photoMetadataRevision != store.photosRevision || photoVisibleIDs != store.visibleActivityIDs {
+            photoModels = Dictionary(eligible.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            photoMetadataRevision = store.photosRevision
+            photoVisibleIDs = store.visibleActivityIDs
+        }
+        let coordinates = eligible.compactMap(\.location)
+        let projected = map.points(for: coordinates)
+        let points = zip(eligible, projected).map { photo, point in
+            MapPhotoLayout.Point(id: photo.id, x: point.x, y: point.y)
+        }
+        let insets = geometry.safeAreaInsets
+        let size = CGSize(width: geometry.size.width + insets.leading + insets.trailing,
+                          height: geometry.size.height + insets.bottom)
+        let groups = MapPhotoLayout.groups(points, size: size, zoom: map.cameraState.zoom)
+        if groups != photoGroups { photoGroups = groups }
+        let thumbnails = map.cameraState.zoom >= MapPhotoLayout.thumbnailZoom
+        if photoThumbnails != thumbnails { photoThumbnails = thumbnails }
+        if let presentation = photoPresentation,
+           !store.photos.contains(where: { $0.id == presentation.id && Int($0.activityID).map(store.visibleActivityIDs.contains) == true }) {
+            photoPresentation = nil
+        }
+    }
+
+    private func handlePhotoTap(at point: CGPoint, map: MapboxMap) -> Bool {
+        guard context.showPhotos else { return false }
+        // Test the current projection during camera animation, rather than the
+        // settled positions used for grouping. Photos take priority over routes.
+        let half: CGFloat = photoThumbnails ? 30 : 26
+        for group in photoGroups {
+            guard let photo = photoModels[group.id], let coordinate = photo.location else { continue }
+            let anchor = map.point(for: coordinate)
+            if abs(point.x - anchor.x) <= half && abs(point.y - anchor.y) <= half {
+                openPhotoGroup(group)
+                return true
+            }
+        }
+        return false
+    }
+
+    private func openPhotoGroup(_ group: MapPhotoLayout.Group) {
+        guard context.showPhotos, let photo = photoModels[group.id], let coordinate = photo.location,
+              Int(photo.activityID).map(store.visibleActivityIDs.contains) == true else { return }
+        // Mapbox and the annotation button may both receive the same touch.
+        if let last = lastPhotoAction, last.id == group.id, Date().timeIntervalSince(last.time) < 0.4 { return }
+        lastPhotoAction = (group.id, Date())
+        if !photoThumbnails, group.photoIDs.count > 1 {
+            withViewportAnimation(.easeOut(duration: 0.45)) {
+                viewport = .camera(center: coordinate, zoom: max(context.camera.zoom + 2, MapPhotoLayout.thumbnailZoom),
+                                   bearing: context.camera.bearing, pitch: context.camera.pitch)
+                    .padding(EdgeInsets(top: context.camera.padding.top, leading: context.camera.padding.left,
+                                        bottom: context.camera.padding.bottom, trailing: context.camera.padding.right))
+            }
+            return
+        }
+        let ids = group.photoIDs.count > 1 ? group.photoIDs : store.photos.filter { $0.activityID == photo.activityID }.map(\.id)
+        photoPresentation = MapPhotoPresentation(id: photo.id, photoIDs: Set(ids))
+    }
+
+    private func photoViewer(_ selected: MapPhotoPresentation) -> AnyView {
+        AnyView(PhotoViewer(store: store, activityID: Int(photoModels[selected.id]?.activityID ?? "") ?? 0,
+                            initialPhotoID: selected.id, mapPhotoIDs: selected.photoIDs,
+                            onViewActivity: { pendingPhotoActivity = $0 }))
+    }
+
+    private func finishPhotoPresentation() {
+        guard let id = pendingPhotoActivity else { return }
+        pendingPhotoActivity = nil
+        guard store.visibleActivityIDs.contains(id) else { return }
+        store.inspect(id)
+        store.selectedTab = .list
     }
 
     private func scheduleNavigation(proxy: MapProxy) {
@@ -241,7 +379,9 @@ struct MapScreen: View {
         // Route hits take priority over external feature overlays. Photo
         // annotations consume their own taps before this layer interaction.
         TapInteraction(.layer(RouteSource.ordinaryLayerID), radius: RouteHitTesting.radius) { _, context in
-            if let map = proxy.map { picker.pick(at: context.point, map: map, store: store) }
+            if let map = proxy.map, !handlePhotoTap(at: context.point, map: map) {
+                picker.pick(at: context.point, map: map, store: store)
+            }
             return true
         }
     }
@@ -285,6 +425,14 @@ struct MapScreen: View {
                     }
                 }
 
+                Section("Activity photos") {
+                    Toggle("Show photos on map", systemImage: "photo", isOn: $context.showPhotos)
+                    if context.showPhotos, !store.photos.contains(where: {
+                        Int($0.activityID).map(store.visibleActivityIDs.contains) == true && MapPhotoLayout.validLocation($0.location)
+                    }) {
+                        Text("No located photos in the current filter")
+                    }
+                }
                 Section("Overlays") {
                     ForEach(SharedMapCatalog.rasterOverlays) { overlay in
                         Button {

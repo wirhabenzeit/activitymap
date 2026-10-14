@@ -22,6 +22,7 @@ struct MapCamera {
 @Observable
 final class MapContext {
     @ObservationIgnored private(set) var camera = MapCamera.initial
+    var showPhotos = false
     var baseStyle = BaseStyle.standard
     var activeOverlays = Set(SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault))
     private(set) var isPitched = false
@@ -55,6 +56,7 @@ final class MapContext {
     }
 
     func clearScope() {
+        showPhotos = false
         camera = .initial
         isPitched = false
         pendingRequest = nil

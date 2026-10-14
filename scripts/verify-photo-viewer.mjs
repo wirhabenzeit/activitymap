@@ -82,6 +82,10 @@ await writeFile(
   'export function usePhotos(){ return {data:window.photoFixtures}; }',
 );
 await writeFile(
+  join(directory, 'navigation.ts'),
+  'export function useRouter(){return {push:path=>window.navigationTarget=path};}',
+);
+await writeFile(
   join(directory, 'activities.ts'),
   'export function useFilteredActivities(){ return {filterIDs:[1]}; }',
 );
@@ -95,6 +99,7 @@ const bundleConfig = {
   outfile: join(directory, 'fixture.js'),
   alias: {
     '~': join(repo, 'src'),
+    'next/navigation': join(directory, 'navigation.ts'),
     'next/image': join(
       repo,
       'node_modules/next/dist/esm/shared/lib/image-external.js',
@@ -131,7 +136,7 @@ function App(){
  <h1>Activity photos</h1><div data-testid="row" onClick={()=>window.rowClicks=(window.rowClicks||0)+1}>
  <PhotoLightbox photos={photos} title="Afternoon on the ridge" className="h-20" /></div>
  <Dialog><DialogTrigger>Open activity detail</DialogTrigger><DialogContent><DialogTitle>Activity detail</DialogTitle><PhotoLightbox photos={photos} title="Detail photos"/></DialogContent></Dialog>
- <div style={{height:260,marginTop:32}}><Map onIdle={()=>window.mapReady=true} initialViewState={{latitude:0,longitude:0,zoom:10}} mapboxAccessToken="pk.offline-test"
+ <div style={{height:260,marginTop:32}}><Map ref={ref=>window.photoMap=ref} onIdle={()=>window.mapReady=true} initialViewState={{latitude:0,longitude:0,zoom:10}} mapboxAccessToken="pk.offline-test"
  mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e6e9e3'}}]}}><PhotoLayer/></Map></div>
  <button onClick={()=>window.underlyingClicks=(window.underlyingClicks||0)+1}>Underlying action</button>
  </div>;
@@ -317,33 +322,29 @@ try {
   await page.keyboard.press('Escape');
   await detail.waitFor({ state: 'hidden' });
   await page.waitForFunction(() => window.mapReady === true);
-  const marker = page
-    .getByRole('button', {
-      name: 'Select Afternoon on the ridge and preview photo',
-    })
-    .last();
+  const marker = page.getByRole('button', {
+    name: 'Zoom into 5 photos',
+    exact: true,
+  });
+  const selection = await page.evaluate(() => window.store.getState().selected);
   await marker.click();
+  const stack = page.getByRole('button', {
+    name: 'View 5 photos: Afternoon on the ridge',
+    exact: true,
+  });
+  await stack.waitFor();
+  await stack.click();
+  await viewer.getByText('1 of 5', { exact: true }).waitFor();
   assert.deepEqual(
     await page.evaluate(() => window.store.getState().selected),
-    [1],
+    selection,
+    'Map photos preserve selection',
   );
-  const preview = page.getByText('View photos', { exact: true });
-  await preview.waitFor();
-  await page
-    .getByRole('button', { name: /^View photo 5 of 5:/ })
-    .last()
-    .click();
-  await viewer.getByText('5 of 5', { exact: true }).waitFor();
-  await viewer.getByRole('button', { name: 'Previous photo' }).click();
-  await viewer.getByText('4 of 5', { exact: true }).waitFor();
+  await viewer.getByRole('button', { name: 'Next photo' }).click();
+  await viewer.getByText('2 of 5', { exact: true }).waitFor();
   await page.keyboard.press('Escape');
   await viewer.waitFor({ state: 'hidden' });
-  assert.equal(
-    await preview.isVisible(),
-    true,
-    'Viewer close restores marker preview',
-  );
-  await page.keyboard.press('Escape'); // dismiss marker preview
+  assert.equal(await stack.isVisible(), true);
   await page.evaluate(() => window.onlyPhoto('2'));
   const only = row.getByRole('button', { name: /^View photo 1 of 1:/ });
   await only.click();
@@ -386,7 +387,7 @@ try {
           'deletion',
           'account switch',
           'nested detail',
-          'origin marker/selection/preview',
+          'map pin zoom / stack viewer / selection preservation',
         ],
       },
       null,
@@ -396,10 +397,14 @@ try {
   const legacyPath = join(directory, 'legacy-photo.tsx');
   await writeFile(
     legacyPath,
-    execFileSync('git', ['show', `${baselineRevision}:src/components/list/photo.tsx`], {
-      cwd: repo,
-      encoding: 'utf8',
-    }),
+    execFileSync(
+      'git',
+      ['show', `${baselineRevision}:src/components/list/photo.tsx`],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+      },
+    ),
   );
   await build({
     ...bundleConfig,

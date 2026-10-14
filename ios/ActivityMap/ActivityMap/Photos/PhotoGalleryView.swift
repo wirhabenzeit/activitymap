@@ -51,10 +51,20 @@ struct PhotoViewer: View {
     let store: ActivityStore
     let activityID: Int
     let transitionNamespace: Namespace.ID?
+    let mapPhotoIDs: Set<String>?
+    let onViewActivity: ((Int) -> Void)?
     @State private var currentID: String
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private var photos: [Photo] { Photo.ordered(store.photos.filter { $0.activityID == String(activityID) }) }
+    private var photos: [Photo] {
+        Photo.ordered(store.photos.filter { photo in
+            if let mapPhotoIDs {
+                return mapPhotoIDs.contains(photo.id) && Int(photo.activityID).map(store.visibleActivityIDs.contains) == true
+            }
+            return photo.activityID == String(activityID)
+        })
+    }
+    private var currentActivityID: Int { current.flatMap { Int($0.activityID) } ?? activityID }
     private var index: Int { photos.firstIndex { $0.id == currentID } ?? 0 }
     private var current: Photo? { photos.first { $0.id == currentID } }
     private var neighbors: [Photo] {
@@ -63,10 +73,12 @@ struct PhotoViewer: View {
         }
     }
 
-    init(store: ActivityStore, activityID: Int, initialPhotoID: String, transitionNamespace: Namespace.ID? = nil) {
+    init(store: ActivityStore, activityID: Int, initialPhotoID: String, transitionNamespace: Namespace.ID? = nil, mapPhotoIDs: Set<String>? = nil, onViewActivity: ((Int) -> Void)? = nil) {
         self.store = store
         self.activityID = activityID
         self.transitionNamespace = transitionNamespace
+        self.mapPhotoIDs = mapPhotoIDs
+        self.onViewActivity = onViewActivity
         _currentID = State(initialValue: initialPhotoID)
     }
 
@@ -108,11 +120,16 @@ struct PhotoViewer: View {
             }
             .overlay(alignment: .top) {
                 HStack(spacing: 12) {
-                    Text(store.activity(id: activityID)?.name ?? "Activity photos")
+                    Text(store.activity(id: currentActivityID)?.name ?? "Activity photos")
                         .font(.subheadline.weight(.medium)).lineLimit(1)
                         .padding(.horizontal, 12).padding(.vertical, 8)
                         .background(.black.opacity(0.55), in: Capsule())
                     Spacer(minLength: 0)
+                    if let onViewActivity {
+                        Button("View activity") { onViewActivity(currentActivityID); dismiss() }
+                            .font(.subheadline).padding(.horizontal, 12).frame(minHeight: 44)
+                            .background(.black.opacity(0.55), in: Capsule())
+                    }
                     Button { dismiss() } label: { floatingIcon("xmark") }
                         .accessibilityLabel("Close photo viewer")
                         .accessibilityIdentifier("photo-viewer-close")
@@ -171,7 +188,7 @@ struct PhotoViewer: View {
                 }
             }
             .onChange(of: photos.map(\.id)) { _, ids in if !ids.contains(currentID) { dismiss() } }
-            .onChange(of: store.activitiesRevision) { _, _ in if store.activity(id: activityID) == nil { dismiss() } }
+            .onChange(of: store.activitiesRevision) { _, _ in if store.activity(id: currentActivityID) == nil { dismiss() } }
             .onChange(of: store.mapContext.scopeRevision) { _, _ in dismiss() }
         }
         .modifier(PhotoViewerZoomTransition(sourceID: currentID, namespace: transitionNamespace))

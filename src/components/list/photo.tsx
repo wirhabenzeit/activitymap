@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
@@ -123,6 +123,11 @@ interface PhotoLightboxProps {
   className?: string;
   /** A map preview can expose just its invoking thumbnail, keeping activity order. */
   thumbnailID?: string;
+  openPhotoID?: string | null;
+  onPhotoIDChange?: (id: string | null) => void;
+  hideThumbnails?: boolean;
+  returnFocus?: React.RefObject<HTMLButtonElement | null>;
+  onViewActivity?: (photo: Photo) => void;
 }
 
 export function PhotoLightbox(props: PhotoLightboxProps) {
@@ -143,9 +148,16 @@ function PhotoGallery({
   title,
   className,
   thumbnailID,
+  openPhotoID,
+  onPhotoIDChange,
+  hideThumbnails,
+  returnFocus,
+  onViewActivity,
 }: PhotoLightboxProps) {
   const ordered = orderedPhotos(photos);
-  const [currentID, setCurrentID] = useState<string | null>(null);
+  const [localID, setLocalID] = useState<string | null>(null);
+  const currentID = openPhotoID === undefined ? localID : openPhotoID;
+  const setCurrentID = onPhotoIDChange ?? setLocalID;
   const invokingButton = useRef<HTMLButtonElement | null>(null);
   const touchStart = useRef<{ x: number; y: number; pointerID: number } | null>(
     null,
@@ -153,7 +165,9 @@ function PhotoGallery({
   const index = ordered.findIndex((p) => p.unique_id === currentID);
   const current = ordered[index];
   // Clear a deleted current identity without ever rendering its retained bytes.
-  if (currentID !== null && !current) setCurrentID(null);
+  useEffect(() => {
+    if (currentID !== null && !current) setCurrentID(null);
+  }, [currentID, current, setCurrentID]);
   const go = (delta: number) => {
     const next = ordered[index + delta];
     if (next) setCurrentID(next.unique_id);
@@ -161,30 +175,32 @@ function PhotoGallery({
   if (!ordered.length) return null;
   return (
     <>
-      <div
-        className={cn(
-          'flex h-11 flex-row items-center gap-2 overflow-x-auto',
-          className,
-        )}
-      >
-        {ordered
-          .filter((p) => !thumbnailID || p.unique_id === thumbnailID)
-          .map((p) => (
-            <button
-              type="button"
-              key={p.unique_id}
-              className="aspect-square h-full min-h-11 min-w-11 shrink-0 overflow-hidden rounded-md focus-visible:outline focus-visible:outline-2"
-              aria-label={`View photo ${ordered.indexOf(p) + 1} of ${ordered.length}: ${p.caption?.trim() ? p.caption.trim() : title}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                invokingButton.current = e.currentTarget;
-                setCurrentID(p.unique_id);
-              }}
-            >
-              <PhotoImage variant={photoVariant(p, 'thumbnail')} alt="" />
-            </button>
-          ))}
-      </div>
+      {!hideThumbnails && (
+        <div
+          className={cn(
+            'flex h-11 flex-row items-center gap-2 overflow-x-auto',
+            className,
+          )}
+        >
+          {ordered
+            .filter((p) => !thumbnailID || p.unique_id === thumbnailID)
+            .map((p) => (
+              <button
+                type="button"
+                key={p.unique_id}
+                className="aspect-square h-full min-h-11 min-w-11 shrink-0 overflow-hidden rounded-md focus-visible:outline focus-visible:outline-2"
+                aria-label={`View photo ${ordered.indexOf(p) + 1} of ${ordered.length}: ${p.caption?.trim() ? p.caption.trim() : title}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  invokingButton.current = e.currentTarget;
+                  setCurrentID(p.unique_id);
+                }}
+              >
+                <PhotoImage variant={photoVariant(p, 'thumbnail')} alt="" />
+              </button>
+            ))}
+        </div>
+      )}
       <DialogPrimitive.Root
         open={!!current}
         onOpenChange={(open) => {
@@ -199,8 +215,8 @@ function PhotoGallery({
             onClick={(e) => e.stopPropagation()}
             onCloseAutoFocus={(e) => {
               e.preventDefault();
-              if (invokingButton.current?.isConnected)
-                invokingButton.current.focus();
+              const button = returnFocus?.current ?? invokingButton.current;
+              if (button?.isConnected) button.focus();
             }}
             onKeyDown={(e) => {
               if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -212,8 +228,17 @@ function PhotoGallery({
           >
             <header className="flex shrink-0 items-center gap-3 pb-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))]">
               <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-sm font-medium">
-                {title}
+                {onViewActivity ? (current?.activity_name ?? title) : title}
               </DialogPrimitive.Title>
+              {onViewActivity && current && (
+                <button
+                  type="button"
+                  className="min-h-11 rounded-full bg-white/15 px-4 text-sm"
+                  onClick={() => onViewActivity(current)}
+                >
+                  View activity
+                </button>
+              )}
               <DialogPrimitive.Close
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 focus-visible:outline focus-visible:outline-2"
                 aria-label="Close photo viewer"
