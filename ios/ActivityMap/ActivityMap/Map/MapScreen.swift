@@ -25,6 +25,7 @@ struct MapScreen: View {
         _viewport = State(initialValue: store.mapContext.camera.viewport)
     }
 
+    @Namespace private var photoTransition
     @State private var photoGroups: [MapPhotoLayout.Group] = []
     @State private var photoModels: [String: Photo] = [:]
     @State private var photoMetadataRevision: Int?
@@ -145,6 +146,7 @@ struct MapScreen: View {
                         MapViewAnnotation(coordinate: coordinate) {
                             MapPhotoMarker(store: store, photo: photo, count: group.photoIDs.count,
                                 thumbnails: photoThumbnails) { openPhotoGroup(group) }
+                                .matchedTransitionSource(id: photo.id, in: photoTransition)
                         }
                         .allowOverlap(true)
                     }
@@ -248,17 +250,13 @@ struct MapScreen: View {
         if groups != photoGroups { photoGroups = groups }
         let thumbnails = map.cameraState.zoom >= MapPhotoLayout.thumbnailZoom
         if photoThumbnails != thumbnails { photoThumbnails = thumbnails }
-        if let presentation = photoPresentation,
-           !store.photos.contains(where: { $0.id == presentation.id && Int($0.activityID).map(store.visibleActivityIDs.contains) == true }) {
-            photoPresentation = nil
-        }
     }
 
     private func handlePhotoTap(at point: CGPoint, map: MapboxMap) -> Bool {
         guard context.showPhotos else { return false }
         // Test the current projection during camera animation, rather than the
         // settled positions used for grouping. Photos take priority over routes.
-        let half: CGFloat = photoThumbnails ? 30 : 26
+        let half: CGFloat = 22
         for group in photoGroups {
             guard let photo = photoModels[group.id], let coordinate = photo.location else { continue }
             let anchor = map.point(for: coordinate)
@@ -285,14 +283,15 @@ struct MapScreen: View {
             }
             return
         }
-        let ids = group.photoIDs.count > 1 ? group.photoIDs : store.photos.filter { $0.activityID == photo.activityID }.map(\.id)
-        photoPresentation = MapPhotoPresentation(id: photo.id, photoIDs: Set(ids))
+        guard let activityID = Int(photo.activityID) else { return }
+        photoPresentation = MapPhotoPresentation(id: photo.id, activityID: activityID, nearbyPhotoIDs: Set(group.photoIDs))
     }
 
     private func photoViewer(_ selected: MapPhotoPresentation) -> AnyView {
-        AnyView(PhotoViewer(store: store, activityID: Int(photoModels[selected.id]?.activityID ?? "") ?? 0,
-                            initialPhotoID: selected.id, mapPhotoIDs: selected.photoIDs,
-                            onViewActivity: { pendingPhotoActivity = $0 }))
+        AnyView(PhotoViewer(store: store, activityID: selected.activityID,
+                            initialPhotoID: selected.id, transitionNamespace: photoTransition,
+                            transitionSourceID: selected.id, nearbyPhotoIDs: selected.nearbyPhotoIDs,
+                            requiresVisibleActivity: true, onViewActivity: { pendingPhotoActivity = $0 }))
     }
 
     private func finishPhotoPresentation() {

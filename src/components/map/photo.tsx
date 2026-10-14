@@ -111,12 +111,7 @@ export function MapPhotos({
             <button
               type="button"
               data-map-photo={group.id}
-              className="relative flex h-11 min-w-11 items-center justify-center rounded-full border-2 border-white bg-slate-800 text-white shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-              style={
-                layout.thumbnails
-                  ? { width: 52, height: 52, borderRadius: 10 }
-                  : undefined
-              }
+              className="relative flex h-11 w-11 items-center justify-center text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
               aria-label={
                 zoomGroup
                   ? `Zoom into ${count} photos`
@@ -149,21 +144,26 @@ export function MapPhotos({
                 });
               }}
             >
-              {layout.thumbnails ? (
-                <span className="absolute inset-0 overflow-hidden rounded-lg">
-                  <PhotoImage
-                    variant={photoVariant(photo, 'thumbnail')}
-                    alt=""
-                  />
-                </span>
-              ) : (
-                <Camera size={20} aria-hidden="true" />
-              )}
-              {count > 1 && (
-                <span className="absolute -right-2 -top-2 min-w-5 rounded-full border border-white bg-slate-800 px-1 text-center text-[10px] font-semibold leading-5">
-                  {count}
-                </span>
-              )}
+              <span
+                className={`relative flex items-center justify-center border-[1.5px] border-white bg-slate-800 shadow-md ${layout.thumbnails ? 'h-9 w-9 rounded-md' : 'h-7 w-7 rounded-full'}`}
+                data-photo-appearance={layout.thumbnails ? 'thumbnail' : 'pin'}
+              >
+                {layout.thumbnails ? (
+                  <span className="absolute inset-0 overflow-hidden rounded-[5px]">
+                    <PhotoImage
+                      variant={photoVariant(photo, 'thumbnail')}
+                      alt=""
+                    />
+                  </span>
+                ) : (
+                  <Camera size={14} aria-hidden="true" />
+                )}
+                {count > 1 && (
+                  <span className="absolute -right-1 -top-1 min-w-4 rounded-full border border-white bg-slate-800 px-1 text-center text-[9px] font-semibold leading-4">
+                    {count}
+                  </span>
+                )}
+              </span>
             </button>
           </Marker>
         );

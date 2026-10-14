@@ -64,6 +64,7 @@ struct RenderedMapPhotoTests {
         let center = CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005)
         store.photos = [Photo(id: "a", activityID: "1", caption: "First map photo", urls: ["256": "https://photos.test/thumb-a", "1600": "https://photos.test/full-a"], location: center, createdAt: nil),
                         Photo(id: "b", activityID: "2", caption: "Second map photo", urls: ["256": "https://photos.test/thumb-b", "1600": "https://photos.test/full-b"], location: center, createdAt: nil),
+                        Photo(id: "a2", activityID: "1", caption: "Second photo of the same activity", urls: ["1600": "https://photos.test/full-a2"], location: nil, createdAt: nil),
                         Photo(id: "unlocated", activityID: "1", caption: nil, urls: [:], location: nil, createdAt: nil)]
         let initialPhotos = store.photos
         try await cache.configure(scope: StoreScope(deployment: URL(string: "https://activitymap.test")!, userID: "1"), photos: store.photos)
@@ -100,6 +101,26 @@ struct RenderedMapPhotoTests {
         try await wait { host.element(labelPrefix: "Close photo viewer") != nil }
         #expect(store.selectedActivityIDs == selected)
         let presented = try #require(host.host.presentedViewController)
+        let viewer = resultsPresented && !sidePanel ? try #require(presented.presentedViewController) : presented
+        #expect(viewer.preferredTransition != nil, "Map and activity photos must both use the native interactive zoom/dismiss transition")
+        #expect(!viewer.isModalInPresentation, "The results sheet's drag lock must not disable photo swipe dismissal")
+        try await wait { host.element(labelPrefix: "1 of 3") != nil }
+        #expect(try #require(host.element(labelPrefix: "Next photo")).accessibilityActivate())
+        try await wait { host.element(labelPrefix: "Second photo of the same activity") != nil }
+        #expect(host.element(labelPrefix: "Second map photo") == nil, "Horizontal paging must stay in the tapped activity")
+        #expect(try #require(host.element(labelPrefix: "Photo activity")).accessibilityActivate())
+        let nearbyName = try #require(store.activity(id: 2)?.name)
+        try await wait { host.menuButton(containingTitle: nearbyName) != nil }
+        let activityMenu = try #require(host.menuButton(containingTitle: nearbyName))
+        func action(_ element: UIMenuElement) -> UIAction? {
+            if let leaf = element as? UIAction, leaf.title == nearbyName { return leaf }
+            for child in (element as? UIMenu)?.children ?? [] { if let found = action(child) { return found } }
+            return nil
+        }
+        activityMenu.sendAction(try #require(activityMenu.menu.flatMap(action)))
+        try await wait { host.element(labelPrefix: "Second map photo") != nil }
+        try await wait { host.element(labelPrefix: "1 of 1") != nil }
+        #expect(store.selectedActivityIDs == selected, "Other cluster activities remain reachable without changing route selection")
         if resultsPresented && !sidePanel {
             #expect(presented.presentedViewController != nil, "The phone results sheet must own the full-screen presentation")
         } else {
@@ -135,7 +156,7 @@ struct RenderedMapPhotoTests {
         #expect(try #require(host.element(labelPrefix: "Next photo")).accessibilityActivate())
         try await Task.sleep(for: .milliseconds(250))
         #expect(try #require(host.element(labelPrefix: "View activity")).accessibilityActivate())
-        try await wait { store.selectedTab == .list && store.inspectedActivityID == 2 }
+        try await wait { store.selectedTab == .list && store.inspectedActivityID == 1 }
         #expect(store.selectedActivityIDs == selected)
     }
     private func wait(line: Int = #line, _ condition: () -> Bool) async throws {
@@ -187,9 +208,9 @@ private actor MapPhotoRequestLog {
         }
         return visit(window)
     }
-    func menuButton() -> UIButton? {
+    func menuButton(containingTitle title: String = "Show photos on map") -> UIButton? {
         func containsPhoto(_ element: UIMenuElement) -> Bool {
-            element.title == "Show photos on map" || (element as? UIMenu)?.children.contains(where: containsPhoto) == true
+            element.title == title || (element as? UIMenu)?.children.contains(where: containsPhoto) == true
         }
         func visit(_ view: UIView) -> UIButton? {
             if let button = view as? UIButton, let menu = button.menu, containsPhoto(menu) { return button }

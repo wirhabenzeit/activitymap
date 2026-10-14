@@ -169,6 +169,17 @@ try {
     exact: true,
   });
   await pin.waitFor();
+  const pinBox = await pin.boundingBox();
+  const pinVisual = await pin
+    .locator('[data-photo-appearance="pin"]')
+    .boundingBox();
+  assert(
+    pinBox.width >= 44 &&
+      pinBox.height >= 44 &&
+      pinVisual.width === 28 &&
+      pinVisual.height === 28,
+    'Compact pin retains a 44px tap target',
+  );
   assert.equal(requests.length, 0, 'Zoomed out pins fetch no image bytes');
   assert.equal(
     await page
@@ -189,6 +200,13 @@ try {
   });
   await stack.waitFor();
   await stack.locator('img').waitFor();
+  const thumbVisual = await stack
+    .locator('[data-photo-appearance="thumbnail"]')
+    .boundingBox();
+  assert(
+    thumbVisual.width === 36 && thumbVisual.height === 36,
+    'Thumbnails are visually compact',
+  );
   await page.evaluate(
     () =>
       new Promise((resolve) => {
