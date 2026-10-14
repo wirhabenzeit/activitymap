@@ -659,9 +659,8 @@ extension RenderedRoutePickingTests {
                 "The visible hierarchy must be title, graph, description, then stats")
         #expect(observations.filter { $0.topCandidates(1).first?.string.contains("42.7") == true }.count == 1,
                 "Distance must appear in one stats row only")
-        let cursorLayers = map.mapboxMap.allLayerIdentifiers.filter { $0.type == .circle }
-        #expect(cursorLayers.contains { map.mapboxMap.layerProperty(for: $0.id, property: "circle-emissive-strength").value as? Double == 1 },
-                "The cursor must preserve its color under dark map lighting")
+        #expect(!map.viewAnnotations.allAnnotations.isEmpty,
+                "The route cursor is drawn above the map and retains its color under dark lighting")
         picker.detent = .expanded
         try await Task.sleep(for: .milliseconds(600))
         let expanded = UIGraphicsImageRenderer(bounds: host.window.bounds).image { _ in

@@ -190,18 +190,6 @@ struct MapScreen: View {
             RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
                         selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
 
-            if picker.isPresented, picker.detailID == store.activeActivityID,
-               let coordinate = store.elevationCoordinate {
-                CircleAnnotationGroup {
-                    CircleAnnotation(centerCoordinate: coordinate)
-                        .circleRadius(10)
-                        .circleColor(UIColor.systemBlue.resolvedColor(with: UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)))
-                        .circleStrokeColor(.white)
-                        .circleStrokeWidth(3)
-                }
-                .circleEmissiveStrength(1)
-            }
-
             if context.showPhotos {
                 ForEvery(photoGroups) { group in
                     if let photo = photoModels[group.id], let coordinate = photo.location,
@@ -214,6 +202,17 @@ struct MapScreen: View {
                         .allowOverlap(true)
                     }
                 }
+            }
+
+            if let coordinate = context.locatedPosition {
+                MapPositionAnnotation(coordinate: coordinate, label: "Last located position",
+                                      identifier: "map-located-position")
+            }
+
+            if picker.isPresented, picker.detailID == store.activeActivityID,
+               let coordinate = store.elevationCoordinate {
+                MapPositionAnnotation(coordinate: coordinate, label: "Position on activity route",
+                                      identifier: "map-route-position")
             }
 
             routeInteraction(proxy: proxy)

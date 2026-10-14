@@ -28,6 +28,7 @@ final class MapContext {
     private(set) var isPitched = false
     private(set) var scopeRevision = 0
     private(set) var pendingRequest: Request?
+    private(set) var locatedPosition: CLLocationCoordinate2D?
     var hiddenTargetID: Int?
     var navigationError: String?
 
@@ -60,9 +61,16 @@ final class MapContext {
         if case .locate = pendingRequest?.action { pendingRequest = nil }
     }
 
+    func recordLocatedPosition(_ coordinate: CLLocationCoordinate2D) {
+        guard coordinate.latitude.isFinite, coordinate.longitude.isFinite,
+              CLLocationCoordinate2DIsValid(coordinate) else { return }
+        locatedPosition = coordinate
+    }
+
     func clearScope() {
         showPhotos = false
         camera = .initial
+        locatedPosition = nil
         isPitched = false
         pendingRequest = nil
         hiddenTargetID = nil

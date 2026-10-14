@@ -71,7 +71,9 @@ struct MapContextTests {
         store.mapContext.activeOverlays = overlays
         store.mapContext.request(.activity(10))
         store.mapContext.hiddenTargetID = 10
+        store.mapContext.recordLocatedPosition(.init(latitude: 46.8, longitude: 8.2))
         store.clearScope()
+        #expect(store.mapContext.locatedPosition == nil)
         #expect(store.mapContext.pendingRequest == nil && store.mapContext.hiddenTargetID == nil)
         #expect(store.mapContext.scopeRevision == 1)
         #expect(store.mapContext.baseStyle == style && store.mapContext.activeOverlays == overlays)

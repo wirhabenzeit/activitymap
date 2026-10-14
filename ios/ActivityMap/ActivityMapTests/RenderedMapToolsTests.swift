@@ -7,6 +7,67 @@ import UIKit
 
 @MainActor @Suite(.serialized)
 struct RenderedMapToolsTests {
+    @Test(arguments: [false, true])
+    func locatedPositionStaysVisibleAtEveryZoomAndPitch(tablet: Bool) async throws {
+        let oldToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = oldToken }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let oldWindow = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: tablet ? CGSize(width: 768, height: 1024) : CGSize(width: 390, height: 844))
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
+        store.replaceSelection(with: [1])
+        let fixture = try MapToolsStyleFixture()
+        let host = UIHostingController(rootView: MapToolsFixtureView(store: store, picker: RoutePicker(), style: fixture))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        host.view.frame = window.bounds
+        defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
+        try await mapToolsWait { mapToolsDescendants(host.view, of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
+        let map = try #require(mapToolsDescendants(host.view, of: MapView.self).first)
+        store.mapContext.request(.resetView)
+        try await mapToolsWait { store.mapContext.pendingRequest == nil }
+        try await Task.sleep(for: .milliseconds(650))
+        store.mapContext.request(.locate(latitude: 46.005, longitude: 8.005))
+        try await mapToolsWait { store.mapContext.pendingRequest == nil && map.viewAnnotations.allAnnotations.count == 1 }
+        try await Task.sleep(for: .milliseconds(650))
+        let coordinate = try #require(store.mapContext.locatedPosition)
+        let selection = store.selectedActivityIDs, filters = store.activeSportTypes
+        for zoom: CGFloat in [2, 6, 10, 14, 18, 22] {
+            for pitch: CGFloat in [0, 50] {
+                // Simulate manual map navigation, which leaves follow/viewport state idle.
+                map.viewport.idle()
+                map.mapboxMap.setCamera(to: CameraOptions(center: coordinate, zoom: zoom, bearing: 25, pitch: pitch))
+                try await mapToolsWait {
+                    guard let view = map.viewAnnotations.allAnnotations.first?.view else { return false }
+                    let frame = view.convert(view.bounds, to: map)
+                    return !view.isHidden && view.alpha > 0 && frame.width >= 26 && frame.height >= 26
+                        && map.bounds.contains(CGPoint(x: frame.midX, y: frame.midY))
+                        && abs(map.mapboxMap.cameraState.zoom - zoom) < 0.1
+                }
+                let view = try #require(map.viewAnnotations.allAnnotations.first?.view)
+                #expect(abs(view.bounds.width - 26) < 0.1 && abs(view.bounds.height - 26) < 0.1,
+                        "Marker stays 26 points at zoom \(zoom), pitch \(pitch)")
+                #expect(store.selectedActivityIDs == selection && store.activeSportTypes == filters)
+                if zoom == 2 || zoom == 18 {
+                    try await Task.sleep(for: .milliseconds(200))
+                    try mapToolsSnapshot(window, name: "location-\(tablet ? "ipad" : "iphone")-z\(Int(zoom))-p\(Int(pitch))")
+                }
+            }
+        }
+        fixture.json = CameraHarness.style.replacingOccurrences(of: "#e5e8df", with: "#cfded8")
+        store.mapContext.baseStyle = BaseStyle.all[1]
+        try await mapToolsWait {
+            map.mapboxMap.isStyleLoaded && map.viewAnnotations.allAnnotations.count == 1
+                && map.viewAnnotations.allAnnotations.first?.view.isHidden == false
+        }
+        #expect(store.mapContext.locatedPosition?.latitude == coordinate.latitude)
+        store.clearScope()
+        try await mapToolsWait { map.viewAnnotations.allAnnotations.isEmpty }
+        #expect(store.mapContext.locatedPosition == nil)
+    }
+
     @Test func terrainSourceFailureExplainsTiltAndAllowsRetry() async throws {
         let oldToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
@@ -222,6 +283,9 @@ struct LiveMapTerrainTests {
         store.mapContext.request(.pitch(50))
         try await mapToolsWait { store.mapContext.pendingRequest == nil }
         try await Task.sleep(for: .milliseconds(650))
+        store.mapContext.request(.locate(latitude: center.latitude, longitude: center.longitude))
+        try await mapToolsWait { store.mapContext.pendingRequest == nil && map.viewAnnotations.allAnnotations.count == 1 }
+        try await Task.sleep(for: .milliseconds(650))
         var previousSource = ""
         for style in BaseStyle.all {
             store.mapContext.baseStyle = style
@@ -241,6 +305,9 @@ struct LiveMapTerrainTests {
                 #expect(abs(camera.center.longitude - center.longitude) < 0.001, "Center retained for \(style.id)")
                 #expect(abs(camera.zoom - 12) < 0.01 && abs(camera.bearing - 25) < 0.1, "Camera retained for \(style.id)")
                 #expect(map.mapboxMap.sourceExists(withId: RouteSource.id))
+                let marker = try #require(map.viewAnnotations.allAnnotations.first?.view)
+                #expect(!marker.isHidden && marker.bounds.size == CGSize(width: 26, height: 26),
+                        "Position remains visible above real terrain for \(style.id)")
                 try mapToolsSnapshot(window, name: "live-terrain-\(style.id)")
                 print("Terrain loaded: \(style.id)")
             } catch {

@@ -99,6 +99,7 @@ extension RenderedRoutePickingTests {
         #expect(located.center?.latitude == 46.8 && located.center?.longitude == 8.2)
         #expect(located.zoom == recorded.zoom && located.pitch == recorded.pitch && located.bearing == recorded.bearing)
         #expect(located.padding == recorded.padding)
+        #expect(store.mapContext.locatedPosition?.latitude == 46.8 && store.mapContext.locatedPosition?.longitude == 8.2)
         #expect(store.selectedActivityIDs == selection && store.activeSportTypes == filters)
         #expect(resolve() == nil, "Locate me is consumed once")
         store.mapContext.request(.locate(latitude: .nan, longitude: 8))

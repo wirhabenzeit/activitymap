@@ -97,6 +97,7 @@ enum MapNavigation {
                 context.navigationError = "Your current location is unavailable. Try again outdoors."
                 return nil
             }
+            context.recordLocatedPosition(coordinate)
             return CameraOptions(center: coordinate, padding: current.padding, zoom: current.zoom,
                                  bearing: current.bearing, pitch: current.pitch)
         case .resetView:
