@@ -48,7 +48,13 @@ final class MapTerrainState {
     }
 
     func configure(enabled: Bool, supported: Bool, restart: Bool = false) {
-        guard enabled else { status = .off; errorMessage = nil; return }
+        guard enabled else {
+            // Returning to a flat map must not republish unchanged state and
+            // cause an unnecessary update of the SDK's retained viewport.
+            if status != .off { status = .off }
+            if errorMessage != nil { errorMessage = nil }
+            return
+        }
         guard supported else {
             status = .unsupported
             errorMessage = "Elevation terrain is unavailable for this map style. Choose another base map to use 3D terrain."

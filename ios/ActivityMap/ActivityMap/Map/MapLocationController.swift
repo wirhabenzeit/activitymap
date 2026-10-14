@@ -50,7 +50,7 @@ final class MapLocationController: NSObject, CLLocationManagerDelegate {
         completion = nil
         requestedAt = nil
         requestedFix = false
-        isRequesting = false
+        if isRequesting { isRequesting = false }
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { authorizationChanged() }
