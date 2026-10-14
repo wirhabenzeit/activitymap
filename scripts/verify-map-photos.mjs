@@ -108,22 +108,27 @@ import {createRoot} from 'react-dom/client';
 import Map, {Source,Layer} from 'react-map-gl/mapbox';
 import {MapPhotos} from '~/components/map/photo';
 import {Selection} from '~/components/map/selection-control';
-import {store} from '~/store';
+import {LayerSwitcher} from '~/components/map/layer-switcher';
+import {MapControlIconButton} from '~/components/map/map-control-icon-button';
+import {store,useShallowStore} from '~/store';
 import 'mapbox-gl/dist/mapbox-gl.css';
 const photo=(id,activity,location)=>({unique_id:id,activity_id:activity,athlete_id:1,activity_name:'Activity '+activity,caption:'Caption '+id,created_at:new Date('2026-01-01'),location,
  urls:{256:'${baseURL}/thumb-1',1600:'${baseURL}/full-1'},sizes:{256:[256,256],1600:[1600,900]}});
 const fixture=[photo('a',1,[46,8]),photo('b',2,[46,8]),photo('c',1,[46.15,8.15]),photo('unlocated',1,null),photo('invalid',1,[91,8]),photo('offscreen',1,[0,0])];
 store.getState().reconcileSelection([1,2], [1,2]);
 store.getState().pickActivities([2]);
+store.setState({showPhotos:true});
 window.store=store;
 function App(){
- const [photos,setPhotos]=useState(fixture), [visible,setVisible]=useState([1,2]), [show,setShow]=useState(true), [revision,setRevision]=useState(0);
- window.setVisible=setVisible;window.setPhotos=setPhotos;window.photoFixtures=fixture;window.setShow=setShow;window.resetScope=()=>setRevision(x=>x+1);
+ const [photos,setPhotos]=useState(fixture), [visible,setVisible]=useState([1,2]), [revision,setRevision]=useState(0);
+ const show=useShallowStore(state=>state.showPhotos);
+ window.setVisible=setVisible;window.setPhotos=setPhotos;window.photoFixtures=fixture;window.resetScope=()=>setRevision(x=>x+1);
  return <Map ref={ref=>window.photoMap=ref} onIdle={()=>window.mapReady=true} initialViewState={{latitude:46,longitude:8,zoom:10}} mapboxAccessToken="pk.offline-test"
  preserveDrawingBuffer style={{height:'100vh',width:'100vw'}} mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e6e9e3'}}]}}>
  <Source id="routeSource" type="geojson" data={{type:'FeatureCollection',features:[{type:'Feature',id:1,properties:{},geometry:{type:'LineString',coordinates:[[7.9,46],[8.1,46]]}}]}}>
  <Layer id="routeLayerBG" type="line" paint={{'line-color':'#237b4b','line-width':12}}/></Source>
  <Selection onSelection={ids=>{window.routeClicks=(window.routeClicks||0)+1;store.getState().pickActivities(ids);}}/>
+ <div style={{position:'absolute',top:8,left:8}}><LayerSwitcher/><MapControlIconButton aria-label="Show photos on map" aria-pressed={show} onClick={store.getState().togglePhotos}>Photos</MapControlIconButton></div>
  {show&&<MapPhotos key={revision} photos={photos} visibleIDs={visible}/>}
  </Map>;
 }
@@ -296,10 +301,29 @@ try {
     center: window.photoMap.getCenter().toArray(),
     zoom: window.photoMap.getZoom(),
   }));
-  await page.evaluate(() => window.setShow(false));
+  await page.getByRole('button', { name: 'Map layers', exact: true }).click();
+  const photoToggle = page.getByRole('menuitemcheckbox', {
+    name: 'Show photos on map',
+    exact: true,
+  });
+  await photoToggle.waitFor();
+  assert.equal(await photoToggle.getAttribute('aria-checked'), 'true');
+  await photoToggle.click();
   await page.locator('[data-map-photo]').waitFor({ state: 'hidden' });
-  await page.evaluate(() => window.setShow(true));
+  const cameraToggle = page.getByRole('button', {
+    name: 'Show photos on map',
+    exact: true,
+  });
+  assert.equal(await cameraToggle.getAttribute('aria-pressed'), 'false');
+  await cameraToggle.click();
   await stack.waitFor();
+  await page.getByRole('button', { name: 'Map layers', exact: true }).click();
+  await photoToggle.waitFor();
+  assert.equal(await photoToggle.getAttribute('aria-checked'), 'true');
+  await page.screenshot({
+    path: join(evidence, 'web-map-photo-layer-menu.png'),
+  });
+  await page.keyboard.press('Escape');
   assert.deepEqual(
     await page.evaluate(() => ({
       center: window.photoMap.getCenter().toArray(),
@@ -344,6 +368,7 @@ try {
           'deletion',
           'scope reset',
           'visibility without camera move',
+          'layer menu and camera control share photo visibility',
           'phone/tablet sizing',
           'zero coordinates',
           'viewport refresh',

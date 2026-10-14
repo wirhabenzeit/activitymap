@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
+  AnimatePresence,
+  motion,
+  useIsPresent,
+  useReducedMotion,
+} from 'motion/react';
+import {
   ChevronLeft,
   ChevronRight,
   ImageOff,
@@ -130,6 +136,49 @@ interface PhotoLightboxProps {
   onViewActivity?: (photo: Photo) => void;
 }
 
+type PhotoSlideMotion = { direction: number; reducedMotion: boolean };
+
+const photoSlideVariants = {
+  enter: ({ direction, reducedMotion }: PhotoSlideMotion) => ({
+    x: reducedMotion ? 0 : `${direction * 100}%`,
+  }),
+  center: { x: 0 },
+  exit: ({ direction, reducedMotion }: PhotoSlideMotion) => ({
+    x: reducedMotion ? 0 : `${direction * -100}%`,
+  }),
+};
+
+function PhotoSlide({
+  photo,
+  alt,
+  navigation,
+}: {
+  photo: Photo;
+  alt: string;
+  navigation: PhotoSlideMotion;
+}) {
+  const present = useIsPresent();
+  return (
+    <motion.div
+      className="absolute inset-0"
+      data-photo-slide={photo.unique_id}
+      aria-hidden={!present}
+      inert={!present}
+      custom={navigation}
+      variants={photoSlideVariants}
+      initial="enter"
+      animate="center"
+      exit="exit"
+      transition={{
+        duration: navigation.reducedMotion ? 0 : 0.25,
+        ease: [0.22, 0.75, 0.25, 1],
+      }}
+    >
+      <PhotoImage variant={photoVariant(photo, 'full')} alt={alt} full />
+    </motion.div>
+  );
+}
+
 export function PhotoLightbox(props: PhotoLightboxProps) {
   const scope = useShallowStore((s) =>
     JSON.stringify([s.user?.id, s.isGuest, s.guestMode]),
@@ -156,6 +205,8 @@ function PhotoGallery({
 }: PhotoLightboxProps) {
   const ordered = orderedPhotos(photos);
   const [localID, setLocalID] = useState<string | null>(null);
+  const [direction, setDirection] = useState(1);
+  const reducedMotion = !!useReducedMotion();
   const currentID = openPhotoID === undefined ? localID : openPhotoID;
   const setCurrentID = onPhotoIDChange ?? setLocalID;
   const invokingButton = useRef<HTMLButtonElement | null>(null);
@@ -170,7 +221,10 @@ function PhotoGallery({
   }, [currentID, current, setCurrentID]);
   const go = (delta: number) => {
     const next = ordered[index + delta];
-    if (next) setCurrentID(next.unique_id);
+    if (next) {
+      setDirection(delta);
+      setCurrentID(next.unique_id);
+    }
   };
   if (!ordered.length) return null;
   return (
@@ -279,18 +333,28 @@ function PhotoGallery({
                 }
               }}
             >
-              {current && (
-                <PhotoImage
-                  key={current.unique_id}
-                  variant={photoVariant(current, 'full')}
-                  alt={
-                    current.caption?.trim()
-                      ? current.caption.trim()
-                      : `Photo ${index + 1} of ${ordered.length}`
-                  }
-                  full
-                />
-              )}
+              <div className="relative h-full w-full overflow-hidden">
+                {current && (
+                  <AnimatePresence
+                    // Drop retained slides immediately when gallery membership
+                    // changes, so deletion/filtering cannot keep obsolete bytes.
+                    key={JSON.stringify(ordered.map((p) => p.unique_id))}
+                    initial={false}
+                    custom={{ direction, reducedMotion }}
+                  >
+                    <PhotoSlide
+                      key={current.unique_id}
+                      photo={current}
+                      alt={
+                        current.caption?.trim()
+                          ? current.caption.trim()
+                          : `Photo ${index + 1} of ${ordered.length}`
+                      }
+                      navigation={{ direction, reducedMotion }}
+                    />
+                  </AnimatePresence>
+                )}
+              </div>
             </div>
             <footer className="shrink-0 px-[max(1rem,env(safe-area-inset-left))] pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
               <div className="mx-auto flex max-w-3xl items-center justify-center gap-6">

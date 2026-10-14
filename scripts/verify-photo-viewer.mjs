@@ -224,6 +224,16 @@ try {
   await page.screenshot({ path: join(evidence, 'web-portrait-phone.png') });
   await page.keyboard.press('ArrowRight');
   await viewer.getByText('3 of 5', { exact: true }).waitFor();
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-photo-slide]').length === 1,
+  );
+  assert.equal(
+    await viewer
+      .locator('[data-photo-slide]')
+      .evaluate((element) => getComputedStyle(element).transform),
+    'none',
+    'Reduced motion switches photos without sliding',
+  );
   const cdp = await context.newCDPSession(page);
   async function swipe(from, to) {
     await cdp.send('Input.dispatchTouchEvent', {
@@ -321,6 +331,91 @@ try {
   );
   await page.keyboard.press('Escape');
   await detail.waitFor({ state: 'hidden' });
+
+  // Observe real intermediate positions, rather than just checking animation props.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.reload();
+  await thumbnail(2).click();
+  await viewer.waitFor();
+  async function observeSlide(action, outgoing, incoming, direction) {
+    await page.evaluate(() => {
+      window.slideFrames = [];
+      window.observeSlides = true;
+      const sample = () => {
+        window.slideFrames.push(
+          [...document.querySelectorAll('[data-photo-slide]')].map(
+            (element) => ({
+              id: element.dataset.photoSlide,
+              x: new DOMMatrixReadOnly(getComputedStyle(element).transform).m41,
+            }),
+          ),
+        );
+        if (window.observeSlides) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+    await action();
+    await page.waitForFunction((id) => {
+      const slides = document.querySelectorAll('[data-photo-slide]');
+      return (
+        slides.length === 1 &&
+        slides[0].dataset.photoSlide === id &&
+        Math.abs(
+          new DOMMatrixReadOnly(getComputedStyle(slides[0]).transform).m41,
+        ) < 0.1
+      );
+    }, incoming);
+    const frames = await page.evaluate(() => {
+      window.observeSlides = false;
+      return window.slideFrames;
+    });
+    await writeFile(
+      join(evidence, `web-slide-${outgoing}-${incoming}.json`),
+      JSON.stringify(frames, null, 2),
+    );
+    assert(
+      frames.some(
+        (frame) =>
+          frame.some(
+            (slide) => slide.id === outgoing && slide.x * direction < -1,
+          ) &&
+          frame.some(
+            (slide) => slide.id === incoming && slide.x * direction > 1,
+          ),
+      ),
+      'Incoming and outgoing photos slide in the navigation direction',
+    );
+  }
+  await observeSlide(
+    () =>
+      viewer.getByRole('button', { name: 'Next photo', exact: true }).click(),
+    '2',
+    '3',
+    1,
+  );
+  await observeSlide(() => page.keyboard.press('ArrowLeft'), '3', '2', -1);
+  await observeSlide(() => swipe(280, 100), '2', '3', 1);
+  await page.screenshot({
+    path: join(evidence, 'web-animated-viewer-desktop.png'),
+  });
+  await viewer
+    .getByRole('button', { name: 'Previous photo', exact: true })
+    .click();
+  await page.evaluate(() => {
+    window.removePhoto('3');
+    return new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+  });
+  assert.equal(
+    await viewer.locator('[data-photo-slide="3"]').count(),
+    0,
+    'Deleted outgoing photo is removed during its transition',
+  );
+  await page.keyboard.press('Escape');
+  await viewer.waitFor({ state: 'hidden' });
+  await page.evaluate(() => window.resetPhotos());
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.waitForFunction(() => window.mapReady === true);
   const marker = page.getByRole('button', {
     name: 'Zoom into 5 photos',
@@ -380,6 +475,9 @@ try {
           'image click',
           'keyboard',
           'touch swipes',
+          'directional sliding via button, keyboard and touch',
+          'reduced motion without sliding',
+          'outgoing photo deletion during transition',
           'single/empty galleries',
           'focus return/containment',
           'scroll lock',
