@@ -36,9 +36,9 @@ struct RenderedActivityEditingTests {
         #expect(store.activities.first?.name == original.name)
     }
 
-    @Test(arguments: ["phone", "tablet", "large-text", "error"])
+    @Test(arguments: ["phone", "tablet", "large-text", "error", "inherited-white", "dark", "changed"])
     func formRendersPrefilledFieldsAndReachableActions(scenario: String) async throws {
-        let original = try Fixtures.activity(["description": "A day in the mountains"])
+        let original = try Fixtures.activity(["name": "Evening Ride", "sport_type": "Ride", "description": "Beautiful evening 😍"])
         let edits = ScriptedEditSource([.failure(.server(code: "validation_failed", message: "Choose a valid name", status: 400, requestID: nil, retryable: false))])
         let syncSource = SyncFixtures.complete([original])
         let controller = SyncController(activities: ActivityStore(), source: { _ in syncSource }, editSource: { _ in edits }, invalidate: { _ in })
@@ -50,12 +50,17 @@ struct RenderedActivityEditingTests {
             model.name = "Unsaved name"
             await model.save(using: controller.editing)
         }
+        if scenario == "changed" { model.name = "Evening ride by the lake" }
         let size = scenario == "tablet" ? CGSize(width: 820, height: 1180) : CGSize(width: 390, height: 844)
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let oldWindow = scene.keyWindow
         let window = UIWindow(windowScene: scene)
+        window.overrideUserInterfaceStyle = scenario == "dark" ? .dark : .light
         window.frame = CGRect(origin: .zero, size: size)
         let host = UIHostingController(rootView: ActivityEditForm(model: model, service: controller.editing)
+            .foregroundStyle(scenario == "inherited-white" ? Color.white : Color.primary)
+            .tint(scenario == "inherited-white" ? Color.white : Color.pink)
+            .environment(\.colorScheme, scenario == "dark" ? .dark : .light)
             .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility3 : .large))
         window.rootViewController = host; window.makeKeyAndVisible()
         defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
@@ -71,7 +76,7 @@ struct RenderedActivityEditingTests {
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([recognize])
         let text = (recognize.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
         #expect(text.contains("Edit activity") && text.contains("Cancel") && text.contains("Save"), "\(scenario): \(text)")
-        #expect(text.contains("mountains") && text.contains("Hike"), "\(scenario): \(text)")
+        #expect(text.contains("Beautiful evening") && text.contains("Ride") && text.contains("Name"), "\(scenario): \(text)")
         if scenario == "error" { #expect(text.contains("Choose a valid name") && text.contains("Unsaved name")) }
     }
 }

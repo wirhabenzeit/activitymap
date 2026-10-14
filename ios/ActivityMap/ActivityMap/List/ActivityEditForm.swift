@@ -44,6 +44,7 @@ struct ActivityEditForm: View {
     @State private var model: ActivityEditModel
     let service: ActivityEditingService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showsDiscardConfirmation = false
     @State private var currentTime = Date()
 
@@ -62,21 +63,37 @@ struct ActivityEditForm: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Name", text: $model.name, axis: .vertical)
-                        .accessibilityLabel("Name")
-                        .accessibilityIdentifier("activity-edit-name")
-                    Picker("Sport", selection: $model.sport) {
-                        ForEach(ActivityCategory.allCases) { category in
-                            Section(category.name) {
-                                ForEach(category.sportTypes) { sport in Text(sport.rawValue).tag(sport) }
-                            }
-                        }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Name").font(.caption).foregroundStyle(.secondary)
+                        TextField("Activity name", text: $model.name, axis: .vertical)
+                            .font(.body).foregroundStyle(Color.primary)
+                            .accessibilityLabel("Name")
+                            .accessibilityIdentifier("activity-edit-name")
                     }
+                    .padding(.vertical, 4)
+                    NavigationLink {
+                        ActivityEditSportPicker(sport: $model.sport)
+                    } label: {
+                        HStack(spacing: 12) {
+                            BrowseSportSymbol(category: model.sport.category)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Sport").font(.caption).foregroundStyle(.secondary)
+                                Text(model.sport.editingTitle).font(.body).foregroundStyle(Color.primary)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Sport")
+                    .accessibilityValue(model.sport.editingTitle)
+                    .accessibilityHint("Choose a sport")
                     .accessibilityIdentifier("activity-edit-sport")
                 } header: { Text("Activity") }
                 Section("Description") {
                     TextField("Description", text: $model.description, axis: .vertical)
-                        .lineLimit(4...12)
+                        .lineLimit(3...8)
+                        .foregroundStyle(Color.primary)
                         .accessibilityLabel("Description")
                         .accessibilityIdentifier("activity-edit-description")
                 }
@@ -96,19 +113,33 @@ struct ActivityEditForm: View {
                     if model.isSaving {
                         ProgressView("Saving to Strava…").accessibilityIdentifier("activity-edit-saving")
                     }
-                } footer: { Text("Saving updates this activity in Strava.") }
+                } footer: {
+                    Label("Changes are saved to Strava", systemImage: "arrow.up.circle")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
             }
+            .foregroundStyle(Color.primary)
             .disabled(model.isSaving)
             .navigationTitle("Edit activity")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(AppTheme.contentBackground, for: .navigationBar)
+            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+            .toolbarColorScheme(colorScheme, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", role: .cancel) { cancel() }
+                    Button(role: .cancel, action: cancel) {
+                        Text("Cancel").font(.body)
+                            .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                            .frame(minHeight: 44)
+                    }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(AppTheme.accent)
+                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                         .disabled(model.isSaving)
                         .accessibilityIdentifier("activity-edit-cancel")
-                }
+                }.sharedBackgroundVisibility(.hidden)
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button {
                         // A committed edit may hide its own detail through filters.
                         // Let the submitted write finish; the coordinator fences
                         // account/deletion changes independently of this presenter.
@@ -119,10 +150,21 @@ struct ActivityEditForm: View {
                                 dismiss()
                             }
                         }
+                    } label: {
+                        Text(model.isSaving ? "Saving…" : "Save")
+                            .font(.body.weight(.semibold))
+                            .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                            .foregroundStyle(canSave ? Color.white : Color.primary)
+                            .padding(.horizontal, 18)
+                            .frame(minHeight: 36)
+                            .background(canSave ? AppTheme.navigationBlue : Color(uiColor: .tertiarySystemFill), in: Capsule())
+                            .frame(minHeight: 44)
                     }
-                    .disabled(!model.canSave(now: currentTime) || service.unavailableReason != nil)
+                    .buttonStyle(.plain)
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    .disabled(!canSave)
                     .accessibilityIdentifier("activity-edit-save")
-                }
+                }.sharedBackgroundVisibility(.hidden)
             }
             .confirmationDialog("Discard your changes?", isPresented: $showsDiscardConfirmation, titleVisibility: .visible) {
                 Button("Discard changes", role: .destructive) { dismiss() }
@@ -131,6 +173,10 @@ struct ActivityEditForm: View {
             .interactiveDismissDisabled(model.isDirty || model.isSaving)
             .accessibilityAction(.escape) { cancel() }
         }
+        // The activity toolbar may use white foreground/tint over the blue
+        // navigation bar. This sheet owns its readable semantic appearance.
+        .foregroundStyle(Color.primary)
+        .tint(AppTheme.accent)
         .task(id: model.retryAt) {
             guard let deadline = model.retryAt else { return }
             do { try await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSinceNow))) }
@@ -139,9 +185,65 @@ struct ActivityEditForm: View {
         }
     }
 
+    private var canSave: Bool { model.canSave(now: currentTime) && service.unavailableReason == nil }
+
     private func cancel() {
         guard !model.isSaving else { return }
         if model.isDirty { showsDiscardConfirmation = true }
         else { dismiss() }
+    }
+}
+
+struct ActivityEditSportPicker: View {
+    @Binding var sport: SportType
+    @Environment(\.dismiss) private var dismiss
+    @State private var search = ""
+
+    var body: some View {
+        List {
+            ForEach(ActivityCategory.allCases) { category in
+                let sports = category.sportTypes.filter {
+                    search.isEmpty || $0.editingTitle.localizedCaseInsensitiveContains(search)
+                }
+                if !sports.isEmpty {
+                    Section(category.name) {
+                        ForEach(sports) { choice in
+                            Button {
+                                sport = choice
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Text(choice.editingTitle).foregroundStyle(Color.primary)
+                                    Spacer()
+                                    if choice == sport {
+                                        Image(systemName: "checkmark").foregroundStyle(AppTheme.accent)
+                                    }
+                                }
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(choice.editingTitle)
+                            .accessibilityAddTraits(choice == sport ? .isSelected : [])
+                        }
+                    }
+                }
+            }
+        }
+        .searchable(text: $search, prompt: "Find a sport")
+        .navigationTitle("Sport")
+        .navigationBarTitleDisplayMode(.inline)
+        .foregroundStyle(Color.primary)
+        .tint(AppTheme.accent)
+    }
+}
+
+extension SportType {
+    var editingTitle: String {
+        switch self {
+        case .eBikeRide: "E-bike ride"
+        case .eMountainBikeRide: "E-mountain bike ride"
+        default: rawValue.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
+        }
     }
 }
