@@ -416,6 +416,19 @@ struct MapScreen: View {
     private var mapControls: some View {
         VStack(spacing: 0) {
             Menu {
+                Section("Activity photos") {
+                    Button {
+                        context.showPhotos.toggle()
+                    } label: {
+                        Label("Show photos on map", systemImage: context.showPhotos ? "checkmark" : "photo")
+                    }
+                    .accessibilityValue(context.showPhotos ? "On" : "Off")
+                    if context.showPhotos, !store.photos.contains(where: {
+                        Int($0.activityID).map(store.visibleActivityIDs.contains) == true && MapPhotoLayout.validLocation($0.location)
+                    }) {
+                        Text("No located photos in the current filter")
+                    }
+                }
                 Section("Base Map") {
                     Picker("Base Map", selection: $context.baseStyle) {
                         ForEach(BaseStyle.all) { style in
@@ -425,14 +438,6 @@ struct MapScreen: View {
                     }
                 }
 
-                Section("Activity photos") {
-                    Toggle("Show photos on map", systemImage: "photo", isOn: $context.showPhotos)
-                    if context.showPhotos, !store.photos.contains(where: {
-                        Int($0.activityID).map(store.visibleActivityIDs.contains) == true && MapPhotoLayout.validLocation($0.location)
-                    }) {
-                        Text("No located photos in the current filter")
-                    }
-                }
                 Section("Overlays") {
                     ForEach(SharedMapCatalog.rasterOverlays) { overlay in
                         Button {

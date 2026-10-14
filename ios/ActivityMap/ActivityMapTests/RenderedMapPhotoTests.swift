@@ -14,6 +14,38 @@ struct RenderedMapPhotoTests {
         try await journey(resultsPresented: true)
     }
 
+    @Test func layersMenuExposesPhotoControlFirstAndPreservesBrowsingState() async throws {
+        let oldToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = oldToken }
+        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
+        let host = try MapPhotoHarness(root: AnyView(MapScreen(store: store)
+            .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##))))
+        defer { host.close() }
+        try await wait { host.element(labelPrefix: "Map layers") != nil }
+        #expect(try #require(host.element(labelPrefix: "Map layers")).accessibilityActivate())
+        try await wait { host.menuButton() != nil }
+        let button = try #require(host.menuButton())
+        func actions(_ element: UIMenuElement) -> [UIAction] {
+            if let action = element as? UIAction { return [action] }
+            return (element as? UIMenu)?.children.flatMap(actions) ?? []
+        }
+        let menu = try #require(button.menu)
+        let photo = try #require(actions(menu).first)
+        #expect(photo.title == "Show photos on map", "Photo visibility must precede the long basemap list")
+        #expect(!photo.attributes.contains(.hidden) && !photo.attributes.contains(.disabled))
+        let selected = store.selectedActivityIDs
+        let camera = store.mapContext.camera
+        button.sendAction(photo)
+        try await wait { store.mapContext.showPhotos }
+        #expect(store.selectedActivityIDs == selected && store.mapContext.pendingRequest == nil)
+        #expect(store.mapContext.camera.zoom == camera.zoom)
+        let updated = try #require(host.menuButton()?.menu)
+        button.sendAction(try #require(actions(updated).first))
+        try await wait { !store.mapContext.showPhotos }
+        #expect(store.selectedActivityIDs == selected && store.mapContext.pendingRequest == nil)
+    }
+
     private func journey(resultsPresented: Bool) async throws {
         let oldToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
@@ -151,6 +183,17 @@ private actor MapPhotoRequestLog {
             if let view = object as? UIView {
                 for child in view.subviews { if let found = visit(child) { return found } }
             }
+            return nil
+        }
+        return visit(window)
+    }
+    func menuButton() -> UIButton? {
+        func containsPhoto(_ element: UIMenuElement) -> Bool {
+            element.title == "Show photos on map" || (element as? UIMenu)?.children.contains(where: containsPhoto) == true
+        }
+        func visit(_ view: UIView) -> UIButton? {
+            if let button = view as? UIButton, let menu = button.menu, containsPhoto(menu) { return button }
+            for child in view.subviews { if let found = visit(child) { return found } }
             return nil
         }
         return visit(window)

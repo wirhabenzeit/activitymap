@@ -10,7 +10,7 @@ Native and web share the screen-space policy in `shared/parity/map-photos.v1.jso
 
 A grouped pin zooms in. A single pin or thumbnail opens the existing viewer directly at the tapped photo. A stack browses the photos in that group, including photos from different activities. A single-photo marker opens its activity's full gallery. Viewing photos preserves selection and camera; the explicit **View activity** action inspects the current photo's activity in List. On iPhone the results sheet presents the viewer while it is visible, retaining its detent when the viewer closes.
 
-Native visibility lives in **Layers → Activity photos → Show photos on map**, initially off. An enabled layer with no located photos explains that state in the menu. Web retains its photo control with an explicit pressed state. Visibility does not fit the map or change selection. Native account reset disables the layer; web media state remounts on account/guest scope changes. Deletion and filters remove obsolete markers and dismiss an ineligible current photo.
+Native visibility is the first action in **Layers → Activity photos → Show photos on map**, initially off. An enabled layer with no located photos explains that state in the menu. Web retains its photo control with an explicit pressed state. Visibility does not fit the map or change selection. Native account reset disables the layer; web media state remounts on account/guest scope changes. Deletion and filters remove obsolete markers and dismiss an ineligible current photo.
 
 ## Ordinary device review
 
