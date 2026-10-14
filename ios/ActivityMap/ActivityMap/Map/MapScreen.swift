@@ -194,10 +194,10 @@ struct MapScreen: View {
                let coordinate = store.elevationCoordinate {
                 CircleAnnotationGroup {
                     CircleAnnotation(centerCoordinate: coordinate)
-                        .circleRadius(6)
-                        .circleColor(UIColor(AppTheme.accent).resolvedColor(with: UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)))
+                        .circleRadius(10)
+                        .circleColor(UIColor.systemBlue.resolvedColor(with: UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)))
                         .circleStrokeColor(.white)
-                        .circleStrokeWidth(2)
+                        .circleStrokeWidth(3)
                 }
                 .circleEmissiveStrength(1)
             }
