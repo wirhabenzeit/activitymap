@@ -51,10 +51,27 @@ struct PhotoViewer: View {
     let store: ActivityStore
     let activityID: Int
     let transitionNamespace: Namespace.ID?
+    let transitionSourceID: String?
+    let nearbyPhotoIDs: Set<String>
+    let requiresVisibleActivity: Bool
+    @State private var galleryActivityID: Int
+    let onViewActivity: ((Int) -> Void)?
     @State private var currentID: String
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private var photos: [Photo] { Photo.ordered(store.photos.filter { $0.activityID == String(activityID) }) }
+    private var photos: [Photo] {
+        guard !requiresVisibleActivity || store.visibleActivityIDs.contains(galleryActivityID) else { return [] }
+        return Photo.ordered(store.photos.filter { $0.activityID == String(galleryActivityID) })
+    }
+    private struct NearbyActivity: Identifiable { let id: Int; let photoID: String }
+    private var nearbyActivities: [NearbyActivity] {
+        var seen = Set<Int>()
+        return Photo.ordered(store.photos.filter { nearbyPhotoIDs.contains($0.id) }).compactMap { photo in
+            guard let id = Int(photo.activityID), store.visibleActivityIDs.contains(id), seen.insert(id).inserted else { return nil }
+            return NearbyActivity(id: id, photoID: photo.id)
+        }
+    }
+    private var currentActivityID: Int { galleryActivityID }
     private var index: Int { photos.firstIndex { $0.id == currentID } ?? 0 }
     private var current: Photo? { photos.first { $0.id == currentID } }
     private var neighbors: [Photo] {
@@ -63,10 +80,15 @@ struct PhotoViewer: View {
         }
     }
 
-    init(store: ActivityStore, activityID: Int, initialPhotoID: String, transitionNamespace: Namespace.ID? = nil) {
+    init(store: ActivityStore, activityID: Int, initialPhotoID: String, transitionNamespace: Namespace.ID? = nil, transitionSourceID: String? = nil, nearbyPhotoIDs: Set<String> = [], requiresVisibleActivity: Bool = false, onViewActivity: ((Int) -> Void)? = nil) {
         self.store = store
         self.activityID = activityID
         self.transitionNamespace = transitionNamespace
+        self.transitionSourceID = transitionSourceID
+        self.nearbyPhotoIDs = nearbyPhotoIDs
+        self.requiresVisibleActivity = requiresVisibleActivity
+        _galleryActivityID = State(initialValue: activityID)
+        self.onViewActivity = onViewActivity
         _currentID = State(initialValue: initialPhotoID)
     }
 
@@ -108,11 +130,13 @@ struct PhotoViewer: View {
             }
             .overlay(alignment: .top) {
                 HStack(spacing: 12) {
-                    Text(store.activity(id: activityID)?.name ?? "Activity photos")
-                        .font(.subheadline.weight(.medium)).lineLimit(1)
-                        .padding(.horizontal, 12).padding(.vertical, 8)
-                        .background(.black.opacity(0.55), in: Capsule())
+                    activityHeading
                     Spacer(minLength: 0)
+                    if let onViewActivity {
+                        Button("View activity") { onViewActivity(currentActivityID); dismiss() }
+                            .font(.subheadline).padding(.horizontal, 12).frame(minHeight: 44)
+                            .background(.black.opacity(0.55), in: Capsule())
+                    }
                     Button { dismiss() } label: { floatingIcon("xmark") }
                         .accessibilityLabel("Close photo viewer")
                         .accessibilityIdentifier("photo-viewer-close")
@@ -171,10 +195,46 @@ struct PhotoViewer: View {
                 }
             }
             .onChange(of: photos.map(\.id)) { _, ids in if !ids.contains(currentID) { dismiss() } }
-            .onChange(of: store.activitiesRevision) { _, _ in if store.activity(id: activityID) == nil { dismiss() } }
+            .onChange(of: store.activitiesRevision) { _, _ in if store.activity(id: currentActivityID) == nil { dismiss() } }
             .onChange(of: store.mapContext.scopeRevision) { _, _ in dismiss() }
         }
-        .modifier(PhotoViewerZoomTransition(sourceID: currentID, namespace: transitionNamespace))
+        // A results/detail sheet may disable its own drag dismissal. Photos
+        // keep the shared native zoom transition's interactive dismissal.
+        .interactiveDismissDisabled(false)
+        .modifier(PhotoViewerZoomTransition(sourceID: transitionSourceID ?? currentID, namespace: transitionNamespace))
+    }
+
+    @ViewBuilder private var activityHeading: some View {
+        if nearbyActivities.count > 1 {
+            Menu {
+                Section("Nearby activities") {
+                    ForEach(nearbyActivities) { activity in
+                        Button {
+                            galleryActivityID = activity.id
+                            currentID = activity.photoID
+                        } label: {
+                            Label(store.activity(id: activity.id)?.name ?? "Activity photos",
+                                  systemImage: galleryActivityID == activity.id ? "checkmark" : "photo")
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(store.activity(id: currentActivityID)?.name ?? "Activity photos").lineLimit(1)
+                    Image(systemName: "chevron.down").font(.caption)
+                }
+                .font(.subheadline.weight(.medium))
+                .padding(.horizontal, 12).frame(minHeight: 44)
+                .background(.black.opacity(0.55), in: Capsule())
+            }
+            .accessibilityLabel("Photo activity")
+            .accessibilityValue(store.activity(id: currentActivityID)?.name ?? "Activity photos")
+        } else {
+            Text(store.activity(id: currentActivityID)?.name ?? "Activity photos")
+                .font(.subheadline.weight(.medium)).lineLimit(1)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(.black.opacity(0.55), in: Capsule())
+        }
     }
 
     private func floatingIcon(_ name: String) -> some View {

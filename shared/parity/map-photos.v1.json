@@ -1,0 +1,177 @@
+{
+  "policy": {
+    "thumbnailZoom": 12,
+    "pinSpacing": 48,
+    "thumbnailSpacing": 72,
+    "viewportMargin": 44,
+    "maxMarkers": 80
+  },
+  "cases": [
+    {
+      "name": "pins below thumbnail threshold",
+      "zoom": 11.99,
+      "width": 400,
+      "height": 700,
+      "points": [
+        {
+          "id": "b",
+          "x": 135,
+          "y": 100
+        },
+        {
+          "id": "a",
+          "x": 100,
+          "y": 100
+        },
+        {
+          "id": "c",
+          "x": 300,
+          "y": 200
+        }
+      ],
+      "expected": [["a", "b"], ["c"]]
+    },
+    {
+      "name": "thumbnail spacing at threshold",
+      "zoom": 12,
+      "width": 400,
+      "height": 700,
+      "points": [
+        {
+          "id": "a",
+          "x": 100,
+          "y": 100
+        },
+        {
+          "id": "b",
+          "x": 160,
+          "y": 100
+        },
+        {
+          "id": "c",
+          "x": 245,
+          "y": 100
+        }
+      ],
+      "expected": [["a", "b"], ["c"]]
+    },
+    {
+      "name": "pins separate beyond spacing",
+      "zoom": 10,
+      "width": 400,
+      "height": 700,
+      "points": [
+        {
+          "id": "a",
+          "x": 100,
+          "y": 100
+        },
+        {
+          "id": "b",
+          "x": 160,
+          "y": 100
+        }
+      ],
+      "expected": [["a"], ["b"]]
+    },
+    {
+      "name": "nearby anchors across cell boundary",
+      "zoom": 10,
+      "width": 400,
+      "height": 700,
+      "points": [
+        {
+          "id": "a",
+          "x": 47,
+          "y": 47
+        },
+        {
+          "id": "b",
+          "x": 49,
+          "y": 49
+        }
+      ],
+      "expected": [["a", "b"]]
+    },
+    {
+      "name": "coincident photos including unicode ids",
+      "zoom": 15,
+      "width": 400,
+      "height": 700,
+      "points": [
+        {
+          "id": "😀",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "a",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "a",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expected": [["a", "", "😀"]]
+    },
+    {
+      "name": "viewport includes edge margin but no far offscreen photos",
+      "zoom": 4,
+      "width": 400,
+      "height": 700,
+      "points": [
+        {
+          "id": "a",
+          "x": -44,
+          "y": 0
+        },
+        {
+          "id": "b",
+          "x": -45,
+          "y": 0
+        },
+        {
+          "id": "c",
+          "x": 444,
+          "y": 744
+        },
+        {
+          "id": "d",
+          "x": 445,
+          "y": 745
+        }
+      ],
+      "expected": [["a"], ["c"]]
+    },
+    {
+      "name": "empty viewport",
+      "zoom": 10,
+      "width": 0,
+      "height": 700,
+      "points": [
+        {
+          "id": "a",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expected": []
+    },
+    {
+      "name": "empty metadata",
+      "zoom": 10,
+      "width": 400,
+      "height": 700,
+      "points": [],
+      "expected": []
+    }
+  ]
+}

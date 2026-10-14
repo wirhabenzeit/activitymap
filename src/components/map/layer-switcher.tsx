@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Map } from 'lucide-react';
+import { Camera, Map } from 'lucide-react';
 
 import { useShallowStore } from '~/store';
 
@@ -46,11 +46,15 @@ export function LayerSwitcher() {
     baseMap,
     toggleOverlayMap,
     setBaseMap,
+    showPhotos,
+    togglePhotos,
   } = useShallowStore((state) => ({
     overlayMaps: state.overlayMaps,
     baseMap: state.baseMap,
     toggleOverlayMap: state.toggleOverlayMap,
     setBaseMap: state.setBaseMap,
+    showPhotos: state.showPhotos,
+    togglePhotos: state.togglePhotos,
   }));
 
   return (
@@ -61,6 +65,16 @@ export function LayerSwitcher() {
         </MapControlIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 h-120 overflow-y-auto">
+        <DropdownMenuLabel>Activity photos</DropdownMenuLabel>
+        <DropdownMenuCheckboxItem
+          checked={showPhotos}
+          onCheckedChange={togglePhotos}
+          className="gap-2"
+        >
+          <Camera className="h-4 w-4" aria-hidden="true" />
+          Show photos on map
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
         <DropdownMenuLabel>Base Map</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup

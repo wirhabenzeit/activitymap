@@ -356,7 +356,8 @@ struct AccountSheet: View {
     private var aboutContent: some View {
         Group {
             Section {
-                LabeledContent("Version", value: "1.0")
+                LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+                LabeledContent("Build", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—")
             }
 
             Section {
