@@ -32,6 +32,7 @@ struct RenderedMapToolsTests {
         store.mapContext.request(.locate(latitude: 46.005, longitude: 8.005))
         try await mapToolsWait { store.mapContext.pendingRequest == nil && map.viewAnnotations.allAnnotations.count == 1 }
         try await Task.sleep(for: .milliseconds(650))
+        #expect(abs(map.mapboxMap.cameraState.zoom - 15) < 0.1, "Locate me animates from the overview to nearby streets")
         let coordinate = try #require(store.mapContext.locatedPosition)
         let selection = store.selectedActivityIDs, filters = store.activeSportTypes
         for zoom: CGFloat in [2, 6, 10, 14, 18, 22] {
@@ -277,7 +278,7 @@ struct LiveMapTerrainTests {
         try await mapToolsWait { store.mapContext.pendingRequest == nil }
         try await Task.sleep(for: .milliseconds(650))
         let center = CLLocationCoordinate2D(latitude: 46.57, longitude: 8.4)
-        map.mapboxMap.setCamera(to: CameraOptions(center: center, zoom: 12, bearing: 25, pitch: 50))
+        map.mapboxMap.setCamera(to: CameraOptions(center: center, zoom: 15, bearing: 25, pitch: 50))
         try await mapToolsWait { store.mapContext.isPitched }
         // Synchronize the declarative viewport after moving the renderer directly.
         store.mapContext.request(.pitch(50))
@@ -303,7 +304,7 @@ struct LiveMapTerrainTests {
                 let camera = map.mapboxMap.cameraState
                 #expect(abs(camera.center.latitude - center.latitude) < 0.001, "Center retained for \(style.id)")
                 #expect(abs(camera.center.longitude - center.longitude) < 0.001, "Center retained for \(style.id)")
-                #expect(abs(camera.zoom - 12) < 0.01 && abs(camera.bearing - 25) < 0.1, "Camera retained for \(style.id)")
+                #expect(abs(camera.zoom - 15) < 0.01 && abs(camera.bearing - 25) < 0.1, "Camera retained for \(style.id)")
                 #expect(map.mapboxMap.sourceExists(withId: RouteSource.id))
                 let marker = try #require(map.viewAnnotations.allAnnotations.first?.view)
                 #expect(!marker.isHidden && marker.bounds.size == CGSize(width: 26, height: 26),

@@ -98,7 +98,8 @@ enum MapNavigation {
                 return nil
             }
             context.recordLocatedPosition(coordinate)
-            return CameraOptions(center: coordinate, padding: current.padding, zoom: current.zoom,
+            // Show the nearby streets without pulling an already closer view back out.
+            return CameraOptions(center: coordinate, padding: current.padding, zoom: max(current.zoom, 15),
                                  bearing: current.bearing, pitch: current.pitch)
         case .resetView:
             context.consume(request)
