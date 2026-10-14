@@ -12,6 +12,7 @@ struct MapAttributionLayout {
         // panel covers these background ornaments.
         let bottom = 18 - bottomInset
         ornamentOptions = OrnamentOptions(
+            compass: CompassViewOptions(visibility: .hidden),
             logo: LogoViewOptions(position: .bottomLeft,
                                   margins: CGPoint(x: 8, y: bottom)),
             attributionButton: AttributionButtonOptions(position: .bottomRight,

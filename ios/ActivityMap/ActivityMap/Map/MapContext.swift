@@ -37,6 +37,7 @@ final class MapContext {
     }
     enum Action: Equatable {
         case activity(Int), fitActivity(Int), fitSelection, fitFiltered, resetBearing, resetView, pitch(CGFloat)
+        case locate(latitude: Double, longitude: Double)
     }
 
     func record(_ state: CameraState) {
@@ -53,6 +54,10 @@ final class MapContext {
     func consume(_ request: Request) {
         guard pendingRequest?.id == request.id else { return }
         pendingRequest = nil
+    }
+
+    func cancelLocationRequest() {
+        if case .locate = pendingRequest?.action { pendingRequest = nil }
     }
 
     func clearScope() {
