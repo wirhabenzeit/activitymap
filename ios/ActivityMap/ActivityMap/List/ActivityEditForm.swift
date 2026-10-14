@@ -47,6 +47,8 @@ struct ActivityEditForm: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showsDiscardConfirmation = false
     @State private var currentTime = Date()
+    @FocusState private var focusedField: Field?
+    private enum Field: Hashable { case name, description }
 
     init(activity: Activity, service: ActivityEditingService) {
         _model = State(initialValue: ActivityEditModel(activity: activity))
@@ -60,12 +62,32 @@ struct ActivityEditForm: View {
     }
 
     var body: some View {
+        ZStack {
+            editor
+                .allowsHitTesting(!model.isSaving)
+                .accessibilityHidden(model.isSaving)
+            if model.isSaving { savingOverlay }
+        }
+        // The activity toolbar may use white foreground/tint over the blue
+        // navigation bar. This sheet owns its readable semantic appearance.
+        .foregroundStyle(Color.primary)
+        .tint(AppTheme.accent)
+        .task(id: model.retryAt) {
+            guard let deadline = model.retryAt else { return }
+            do { try await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSinceNow))) }
+            catch { return }
+            currentTime = Date()
+        }
+    }
+
+    private var editor: some View {
         NavigationStack {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Name").font(.caption).foregroundStyle(.secondary)
                         TextField("Activity name", text: $model.name, axis: .vertical)
+                            .focused($focusedField, equals: .name)
                             .font(.body).foregroundStyle(Color.primary)
                             .accessibilityLabel("Name")
                             .accessibilityIdentifier("activity-edit-name")
@@ -92,12 +114,12 @@ struct ActivityEditForm: View {
                 } header: { Text("Activity") }
                 Section("Description") {
                     TextField("Description", text: $model.description, axis: .vertical)
+                        .focused($focusedField, equals: .description)
                         .lineLimit(3...8)
                         .foregroundStyle(Color.primary)
                         .accessibilityLabel("Description")
                         .accessibilityIdentifier("activity-edit-description")
                 }
-                .disabled(model.isSaving)
                 Section {
                     if let message = model.validationMessage {
                         Text(message).foregroundStyle(.red).accessibilityIdentifier("activity-edit-validation")
@@ -110,16 +132,12 @@ struct ActivityEditForm: View {
                         Text("Try again after \(retryAt.formatted(date: .omitted, time: .standard)).")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                    if model.isSaving {
-                        ProgressView("Saving to Strava…").accessibilityIdentifier("activity-edit-saving")
-                    }
                 } footer: {
                     Label("Changes are saved to Strava", systemImage: "arrow.up.circle")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
             .foregroundStyle(Color.primary)
-            .disabled(model.isSaving)
             .navigationTitle("Edit activity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(AppTheme.contentBackground, for: .navigationBar)
@@ -140,6 +158,7 @@ struct ActivityEditForm: View {
                 }.sharedBackgroundVisibility(.hidden)
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
+                        focusedField = nil
                         // A committed edit may hide its own detail through filters.
                         // Let the submitted write finish; the coordinator fences
                         // account/deletion changes independently of this presenter.
@@ -151,7 +170,7 @@ struct ActivityEditForm: View {
                             }
                         }
                     } label: {
-                        Text(model.isSaving ? "Saving…" : "Save")
+                        Text("Save")
                             .font(.body.weight(.semibold))
                             .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(canSave ? Color.white : Color.primary)
@@ -173,16 +192,31 @@ struct ActivityEditForm: View {
             .interactiveDismissDisabled(model.isDirty || model.isSaving)
             .accessibilityAction(.escape) { cancel() }
         }
-        // The activity toolbar may use white foreground/tint over the blue
-        // navigation bar. This sheet owns its readable semantic appearance.
-        .foregroundStyle(Color.primary)
-        .tint(AppTheme.accent)
-        .task(id: model.retryAt) {
-            guard let deadline = model.retryAt else { return }
-            do { try await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSinceNow))) }
-            catch { return }
-            currentTime = Date()
+    }
+
+    private var savingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.18).ignoresSafeArea()
+            VStack(spacing: 16) {
+                ProgressView().controlSize(.large).tint(AppTheme.accent)
+                Text("Saving to Strava…")
+                    .font(.headline).foregroundStyle(Color.primary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(28)
+            .frame(maxWidth: 300)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
+            .padding(24)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Saving to Strava")
+            .accessibilityAddTraits(.isModal)
+            .accessibilityIdentifier("activity-edit-saving-overlay")
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .ignoresSafeArea()
+        .onAppear { UIAccessibility.post(notification: .announcement, argument: "Saving to Strava") }
     }
 
     private var canSave: Bool { model.canSave(now: currentTime) && service.unavailableReason == nil }

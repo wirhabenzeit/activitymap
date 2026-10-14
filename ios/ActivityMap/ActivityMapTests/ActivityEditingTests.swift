@@ -13,7 +13,7 @@ actor ScriptedEditSource: ActivityEditSource {
 }
 
 actor GatedEditSource: ActivityEditSource {
-    private var continuation: CheckedContinuation<ActivityMapAPI.Activity, Never>?
+    private var continuation: CheckedContinuation<ActivityMapAPI.Activity, Error>?
     private var requested: CheckedContinuation<Void, Never>?
     private var started = false
     func waitForRequest() async {
@@ -21,8 +21,9 @@ actor GatedEditSource: ActivityEditSource {
         await withCheckedContinuation { requested = $0 }
     }
     func release(_ dto: ActivityMapAPI.Activity) { continuation?.resume(returning: dto); continuation = nil }
-    func update(activityID: String, fields: ActivityMapAPI.UpdateActivityRequest) async -> ActivityMapAPI.Activity {
-        await withCheckedContinuation {
+    func fail(_ error: APIClient.RequestError) { continuation?.resume(throwing: error); continuation = nil }
+    func update(activityID: String, fields: ActivityMapAPI.UpdateActivityRequest) async throws -> ActivityMapAPI.Activity {
+        try await withCheckedThrowingContinuation {
             continuation = $0; started = true
             requested?.resume(); requested = nil
         }
