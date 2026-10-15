@@ -12,6 +12,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     var hasRoute = true
     var showOnMap: ((Int) -> Void)? = nil
     var editing: ActivityEditingService? = nil
+    var streamSummaries: StreamSummaryLoader? = nil
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -57,6 +58,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                 }
                 .accessibilityIdentifier("activity-metric-group-\(group.id)")
             }
+            ActivityDetailActions(activity: activity, summaries: streamSummaries).id(activity.id)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, AppTheme.Spacing.large)
@@ -211,7 +213,8 @@ struct ActivityDetailHeading: View {
 }
 
 extension ActivityDetailContent where Profile == EmptyView, Photos == EmptyView {
-    init(activity: Activity, headerTrailingInset: CGFloat = 0, showsHeading: Bool = true) {
-        self.init(activity: activity, headerTrailingInset: headerTrailingInset, showsHeading: showsHeading, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
+    init(activity: Activity, headerTrailingInset: CGFloat = 0, showsHeading: Bool = true, streamSummaries: StreamSummaryLoader? = nil) {
+        self.init(activity: activity, headerTrailingInset: headerTrailingInset, showsHeading: showsHeading,
+                  streamSummaries: streamSummaries, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
     }
 }

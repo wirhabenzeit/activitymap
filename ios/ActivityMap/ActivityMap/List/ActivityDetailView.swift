@@ -94,7 +94,7 @@ struct ActivityDetailView: View {
 }
 
 /// Resolve by identity on every update, never retain the destination's initial snapshot.
-/// Actions live in the title row, so no footer bar takes height from the content.
+/// Editing/map actions stay by the title; Strava/GPX rows scroll with detail.
 struct ActivityDetailPanel: View {
     @Environment(\.activityDetailOverMap) private var overMap
     @Bindable var store: ActivityStore
@@ -131,7 +131,7 @@ struct ActivityDetailPanel: View {
                             if let showOnMap { showOnMap(id) }
                             else if overMap { store.mapContext.request(.fitActivity(id)) }
                             else { store.showOnMap(id) }
-                        }, editing: store.activityEditing, profile: { activity in
+                        }, editing: store.activityEditing, streamSummaries: store.streamSummaries, profile: { activity in
                             ElevationProfileView(store: store, activityID: activity.id,
                                                  isRelevant: store.selectedTab == hostTab)
                         }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
@@ -207,9 +207,11 @@ private struct MapActivityDetailReveal: View {
                 .padding(.horizontal, AppTheme.Spacing.large)
                 .padding(.vertical, AppTheme.Spacing.small)
                 ActivityDetailContent(activity: activity, showsHeading: false, showsPrimaryMetrics: false, showsDescription: false,
+                                      streamSummaries: store.streamSummaries,
                                       profile: { _ in EmptyView() }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             } else {
                 ActivityDetailContent(activity: activity, showsHeading: false,
+                                      streamSummaries: store.streamSummaries,
                                       profile: { _ in elevation }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             }
         }

@@ -55,7 +55,7 @@ extension RenderedRoutePickingTests {
         request.recognitionLevel = .accurate
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(text.contains("Geometry status"), "The final grouped content row must be visible at the end of scrolling: \(text)")
+        #expect(text.contains("offline"), "The final export row must be visible at the end of scrolling: \(text)")
         let lowestText = (request.results ?? []).map(\.boundingBox.minY).min() ?? 0
         #expect(lowestText * size.height >= bottom - 1, "Final text must still stop above the home indicator")
         #expect(store.mapContext.pendingRequest == nil)
@@ -693,8 +693,8 @@ extension RenderedRoutePickingTests {
         try host.save(bottom, name: "elevation-phone-details-bottom-\(count)")
         try VNImageRequestHandler(cgImage: try #require(bottom.cgImage)).perform([request])
         let bottomText = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(bottomText.contains("Activity"),
-                "Recording metadata must remain available by scrolling: \(bottomText)")
+        #expect(bottomText.contains("Activity") && bottomText.contains("Open in Strava") && bottomText.contains("Export GPX"),
+                "Recording metadata and bottom action rows must remain available by scrolling: \(bottomText)")
     }
 }
 
