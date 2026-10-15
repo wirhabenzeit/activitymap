@@ -36,12 +36,7 @@ struct ActivityRowView: View {
             .accessibilityLabel("Details for \(activity.name)")
             .accessibilityValue(accessibleDetails)
             .accessibilityHint("Inspect activity without changing selection")
-            .contextMenu { actionItems }
-            .accessibilityActions {
-                if hasGeometry {
-                    Button("Show on map") { store.showOnMap(activity.id) }
-                }
-            }
+            .modifier(ActivityRowContextMenu(activity: activity, store: store, showsMapAction: true))
         }
         .padding(.vertical, settings.density == .compact || verticalSizeClass == .compact ? 0 : 2)
         .contentShape(Rectangle())
@@ -102,12 +97,6 @@ struct ActivityRowView: View {
                 .accessibilityValue(metric.value(for: activity))
             }
         }
-    }
-
-    @ViewBuilder private var actionItems: some View {
-        Button("Details", systemImage: "info.circle") { store.inspect(activity.id) }
-        Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
-            .disabled(!hasGeometry)
     }
 
     private var accessibleDetails: String {

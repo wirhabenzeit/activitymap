@@ -32,6 +32,10 @@ struct ScreenshotGalleryTests {
                     try await GalleryWindow.orient(landscape: true)
                 }
                 try await window.settle(staged)
+                if scene == .mapDetail, GalleryEnvironment.values["ACTIVITYMAP_GALLERY_DETAIL_ACTIONS"] == "1" {
+                    window.revealActivityActions()
+                    try await Task.sleep(for: .milliseconds(300))
+                }
                 try window.save(scene: scene, variant: variant, library: library.source, scenario: scenario)
             }
         } catch {
@@ -219,6 +223,21 @@ private final class GalleryWindow {
         window.isHidden = true
         oldWindow?.makeKeyAndVisible()
         MapboxOptions.accessToken = previousToken
+    }
+
+    /// Review the bottom actions in their real Map sheet, rather than a bare row.
+    func revealActivityActions() {
+        func scrolls(in view: UIView) -> [UIScrollView] {
+            guard !view.isHidden, view.alpha > 0 else { return [] }
+            return ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap { scrolls(in: $0) }
+        }
+        let root = host.presentedViewController?.view ?? host.view!
+        let scroll = scrolls(in: root).filter { $0.bounds.height > 100 && $0.contentSize.height > $0.bounds.height + 1 }
+            .max { $0.contentSize.height < $1.contentSize.height }
+        if let scroll {
+            scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x,
+                y: scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom), animated: false)
+        }
     }
 
     func settle(_ staged: GalleryScene.Staged) async throws {

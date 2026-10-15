@@ -3,6 +3,7 @@ import SwiftUI
 struct ActivityDetailActions: View {
     let activity: Activity
     var summaries: StreamSummaryLoader? = nil
+    @Environment(\.activityDetailOverMap) private var overMap
     @State private var exportTask: Task<Void, Never>?
     @State private var stravaTask: Task<Void, Never>?
     @State private var file: ActivityGPXFile?
@@ -58,7 +59,11 @@ struct ActivityDetailActions: View {
                 })
             }
             .buttonStyle(.plain)
-            .background(AppTheme.contentBackground, in: RoundedRectangle(cornerRadius: 12))
+            .background {
+                if !overMap {
+                    RoundedRectangle(cornerRadius: 12).fill(AppTheme.contentBackground)
+                }
+            }
         }
         .alert(item: $failure) { failure in
             Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text("OK")))

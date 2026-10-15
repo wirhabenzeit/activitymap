@@ -557,10 +557,12 @@ extension RenderedRoutePickingTests {
             if scenario == "loading" { await source.resolve(response) }
         }
         let ready = try #require(heights["ready"])
-        // A profile that may still arrive keeps its space; none at all takes none.
-        let waiting = heights.filter { $0.key != "unavailable" }
-        #expect(waiting.count == 4)
+        // Loading and pending retain chart space; failures use compact recovery.
+        let waiting = heights.filter { ["ready", "pending", "loading"].contains($0.key) }
+        #expect(waiting.count == 3)
         #expect(waiting.values.allSatisfy { abs($0 - ready) < 1 }, "Profile states must reserve the same space: \(heights)")
+        let error = try #require(heights["error"])
+        #expect(error > 0 && error < ready, "Failure must retain the compact recovery row")
         #expect((heights["unavailable"] ?? 0) < 1, "An activity without elevation must not reserve space: \(heights)")
     }
 }
