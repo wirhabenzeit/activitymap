@@ -1,24 +1,57 @@
 import CoreLocation
 import Foundation
 
-/// A detached snapshot of the already chosen cached geometry. No stream fetch,
-/// timestamps or elevation estimates are needed to export a route.
+/// A detached snapshot of cached geometry. The optional sampled track retains
+/// the cache’s paired GPS/bucket-mean elevation values without interpolation.
 nonisolated struct ActivityGPX: Sendable {
     struct Point: Sendable {
         let latitude: Double
         let longitude: Double
+        var altitude: Double? = nil
     }
 
+    struct SampledElevation: Sendable {
+        let points: [Point]
+
+        static func decode(_ cached: CachedStreamSummary?, activityID: Int) -> Self? {
+            guard let cached, cached.activityID == String(activityID), cached.isCurrent,
+                  cached.metadata.state == .current, cached.codec == "polyline-v1", cached.algorithmVersion == 1,
+                  let compact = cached.dto.summary, compact.algorithmVersion == 1,
+                  let summary = try? CompactStreamCodec.decode(compact), summary.basis != nil,
+                  let coordinates = summary.latlng, let altitude = summary.altitude,
+                  !coordinates.isEmpty, coordinates.count == altitude.count,
+                  altitude.allSatisfy(\.isFinite), coordinates.allSatisfy({
+                      $0.count == 2 && $0[0].isFinite && $0[1].isFinite
+                          && (-90...90).contains($0[0]) && (-180...180).contains($0[1])
+                  }) else { return nil }
+            return Self(points: zip(coordinates, altitude).map {
+                Point(latitude: $0.0[0], longitude: $0.0[1], altitude: $0.1)
+            })
+        }
+    }
+
+    let activityID: Int
     let name: String
     let description: String?
-    let points: [Point]
-    let simplified: Bool
+    private(set) var points: [Point]
+    private(set) var simplified: Bool
+    private(set) var hasSampledElevation = false
 
     @MainActor init(activity: Activity) {
+        activityID = activity.id
         name = activity.name
         description = activity.description
         points = activity.coordinates.map { Point(latitude: $0.latitude, longitude: $0.longitude) }
         simplified = activity.geometrySource != .detailed
+    }
+
+    func includingSampledElevation(from cached: CachedStreamSummary?) -> Self {
+        guard let elevation = SampledElevation.decode(cached, activityID: activityID) else { return self }
+        var result = self
+        result.points = elevation.points
+        result.simplified = true
+        result.hasSampledElevation = true
+        return result
     }
 
     enum ExportError: LocalizedError {
@@ -44,7 +77,8 @@ nonisolated struct ActivityGPX: Sendable {
         if let description, !description.isEmpty {
             xml += "\n    <desc>\(Self.escape(description))</desc>"
         }
-        xml += "\n    <src>ActivityMap cached \(simplified ? "simplified" : "detailed") route</src>\n    <trkseg>"
+        let source = hasSampledElevation ? "sampled route with averaged elevation" : "\(simplified ? "simplified" : "detailed") route"
+        xml += "\n    <src>ActivityMap cached \(source)</src>\n    <trkseg>"
         let locale = Locale(identifier: "en_US_POSIX")
         for (index, point) in points.enumerated() {
             if index.isMultiple(of: 1024) { try Task.checkCancellation() }
@@ -56,7 +90,13 @@ nonisolated struct ActivityGPX: Sendable {
             var longitude = String(format: "%.8f", locale: locale, point.longitude)
             // GPX 1.1 uses [-180, 180). Both values describe the same meridian.
             if longitude == "180.00000000" { longitude = "-180.00000000" }
-            xml += "\n      <trkpt lat=\"\(latitude)\" lon=\"\(longitude)\"/>"
+            if let altitude = point.altitude {
+                guard altitude.isFinite else { throw ExportError.invalidCoordinate }
+                let elevation = String(format: "%.1f", locale: locale, altitude)
+                xml += "\n      <trkpt lat=\"\(latitude)\" lon=\"\(longitude)\"><ele>\(elevation)</ele></trkpt>"
+            } else {
+                xml += "\n      <trkpt lat=\"\(latitude)\" lon=\"\(longitude)\"/>"
+            }
         }
         xml += "\n    </trkseg>\n  </trk>\n</gpx>\n"
         return Data(xml.utf8)

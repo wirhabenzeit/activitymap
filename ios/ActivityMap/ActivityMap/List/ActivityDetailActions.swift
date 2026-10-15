@@ -2,11 +2,18 @@ import SwiftUI
 
 struct ActivityDetailActions: View {
     let activity: Activity
+    var summaries: StreamSummaryLoader? = nil
     @State private var exportTask: Task<Void, Never>?
     @State private var stravaTask: Task<Void, Never>?
     @State private var file: ActivityGPXFile?
     @State private var openingStrava = false
     @State private var failure: Failure?
+    @State private var decodedElevation: DecodedElevation?
+
+    private struct DecodedElevation {
+        let cached: CachedStreamSummary
+        let elevation: ActivityGPX.SampledElevation?
+    }
 
     private struct Failure: Identifiable {
         let id = UUID()
@@ -14,18 +21,27 @@ struct ActivityDetailActions: View {
         let message: String
     }
 
-    private var hasGeometry: Bool { !activity.coordinates.isEmpty }
-    private var quality: String { activity.geometrySource == .detailed ? "Detailed route" : "Simplified route" }
+    private var cached: CachedStreamSummary? { summaries?.currentSummary(for: String(activity.id)) }
+    private var elevation: ActivityGPX.SampledElevation? {
+        decodedElevation?.cached == cached ? decodedElevation?.elevation : nil
+    }
+    private var hasGeometry: Bool { !activity.coordinates.isEmpty || elevation != nil }
+    private var quality: String {
+        elevation != nil ? "Sampled route with elevation" : activity.geometrySource == .detailed ? "Detailed route" : "Simplified route"
+    }
     private var exportSubtitle: String {
         hasGeometry ? "\(quality) · available offline" : "Unavailable · no GPS route"
+    }
+    private var explanation: String {
+        if !hasGeometry { return "This activity has no GPS route to export." }
+        if elevation != nil { return "Includes averaged elevation from the saved profile on a sampled route. Recorded times aren’t included." }
+        return activity.geometrySource == .detailed
+            ? "Elevation isn’t available in the saved route. Recorded times aren’t included."
+            : "Uses a simplified route. Elevation isn’t available in the saved route. Recorded times aren’t included."
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Activity actions")
-                .font(.caption).foregroundStyle(AppTheme.secondaryText)
-                .textCase(.uppercase)
-                .accessibilityAddTraits(.isHeader)
             VStack(spacing: 0) {
                 Button(action: openStrava) {
                     row(title: openingStrava ? "Opening Strava…" : "Open in Strava",
@@ -50,16 +66,21 @@ struct ActivityDetailActions: View {
             }
             .buttonStyle(.plain)
             .background(AppTheme.contentBackground, in: RoundedRectangle(cornerRadius: 12))
-            Text(!hasGeometry ? "This activity has no GPS route to export."
-                 : activity.geometrySource == .detailed
-                    ? "Route coordinates only. Recorded times and elevation samples aren’t included."
-                    : "Uses a simplified route. Some route detail is missing. Recorded times and elevation samples aren’t included.")
+            Text(explanation)
                 .font(.caption).foregroundStyle(AppTheme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("activity-gpx-explanation")
         }
         .alert(item: $failure) { failure in
             Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text("OK")))
+        }
+        .task(id: cached) {
+            guard let cached else { decodedElevation = nil; return }
+            let id = activity.id
+            let worker = Task.detached(priority: .userInitiated) { ActivityGPX.SampledElevation.decode(cached, activityID: id) }
+            let elevation = await withTaskCancellationHandler { await worker.value } onCancel: { worker.cancel() }
+            guard !Task.isCancelled, self.cached == cached else { return }
+            decodedElevation = DecodedElevation(cached: cached, elevation: elevation)
         }
         .onDisappear {
             exportTask?.cancel()
@@ -101,12 +122,16 @@ struct ActivityDetailActions: View {
     private func exportGPX() {
         guard hasGeometry, exportTask == nil, file == nil else { return }
         let snapshot = ActivityGPX(activity: activity)
+        let source = cached
         exportTask = Task {
             defer { exportTask = nil }
-            let worker = Task.detached(priority: .userInitiated) { try snapshot.write() }
+            let worker = Task.detached(priority: .userInitiated) {
+                try snapshot.includingSampledElevation(from: source).write()
+            }
             do {
                 let result = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 try Task.checkCancellation()
+                guard source == cached else { return }
                 file = result
             } catch is CancellationError { }
             catch {

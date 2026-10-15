@@ -17,7 +17,6 @@ extension RenderedRoutePickingTests {
         }.background(AppTheme.surface)), size: size)
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(200))
-        try host.save("rows-\(scenario)")
         let stravaElement = host.element("Open in Strava")
         let gpxElement = host.element("Export GPX")
         let strava = try #require(stravaElement)
@@ -28,11 +27,18 @@ extension RenderedRoutePickingTests {
         #expect(!strava.accessibilityTraits.contains(.notEnabled))
         let label = gpx.accessibilityLabel ?? ""
         #expect(label.contains(scenario == "no-gps" ? "no GPS" : scenario == "summary" ? "Simplified route" : "Detailed route"))
-        if scenario == "large-text" {
-            host.reveal(gpx.accessibilityFrame)
-            try await Task.sleep(for: .milliseconds(150))
-            try host.save("rows-large-text-scrolled")
+        host.reveal(gpx.accessibilityFrame)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(host.element("ACTIVITY ACTIONS") == nil && host.element("Activity actions") == nil)
+        if scenario != "large-text" {
+            let metadataElement = host.element("Activity, Geometry status")
+            let metadata = try #require(metadataElement)
+            let visibleStravaElement = host.element("Open in Strava")
+            let visibleStrava = try #require(visibleStravaElement)
+            #expect(metadata.accessibilityFrame.maxY < visibleStrava.accessibilityFrame.minY,
+                    "Both action rows belong after the final measurement group")
         }
+        try host.save("rows-\(scenario)")
     }
 
     @Test func activityGPXShareUsesNativePresentationAndCleansUpOnCancel() async throws {
@@ -83,6 +89,52 @@ extension RenderedRoutePickingTests {
     private func exportDirectories() throws -> Set<URL> {
         Set(try FileManager.default.contentsOfDirectory(at: FileManager.default.temporaryDirectory,
             includingPropertiesForKeys: nil).filter { $0.lastPathComponent.hasPrefix("activitymap-gpx-") })
+    }
+
+    @Test func activityGPXIncludesOfflineSampledElevationAndHandlesInvalidation() async throws {
+        let cached = try GPXFixtures.cached()
+        let metadata = try JSONSerialization.jsonObject(with: Data(StreamFixtures.metadataJSON().utf8))
+        let dto = try Fixtures.activity(["streams": metadata])
+        let activity = try StoredModelMapper.activity(dto)
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        try await storage.apply([.upsertActivity(dto)], scope: Fixtures.scope)
+        let fence = await storage.streamFence()
+        _ = try await storage.saveStreamSummary(cached.dto, scope: Fixtures.scope, fence: fence)
+        let source = SummarySourceProbe([])
+        let loader = StreamSummaryLoader(source: { _ in source })
+        await loader.configure(SyncFixtures.session(verified: false), storage: storage)
+        await loader.load(activityID: String(activity.id))
+        let host = try ActionsHarness(root: AnyView(ScrollView {
+            ActivityDetailContent(activity: activity, streamSummaries: loader)
+        }), size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        var element: NSObject?
+        for _ in 0..<100 {
+            element = host.element("Export GPX")
+            if element?.accessibilityLabel?.contains("with elevation") == true { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let button = try #require(element)
+        #expect(button.accessibilityLabel?.contains("Sampled route with elevation") == true)
+        host.reveal(button.accessibilityFrame)
+        try host.save("rows-sampled-elevation")
+        let before = try exportDirectories()
+        #expect(button.accessibilityActivate())
+        let presenter = try await waitForShare(host)
+        let share = try #require(presenter.activityController)
+        let directory = try #require(try exportDirectories().subtracting(before).first)
+        let xml = try String(contentsOf: directory.appendingPathComponent("Morning-hike.gpx"), encoding: .utf8)
+        #expect(xml.contains("<ele>400.0</ele>") && xml.contains("<ele>450.0</ele>"))
+        #expect(xml.contains("sampled route with averaged elevation"))
+        #expect(!xml.contains("<time>"))
+        let completion = share.completionWithItemsHandler
+        await withCheckedContinuation { continuation in share.dismiss(animated: false) { continuation.resume() } }
+        completion?(nil, false, nil, nil)
+        loader.reset()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(host.element("Export GPX")?.accessibilityLabel?.contains("with elevation") == false)
+        #expect(await source.calls == 0, "Export only reads already cached elevation; it never fetches streams")
+        #expect(try exportDirectories() == before)
     }
 
     private func waitForShare(_ host: ActionsHarness) async throws -> ActivityGPXSharePresenter.Controller {

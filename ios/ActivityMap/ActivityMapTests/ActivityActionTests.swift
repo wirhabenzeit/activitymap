@@ -5,6 +5,49 @@ import Testing
 
 @MainActor
 struct ActivityActionTests {
+    @Test(arguments: [ActivityMapAPI.StreamSeriesType.distance, .time])
+    func gpxIncludesSampledElevationAtItsOwnGPSCoordinates(basis: ActivityMapAPI.StreamSeriesType) throws {
+        let activity = try StoredModelMapper.activity(Fixtures.activity())
+        let summary = ElevationFixtures.summary(altitude: [0, -10, 123.4, 405.6], basis: basis)
+        let cached = try GPXFixtures.cached(summary)
+        let snapshot = ActivityGPX(activity: activity).includingSampledElevation(from: cached)
+        let document = try GPXDocument(snapshot.data())
+        #expect(snapshot.hasSampledElevation && snapshot.simplified)
+        #expect(document.points.count == 4)
+        #expect(document.elevations == [0, -10, 123.4, 405.6])
+        #expect(document.points.map(\.latitude) == summary.latlng?.map { $0[0] })
+        #expect(document.points.map(\.longitude) == summary.latlng?.map { $0[1] })
+        #expect(document.text["src"]?.contains("sampled route with averaged elevation") == true)
+        #expect(!document.elements.contains("time"), "Export must not invent recording timestamps")
+    }
+
+    @Test func elevationCannotBeAttachedToUnrelatedRouteVerticesOrInvalidSources() throws {
+        let activity = try StoredModelMapper.activity(Fixtures.activity())
+        let original = ActivityGPX(activity: activity)
+        let cached = try GPXFixtures.cached()
+        let wrongID = try GPXFixtures.cached(id: "2")
+        let stale = CachedStreamSummary(dto: cached.dto, codec: cached.codec, algorithmVersion: 1, isCurrent: false, storedAt: .now)
+        let unknownCodec = CachedStreamSummary(dto: cached.dto, codec: "unsupported", algorithmVersion: 1, isCurrent: true, storedAt: .now)
+        let unknownVersion = CachedStreamSummary(dto: cached.dto, codec: cached.codec, algorithmVersion: 2, isCurrent: true, storedAt: .now)
+        let staleState = try GPXFixtures.cached(state: "stale")
+        let noGPS = try GPXFixtures.cached(ElevationFixtures.summary(locations: nil))
+        let noAltitude = try GPXFixtures.cached(ElevationFixtures.summary(altitude: nil))
+        let compact = try #require(cached.dto.summary)
+        let malformed = ActivityMapAPI.CompactStreamSummary(codec: compact.codec, algorithmVersion: 1,
+            basis: compact.basis, count: compact.count, time: compact.time, distance: compact.distance,
+            altitude: "?", watts: nil, heartrate: nil, latlng: compact.latlng)
+        let malformedDTO = ActivityMapAPI.ActivityCompactStreamSummary(activityID: cached.activityID,
+            metadata: cached.metadata, summary: malformed, lastError: nil, nextRetryAt: nil)
+        let badSamples = CachedStreamSummary(dto: malformedDTO, codec: cached.codec, algorithmVersion: 1, isCurrent: true, storedAt: .now)
+        for source in [wrongID, stale, unknownCodec, unknownVersion, staleState, noGPS, noAltitude, badSamples] {
+            let snapshot = original.includingSampledElevation(from: source)
+            let document = try GPXDocument(snapshot.data())
+            #expect(!snapshot.hasSampledElevation && !document.elements.contains("ele"))
+            #expect(document.points.count == activity.coordinates.count)
+            #expect(document.points[0].latitude == activity.coordinates[0].latitude)
+        }
+    }
+
     @Test(arguments: ["Afternoon ride", "Zürich & <Alps> \"ride\" 'été' 🚲", "A\u{0}B\u{1}C\tD\nE"])
     func gpxParsesEscapedUnicodeMetadataAndOrderedCoordinates(name: String) throws {
         var activity = try StoredModelMapper.activity(Fixtures.activity())
@@ -126,6 +169,18 @@ struct ActivityActionTests {
     }
 }
 
+nonisolated enum GPXFixtures {
+    static func cached(_ summary: ActivityMapAPI.StreamSummary = ElevationFixtures.summary(),
+                       id: String = StreamFixtures.activityID, state: String = "current") throws -> CachedStreamSummary {
+        let metadata = try ActivityMapAPI.makeDecoder().decode(ActivityMapAPI.StreamMetadata.self,
+            from: Data(StreamFixtures.metadataJSON(state: state).utf8))
+        let dto = ActivityMapAPI.ActivityCompactStreamSummary(activityID: id, metadata: metadata,
+            summary: try CompactStreamCodec.encode(summary), lastError: nil, nextRetryAt: nil)
+        return CachedStreamSummary(dto: dto, codec: "polyline-v1", algorithmVersion: 1, isCurrent: true,
+                                   storedAt: Date().addingTimeInterval(-40 * 86400))
+    }
+}
+
 nonisolated private final class GPXDocument: NSObject, XMLParserDelegate {
     struct Point { let latitude: Double; let longitude: Double }
     var namespace: String?
@@ -134,6 +189,7 @@ nonisolated private final class GPXDocument: NSObject, XMLParserDelegate {
     var elements = Set<String>()
     var text: [String: String] = [:]
     var points: [Point] = []
+    var elevations: [Double] = []
     private var current = ""
 
     init(_ data: Data) throws {
@@ -152,7 +208,13 @@ nonisolated private final class GPXDocument: NSObject, XMLParserDelegate {
         }
     }
     func parser(_ parser: XMLParser, foundCharacters string: String) {
-        if ["name", "desc", "src"].contains(current) { text[current, default: ""] += string }
+        if ["name", "desc", "src", "ele"].contains(current) { text[current, default: ""] += string }
     }
-    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) { current = "" }
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
+        if elementName == "ele" {
+            if let value = text["ele"].flatMap(Double.init) { elevations.append(value) }
+            text["ele"] = nil
+        }
+        current = ""
+    }
 }
