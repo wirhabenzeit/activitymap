@@ -1,6 +1,6 @@
 # Native activity editing — #220
 
-The shared Map/List/Stats detail now exposes a name/description/sport editor. Wide headings show Edit beside Show on map; compact headings and pushed toolbars use the activity-actions menu. The form sends only changed fields to the existing authenticated PATCH endpoint, including an explicit empty description when clearing it.
+The shared Map/List/Stats detail now exposes a name/description/sport editor. All headings and pushed toolbars show a direct Edit button; wide headings add a pencil icon beside the label. The form sends only changed fields to the existing authenticated PATCH endpoint, including an explicit empty description when clearing it.
 
 Saving waits for an existing activity sync, then commits the authoritative result without moving the feed cursor. Older activity rows in a delayed feed or replacement snapshot cannot regress the committed result; later rows and tombstones still apply. Existing source-change invalidation, filter membership, map sport colors, inspection and selection reconciliation remain authoritative.
 
@@ -38,3 +38,9 @@ The editor was also captured inside a real SwiftUI `.sheet` on the iPad Pro 11-i
 The temporary capture harness passed and was removed after capture. Result: `/tmp/activitymap-ipad-sheet-capture-3.xcresult`. The owner reviewed the screenshot and accepted the appearance.
 
 ![Native activity editor sheet on an 11-inch iPad simulator](ios-activity-editing-ipad.png)
+
+## Direct Edit action — 15 October
+
+The single-item activity-actions menu was replaced with a direct Edit button in compact Map sheets and pushed List/Stats toolbars. Wide headings retain their pencil and Edit label. The plain button belongs to the title row, has a minimum 44-point touch target and opens the same editor with one tap; there is no menu popover anchor to animate during scrolling or activation. Physical-device scroll/tap verification remains part of owner review.
+
+The existing rendered editing suite passed (12 cases across three test functions), covering form and overlay behavior plus wide heading actions. Result: `/tmp/activitymap-direct-edit-rendered.xcresult`. A temporary capture harness also passed for compact Map, pushed navigation and accessibility text; before/after-scroll Map captures were visually inspected. Result: `/tmp/activitymap-direct-edit-capture.xcresult`. This checks rendered placement, not the reported physical-device touch/scroll animation.

@@ -6,34 +6,26 @@ struct ActivityEditButton: View {
     let activity: Activity
     let service: ActivityEditingService
     var onNavigationBar = false
-    var labelled = false
+    var showsIcon = false
     @State private var isPresented = false
 
     var body: some View {
-        Group {
-            if labelled {
-                Button { isPresented = true } label: {
-                    Label("Edit", systemImage: "pencil").font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 12).frame(minHeight: 44)
-                }
-                .accessibilityLabel("Edit activity")
-                .accessibilityIdentifier("activity-actions")
-            } else {
-                Menu {
-                    Button { isPresented = true } label: { Label("Edit activity", systemImage: "pencil") }
-                        .accessibilityIdentifier("activity-edit-action")
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.body.weight(.semibold))
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("More activity actions")
-                .accessibilityIdentifier("activity-actions")
+        Button { isPresented = true } label: {
+            HStack(spacing: 6) {
+                if showsIcon { Image(systemName: "pencil") }
+                Text("Edit")
             }
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, showsIcon ? 12 : 8)
+            .frame(minWidth: AppTheme.minimumTarget, minHeight: AppTheme.minimumTarget)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(onNavigationBar ? Color.white : AppTheme.accent)
+        .accessibilityLabel("Edit activity")
+        .accessibilityIdentifier("activity-edit-action")
         .sheet(isPresented: $isPresented) {
             ActivityEditForm(activity: activity, service: service)
         }
