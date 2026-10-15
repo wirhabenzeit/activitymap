@@ -55,7 +55,7 @@ extension RenderedRoutePickingTests {
         request.recognitionLevel = .accurate
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(text.contains("Recorded times"), "The final export explanation must be visible at the end of scrolling: \(text)")
+        #expect(text.contains("offline"), "The final export row must be visible at the end of scrolling: \(text)")
         let lowestText = (request.results ?? []).map(\.boundingBox.minY).min() ?? 0
         #expect(lowestText * size.height >= bottom - 1, "Final text must still stop above the home indicator")
         #expect(store.mapContext.pendingRequest == nil)

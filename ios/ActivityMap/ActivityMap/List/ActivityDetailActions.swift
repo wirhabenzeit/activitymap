@@ -32,13 +32,6 @@ struct ActivityDetailActions: View {
     private var exportSubtitle: String {
         hasGeometry ? "\(quality) · available offline" : "Unavailable · no GPS route"
     }
-    private var explanation: String {
-        if !hasGeometry { return "This activity has no GPS route to export." }
-        if elevation != nil { return "Includes averaged elevation from the saved profile on a sampled route. Recorded times aren’t included." }
-        return activity.geometrySource == .detailed
-            ? "Elevation isn’t available in the saved route. Recorded times aren’t included."
-            : "Uses a simplified route. Elevation isn’t available in the saved route. Recorded times aren’t included."
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -66,10 +59,6 @@ struct ActivityDetailActions: View {
             }
             .buttonStyle(.plain)
             .background(AppTheme.contentBackground, in: RoundedRectangle(cornerRadius: 12))
-            Text(explanation)
-                .font(.caption).foregroundStyle(AppTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("activity-gpx-explanation")
         }
         .alert(item: $failure) { failure in
             Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text("OK")))
