@@ -21,6 +21,7 @@ struct RoutePickerSheet: View {
         picker.candidateIDs.filter(store.visibleActivityIDs.contains).compactMap { store.activity(id: $0) }
     }
     private var detail: Activity? { candidates.first { $0.id == picker.detailID } }
+    private var fitActivityID: Int? { detail?.id ?? store.activeActivityID }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -108,11 +109,11 @@ struct RoutePickerSheet: View {
     private var groupHeader: some View {
         HStack(spacing: 0) {
             SelectionBar(store: store, showsClear: false, expandsCount: true)
-            Button { store.mapContext.request(detail.map { .fitActivity($0.id) } ?? .fitSelection) } label: {
+            Button { store.mapContext.request(fitActivityID.map { .fitActivity($0) } ?? .fitSelection) } label: {
                 Image(systemName: "viewfinder").frame(width: 44, height: 44).contentShape(Rectangle())
-            }.accessibilityLabel(detail == nil ? "Fit selection" : "Fit route")
+            }.accessibilityLabel(fitActivityID == nil ? "Fit selection" : "Fit route")
                 .accessibilityIdentifier("map-results-fit")
-                .disabled(detail.map { !store.routableActivityIDs.contains($0.id) }
+                .disabled(fitActivityID.map { !store.routableActivityIDs.contains($0) }
                     ?? !candidates.contains { store.routableActivityIDs.contains($0.id) })
             Button { store.clearSelection() } label: {
                 Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
@@ -160,37 +161,53 @@ struct RoutePickerSheet: View {
     }
 
     private func resultRow(_ activity: Activity) -> some View {
-        HStack(spacing: 8) {
+        let isActive = store.activeActivityID == activity.id
+        return HStack(spacing: 0) {
             ActivitySelectionSymbol(store: store, activity: activity)
             Button {
-                picker.showDetail(activity.id, store: store)
-            } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        BrowseActivityHeading(activity: activity, isActive: store.activeActivityID == activity.id)
-                        let metrics = typeSize.isAccessibilitySize
-                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                            : AnyLayout(HStackLayout(spacing: 8))
-                        metrics {
-                            BrowseInlineMetric(title: "Distance", value: Formatters.distance(activity.distance), systemImage: "ruler")
-                            BrowseInlineMetric(title: "Elapsed time", value: Formatters.duration(activity.elapsedTime), systemImage: "clock")
-                            BrowseInlineMetric(title: "Elevation gain", value: Formatters.elevation(activity.totalElevationGain), systemImage: "mountain.2")
-                        }
-                        .foregroundStyle(AppTheme.secondaryText)
-                        if activity.coordinates.isEmpty {
-                            Label("No GPS route", systemImage: "map.slash").font(.caption).foregroundStyle(AppTheme.secondaryText)
-                        }
-                        if store.activeActivityID == activity.id {
-                            Label(activity.coordinates.isEmpty ? "Active activity" : "Active route", systemImage: "location.fill").font(.caption).foregroundStyle(AppTheme.accent)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if store.isCombining {
+                    store.toggleMember(activity.id)
+                } else {
+                    picker.showDetail(activity.id, store: store)
                 }
-                .frame(minHeight: 44)
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    BrowseActivityHeading(activity: activity)
+                    ActivityMetricFlow(spacing: 8, rowSpacing: 4, stacked: typeSize.isAccessibilitySize) {
+                        BrowseInlineMetric(title: "Distance", value: Formatters.distance(activity.distance), systemImage: "ruler")
+                        BrowseInlineMetric(title: "Elapsed time", value: Formatters.duration(activity.elapsedTime), systemImage: "clock")
+                        BrowseInlineMetric(title: "Elevation gain", value: Formatters.elevation(activity.totalElevationGain), systemImage: "mountain.2")
+                    }
+                    .foregroundStyle(AppTheme.secondaryText)
+                    if activity.coordinates.isEmpty {
+                        Label("No GPS route", systemImage: "map.slash").font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
             }.buttonStyle(.plain)
-            .accessibilityValue(store.activeActivityID == activity.id ? "Inspected. Selected. Active on map" : "Not inspected. Selected")
-
+                .padding(.leading, 8)
+                .padding(.trailing, 4)
+                .accessibilityLabel(store.isCombining ? "Remove \(activity.name) from selection" : "Details for \(activity.name)")
+                .accessibilityValue(isActive ? "Selected. Active on map" : "Selected")
+                .accessibilityHint(store.isCombining ? "Removes this activity from the selection" : "Activates this activity and opens its details")
+                .accessibilityIdentifier("map-result-open-\(activity.id)")
+                .modifier(ActivityRowContextMenu(activity: activity, store: store))
+            Button { store.toggleActive(activity.id) } label: {
+                Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath")
+                    .font(.system(size: 18, weight: isActive ? .semibold : .regular))
+                    .foregroundStyle(isActive ? AppTheme.accent : AppTheme.secondaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isActive ? "Deactivate: \(activity.name)" : "Make active: \(activity.name)")
+            .accessibilityValue(isActive ? "Active on map" : "Not active")
+            .accessibilityHint(isActive
+                ? "Clears the active route without changing selection"
+                : "Makes this activity active without opening details or changing selection")
+            .accessibilityAddTraits(isActive ? .isSelected : [])
+            .accessibilityIdentifier("map-result-activate-\(activity.id)")
         }
         .padding(.leading, 12).padding(.trailing, 8).padding(.vertical, 4)
         .background(ActivityRowBackground(selected: true, inspected: store.activeActivityID == activity.id, overMap: true))

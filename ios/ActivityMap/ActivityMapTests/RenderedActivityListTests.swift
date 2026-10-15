@@ -6,6 +6,243 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
+    @Test(arguments: ["map", "list"], [false, true])
+    func rowContextMenuEditsAndSharesWithoutChangingFocus(surface: String, combining: Bool) async throws {
+        let overMap = surface == "map"
+        let store = ActivityStore(activities: (1...2).map { ActivityStoreSelectionTests.activity($0) })
+        store.selectedTab = overMap ? .map : .list
+        store.activityEditing = ActivityEditingService()
+        store.replaceSelection(with: [1, 2])
+        store.activate(2)
+        store.setCombine(combining)
+        let picker = RoutePicker()
+        let host = try ListHarness(root: Group {
+            if overMap {
+                MapResultsContainer(picker: picker, store: store,
+                    size: CGSize(width: 390, height: 844), topInset: 0, bottomInset: 34, largeText: false)
+            } else {
+                NavigationStack { ListScreen(store: store) }
+            }
+        },
+            size: CGSize(width: 390, height: 844))
+        host.host.view.backgroundColor = .systemTeal
+        defer { host.host.dismiss(animated: false); host.close() }
+        picker.reviewSelection(store: store)
+        picker.showResults()
+        if overMap { try await listWait { host.host.presentedViewController?.sheetPresentationController != nil } }
+        let panel = overMap ? try #require(host.host.presentedViewController) : host.host
+        try await listWait { panel.transitionCoordinator == nil }
+        let label = overMap && combining ? "Remove Activity 1 from selection" : "Details for Activity 1"
+        try await listWait { host.accessibilityElement(label: label, includingSheets: true)?.accessibilityCustomActions?.contains { $0.name == "Edit" } == true }
+
+        // Real long-press/release review complements the custom-action checks.
+        if !combining, ProcessInfo.processInfo.environment["ACTIVITYMAP_ROW_CONTEXT_REVIEW"] == surface {
+            try await Task.sleep(for: .seconds(90))
+        }
+
+        let row = try #require(host.accessibilityElement(label: label, includingSheets: true))
+        let actionNames = Set(row.accessibilityCustomActions?.map(\.name) ?? [])
+        #expect(actionNames.contains("Edit") && actionNames.contains("Share GPX"))
+        #expect(!actionNames.contains("Details"))
+        #expect(actionNames.contains("Show on map") == !overMap)
+        let edit = try #require(row.accessibilityCustomActions?.first { $0.name == "Edit" })
+        #expect(edit.actionHandler?(edit) == true)
+        try await listWait { panel.presentedViewController != nil }
+        let editor = try #require(panel.presentedViewController)
+        try await listWait { editor.transitionCoordinator == nil }
+        try await listWait { host.accessibilityElement(label: "Name", value: "Activity 1", root: editor.view) != nil }
+        let field = try #require(host.accessibilityElement(label: "Name", value: "Activity 1", root: editor.view))
+        #expect(field.accessibilityValue == "Activity 1", "Edit must open the pressed row, even when another route is active")
+        #expect(store.activeActivityID == 2 && picker.detailID == nil && store.selectedActivityIDs == [1, 2])
+        #expect(store.inspectedActivityID == nil && store.selectedTab == (overMap ? .map : .list))
+        let cancel = try #require(host.accessibilityElement(label: "Cancel", root: editor.view))
+        #expect(cancel.accessibilityActivate())
+        try await listWait { panel.presentedViewController == nil }
+
+        func exportDirectories() throws -> Set<URL> {
+            Set(try FileManager.default.contentsOfDirectory(at: FileManager.default.temporaryDirectory,
+                includingPropertiesForKeys: nil).filter { $0.lastPathComponent.hasPrefix("activitymap-gpx-") })
+        }
+        let before = try exportDirectories()
+        let freshRow = try #require(host.accessibilityElement(label: label, includingSheets: true))
+        let share = try #require(freshRow.accessibilityCustomActions?.first { $0.name == "Share GPX" })
+        #expect(share.actionHandler?(share) == true)
+        try await listWait { panel.presentedViewController is UIActivityViewController }
+        let shareController = try #require(panel.presentedViewController as? UIActivityViewController)
+        let directory = try #require(try exportDirectories().subtracting(before).first)
+        let url = directory.appendingPathComponent("Activity-1.gpx")
+        #expect(try String(contentsOf: url, encoding: .utf8).contains("<name>Activity 1</name>"))
+        #expect(store.activeActivityID == 2 && picker.detailID == nil && store.selectedActivityIDs == [1, 2])
+        #expect(store.mapContext.pendingRequest == nil && picker.detent == .medium)
+        let completion = shareController.completionWithItemsHandler
+        await withCheckedContinuation { continuation in
+            shareController.dismiss(animated: false) { continuation.resume() }
+        }
+        completion?(nil, false, nil, nil)
+        try await listWait { (try? exportDirectories()) == before }
+        if !overMap {
+            let details = try #require(host.accessibilityElement(label: label))
+            #expect(details.accessibilityActivate())
+            try await listWait { store.inspectedActivityID == 1 }
+            #expect(store.activeActivityID == 2 && store.selectedActivityIDs == [1, 2],
+                    "A normal List row tap must still inspect without changing map focus")
+        }
+    }
+
+    @Test(arguments: ["light", "dark"])
+    func nativeMapSheetShowsColorsBehindItsBackground(appearance: String) async throws {
+        let store = ActivityStore(activities: (1...2).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: [1, 2])
+        let picker = RoutePicker()
+        let host = try ListHarness(root: MapResultsContainer(picker: picker, store: store,
+            size: CGSize(width: 390, height: 844), topInset: 0, bottomInset: 34, largeText: false),
+            size: CGSize(width: 390, height: 844))
+        host.window.overrideUserInterfaceStyle = appearance == "dark" ? .dark : .light
+        defer { host.host.dismiss(animated: false); host.close() }
+        picker.reviewSelection(store: store)
+        try await listWait { host.host.presentedViewController?.sheetPresentationController != nil }
+        let controller = try #require(host.host.presentedViewController)
+        try await listWait { controller.transitionCoordinator == nil }
+        #expect(controller.presentationController?.backgroundEffect is UIBlurEffect)
+        let panel = try #require(controller.presentationController?.presentedView)
+        let frame = panel.convert(panel.bounds, to: host.window)
+        // Empty chart/list space samples the sheet, without text or selection tint.
+        let sample = CGRect(x: frame.midX - 20, y: frame.minY + frame.height * 0.75, width: 40, height: 40)
+        let directory = URL(fileURLWithPath: "/private/tmp/activitymap-frosted-sheet-review")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var colors: [[UInt8]] = []
+        for (name, backdrop) in [("red", UIColor.systemRed), ("blue", UIColor.systemBlue)] {
+            host.host.view.backgroundColor = backdrop
+            try await Task.sleep(for: .milliseconds(350))
+            let image = UIGraphicsImageRenderer(bounds: host.window.bounds).image { _ in
+                host.window.drawHierarchy(in: host.window.bounds, afterScreenUpdates: true)
+            }
+            try image.pngData()?.write(to: directory.appendingPathComponent("\(appearance)-\(name).png"))
+            let crop = try #require(image.cgImage?.cropping(to: sample.applying(
+                CGAffineTransform(scaleX: image.scale, y: image.scale))))
+            var rgba = [UInt8](repeating: 0, count: 4)
+            let context = try #require(CGContext(data: &rgba, width: 1, height: 1, bitsPerComponent: 8,
+                bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+            context.draw(crop, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            colors.append(rgba)
+        }
+        #expect(Int(colors[0][0]) > Int(colors[1][0]) + 12
+                && Int(colors[1][2]) > Int(colors[0][2]) + 12,
+                "The native sheet must transmit the backdrop's color in \(appearance), rather than cover it: \(colors)")
+        // Opt-in manual simulator review dispatches real pointer presses, which
+        // accessibilityActivate() cannot reproduce for system sheet effects.
+        if appearance == "light", ProcessInfo.processInfo.environment["ACTIVITYMAP_NATIVE_TOUCH_REVIEW"] == "1" {
+            print("NATIVE_TOUCH_REVIEW_READY")
+            try await Task.sleep(for: .seconds(90))
+        }
+    }
+
+    @Test(arguments: ["phone", "small-phone", "combine", "dark", "large-text", "tablet", "no-gps"])
+    func mapResultActivationStaysSeparateFromDetailsAndSelection(variant: String) async throws {
+        #expect(UIImage(systemName: "point.bottomleft.forward.to.point.topright.scurvepath") != nil)
+        let names = ["Geltendorf - Winterthur", "Sontheim - Zürich", "Morning Ride",
+                     "Zurich - Munich", "Zürich - Gabelbach", "Landsberg - Winterthur"]
+        var activities = (1...6).map { ActivityStoreSelectionTests.activity($0, route: variant != "no-gps" || $0 != 6) }
+        for i in activities.indices {
+            activities[i].name = names[5 - i]
+            activities[i].sportType = .ride
+            activities[i].distance = 234100
+            activities[i].elapsedTime = 32340
+            activities[i].totalElevationGain = 2730
+        }
+        let store = ActivityStore(activities: activities)
+        store.replaceSelection(with: Array(1...6))
+        store.activate(3)
+        store.inspect(1)
+        store.setCombine(variant == "combine")
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        picker.showResults()
+        let width: CGFloat = variant == "small-phone" ? 320 : variant == "tablet" ? 520 : 390
+        let host = try ListHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: variant == "tablet")
+            .environment(\.dynamicTypeSize, variant == "large-text" ? .accessibility3 : .large)
+            .environment(\.colorScheme, variant == "dark" ? .dark : .light),
+            size: CGSize(width: width, height: variant == "large-text" ? 900 : 600))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(150))
+        try host.save("route-activation-\(variant)-initial")
+        let activationLabel = "Make active: \(activities[5].name)"
+        try await listWait { host.accessibilityElement(label: activationLabel) != nil }
+        let selection = store.selectedActivityIDs
+        let camera = store.mapContext.camera
+        let detent = picker.detent
+        let button = try #require(host.accessibilityElement(label: activationLabel))
+        let frame = button.accessibilityFrame
+        #expect(frame.width >= 43.99 && frame.height >= 43.99, "The 44-point target must survive screen-coordinate rounding: \(frame)")
+        let rowLabel = store.isCombining ? "Remove \(activities[5].name) from selection" : "Details for \(activities[5].name)"
+        let row = try #require(host.accessibilityElement(label: rowLabel))
+        #expect(row.accessibilityFrame.maxX <= frame.minX, "Detail/selection and activation targets must not overlap")
+        #expect(button.accessibilityActivate())
+        try await listWait { store.activeActivityID == 6 }
+        picker.reconcile(with: store)
+        #expect(picker.detailID == nil && picker.detent == detent)
+        #expect(store.selectedActivityIDs == selection && store.inspectedActivityID == 1)
+        #expect(store.mapContext.camera.center.latitude == camera.center.latitude
+                && store.mapContext.camera.center.longitude == camera.center.longitude
+                && store.mapContext.camera.zoom == camera.zoom && store.mapContext.camera.bearing == camera.bearing
+                && store.mapContext.camera.pitch == camera.pitch && store.mapContext.camera.padding == camera.padding)
+        #expect(store.mapContext.pendingRequest == nil)
+        try await Task.sleep(for: .milliseconds(100))
+        try host.save("route-activation-\(variant)")
+
+        try await listWait { host.accessibilityElement(label: "Fit route") != nil }
+        let fitRoute = try #require(host.accessibilityElement(label: "Fit route"))
+        if variant == "no-gps" {
+            #expect(fitRoute.accessibilityTraits.contains(.notEnabled), "An active GPS-less activity cannot be fitted")
+        } else {
+            #expect(fitRoute.accessibilityActivate())
+            let request = try #require(store.mapContext.pendingRequest)
+            #expect(request.action == .fitActivity(6), "Fit must frame the active route while results stay open")
+            store.mapContext.consume(request)
+            #expect(picker.detailID == nil && store.selectedActivityIDs == selection)
+        }
+
+        // Switching modes must retain the target; pressing the active symbol clears focus.
+        store.setCombine(!store.isCombining)
+        let deactivationLabel = "Deactivate: \(activities[5].name)"
+        try await listWait { host.accessibilityElement(label: deactivationLabel) != nil }
+        let switched = try #require(host.accessibilityElement(label: deactivationLabel))
+        #expect(abs(switched.accessibilityFrame.minX - frame.minX) < 1)
+        #expect(switched.accessibilityActivate())
+        try await listWait { store.activeActivityID == nil }
+        picker.reconcile(with: store)
+        #expect(store.selectedActivityIDs == selection && picker.detailID == nil && picker.detent == detent)
+        #expect(store.inspectedActivityID == 1 && store.mapContext.pendingRequest == nil)
+        try await listWait { host.accessibilityElement(label: "Fit selection") != nil }
+        let fitSelection = try #require(host.accessibilityElement(label: "Fit selection"))
+        #expect(!fitSelection.accessibilityTraits.contains(.notEnabled))
+        #expect(fitSelection.accessibilityActivate())
+        let selectionRequest = try #require(store.mapContext.pendingRequest)
+        #expect(selectionRequest.action == .fitSelection)
+        store.mapContext.consume(selectionRequest)
+
+        try await listWait { host.accessibilityElement(label: activationLabel) != nil }
+        #expect(try #require(host.accessibilityElement(label: activationLabel)).accessibilityActivate())
+        try await listWait { store.activeActivityID == 6 }
+
+        store.setCombine(false)
+        try await listWait { host.accessibilityElement(label: "Details for \(activities[5].name)") != nil }
+        let details = try #require(host.accessibilityElement(label: "Details for \(activities[5].name)"))
+        #expect(details.accessibilityActivate())
+        try await listWait { picker.detailID == 6 }
+        #expect(store.activeActivityID == 6 && store.selectedActivityIDs == selection)
+        picker.showResults()
+        store.setCombine(true)
+        try await listWait { host.accessibilityElement(label: "Remove \(activities[5].name) from selection") != nil }
+        let member = try #require(host.accessibilityElement(label: "Remove \(activities[5].name) from selection"))
+        #expect(member.accessibilityActivate())
+        try await listWait { !store.selectedActivityIDs.contains(6) }
+        picker.reconcile(with: store)
+        #expect(store.selectedActivityIDs == selection.subtracting([6]) && picker.detailID == nil)
+        #expect(store.inspectedActivityID == 1 && store.mapContext.pendingRequest == nil)
+    }
+
     @Test(arguments: ["light", "dark"])
     func inspectionAndSelectionHaveIndependentRowFeedback(appearance: String) async throws {
         let store = ActivityStore(activities: (1...4).map { ActivityStoreSelectionTests.activity($0, route: false) },
@@ -645,13 +882,16 @@ private final class ListHarness<Content: View> {
         window.rootViewController = nil
         oldWindow?.makeKeyAndVisible()
     }
-    func accessibilityElement(label: String = "", identifier: String? = nil, includingSheets: Bool = false) -> NSObject? {
+    func accessibilityElement(label: String = "", value: String? = nil, identifier: String? = nil,
+                              includingSheets: Bool = false, root: UIView? = nil) -> NSObject? {
         var visited: Set<ObjectIdentifier> = []
         func visit(_ object: NSObject) -> NSObject? {
             guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
             if let view = object as? UIView, view.isHidden || view.alpha == 0 { return nil }
             if (identifier.map { (object as? UIAccessibilityIdentification)?.accessibilityIdentifier == $0 }
-                ?? (object.accessibilityLabel == label)), !object.accessibilityFrame.isEmpty { return object }
+                ?? (object.accessibilityLabel == label)),
+               value.map({ object.accessibilityValue == $0 }) ?? true,
+               !object.accessibilityFrame.isEmpty { return object }
             let count = object.accessibilityElementCount()
             if count > 0, count < 1000 {
                 for index in 0..<count {
@@ -664,7 +904,7 @@ private final class ListHarness<Content: View> {
             }
             return nil
         }
-        return visit(includingSheets ? window : host.view)
+        return visit(root ?? (includingSheets ? window : host.view))
     }
     func accessibilityValues() -> [String] {
         var visited: Set<ObjectIdentifier> = []
@@ -922,16 +1162,17 @@ extension RenderedRoutePickingTests {
         for id in [0, 1, 2, 0] {
             if id == 0 { picker.showResults() }
             else { picker.showDetail(id, store: store) }
-            let label = id == 0 ? "Fit selection" : "Fit route"
+            let activeID = store.activeActivityID
+            let label = activeID == nil ? "Fit selection" : "Fit route"
             try await listWait { host.accessibilityElement(label: label) != nil }
-            #expect(host.accessibilityElement(label: id == 0 ? "Fit route" : "Fit selection") == nil)
+            #expect(host.accessibilityElement(label: activeID == nil ? "Fit route" : "Fit selection") == nil)
             #expect(host.accessibilityElement(identifier: "activity-show-on-map") == nil,
                     "The Map detail heading must not offer a duplicate Fit button")
             let fit = try #require(host.accessibilityElement(label: label))
             #expect(fit.accessibilityActivate())
             try await listWait { store.mapContext.pendingRequest != nil }
             let request = try #require(store.mapContext.pendingRequest)
-            #expect(request.action == (id == 0 ? .fitSelection : .fitActivity(id)))
+            #expect(request.action == (activeID.map { .fitActivity($0) } ?? .fitSelection))
             #expect(store.selectedActivityIDs == [1, 2, 3])
             #expect(picker.detailID == (id == 0 ? nil : id))
             store.mapContext.consume(request)
@@ -943,6 +1184,10 @@ extension RenderedRoutePickingTests {
         #expect(host.accessibilityElement(label: "Fit route")?.accessibilityTraits.contains(.notEnabled) == true,
                 "Collapsed detail retains its fit target, including no-GPS disabling")
         picker.showResults()
+        #expect(host.accessibilityElement(label: "Fit route")?.accessibilityTraits.contains(.notEnabled) == true,
+                "Returning to results keeps the active GPS-less route as the fit target")
+        store.toggleActive(3)
+        picker.reconcile(with: store)
         try await listWait { host.accessibilityElement(label: "Fit selection")?.accessibilityTraits.contains(.notEnabled) == false }
     }
 }

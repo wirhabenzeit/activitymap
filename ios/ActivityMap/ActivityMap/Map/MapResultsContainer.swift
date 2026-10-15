@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Phones use the native sheet. Wide windows use a bottom-trailing panel; expanding
 /// the card never changes selection, scroll context or the map camera.
@@ -113,52 +114,151 @@ private struct NativeMapResultsSheet: View {
     @Environment(\.mapResultsPresentationChanged) private var presentationChanged
     @Environment(\.stackedMapPhotoViewer) private var photoViewer
     @Environment(\.stackedShellSheet) private var stacked
-    // Geometry alone defines the stops: results, detail and selection changes
-    // never replace the selected detent or resize the user's map viewport.
-    private var compact: PresentationDetent { .height(NativeMapResultsSizing.compactHeight(largeText: largeText)) }
-    private var opening: PresentationDetent { .height(openingHeight) }
-    private var detents: Set<PresentationDetent> { [compact, opening, .large] }
-    // Resolve the initial detent before UIKit starts presenting. A default
-    // .large followed by onAppear adjustment visibly shrinks during entrance.
-    private var selected: PresentationDetent {
-        picker.detent == .compact ? compact : picker.detent == .expanded ? .large : opening
-    }
-    private var selection: Binding<PresentationDetent> {
-        Binding(get: { selected }, set: { value in
-            picker.detent = value == compact ? .compact : value == .large ? .expanded : .medium
-        })
-    }
+    @Environment(\.self) private var environment
+
     var body: some View {
-        Color.clear.allowsHitTesting(false)
-            .sheet(isPresented: Binding(get: { picker.isPresented && store.selectedTab == .map && !suspended }, set: { _ in }), onDismiss: { presentationChanged(false) }) {
-                GeometryReader { geometry in
-                    RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
-                                     bottomInset: geometry.safeAreaInsets.bottom,
-                                     collapsedOverride: selected == compact,
-                                     nativePresentation: true)
-                        .ignoresSafeArea(.container, edges: .bottom)
-                }
-                .presentationDetents(detents, selection: selection)
-
-                // While rotating to landscape, size classes change before the side
-                // panel replaces this sheet; iOS would otherwise adapt it to full
-                // screen for that moment (device review, 2026-10-06).
-                .presentationCompactAdaptation(.none)
-                .presentationDragIndicator(.visible)
-                .presentationBackgroundInteraction(.enabled(upThrough: .large))
-                // Scroll the results/detail without promoting the sheet to
-                // Large. The grabber still owns deliberate detent changes.
-                .presentationContentInteraction(.scrolls)
-                .interactiveDismissDisabled()
-                .onAppear { presentationChanged(true) }
-                .fullScreenCover(item: photoViewer?.request ?? .constant(nil), onDismiss: { photoViewer?.onDismiss() }) { destination in
-                    photoViewer?.content(destination)
-                }
-                .sheet(item: stacked?.request ?? .constant(nil)) { destination in
-                    stacked?.content(destination)
-                }
-
+        NativeMapResultsPresenter(
+            isPresented: picker.isPresented && store.selectedTab == .map && !suspended,
+            detent: Binding(get: { picker.detent }, set: { picker.detent = $0 }),
+            compactHeight: NativeMapResultsSizing.compactHeight(largeText: largeText),
+            openingHeight: openingHeight, presentationChanged: presentationChanged,
+            content: GeometryReader { geometry in
+                RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
+                    bottomInset: geometry.safeAreaInsets.bottom,
+                    collapsedOverride: picker.detent == .compact, nativePresentation: true)
+                    .ignoresSafeArea(.container, edges: .bottom)
             }
+            .fullScreenCover(item: photoViewer?.request ?? .constant(nil), onDismiss: { photoViewer?.onDismiss() }) { destination in
+                photoViewer?.content(destination)
+            }
+            .sheet(item: stacked?.request ?? .constant(nil)) { destination in
+                stacked?.content(destination)
+            }
+            .environment(\.self, environment))
+            .allowsHitTesting(false)
+            .onDisappear { presentationChanged(false) }
+    }
+}
+
+/// Configure the native presentation before it starts. Changing SwiftUI's
+/// background after presentation leaves the system's glass press interaction
+/// installed, even when the visible backdrop uses a noninteractive effect.
+private struct NativeMapResultsPresenter<Content: View>: UIViewControllerRepresentable {
+    let isPresented: Bool
+    var detent: Binding<MapResultsDetent>
+    let compactHeight: CGFloat
+    let openingHeight: CGFloat
+    let presentationChanged: (Bool) -> Void
+    let content: Content
+
+    func makeUIViewController(context: Context) -> Presenter { Presenter() }
+
+    func updateUIViewController(_ controller: Presenter, context: Context) {
+        controller.configuration = self
+        controller.reconcile()
+    }
+
+    static func dismantleUIViewController(_ controller: Presenter, coordinator: ()) {
+        controller.configuration = nil
+        controller.close(animated: false)
+    }
+
+    final class Presenter: UIViewController, UISheetPresentationControllerDelegate {
+        var configuration: NativeMapResultsPresenter?
+        private var panel: UIHostingController<Content>?
+        private var closing = false
+        private let compactID = UISheetPresentationController.Detent.Identifier("activitymap.compact")
+        private let openingID = UISheetPresentationController.Detent.Identifier("activitymap.opening")
+        private var lastCompactHeight: CGFloat?
+        private var lastOpeningHeight: CGFloat?
+
+        override func loadView() {
+            view = UIView()
+            view.backgroundColor = .clear
+            view.isUserInteractionEnabled = false
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            reconcile()
+        }
+
+        func reconcile() {
+            guard let configuration, isViewLoaded, view.window != nil, !closing else { return }
+            guard configuration.isPresented else { close(animated: true); return }
+            if let panel {
+                panel.rootView = configuration.content
+                guard let sheet = panel.sheetPresentationController else { return }
+                updateSizing(sheet)
+                let target = identifier(configuration.detent.wrappedValue)
+                if sheet.selectedDetentIdentifier != target {
+                    sheet.animateChanges { sheet.selectedDetentIdentifier = target }
+                }
+                return
+            }
+            guard presentedViewController == nil else { return }
+            let panel = UIHostingController(rootView: configuration.content)
+            panel.view.backgroundColor = .clear
+            panel.modalPresentationStyle = .pageSheet
+            panel.isModalInPresentation = true
+            guard let sheet = panel.sheetPresentationController else { return }
+            updateSizing(sheet)
+            sheet.selectedDetentIdentifier = identifier(configuration.detent.wrappedValue)
+            sheet.prefersGrabberVisible = true
+            sheet.largestUndimmedDetentIdentifier = .large
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = false
+            sheet.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+            sheet.delegate = self
+            self.panel = panel
+            present(panel, animated: true) { [weak self] in
+                self?.configuration?.presentationChanged(true)
+            }
+        }
+
+        private func updateSizing(_ sheet: UISheetPresentationController) {
+            guard let configuration else { return }
+            let compactHeight = configuration.compactHeight
+            let openingHeight = configuration.openingHeight
+            guard compactHeight != lastCompactHeight || openingHeight != lastOpeningHeight else { return }
+            lastCompactHeight = compactHeight
+            lastOpeningHeight = openingHeight
+            sheet.detents = [
+                .custom(identifier: compactID) { _ in compactHeight },
+                .custom(identifier: openingID) { _ in openingHeight },
+                .large()
+            ]
+        }
+
+        private func identifier(_ detent: MapResultsDetent) -> UISheetPresentationController.Detent.Identifier {
+            switch detent {
+            case .compact: compactID
+            case .medium: openingID
+            case .expanded: .large
+            }
+        }
+
+        func sheetPresentationControllerDidChangeSelectedDetentIdentifier(_ sheet: UISheetPresentationController) {
+            let value: MapResultsDetent = sheet.selectedDetentIdentifier == compactID ? .compact
+                : sheet.selectedDetentIdentifier == .large ? .expanded : .medium
+            if configuration?.detent.wrappedValue != value { configuration?.detent.wrappedValue = value }
+        }
+
+        func adaptivePresentationStyle(for controller: UIPresentationController,
+                                       traitCollection: UITraitCollection) -> UIModalPresentationStyle { .none }
+
+        func close(animated: Bool) {
+            guard let panel, !closing else { return }
+            closing = true
+            panel.presentingViewController?.dismiss(animated: animated) { [weak self] in
+                guard let self else { return }
+                self.panel = nil
+                self.closing = false
+                self.lastCompactHeight = nil
+                self.lastOpeningHeight = nil
+                self.configuration?.presentationChanged(false)
+                self.reconcile()
+            }
+        }
     }
 }
 

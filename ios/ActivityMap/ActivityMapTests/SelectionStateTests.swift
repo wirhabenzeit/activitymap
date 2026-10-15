@@ -153,6 +153,34 @@ struct SelectionFixtureTests {
 
 @MainActor
 struct ActivityStoreSelectionTests {
+    @Test(arguments: [1, 2])
+    func routeActivationTogglesWithoutChangingSelectionOrInspection(count: Int) {
+        let store = ActivityStore(activities: (1...count).map { Self.activity($0) })
+        store.replaceSelection(with: 1...count)
+        store.inspect(count)
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        picker.showResults()
+        store.activate(1)
+        let selection = store.selectedActivityIDs
+
+        store.toggleActive(1)
+        picker.reconcile(with: store)
+        #expect(store.activeActivityID == nil, "Even a sole selected route can be explicitly deactivated")
+        #expect(store.selectedActivityIDs == selection && store.inspectedActivityID == count)
+        #expect(picker.isPresented && picker.detailID == nil && picker.candidateIDs.count == count)
+        #expect(store.mapContext.pendingRequest == nil)
+
+        store.toggleActive(count)
+        #expect(store.activeActivityID == count)
+        store.toggleActive(1)
+        #expect(store.activeActivityID == (count == 1 ? nil : 1))
+        picker.showDetail(1, store: store)
+        picker.showDetail(1, store: store)
+        #expect(store.activeActivityID == 1 && picker.detailID == 1, "Opening details continues to activate idempotently")
+        #expect(store.selectedActivityIDs == selection && store.inspectedActivityID == count)
+    }
+
     static func activity(_ id: Int, sport: SportType = .run, route: Bool = true) -> Activity {
         Activity(
             id: id, name: "Activity \(id)", sportType: sport, startDate: Date(timeIntervalSince1970: 1_700_000_000),

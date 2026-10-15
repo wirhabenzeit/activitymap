@@ -372,6 +372,8 @@ final class ActivityStore {
 
     func activate(_ activityID: Int) { selection.activate(activityID) }
 
+    func toggleActive(_ activityID: Int) { selection.toggleActive(activityID) }
+
     func inspect(_ activityID: Int) { selection.inspect(activityID) }
 
     func dismissInspection() { selection.dismissInspection() }

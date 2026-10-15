@@ -68,8 +68,7 @@ struct ElevationProfileView: View {
                         .padding(.vertical, 8)
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
-                        if isDecoding { ProgressView("Reading elevation samples…") }
-                        else { Text(placeholder).foregroundStyle(AppTheme.secondaryText) }
+                        Text(placeholder).foregroundStyle(AppTheme.secondaryText)
                         statusTimeline
                     }
                     .font(.caption)
@@ -117,7 +116,9 @@ struct ElevationProfileView: View {
         switch state { case .failed, .stale: return true; default: return false }
     }
     private var placeholder: String {
-        switch state {
+        // Downloading and local decoding share one quiet loading presentation.
+        if isDecoding { return "Loading elevation samples…" }
+        return switch state {
         case .loading, .notRequested: loader == nil ? "Elevation by distance is unavailable." : "Loading elevation samples…"
         case .pending: "Elevation samples are being prepared."
         case .stale: "The recorded data changed. Reload this profile."

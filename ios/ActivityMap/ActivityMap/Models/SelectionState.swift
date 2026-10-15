@@ -135,6 +135,12 @@ nonisolated struct SelectionState: Equatable, Sendable {
         activeID = selectedIDs.contains(id) && visibleIDs.contains(id) ? id : nil
     }
 
+    /// The route symbol toggles focus without changing the selected activities.
+    mutating func toggleActive(_ id: Int) {
+        if activeID == id { activeID = nil }
+        else { activate(id) }
+    }
+
     /// Explicitly activate the target, replacing by default or adding in Combine.
     @discardableResult
     mutating func showOnMap(_ id: Int, hasGeometry: Bool) -> ShowOnMapOutcome {
