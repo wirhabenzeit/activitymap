@@ -147,7 +147,7 @@ struct ActivityDetailIdentity: View {
 }
 
 /// An activity's title row. The route action sits beside the title rather
-/// than in a footer row. Edit lives in the adjacent activity-actions menu.
+/// than in a footer row. Edit is a direct button beside the title.
 struct ActivityDetailHeading: View {
     let activity: Activity
     var trailingInset: CGFloat = 0
@@ -174,7 +174,7 @@ struct ActivityDetailHeading: View {
             HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
                 ActivityDetailIdentity(activity: activity, titleLineLimit: titleLineLimit, onNavigationBar: onNavigationBar)
                 if let editing {
-                    ActivityEditButton(activity: activity, service: editing, onNavigationBar: onNavigationBar, labelled: labelled)
+                    ActivityEditButton(activity: activity, service: editing, onNavigationBar: onNavigationBar, showsIcon: labelled)
                 }
                 if let showOnMap, !overMap {
                     Button { showOnMap(activity.id) } label: {

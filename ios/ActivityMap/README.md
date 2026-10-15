@@ -204,7 +204,7 @@ A store-open error is displayed without deleting data or falling back silently t
 
 ### Edit an activity in Strava
 
-Open an activity from Map, List or Stats, then choose **Edit activity** in the **•••** menu beside its title (wide detail headings show **Edit** directly). The native form prefills name, description and sport. Save sends only changed fields through the authenticated v1 PATCH endpoint; clearing the description sends an explicit empty string. Cancel offers to discard a changed draft. Submitted saves cannot be dismissed or submitted twice.
+Open an activity from Map, List or Stats, then tap **Edit** beside its title. The direct button is also available in pushed detail toolbars; wide headings add a pencil icon. The native form prefills name, description and sport. Save sends only changed fields through the authenticated v1 PATCH endpoint; clearing the description sends an explicit empty string. Cancel offers to discard a changed draft. Submitted saves cannot be dismissed or submitted twice.
 
 Editing requires a verified, connected session and Strava write permission. Offline drafts remain on screen, and rate-limited/server-unavailable saves keep the input and honor Retry-After. An ambiguous connection failure or a result accepted upstream but not reconciled locally asks the user to close and sync before another write; there is no automatic submission or offline queue.
 
