@@ -676,8 +676,9 @@ extension RenderedRoutePickingTests {
         try host.save(expanded, name: "elevation-phone-expanded-\(count)")
         try VNImageRequestHandler(cgImage: try #require(expanded.cgImage)).perform([request])
         let expandedText = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(expandedText.contains("Elapsed time") && expandedText.contains("Time & speed") && expandedText.contains("Power"),
-                "Expanding the sheet must reveal grouped activity measurements: \(expandedText)")
+        #expect(expandedText.contains("Open in Strava") && expandedText.contains("Export GPX")
+                && expandedText.contains("Elapsed time") && expandedText.contains("Time & speed"),
+                "Expanding the sheet must reveal action rows and the first grouped measurements: \(expandedText)")
         #expect(!expandedText.contains("All recorded details"), "Groups must always be open")
         func scrollViews(_ view: UIView) -> [UIScrollView] {
             ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrollViews)
@@ -693,8 +694,8 @@ extension RenderedRoutePickingTests {
         try host.save(bottom, name: "elevation-phone-details-bottom-\(count)")
         try VNImageRequestHandler(cgImage: try #require(bottom.cgImage)).perform([request])
         let bottomText = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(bottomText.contains("Activity"),
-                "Recording metadata must remain available by scrolling: \(bottomText)")
+        #expect(bottomText.contains("Power") && bottomText.contains("Activity"),
+                "Further measurements and recording metadata must remain available by scrolling: \(bottomText)")
     }
 }
 

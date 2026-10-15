@@ -32,6 +32,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                 Divider()
                 ActivityHeadlineStats(activity: activity)
             }
+            ActivityDetailActions(activity: activity).id(activity.id)
             photos(activity)
             ForEach(ActivityMetricGroup.groups(for: activity)) { group in
                 VStack(alignment: .leading, spacing: 12) {

@@ -94,7 +94,7 @@ struct ActivityDetailView: View {
 }
 
 /// Resolve by identity on every update, never retain the destination's initial snapshot.
-/// Actions live in the title row, so no footer bar takes height from the content.
+/// Editing/map actions stay by the title; Strava/GPX rows scroll with detail.
 struct ActivityDetailPanel: View {
     @Environment(\.activityDetailOverMap) private var overMap
     @Bindable var store: ActivityStore

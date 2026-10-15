@@ -8,8 +8,9 @@ Applies to web Map/List cards and iOS Map/List detail panels. Native controls ma
 2. Elevation graph when an elevation profile is available, with its axes and units.
 3. Activity description, when present, below the graph. Preserve line breaks; omit blank descriptions.
 4. Exactly three headline measurements: **Distance**, **Moving time**, **Elevation gain**, in that order. Use one row at ordinary phone size; reflow for accessibility text sizes. Values are prominent, labels secondary. Do not repeat elapsed time or min/max as headline captions. Missing primary values show an em dash.
-5. Topic groups containing the remaining recorded fields, each shown once.
-6. Photos, when present.
+5. On native iOS, visible **Open in Strava** and **Export GPX** action rows. The GPX subtitle discloses detailed/simplified cached geometry and offline availability; activities without GPS have a disabled export row and an explanation. Sharing uses the native sheet on iPhone and a popover anchored to the export row on iPad. These rows scroll with detail, below the headline measurements even in compact map profiles.
+6. Topic groups containing the remaining recorded fields, each shown once.
+7. Photos, when present.
 
 Collapsed map details reuse the same sport icon, title typography, subtitle spacing and content padding in portrait and landscape. They use a single-line, tail-truncated title with the sport and activity-local date/time beneath it. The full title remains available in the open detail.
 
