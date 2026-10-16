@@ -5,6 +5,8 @@ import {
   useBrowsingState,
   useRetainedScroll,
 } from '~/hooks/use-browsing-context';
+import { SpeedDisplayContext } from './speed-display-context';
+import { speedDisplayForSports } from '~/lib/speed-display';
 import { sortActivities } from '~/lib/activity-presentation';
 import {
   useDisplayUnits,
@@ -176,9 +178,19 @@ export const DataTable = React.memo(function DataTable<
         : columnVisibility,
     [panelOpen, columnVisibility],
   );
+  const speedDisplay = React.useMemo(() => {
+    const ids = columnFilters.find((filter) => filter.id === 'id')?.value as
+      number[] | undefined;
+    const included = ids ? new Set(ids) : null;
+    return speedDisplayForSports(
+      data
+        .filter((activity) => !included || included.has(activity.id))
+        .map((activity) => (activity as { sport_type?: string }).sport_type),
+    );
+  }, [data, columnFilters]);
   const sortedData = React.useMemo(
-    () => sortActivities(data, sorting),
-    [data, sorting],
+    () => sortActivities(data, sorting, speedDisplay),
+    [data, sorting, speedDisplay],
   );
   const table = useTable({
     manualSorting: true,
@@ -472,7 +484,7 @@ export const DataTable = React.memo(function DataTable<
       scroller.scrollTop += rowBounds.bottom - bounds.bottom;
   }, [activeId, pageIndex, detailStepping]);
 
-  return (
+  const content = (
     <div
       ref={containerRef}
       className={cn('relative flex flex-col', className)}
@@ -768,6 +780,9 @@ export const DataTable = React.memo(function DataTable<
         <DataTablePagination table={table} hiddenByFit={hiddenByFit} />
       )}
     </div>
+  );
+  return (
+    <SpeedDisplayContext value={speedDisplay}>{content}</SpeedDisplayContext>
   );
 }) as <TData extends RowWithId & RowData>(
   props: DataTableProps<TData>,

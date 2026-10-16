@@ -101,7 +101,12 @@ struct ActivityHeadlineStats: View {
     @ViewBuilder private var metrics: some View {
         metric("Distance", value: Formatters.distance(activity.distance))
         metric("Moving time", value: Formatters.duration(activity.movingTime))
-        metric("Elevation gain", value: Formatters.elevation(activity.totalElevationGain))
+        let display = SpeedDisplay.forSport(activity.sportType)
+        if display == .speed {
+            metric("Elevation gain", value: Formatters.elevation(activity.totalElevationGain))
+        } else {
+            metric("Average pace", value: display.format(activity.averageSpeed))
+        }
     }
 
     private func metric(_ title: String, value: String) -> some View {

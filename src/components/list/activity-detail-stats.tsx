@@ -41,7 +41,16 @@ export function ActivityDetailStats({
           >
             <dt className="text-xs text-muted-foreground">{stat.label}</dt>
             <dd className="order-first text-base font-semibold tabular-nums">
-              {stat.value}
+              {stat.id === 'averagePace' ? (
+                <>
+                  {stat.value.split(' ')[0]}{' '}
+                  <span className="whitespace-nowrap">
+                    {stat.value.split(' ').slice(1).join(' ')}
+                  </span>
+                </>
+              ) : (
+                stat.value
+              )}
             </dd>
           </div>
         ))}

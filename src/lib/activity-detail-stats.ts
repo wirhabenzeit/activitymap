@@ -1,3 +1,9 @@
+import {
+  formatSpeed,
+  paceSeconds,
+  speedDisplayForSport,
+  speedLabel,
+} from './speed-display';
 import { measurementScale, measurementUnit, type UnitSystem } from './units';
 import type { Activity } from '~/server/db/schema';
 
@@ -48,6 +54,8 @@ export function activityDetailStats(
     label: string,
     value: string | undefined,
   ): DetailStat => ({ id, label, value: value ?? '—' });
+  const display = speedDisplayForSport(activity.sport_type);
+  const hasPace = display !== 'speed';
   const headline = [
     stat(
       'distance',
@@ -62,9 +70,11 @@ export function activityDetailStats(
     ),
     stat('movingTime', 'Moving time', duration(activity.moving_time)),
     stat(
-      'elevationGain',
-      'Elevation gain',
-      elevation(activity.total_elevation_gain),
+      hasPace ? 'averagePace' : 'elevationGain',
+      hasPace ? 'Average pace' : 'Elevation gain',
+      hasPace
+        ? formatSpeed(activity.average_speed, display, units)
+        : elevation(activity.total_elevation_gain),
     ),
   ];
   const groups: DetailStatGroup[] = [];
@@ -78,12 +88,32 @@ export function activityDetailStats(
     );
     if (stats.length) groups.push({ id, title, stats });
   };
-  group('time-speed', 'Time & speed', [
+  group('time-speed', hasPace ? 'Time & pace' : 'Time & speed', [
+    ...(hasPace
+      ? [
+          [
+            'bestPace',
+            speedLabel(display, true),
+            paceSeconds(activity.max_speed, display, units) == null
+              ? undefined
+              : formatSpeed(activity.max_speed, display, units),
+          ] as [string, string, string | undefined],
+        ]
+      : []),
     ['elapsedTime', 'Elapsed time', duration(activity.elapsed_time)],
     ['averageSpeed', 'Average speed', speed(activity.average_speed)],
     ['maxSpeed', 'Maximum speed', speed(activity.max_speed)],
   ]);
   group('elevation', 'Elevation', [
+    ...(hasPace
+      ? [
+          [
+            'elevationGain',
+            'Elevation gain',
+            elevation(activity.total_elevation_gain),
+          ] as [string, string, string | undefined],
+        ]
+      : []),
     ['elevLow', 'Minimum', elevation(activity.elev_low)],
     ['elevHigh', 'Maximum', elevation(activity.elev_high)],
   ]);

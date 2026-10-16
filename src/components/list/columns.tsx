@@ -4,6 +4,16 @@ import {
   useDisplayUnits,
   useDateFormat,
 } from '~/hooks/use-display-preferences';
+import { useContext } from 'react';
+import { SpeedDisplayContext } from './speed-display-context';
+import {
+  formatSpeed,
+  formatPaceSeconds,
+  paceSeconds,
+  speedLabel,
+  speedDisplayForSports,
+} from '~/lib/speed-display';
+import { aggregateMetric } from '~/lib/activity-presentation';
 import { type ColumnDef, type Table } from '@tanstack/react-table';
 import { store, useShallowStore } from '~/store';
 import { Checkbox } from '~/components/ui/checkbox';
@@ -74,15 +84,44 @@ function columnFromField<K extends ActivityValueType>(
   const Footer = ({ table }: { table: Table<Features, Activity> }) => {
     const units = useDisplayUnits();
     const dateFormat = useDateFormat();
+    const display = useContext(SpeedDisplayContext);
     const rows = summaryRows(table);
     const values: K[] = rows.map((row) => row.getValue(id));
     const reducedValue = spec.reducer ? spec.reducer(values) : null;
-    const summary = spec.summary
-      ? spec.summary(values)
-      : reducedValue != null
-        ? `${spec.reducerSymbol ?? ''}${spec.formatter(reducedValue, units, dateFormat)}`
-        : '—';
-    const known = values.filter((v) => !isMissing(v)).length;
+    // A selected summary can contain filter-hidden sports; keep it comparable.
+    const summaryDisplay =
+      id === 'average_speed' &&
+      display !== 'speed' &&
+      speedDisplayForSports(rows.map((row) => row.original.sport_type)) ===
+        display
+        ? display
+        : 'speed';
+    const paceSummary =
+      id === 'average_speed' && summaryDisplay !== 'speed'
+        ? formatPaceSeconds(
+            aggregateMetric(
+              values.map((value) =>
+                paceSeconds(value as number, summaryDisplay, units),
+              ),
+              'mean',
+            ).value,
+            summaryDisplay,
+            units,
+          )
+        : null;
+    const summary =
+      paceSummary !== null
+        ? `∅${paceSummary}`
+        : spec.summary
+          ? spec.summary(values)
+          : reducedValue != null
+            ? `${spec.reducerSymbol ?? ''}${spec.formatter(reducedValue, units, dateFormat)}`
+            : '—';
+    const known = values.filter((v) =>
+      id === 'average_speed' && summaryDisplay !== 'speed'
+        ? paceSeconds(v as number, summaryDisplay, units) !== null
+        : !isMissing(v),
+    ).length;
     return (
       <div
         className="text-right w-full"
@@ -100,23 +139,32 @@ function columnFromField<K extends ActivityValueType>(
     cell: function MetricCell({ getValue }) {
       const units = useDisplayUnits();
       const dateFormat = useDateFormat();
+      const display = useContext(SpeedDisplayContext);
       return (
         <div className="text-right w-full">
-          {spec.formatter(getValue() as K, units, dateFormat)}
+          {id === 'average_speed'
+            ? formatSpeed(getValue() as number, display, units)
+            : spec.formatter(getValue() as K, units, dateFormat)}
         </div>
       );
     },
     meta: {
-      title: spec.title,
+      title: id === 'average_speed' ? 'Average speed / pace' : spec.title,
       width: 'minmax(70px, 1fr)',
     },
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column}>
-        <div className="w-full justify-end flex">
-          {spec.Icon && <spec.Icon className="w-4 h-4" />}
-        </div>
-      </DataTableColumnHeader>
-    ),
+    header: function MetricHeader({ column }) {
+      const display = useContext(SpeedDisplayContext);
+      return (
+        <DataTableColumnHeader
+          column={column}
+          title={id === 'average_speed' ? speedLabel(display) : undefined}
+        >
+          <div className="w-full justify-end flex">
+            {spec.Icon && <spec.Icon className="w-4 h-4" />}
+          </div>
+        </DataTableColumnHeader>
+      );
+    },
     ...(spec.accessorFn && { accessorFn: spec.accessorFn }),
     ...(!spec.accessorFn && { accessorKey: id }),
     ...((spec.reducer ?? spec.summary) && { footer: Footer }),
