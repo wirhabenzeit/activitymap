@@ -636,6 +636,32 @@ nonisolated extension ActivityMapAPI {
         let streams: IngestionStreams
     }
 
+    struct StravaImport: Codable, Hashable, Sendable {
+        let available: Bool
+        let runID: String?
+        let status: StravaImportStatus
+        let reason: StravaImportReason?
+        let startedAt: Date?
+        let finishedAt: Date?
+        let retryAt: Date?
+        let summaries: Int
+        let details: Int
+        let photos: Int
+
+        enum CodingKeys: String, CodingKey {
+            case available
+            case runID = "runId"
+            case status
+            case reason
+            case startedAt
+            case finishedAt
+            case retryAt
+            case summaries
+            case details
+            case photos
+        }
+    }
+
     /// The shape of `ErrorEnvelope.error`.
     struct ErrorBody: Codable, Hashable, Sendable {
         let code: String
@@ -837,6 +863,28 @@ nonisolated extension ActivityMapAPI {
         case all = "all"
         case `public` = "public"
         case `none` = "none"
+    }
+
+    enum StravaImportReason: String, Codable, Hashable, Sendable {
+        case complete = "complete"
+        case busy = "busy"
+        case accountUnavailable = "account_unavailable"
+        case requestLimit = "request_limit"
+        case deadline = "deadline"
+        case rateLimit = "rate_limit"
+        case detailFailed = "detail_failed"
+        case internalError = "internal_error"
+        case interrupted = "interrupted"
+    }
+
+    enum StravaImportStatus: String, Codable, Hashable, Sendable {
+        case idle = "idle"
+        case running = "running"
+        case succeeded = "succeeded"
+        case deferred = "deferred"
+        case failed = "failed"
+        case interrupted = "interrupted"
+        case blocked = "blocked"
     }
 
     enum StreamFailureCode: String, Codable, Hashable, Sendable {

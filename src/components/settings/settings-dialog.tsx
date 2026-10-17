@@ -21,6 +21,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { DisplaySettings } from './display-settings';
 import { useShallowStore } from '~/store';
 import { useIngestionStatus } from '~/hooks/use-ingestion-status';
+import { useStravaImport } from '~/hooks/use-strava-import';
+import { stravaImportMessage } from '~/lib/ingestion/strava-import';
 import {
   coverageProgress,
   snapshotIsStale,
@@ -64,6 +66,7 @@ export function SettingsDialog({
     userId,
     open && (tab === 'sync' || tab === 'account'),
   );
+  const manualImport = useStravaImport(userId, open && tab === 'sync');
   const [signingOut, setSigningOut] = useState(false);
   const [signOutFailed, setSignOutFailed] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
@@ -134,7 +137,12 @@ export function SettingsDialog({
     userId && user?.stravaConnected
       ? stravaPermissionNotes(user.stravaPermissions)
       : [];
-  const showConnect = !userId || !!needsReconnect || permissionNotes.length > 0;
+  const manualNeedsReconnect = manualImport.data?.status === 'blocked';
+  const showConnect =
+    !userId ||
+    !!needsReconnect ||
+    manualNeedsReconnect ||
+    permissionNotes.length > 0;
   const email = userId ? displayEmail(user?.email) : null;
 
   const handleSignOut = async () => {
@@ -300,6 +308,58 @@ export function SettingsDialog({
                 <h2 id="import-heading" className="text-sm font-semibold">
                   Strava import status
                 </h2>
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="min-h-10"
+                    onClick={manualImport.start}
+                    disabled={
+                      !userId ||
+                      offline ||
+                      !!needsReconnect ||
+                      manualImport.starting ||
+                      !manualImport.data?.available ||
+                      manualImport.data.status === 'running' ||
+                      clock < manualImport.retryAt
+                    }
+                  >
+                    <RefreshCw
+                      aria-hidden="true"
+                      className={
+                        manualImport.starting ||
+                        manualImport.data?.status === 'running'
+                          ? 'animate-spin'
+                          : ''
+                      }
+                    />
+                    Fetch from Strava
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Fetch recent activities, missing details and photos, and
+                    more history in the background.
+                  </p>
+                  {(!!manualImport.startError || manualImport.isError) && (
+                    <p role="status" className="text-xs text-muted-foreground">
+                      {manualImport.startError?.message ??
+                        'Could not check the Strava fetch. Please try again later.'}
+                    </p>
+                  )}
+                  {manualImport.data &&
+                    stravaImportMessage(manualImport.data) && (
+                      <p
+                        role="status"
+                        className="text-xs text-muted-foreground"
+                      >
+                        {stravaImportMessage(manualImport.data)}
+                      </p>
+                    )}
+                  {clock < manualImport.retryAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Try again after{' '}
+                      {date(new Date(manualImport.retryAt).toISOString())}.
+                    </p>
+                  )}
+                </div>
                 {status ? (
                   <>
                     <dl className="space-y-3 text-sm [@media(min-width:640px)_and_(max-height:500px)]:space-y-2">
@@ -430,7 +490,7 @@ export function SettingsDialog({
                     <p className="text-xs text-muted-foreground">
                       {permissionNotes.join(' ')} {STRAVA_PERMISSIONS_RECONNECT}
                     </p>
-                  ) : needsReconnect ? (
+                  ) : needsReconnect || manualNeedsReconnect ? (
                     <p className="text-xs text-muted-foreground">
                       Connect with Strava again to restore access to your
                       activities.

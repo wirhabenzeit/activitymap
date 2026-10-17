@@ -3,6 +3,7 @@ import SwiftUI
 struct IngestionStatusSection: View {
     let session: SyncSession
     let controller: IngestionStatusController
+    var stravaImport: StravaImportController? = nil
 
     private var snapshot: ActivityMapAPI.IngestionStatus? {
         controller.scope == session.scope ? controller.snapshot : nil
@@ -14,6 +15,29 @@ struct IngestionStatusSection: View {
 
     var body: some View {
         Section {
+            if let stravaImport, stravaImport.scope == session.scope {
+                Button {
+                    Task { await stravaImport.start(session) }
+                } label: {
+                    HStack {
+                        Label("Fetch from Strava", systemImage: "arrow.down.circle")
+                        if stravaImport.isStarting || stravaImport.snapshot?.status == .running {
+                            Spacer()
+                            ProgressView().accessibilityLabel("Fetching from Strava")
+                        }
+                    }
+                }.disabled(!stravaImport.canStart(session))
+                Text("Fetch recent activities, missing details and photos, and more history in the background.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                if let message = stravaImport.message ?? stravaImport.progressMessage {
+                    Text(message).font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.updatesFrequently)
+                }
+                if stravaImport.retryAt > Date() {
+                    Text("Try again after \(stravaImport.retryAt.formatted(date: .abbreviated, time: .shortened)).")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
             if let snapshot {
                 LabeledContent("All activities imported", value: snapshot.history.progress == .complete ? "Yes"
                     : snapshot.history.progress == .unknown ? "Unknown" : "No")

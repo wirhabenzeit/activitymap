@@ -10,6 +10,7 @@ struct AccountSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var ingestionStatus = IngestionStatusController()
+    @State private var stravaImport = StravaImportController()
     @Bindable private var preferences = DisplayPreferences.shared
     /// Profile opened while signed out is only a login presentation: once the
     /// connection is verified it closes and returns to the browsing context.
@@ -63,13 +64,24 @@ struct AccountSheet: View {
                 await ingestionStatus.observe(session)
             }
         }
+        .task(id: StatusObservation(session: syncSession, active: scenePhase == .active)) {
+            if destination == .settings, scenePhase == .active, let session = syncSession {
+                await stravaImport.observe(session)
+            }
+        }
+        .onChange(of: stravaImport.snapshot) { _, snapshot in
+            guard snapshot?.runID != nil, let session = syncSession,
+                  stravaImport.scope == session.scope else { return }
+            Task { await refresh?() }
+        }
     }
 
     private var syncSession: SyncSession? { sync?.session ?? auth.syncSession }
     private struct StatusObservation: Equatable { let session: SyncSession?; let active: Bool }
     private var importNeedsReconnect: Bool {
-        guard let session = syncSession, ingestionStatus.scope == session.scope,
-              let status = ingestionStatus.snapshot else { return false }
+        guard let session = syncSession else { return false }
+        if stravaImport.scope == session.scope, stravaImport.snapshot?.status == .blocked { return true }
+        guard ingestionStatus.scope == session.scope, let status = ingestionStatus.snapshot else { return false }
         return status.history.scheduling == .blocked || status.details.scheduling == .blocked
             || status.photos.scheduling == .blocked || status.streams.scheduling == .blocked
     }
@@ -284,7 +296,7 @@ struct AccountSheet: View {
         Group {
             syncContent
             if let session = syncSession {
-                IngestionStatusSection(session: session, controller: ingestionStatus)
+                IngestionStatusSection(session: session, controller: ingestionStatus, stravaImport: stravaImport)
             }
 
             accountContent

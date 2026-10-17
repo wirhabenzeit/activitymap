@@ -18,6 +18,10 @@ import {
   updateActivityForActor,
 } from '~/server/application/activities';
 import { requestIdFor } from '~/server/http/request-id';
+import {
+  SIGNUP_WARMUP_TIME_MS,
+  warmSignupActivitiesForActor,
+} from '~/server/application/signup-warmup';
 
 const path = /^\/api\/v1\/activities\/([^/]+)(?:\/refresh)?\/?$/;
 const activityIdSchema = z
@@ -38,6 +42,8 @@ type MutationHandlerDependencies = {
   ) => Promise<UpdateResult>;
   refresh?: (actor: Actor, activityId: number) => Promise<RefreshResult>;
   fetchSummaries?: (actor: Actor) => Promise<number>;
+  afterResponse?: (work: () => Promise<void>) => void;
+  warmSignup?: typeof warmSignupActivitiesForActor;
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
 };
@@ -96,6 +102,7 @@ export function createFetchActivitySummariesHandler(
 ) {
   return async (request: Request) => {
     const requestId = requestIdFor(request);
+    const startedAt = Date.now();
     try {
       const actor = await deps.resolveActor(request);
       if (!actor)
@@ -116,6 +123,31 @@ export function createFetchActivitySummariesHandler(
       const count = await (
         deps.fetchSummaries ?? fetchInitialActivitySummariesForActor
       )(actor);
+      if (count > 0 && deps.afterResponse) {
+        // Leave ten seconds of the route's 60s lifetime for persistence and
+        // cleanup, including time already spent importing the first page.
+        try {
+          deps.afterResponse(async () => {
+            const timeMs = Math.min(
+              SIGNUP_WARMUP_TIME_MS,
+              50_000 - (Date.now() - startedAt),
+            );
+            if (timeMs <= 0) return;
+            try {
+              await (deps.warmSignup ?? warmSignupActivitiesForActor)(
+                actor,
+                count,
+                { timeMs },
+              );
+            } catch (error) {
+              deps.onError?.(error, requestId);
+            }
+          });
+        } catch (error) {
+          // Optional acceleration must never turn a saved import into a 500.
+          deps.onError?.(error, requestId);
+        }
+      }
       return Response.json(
         responseEnvelope(activitySummaryFetchResultSchema).parse(
           makeEnvelope(count),

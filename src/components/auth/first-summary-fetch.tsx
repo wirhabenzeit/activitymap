@@ -31,6 +31,28 @@ export function FirstSummaryFetch() {
   const fetch = useQuery(
     firstSummaryFetchOptions(client, userId, Boolean(connected && empty)),
   );
+  useEffect(() => {
+    if (!userId || !connected || !fetch.data) return;
+    // Download changes committed after the first-page response. These bounded
+    // follow-ups keep the signup view live; they never trigger more imports.
+    const timers = [10_000, 25_000, 50_000].map((delay) =>
+      window.setTimeout(() => {
+        if (useShallowStore.getState().user?.id !== userId || !navigator.onLine)
+          return;
+        window.dispatchEvent(new Event('activitymap:retry-browser-sync'));
+        void client
+          .invalidateQueries({
+            predicate: ({ queryKey }) =>
+              (queryKey[0] === 'activities' &&
+                queryKey[1] === 'auth' &&
+                queryKey[2] === userId) ||
+              (queryKey[0] === 'photos' && queryKey[1] === userId),
+          })
+          .catch(() => undefined);
+      }, delay),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [client, userId, connected, fetch.data]);
   const [now, setNow] = useState(Date.now);
   const error =
     fetch.error instanceof FirstSummaryFetchError ? fetch.error : null;

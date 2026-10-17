@@ -1,8 +1,10 @@
+import { after } from 'next/server';
 import { activityDTOSchema, toActivityDTO } from '~/contracts/v1/activity';
 import { withApiV1Observability } from '~/server/api/observability';
 import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
 import { resolveActor } from '~/server/auth/actor';
 import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
+import { warmSignupActivitiesForActor } from '~/server/application/signup-warmup';
 import { logger } from '~/server/logging/logger';
 import { activitiesRepository } from '~/server/repositories/activities';
 import { createListHandler } from '../list-handler';
@@ -15,6 +17,16 @@ export const POST = withApiV1Observability(
   withApiV1RateLimit(
     createFetchActivitySummariesHandler({
       resolveActor: (request) => resolveActor(request.headers),
+      afterResponse: after,
+      warmSignup: async (actor, count, options) => {
+        const result = await warmSignupActivitiesForActor(
+          actor,
+          count,
+          options,
+        );
+        logger.info('Signup warmup finished', result);
+        return result;
+      },
       onError: (error, requestId) =>
         logger.error('Summary fetch failed', { error, requestId }),
     }),

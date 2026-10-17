@@ -20,6 +20,7 @@ import { currentUserDTOSchema } from './user';
 import { syncBootstrapPageDTOSchema, syncChangesPageDTOSchema } from './sync';
 import { errorEnvelopeSchema } from './error';
 import { ingestionStatusDTOSchema } from './ingestion-status';
+import { stravaImportDTOSchema } from './strava-import';
 import { responseEnvelope } from './envelope';
 import { paginatedSchema, MAX_PAGE_SIZE } from './pagination';
 import {
@@ -68,6 +69,7 @@ export function buildOpenApiDocument() {
     id: 'IngestionStatusResponse',
   });
   registry.add(errorEnvelopeSchema, { id: 'FailureResponse' });
+  registry.add(responseEnvelope(stravaImportDTOSchema), { id: 'StravaImportResponse' });
   registry.add(responseEnvelope(currentUserDTOSchema), {
     id: 'CurrentUserResponse',
   });
@@ -174,6 +176,26 @@ export function buildOpenApiDocument() {
             '500': errorResponse(
               'The server could not serialize a valid contract response',
             ),
+          },
+        },
+      },
+      '/api/v1/strava-import': {
+        get: {
+          operationId: 'getStravaImport', summary: 'Read the caller’s manual Strava fetch status', security,
+          description: 'Read-only run status. Poll every three seconds while a run is active and Settings is visible. Expired leases report interruption.',
+          responses: {
+            '200': { description: 'Current run and cooldown', content: { 'application/json': { schema: ref('StravaImportResponse') } } },
+            '401': errorResponse('Authentication required'), '429': errorResponse('Too many requests; honor Retry-After'), '500': errorResponse('Status unavailable'),
+          },
+        },
+        post: {
+          operationId: 'startStravaImport', summary: 'Fetch more Strava data in the background', security,
+          description: 'Starts a bounded background fetch of recent summaries, pending details/photos and older history. Existing runs and five-minute cooldowns are shared across devices. Progress checkpoints survive later runs; shared Strava quotas still apply. This operation never fetches activity streams.',
+          responses: {
+            '202': { description: 'Background run accepted', content: { 'application/json': { schema: ref('StravaImportResponse') } } },
+            '200': { description: 'An existing run or cooldown is returned without dispatching more work', content: { 'application/json': { schema: ref('StravaImportResponse') } } },
+            '401': errorResponse('Authentication required'), '403': errorResponse('Origin rejected or external effects disabled'),
+            '409': errorResponse('Reconnect Strava'), '429': errorResponse('Too many requests; honor Retry-After'), '500': errorResponse('Could not start the run'),
           },
         },
       },
