@@ -411,6 +411,29 @@ async function runProof() {
   assert.equal(originalHistory.length, 12);
   assert.ok(originalHistory.every((row) => row.fetched));
 
+  // Signup warmup yields under concurrent load, while foreground traffic
+  // remains available. Releasing requests restores warmup capacity.
+  await cleanup();
+  nextHour();
+  const foregroundLoad = createStravaRequestBudget(database, now);
+  const warmupBudget = createStravaRequestBudget(database, now, {
+    fifteenMinutes: 50,
+    daily: 200,
+    maxInFlight: 4,
+  });
+  const activeTickets = await Promise.all(
+    Array.from({ length: 4 }, () => foregroundLoad.reserve(true)),
+  );
+  await assert.rejects(warmupBudget.reserve(true), StravaBudgetExceededError);
+  const extraForeground = await foregroundLoad.reserve(true);
+  await foregroundLoad.observe(extraForeground, null, 200);
+  await assert.rejects(warmupBudget.reserve(true), StravaBudgetExceededError);
+  await foregroundLoad.observe(activeTickets[0]!, null, 200);
+  const warmupTicket = await warmupBudget.reserve(true);
+  await warmupBudget.observe(warmupTicket, null, 200);
+  for (const ticket of activeTickets.slice(1))
+    await foregroundLoad.observe(ticket, null, 200);
+
   // Each of the four shared windows can stop backfill while ordinary traffic
   // still has room. The background reserve must not mark it globally blocked.
   for (const [key, ceiling, used, duration] of [

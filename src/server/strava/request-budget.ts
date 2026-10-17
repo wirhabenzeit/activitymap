@@ -17,5 +17,14 @@ export class StravaBudgetExceededError extends Error {
   }
 }
 
+/** Optional work yields to current app load without exhausting a quota window. */
+export class StravaBudgetBusyError extends StravaBudgetExceededError {
+  constructor() {
+    super(30);
+    this.name = 'StravaBudgetBusyError';
+    this.message = 'The shared Strava request budget is busy';
+  }
+}
+
 export const STRAVA_RATE_LIMIT_15_MINUTE_RESERVE = 25;
 export const STRAVA_RATE_LIMIT_DAILY_RESERVE = 100;

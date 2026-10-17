@@ -8,6 +8,80 @@ The status covers **Strava → ActivityMap** only. Whether a browser or device
 has downloaded ActivityMap's data is separate local sync state, and a complete
 local sync never makes the server status complete.
 
+## Signup warmup
+
+The first `POST /api/v1/activities` still waits for one page of up to 200
+summaries. A successful, non-empty import schedules an optional server warmup
+after the response, for both web and iOS. It first enriches pending details and
+photos for the newest five stored activities, then tries up to three additional
+200-summary pages when the initial page was full. The older-history boundary
+includes its last second to retain activities with equal start times, so one
+or more summaries can overlap the first page.
+
+The warmup has a 35-second budget, shortened by the time already spent in the
+60-second request, with ten seconds reserved for finishing. It makes at most
+20 Strava request attempts, including both photo sizes. Database counters admit
+at most one warmup per account per UTC hour and one globally per UTC minute;
+repeated requests and multiple server instances share those counters.
+Every upstream request also reserves the shared Strava budget, leaving at
+least 50 requests in each 15-minute quota and 200 in each daily quota. Warmup
+yields when four requests are already in flight in the current 15-minute
+window. Foreground traffic keeps its ordinary reserves and is not subject to
+this concurrency threshold. Strava's reported limits and usage update the
+shared budget after every response.
+
+The warmup reads a fresh, active grant without refreshing or reviving it, checks
+it again before each request, and stops on errors or budget exhaustion. Detail
+fetches cannot recreate a concurrently deleted row. All successful writes use
+the ordinary activity/photo persistence and sync change feed. Web requests
+three follow-up downloads at 10, 25 and 50 seconds while the account remains
+connected; iOS discovers the changes through its existing foreground sync.
+
+This is best-effort acceleration, not a durable queue. A busy, interrupted or
+timed-out warmup leaves remaining work to the existing scheduled workers. A
+short first page skips extra history pages; a short later page stops paging.
+Warmup does not mark history discovery complete: summary reconciliation still
+owns that proof. No schema migration, new client API or scheduling switch is
+required. The activities route logs the warmup counts and stop reason.
+
+## Fetch from Strava in Settings
+
+Web and iOS Settings expose **Fetch from Strava** beside import coverage.
+**Sync now** continues to download data already stored by ActivityMap.
+The new action refreshes one recent summary page, enriches up to five pending
+activities (including detailed activities whose photo sets are pending), then
+continues up to three older-history pages. Streams retain their existing
+scheduled/on-demand workers. A manual fetch uses the same 35-second,
+20-request budget and shared quota/load reserves as signup warmup. Expired
+tokens refresh through that budget with an account/run fence.
+
+`POST /api/v1/strava-import` returns `202` with run status after claiming the
+work. Duplicate clicks, devices and a five-minute cooldown return the existing
+status with `200` and dispatch no extra work. A global dispatch counter also
+yields to signup warmup. Quota deferrals can extend the cooldown to the shared
+window reset. `GET /api/v1/strava-import` reads only the caller's run, has
+`private, no-store` caching, and never contacts Strava. Clients poll at three
+seconds while running and visible, otherwise thirty seconds while Settings
+is visible, and honor HTTP Retry-After. Closing Settings does not cancel server
+work. Reopening reads its durable status.
+
+Migration `0022_manual-strava-import` adds one operational row per user, tied
+to the Strava account with cascading deletion. It stores counters, a run token,
+a 90-second lease, retry time and a fixed older-history boundary/page checkpoint.
+Each persisted history page advances the checkpoint. Later clicks continue it;
+fresh recent summaries still refresh every run. Pending detail/photo candidates
+honor existing activity backoffs. Per-activity failures leave other manual work
+eligible; account/quota/deadline stops end the batch. A lost worker reports
+`interrupted` after its lease expires. This is a bounded request follow-up;
+scheduled ingestion remains responsible for eventual completion.
+
+Apply migration 0022 before deploying this code. No extra scheduling switch is
+needed; the ordinary Strava-access environment guard applies. Existing coverage
+enums and the native data model stay compatible. Run `pnpm db:test-strava-import`
+against guarded local Postgres and `node scripts/verify-strava-import.mjs`
+against a local dev server for the database and fixture-only browser proofs.
+The new database proof is included in CI.
+
 ## Categories
 
 | Category | Population                                 | Source of truth                                                       | Automatic work                                                                         |
@@ -148,9 +222,9 @@ the standard v1 envelope and the `IngestionStatus` schema in
   strictly, so new values for `progress`, `scheduling`, `outcome`, `reason` or
   `freshness` are breaking for older iOS builds. Add them only together with a
   client-side fallback, or as a new field.
-- **Manual actions:** none are exposed yet. #298 will add operation
-  capability and retry fields. Until then, clients must not imply that manual
-  backfill exists.
+- **Manual actions:** fetching uses the separate `/api/v1/strava-import` run
+  contract described above. This coverage endpoint stays read-only and retains
+  its 60-second cache/polling policy.
 
 ## Shared fixtures
 

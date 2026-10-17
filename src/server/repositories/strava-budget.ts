@@ -4,6 +4,7 @@ import { db } from '~/server/db';
 import { stravaRequestBudgets } from '~/server/db/schema';
 import {
   StravaBudgetExceededError,
+  StravaBudgetBusyError,
   STRAVA_RATE_LIMIT_15_MINUTE_RESERVE,
   STRAVA_RATE_LIMIT_DAILY_RESERVE,
   type StravaRequestBudget,
@@ -45,7 +46,7 @@ const startOf = (now: Date, duration: number) =>
 export function createStravaRequestBudget(
   database: typeof db = db,
   clock = () => new Date(),
-  reserves?: { fifteenMinutes: number; daily: number },
+  reserves?: { fifteenMinutes: number; daily: number; maxInFlight?: number },
 ): StravaRequestBudget {
   return {
     async reserve(read) {
@@ -73,6 +74,14 @@ export function createStravaRequestBudget(
           const ceiling = previous?.ceiling ?? window.ceiling;
           const blockedUntil = previous?.blockedUntil;
           const reset = windowStart.getTime() + window.duration;
+          // Use the short window so orphaned reservations cannot suppress
+          // optional work all day. Busy app load is distinct from quota loss.
+          if (
+            window.key === 'overall:15m' &&
+            reserves?.maxInFlight !== undefined &&
+            inFlight >= reserves.maxInFlight
+          )
+            throw new StravaBudgetBusyError();
           if (
             (blockedUntil && blockedUntil > startedAt) ||
             used >=

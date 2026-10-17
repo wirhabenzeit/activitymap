@@ -348,3 +348,119 @@ void test('the shared per-user rate limit rejects a mutation before upstream wor
   assert.equal(response.status, 429);
   assert.ok(response.headers.has('retry-after'));
 });
+
+void test('summary POST returns before optional warmup and contains background failures', async () => {
+  const queued: (() => Promise<void>)[] = [];
+  const errors: unknown[] = [];
+  let warmed = false;
+  const handler = createFetchActivitySummariesHandler({
+    resolveActor: async () => actor,
+    fetchSummaries: async () => 200,
+    afterResponse: (work) => {
+      queued.push(work);
+    },
+    warmSignup: async (resolved, count, opts) => {
+      assert.deepEqual(resolved, actor);
+      assert.equal(count, 200);
+      assert.ok(opts?.timeMs && opts.timeMs <= 35_000);
+      warmed = true;
+      throw new Error('Optional worker failed');
+    },
+    onError: (error) => {
+      errors.push(error);
+    },
+  });
+  const response = await handler(
+    new Request('https://example.test/api/v1/activities', { method: 'POST' }),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(((await response.json()) as { data: number }).data, 200);
+  assert.equal(warmed, false);
+  assert.equal(queued.length, 1);
+  await queued[0]!();
+  assert.equal(warmed, true);
+  assert.equal(errors.length, 1);
+});
+
+void test('empty, unauthorized, cross-origin and failed summary imports never queue warmup', async () => {
+  for (const scenario of ['empty', 'unauthorized', 'cross-origin', 'failed']) {
+    let queued = 0;
+    const handler = createFetchActivitySummariesHandler({
+      resolveActor: async () => (scenario === 'unauthorized' ? null : actor),
+      fetchSummaries: async () => {
+        if (scenario === 'failed') throw new Error('Import failed');
+        return 0;
+      },
+      afterResponse: () => {
+        queued++;
+      },
+    });
+    await handler(
+      new Request('https://example.test/api/v1/activities', {
+        method: 'POST',
+        ...(scenario === 'cross-origin'
+          ? { headers: { Origin: 'https://other.test' } }
+          : {}),
+      }),
+    );
+    assert.equal(queued, 0, scenario);
+  }
+});
+
+void test('slow first imports leave no optional background work past the route deadline', async (t) => {
+  let time = 1_000_000;
+  t.mock.method(Date, 'now', () => time);
+  let queued!: () => Promise<void>;
+  let warmed = false;
+  const handler = createFetchActivitySummariesHandler({
+    resolveActor: async () => actor,
+    fetchSummaries: async () => {
+      time += 51_000;
+      return 200;
+    },
+    afterResponse: (work) => {
+      queued = work;
+    },
+    warmSignup: async () => {
+      warmed = true;
+      throw new Error('must not run');
+    },
+  });
+  assert.equal(
+    (
+      await handler(
+        new Request('https://example.test/api/v1/activities', {
+          method: 'POST',
+        }),
+      )
+    ).status,
+    200,
+  );
+  await queued();
+  assert.equal(warmed, false);
+});
+
+void test('failure to schedule optional work cannot fail a committed first-page import', async () => {
+  const errors: unknown[] = [];
+  const handler = createFetchActivitySummariesHandler({
+    resolveActor: async () => actor,
+    fetchSummaries: async () => 200,
+    afterResponse: () => {
+      throw new Error('Scheduling unavailable');
+    },
+    onError: (error) => {
+      errors.push(error);
+    },
+  });
+  assert.equal(
+    (
+      await handler(
+        new Request('https://example.test/api/v1/activities', {
+          method: 'POST',
+        }),
+      )
+    ).status,
+    200,
+  );
+  assert.equal(errors.length, 1);
+});

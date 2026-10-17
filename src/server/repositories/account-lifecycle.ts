@@ -1,9 +1,20 @@
 import 'server-only';
 import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
-import type { db } from '~/server/db';
+import { db } from '~/server/db';
 import { accounts, users } from '~/server/db/schema';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Read only: optional warmup must never revive or refresh a revoked grant. */
+export async function findActiveStravaAccount(userId: string) {
+  return db.query.accounts.findFirst({
+    where: and(
+      eq(accounts.userId, userId),
+      eq(accounts.providerId, 'strava'),
+      isNull(accounts.revokedAt),
+    ),
+  });
+}
 
 /** Fence work started with an account that has since been deleted/recreated. */
 export async function lockActiveStravaAccount(

@@ -202,6 +202,13 @@ Summary caches reopen offline for a still-valid scoped session regardless of cac
 
 A store-open error is displayed without deleting data or falling back silently to memory. Activity editing is supported; per-activity Strava refresh and background refresh tasks remain pending.
 
+Settings also offers **Fetch from Strava**, which starts a bounded server-side
+import of recent summaries, pending details/photos and older history. Its run
+status and cooldown are shared across devices. Reopening Settings reads the
+current run; successful history pages resume on later runs. HTTP retry deadlines
+remain scoped to the account and deployment. **Sync now** downloads stored data
+to this device. See [ingestion status](../../docs/ingestion-status.md).
+
 ### Edit an activity in Strava
 
 Open an activity from Map, List or Stats, then tap **Edit** beside its title. The direct button is also available in pushed detail toolbars; wide headings add a pencil icon. The native form prefills name, description and sport. Save sends only changed fields through the authenticated v1 PATCH endpoint; clearing the description sends an explicit empty string. Cancel offers to discard a changed draft. Submitted saves cannot be dismissed or submitted twice.
