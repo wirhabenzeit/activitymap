@@ -4,7 +4,7 @@ The SwiftUI client supports mobile sign-in and local-first activity synchronizat
 
 ## Run it
 
-1. Use Xcode 27 or newer.
+1. Use Xcode 27 or newer. The app runs on iOS 26 or newer; Xcode 27 is needed to compile optional iOS 27 APIs.
 2. Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig`.
 3. Add a URL-restricted public Mapbox token to the local file.
 4. Open `ActivityMap.xcodeproj` and run the `ActivityMap` scheme.
@@ -212,7 +212,7 @@ The edit coordinator waits for an existing activity sync, commits the returned D
 
 `ActivityEditingTests`, `ActivityEditsAPITests` and `RenderedActivityEditingTests` cover drafts/validation, explicit empty descriptions, request transport, retry timing, disk reopen, older feed/snapshot protection, duplicate submissions, deletion/recreation, account changes, authentication failure and phone/tablet/large-text/error presentation. Real Strava writes and physical-device/VoiceOver acceptance remain an owner review; tests use synthetic responses.
 
-Run the `ActivityMap` scheme's tests in Xcode, or select an installed iOS 27 simulator:
+Run the `ActivityMap` scheme's tests in Xcode, or select an installed iOS 26 or newer simulator:
 
 ```sh
 xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \

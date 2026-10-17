@@ -188,9 +188,16 @@ struct AppShell: View {
                 }
         }
             .tint(AppTheme.accent)
-        // Every width zooms the tile into its focus page; Reduce Motion cross-fades.
-        if reduceMotion { content.navigationTransition(.crossFade) }
-        else { content.navigationTransition(.zoom(sourceID: tile.id, in: statsTransitionNamespace)) }
+        // Reduce Motion uses cross-fade on iOS 27 and standard navigation on iOS 26.
+        if reduceMotion {
+            if #available(iOS 27.0, *) {
+                content.navigationTransition(.crossFade)
+            } else {
+                content
+            }
+        } else {
+            content.navigationTransition(.zoom(sourceID: tile.id, in: statsTransitionNamespace))
+        }
     }
 
     private var shellContent: some View {

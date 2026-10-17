@@ -103,7 +103,9 @@ extension RenderedRoutePickingTests {
         try await listWait { host.host.presentedViewController?.sheetPresentationController != nil }
         let controller = try #require(host.host.presentedViewController)
         try await listWait { controller.transitionCoordinator == nil }
-        #expect(controller.presentationController?.backgroundEffect is UIBlurEffect)
+        if #available(iOS 26.1, *) {
+            #expect(controller.presentationController?.backgroundEffect is UIBlurEffect)
+        }
         let panel = try #require(controller.presentationController?.presentedView)
         let frame = panel.convert(panel.bounds, to: host.window)
         // Empty chart/list space samples the sheet, without text or selection tint.
