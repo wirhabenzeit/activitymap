@@ -207,7 +207,10 @@ private struct NativeMapResultsPresenter<Content: View>: UIViewControllerReprese
             sheet.prefersGrabberVisible = true
             sheet.largestUndimmedDetentIdentifier = .large
             sheet.prefersScrollingExpandsWhenScrolledToEdge = false
-            sheet.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+            // iOS 26.0 keeps the system sheet background.
+            if #available(iOS 26.1, *) {
+                sheet.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+            }
             sheet.delegate = self
             self.panel = panel
             present(panel, animated: true) { [weak self] in

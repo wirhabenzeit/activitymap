@@ -50,10 +50,9 @@ jobs:
   # `swift-client` above compiles a separate OpenAPI-generated package, so
   # without this job invalid generated Swift could pass CI.
   #
-  # This needs the iOS 27 SDK, which as of September 2026 exists only on the
-  # `xcode-27` runner label (public preview). macos-26 tops out at iOS 26.5. If
-  # that label is withdrawn before it goes GA, pin an image with an iOS 27 SDK
-  # rather than lowering IPHONEOS_DEPLOYMENT_TARGET.
+  # The minimum deployment target is iOS 26. The iOS 27 SDK is still needed
+  # to compile optional, availability-guarded APIs such as cross-fade navigation.
+  # Keep the Xcode 27 runner for that SDK.
   ios-app:
     runs-on: xcode-27
     steps:

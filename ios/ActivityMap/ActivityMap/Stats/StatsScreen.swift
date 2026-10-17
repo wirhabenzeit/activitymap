@@ -121,7 +121,12 @@ struct StatsScreen: View {
 
     @ViewBuilder private func detail(_ tile: StatsTileDefinition) -> some View {
         if reduceMotion {
-            detailContent(tile).navigationTransition(.crossFade)
+            if #available(iOS 27.0, *) {
+                detailContent(tile).navigationTransition(.crossFade)
+            } else {
+                // Standard navigation respects Reduce Motion on iOS 26.
+                detailContent(tile)
+            }
         } else {
             detailContent(tile).navigationTransition(.zoom(sourceID: tile.id, in: transitionNamespace))
         }
