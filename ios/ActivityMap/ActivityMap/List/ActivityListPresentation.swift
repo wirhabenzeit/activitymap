@@ -51,6 +51,14 @@ enum ActivitySortField: String, CaseIterable, Codable, Identifiable {
         case .comments: "Comments"
         }
     }
+
+    func title(speedDisplay: SpeedDisplay) -> String {
+        switch self {
+        case .averageSpeed: speedDisplay.label()
+        case .maxSpeed: speedDisplay.label(maximum: true)
+        default: title
+        }
+    }
 }
 
 enum ActivitySortDirection: String, CaseIterable, Codable, Identifiable {
@@ -63,7 +71,7 @@ struct ActivityListSort: Codable, Equatable {
     var field: ActivitySortField = .id
     var direction: ActivitySortDirection = .descending
 
-    func sorted(_ activities: [Activity], selectedIDs: Set<Int> = []) -> [Activity] {
+    func sorted(_ activities: [Activity], selectedIDs: Set<Int> = [], speedDisplay: SpeedDisplay = .speed) -> [Activity] {
         activities.sorted { lhs, rhs in
             let comparison: Int
             switch field {
@@ -85,7 +93,10 @@ struct ActivityListSort: Codable, Equatable {
             case .flagged: comparison = compare(lhs.flagged.map { $0 ? 1 : 0 }, rhs.flagged.map { $0 ? 1 : 0 })
             case .trainer: comparison = compare(lhs.trainer.map { $0 ? 1 : 0 }, rhs.trainer.map { $0 ? 1 : 0 })
             case .manual: comparison = compare(lhs.manual.map { $0 ? 1 : 0 }, rhs.manual.map { $0 ? 1 : 0 })
-            default: comparison = compare(number(lhs), number(rhs))
+            default:
+                if speedDisplay != .speed && (field == .averageSpeed || field == .maxSpeed) {
+                    comparison = compare(speedDisplay.paceSeconds(number(lhs)), speedDisplay.paceSeconds(number(rhs)))
+                } else { comparison = compare(number(lhs), number(rhs)) }
             }
             return comparison == 0 ? lhs.id > rhs.id : comparison < 0
         }
@@ -183,14 +194,15 @@ enum ActivityListMetric: String, CaseIterable, Codable, Identifiable {
         }
     }
     var title: String { field.title }
-    func value(for activity: Activity) -> String {
+    func title(speedDisplay: SpeedDisplay) -> String { field.title(speedDisplay: speedDisplay) }
+    func value(for activity: Activity, speedDisplay: SpeedDisplay = .speed) -> String {
         switch self {
         case .distance: Formatters.distance(activity.distance)
         case .elapsedTime: Formatters.duration(activity.elapsedTime)
         case .elevationGain: Formatters.elevation(activity.totalElevationGain)
         case .movingTime: Formatters.duration(activity.movingTime)
-        case .averageSpeed: Formatters.speed(activity.averageSpeed)
-        case .maxSpeed: Formatters.speed(activity.maxSpeed)
+        case .averageSpeed: speedDisplay.format(activity.averageSpeed)
+        case .maxSpeed: speedDisplay.format(activity.maxSpeed)
         case .elevationHigh: Formatters.elevation(activity.elevHigh)
         case .elevationLow: Formatters.elevation(activity.elevLow)
         case .averageHeartRate: Formatters.heartrate(activity.averageHeartrate)

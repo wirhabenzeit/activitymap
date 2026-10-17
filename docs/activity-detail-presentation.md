@@ -7,7 +7,7 @@ Applies to web Map/List cards and iOS Map/List detail panels. Native controls ma
 1. Activity title, sport and activity-local date/time. Route/navigation actions sit beside the title, never in a footer row. Every surface uses the same tinted map button: on the map it is Fit route; in List, the iPad detail pane and Stats it is Show on map, which adds the activity to the selection and keeps it there. Rows at least 520pt/px wide label the map action; narrower rows show the map icon alone. Native iOS always shows a direct Edit button, adding a pencil icon on wide rows. On web, wide rows keep Edit beside the map action; narrower rows move Edit into the ••• menu alongside Strava refresh, GPX and Open in Strava.
 2. Elevation graph when an elevation profile is available, with its axes and units.
 3. Activity description, when present, below the graph. Preserve line breaks; omit blank descriptions.
-4. Exactly three headline measurements: **Distance**, **Moving time**, **Elevation gain**, in that order. Use one row at ordinary phone size; reflow for accessibility text sizes. Values are prominent, labels secondary. Do not repeat elapsed time or min/max as headline captions. Missing primary values show an em dash.
+4. Exactly three headline measurements: **Distance**, **Moving time**, **Elevation gain**, in that order for speed-based sports. Run, TrailRun, VirtualRun and Swim replace the third headline with **Average pace**; elevation gain moves to the Elevation group. Use one row at ordinary phone size; reflow for accessibility text sizes. Values are prominent, labels secondary. Do not repeat elapsed time or min/max as headline captions. Missing primary values show an em dash.
 5. Topic groups containing the remaining recorded fields, each shown once.
 6. Photos, when present.
 7. On native iOS, **Open in Strava** and **Export GPX** rows at the bottom of the scrolling detail, without an actions heading or explanatory paragraph below the rows. Availability and route quality stay in the GPX row’s subtitle. GPX includes elevation when the current cache contains paired GPS/altitude summary values, exporting a labelled sampled route with averaged elevation. These are the chart cache’s bucket averages, not raw per-point readings. Otherwise it preserves the chosen detailed/simplified cached route with elevation unavailable. There is no further interpolation, invented altitude or recorded timestamp output. Activities without any cached GPS have a disabled export row and an explanation in its subtitle. Sharing uses the native sheet on iPhone and a popover anchored to the export row on iPad.
@@ -30,7 +30,7 @@ Groups have one small neutral icon beside the group title. Substats have no icon
 
 | Group | Icon meaning | Fields, in order |
 | --- | --- | --- |
-| Time & speed | Speedometer | Elapsed time, Average speed, Maximum speed |
+| Time & speed (Time & pace for runs/swims) | Speedometer | Best pace for runs/swims, Elapsed time, Average speed, Maximum speed |
 | Elevation | Mountain | Minimum, Maximum |
 | Power | Bolt | Average, Maximum, Weighted average, Work |
 | Heart rate | Heart | Average, Maximum |
@@ -45,6 +45,7 @@ Short labels are scoped by their visible group heading. Accessibility combines t
 - Use actual activity fields. Moving time is `moving_time`, never `elapsed_time` or a calculated replacement. Elevation gain is `total_elevation_gain`, not profile maximum minus minimum.
 - Each field is independently present. Omit missing/nonfinite secondary measurements and empty groups, but preserve measured zero, negative altitude, and recorded false flags (“No”). Missing siblings cannot suppress a valid average, maximum or minimum.
 - Headline measurements and activity-local date already shown above are excluded from groups. Do not repeat flags as badges. Description remains available without a duplicate metadata cell.
+- Run/TrailRun/VirtualRun pace uses min/km or min/mi; Swim uses min/100 m or min/100 yd. Round the reciprocal of recorded speed to whole seconds before splitting into m:ss. Average pace is the headline, best pace derives from maximum speed, and original speed remains secondary. Non-positive/non-finite/missing speed has no pace.
 - Honor saved display preferences: distance uses km/mi with one decimal, speed uses km/h or mph with one decimal, and elevation uses m/ft; power: W; work: kJ; heart rate: bpm; calories: kcal. Put a space between number and unit. Locale controls decimal/grouping separators. Duration uses abbreviated hours/minutes (days/hours for long activities).
 - Photo count uses total photo count when supplied, falling back to photo count. Photo thumbnails remain a separate media section.
 - Omit internal activity IDs from user-facing details. Keep Edit as a top-level action, without duplicating it in the overflow menu.

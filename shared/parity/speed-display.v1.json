@@ -1,0 +1,88 @@
+{
+  "formatCases": [
+    {
+      "sport": "Run",
+      "speed": 3.3333333333333335,
+      "metric": "5:00 min/km",
+      "imperial": "8:03 min/mi"
+    },
+    {
+      "sport": "TrailRun",
+      "speed": 2.5,
+      "metric": "6:40 min/km",
+      "imperial": "10:44 min/mi"
+    },
+    {
+      "sport": "VirtualRun",
+      "speed": 2.7808676307007785,
+      "metric": "6:00 min/km",
+      "imperial": "9:39 min/mi"
+    },
+    {
+      "sport": "Swim",
+      "speed": 1.25,
+      "metric": "1:20 min/100 m",
+      "imperial": "1:13 min/100 yd"
+    },
+    {
+      "sport": "Ride",
+      "speed": 3.3333333333333335,
+      "metric": "12.0 km/h",
+      "imperial": "7.5 mph"
+    },
+    {
+      "sport": "Run",
+      "speed": 0,
+      "metric": "\u2014",
+      "imperial": "\u2014"
+    },
+    {
+      "sport": "Swim",
+      "speed": null,
+      "metric": "\u2014",
+      "imperial": "\u2014"
+    },
+    {
+      "sport": "Run",
+      "speed": -1,
+      "metric": "\u2014",
+      "imperial": "\u2014"
+    },
+    {
+      "sport": "Ride",
+      "speed": 0,
+      "metric": "0.0 km/h",
+      "imperial": "0.0 mph"
+    }
+  ],
+  "scopeCases": [
+    {
+      "sports": [],
+      "display": "speed"
+    },
+    {
+      "sports": ["Run", "TrailRun", "VirtualRun"],
+      "display": "run"
+    },
+    {
+      "sports": ["Swim", "Swim"],
+      "display": "swim"
+    },
+    {
+      "sports": ["Run", "Ride"],
+      "display": "speed"
+    },
+    {
+      "sports": ["Run", "Swim"],
+      "display": "speed"
+    },
+    {
+      "sports": ["Run", "Hike"],
+      "display": "speed"
+    },
+    {
+      "sports": ["Run", "Workout"],
+      "display": "speed"
+    }
+  ]
+}

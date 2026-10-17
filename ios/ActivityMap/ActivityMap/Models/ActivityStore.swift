@@ -248,7 +248,7 @@ final class ActivityStore {
         if let cached = listedSnapshot, cached.data == data, cached.filters == filters, cached.sort == sort, cached.selected == selected, cached.restricted == onlySelected {
             return cached.activities
         }
-        let result = sort.sorted(browsingActivities, selectedIDs: selected ?? [])
+        let result = sort.sorted(browsingActivities, selectedIDs: selected ?? [], speedDisplay: SpeedDisplay.forActivities(browsingActivities))
         listedSnapshot = (data, filters, sort, selected, onlySelected, result)
         sortBuildCount += 1
         return result

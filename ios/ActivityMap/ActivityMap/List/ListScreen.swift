@@ -66,10 +66,12 @@ struct ListScreen: View {
     }
 
     private func activityList(width: CGFloat, inspectedID: Int?) -> some View {
-        List {
-            ForEach(store.listedActivities) { activity in
+        let activities = store.listedActivities
+        let speedDisplay = SpeedDisplay.forActivities(activities)
+        return List {
+            ForEach(activities) { activity in
                 ActivityRowView(store: store, activity: activity, availableWidth: width,
-                                isInspected: activity.id == inspectedID)
+                                isInspected: activity.id == inspectedID, speedDisplay: speedDisplay)
                     .listRowInsets(EdgeInsets(top: verticalSizeClass == .compact ? 2 : 4, leading: 8,
                                               bottom: verticalSizeClass == .compact ? 2 : 4, trailing: 8))
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 44 }
@@ -86,7 +88,7 @@ struct ListScreen: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize, availableWidth: width) {
                 ActivityTableHeader(store: store, availableWidth: width,
-                                    rowHeight: verticalSizeClass == .compact ? 32 : 44)
+                                    rowHeight: verticalSizeClass == .compact ? 32 : 44, speedDisplay: speedDisplay)
             } else if store.listPresentation.settings.width == .columns && !typeSize.isAccessibilitySize {
                 // A resized window or older saved preferences can exceed the
                 // column budget. Keep every metric visible and explain the fallback.
@@ -101,7 +103,7 @@ struct ListScreen: View {
                 .background(AppTheme.surface)
             }
         }
-        .modifier(ListOptionsSheets(presentation: store.listPresentation, availableWidth: width))
+        .modifier(ListOptionsSheets(presentation: store.listPresentation, availableWidth: width, speedDisplay: speedDisplay))
     }
 
     @ViewBuilder private var detailColumn: some View {

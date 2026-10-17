@@ -4,6 +4,11 @@ import {
   useDisplayUnits,
   useDateFormat,
 } from '~/hooks/use-display-preferences';
+import {
+  formatSpeed,
+  speedDisplayForSport,
+  speedLabel,
+} from '~/lib/speed-display';
 import { formatMeasurement } from '~/lib/units';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
@@ -134,8 +139,12 @@ function ActivityDetails({
         />
         <Stat
           icon={Gauge}
-          label="Average speed"
-          value={formatMeasurement(activity.average_speed, 'speed', units)}
+          label={speedLabel(speedDisplayForSport(activity.sport_type))}
+          value={formatSpeed(
+            activity.average_speed,
+            speedDisplayForSport(activity.sport_type),
+            units,
+          )}
         />
       </div>
 
@@ -146,7 +155,9 @@ function ActivityDetails({
             profile={profile}
             height={130}
             onSelection={(index) =>
-              onCursor(index === null ? null : (profile.latlng?.[index] ?? null))
+              onCursor(
+                index === null ? null : (profile.latlng?.[index] ?? null),
+              )
             }
           />
         </div>
@@ -191,7 +202,9 @@ export function SharedActivityMap({
     }
     if (!bounds.isEmpty()) {
       // Keep routes clear of the details card, which is taller with a profile.
-      const card = activities.some((activity) => activity.elevation_profile) ? 410 : 260;
+      const card = activities.some((activity) => activity.elevation_profile)
+        ? 410
+        : 260;
       map.fitBounds(bounds, {
         duration: 0,
         maxZoom: 15,
@@ -205,14 +218,17 @@ export function SharedActivityMap({
     }
   }, [activities, routes]);
 
-  const handleRouteClick = useCallback((event: MapMouseEvent) => {
-    const properties: unknown = event.features?.[0]?.properties;
-    const id =
-      properties && typeof properties === 'object'
-        ? (properties as Record<string, unknown>).id
-        : undefined;
-    if (typeof id === 'string') selectActivity(id);
-  }, [selectActivity]);
+  const handleRouteClick = useCallback(
+    (event: MapMouseEvent) => {
+      const properties: unknown = event.features?.[0]?.properties;
+      const id =
+        properties && typeof properties === 'object'
+          ? (properties as Record<string, unknown>).id
+          : undefined;
+      if (typeof id === 'string') selectActivity(id);
+    },
+    [selectActivity],
+  );
 
   if (activities.length === 0) {
     return (

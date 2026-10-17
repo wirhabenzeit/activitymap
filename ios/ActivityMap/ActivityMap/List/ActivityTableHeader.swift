@@ -30,24 +30,26 @@ enum ActivityTableLayout {
             + settings.orderedMetrics.reduce(CGFloat(0)) { $0 + width($1, availableWidth: availableWidth) }
     }
 
-    static func title(_ metric: ActivityListMetric) -> String {
-        switch metric {
-        case .distance: "km"
+    static func title(_ metric: ActivityListMetric, speedDisplay: SpeedDisplay = .speed) -> String {
+        let units = DisplayPreferences.shared.units
+        return switch metric {
+        case .distance: units.distanceUnit
         case .elapsedTime: "Time"
         case .movingTime: "Moving"
-        case .averageSpeed: "Avg km/h"
-        case .maxSpeed: "Max km/h"
-        case .elevationGain: "↑ m"
+        case .averageSpeed: "Avg \(speedDisplay.unit(units))"
+        case .maxSpeed: "\(speedDisplay == .speed ? "Max" : "Best") \(speedDisplay.unit(units))"
+        case .elevationGain: "↑ \(units.elevationUnit)"
         default: metric.title
         }
     }
 
-    static func value(_ metric: ActivityListMetric, activity: Activity) -> String {
-        let value = metric.value(for: activity)
+    static func value(_ metric: ActivityListMetric, activity: Activity, speedDisplay: SpeedDisplay = .speed) -> String {
+        let units = DisplayPreferences.shared.units
+        let value = metric.value(for: activity, speedDisplay: speedDisplay)
         switch metric {
-        case .distance: return value.replacingOccurrences(of: " km", with: "")
-        case .elevationGain: return value.replacingOccurrences(of: " m", with: "")
-        case .averageSpeed, .maxSpeed: return value.replacingOccurrences(of: " km/h", with: "")
+        case .distance: return value.replacingOccurrences(of: " \(units.distanceUnit)", with: "")
+        case .elevationGain: return value.replacingOccurrences(of: " \(units.elevationUnit)", with: "")
+        case .averageSpeed, .maxSpeed: return value.replacingOccurrences(of: " \(speedDisplay.unit(units))", with: "")
         default: return value
         }
     }
@@ -58,6 +60,7 @@ struct ActivityTableHeader: View {
     var availableWidth: CGFloat = 390
     /// Shorter in iPhone landscape, where vertical space is scarce.
     var rowHeight: CGFloat = 44
+    var speedDisplay: SpeedDisplay = .speed
     private var presentation: ActivityListPresentation { store.listPresentation }
 
     var body: some View {
@@ -103,13 +106,13 @@ struct ActivityTableHeader: View {
             ForEach(presentation.settings.orderedMetrics) { metric in
                 Button { sort(metric.field) } label: {
                     HStack(spacing: 2) {
-                        Text(ActivityTableLayout.title(metric))
+                        Text(ActivityTableLayout.title(metric, speedDisplay: speedDisplay))
                         if presentation.settings.sort.field == metric.field { arrow }
                     }
                     .frame(width: ActivityTableLayout.width(metric, availableWidth: availableWidth), height: rowHeight, alignment: .trailing)
                     .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Sort by \(metric.title)")
+                .accessibilityLabel("Sort by \(metric.title(speedDisplay: speedDisplay))")
                 .accessibilityValue(presentation.settings.sort.field == metric.field ? presentation.settings.sort.direction.title : "Not sorted")
             }
         }

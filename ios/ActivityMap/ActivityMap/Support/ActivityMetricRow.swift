@@ -22,6 +22,11 @@ struct ActivityMetricRow: Identifiable {
         add("elevationGain", "Elevation gain", "mountain.2", Formatters.elevation(activity.totalElevationGain))
         add("elevHigh", "Maximum elevation", "mountain.2", Formatters.elevation(activity.elevHigh))
         add("elevLow", "Minimum elevation", "mountain.2", Formatters.elevation(activity.elevLow))
+        let display = SpeedDisplay.forSport(activity.sportType)
+        if display != .speed {
+            add("averagePace", "Average pace", "stopwatch", display.format(activity.averageSpeed))
+            add("bestPace", "Best pace", "stopwatch", display.format(activity.maxSpeed))
+        }
         add("averageSpeed", "Average speed", "speedometer", Formatters.speed(activity.averageSpeed))
         add("maxSpeed", "Maximum speed", "speedometer", Formatters.speed(activity.maxSpeed))
         add("averageHeartrate", "Average heart rate", "heart", Formatters.heartrate(activity.averageHeartrate))
@@ -49,10 +54,11 @@ struct ActivityMetricGroup: Identifiable {
 
     static func groups(for activity: Activity) -> [ActivityMetricGroup] {
         let rows = ActivityMetricRow.rows(for: activity)
+        let hasPace = SpeedDisplay.forSport(activity.sportType) != .speed
         let definitions: [(String, String, String, [(String, String)])] = [
-            ("time-speed", "Time & speed", "speedometer", [
+            ("time-speed", hasPace ? "Time & pace" : "Time & speed", "speedometer", (hasPace ? [("bestPace", "Best pace")] : []) + [
                 ("elapsedTime", "Elapsed time"), ("averageSpeed", "Average speed"), ("maxSpeed", "Maximum speed")]),
-            ("elevation", "Elevation", "mountain.2", [("elevLow", "Minimum"), ("elevHigh", "Maximum")]),
+            ("elevation", "Elevation", "mountain.2", (hasPace ? [("elevationGain", "Elevation gain")] : []) + [("elevLow", "Minimum"), ("elevHigh", "Maximum")]),
             ("power", "Power", "bolt", [("averageWatts", "Average"), ("maxWatts", "Maximum"),
                 ("weightedAverageWatts", "Weighted average"), ("kilojoules", "Work")]),
             ("heart-rate", "Heart rate", "heart", [("averageHeartrate", "Average"), ("maxHeartrate", "Maximum")]),

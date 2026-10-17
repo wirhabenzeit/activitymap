@@ -5,6 +5,7 @@ struct ActivityRowView: View {
     let activity: Activity
     var availableWidth: CGFloat = 390
     var isInspected = false
+    var speedDisplay: SpeedDisplay = .speed
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -74,7 +75,7 @@ struct ActivityRowView: View {
                     .frame(width: 120, alignment: .leading)
             }
             ForEach(settings.orderedMetrics) { metric in
-                Text(ActivityTableLayout.value(metric, activity: activity))
+                Text(ActivityTableLayout.value(metric, activity: activity, speedDisplay: speedDisplay))
                     .font(.caption).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.85)
                     .frame(width: ActivityTableLayout.width(metric, availableWidth: availableWidth), alignment: .trailing)
@@ -86,15 +87,15 @@ struct ActivityRowView: View {
         ActivityMetricFlow(spacing: 16, rowSpacing: 8, stacked: typeSize.isAccessibilitySize) {
             ForEach(settings.orderedMetrics) { metric in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(metric.value(for: activity))
+                    Text(metric.value(for: activity, speedDisplay: speedDisplay))
                         .font(.subheadline.weight(.medium)).monospacedDigit()
-                    Text(metric.title)
+                    Text(metric.title(speedDisplay: speedDisplay))
                         .font(.caption2).foregroundStyle(AppTheme.secondaryText)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(metric.title)
-                .accessibilityValue(metric.value(for: activity))
+                .accessibilityLabel(metric.title(speedDisplay: speedDisplay))
+                .accessibilityValue(metric.value(for: activity, speedDisplay: speedDisplay))
             }
         }
     }
@@ -102,8 +103,8 @@ struct ActivityRowView: View {
     private var accessibleDetails: String {
         ([activity.sportType.rawValue, Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt)]
             + settings.orderedMetrics.map { metric in
-                let value = metric.value(for: activity)
-                return "\(metric.title): \(value == Formatters.unknown ? "Not recorded" : value)"
+                let value = metric.value(for: activity, speedDisplay: speedDisplay)
+                return "\(metric.title(speedDisplay: speedDisplay)): \(value == Formatters.unknown ? "Not recorded" : value)"
             } + [isInspected ? "Inspected" : "Not inspected", isSelected ? "Selected" : "Not selected"]
             + (isActive ? ["Active on map"] : [])).joined(separator: ". ")
     }

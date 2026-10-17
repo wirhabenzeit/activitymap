@@ -15,7 +15,8 @@ struct ListControls: View {
     }
 
     private var controls: some View {
-        Menu {
+        let speedDisplay = store.map { SpeedDisplay.forActivities($0.browsingActivities) } ?? .speed
+        return Menu {
             if let store, store.isCombining {
                 Section("Selection") {
                     Button("Select all filtered activities") { store.selectAllFiltered() }
@@ -27,7 +28,7 @@ struct ListControls: View {
             Button { presentation.sortOpen = true } label: {
                 Label("Sort activities", systemImage: "arrow.up.arrow.down")
             }
-            .accessibilityValue("\(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
+            .accessibilityValue("\(presentation.settings.sort.field.title(speedDisplay: speedDisplay)), \(presentation.settings.sort.direction.title)")
             .accessibilityIdentifier("list-sort-control")
             Button { presentation.displayOpen = true } label: {
                 Label("View and metrics", systemImage: "rectangle.split.3x1")
@@ -46,7 +47,7 @@ struct ListControls: View {
             .contentShape(Rectangle())
         }
         .accessibilityLabel("List view options")
-        .accessibilityValue("Sorted by \(presentation.settings.sort.field.title), \(presentation.settings.sort.direction.title)")
+        .accessibilityValue("Sorted by \(presentation.settings.sort.field.title(speedDisplay: speedDisplay)), \(presentation.settings.sort.direction.title)")
     }
 }
 
@@ -54,6 +55,7 @@ struct ListControls: View {
 struct ListOptionsSheets: ViewModifier {
     @Bindable var presentation: ActivityListPresentation
     var availableWidth: CGFloat = 390
+    var speedDisplay: SpeedDisplay = .speed
 
     private var metricsFitColumns: Bool {
         ActivityTableLayout.metricsFit(presentation.settings, availableWidth: availableWidth)
@@ -80,7 +82,7 @@ struct ListOptionsSheets: ViewModifier {
                     }
                     Section {
                         Picker("Sort by", selection: $presentation.settings.sort.field) {
-                            ForEach(ActivitySortField.allCases) { Text($0.title).tag($0) }
+                            ForEach(ActivitySortField.allCases) { Text($0.title(speedDisplay: speedDisplay)).tag($0) }
                         }
                         .pickerStyle(.inline)
                     }
@@ -126,7 +128,7 @@ struct ListOptionsSheets: ViewModifier {
                     }
                     Section {
                         ForEach(ActivityListMetric.allCases) { metric in
-                            Toggle(metric.title, isOn: Binding(
+                            Toggle(metric.title(speedDisplay: speedDisplay), isOn: Binding(
                                 get: { presentation.settings.visibleMetrics.contains(metric) },
                                 set: { visible in
                                     if visible { presentation.settings.visibleMetrics.insert(metric) }

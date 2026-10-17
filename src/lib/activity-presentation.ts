@@ -1,3 +1,5 @@
+import { paceSeconds, type SpeedDisplay } from './speed-display';
+
 /** Shared web list/detail semantics; all numbers here remain canonical. */
 export type Reducer = 'sum' | 'mean' | 'min' | 'max';
 export function aggregateMetric(
@@ -40,9 +42,23 @@ function sortValue(activity: Sortable, key: string): unknown {
       : null;
   return row[key];
 }
-function sortKey(activity: Sortable, key: string): SortKey {
+function sortKey(
+  activity: Sortable,
+  key: string,
+  speedDisplay: SpeedDisplay = 'speed',
+): SortKey {
   const value = sortValue(activity, key);
   if (isMissing(value)) return null;
+  if (
+    speedDisplay !== 'speed' &&
+    (key === 'average_speed' || key === 'max_speed')
+  ) {
+    return paceSeconds(
+      typeof value === 'number' ? value : null,
+      speedDisplay,
+      'metric',
+    );
+  }
   if (value instanceof Date) return value.getTime();
   if (typeof value === 'string') return value.normalize('NFC').toLowerCase();
   const number = Number(value);
@@ -72,9 +88,13 @@ function compareKeys(
   }
   return b.id - a.id;
 }
-const keyed = (activity: Sortable, sorting: Sorting) => ({
+const keyed = (
+  activity: Sortable,
+  sorting: Sorting,
+  speedDisplay: SpeedDisplay = 'speed',
+) => ({
   id: activity.id,
-  keys: sorting.map(({ id }) => sortKey(activity, id)),
+  keys: sorting.map(({ id }) => sortKey(activity, id, speedDisplay)),
 });
 
 export function compareActivities(
@@ -90,10 +110,11 @@ export function compareActivities(
 export function sortActivities<T extends Sortable>(
   activities: readonly T[],
   sorting: Sorting,
+  speedDisplay: SpeedDisplay = 'speed',
 ): T[] {
   const order = sorting.length ? sorting : defaultSorting;
   return activities
-    .map((activity) => ({ activity, ...keyed(activity, order) }))
+    .map((activity) => ({ activity, ...keyed(activity, order, speedDisplay) }))
     .sort((a, b) => compareKeys(a, b, order))
     .map(({ activity }) => activity);
 }
