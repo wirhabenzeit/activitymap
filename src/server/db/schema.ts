@@ -888,3 +888,22 @@ export const photoBackfillAccounts = pgTable('photo_backfill_account', {
   blockedCredentials: text('blocked_credentials').notNull(),
   reason: text('reason').notNull(),
 });
+
+// Account-scoped manual import status, lease and older-history checkpoint.
+// Deleting the account/user also deletes its operational metadata.
+export const stravaImportRuns = pgTable('strava_import_run', {
+  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  accountId: text('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  runId: text('run_id').notNull(),
+  status: text('status', { enum: ['running', 'succeeded', 'deferred', 'failed', 'blocked'] }).notNull(),
+  reason: text('reason').$type<import('~/contracts/v1/strava-import').StravaImportDTO['reason']>(),
+  startedAt: timestamp('started_at', { mode: 'date' }).notNull(),
+  finishedAt: timestamp('finished_at', { mode: 'date' }),
+  leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }).notNull(),
+  retryAt: timestamp('retry_at', { mode: 'date' }).notNull(),
+  summaries: integer('summaries').notNull().default(0),
+  details: integer('details').notNull().default(0),
+  photos: integer('photos').notNull().default(0),
+  requests: integer('requests').notNull().default(0),
+  historyCursor: jsonb('history_cursor').$type<import('~/server/strava/activity-import-policy').ActivityImportCursor>(),
+});
