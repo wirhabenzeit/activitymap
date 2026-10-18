@@ -213,25 +213,28 @@ function createFakeStore() {
     return m;
   };
 
-  const deps: V1SyncStoreDeps = {
-    getV1SyncState: async (scope) => states.get(scope) ?? null,
-    setV1SyncState: async (state) => {
+  const legacy = {
+    getV1SyncState: async (scope: string) => states.get(scope) ?? null,
+    setV1SyncState: async (state: V1SyncState) => {
       states.set(state.scope, state);
     },
-    upsertActivityDTOs: async (scope, items) => {
+    upsertActivityDTOs: async (scope: string, items: ActivityDTO[]) => {
       const m = forActivities(scope);
       for (const item of items) m.set(item.id, item);
     },
-    upsertPhotoDTOs: async (scope, items) => {
+    upsertPhotoDTOs: async (scope: string, items: PhotoDTO[]) => {
       const m = forPhotos(scope);
       for (const item of items) m.set(item.unique_id, item);
     },
-    deleteActivityDTOsByIds: async (scope, ids) => {
+    deleteActivityDTOsByIds: async (scope: string, ids: string[]) => {
       const m = forActivities(scope);
       // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
       for (const id of ids) m.delete(id);
     },
-    deletePhotoDTOsByActivityIds: async (scope, activityIds) => {
+    deletePhotoDTOsByActivityIds: async (
+      scope: string,
+      activityIds: string[],
+    ) => {
       const m = forPhotos(scope);
       const idSet = new Set(activityIds);
       for (const [key, photo] of m) {
@@ -239,12 +242,12 @@ function createFakeStore() {
         if (idSet.has(photo.activity_id)) m.delete(key);
       }
     },
-    deletePhotoDTOsByIds: async (scope, ids) => {
+    deletePhotoDTOsByIds: async (scope: string, ids: string[]) => {
       const m = forPhotos(scope);
       // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
       for (const id of ids) m.delete(id);
     },
-    clearV1Scope: async (scope) => {
+    clearV1Scope: async (scope: string) => {
       // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
       activities.delete(scope);
       // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
@@ -254,6 +257,25 @@ function createFakeStore() {
     },
   };
 
+  const deps = {
+    ...legacy,
+    applyV1SyncPage: async (scope, items, state, options) => {
+      if (options?.replace) await legacy.clearV1Scope(scope);
+      for (const item of items) {
+        if (item.entityType === 'activity') {
+          if (item.operation === 'upsert')
+            await legacy.upsertActivityDTOs(scope, [item.activity!]);
+          else {
+            await legacy.deleteActivityDTOsByIds(scope, [item.id]);
+            await legacy.deletePhotoDTOsByActivityIds(scope, [item.id]);
+          }
+        } else if (item.operation === 'upsert')
+          await legacy.upsertPhotoDTOs(scope, [item.photo!]);
+        else await legacy.deletePhotoDTOsByIds(scope, [item.id]);
+      }
+      await legacy.setV1SyncState(state);
+    },
+  } satisfies V1SyncStoreDeps & typeof legacy;
   return { deps, activities, states };
 }
 
@@ -315,8 +337,8 @@ void test('runV1Sync clears partial rows before retrying an interrupted bootstra
   let interruptOnce = true;
   const interruptedStore: V1SyncStoreDeps = {
     ...deps,
-    upsertActivityDTOs: async (scope, items) => {
-      await deps.upsertActivityDTOs(scope, items);
+    applyV1SyncPage: async (scope, items, state, options) => {
+      await deps.applyV1SyncPage(scope, items, state, options);
       if (interruptOnce) {
         interruptOnce = false;
         throw new Error('simulated browser interruption');
@@ -376,7 +398,7 @@ void test('runV1Sync catches up via /sync/changes once a scope has already boots
   assert.deepEqual([...activities.get(SCOPE)!.keys()].sort(), ['2']);
 });
 
-void test('runV1Sync clears local state and re-bootstraps on 409 sync_rebootstrap_required', async () => {
+void test('runV1Sync atomically replaces local state after re-bootstrap on 409 sync_rebootstrap_required', async () => {
   const server = new FakeServer();
   server.upsertActivity(buildActivity({ id: 1 }));
   const { deps, activities, states } = createFakeStore();
@@ -414,7 +436,7 @@ void test('runV1Sync clears local state and re-bootstraps on 409 sync_rebootstra
   assert.deepEqual(
     [...activities.get(SCOPE)!.keys()].sort(),
     ['1'],
-    'the stale pre-rebootstrap row must not survive - clearV1Scope ran before the fresh bootstrap',
+    'rows absent from the completed replacement must disappear',
   );
   assert.equal(states.get(SCOPE)?.bootstrapComplete, true);
 });
@@ -484,4 +506,52 @@ void test('runV1Sync fences the whole scope before a cursor-expiry rebootstrap p
 
   assert.equal(observed[0], 'reset');
   assert.ok(observed.includes('upsert:1'));
+});
+
+void test('real filtered change pages cannot hide later tombstones', async () => {
+  const server = new FakeServer();
+  for (let id = 1; id <= 501; id++)
+    server.upsertActivity(buildActivity({ id }));
+  for (let id = 1; id <= 501; id++) server.deleteActivity(id);
+  const { deps, activities } = createFakeStore();
+  const cursor = encodeSyncCursor({
+    sequence: 0,
+    athleteId: ACTOR.athleteId,
+    issuedAt: NOW,
+  });
+  await deps.setV1SyncState({
+    scope: SCOPE,
+    bootstrapCursor: cursor,
+    bootstrapComplete: true,
+    changesCursor: cursor,
+    lastSyncAt: NOW.toISOString(),
+    updatedAt: NOW.toISOString(),
+  });
+  await deps.upsertActivityDTOs(SCOPE, [{ id: '501' } as ActivityDTO]);
+  const result = await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+  });
+  assert.equal(result.activityDeletes, 501);
+  assert.deepEqual([...activities.get(SCOPE)!.keys()], []);
+});
+
+void test('real delete then recreate feed leaves the recreated activity present', async () => {
+  const server = new FakeServer();
+  server.upsertActivity(buildActivity({ id: 1 }));
+  const { deps, activities } = createFakeStore();
+  await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+  });
+  server.deleteActivity(1);
+  server.upsertActivity(buildActivity({ id: 1, name: 'Recreated' }));
+  await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+  });
+  assert.equal(activities.get(SCOPE)?.get('1')?.name, 'Recreated');
 });

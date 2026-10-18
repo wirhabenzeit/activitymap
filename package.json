@@ -51,7 +51,8 @@
     "benchmark:compact-streams": "tsx scripts/benchmark-compact-streams.ts",
     "test:compact-stream-swift": "bash scripts/verify-compact-stream-codec.sh",
     "db:test-photo-backfill": "tsx --conditions=react-server scripts/database/test-photo-backfill.ts",
-    "db:test-strava-import": "tsx --conditions=react-server scripts/database/test-strava-import.ts"
+    "db:test-strava-import": "tsx --conditions=react-server scripts/database/test-strava-import.ts",
+    "test:sync-integrity": "node scripts/verify-sync-integrity.mjs"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",

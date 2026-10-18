@@ -250,7 +250,7 @@ void test('drainSyncBootstrap for resource=photos never captures a snapshotCurso
   assert.equal(snapshotCursor, null);
 });
 
-void test('drainSyncChanges stops as soon as a page has no items, returning the cursor to persist', async () => {
+void test('drainSyncChanges stops at an empty non-advancing page, returning the cursor to persist', async () => {
   const server = new FakeServer();
   server.upsertActivity(buildActivity({ id: 1 }));
 
@@ -265,13 +265,13 @@ void test('drainSyncChanges stops as soon as a page has no items, returning the 
   );
 
   assert.equal(pagesApplied, 1);
-  assert.deepEqual(pages, [1]);
+  assert.deepEqual(pages, [1, 0]);
   assert.notEqual(nextCursor, startCursor);
 
   // Calling again from the new cursor with nothing new must yield zero
   // applied pages, not an infinite loop.
-  const second = await drainSyncChanges(nextCursor, () => {
-    throw new Error('onPage must not be called for an empty page');
+  const second = await drainSyncChanges(nextCursor, (page) => {
+    assert.deepEqual(page.items, []);
   }, { fetchImpl: buildFetchImpl(server) });
   assert.equal(second.pagesApplied, 0);
   assert.equal(second.nextCursor, nextCursor);
