@@ -24,6 +24,7 @@
 		000000000000000000000120 /* ActivityMap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ActivityMap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DE00000000000000000001 /* ActivityMapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ActivityMapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DECAFE0000000000000001 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		C0DE00000000000000000101 /* ActivityMapUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ActivityMapUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -50,6 +51,7 @@
 			path = ActivityMapTests;
 			sourceTree = "<group>";
 		};
+		C0DE00000000000000000102 /* ActivityMapUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = ActivityMapUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +66,7 @@
 			files = (
 			);
 		};
+		C0DE00000000000000000103 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; files = (); };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -72,6 +75,7 @@
 			children = (
 				000000000000000000000010 /* ActivityMap */,
 				C0DE00000000000000000002 /* ActivityMapTests */,
+				C0DE00000000000000000102 /* ActivityMapUITests */,
 				C0DECAFE0000000000000002 /* Config */,
 				000000000000000000000020 /* Products */,
 			);
@@ -82,6 +86,7 @@
 			children = (
 				000000000000000000000120 /* ActivityMap.app */,
 				C0DE00000000000000000001 /* ActivityMapTests.xctest */,
+				C0DE00000000000000000101 /* ActivityMapUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -139,6 +144,22 @@
 			productReference = C0DE00000000000000000001 /* ActivityMapTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		C0DE00000000000000000104 /* ActivityMapUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0DE00000000000000000105 /* Build configuration list for PBXNativeTarget "ActivityMapUITests" */;
+			buildPhases = (
+				C0DE00000000000000000106 /* Sources */,
+				C0DE00000000000000000103 /* Frameworks */,
+				C0DE00000000000000000107 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = (C0DE00000000000000000108 /* PBXTargetDependency */,);
+			fileSystemSynchronizedGroups = (C0DE00000000000000000102 /* ActivityMapUITests */,);
+			name = ActivityMapUITests;
+			productName = ActivityMapUITests;
+			productReference = C0DE00000000000000000101 /* ActivityMapUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -173,6 +194,7 @@
 			targets = (
 				000000000000000100000000 /* ActivityMap */,
 				C0DE00000000000000000004 /* ActivityMapTests */,
+				C0DE00000000000000000104 /* ActivityMapUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -188,6 +210,7 @@
 			files = (
 			);
 		};
+		C0DE00000000000000000107 /* Resources */ = {isa = PBXResourcesBuildPhase; files = (); };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -201,6 +224,7 @@
 			files = (
 			);
 		};
+		C0DE00000000000000000106 /* Sources */ = {isa = PBXSourcesBuildPhase; files = (); };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -209,6 +233,7 @@
 			target = 000000000000000100000000 /* ActivityMap */;
 			targetProxy = C0DE00000000000000000009 /* PBXContainerItemProxy */;
 		};
+		C0DE00000000000000000108 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = 000000000000000100000000 /* ActivityMap */; targetProxy = C0DE00000000000000000009 /* PBXContainerItemProxy */; };
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -478,6 +503,38 @@
 			};
 			name = Release;
 		};
+		C0DE0000000000000000010A /* Debug configuration for PBXNativeTarget "ActivityMapUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DX96FWY9AX;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = page.dominik.activitymap.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ActivityMap;
+			};
+			name = Debug;
+		};
+		C0DE0000000000000000010B /* Release configuration for PBXNativeTarget "ActivityMapUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DX96FWY9AX;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = page.dominik.activitymap.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ActivityMap;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -502,6 +559,14 @@
 			buildConfigurations = (
 				C0DE0000000000000000000A /* Debug configuration for PBXNativeTarget "ActivityMapTests" */,
 				C0DE0000000000000000000B /* Release configuration for PBXNativeTarget "ActivityMapTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		C0DE00000000000000000105 /* Build configuration list for PBXNativeTarget "ActivityMapUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0DE0000000000000000010A /* Debug configuration for PBXNativeTarget "ActivityMapUITests" */,
+				C0DE0000000000000000010B /* Release configuration for PBXNativeTarget "ActivityMapUITests" */,
 			);
 			defaultConfigurationName = Release;
 		};

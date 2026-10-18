@@ -4,29 +4,51 @@ import SwiftUI
 struct ActivityMapApp: App {
     private let isTesting = ProcessInfo.processInfo.arguments.contains("--unit-testing")
     private let persistence: Result<LocalStore, Error>
+    #if DEBUG
+    private let isMapPhotoUITesting = ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
+    #endif
 
     init() {
         persistence = Result {
             try LocalStore(container: LocalStore.makeContainer(
-                inMemory: ProcessInfo.processInfo.arguments.contains("--unit-testing")))
+                inMemory: Self.usesInMemoryPersistence))
         }
+    }
+
+    private static var usesInMemoryPersistence: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing") { return true }
+        #endif
+        return ProcessInfo.processInfo.arguments.contains("--unit-testing")
     }
 
     var body: some Scene {
         WindowGroup {
-            if isTesting {
-                // Hosted tests must not restore a real session or initialize Mapbox.
-                Color.clear
+            #if DEBUG
+            if isMapPhotoUITesting {
+                MapPhotoUITestFixture(resultsPresented: ProcessInfo.processInfo.arguments.contains("--map-photo-results"))
             } else {
-                switch persistence {
-                case .success(let store):
-                    ContentView().environment(\.localStore, store)
-                        .preferredColorScheme(DisplayPreferences.shared.appearance.colorScheme)
-                case .failure:
-                    ContentUnavailableView(
-                        "Couldn’t open saved activities", systemImage: "externaldrive.badge.exclamationmark",
-                        description: Text("Restart the app to try again. Your saved data has not been erased."))
-                }
+                standardContent
+            }
+            #else
+            standardContent
+            #endif
+        }
+    }
+
+    @ViewBuilder private var standardContent: some View {
+        if isTesting {
+            // Hosted tests must not restore a real session or initialize Mapbox.
+            Color.clear
+        } else {
+            switch persistence {
+            case .success(let store):
+                ContentView().environment(\.localStore, store)
+                    .preferredColorScheme(DisplayPreferences.shared.appearance.colorScheme)
+            case .failure:
+                ContentUnavailableView(
+                    "Couldn’t open saved activities", systemImage: "externaldrive.badge.exclamationmark",
+                    description: Text("Restart the app to try again. Your saved data has not been erased."))
             }
         }
     }

@@ -11,6 +11,38 @@ The SwiftUI client supports mobile sign-in and local-first activity synchronizat
 
 Swift Package Manager pins the Mapbox dependency in `Package.resolved`. Local Xcode state and credentials are intentionally ignored.
 
+## Map photo UI tests
+
+The three map-photo interaction journeys run in `ActivityMapUITests/MapPhotoUITests`
+through XCTest's UI automation runner. They cover the layers toggle, pin-to-thumbnail
+zoom, gallery paging and nearby activities, native viewer presentation/dismissal,
+results preservation, filtering/deletion, and the activity handoff without changing
+route selection. The app-hosted cache and map-policy unit tests remain separate.
+
+Run from the repository root using a simulator UUID from `xcrun simctl list devices`:
+
+```sh
+xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj -scheme ActivityMap \
+  -configuration Debug -destination 'platform=iOS Simulator,id=<SIMULATOR_UDID>' \
+  -parallel-testing-enabled NO -only-testing:ActivityMapUITests/MapPhotoUITests \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+The runner launches a DEBUG-only fixture with generated photo bytes and an inline
+map style. It bypasses authentication/sync, uses in-memory persistence, and clears
+only its dedicated temporary image-cache directory at startup. No real account,
+Mapbox token, or backend is needed. The placeholder token can produce Mapbox billing
+warnings; it does not prevent the inline style from rendering. The fixture and its
+launch argument are absent from Release builds.
+
+These scenarios previously traversed SwiftUI's accessibility objects from hosted
+unit tests. On the iOS 27 simulator that run exposed no accessibility children or
+frames, despite visibly rendering the controls. A real UI automation session
+initializes and queries that tree. Do not restore the traversal, enable private
+accessibility APIs, or skip the interactions when discovery fails. Verify that the
+result actually contains three executed tests; an invalid Swift Testing method
+filter can report success with zero tests.
+
 ## TestFlight releases
 
 Publish a GitHub Release with a tag such as `ios/v1.0.0` or
