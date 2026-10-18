@@ -131,7 +131,7 @@ struct ActivityDetailPanel: View {
                             if let showOnMap { showOnMap(id) }
                             else if overMap { store.mapContext.request(.fitActivity(id)) }
                             else { store.showOnMap(id) }
-                        }, editing: store.activityEditing, streamSummaries: store.streamSummaries, profile: { activity in
+                        }, editing: store.activityEditing, streamSummaries: store.streamSummaries, exportStore: store, profile: { activity in
                             ElevationProfileView(store: store, activityID: activity.id,
                                                  isRelevant: store.selectedTab == hostTab)
                         }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
@@ -207,11 +207,11 @@ private struct MapActivityDetailReveal: View {
                 .padding(.horizontal, AppTheme.Spacing.large)
                 .padding(.vertical, AppTheme.Spacing.small)
                 ActivityDetailContent(activity: activity, showsHeading: false, showsPrimaryMetrics: false, showsDescription: false,
-                                      streamSummaries: store.streamSummaries,
+                                      streamSummaries: store.streamSummaries, exportStore: store,
                                       profile: { _ in EmptyView() }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             } else {
                 ActivityDetailContent(activity: activity, showsHeading: false,
-                                      streamSummaries: store.streamSummaries,
+                                      streamSummaries: store.streamSummaries, exportStore: store,
                                       profile: { _ in elevation }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             }
         }
