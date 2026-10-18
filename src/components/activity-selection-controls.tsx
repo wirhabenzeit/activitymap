@@ -63,7 +63,7 @@ export function CombineSelectionButton() {
     <Button
       variant="ghost"
       size="icon"
-      className={`size-10 ${combine ? 'bg-header-background/10 text-header-background hover:bg-header-background/15' : ''}`}
+      className={`h-6 w-8 shrink-0 ${combine ? 'bg-header-background/10 text-header-background hover:bg-header-background/15' : ''}`}
       aria-label="Combine selections"
       aria-pressed={combine}
       title={
