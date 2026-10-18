@@ -7,6 +7,10 @@ import type { PhotosRepository } from '~/server/repositories/photos';
 import type { Actor } from '~/server/auth/actor';
 import { StravaApiError } from '~/server/strava/client';
 import { StravaBudgetExceededError } from '~/server/strava/request-budget';
+import {
+  AccountCredentialsUnavailableError,
+  AccountPersistenceError,
+} from './account-credentials';
 import type { StravaActivity } from '~/server/strava/types';
 import { EXTERNAL_EFFECTS_DISABLED_MESSAGE } from '~/server/config/external-effects';
 
@@ -851,4 +855,106 @@ void test("deleteActivitiesForActor deletes only the actor's own activities when
     [1, 2],
     "athlete B deleting a mixed id list must not remove athlete A's activities",
   );
+});
+
+void test('credential refresh errors keep classification, retry metadata and cause through all activity boundaries', async () => {
+  const saveFailure = new AccountPersistenceError(
+    true,
+    new Error('local save failed'),
+  );
+  const cases = [
+    [
+      new StravaApiError('limited', 429, undefined, 123),
+      'rate_limited',
+      429,
+      true,
+      123,
+    ],
+    [
+      new StravaApiError('unauthorized', 401),
+      'strava_not_connected',
+      409,
+      false,
+      undefined,
+    ],
+    [
+      new StravaApiError('upstream failed', 503, undefined, 77),
+      'upstream_unavailable',
+      503,
+      true,
+      77,
+    ],
+    [new StravaBudgetExceededError(321), 'rate_limited', 429, true, 321],
+    [saveFailure, 'local_persistence_failed', 503, true, undefined],
+    [
+      new AccountCredentialsUnavailableError('changed'),
+      'local_state_conflict',
+      409,
+      true,
+      undefined,
+    ],
+    [
+      new AccountCredentialsUnavailableError('missing_credentials'),
+      'strava_not_connected',
+      409,
+      false,
+      undefined,
+    ],
+  ] as const;
+  for (const [upstream, code, status, retryable, delay] of cases) {
+    const deps = {
+      activitiesRepo: createFakeActivitiesRepository([
+        buildActivity({ id: 7, athlete: ATHLETE_A }),
+      ]),
+      resolveAccount: async () => {
+        throw upstream;
+      },
+      createClient: () => {
+        throw new Error('must not mutate before credentials resolve');
+      },
+      fetchActivities: async () => {
+        throw new Error('must not fetch before credentials resolve');
+      },
+    };
+    for (const operation of [
+      () => updateActivityForActor(ACTOR_A, { id: 7, name: 'Updated' }, deps),
+      () => refreshActivityForActor(ACTOR_A, 7, deps),
+      () => fetchInitialActivitySummariesForActor(ACTOR_A, deps),
+    ]) {
+      await assert.rejects(
+        operation,
+        (error) =>
+          error instanceof ActivityMutationError &&
+          error.code === code &&
+          error.status === status &&
+          error.retryable === retryable &&
+          error.retryAfterSeconds === delay &&
+          error.cause === upstream,
+      );
+    }
+  }
+});
+
+void test('stale actor cannot use another athlete account for an update or refresh', async () => {
+  const deps = {
+    activitiesRepo: createFakeActivitiesRepository([
+      buildActivity({ id: 7, athlete: ATHLETE_A }),
+    ]),
+    resolveAccount: async () => stubAccount({ accountId: String(ATHLETE_B) }),
+    createClient: () => {
+      throw new Error('must not use another athlete credentials');
+    },
+    fetchActivities: async () => {
+      throw new Error('must not use another athlete credentials');
+    },
+  };
+  for (const operation of [
+    () => updateActivityForActor(ACTOR_A, { id: 7, name: 'Updated' }, deps),
+    () => refreshActivityForActor(ACTOR_A, 7, deps),
+  ])
+    await assert.rejects(
+      operation,
+      (e) =>
+        e instanceof ActivityMutationError && e.code === 'strava_not_connected',
+    );
 });

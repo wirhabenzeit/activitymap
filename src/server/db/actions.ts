@@ -5,13 +5,14 @@ import { activities } from './schema';
 import { db } from './index';
 import { headers } from 'next/headers';
 import { getUserInternal } from './internal';
+import { getRequestUserInternal } from '~/server/auth/request-account';
 import { requireActor } from '~/server/auth/actor';
 import * as activitiesService from '~/server/application/activities';
 import { assertLegacySharingEnabled } from '~/lib/legacy-sharing';
 
 // Safe wrapper for getUser
 export const getUser = async (id?: string) => {
-  return getUserInternal(id);
+  return getRequestUserInternal(id);
 };
 
 /**
