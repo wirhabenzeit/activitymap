@@ -67,6 +67,7 @@ declare module '@tanstack/react-table' {
     TValue,
   > {
     width: string;
+    minWidth?: number;
     title: string;
   }
 }
@@ -94,6 +95,8 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   setSelected: (updater: Updater<number[]>) => void;
   columnFilters: ColumnFiltersState;
   activeId?: number;
+  /** Map emphasis is independent of whether a detail is open. */
+  highlightedId?: number;
   headerClassName?: string;
   cellClassName?: string;
   onRowClick?: (row: Row<Features, TData>) => void;
@@ -132,6 +135,7 @@ export const DataTable = React.memo(function DataTable<
   summaryRow,
   paginationControl = true,
   activeId,
+  highlightedId,
   headerClassName,
   cellClassName,
   onRowClick,
@@ -307,6 +311,7 @@ export const DataTable = React.memo(function DataTable<
     Number(/(\d+)px/.exec(width ?? '')?.[1] ?? 80);
   const widthOf = (column: (typeof visibleColumns)[number]) =>
     Math.max(
+      column.columnDef.meta?.minWidth ?? 0,
       panelOpen
         ? column.id === 'name'
           ? 200
@@ -630,8 +635,12 @@ export const DataTable = React.memo(function DataTable<
                   key={row.id}
                   data-activity-id={row.id}
                   data-detail-origin={Number(row.id) === activeId || undefined}
+                  data-map-highlighted={
+                    Number(row.id) === highlightedId || undefined
+                  }
                   aria-current={
-                    detailStepping && Number(row.id) === activeId
+                    (detailStepping && Number(row.id) === activeId) ||
+                    Number(row.id) === highlightedId
                       ? 'true'
                       : undefined
                   }
@@ -677,11 +686,14 @@ export const DataTable = React.memo(function DataTable<
                           'bg-background group-data-[state=selected]:bg-muted flex items-center',
                           // Blend into an opaque surface so pinned cells cover
                           // scrolling content even when inspected or selected.
+                          ((detailStepping && Number(row.id) === activeId) ||
+                            Number(row.id) === highlightedId) &&
+                            'bg-[color:color-mix(in_srgb,var(--color-header-background)_10%,var(--color-background))] group-data-[state=selected]:bg-[color:color-mix(in_srgb,var(--color-header-background)_10%,var(--color-muted))]',
                           detailStepping &&
                             Number(row.id) === activeId &&
-                            'bg-[color:color-mix(in_srgb,var(--color-header-background)_10%,var(--color-background))] group-data-[state=selected]:bg-[color:color-mix(in_srgb,var(--color-header-background)_10%,var(--color-muted))] border-y border-header-background/40',
-                          detailStepping &&
-                            Number(row.id) === activeId &&
+                            'border-y border-header-background/40',
+                          ((detailStepping && Number(row.id) === activeId) ||
+                            Number(row.id) === highlightedId) &&
                             cell.column.id === 'name' &&
                             'shadow-[inset_3px_0_0_var(--color-header-background)]',
                           cell.column.getIsPinned() == 'start' &&

@@ -315,12 +315,13 @@ export default function InteractiveMap() {
     () => selected.filter((id) => filterIDs.includes(id) && activityDict[id]),
     [selected, filterIDs, activityDict],
   );
-  // Closing details retains the highlighted map route and the results table.
+  // Follow active changes only while inspecting details. Results can toggle
+  // the highlighted route independently, just like the native results list.
   const [detailId, setDetailId] = useState(highlighted);
   const [previousHighlight, setPreviousHighlight] = useState(highlighted);
   if (previousHighlight !== highlighted) {
     setPreviousHighlight(highlighted);
-    setDetailId(highlighted);
+    if (detailId) setDetailId(highlighted);
   } else if (
     !activitiesPending &&
     detailId &&
@@ -670,6 +671,9 @@ export default function InteractiveMap() {
         const meta = column.meta && {
           ...column.meta,
           width: column.id === 'name' ? 'minmax(0, 1fr)' : 'max-content',
+          // Keep the name and its highlight control readable before
+          // spending the remaining panel width on metric columns.
+          ...(column.id === 'name' && { minWidth: 240 }),
         };
         return column.id === 'name'
           ? {
@@ -679,7 +683,13 @@ export default function InteractiveMap() {
                 row,
               }: {
                 row: Parameters<typeof ActivityCard>[0]['row'];
-              }) => <ActivityCard row={row} showMapButton={false} />,
+              }) => (
+                <ActivityCard
+                  row={row}
+                  showMapButton={false}
+                  showHighlightButton
+                />
+              ),
             }
           : { ...column, meta };
       }),
@@ -860,7 +870,7 @@ export default function InteractiveMap() {
           id="map-route-panel"
           style={
             {
-              '--selection-results-height': `${resultIds.length * 32 + 36}px`,
+              '--selection-results-height': `${resultIds.length * 33 + 40}px`,
             } as React.CSSProperties
           }
           className={cn(
@@ -900,9 +910,9 @@ export default function InteractiveMap() {
               setSelected={setSelected}
               columnFilters={columnFilters}
               paginationControl={false}
-              headerClassName="max-lg:hidden"
               cellClassName="max-lg:px-2 max-lg:border-r-0"
               activeId={detailId}
+              highlightedId={highlighted}
               onRowClick={(row) => openDetail(row.original.id)}
               onDetailBack={() => setDetailId(0)}
               detailBackLabel={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
