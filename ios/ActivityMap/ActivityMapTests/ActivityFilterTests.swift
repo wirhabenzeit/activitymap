@@ -47,26 +47,28 @@ struct ActivityFilterTests {
         }
         let store = ActivityStore(activities: models)
         for testCase in cases {
-            store.resetFilters()
             let filter = try #require(testCase["filter"] as? [String: Any])
             let name = try #require(testCase["name"] as? String)
-            store.searchText = filter["search"] as? String ?? ""
-            if let sports = filter["sport_types"] as? [String] {
-                store.activeSportTypes = Set(try sports.map { try #require(SportType(rawValue: $0)) })
+            try store.updateFilters { next in
+                next = ActivityFilterState()
+                next.searchText = filter["search"] as? String ?? ""
+                if let sports = filter["sport_types"] as? [String] {
+                    next.activeSportTypes = Set(try sports.map { try #require(SportType(rawValue: $0)) })
+                }
+                if let range = filter["date_range"] as? [String: String] {
+                    let start = try #require(range["start"])
+                    let end = try #require(range["end"])
+                    next.dateDayRange = try #require(ActivityDayRange(start: start, end: end))
+                }
+                let binary = filter["binary"] as? [String: String] ?? [:]
+                next.commuteOnly = try binaryValue(binary["commute"])
+                next.privateFilter = try binaryValue(binary["private"])
+                next.flaggedFilter = try binaryValue(binary["flagged"])
+                let values = filter["values"] as? [String: [String: Any]] ?? [:]
+                next.distanceFilter = try numeric(values["distance"])
+                next.durationFilter = try numeric(values["elapsed_time"])
+                next.elevationFilter = try numeric(values["total_elevation_gain"])
             }
-            if let range = filter["date_range"] as? [String: String] {
-                let start = try #require(range["start"])
-                let end = try #require(range["end"])
-                store.dateDayRange = try #require(ActivityDayRange(start: start, end: end))
-            }
-            let binary = filter["binary"] as? [String: String] ?? [:]
-            store.commuteOnly = try binaryValue(binary["commute"])
-            store.privateFilter = try binaryValue(binary["private"])
-            store.flaggedFilter = try binaryValue(binary["flagged"])
-            let values = filter["values"] as? [String: [String: Any]] ?? [:]
-            store.distanceFilter = try numeric(values["distance"])
-            store.durationFilter = try numeric(values["elapsed_time"])
-            store.elevationFilter = try numeric(values["total_elevation_gain"])
             let expected = try #require(testCase["expected_ids"] as? [String])
             #expect(store.filteredActivities.map { String($0.id) } == expected, "\(name) in \(deviceTimezone)")
         }
