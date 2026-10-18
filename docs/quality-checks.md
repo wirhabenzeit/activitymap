@@ -22,27 +22,37 @@ explicit disposable Postgres service.
 
 The wrapper copies an allowlist of app sources and shared fixtures into an owned
 `.quality/browser-*` directory, links installed dependencies, and invokes the
-Next CLI directly with webpack. It never calls migration-bearing `pnpm dev` or
-`pnpm build`. Local `.env*` files are excluded, inherited service credentials are
-removed, database URLs point to unused loopback port 1, and external effects are
-disabled. Browser requests to remote hosts, unmocked APIs or non-read methods are
+Next CLI directly with webpack and an explicit workspace root inside that copy.
+It never calls migration-bearing `pnpm dev` or `pnpm build`. Local `.env*` files
+are excluded, inherited service credentials are removed, database URLs point to
+unused loopback port 1, and external effects are disabled. Browser requests to remote hosts, unmocked APIs or non-read methods are
 blocked; scenario-specific fixture routes provide needed API responses.
 
 The server binds loopback on a fresh port. Readiness requires a per-run UUID
 response from this server, so an occupied port or unrelated server cannot pass.
-The existing scripts create routes only if absent. Their fixtures and generated
-Next files live in the owned copy; startup failure, test failure, timeout and
-SIGINT/SIGTERM clean that copy. A preexisting developer fixture remains untouched
-and causes the scenario to fail safely. The checkout's environment and source
+The wrapper creates all selected routes before starting Next. Their shared source
+is also used by standalone scripts, which continue to create routes only if
+absent. A per-run ownership token and exact source check permit reuse only inside
+the harness. Prepared routes/types remain until wrapper cleanup, and the three
+fixture entries stay warm for the fifteen-minute server budget; removing one
+scenario or evicting its dev entry must not Fast Refresh another tab mid-test.
+Fixtures and generated Next files live in the owned copy; startup
+failure, test failure, timeout and SIGINT/SIGTERM clean that copy. A preexisting
+developer fixture remains untouched and causes the scenario to fail safely. The checkout's environment and source
 files are never used as scratch storage.
 
 The CI smoke boundary runs the **full existing three scripts**, not all app
 features: list inspection at desktop/tablet/phone widths (keyboard, history,
 selection and paging), stats focus/drilldown across widths with dark/reduced-motion
 cases, and mocked account deletion failure/success with cache and sync fencing.
-This reuses their assertions and result lists. Each script is limited to four
-minutes, server startup to two minutes, the server to fifteen minutes and the CI
-job to eighteen minutes. The server budget includes fixture compilation. A local
+This reuses their assertions and result lists. Each script's assertions are
+limited to four minutes, server identity readiness to two minutes, and each
+fixture's cold compilation to three minutes before the assertion processes
+start. Compilation timings/failures are recorded separately in the summary; 5xx
+responses fail immediately. The server has a fifteen-minute overall budget and
+the CI job eighteen minutes, including all compilation and scenarios. The first
+Linux run compiled the list in 67 seconds; a later cold run exceeded the old
+two-minute in-scenario allowance before executing assertions. A local
 system Chromium can be selected explicitly with `CHROME_PATH`; CI installs the
 pinned browser and does not rely on a machine-specific executable path.
 
@@ -77,9 +87,14 @@ The bounded suite is:
 - `PhotoGalleryTests`: gallery state and image request/cache behavior.
 - `MapPhotoUITests`: three real XCUI map/photo interactions using the offline app fixture.
 
-`xcodebuild test` executes these suites, with parallel execution disabled, a
-twelve-minute process budget and 90/180-second default/maximum per-test allowances.
-Boot readiness has a three-minute budget; the whole CI job has twenty minutes.
+`xcodebuild build-for-testing` has an eighteen-minute cold-build budget, followed
+by `xcodebuild test-without-building` with a separate twelve-minute runtime budget.
+The first CI cold build took about eleven and a half minutes and exhausted the
+former combined allowance as tests launched; separate phases preserve the test
+allowance and identify which phase failed. Parallel execution is disabled, with
+90/180-second default/maximum per-test allowances. Boot readiness has a
+three-minute budget; the whole CI job has forty minutes, including setup and
+artifact upload.
 The wrapper records the toolchain, validates a positive passing test count, zero
 failures/skips, and a positive number of passing cases in every selected suite.
 `ACTIVITYMAP_API_BASE_URL`/Mapbox build settings use inert fixture values.
@@ -88,8 +103,9 @@ suites launch the ordinary app with the inert URL and supply isolated stores and
 fixtures within their tests. `IOS_DERIVED_DATA` can reuse a
 caller-owned build cache; otherwise `.quality/ios-derived` is retained for later runs.
 
-Evidence in `output/quality/ios/<timestamp>/` includes `xcodebuild.log`, toolchain,
-boot logs, summary, per-test tree and `Results.xcresult`. Open the result bundle in
+Evidence in `output/quality/ios/<timestamp>/` includes separate
+`xcodebuild-build.log` and `xcodebuild-test.log` files, toolchain, boot logs,
+summary, per-test tree and `Results.xcresult`. Open the result bundle in
 Xcode for attachments and failures. CI uploads browser and native evidence even
 when a job fails. The separate `swift-client` job remains compile-only and is
 labelled accordingly.
@@ -104,8 +120,9 @@ their first AX lookup, while the controller/file suite passed 19 methods and
 reported as passed by this harness.
 Other rendered suites and device-only touch/VoiceOver acceptance remain outside
 this smoke boundary; failures there are not silently treated as passing here.
-Pending photo-pipeline/sync-integrity suites from #422/#423 can be added after
-those changes land; this base does not contain them.
+Pending photo-pipeline/sync-integrity suites from #422/#423 and filter/GPX
+regressions from #426/#427 can be added after those changes land; this base does
+not contain them.
 
 ## Formatting policy
 

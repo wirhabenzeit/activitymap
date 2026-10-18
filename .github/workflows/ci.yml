@@ -75,7 +75,7 @@ jobs:
   # Keep the Xcode 27 runner for that SDK.
   ios-app:
     runs-on: xcode-27
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
