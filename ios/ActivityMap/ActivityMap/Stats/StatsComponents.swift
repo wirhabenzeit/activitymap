@@ -96,15 +96,14 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
 }
 
 struct StatsMetricPicker: View {
+    var title = "Metric"
     let metrics: [StatsMetric]
     @Binding var selection: StatsMetric
-    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        StatsRangePicker(title: "Metric", ranges: metrics, selection: $selection,
+        StatsRangePicker(title: title, ranges: metrics, selection: $selection,
                          label: { $0 == .count ? "#" : $0.displayUnit },
                          accessibilityLabel: { $0.definition.label })
-            .frame(width: typeSize.isAccessibilitySize ? nil : CGFloat(metrics.count) * AppTheme.minimumTarget)
     }
 }
 
@@ -145,7 +144,7 @@ struct StatsComparison: View {
     }
 }
 
-/// Native range selection, with full labels and a menu at accessibility sizes.
+/// Content-sized choices with full labels and a native menu when space is tight.
 /// Range meanings and their persistence remain with the dashboard/history.
 struct StatsRangePicker<Range: Hashable>: View {
     let title: String
@@ -159,8 +158,47 @@ struct StatsRangePicker<Range: Hashable>: View {
         if typeSize.isAccessibilitySize {
             picker.pickerStyle(.menu).frame(minHeight: AppTheme.minimumTarget)
         } else {
-            picker.pickerStyle(.segmented).frame(minHeight: AppTheme.minimumTarget)
+            ViewThatFits(in: .horizontal) {
+                compactChoices.fixedSize(horizontal: true, vertical: false)
+                picker.pickerStyle(.menu).frame(minHeight: AppTheme.minimumTarget)
+            }
         }
+    }
+
+    private var compactChoices: some View {
+        HStack(spacing: 0) {
+            ForEach(ranges, id: \.self) { range in
+                let selected = selection == range
+                Button { selection = range } label: {
+                    Text(label(range))
+                        .font(.caption.weight(selected ? .semibold : .medium))
+                        .foregroundStyle(selected ? AppTheme.accent : Color.secondary)
+                        .padding(.horizontal, 10)
+                        .frame(minWidth: AppTheme.minimumTarget, minHeight: 28)
+                        .background {
+                            if selected {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(AppTheme.accent.opacity(0.12))
+                            }
+                        }
+                        // The visible control is shallow; each choice still
+                        // owns a separate, non-overlapping 44pt touch target.
+                        .frame(minHeight: AppTheme.minimumTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(accessibilityLabel?(range) ?? label(range))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(.horizontal, 2)
+        .background {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.primary.opacity(0.035))
+                .frame(height: 32)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(title)
     }
 
     private var picker: some View {
