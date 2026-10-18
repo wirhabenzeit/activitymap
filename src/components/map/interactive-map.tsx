@@ -15,6 +15,7 @@ import {
   Scan,
   ChevronLeft,
   ChevronRight,
+  ArrowLeft,
 } from 'lucide-react';
 import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { store } from '~/store';
@@ -343,6 +344,7 @@ export default function InteractiveMap() {
   const { open } = useSidebar();
   const mapRefLoc = useRef<MapRef>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const detailBackButtonRef = useRef<HTMLButtonElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   useEffect(() => {
     // A reused map can fire load before React attaches its ref. Publish the
@@ -713,10 +715,34 @@ export default function InteractiveMap() {
   );
   const panelControls = (fitIds: number[], fitLabel: string) => (
     <div className="flex shrink-0 items-center gap-0.5">
+      {detailId > 0 && resultIds.length > 1 && (
+        <div className="flex items-center" role="group" aria-label="Browse selected activities">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            aria-label="Previous activity"
+            disabled={detailIndex <= 0}
+            onClick={() => openDetail(resultIds[detailIndex - 1]!)}
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            aria-label="Next activity"
+            disabled={detailIndex < 0 || detailIndex >= resultIds.length - 1}
+            onClick={() => openDetail(resultIds[detailIndex + 1]!)}
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+      )}
       <Button
         size="icon"
         variant="ghost"
-        className="size-10"
+        className={detailId > 0 ? 'size-8' : 'size-10'}
         aria-label={fitLabel}
         title={fitLabel}
         onClick={() => requestRouteFit(fitIds)}
@@ -726,7 +752,7 @@ export default function InteractiveMap() {
       <Button
         size="icon"
         variant="ghost"
-        className="size-10"
+        className={detailId > 0 ? 'size-8' : 'size-10'}
         aria-label={panelExpanded ? 'Shrink route panel' : 'Expand route panel'}
         title={panelExpanded ? 'Shrink route panel' : 'Expand route panel'}
         aria-expanded={panelExpanded}
@@ -882,6 +908,19 @@ export default function InteractiveMap() {
           {
             <SelectionBar
               filterIDs={filterIDs}
+              backButton={detailId > 0 ? (
+                <Button
+                  ref={detailBackButtonRef}
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0"
+                  aria-label={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
+                  title="Back to selected activities"
+                  onClick={() => setDetailId(0)}
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              ) : undefined}
               controls={
                 selected.length > 0
                   ? panelControls(
@@ -915,43 +954,7 @@ export default function InteractiveMap() {
               highlightedId={highlighted}
               onRowClick={(row) => openDetail(row.original.id)}
               onDetailBack={() => setDetailId(0)}
-              detailBackLabel={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
-              detailNavigation={
-                <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
-                  {resultIds.length > 1 && (
-                    <div className="flex min-w-0 flex-1 items-center justify-center text-xs tabular-nums">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-7 shrink-0"
-                        aria-label="Previous activity"
-                        disabled={detailIndex <= 0}
-                        onClick={() => openDetail(resultIds[detailIndex - 1]!)}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <span
-                        className="whitespace-nowrap px-1"
-                        aria-label={`Activity ${detailIndex + 1} of ${resultIds.length}`}
-                      >
-                        {detailIndex + 1}/{resultIds.length}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-7 shrink-0"
-                        aria-label="Next activity"
-                        disabled={
-                          detailIndex < 0 || detailIndex >= resultIds.length - 1
-                        }
-                        onClick={() => openDetail(resultIds[detailIndex + 1]!)}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              }
+              detailBackButtonRef={detailBackButtonRef}
               renderDetails={(row) => (
                 <ActivityCardContent
                   key={row.id}

@@ -105,6 +105,8 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   onDetailBack?: () => void;
   detailBackLabel?: string;
   detailNavigation?: React.ReactNode;
+  /** A host can put Back in its persistent toolbar instead of a second header. */
+  detailBackButtonRef?: React.RefObject<HTMLButtonElement | null>;
   detailPresentation?: DetailPresentation;
   /** Browse the complete filtered/sorted order, including other pages. */
   detailStepping?: boolean;
@@ -143,6 +145,7 @@ export const DataTable = React.memo(function DataTable<
   onDetailBack,
   detailBackLabel = 'Back to activities',
   detailNavigation,
+  detailBackButtonRef,
   detailPresentation = 'push',
   detailStepping = false,
   listHeader,
@@ -502,6 +505,7 @@ export const DataTable = React.memo(function DataTable<
         detail={detailRow && renderDetails?.(detailRow)}
         onBack={onDetailBack ?? (() => undefined)}
         backLabel={detailBackLabel}
+        externalBackRef={detailBackButtonRef}
         returnFocus={returnFocusRef}
         presentation={detailPresentation}
         onStep={detailStepping ? step : undefined}

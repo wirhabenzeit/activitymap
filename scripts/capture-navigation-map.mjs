@@ -198,6 +198,9 @@ export default function Review() {
         const snapshot = await page.evaluate(() => {
           const panel = document.querySelector('#map-route-panel');
           const map = window.__ACTIVITYMAP_GALLERY_MAP__;
+          const selectionCount = panel?.querySelector(
+            '[data-selection-bar] .truncate',
+          );
           return {
             url: location.pathname + location.search + location.hash,
             historyLength: history.length,
@@ -213,6 +216,9 @@ export default function Review() {
             detailOpen: Boolean(
               document.querySelector('[data-detail-presentation]'),
             ),
+            selectionCountClipped: selectionCount
+              ? selectionCount.scrollWidth > selectionCount.clientWidth
+              : false,
             highlightedRows: [
               ...document.querySelectorAll('[data-map-highlighted="true"]'),
             ].map((row) => Number(row.getAttribute('data-activity-id'))),
@@ -291,6 +297,50 @@ export default function Review() {
       await page.locator('#map-route-panel [data-activity-id]').first().click();
       await page.locator('[data-detail-presentation]').waitFor();
       await observe('inspect-one');
+      assert.equal(
+        await page
+          .locator('[data-selection-bar]')
+          .getByRole('button', { name: /^Back to \d+ routes?$/ })
+          .count(),
+        1,
+        'Back belongs to the persistent selection header',
+      );
+      assert.equal(
+        await page
+          .locator('[data-detail-presentation] [data-detail-scroll]')
+          .evaluate((scroll) => scroll.previousElementSibling),
+        null,
+        'Detail content has no separate navigation header',
+      );
+      assert.equal(
+        await page
+          .locator(
+            '#map-route-panel [aria-label^="Activity "][aria-label*=" of "]',
+          )
+          .count(),
+        0,
+        'Map details omit the redundant position counter',
+      );
+      await page
+        .getByRole('button', { name: 'Next activity', exact: true })
+        .click();
+      await page.waitForFunction(
+        (id) => window.__NAVIGATION_AUDIT_STATE__().active === id,
+        secondID,
+      );
+      await page
+        .getByRole('button', { name: 'Previous activity', exact: true })
+        .click();
+      await page.waitForFunction(
+        (id) => window.__NAVIGATION_AUDIT_STATE__().active === id,
+        firstID,
+      );
+      await page.keyboard.press('Escape');
+      await page
+        .locator('[data-detail-presentation]')
+        .waitFor({ state: 'hidden' });
+      await resultRows.first().click();
+      await page.locator('[data-detail-presentation]').waitFor();
       await page
         .getByRole('button', { name: 'Fit route', exact: true })
         .click();
@@ -375,6 +425,11 @@ export default function Review() {
       assert.equal(back.pressedHighlights, 1);
       assert.equal(fitted.state.active, detail.state.active);
       assert.equal(fitted.detailOpen, true);
+      assert.equal(
+        detail.selectionCountClipped,
+        false,
+        'Selection count remains readable in the unified header',
+      );
       for (const name of [
         'expand-panel',
         'shrink-panel',

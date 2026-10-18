@@ -106,9 +106,11 @@ export function SelectionActions({ controls }: { controls?: ReactNode }) {
 export function SelectionBar({
   filterIDs,
   controls,
+  backButton,
 }: {
   filterIDs: number[];
   controls?: ReactNode;
+  backButton?: ReactNode;
 }) {
   const hasSelection = useShallowStore((state) => state.selected.length > 0);
   if (!hasSelection) return null;
@@ -118,8 +120,9 @@ export function SelectionBar({
       className="flex min-h-12 shrink-0 items-center justify-between gap-1 border-b bg-background px-2"
     >
       <div className="flex min-w-0 flex-1 items-center gap-1">
-        <CombineSelectionButton />
+        {backButton ?? <CombineSelectionButton />}
         <SelectionCount filterIDs={filterIDs} />
+        {backButton && <CombineSelectionButton />}
       </div>
       <SelectionActions controls={controls} />
     </div>
