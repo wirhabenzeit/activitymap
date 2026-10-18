@@ -35,17 +35,29 @@ udid="$(python3 - "$work/devices.json" "$device" <<'EOF'
 import json, sys
 devices = json.load(open(sys.argv[1]))['result']['devices']
 wanted = sys.argv[2]
-phones = [d for d in devices
-          if d['hardwareProperties'].get('reality') == 'physical'
-          and d['hardwareProperties'].get('deviceType') == 'iPhone'
-          and d['connectionProperties'].get('pairingState') == 'paired']
+def fields(device):
+    properties = device.get('properties', {})
+    return (properties.get('hardware', device.get('hardwareProperties', {})),
+            properties.get('connection', device.get('connectionProperties', {})),
+            properties.get('state', device.get('deviceProperties', {})))
+
+phones = []
+for device in devices:
+    hardware, connection, state = fields(device)
+    # New devicectl omits the default physical reality; ECID identifies hardware.
+    physical = hardware.get('reality') == 'physical' or (
+        hardware.get('reality') is None and hardware.get('ecid') is not None)
+    if (physical and hardware.get('deviceType') == 'iPhone'
+            and connection.get('pairingState') == 'paired'):
+        phones.append(device)
 if wanted:
-    phones = [d for d in phones if wanted in (d['hardwareProperties'].get('udid'), d['deviceProperties'].get('name'))]
+    phones = [d for d in phones if wanted in (fields(d)[0].get('udid'), fields(d)[2].get('name'))]
 if not phones:
     sys.exit('No paired iPhone found' + (f' matching {wanted!r}' if wanted else '') + '. Connect and unlock it, then trust this Mac.')
 phone = phones[0]
-print(phone['hardwareProperties']['udid'])
-print(f"Device: {phone['deviceProperties']['name']}", file=sys.stderr)
+hardware, _, state = fields(phone)
+print(hardware['udid'])
+print(f"Device: {state['name']}", file=sys.stderr)
 EOF
 )"
 

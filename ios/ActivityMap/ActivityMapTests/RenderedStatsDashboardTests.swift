@@ -545,6 +545,31 @@ import Testing
         }
     }
 
+    @Test func compactMetricChoicesKeepTouchTargetsAndAccessibleSelection() async throws {
+        try await statsWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
+        let selection = StatsPickerReviewSelection()
+        let host = try StatsDashboardHarness(root: StatsMetricPicker(title: "Training volume: Metric",
+            metrics: [.distance, .time, .elevation], selection: Binding(
+                get: { selection.metric }, set: { selection.metric = $0 }
+            )).padding(), size: CGSize(width: 320, height: 120))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(150))
+        let distance = try #require(host.shellControl(label: "Distance"))
+        let time = try #require(host.shellControl(label: "Moving time"))
+        #expect(distance.accessibilityTraits.contains(.selected))
+        #expect(!time.accessibilityTraits.contains(.selected))
+        for label in ["Distance", "Moving time", "Elevation"] {
+            let choice = try #require(host.shellControl(label: label))
+            #expect(choice.accessibilityFrame.width >= 44)
+            #expect(choice.accessibilityFrame.height >= 44)
+        }
+        #expect(time.accessibilityActivate())
+        try await statsWait { selection.metric == .time }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(try #require(host.shellControl(label: "Moving time")).accessibilityTraits.contains(.selected))
+        #expect(!(try #require(host.shellControl(label: "Distance"))).accessibilityTraits.contains(.selected))
+    }
+
     @Test(arguments: ["phone", "phone-dark", "small-large-text", "tablet", "landscape"])
     func dashboardRendersRealTilesAndRetainsMetricState(variant: String) async throws {
         let (store, _) = try StatsDashboardTests.fixture()
@@ -821,7 +846,7 @@ import Testing
             if id == .records { state.inspection(id)?.recordsRange = .allTime }
             if id == .activityCalendar {
                 #expect(state.inspection(id)?.calendarDay == StatsDashboardSource(store).today)
-                state.inspection(id)?.calendarYear = StatsDates.parts(StatsDashboardSource(store).today).year!
+                state.inspection(id)?.calendarWeek = StatsDates.monday(StatsDashboardSource(store).today) - 14
             }
             try host.capture("detail-\(id.rawValue)-\(variant)")
             navigation.popViewController(animated: true)
@@ -836,7 +861,7 @@ import Testing
             #expect(abs(root.contentSize.height - height) < 1)
         }
         #expect(state.inspection(.records)?.recordsRange == .allTime)
-        #expect(state.inspection(.activityCalendar)?.calendarYear == StatsDates.parts(StatsDashboardSource(store).today).year!)
+        #expect(state.inspection(.activityCalendar)?.calendarWeek == StatsDates.monday(StatsDashboardSource(store).today) - 14)
         #expect(state.option(.weeklyVolume) == .elevation)
         #expect(state.inspection(.weeklyVolume) === volume && volume.volumeRange == .months)
         state.toggleExpansion(.records)
@@ -1326,6 +1351,10 @@ import Testing
     let deadline = Date().addingTimeInterval(12)
     while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(40)) }
     try #require(condition(), "Stats rendering did not reach the expected state")
+}
+
+@MainActor @Observable private final class StatsPickerReviewSelection {
+    var metric = StatsMetric.distance
 }
 
 @MainActor private final class StatsDashboardHarness<Content: View> {

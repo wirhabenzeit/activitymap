@@ -23,6 +23,10 @@ struct StatsTileGalleryTests {
         await state.load(store: store, request: .init(source: StatsDashboardSource(store), choices: [:], canLoad: true))
         try #require(state.completedTiles.count == StatsDashboard.tiles.count)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        let sceneDeadline = Date().addingTimeInterval(5)
+        while UIApplication.shared.connectedScenes.first as? UIWindowScene == nil && Date() < sceneDeadline {
+            try await Task.sleep(for: .milliseconds(25))
+        }
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let previous = scene.keyWindow
         defer { previous?.makeKeyAndVisible() }

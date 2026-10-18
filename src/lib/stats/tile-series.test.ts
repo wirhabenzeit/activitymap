@@ -8,6 +8,8 @@ import {
 } from './tile-data';
 import {
   calendarMonths,
+  calendarWeeks,
+  calendarSummaryWindow,
   comparisonYear,
   cumulativeYearPoints,
   volumeDomain,
@@ -130,4 +132,61 @@ void test('volume scale includes unusually large and small partial weeks and con
     for (const value of values) assert.ok(value >= low && value <= high);
   }
   assert.deepEqual(volumeDomain([]), [0, 1]);
+});
+
+void test('weekday calendar aligns Mondays and preserves partial weeks, empty days and leap days across years', () => {
+  for (const [start, end] of [
+    ['2024-02-28', '2024-03-05'],
+    ['2025-12-31', '2026-01-05'],
+    ['2026-10-18', '2026-10-18'],
+    ['2020-01-01', '2026-10-18'],
+  ]) {
+    const first = dayFromISODate(start!);
+    const last = dayFromISODate(end!);
+    const weeks = calendarWeeks(last, first);
+    const days = weeks
+      .flatMap((week) => week.days)
+      .filter((day) => day !== null);
+    assert.deepEqual(
+      days,
+      Array.from({ length: last - first + 1 }, (_, i) => first + i),
+    );
+    for (const week of weeks) {
+      assert.equal(new Date(week.start * 86400000).getUTCDay(), 1);
+      assert.equal(week.days.length, 7);
+      week.days.forEach((day, row) => {
+        if (day !== null)
+          assert.equal(new Date(day * 86400000).getUTCDay(), (row + 1) % 7);
+      });
+    }
+  }
+  assert.deepEqual(calendarWeeks(0, 1), []);
+});
+
+void test('compact calendar fits recent weeks to the tile dimensions and keeps the current week', () => {
+  const today = dayFromISODate('2026-10-18');
+  const narrow = calendarSummaryWindow(today, 320, 300);
+  const wide = calendarSummaryWindow(today, 560, 300);
+  assert.equal(narrow.weeks, 14);
+  assert.equal(wide.weeks, 26);
+  assert(wide.first < narrow.first);
+  for (const [width, height] of [
+    [160, 250],
+    [320, 300],
+    [560, 300],
+    [1600, 400],
+  ]) {
+    const window = calendarSummaryWindow(today, width!, height!);
+    assert(window.weeks >= 4 && window.weeks <= 52);
+    const weeks = calendarWeeks(today, window.first);
+    assert.equal(weeks.length, window.weeks);
+    assert.equal(weeks[0]!.days[0], window.first);
+    assert.equal(weeks.at(-1)!.days.at(-1), today);
+    assert((width! - 40 - (window.weeks - 1) * 2) / window.weeks >= 14);
+  }
+  // A shorter tile fits smaller squares and can show more week columns.
+  assert(
+    calendarSummaryWindow(today, 480, 250).weeks >
+      calendarSummaryWindow(today, 480, 400).weeks,
+  );
 });

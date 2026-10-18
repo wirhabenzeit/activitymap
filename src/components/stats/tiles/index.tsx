@@ -23,6 +23,7 @@ import {
   useMemo,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from 'react';
 import { useTheme } from 'next-themes';
 import { ArrowLeft, Maximize2 } from 'lucide-react';
@@ -196,17 +197,11 @@ export function StatsTileGrid({
   const [options, setOptions] = useBrowsingState<
     Partial<Record<StatsTileID, string>>
   >('stats:options', {});
-  const [calendarYear, setCalendarYear] = useBrowsingState<number | null>(
-    'stats:calendarYear',
-    null,
-  );
   const [calendarDay, setCalendarDay] = useBrowsingState<number | null>(
     'stats:calendarDay',
     null,
   );
   const calendar = {
-    year: calendarYear,
-    setYear: setCalendarYear,
     selectedDay: calendarDay,
     setSelectedDay: setCalendarDay,
   };
@@ -356,12 +351,21 @@ function BentoGroup({
         ? compact
         : narrow;
   const placements = placeBento(
-    tiles.map(({ tile }) => tile.span),
+    // Seven weekday rows need less vertical space in the web bento grid.
+    // Native cards size their content independently of the shared spans.
+    tiles.map(({ tile }) =>
+      tile.id === 'activityCalendar' ? { ...tile.span, rows: 1 } : tile.span,
+    ),
     grid.columns,
   );
   const rowMinimums = bentoRowMinimums(
     tiles.map(({ tile }) => ({
-      minHeight: 'minHeight' in tile ? tile.minHeight : undefined,
+      minHeight:
+        tile.id === 'activityCalendar'
+          ? 360
+          : 'minHeight' in tile
+            ? tile.minHeight
+            : undefined,
     })),
     placements,
     grid.rowHeight,
@@ -414,25 +418,30 @@ function BentoGroup({
 function Headline({
   summary,
   size,
+  controls,
 }: {
   summary: TileSummary;
   size: 'tile' | 'large';
+  controls?: ReactNode;
 }) {
   return (
     <>
-      <div
-        className={cn(
-          'shrink-0 font-mono font-medium tabular-nums leading-tight tracking-tight',
-          size === 'tile' && 'mt-1 text-[20px]',
-          size === 'large' && 'mt-1 text-[32px]',
-        )}
-      >
-        {summary.value}
-        {summary.unit && (
-          <small className="ml-1 font-sans text-[13px] font-normal tracking-normal text-muted-foreground">
-            {summary.unit}
-          </small>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div
+          className={cn(
+            'min-w-0 max-w-full shrink-0 font-mono font-medium tabular-nums leading-tight tracking-tight',
+            size === 'tile' && 'mt-1 text-[20px]',
+            size === 'large' && 'mt-1 text-[32px]',
+          )}
+        >
+          {summary.value}
+          {summary.unit && (
+            <small className="ml-1 font-sans text-[13px] font-normal tracking-normal text-muted-foreground">
+              {summary.unit}
+            </small>
+          )}
+        </div>
+        {controls}
       </div>
       <div className="shrink-0 text-xs text-muted-foreground">
         {summary.sub}
@@ -464,6 +473,15 @@ function TileCard({
 }) {
   const toggle = toggleOf(tile);
   const summary = view.summary(context, option);
+  const headlineControls = Boolean(view.headlineControls && summary && toggle);
+  const controls = toggle ? (
+    <FaceSwitch
+      label={`${tile.title}: ${toggle.label}`}
+      options={toggle.options}
+      value={option}
+      onChange={onOption}
+    />
+  ) : null;
   return (
     <section
       aria-label={tile.title}
@@ -488,23 +506,31 @@ function TileCard({
             </button>
           )}
         </div>
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-          <span className="text-[11px] text-muted-foreground">
-            {view.period(context, option)}
-          </span>
-          {toggle && (
-            <FaceSwitch
-              label={`${tile.title}: ${toggle.label}`}
-              options={toggle.options}
-              value={option}
-              onChange={onOption}
-            />
-          )}
-        </div>
-        {summary && (
-          <Headline summary={summary} size={large ? 'large' : 'tile'} />
+        {tile.id !== 'activityCalendar' && (
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="text-[11px] text-muted-foreground">
+              {(view.compactPeriod ?? view.period)(context, option)}
+            </span>
+            {!headlineControls && controls}
+          </div>
         )}
-        {view.face({ ...context, onExpand }, option, false)}
+        {summary && (
+          <Headline
+            summary={{ ...summary, unit: summary.compactUnit ?? summary.unit }}
+            size={large ? 'large' : 'tile'}
+            controls={headlineControls ? controls : undefined}
+          />
+        )}
+        {view.face(
+          {
+            ...context,
+            onExpand,
+            calendarControls:
+              tile.id === 'activityCalendar' ? controls : undefined,
+          },
+          option,
+          false,
+        )}
         {context.inlineDetails && view.more?.(context, option)}
       </div>
     </section>
@@ -585,9 +611,11 @@ export function TileFocusView({
                 : 'max-w-7xl',
           )}
         >
-          <p className="mb-2 text-xs text-muted-foreground">
-            {view.expandedPeriod ?? view.period(context, option)}
-          </p>
+          {view.expandedPeriod !== null && (
+            <p className="mb-2 text-xs text-muted-foreground">
+              {view.expandedPeriod ?? view.period(context, option)}
+            </p>
+          )}
           {view.detail ? (
             view.detail(context, option)
           ) : (

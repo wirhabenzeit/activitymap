@@ -82,22 +82,32 @@ export type TileContext = {
   selectedActivityId?: number | null;
   focusChartHeight?: number;
   inlineDetails?: boolean;
+  // Compact calendar controls share a row with its measured active-day count.
+  calendarControls?: ReactNode;
   calendar?: {
-    year: number | null;
-    setYear: (year: number | null) => void;
     selectedDay: number | null;
     setSelectedDay: (day: number | null) => void;
   };
 };
 
-export type TileSummary = { value: string; unit: string; sub: ReactNode };
+export type TileSummary = {
+  value: string;
+  unit: string;
+  // The compact period line supplies suffixes such as "so far".
+  compactUnit?: string;
+  sub: ReactNode;
+};
 
 export type TileView = {
   // Expansion must offer useful details, controls, or a more inspectable chart.
   expandable: boolean;
   period: (context: TileContext, option?: string) => string;
+  // Compact cards can share the headline row with a switch. Keep focus
+  // controls in their own header, where they are already easy to reach.
+  headlineControls?: boolean;
+  compactPeriod?: (context: TileContext, option?: string) => string;
   // The period line while expanded, when it differs from the face's.
-  expandedPeriod?: string;
+  expandedPeriod?: string | null;
   // Null leaves the face without a headline number.
   summary: (
     context: TileContext,
@@ -381,6 +391,11 @@ function PeriodComparison({
 
 const yearToDateView: TileView = {
   expandable: true,
+  headlineControls: true,
+  compactPeriod: ({ today }) => {
+    const year = dateOfDay(today).getUTCFullYear();
+    return `${year} so far · vs ${year - 1}`;
+  },
   insight: (context, option) => (
     <YearRhythm context={context} metric={asMetric(option, 'distance')} />
   ),
@@ -399,6 +414,7 @@ const yearToDateView: TileView = {
     return {
       value: formatMetric(current, metric),
       unit: `${metric === 'count' ? 'activities' : metricUnit[metric]} so far`,
+      compactUnit: metric === 'count' ? 'activities' : metricUnit[metric],
       sub: (
         <Delta
           units={units}
@@ -466,6 +482,8 @@ function rollingFourWeeks(context: TileContext, metric: StatsMetric) {
 
 const weeklyVolumeView: TileView = {
   expandable: true,
+  headlineControls: true,
+  compactPeriod: () => 'Last 28 days · 12-week trend',
   detail: (context, option) => (
     <VolumeHistory context={context} metric={asMetric(option, 'distance')} />
   ),
@@ -483,6 +501,7 @@ const weeklyVolumeView: TileView = {
     return {
       value: formatMetric(current, metric),
       unit: `${metricUnit[metric]} · last 28 days`,
+      compactUnit: metric === 'count' ? 'activities' : metricUnit[metric],
       sub: (
         <Delta
           units={context.units}
@@ -536,9 +555,8 @@ const weeklyVolumeView: TileView = {
 
 const activityCalendarView: TileView = {
   expandable: true,
-  period: () => 'Last 12 months',
-  // The period navigation names the range; label the colour switch instead.
-  expandedPeriod: 'Colour by',
+  period: () => 'Recent activity',
+  expandedPeriod: null,
   summary: () => null,
   face: (context, option, expanded) => (
     <CalendarHistory
@@ -600,6 +618,14 @@ function samePeriodLastMonth(today: number) {
 
 const monthVsLastMonthView: TileView = {
   expandable: true,
+  headlineControls: true,
+  compactPeriod: ({ today }) => {
+    const date = dateOfDay(today);
+    const previous = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1),
+    );
+    return `${monthName(date)} so far · vs ${monthName(previous)}`;
+  },
   insight: (context, option) => (
     <MonthRhythm context={context} metric={asMetric(option, 'distance')} />
   ),
@@ -621,6 +647,7 @@ const monthVsLastMonthView: TileView = {
     return {
       value: formatMetric(current, metric),
       unit: `${metric === 'count' ? 'activities' : metricUnit[metric]} so far`,
+      compactUnit: metric === 'count' ? 'activities' : metricUnit[metric],
       sub: (
         <Delta
           units={units}
@@ -676,6 +703,8 @@ type MixRange = 'currentYear' | 'allTime';
 
 const sportMixView: TileView = {
   expandable: true,
+  // The adjacent range switch already names This year / All time.
+  compactPeriod: () => 'Moving time',
   period: ({ today }, option) =>
     option === 'allTime'
       ? 'All time by moving time'
@@ -1170,6 +1199,7 @@ const typicalWeekView: TileView = {
 
 const yearPaceView: TileView = {
   expandable: false,
+  headlineControls: true,
   period: ({ today }) => `${dateOfDay(today).getUTCFullYear()} projection`,
   summary: ({ activities, today, units = 'metric' }, option) => {
     const { formatMetric, metricUnit } = statsFormat(units);
@@ -1179,6 +1209,7 @@ const yearPaceView: TileView = {
     return {
       value: formatMetric(pace.projected, metric),
       unit: `${metricUnit[metric]} projected`,
+      compactUnit: metricUnit[metric],
       sub: "At this year's daily average",
     };
   },

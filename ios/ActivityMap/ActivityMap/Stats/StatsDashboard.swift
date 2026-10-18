@@ -179,7 +179,7 @@ struct StatsDashboardFace {
 /// Inspection choices outlive a detail destination and are shared with its source tile.
 @MainActor @Observable final class StatsTileInspection {
     var volumeRange = StatsHistoryRange.weeks
-    var calendarYear: Int?
+    var calendarWeek: Int?
     var calendarDay: Int?
     var monthDay: Int?
     var yearMonth: Int?

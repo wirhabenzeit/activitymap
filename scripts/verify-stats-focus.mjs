@@ -132,6 +132,52 @@ export default function Review() {
   ]) {
     await page.setViewportSize({ width, height });
     await loaded();
+    const compactCalendarSize = await card('activityCalendar').evaluate(
+      (el) => {
+        const cell = el.querySelector('[data-calendar-day]');
+        return {
+          weeks: el.querySelectorAll('[data-calendar-week]').length,
+          cellWidth: cell?.getBoundingClientRect().width ?? 0,
+          cellHeight: cell?.getBoundingClientRect().height ?? 0,
+          monthSeparatorWidth: el
+            .querySelector('[data-calendar-month-boundary] > span:last-child')
+            ?.getBoundingClientRect().width,
+          fits:
+            el.scrollWidth <= el.clientWidth &&
+            el.scrollHeight <= el.clientHeight,
+          text: el.innerText,
+          countSharesControls: Boolean(
+            el.querySelector('[data-calendar-summary-header] [role="group"]'),
+          ),
+        };
+      },
+    );
+    assert(compactCalendarSize.weeks >= 4 && compactCalendarSize.weeks <= 52);
+    assert(
+      compactCalendarSize.cellWidth >= 14 &&
+        compactCalendarSize.cellWidth <= 18.1,
+    );
+    assert(compactCalendarSize.fits, 'The compact calendar fits its tile');
+    assert(
+      compactCalendarSize.countSharesControls,
+      'The active-day count shares a row with the calendar controls',
+    );
+    assert(!compactCalendarSize.text.includes('Recent activity'));
+    assert.equal(
+      compactCalendarSize.monthSeparatorWidth,
+      6,
+      'Month separators remain visible in the compact calendar',
+    );
+    assert.equal(
+      compactCalendarSize.cellWidth,
+      compactCalendarSize.cellHeight,
+      'Compact calendar days are square',
+    );
+    assert(
+      compactCalendarSize.text.includes(
+        `last ${compactCalendarSize.weeks} weeks`,
+      ),
+    );
     for (const [id, slug] of tiles) {
       if (id === 'sportMix' && width === 1440) {
         assert.equal(
@@ -200,6 +246,30 @@ export default function Review() {
         `${slug} overflows horizontally`,
       );
       await settle();
+      if (id === 'activityCalendar') {
+        assert(
+          await focus.locator('[data-calendar-day]').evaluateAll((cells) =>
+            cells.every((cell) => {
+              const bounds = cell.getBoundingClientRect();
+              return bounds.width === bounds.height;
+            }),
+          ),
+          `Expanded calendar days are square at ${width}×${height}`,
+        );
+        const lastDay = focus.locator('[data-calendar-day]').last();
+        await lastDay.click();
+        const rightInset = await lastDay.evaluate((cell) => {
+          const viewport = cell
+            .closest('[data-calendar-scroll]')
+            .getBoundingClientRect();
+          return viewport.right - cell.getBoundingClientRect().right;
+        });
+        assert(
+          rightInset >= 3,
+          'The rightmost selection outline fits inside the calendar viewport',
+        );
+        await focus.getByRole('button', { name: 'Close day details' }).click();
+      }
       await page.screenshot({
         path: join(output, `${slug}--${width}x${height}.png`),
         animations: 'disabled',
@@ -474,6 +544,123 @@ export default function Review() {
   await page.keyboard.press('Escape');
   await active(null);
   console.log('Compact calendar day selection carries into focus');
+
+  // Weekday rows browse continuous history, including years outside the face.
+  await loaded('?tile=activity-calendar');
+  const calendarScroll = focus.locator('[data-calendar-scroll]');
+  assert.equal(
+    await focus.getByRole('combobox', { name: 'Calendar period' }).count(),
+    0,
+  );
+  assert.equal(
+    await calendarScroll.locator('[data-calendar-day]').count(),
+    1263,
+  );
+  assert(
+    await calendarScroll.evaluate((el) => el.scrollWidth > el.clientWidth),
+  );
+  assert(await calendarScroll.evaluate((el) => el.scrollLeft > 0));
+  // Clicking a visible day must preserve the timeline, including when the
+  // details appear at the wide-layout breakpoint. Month overlays make the
+  // button's offsetParent a week column rather than the scroll viewport.
+  for (const width of [1440, 402]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await calendarScroll.evaluate((el) => {
+      el.scrollLeft = 1200;
+    });
+    const before = await calendarScroll.evaluate((el) => {
+      const bounds = el.getBoundingClientRect();
+      const cell = [...el.querySelectorAll('[data-calendar-day]')].find(
+        (cell) => {
+          const box = cell.getBoundingClientRect();
+          return (
+            box.left > bounds.left + bounds.width / 2 &&
+            box.right < bounds.right
+          );
+        },
+      );
+      return {
+        left: el.scrollLeft,
+        width: el.clientWidth,
+        day: cell?.getAttribute('data-calendar-day'),
+      };
+    });
+    assert(before.day, 'A visible day is available');
+    await calendarScroll.locator(`[data-calendar-day="${before.day}"]`).click();
+    await focus
+      .getByRole('region', { name: 'Selected day activities' })
+      .waitFor();
+    assert.deepEqual(
+      await calendarScroll.evaluate((el) => ({
+        left: el.scrollLeft,
+        width: el.clientWidth,
+      })),
+      { left: before.left, width: before.width },
+      `Selecting a day preserves calendar position at ${width}px`,
+    );
+    await focus.getByRole('button', { name: 'Close day details' }).click();
+    assert.equal(
+      await calendarScroll.evaluate((el) => el.scrollLeft),
+      before.left,
+    );
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await calendarScroll.evaluate((el) => {
+    el.scrollLeft = 0;
+  });
+  const firstDay = calendarScroll.locator('[data-calendar-day]').first();
+  await firstDay.click();
+  await focus
+    .getByRole('region', { name: 'Selected day activities' })
+    .waitFor();
+  assert.match(await firstDay.getAttribute('aria-label'), /Apr 9, 2023/);
+  const firstNumber = Number(await firstDay.getAttribute('data-calendar-day'));
+  await page.keyboard.press('ArrowRight');
+  assert.equal(
+    await page.evaluate(() =>
+      Number(document.activeElement.dataset.calendarDay),
+    ),
+    firstNumber + 7,
+  );
+  await page.keyboard.press('ArrowDown');
+  assert.equal(
+    await page.evaluate(() =>
+      Number(document.activeElement.dataset.calendarDay),
+    ),
+    firstNumber + 8,
+  );
+  await page.keyboard.press('Enter');
+  await page.screenshot({
+    path: join(output, 'calendar-history-start.png'),
+    animations: 'disabled',
+  });
+  await focus.getByRole('button', { name: 'Close day details' }).click();
+  await calendarScroll.evaluate((el) => {
+    el.scrollLeft = 1200;
+  });
+  await page.waitForTimeout(100);
+  const savedCalendarScroll = await calendarScroll.evaluate(
+    (el) => el.scrollLeft,
+  );
+  await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
+  await active(null);
+  await card('activityCalendar').screenshot({
+    path: join(output, 'calendar-compact.png'),
+    animations: 'disabled',
+  });
+  await card('activityCalendar')
+    .getByRole('button', { name: /^Expand / })
+    .click();
+  await active('activity-calendar');
+  assert.equal(
+    await calendarScroll.evaluate((el) => el.scrollLeft),
+    savedCalendarScroll,
+  );
+  await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
+  await active(null);
+  console.log(
+    'Weekday alignment, cross-year scrolling, day selection, keyboard navigation and retained scroll pass',
+  );
 
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await loaded();
