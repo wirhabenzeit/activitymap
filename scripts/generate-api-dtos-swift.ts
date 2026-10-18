@@ -1,4 +1,5 @@
 #!/usr/bin/env -S tsx
+import { createShareLinkRequestSchema, createdShareLinkDTOSchema, shareLinkSummaryDTOSchema, shareLinkListDTOSchema, revokeShareLinkRequestSchema, revokeShareLinkResultSchema } from '../src/contracts/v1/share-links';
 
 /**
  * Generates the Swift wire types the iOS client decodes, from the same Zod
@@ -102,6 +103,12 @@ const INDENT = '    ';
  * order in the output file.
  */
 const registeredSchemas: [string, z.ZodType][] = [
+  ['CreateShareLinkRequest', createShareLinkRequestSchema],
+  ['CreatedShareLink', createdShareLinkDTOSchema],
+  ['ShareLinkSummary', shareLinkSummaryDTOSchema],
+  ['ShareLinkList', shareLinkListDTOSchema],
+  ['RevokeShareLinkRequest', revokeShareLinkRequestSchema],
+  ['RevokeShareLinkResult', revokeShareLinkResultSchema],
   ['StreamType', streamTypeSchema],
   ['StreamFreshness', streamFreshnessSchema],
   ['StreamFetchStatus', streamFetchStatusSchema],
@@ -165,6 +172,7 @@ const enumKey = (values: readonly string[]): string =>
   JSON.stringify([...values].sort());
 
 const inlineEnumNames = new Map<string, string>([
+  [enumKey(['active', 'expired', 'revoked']), 'ShareLinkStatus'],
   [enumKey(['activity', 'photo']), 'EntityType'],
   [enumKey(['upsert', 'delete']), 'ChangeOperation'],
   [enumKey(['cookie', 'bearer']), 'AuthenticationMethod'],

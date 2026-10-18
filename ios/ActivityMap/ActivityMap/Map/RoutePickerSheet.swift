@@ -115,6 +115,7 @@ struct RoutePickerSheet: View {
                 .accessibilityIdentifier("map-results-fit")
                 .disabled(fitActivityID.map { !store.routableActivityIDs.contains($0) }
                     ?? !candidates.contains { store.routableActivityIDs.contains($0.id) })
+            SelectionShareButton(store: store)
             Button { store.clearSelection() } label: {
                 Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
             }.accessibilityLabel("Clear selection")

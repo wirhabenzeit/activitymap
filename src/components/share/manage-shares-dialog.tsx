@@ -16,8 +16,8 @@ import { cn } from '~/lib/utils';
 import {
   listMyShareLinks,
   revokeShareLink,
-  type ShareLinkSummaryDTO,
-} from '~/server/share-actions';
+} from '~/lib/sharing/client';
+import type { ShareLinkSummaryDTO } from '~/contracts/v1/share-links';
 
 export const MY_SHARE_LINKS_QUERY_KEY = ['my-share-links'] as const;
 
@@ -59,7 +59,8 @@ export function ManageSharesDialog({ onBack }: { onBack: () => void }) {
 
   const sharesQuery = useQuery({
     queryKey: MY_SHARE_LINKS_QUERY_KEY,
-    queryFn: () => listMyShareLinks(),
+    queryFn: ({ signal }) => listMyShareLinks(signal),
+    retry: false,
   });
 
   const revokeMutation = useMutation({

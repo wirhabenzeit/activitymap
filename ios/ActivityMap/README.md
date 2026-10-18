@@ -186,6 +186,32 @@ TEST_RUNNER_ACTIVITYMAP_LIVE_MAP_TOOLS=1 xcodebuild test \
 
 Issues #391–#393 still require physical-device acceptance: grant and deny the location prompt, retry from Settings, exercise restricted/disabled Location Services and foreground re-entry, confirm compass rotation/reset with touch and VoiceOver, and view mountain relief on a network-connected device while toggling 2D/3D and switching styles. Simulator tests and captures do not certify those device checks. Heading and follow-location behavior in broader #223 remain separate work.
 
+## Share activity maps
+
+**Share activity** in the bottom detail actions opens a draft for that activity.
+The share icon beside Clear in the List footer and beside Fit/Clear in the Map
+results header opens a draft for the complete selection, including filter-hidden
+members. Opening a draft never changes selection, inspection or map framing.
+
+Choose an expiry (1 hour to 30 days; 7 days by default) and whether to show route
+ends. Continue reviews the exact activities and disclosed fields before **Create
+link** makes a request. The first/last 200 m remain hidden by default. The created
+URL can be sent or copied with the native share sheet; it stays in memory only.
+**Your links** lists existing links and supports immediate revocation. Private
+Strava activities are omitted by the existing recipient view.
+
+Web and native clients use authenticated `/api/v1/share-links` (GET/POST) and
+`/api/v1/share-links/revoke` (POST), backed by the existing web sharing service.
+Deploy these backend routes before shipping the iOS build. No database migration
+is needed. Failed or uncertain creation keeps the draft and offers the link list;
+account/deployment changes discard late responses and dismiss the sharing flow.
+
+Verification: `ActivitySharingTests`, `ShareLinksAPITests` and
+`RenderedActivitySharingTests` pass on the iPhone 18 Pro / iOS 27 simulator (7 tests,
+13 parameterized runs). Captures cover 320–820pt group controls, phone/tablet forms,
+dark mode and accessibility text. Real recipient delivery through installed share
+extensions and physical-device review remain release checks.
+
 ## Local persistence and tests
 
 `LocalStore` owns all SwiftData reads and writes. Records are scoped by deployment URL and authenticated user ID. Activities and photos retain the complete generated DTO as encoded data, with unique scoped keys; UI mappers consume detached values. Each page and its optional sync checkpoint commit in one explicit save, with autosave disabled and rollback on failure. CloudKit is disabled.

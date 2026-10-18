@@ -37,6 +37,12 @@ struct ActivityDetailActions: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(spacing: 0) {
+                ActivityShareButton(activities: { [activity] }) {
+                    row(title: "Share activity", subtitle: "Create an expiring link to its map", icon: "square.and.arrow.up",
+                        trailing: "chevron.right", busy: false)
+                }
+                .accessibilityIdentifier("activity-share")
+                Divider().padding(.leading, 44)
                 Button(action: openStrava) {
                     row(title: openingStrava ? "Opening Strava…" : "Open in Strava",
                         subtitle: "View the original activity", icon: "arrow.up.right.square",
