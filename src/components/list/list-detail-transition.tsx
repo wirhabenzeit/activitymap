@@ -18,6 +18,7 @@ interface DetailPageProps {
   onBack: () => void;
   backLabel: string;
   navigation?: ReactNode;
+  externalBackRef?: RefObject<HTMLButtonElement | null>;
   returnFocus: RefObject<HTMLElement | null>;
   findReturnFocus?: () => HTMLElement | null;
   presentation?: DetailPresentation;
@@ -39,6 +40,7 @@ function DetailPage({
   onBack,
   backLabel,
   navigation,
+  externalBackRef,
   returnFocus,
   findReturnFocus,
   presentation = 'push',
@@ -49,7 +51,9 @@ function DetailPage({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    backRef.current?.focus({ preventScroll: true });
+    (externalBackRef?.current ?? backRef.current)?.focus({
+      preventScroll: true,
+    });
     return () => {
       // Stepping deliberately replaces the origin with the latest inspected row.
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,7 +61,7 @@ function DetailPage({
       const target = origin?.isConnected ? origin : findReturnFocus?.();
       target?.focus({ preventScroll: true });
     };
-  }, [returnFocus, findReturnFocus]);
+  }, [returnFocus, findReturnFocus, externalBackRef]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
@@ -90,27 +94,29 @@ function DetailPage({
         ease: [0.22, 0.75, 0.25, 1],
       }}
     >
-      <div className="flex min-h-12 shrink-0 items-center justify-between gap-1 border-b bg-background px-2">
-        <Button
-          ref={backRef}
-          variant="ghost"
-          onClick={onBack}
-          aria-label={
-            presentation === 'panel' ? 'Close activity detail' : backLabel
-          }
-          className="min-w-0 gap-1 px-1 text-xs sm:px-2 sm:text-sm"
-        >
-          {presentation === 'panel' ? (
-            <X className="h-4 w-4" aria-hidden="true" />
-          ) : (
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          )}
-          <span className="truncate">
-            {presentation === 'panel' ? 'Close' : backLabel}
-          </span>
-        </Button>
-        {navigation}
-      </div>
+      {!externalBackRef && (
+        <div className="flex min-h-12 shrink-0 items-center justify-between gap-1 border-b bg-background px-2">
+          <Button
+            ref={backRef}
+            variant="ghost"
+            onClick={onBack}
+            aria-label={
+              presentation === 'panel' ? 'Close activity detail' : backLabel
+            }
+            className="min-w-0 gap-1 px-1 text-xs sm:px-2 sm:text-sm"
+          >
+            {presentation === 'panel' ? (
+              <X className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            )}
+            <span className="truncate">
+              {presentation === 'panel' ? 'Close' : backLabel}
+            </span>
+          </Button>
+          {navigation}
+        </div>
+      )}
       <div
         ref={scrollRef}
         data-detail-scroll
@@ -133,17 +139,19 @@ export function ListDetailTransition({
   const reducedMotion = useReducedMotion();
   const open = detail != null;
   const panel = props.presentation === 'panel';
-  const { onStep, onBack } = props;
+  const { onStep, onBack, externalBackRef } = props;
   useEffect(() => {
-    if (!open || !onStep) return;
-    // Paging can disable the focused pagination button, leaving focus on the
-    // document. The List inspector's shortcuts remain available in that case.
+    if (!open || (!onStep && !externalBackRef)) return;
+    // Hosted Back controls sit outside this transition, so Escape must also
+    // work there. List paging can leave focus on the document when a button
+    // becomes disabled; its shortcuts remain available in that case too.
     const keyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || !ownsDetailKeys(event.target)) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         onBack();
       } else if (
+        onStep &&
         !event.altKey &&
         !event.ctrlKey &&
         !event.metaKey &&
@@ -156,7 +164,7 @@ export function ListDetailTransition({
     };
     window.addEventListener('keydown', keyDown);
     return () => window.removeEventListener('keydown', keyDown);
-  }, [open, onStep, onBack]);
+  }, [open, onStep, onBack, externalBackRef]);
   return (
     <div
       className="relative h-full min-h-0 overflow-hidden"

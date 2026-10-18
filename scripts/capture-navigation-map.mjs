@@ -198,6 +198,9 @@ export default function Review() {
         const snapshot = await page.evaluate(() => {
           const panel = document.querySelector('#map-route-panel');
           const map = window.__ACTIVITYMAP_GALLERY_MAP__;
+          const selectionCount = panel?.querySelector(
+            '[data-selection-bar] .truncate',
+          );
           return {
             url: location.pathname + location.search + location.hash,
             historyLength: history.length,
@@ -213,6 +216,28 @@ export default function Review() {
             detailOpen: Boolean(
               document.querySelector('[data-detail-presentation]'),
             ),
+            selectionCountClipped: selectionCount
+              ? selectionCount.scrollWidth > selectionCount.clientWidth
+              : false,
+            highlightedRows: [
+              ...document.querySelectorAll('[data-map-highlighted="true"]'),
+            ].map((row) => Number(row.getAttribute('data-activity-id'))),
+            pressedHighlights: [
+              ...document.querySelectorAll(
+                '#map-route-panel button[aria-pressed="true"]',
+              ),
+            ].filter((button) =>
+              button.getAttribute('aria-label')?.startsWith('Deactivate:'),
+            ).length,
+            highlightedRouteFilter: map.getFilter('routeLayerHighFG'),
+            resultsHeaderHeight: document
+              .querySelector('#map-route-panel thead')
+              ?.getBoundingClientRect().height,
+            resultRowHeights: [
+              ...document.querySelectorAll(
+                '#map-route-panel [data-activity-id]',
+              ),
+            ].map((row) => row.getBoundingClientRect().height),
             filtersExpanded: document
               .querySelector('[data-sidebar="sidebar"]')
               ?.closest('[data-state]')
@@ -240,9 +265,82 @@ export default function Review() {
         () => !document.querySelector('[data-route-fit="pending"]'),
       );
       await observe('fit-selection');
+      const resultRows = page.locator('#map-route-panel [data-activity-id]');
+      const firstID = Number(
+        await resultRows.nth(0).getAttribute('data-activity-id'),
+      );
+      const secondID = Number(
+        await resultRows.nth(1).getAttribute('data-activity-id'),
+      );
+      const highlightButton = (index) =>
+        resultRows.nth(index).getByRole('button', {
+          name: /^(Make active|Deactivate):/,
+        });
+      await highlightButton(0).click();
+      await page.waitForFunction(
+        (id) => window.__NAVIGATION_AUDIT_STATE__().active === id,
+        firstID,
+      );
+      await observe('highlight-first');
+      await highlightButton(1).focus();
+      await highlightButton(1).press('Enter');
+      await page.waitForFunction(
+        (id) => window.__NAVIGATION_AUDIT_STATE__().active === id,
+        secondID,
+      );
+      await observe('highlight-second');
+      await highlightButton(1).press('Space');
+      await page.waitForFunction(
+        () => window.__NAVIGATION_AUDIT_STATE__().active === 0,
+      );
+      await observe('clear-highlight');
       await page.locator('#map-route-panel [data-activity-id]').first().click();
       await page.locator('[data-detail-presentation]').waitFor();
       await observe('inspect-one');
+      assert.equal(
+        await page
+          .locator('[data-selection-bar]')
+          .getByRole('button', { name: /^Back to \d+ routes?$/ })
+          .count(),
+        1,
+        'Back belongs to the persistent selection header',
+      );
+      assert.equal(
+        await page
+          .locator('[data-detail-presentation] [data-detail-scroll]')
+          .evaluate((scroll) => scroll.previousElementSibling),
+        null,
+        'Detail content has no separate navigation header',
+      );
+      assert.equal(
+        await page
+          .locator(
+            '#map-route-panel [aria-label^="Activity "][aria-label*=" of "]',
+          )
+          .count(),
+        0,
+        'Map details omit the redundant position counter',
+      );
+      await page
+        .getByRole('button', { name: 'Next activity', exact: true })
+        .click();
+      await page.waitForFunction(
+        (id) => window.__NAVIGATION_AUDIT_STATE__().active === id,
+        secondID,
+      );
+      await page
+        .getByRole('button', { name: 'Previous activity', exact: true })
+        .click();
+      await page.waitForFunction(
+        (id) => window.__NAVIGATION_AUDIT_STATE__().active === id,
+        firstID,
+      );
+      await page.keyboard.press('Escape');
+      await page
+        .locator('[data-detail-presentation]')
+        .waitFor({ state: 'hidden' });
+      await resultRows.first().click();
+      await page.locator('[data-detail-presentation]').waitFor();
       await page
         .getByRole('button', { name: 'Fit route', exact: true })
         .click();
@@ -258,7 +356,7 @@ export default function Review() {
         .getByRole('button', { name: 'Shrink route panel', exact: true })
         .click();
       await observe('shrink-panel');
-      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: /^Back to \d+ routes?$/ }).click();
       await page
         .locator('[data-detail-presentation]')
         .waitFor({ state: 'hidden' });
@@ -275,13 +373,7 @@ export default function Review() {
       await page.locator('[data-detail-presentation]').waitFor();
       await observe('inspect-before-clear');
       await page
-        .getByRole('button', { name: 'Selection actions', exact: true })
-        .click();
-      await page.getByRole('menu').waitFor();
-      await page.screenshot({ path: join(output, `map-selection-actions--${width}x${height}.png`), animations: 'disabled' });
-
-      await page
-        .getByRole('menuitem', { name: 'Clear selection', exact: true })
+        .getByRole('button', { name: 'Clear selection', exact: true })
         .click();
       await page.waitForFunction(
         () => window.__NAVIGATION_AUDIT_STATE__().selected.length === 0,
@@ -296,11 +388,48 @@ export default function Review() {
         back = steps['back-to-four'],
         cleared = steps['clear-selection'];
       assert.equal(initial.state.selected.length, 4);
+      assert(
+        initial.resultsHeaderHeight > 0,
+        'Column headers stay visible at every width',
+      );
+      assert(
+        initial.resultRowHeights.every((height) => height > 0 && height <= 33),
+        'Map results retain compact rows',
+      );
+      for (const [name, id] of [
+        ['highlight-first', firstID],
+        ['highlight-second', secondID],
+        ['clear-highlight', 0],
+      ]) {
+        const step = steps[name];
+        assert.equal(step.state.active, id);
+        assert.equal(
+          step.detailOpen,
+          false,
+          'Highlighting must keep results open',
+        );
+        assert.deepEqual(step.highlightedRows, id ? [id] : []);
+        assert.equal(step.pressedHighlights, id ? 1 : 0);
+        assert.deepEqual(step.highlightedRouteFilter.at(-1), ['==', 'id', id]);
+        assert.deepEqual(step.camera, steps['fit-selection'].camera);
+        assert.deepEqual(
+          step.resultRowHeights,
+          steps['fit-selection'].resultRowHeights,
+          'Highlighting must not change row height',
+        );
+      }
       for (const step of observation.steps.filter((step) => step !== cleared))
         assert.deepEqual(step.state.selected, initial.state.selected);
       assert.equal(back.state.active, detail.state.active);
+      assert.deepEqual(back.highlightedRows, [detail.state.active]);
+      assert.equal(back.pressedHighlights, 1);
       assert.equal(fitted.state.active, detail.state.active);
       assert.equal(fitted.detailOpen, true);
+      assert.equal(
+        detail.selectionCountClipped,
+        false,
+        'Selection count remains readable in the unified header',
+      );
       for (const name of [
         'expand-panel',
         'shrink-panel',

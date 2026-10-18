@@ -2,6 +2,7 @@
 
 import {
   Map,
+  Route,
   Minus,
   Download,
   MoreHorizontal,
@@ -438,13 +439,15 @@ export function ActivityCardContent({
   );
 }
 
-/** Name cell: selection toggle, name, and optionally a jump to the map. */
+/** Name cell: selection toggle, name, and optional map actions. */
 export function ActivityCard({
   row,
   showMapButton = true,
+  showHighlightButton = false,
 }: {
   row: Row<Features, Activity>;
   showMapButton?: boolean;
+  showHighlightButton?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { highlighted, isGuest } = useShallowStore((state) => ({
@@ -456,6 +459,8 @@ export function ActivityCard({
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
+  const isHighlighted = highlighted === row.original.id;
+  const highlightLabel = `${isHighlighted ? 'Deactivate' : 'Make active'}: ${row.original.name}`;
 
   const prototypeSelected = useShallowStore((state) =>
     state.selected.includes(row.original.id),
@@ -471,7 +476,7 @@ export function ActivityCard({
   return (
     <>
       <div
-        className="flex items-center space-x-2 w-full"
+        className="flex min-w-0 items-center space-x-2 w-full"
         onDoubleClick={() => !isGuest && setOpen(true)}
       >
         <ActivitySelectionSymbol
@@ -487,6 +492,32 @@ export function ActivityCard({
         </ActivitySelectionSymbol>
         <div className={nameClassName}>{row.getValue('name')}</div>
         <div className="flex-1" />
+        {showHighlightButton && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'h-6 w-8 shrink-0 text-muted-foreground',
+              isHighlighted &&
+                'text-header-background hover:text-header-background',
+            )}
+            aria-label={highlightLabel}
+            aria-pressed={isHighlighted}
+            title={
+              isHighlighted
+                ? 'Active on map. Clear highlight'
+                : 'Highlight route on map'
+            }
+            onClick={() => {
+              const state = store.getState();
+              state.setHighlighted(
+                state.highlighted === row.original.id ? 0 : row.original.id,
+              );
+            }}
+          >
+            <Route aria-hidden="true" strokeWidth={isHighlighted ? 2.5 : 2} />
+          </Button>
+        )}
         {showMapButton && (
           <Button
             variant="ghost"
