@@ -48,7 +48,7 @@ extension EnvironmentValues {
 
 @MainActor @Observable
 final class ActivityShareModel {
-    enum Step { case configure, review, created }
+    enum Step { case configure, created }
     // Capture the exact set when opening; later filter/selection changes cannot widen it.
     let activities: [Activity]
     var expiresInHours = 7 * 24
@@ -69,7 +69,7 @@ final class ActivityShareModel {
     }
 
     func create(using service: ActivitySharingService) async {
-        guard step == .review, !isBusy, scopeError == nil,
+        guard step == .configure, !isBusy, scopeError == nil,
               retryAt.map({ $0 <= .now }) ?? true else { return }
         isBusy = true; errorMessage = nil; retryAt = nil
         defer { isBusy = false }

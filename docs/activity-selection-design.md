@@ -32,7 +32,7 @@ Several routes found by one tap are ordinary exploration. Combining several inde
 | Activity rows | Keep the existing sport-icon footprint. Outside Combine it identifies the sport; inside Combine it toggles membership and overlays a small checkmark on selected icons. Keep selected names/backgrounds identifiable in both modes. |
 | Zero selection | Map shows no selection controls until a route pick creates a group; List keeps its existing footer. Hide or disable unavailable Clear/Fit actions. |
 
-Combine is a direct toggle, not a menu of input modes. Clear is directly available and includes hidden members. Camera fitting remains independent of selection, restriction, Back and sheet sizing. One persistent header button uses **Fit selection** in Results and **Fit route** in detail; this work does not introduce another framing vocabulary.
+Combine is a direct toggle, not a menu of input modes. Clear is directly available and includes hidden members. Camera fitting remains independent of selection, restriction, Back and sheet sizing. The Map group Share action appears in Results only while Combine is on; an open detail shares that activity alone. Map result-row taps always open details; only the sport icon/checkmark changes membership. One persistent header button uses **Fit selection** in Results and **Fit route** in detail; this work does not introduce another framing vocabulary.
 
 Sport icons do not secretly select during ordinary browsing. There is no separate exclusive-selection button in List: row taps inspect, and Show on map explicitly selects a target. The earlier exclusive List-control alternative is no longer the implementation target.
 

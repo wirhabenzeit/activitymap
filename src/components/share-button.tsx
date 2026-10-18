@@ -35,7 +35,7 @@ import { ManageSharesDialog } from '~/components/share/manage-shares-dialog';
  * entirely (see `LegacyShareButton` below, kept only behind the flag).
  *
  * The dialog has two views: creating a new link (`CreateShareDialog`,
- * which itself has its own configure -> confirm -> created-link-shown-once
+ * which itself has its own configure/create -> created-link-shown-once
  * steps) and managing/revoking existing ones (`ManageSharesDialog`).
  * Reopening the dialog always lands back on "create" with fresh state - a
  * just-created token is never re-shown, only the links view's metadata

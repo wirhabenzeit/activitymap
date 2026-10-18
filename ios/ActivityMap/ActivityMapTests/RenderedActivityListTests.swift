@@ -177,7 +177,7 @@ extension RenderedRoutePickingTests {
         let button = try #require(host.accessibilityElement(label: activationLabel))
         let frame = button.accessibilityFrame
         #expect(frame.width >= 43.99 && frame.height >= 43.99, "The 44-point target must survive screen-coordinate rounding: \(frame)")
-        let rowLabel = store.isCombining ? "Remove \(activities[5].name) from selection" : "Details for \(activities[5].name)"
+        let rowLabel = "Details for \(activities[5].name)"
         let row = try #require(host.accessibilityElement(label: rowLabel))
         #expect(row.accessibilityFrame.maxX <= frame.minX, "Detail/selection and activation targets must not overlap")
         #expect(button.accessibilityActivate())
@@ -236,8 +236,8 @@ extension RenderedRoutePickingTests {
         #expect(store.activeActivityID == 6 && store.selectedActivityIDs == selection)
         picker.showResults()
         store.setCombine(true)
-        try await listWait { host.accessibilityElement(label: "Remove \(activities[5].name) from selection") != nil }
-        let member = try #require(host.accessibilityElement(label: "Remove \(activities[5].name) from selection"))
+        try await listWait { host.accessibilityElement(label: "Deselect \(activities[5].name)") != nil }
+        let member = try #require(host.accessibilityElement(label: "Deselect \(activities[5].name)"))
         #expect(member.accessibilityActivate())
         try await listWait { !store.selectedActivityIDs.contains(6) }
         picker.reconcile(with: store)

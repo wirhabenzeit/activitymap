@@ -32,6 +32,38 @@ struct SelectionShareButton: View {
     }
 }
 
+/// Map hit results are browse context; group sharing belongs to Combine mode.
+/// An open detail always narrows sharing to that activity, regardless of mode.
+struct MapActivityShareButton: View {
+    let picker: RoutePicker
+    let store: ActivityStore
+
+    var body: some View {
+        if !picker.activitiesToShare(in: store).isEmpty {
+            ActivityShareButton(activities: { picker.activitiesToShare(in: store) }) {
+                Image(systemName: "square.and.arrow.up")
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+            .foregroundStyle(AppTheme.accent)
+            .accessibilityLabel(picker.detailID == nil ? "Share selected activities" : "Share activity")
+            .accessibilityHint(picker.detailID == nil ? "Share the selected group, including activities hidden by filters" : "Share only the activity whose details are open")
+            .accessibilityIdentifier("map-share")
+        }
+    }
+}
+
+extension RoutePicker {
+    func activitiesToShare(in store: ActivityStore) -> [Activity] {
+        if let detailID {
+            guard candidateIDs.contains(detailID), store.visibleActivityIDs.contains(detailID),
+                  let activity = store.activity(id: detailID) else { return [] }
+            return [activity]
+        }
+        guard store.isCombining else { return [] }
+        return store.activities.filter { store.selectedActivityIDs.contains($0.id) }
+    }
+}
+
 struct ActivityShareView: View {
     @State private var model: ActivityShareModel
     @State private var currentTime = Date()
@@ -65,19 +97,13 @@ struct ActivityShareView: View {
                     } header: { Text(model.activities.count == 1 ? "1 activity" : "\(model.activities.count) activities") }
                     footer: { Text("Only these activities are included. Anyone with the link can view them until it expires or you revoke it. Activities marked private in Strava are omitted from the shared map.") }
 
-                    if model.step == .configure {
-                        Section {
-                            Picker("Expires after", selection: $model.expiresInHours) {
-                                ForEach(expiryOptions, id: \.self) { hours in Text(expiryLabel(hours)).tag(hours) }
-                            }
-                            Toggle("Show start and finish", isOn: $model.showRouteEnds)
-                        } footer: { Text("The first and last 200 m of each route and elevation profile are hidden unless you choose to show them.") }
-                    } else {
-                        Section("Review link") {
-                            LabeledContent("Expires after", value: expiryLabel(model.expiresInHours))
-                            LabeledContent("Start and finish", value: model.showRouteEnds ? "Shown" : "Hidden (200 m)")
+                    Section {
+                        Picker("Expires after", selection: $model.expiresInHours) {
+                            ForEach(expiryOptions, id: \.self) { hours in Text(expiryLabel(hours)).tag(hours) }
                         }
-                    }
+                        Toggle("Show start and finish", isOn: $model.showRouteEnds)
+                    } footer: { Text("The first and last 200 m of each route and elevation profile are hidden unless you choose to show them.") }
+                    .disabled(model.isBusy)
                     Section("Shown to recipients") {
                         Text("Route, elevation profile, name, sport, date and time, distance, moving time, elevation gain and average speed.")
                         Text("Heart rate, power, calories, social information, descriptions and photos are excluded.")
@@ -93,26 +119,18 @@ struct ActivityShareView: View {
                         }.accessibilityIdentifier("share-error")
                     }
                     Section {
-                        if model.step == .configure {
-                            Button("Continue") { model.step = .review }
-                                .foregroundStyle(AppTheme.accent)
-                                .disabled(cannotCreate)
-                                .accessibilityIdentifier("share-continue")
-                        } else {
-                            Button {
-                                guard let service else { return }
-                                Task { await model.create(using: service) }
-                            } label: {
-                                HStack {
-                                    Text(model.isBusy ? "Creating…" : "Create link")
-                                    if model.isBusy { Spacer(); ProgressView() }
-                                }
+                        Button {
+                            guard let service else { return }
+                            Task { await model.create(using: service) }
+                        } label: {
+                            HStack {
+                                Text(model.isBusy ? "Creating…" : "Create link")
+                                if model.isBusy { Spacer(); ProgressView() }
                             }
-                            .disabled(cannotCreate || model.isBusy || model.retryAt.map { $0 > currentTime } == true)
-                            .foregroundStyle(AppTheme.accent)
-                            .accessibilityIdentifier("share-confirm-create")
-                            Button("Back") { model.step = .configure }.foregroundStyle(AppTheme.accent).disabled(model.isBusy)
                         }
+                        .disabled(cannotCreate || model.isBusy || model.retryAt.map { $0 > currentTime } == true)
+                        .foregroundStyle(AppTheme.accent)
+                        .accessibilityIdentifier("share-create-link")
                     }
                 }
                 Section {
@@ -120,7 +138,7 @@ struct ActivityShareView: View {
                         .disabled(model.isBusy || service?.unavailableReason != nil || service == nil)
                 }
             }
-            .navigationTitle(model.step == .review ? "Create this link?" : "Share activities")
+            .navigationTitle("Share activities")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { dismiss() }.disabled(model.isBusy)
