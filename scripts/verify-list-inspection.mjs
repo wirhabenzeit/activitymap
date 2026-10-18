@@ -484,18 +484,54 @@ export default function Review() {
     '1',
   );
   await row(100).focus();
-  const scrollBefore = await page
-    .locator('#table-main')
-    .evaluate((table) => table.parentElement.scrollTop);
+  const inspectedRowIsVisible = () =>
+    row(100).evaluate((element) => {
+      const scroller = element.closest('table').parentElement;
+      const bounds = scroller.getBoundingClientRect();
+      const header = scroller.querySelector('thead').getBoundingClientRect();
+      const item = element.getBoundingClientRect();
+      return item.top >= header.bottom && item.bottom <= bounds.bottom;
+    });
+  assert(
+    await inspectedRowIsVisible(),
+    'Focused row is visible before inspection',
+  );
   await page.keyboard.press('Enter');
   await waitID('100');
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('#table-main [data-activity-id="100"]')
+        ?.getAttribute('aria-current') === 'true',
+  );
+  // Opening reserves the saved-hidden Date column and styles the inspected row.
+  // These layout changes can anchor scroll differently across platforms. Closing
+  // must retain the settled open offset exactly and return focus to that row.
+  const scrollBeforeClose = await row(100).evaluate(async (element) => {
+    await document.fonts.ready;
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    return element.closest('table').parentElement.scrollTop;
+  });
+  assert(await inspectedRowIsVisible(), 'Inspected row stays visible');
   await page.keyboard.press('Escape');
   await waitID(null);
+  await detail.waitFor({ state: 'detached' });
+  assert.equal(
+    await page.evaluate(() =>
+      document.activeElement?.getAttribute('data-activity-id'),
+    ),
+    '100',
+    'Closing returns keyboard focus to the inspected row',
+  );
+  assert(await inspectedRowIsVisible(), 'Returned row stays visible');
   assert.equal(
     await page
       .locator('#table-main')
       .evaluate((table) => table.parentElement.scrollTop),
-    scrollBefore,
+    scrollBeforeClose,
+    'Closing retains the exact settled inspection scroll offset',
   );
   console.log(
     'PASS saved columns, sorted stepping order, retained scroll and focus after paging away',
