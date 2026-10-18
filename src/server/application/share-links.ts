@@ -27,7 +27,7 @@ import {
  * #132). Like every other file under `~/server/application`, this has no
  * React/`next/*`/Route Handler imports (see
  * `~/server/application/framework-boundary.test.ts`) - transport code
- * (`~/server/share-actions.ts`'s `'use server'` actions, and
+ * (`~/app/api/v1/share-links`'s HTTP handlers for web/native clients, and
  * `~/app/share/[token]/page.tsx`) resolves an `Actor` (or, for the public
  * recipient view, nothing at all) and calls straight into this module.
  */

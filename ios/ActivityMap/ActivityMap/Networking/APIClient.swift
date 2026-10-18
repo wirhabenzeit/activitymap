@@ -89,9 +89,11 @@ nonisolated enum APIClient {
         _ path: String,
         body: Body,
         bearerToken: String? = nil,
+        baseURL: URL = APIConfiguration.baseURL,
+        session: URLSession = .shared,
         as payloadType: Payload.Type
     ) async throws -> Payload {
-        var request = URLRequest(url: APIConfiguration.endpoint(path))
+        var request = URLRequest(url: baseURL.appending(path: path), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
         request.httpMethod = "POST"
         applyCommonHeaders(&request, bearerToken: bearerToken)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -100,7 +102,7 @@ nonisolated enum APIClient {
         } catch {
             throw RequestError.encoding(String(describing: error))
         }
-        return try await perform(request, as: payloadType)
+        return try await perform(request, session: session, as: payloadType)
     }
 
     /// A body-less `POST`, e.g. `/api/v1/auth/logout`.

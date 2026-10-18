@@ -38,6 +38,7 @@ final class SyncController {
     let summaries: StreamSummaryLoader
     let summarySync: StreamSummarySync
     let editing = ActivityEditingService()
+    let sharing = ActivitySharingService()
     private(set) var editingInProgress = false
     let activities: ActivityStore
     private(set) var status: Status = .signedOut
@@ -113,6 +114,7 @@ final class SyncController {
         self.editSource = editSource
         editing.coordinator = self
         activities.activityEditing = editing
+        sharing.session = { [weak self] in self?.session }
     }
 
     /// Cancellation and a generation check protect both disk and visible state.

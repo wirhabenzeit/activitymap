@@ -1,3 +1,4 @@
+import { createShareLinkRequestSchema, createdShareLinkDTOSchema, shareLinkListDTOSchema, revokeShareLinkRequestSchema, revokeShareLinkResultSchema } from './share-links';
 import {
   activityCompactStreamSummaryDTOSchema,
   activityCompactStreamSummariesDTOSchema,
@@ -40,6 +41,11 @@ import {
  */
 export function buildOpenApiDocument() {
   const registry = z.registry<{ id: string }>();
+  registry.add(createShareLinkRequestSchema, { id: 'CreateShareLinkRequest' });
+  registry.add(responseEnvelope(createdShareLinkDTOSchema), { id: 'CreatedShareLinkResponse' });
+  registry.add(responseEnvelope(shareLinkListDTOSchema), { id: 'ShareLinkListResponse' });
+  registry.add(revokeShareLinkRequestSchema, { id: 'RevokeShareLinkRequest' });
+  registry.add(responseEnvelope(revokeShareLinkResultSchema), { id: 'RevokeShareLinkResponse' });
   registry.add(authenticationDTOSchema, { id: 'Authentication' });
   registry.add(currentUserDTOSchema, { id: 'CurrentUser' });
   registry.add(activityDTOSchema, { id: 'Activity' });
@@ -140,6 +146,39 @@ export function buildOpenApiDocument() {
       },
     },
     paths: {
+      '/api/v1/share-links': {
+        get: {
+          operationId: 'listShareLinks', summary: 'List the caller’s links without capability tokens', security,
+          responses: {
+            '200': { description: 'Share links', content: { 'application/json': { schema: ref('ShareLinkListResponse') } } },
+            '401': errorResponse('Authentication required'), '429': errorResponse('Rate limited'),
+            '500': errorResponse('Share request failed'),
+          },
+        },
+        post: {
+          operationId: 'createShareLink', summary: 'Create an explicitly confirmed, expiring activity share', security,
+          requestBody: { required: true, content: { 'application/json': { schema: ref('CreateShareLinkRequest') } } },
+          responses: {
+            '201': { description: 'Capability token returned once; open /share/{token} on this deployment', content: { 'application/json': { schema: ref('CreatedShareLinkResponse') } } },
+            '400': errorResponse('Invalid activity subset or expiry'), '401': errorResponse('Authentication required'),
+            '403': errorResponse('Activity ownership or origin denied'), '429': errorResponse('Rate limited'),
+            '500': errorResponse('Share request failed'),
+          },
+        },
+      },
+      '/api/v1/share-links/revoke': {
+        post: {
+          operationId: 'revokeShareLink', summary: 'Immediately revoke one of the caller’s links', security,
+          requestBody: { required: true, content: { 'application/json': { schema: ref('RevokeShareLinkRequest') } } },
+          responses: {
+            '200': { description: 'Revoked', content: { 'application/json': { schema: ref('RevokeShareLinkResponse') } } },
+            '400': errorResponse('Invalid link ID'), '401': errorResponse('Authentication required'),
+            '403': errorResponse('Origin denied'), '404': errorResponse('Link not found'),
+            '429': errorResponse('Rate limited'), '500': errorResponse('Share request failed'),
+          },
+        },
+      },
+
       '/api/v1/account/delete': {
         post: {
           operationId: 'deleteAccount',

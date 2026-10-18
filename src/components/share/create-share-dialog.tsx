@@ -34,7 +34,7 @@ import {
   type ShareLinkFieldOptions,
 } from '~/lib/sharing/fields';
 import { SHARED_ROUTE_END_TRIM_METERS } from '~/lib/sharing/route-trim';
-import { createShareLink } from '~/server/share-actions';
+import { createShareLink } from '~/lib/sharing/client';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -89,7 +89,7 @@ export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) 
     setIsCreating(true);
     try {
       const result = await createShareLink({
-        activityIds: selectedActivities.map((activity) => activity.id),
+        activityIds: selectedActivities.map((activity) => String(activity.id)),
         expiresInMs,
         fields,
       });

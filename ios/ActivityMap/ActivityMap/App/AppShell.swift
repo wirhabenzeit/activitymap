@@ -61,6 +61,7 @@ struct AppShell: View {
             }
         }
         .environment(\.listShellNavigation, listNavigation)
+        .environment(\.activitySharing, sync?.sharing)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { old, new in
             shellSize = new
             // A resize that switches between sheet and sidebar closes the old

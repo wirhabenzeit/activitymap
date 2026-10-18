@@ -21,6 +21,50 @@ nonisolated enum ActivityMapAPI {
 }
 
 nonisolated extension ActivityMapAPI {
+    /// The shape of `CreateShareLinkRequest.fields`.
+    struct CreateShareLinkRequestFields: Codable, Hashable, Sendable {
+        let showRouteEnds: Bool
+    }
+
+    struct CreateShareLinkRequest: Codable, Hashable, Sendable {
+        let activityIds: [String]
+        let expiresInMs: Int
+        let fields: CreateShareLinkRequestFields
+    }
+
+    struct CreatedShareLink: Codable, Hashable, Sendable {
+        let id: String
+        let token: String
+        let expiresAt: Date
+    }
+
+    /// The shape of `ShareLinkSummary.fields`.
+    struct ShareLinkSummaryFields: Codable, Hashable, Sendable {
+        let showRouteEnds: Bool
+    }
+
+    struct ShareLinkSummary: Codable, Hashable, Sendable {
+        let id: String
+        let createdAt: Date
+        let expiresAt: Date
+        let revokedAt: Date?
+        let fields: ShareLinkSummaryFields
+        let activityCount: Int
+        let status: ShareLinkStatus
+    }
+
+    struct ShareLinkList: Codable, Hashable, Sendable {
+        let links: [ShareLinkSummary]
+    }
+
+    struct RevokeShareLinkRequest: Codable, Hashable, Sendable {
+        let id: String
+    }
+
+    struct RevokeShareLinkResult: Codable, Hashable, Sendable {
+        let status: String
+    }
+
     struct StreamMetadata: Codable, Hashable, Sendable {
         let generation: String?
         let revision: String
@@ -804,6 +848,12 @@ nonisolated extension ActivityMapAPI {
         case idle = "idle"
         case scanning = "scanning"
         case confirming = "confirming"
+    }
+
+    enum ShareLinkStatus: String, Codable, Hashable, Sendable {
+        case active = "active"
+        case expired = "expired"
+        case revoked = "revoked"
     }
 
     enum SportType: String, Codable, Hashable, Sendable {

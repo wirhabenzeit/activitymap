@@ -209,6 +209,7 @@ struct SelectionBar: View {
                 .frame(maxWidth: expandsCount ? .infinity : nil, alignment: .leading)
             }
             if showsClear && !store.selectedActivityIDs.isEmpty {
+                SelectionShareButton(store: store, onNavigationBar: onNavigationBar)
                 Button { store.clearSelection() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle()) }
                     .accessibilityLabel("Clear selection").accessibilityIdentifier("clear-selection")
             }
