@@ -163,24 +163,40 @@ export async function runNativeHarness({
       'boot-status.log',
       180000,
     );
+    const commonArguments = [
+      '-project',
+      'ios/ActivityMap/ActivityMap.xcodeproj',
+      '-scheme',
+      'ActivityMap',
+      '-configuration',
+      'Debug',
+      '-destination',
+      `platform=iOS Simulator,id=${simulator}`,
+      '-destination-timeout',
+      '60',
+      '-derivedDataPath',
+      resolve(
+        process.env.IOS_DERIVED_DATA || join(root, '.quality/ios-derived'),
+      ),
+      ...nativeSuites.map((suite) => `-only-testing:${suite}`),
+      'CODE_SIGNING_ALLOWED=NO',
+      'ACTIVITYMAP_API_BASE_URL=http:$(SLASH)$(SLASH)127.0.0.1:1',
+      'MAPBOX_ACCESS_TOKEN=pk.offline-test',
+    ];
+    // The first hosted run spent 11m37s compiling before tests could launch.
+    // Give cold compilation its own bound so it cannot consume runtime's budget.
+    await runCommand('xcodebuild', ['build-for-testing', ...commonArguments], {
+      cwd: root,
+      log: join(output, 'xcodebuild-build.log'),
+      timeoutMs: 18 * 60 * 1000,
+      signal: abort.signal,
+      echo: false,
+    });
     await runCommand(
       'xcodebuild',
       [
-        'test',
-        '-project',
-        'ios/ActivityMap/ActivityMap.xcodeproj',
-        '-scheme',
-        'ActivityMap',
-        '-configuration',
-        'Debug',
-        '-destination',
-        `platform=iOS Simulator,id=${simulator}`,
-        '-destination-timeout',
-        '60',
-        '-derivedDataPath',
-        resolve(
-          process.env.IOS_DERIVED_DATA || join(root, '.quality/ios-derived'),
-        ),
+        'test-without-building',
+        ...commonArguments,
         '-resultBundlePath',
         resultBundle,
         '-parallel-testing-enabled',
@@ -191,14 +207,10 @@ export async function runNativeHarness({
         '90',
         '-maximum-test-execution-time-allowance',
         '180',
-        ...nativeSuites.map((suite) => `-only-testing:${suite}`),
-        'CODE_SIGNING_ALLOWED=NO',
-        'ACTIVITYMAP_API_BASE_URL=http:$(SLASH)$(SLASH)127.0.0.1:1',
-        'MAPBOX_ACCESS_TOKEN=pk.offline-test',
       ],
       {
         cwd: root,
-        log: join(output, 'xcodebuild.log'),
+        log: join(output, 'xcodebuild-test.log'),
         timeoutMs: 12 * 60 * 1000,
         signal: abort.signal,
         echo: false,
