@@ -9,6 +9,7 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     var expanded = false
     var compactHeader = false
     var detailScreen = false
+    var controlsInContent = false
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let content: () -> Content
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -31,7 +32,7 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
                     HStack { periodLabel; Spacer(minLength: 8); controls() }
                     VStack(alignment: .leading, spacing: 8) { periodLabel; controls() }
                 }
-            } else if shortViewportLimit != nil && !typeSize.isAccessibilitySize {
+            } else if shortViewportLimit != nil && !typeSize.isAccessibilitySize && !controlsInContent {
                 // iPhone landscape: one header row where the card is wide enough.
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
@@ -67,7 +68,9 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
                 expandButton
             }
             .frame(minHeight: AppTheme.minimumTarget)
-            if compactHeader && !typeSize.isAccessibilitySize {
+            if controlsInContent {
+                EmptyView()
+            } else if compactHeader && !typeSize.isAccessibilitySize {
                 ViewThatFits(in: .horizontal) {
                     HStack {
                         periodLabel.fixedSize()
@@ -84,9 +87,11 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
             }
         }
     }
-    private var periodLabel: some View {
-        Text(period).font(AppTheme.Typography.caption).foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+    @ViewBuilder private var periodLabel: some View {
+        if !period.isEmpty {
+            Text(period).font(AppTheme.Typography.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

@@ -82,9 +82,9 @@ export type TileContext = {
   selectedActivityId?: number | null;
   focusChartHeight?: number;
   inlineDetails?: boolean;
+  // Compact calendar controls share a row with its measured active-day count.
+  calendarControls?: ReactNode;
   calendar?: {
-    year: number | null;
-    setYear: (year: number | null) => void;
     selectedDay: number | null;
     setSelectedDay: (day: number | null) => void;
   };
@@ -97,7 +97,7 @@ export type TileView = {
   expandable: boolean;
   period: (context: TileContext, option?: string) => string;
   // The period line while expanded, when it differs from the face's.
-  expandedPeriod?: string;
+  expandedPeriod?: string | null;
   // Null leaves the face without a headline number.
   summary: (
     context: TileContext,
@@ -536,9 +536,8 @@ const weeklyVolumeView: TileView = {
 
 const activityCalendarView: TileView = {
   expandable: true,
-  period: () => 'Last 12 months',
-  // The period navigation names the range; label the colour switch instead.
-  expandedPeriod: 'Colour by',
+  period: () => 'Recent activity',
+  expandedPeriod: null,
   summary: () => null,
   face: (context, option, expanded) => (
     <CalendarHistory

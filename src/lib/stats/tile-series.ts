@@ -234,6 +234,44 @@ export function calendarMonths(today: number, first = sameDateLastYear(today)) {
   });
 }
 
+// Monday–Sunday rows, with chronological week columns. Null cells pad only
+// the two partial boundary weeks; every in-range calendar day appears once.
+export function calendarWeeks(today: number, first = sameDateLastYear(today)) {
+  if (first > today) return [];
+  const start = mondayOf(first);
+  return Array.from(
+    { length: Math.floor((today - start) / 7) + 1 },
+    (_, index) => {
+      const week = start + index * 7;
+      return {
+        start: week,
+        days: Array.from({ length: 7 }, (_, weekday) => {
+          const day = week + weekday;
+          return day >= first && day <= today ? day : null;
+        }),
+      };
+    },
+  );
+}
+
+// Reserve space for the summary, month labels and legend, then fit recent
+// week columns at a readable cell size. Include the current partial week.
+export function calendarSummaryWindow(
+  today: number,
+  width: number,
+  height: number,
+) {
+  const cellSize = Math.max(
+    14,
+    Math.min(18, Math.floor((height - 152) / 7) - 2),
+  );
+  const weeks = Math.max(
+    4,
+    Math.min(52, Math.floor((width - 40 + 2) / (cellSize + 2))),
+  );
+  return { weeks, first: mondayOf(today) - (weeks - 1) * 7, cellSize };
+}
+
 // Include the partial week as well as the trend in the visible domain.
 export function volumeDomain(values: readonly number[]): [number, number] {
   if (values.length === 0) return [0, 1];

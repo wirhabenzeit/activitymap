@@ -52,8 +52,7 @@ struct StatsDashboardTile: View {
         case .yearToDate: "\(year.formatted(.number.grouping(.never))) vs \((year - 1).formatted(.number.grouping(.never)))"
         case .yearPace: "\(year.formatted(.number.grouping(.never))) projection"
         case .records: expanded ? "Personal bests" : "This year"
-        // Expanded, the period navigation names the range; label the colour switch instead.
-        case .activityCalendar: expanded ? "Colour by" : "Last 12 months"
+        case .activityCalendar: ""
         case .sportMix: displayedOption == .allTime ? "All time by moving time" : "\(year.formatted(.number.grouping(.never))) by moving time"
         case .typicalWeek: "Per week · last 11 full weeks"
         default: "Last 12 months"
@@ -82,7 +81,8 @@ struct StatsDashboardTile: View {
     var body: some View {
         StatsTileSurface(title: tile.title, period: period,
                          expand: StatsDashboard.expandable(tile.id) && !(tile.id == .sportMix && availableWidth >= 760 && !expanded) ? toggleExpansion : nil,
-                         expanded: expanded, compactHeader: pilot, detailScreen: detailScreen) {
+                         expanded: expanded, compactHeader: pilot, detailScreen: detailScreen,
+                         controlsInContent: tile.id == .activityCalendar && !expanded) {
             controls
         } content: {
             if let displayed {
@@ -122,7 +122,7 @@ struct StatsDashboardTile: View {
                             metric == .count ? "#" : metric.displayUnit
                         } else { StatsDisplay.option(value) }
                     }, accessibilityLabel: StatsDisplay.option)
-                .frame(width: tile.id == .sportMix && !typeSize.isAccessibilitySize ? 176 : nil)
+                .frame(width: (tile.id == .sportMix || tile.id == .activityCalendar) && !typeSize.isAccessibilitySize ? 176 : nil)
             }
         }
     }
@@ -166,7 +166,10 @@ struct StatsDashboardTile: View {
         case .records(let current, let allTime, let best30):
             StatsRecordsDetail(current: current, allTime: allTime, best30: best30, year: year, expanded: expanded, filtered: filtered, openActivity: openActivity)
         case .calendar(let rolling, let years):
-            StatsCalendarDetail(rolling: rolling, years: years, today: today, option: displayedOption ?? .sport, expanded: expanded, openActivity: openActivity, expand: toggleExpansion)
+            StatsCalendarDetail(rolling: rolling, years: years, today: today, option: displayedOption ?? .sport,
+                expanded: expanded, openActivity: openActivity, expand: toggleExpansion,
+                summaryControls: expanded ? nil : AnyView(controls),
+                background: detailScreen ? AppTheme.contentBackground : AppTheme.surface)
         case .mix(let shares, let hours, let breakdown):
             if let top = shares.first {
                 Text("\(Text("\(StatsDisplay.number(top.share * 100))%").font(AppTheme.Typography.metric)) \(Text(top.sport.name).font(.caption).foregroundColor(.secondary))").monospacedDigit().fixedSize(horizontal: false, vertical: true)

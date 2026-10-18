@@ -27,12 +27,13 @@ import {
 } from '~/lib/stats/history';
 import {
   dailyTotals,
+  calendarSummaryWindow,
   dateOfDay,
   monthStart,
   yearStart,
 } from '~/lib/stats/tile-series';
 import { ActivityRow } from './activity-row';
-import { MonthRows } from './calendar';
+import { WeekdayRows } from './calendar';
 import { Measure, SportArea } from './charts';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import { statsFormat, monthName, shortDate } from './format';
@@ -305,6 +306,35 @@ export function CalendarHistory({
   colorBy: 'sport' | StatsMetric;
   expanded: boolean;
 }) {
+  if (expanded)
+    return (
+      <CalendarHistoryContent context={context} colorBy={colorBy} expanded />
+    );
+  return (
+    <Measure retainSize className="flex min-h-0 flex-1 flex-col">
+      {({ width, height }) => (
+        <CalendarHistoryContent
+          context={context}
+          colorBy={colorBy}
+          expanded={false}
+          compactWindow={calendarSummaryWindow(context.today, width, height)}
+        />
+      )}
+    </Measure>
+  );
+}
+
+function CalendarHistoryContent({
+  context,
+  colorBy,
+  expanded,
+  compactWindow,
+}: {
+  context: TileContext;
+  colorBy: 'sport' | StatsMetric;
+  expanded: boolean;
+  compactWindow?: ReturnType<typeof calendarSummaryWindow>;
+}) {
   const { formatWithUnit } = statsFormat(context.units);
   const dateLabel = (day: number) =>
     formatPreferredDate(dateOfDay(day), context.dateFormat, undefined, {
@@ -313,27 +343,18 @@ export function CalendarHistory({
       year: 'numeric',
     });
 
-  const currentYear = dateOfDay(context.today).getUTCFullYear();
-  const earliestYear = dateOfDay(
-    firstActivityDay(context.activities, context.today),
-  ).getUTCFullYear();
-  const [localYear, setLocalYear] = useState<number | null>(null);
   const [localDay, setLocalDay] = useState<number | null>(null);
-  const { year, setYear, selectedDay, setSelectedDay } = context.calendar ?? {
-    year: localYear,
-    setYear: setLocalYear,
+  const { selectedDay, setSelectedDay } = context.calendar ?? {
     selectedDay: localDay,
     setSelectedDay: setLocalDay,
   };
-  const selectedYear = expanded ? year : null;
-  const first =
-    selectedYear === null
-      ? sameDateLastYear(context.today)
-      : yearStart(selectedYear);
-  const last =
-    selectedYear === null
-      ? context.today
-      : Math.min(context.today, yearStart(selectedYear + 1) - 1);
+  const first = expanded
+    ? Math.min(
+        sameDateLastYear(context.today),
+        firstActivityDay(context.activities, context.today),
+      )
+    : compactWindow!.first;
+  const last = context.today;
   const { days, dominantSport, secondSport, mixedDays } = useMemo(
     () => calendarDays(context.activities, first, last),
     [context.activities, first, last],
@@ -347,102 +368,44 @@ export function CalendarHistory({
   return (
     <>
       {expanded && (
-        <div className="space-y-2 pt-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-11"
-              aria-label="Previous calendar year"
-              disabled={(year ?? currentYear) <= earliestYear}
-              onClick={() => {
-                setYear((year ?? currentYear) - 1);
-                setSelectedDay(null);
-              }}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Select
-              value={year === null ? 'rolling' : String(year)}
-              onValueChange={(value) => {
-                setYear(value === 'rolling' ? null : Number(value));
-                setSelectedDay(null);
-              }}
-            >
-              <SelectTrigger
-                aria-label="Calendar period"
-                className="h-11 w-[170px]"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="rolling">Last 12 months</SelectItem>
-                {Array.from(
-                  {
-                    length:
-                      currentYear -
-                      Math.min(earliestYear, year ?? earliestYear) +
-                      1,
-                  },
-                  (_, i) => currentYear - i,
-                ).map((value) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-11"
-              aria-label="Next calendar year"
-              disabled={year === null || year >= currentYear}
-              onClick={() => {
-                setYear(Math.min(currentYear, (year ?? currentYear) + 1));
-                setSelectedDay(null);
-              }}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-          <p className="text-sm">
-            <strong className="font-mono">{days.size}</strong> active days ·{' '}
-            {dateLabel(first)} – {dateLabel(last)}
-          </p>
-        </div>
+        <p className="pt-2 text-sm">
+          <strong className="font-mono">{days.size}</strong> active days ·{' '}
+          {dateLabel(first)} – {dateLabel(last)}
+        </p>
       )}
       {!expanded && (
         <div className="space-y-1">
-          <p>
-            <strong className="font-mono text-[28px] font-medium">
-              {days.size}
-            </strong>
-            <span className="ml-1 text-xs text-muted-foreground">
-              active days
-            </span>
-          </p>
+          <div
+            data-calendar-summary-header
+            className="flex min-h-8 items-center justify-between gap-2"
+          >
+            <p className="flex items-baseline gap-1 whitespace-nowrap">
+              <strong className="font-mono text-xl font-medium leading-none">
+                {days.size}
+              </strong>
+              <span className="text-xs text-muted-foreground">active days</span>
+            </p>
+            {context.calendarControls}
+          </div>
           <p className="text-xs text-muted-foreground">
             {Math.round((days.size / (last - first + 1)) * 100)}% of days in the
-            last 12 months
+            last {compactWindow!.weeks} weeks
           </p>
         </div>
       )}
       <div
         className={
-          expanded
-            ? 'grid min-w-0 gap-5 @min-[1000px]:grid-cols-[minmax(0,3fr)_minmax(300px,2fr)]'
-            : 'flex min-h-0 flex-1 flex-col'
+          expanded ? 'grid min-w-0 gap-5' : 'flex min-h-0 flex-1 flex-col'
         }
       >
         <div
           className={
-            expanded
-              ? 'flex h-[380px] flex-col'
-              : 'flex min-h-0 flex-1 flex-col'
+            expanded ? 'flex min-w-0 flex-col' : 'flex min-h-0 flex-1 flex-col'
           }
         >
-          <MonthRows
+          <WeekdayRows
+            expanded={expanded}
+            cellSize={expanded ? 20 : compactWindow!.cellSize}
             units={context.units}
             dateFormat={context.dateFormat}
             key={`${first}-${last}`}
@@ -454,11 +417,16 @@ export function CalendarHistory({
             totals={totals}
             palette={context.palette}
             colorBy={colorBy}
-            selectedDay={selectedDay}
+            selectedDay={
+              selectedDay !== null &&
+              selectedDay >= first &&
+              selectedDay <= last
+                ? selectedDay
+                : null
+            }
             onSelectDay={(day) => {
               setSelectedDay(day);
               if (!expanded) {
-                setYear(null);
                 context.onExpand?.();
               }
             }}
@@ -484,7 +452,8 @@ export function CalendarHistory({
             }
           />
         </div>
-        {selectedDay !== null &&
+        {expanded &&
+          selectedDay !== null &&
           selectedDay >= first &&
           selectedDay <= last && (
             <section

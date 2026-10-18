@@ -821,7 +821,7 @@ import Testing
             if id == .records { state.inspection(id)?.recordsRange = .allTime }
             if id == .activityCalendar {
                 #expect(state.inspection(id)?.calendarDay == StatsDashboardSource(store).today)
-                state.inspection(id)?.calendarYear = StatsDates.parts(StatsDashboardSource(store).today).year!
+                state.inspection(id)?.calendarWeek = StatsDates.monday(StatsDashboardSource(store).today) - 14
             }
             try host.capture("detail-\(id.rawValue)-\(variant)")
             navigation.popViewController(animated: true)
@@ -836,7 +836,7 @@ import Testing
             #expect(abs(root.contentSize.height - height) < 1)
         }
         #expect(state.inspection(.records)?.recordsRange == .allTime)
-        #expect(state.inspection(.activityCalendar)?.calendarYear == StatsDates.parts(StatsDashboardSource(store).today).year!)
+        #expect(state.inspection(.activityCalendar)?.calendarWeek == StatsDates.monday(StatsDashboardSource(store).today) - 14)
         #expect(state.option(.weeklyVolume) == .elevation)
         #expect(state.inspection(.weeklyVolume) === volume && volume.volumeRange == .months)
         state.toggleExpansion(.records)

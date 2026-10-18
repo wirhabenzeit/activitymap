@@ -8,7 +8,7 @@ import { dayFromISODate, type StatsActivity } from '~/lib/stats/tile-data';
 import { tileView, type TileContext } from './tiles';
 import { tilePalette, formatDailyRate, statsFormat } from './format';
 import { PlainBars } from './charts';
-import { MonthRows } from './calendar';
+import { WeekdayRows } from './calendar';
 import { focusTiles } from './focus';
 import { statsCapabilitiesSchema } from '../../../../scripts/lib/stats-parity-schema';
 
@@ -152,10 +152,10 @@ void test('all-time sport mix uses the same range for summary, chart and table',
   );
 });
 
-void test('calendar renders the counted starting month with accessible metric values', () => {
+void test('calendar renders every day in the rolling year with accessible metric values', () => {
   const day = dayFromISODate('2025-09-15');
   const html = renderToStaticMarkup(
-    createElement(MonthRows, {
+    createElement(WeekdayRows, {
       today,
       dominantSport: new Map([[day, 'run' as const]]),
       totals: new Map([
@@ -367,18 +367,22 @@ void test('expanded training history exposes bounded presets and period totals',
   assert.match(view.summary(context, 'distance')!.unit, /last 28 days/);
 });
 
-void test('calendar history supports year selection, and mixed days stay identifiable', () => {
+void test('calendar history scrolls across years, and mixed days stay identifiable', () => {
   const view = tileView('activityCalendar')!;
   const html = renderToStaticMarkup(
     view.face(context, 'sport', true) as ReactElement,
   );
-  assert.match(html, /Calendar period/);
-  assert.match(html, /role="combobox"/);
+  assert.match(html, /Activity calendar history/);
+  assert.match(html, /data-calendar-scroll/);
+  assert.doesNotMatch(
+    html,
+    /Calendar period|Previous calendar year|Next calendar year|role="combobox"/,
+  );
   assert.doesNotMatch(html, /Inspect date|Inspect day|role="dialog"/);
   assert.doesNotMatch(html, /calendar day/);
   const day = dayFromISODate('2024-02-29');
   const mixed = renderToStaticMarkup(
-    createElement(MonthRows, {
+    createElement(WeekdayRows, {
       today: dayFromISODate('2024-12-31'),
       first: dayFromISODate('2024-01-01'),
       selectedDay: day,
@@ -600,7 +604,7 @@ void test('imperial preferences reach Stats headlines, records and calendar acce
   assert.match(records, /2026-08-31/);
   assert.doesNotMatch(records, /10 km|100 m/);
   const calendar = renderToStaticMarkup(
-    createElement(MonthRows, {
+    createElement(WeekdayRows, {
       today,
       dominantSport: new Map([[today, 'ride' as const]]),
       totals: new Map([
