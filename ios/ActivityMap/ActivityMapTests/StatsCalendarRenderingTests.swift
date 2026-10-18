@@ -6,6 +6,7 @@ import Testing
 
 @MainActor @Suite(.serialized) struct StatsCalendarRenderingTests {
     private func fixture() async throws -> (StatsCalendarSnapshot, [Int: StatsCalendarSnapshot], Int) {
+        try await calendarWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
         let library = try GalleryLibrary.load()
         let store = ActivityStore(activities: library.activities, listPresentation: ActivityListPresentation(defaults: nil))
         let today = StatsDates.day("2026-09-22")

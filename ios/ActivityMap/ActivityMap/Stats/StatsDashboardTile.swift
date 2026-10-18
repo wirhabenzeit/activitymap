@@ -43,17 +43,20 @@ struct StatsDashboardTile: View {
     private var displayedOption: StatsToggleOption? { displayed?.option ?? option }
     private var metric: StatsMetric { displayedOption.flatMap { StatsMetric(rawValue: $0.rawValue) } ?? .distance }
     private var year: Int { StatsDates.parts(today).year! }
+    private var headlineControls: Bool {
+        !expanded && [.weeklyVolume, .monthVsLastMonth, .yearToDate, .yearPace].contains(tile.id)
+    }
     private var period: String {
         switch tile.id {
         // The title already says "This week"; name its dates instead.
         case .thisWeek: "\(StatsDisplay.shortDate(StatsDates.monday(today))) – \(StatsDisplay.shortDate(StatsDates.monday(today) + 6))"
-        case .weeklyVolume: expanded ? "Volume by sport" : "12-week trend"
-        case .monthVsLastMonth: "\(comparisonLabels.current) vs \(comparisonLabels.previous)"
-        case .yearToDate: "\(year.formatted(.number.grouping(.never))) vs \((year - 1).formatted(.number.grouping(.never)))"
+        case .weeklyVolume: expanded ? "Volume by sport" : "Last 28 days · 12-week trend"
+        case .monthVsLastMonth: expanded ? "\(comparisonLabels.current) vs \(comparisonLabels.previous)" : "\(comparisonLabels.current) so far · vs \(comparisonLabels.previous)"
+        case .yearToDate: expanded ? "\(year.formatted(.number.grouping(.never))) vs \((year - 1).formatted(.number.grouping(.never)))" : "\(year.formatted(.number.grouping(.never))) so far · vs \((year - 1).formatted(.number.grouping(.never)))"
         case .yearPace: "\(year.formatted(.number.grouping(.never))) projection"
         case .records: expanded ? "Personal bests" : "This year"
         case .activityCalendar: ""
-        case .sportMix: displayedOption == .allTime ? "All time by moving time" : "\(year.formatted(.number.grouping(.never))) by moving time"
+        case .sportMix: !expanded ? "Moving time" : displayedOption == .allTime ? "All time by moving time" : "\(year.formatted(.number.grouping(.never))) by moving time"
         case .typicalWeek: "Per week · last 11 full weeks"
         default: "Last 12 months"
         }
@@ -83,7 +86,7 @@ struct StatsDashboardTile: View {
                          expand: StatsDashboard.expandable(tile.id) && !(tile.id == .sportMix && availableWidth >= 760 && !expanded) ? toggleExpansion : nil,
                          expanded: expanded, compactHeader: pilot, detailScreen: detailScreen,
                          controlsInContent: tile.id == .activityCalendar && !expanded) {
-            controls
+            if !headlineControls || displayed == nil { controls }
         } content: {
             if let displayed {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
@@ -93,6 +96,12 @@ struct StatsDashboardTile: View {
                     if displayed.option != option {
                         ProgressView().controlSize(.small)
                             .accessibilityLabel("Updating \(tile.title)")
+                            // A compact picker now occupies the headline row.
+                            // Keep refresh feedback above it, beside the period.
+                            .alignmentGuide(.top) { dimensions in
+                                headlineControls ? dimensions[.bottom] + AppTheme.Spacing.medium : dimensions[.top]
+                            }
+                            .allowsHitTesting(false)
                     }
                 }
             }
@@ -108,7 +117,7 @@ struct StatsDashboardTile: View {
         if let toggle = tile.toggle {
             let metrics = toggle.options.compactMap { StatsMetric(rawValue: $0.rawValue) }
             if metrics.count == toggle.options.count {
-                StatsMetricPicker(metrics: metrics, selection: Binding(
+                StatsMetricPicker(title: "\(tile.title): \(toggle.label)", metrics: metrics, selection: Binding(
                     get: { option.flatMap { StatsMetric(rawValue: $0.rawValue) } ?? .distance },
                     set: { option = StatsToggleOption(rawValue: $0.rawValue) }
                 ))
@@ -122,7 +131,6 @@ struct StatsDashboardTile: View {
                             metric == .count ? "#" : metric.displayUnit
                         } else { StatsDisplay.option(value) }
                     }, accessibilityLabel: StatsDisplay.option)
-                .frame(width: (tile.id == .sportMix || tile.id == .activityCalendar) && !typeSize.isAccessibilitySize ? 176 : nil)
             }
         }
     }
@@ -238,10 +246,36 @@ struct StatsDashboardTile: View {
     }
 
     private func headline(_ value: Double, metric: StatsMetric, suffix: String = "") -> some View {
-        headline(metric.displayValue(value), unit: (metric == .count ? "activities" : metric.displayUnit) + suffix,
+        headline(metric.displayValue(value), unit: (metric == .count ? "activities" : metric.displayUnit) + (headlineControls ? "" : suffix),
                  decimals: metric == .time && abs(value) < 10 ? 1 : 0)
     }
     private func headline(_ value: Double, unit: String, decimals: Int = 0) -> some View {
+        Group {
+            if headlineControls {
+                if typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 4) {
+                        headlineValue(value, unit: unit, decimals: decimals)
+                        controls
+                    }
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            headlineValue(value, unit: unit, decimals: decimals).fixedSize()
+                            Spacer(minLength: 0)
+                            controls.fixedSize()
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            headlineValue(value, unit: unit, decimals: decimals)
+                            controls
+                        }
+                    }
+                }
+            } else {
+                headlineValue(value, unit: unit, decimals: decimals)
+            }
+        }
+    }
+    private func headlineValue(_ value: Double, unit: String, decimals: Int = 0) -> some View {
         Group {
             if pilot {
                 Text("\(Text(StatsDisplay.number(value, decimals: decimals)).font(tile.isPrimary ? AppTheme.Typography.statsHeadline : AppTheme.Typography.metric)) \(Text(unit).font(.caption).foregroundColor(.secondary))")
