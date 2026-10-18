@@ -409,3 +409,44 @@ On portrait phones, the middle map sheet shows the activity title/date, a compac
 Swift Charts chooses round distance ticks automatically. Native chart selection drives a short distance/altitude readout in a reserved row above the plot, with opaque background and primary text. Web uses the same layout, units, rounding and light/dark accent colors. Drag across the plot to inspect a recorded distance/elevation pair. In Map detail, the corresponding aligned GPS sample moves a contrasting dot without refitting the camera or rebuilding routes. The cursor uses full emissive strength, matching the route layers so Standard night lighting does not dim it. Releasing the drag clears it. Missing GPS never produces an estimated position. VoiceOver exposes the range/distance description, adjustable sample selection and a clear-selection action. The native activity pager yields while a sample is selected.
 
 `ElevationProfileTests` and `ElevationLifecycleTests` cover sample validation, short/flat/repeated-distance routes, GPS alignment, time-only summaries, retry states, old offline caches and invalidation. The rendered detail tests cover phone/tablet/large text, visible demand, detail switching and map cursor/pager integration. A native phone-sheet regression checks that the complete chart and unobscured map cursor are visible together for single and multiple selected activities. Physical-device touch and VoiceOver certification remains part of #228.
+
+## Photo request and decode pipeline
+
+`PhotoImageCache` coalesces gallery demand and adjacent-page prefetch for the same
+photo URL, revision and decoded size (256 or 2048 pixels). `PhotoByteCache` also
+shares downloads between sizes. Work belongs to the cache: cancelling a consumer
+rejects its result after shared work completes, without cancelling another
+consumer's download or decode. If all consumers leave, work completes for reuse;
+network resources retain their 45-second timeout. Scope/metadata reconciliation
+cancels and fences obsolete work. In-flight entries retire on both success and
+failure, so Retry starts a fresh attempt. Invalid-image cleanup includes the
+revision fence, including a failed old decode arriving after replacement bytes.
+
+ImageIO thumbnail creation and immediate decompression run in a detached task.
+UIImage construction and the 16 MiB decoded-image cache remain on MainActor.
+The byte cache retains its 64 MiB disk budget, 12 MiB file limit, protected atomic
+writes, backup exclusion, offline reopen and metadata pruning.
+
+`PhotoPipelineTests` gates downloads and decodes to cover shared work, different
+sizes, cancellation, network/invalid-image retry, suspended decode invalidation
+on logout/account/metadata changes, and old invalid-image cleanup. The existing
+`PhotoGalleryTests` exercise adjacent-page demand and rendered viewer behavior.
+
+Representative synthetic evidence, 18 October 2026, Xcode 27.1 Debug,
+iPhone 18 Pro / iOS 27.0 simulator: five concurrent 2048-pixel consumers of one
+2400×1600 JPEG produced **5 downloads / 5 decodes / 5 main-thread decodes** in a
+reconstruction of the old cache-miss path and **1 / 1 / 0** through the shared
+pipeline. Aggregate time inside ImageIO was **114.52 ms before / 21.64 ms after**
+in that sample. The baseline omits disk bookkeeping, so these are decode-work
+measurements rather than total request latency. The mixed-size regression
+produces one download and one decode per requested size. Reproduce the synthetic
+measurement with `PhotoPipelineTests/syntheticBeforeAfterDemandAndMainThreadEvidence`;
+it prints `PHOTO_PIPELINE_SYNTHETIC` and asserts counts, never timing thresholds.
+These are synthetic simulator measurements, not physical-device frame-time or
+Instruments results. Named-device gallery scrolling, memory pressure and frame
+budgets remain #229; no physical-device performance claim is made here.
+
+The focused pipeline/gallery/map-policy suites passed 21 test methods on that
+simulator. All three broader `RenderedMapPhotoTests` timed out discovering map
+pins or the layers menu before photo demand; the unchanged pre-#414 photo cache
+reproduced those same failures. This rendering limitation needs separate review.

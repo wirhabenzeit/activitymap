@@ -21,6 +21,8 @@ actor PhotoByteCache {
     private var directory: URL?
     private var allowed: Set<String> = []
     private var entries: [String: Entry] = [:]
+    private var requests: [String: Task<Data, Error>] = [:]
+    private var requestGeneration = UUID()
 
     init(root: URL = URL.cachesDirectory.appending(path: "ActivityMapPhotos", directoryHint: .isDirectory),
          budget: Int = 64 * 1024 * 1024, fileLimit: Int = 12 * 1024 * 1024,
@@ -54,6 +56,9 @@ actor PhotoByteCache {
 
     /// Reconciliation includes snapshots/rebootstrap, changed URLs and removals.
     func configure(scope: StoreScope?, photos: [Photo], revision: UUID) throws {
+        requests.values.forEach { $0.cancel() }
+        requests.removeAll()
+        requestGeneration = UUID()
         self.revision = revision
         directory = nil
         entries = [:]
@@ -91,6 +96,7 @@ actor PhotoByteCache {
     }
 
     func data(photoID: String, url: URL, revision expected: UUID) async throws -> Data {
+        try Task.checkCancellation()
         let key = Self.key(photoID: photoID, url: url)
         guard revision == expected, allowed.contains(key), let directory else { throw Failure.obsolete }
         let file = directory.appending(path: key)
@@ -100,18 +106,37 @@ actor PhotoByteCache {
             try? save()
             return cached
         }
-        let data = try await fetch(url)
+        // Work belongs to the cache, not to the first view/prefetch consumer.
+        // Consumer cancellation never cancels a download another size/view needs.
+        let generation = requestGeneration
+        let requestKey = "\(generation):\(key)"
+        let request: Task<Data, Error>
+        if let pending = requests[requestKey] {
+            request = pending
+        } else {
+            request = Task {
+                defer { requests.removeValue(forKey: requestKey) }
+                let data = try await fetch(url)
+                guard revision == expected, requestGeneration == generation, allowed.contains(key), self.directory == directory else { throw Failure.obsolete }
+                try Task.checkCancellation()
+                guard data.count <= fileLimit else { throw Failure.oversized }
+                try data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                entries[key] = Entry(photoID: photoID, url: url.absoluteString, bytes: data.count, accessedAt: Date())
+                try evict()
+                try save()
+                return data
+            }
+            requests[requestKey] = request
+        }
+        let data = try await request.value
+        guard revision == expected, requestGeneration == generation, allowed.contains(key), self.directory == directory else { throw Failure.obsolete }
         try Task.checkCancellation()
-        guard revision == expected, allowed.contains(key), self.directory == directory else { throw Failure.obsolete }
-        guard data.count <= fileLimit else { throw Failure.oversized }
-        try data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        entries[key] = Entry(photoID: photoID, url: url.absoluteString, bytes: data.count, accessedAt: Date())
-        try evict()
-        try save()
         return data
     }
 
-    func remove(photoID: String, url: URL) throws {
+    func remove(photoID: String, url: URL, revision expected: UUID) throws {
+        // A delayed invalid decode must not delete the new account/revision's file.
+        guard revision == expected else { return }
         let key = Self.key(photoID: photoID, url: url)
         entries.removeValue(forKey: key)
         if let directory { try? FileManager.default.removeItem(at: directory.appending(path: key)) }
@@ -139,14 +164,18 @@ final class PhotoImageCache {
     private let memory = NSCache<NSString, UIImage>()
     private(set) var revision = UUID()
     private var allowed: Set<String> = []
+    private var requests: [String: Task<UIImage, Error>] = [:]
+    private let decode: @Sendable (Data, Int) throws -> CGImage
 
-    init(bytes: PhotoByteCache = PhotoByteCache()) {
+    init(bytes: PhotoByteCache = PhotoByteCache(),
+         decode: @escaping @Sendable (Data, Int) throws -> CGImage = PhotoImageCache.decode) {
         self.bytes = bytes
+        self.decode = decode
         memory.totalCostLimit = 16 * 1024 * 1024
     }
 
     func configure(scope: StoreScope?, photos: [Photo]) async throws {
-        revision = UUID()
+        invalidate()
         memory.removeAllObjects()
         allowed = Set(photos.map(\.id))
         try await bytes.configure(scope: scope, photos: photos, revision: revision)
@@ -154,34 +183,72 @@ final class PhotoImageCache {
 
     /// Clear presentation synchronously; pending requests cannot publish after this.
     func reset() {
-        revision = UUID()
+        invalidate()
         allowed = []
         memory.removeAllObjects()
         let current = revision
         Task { try? await bytes.configure(scope: nil, photos: [], revision: current) }
     }
 
+    private func invalidate() {
+        revision = UUID()
+        requests.values.forEach { $0.cancel() }
+        requests.removeAll()
+    }
+
+    /// Cache-owned tasks complete even if every consumer leaves; the bounded byte
+    /// download has a resource timeout. Scope/metadata invalidation cancels them.
+    /// Each consumer checks its own cancellation before receiving a result.
     func image(photo: Photo, use: Photo.ImageUse) async throws -> UIImage {
+        try Task.checkCancellation()
         guard allowed.contains(photo.id), let variant = photo.variant(use) else { throw PhotoByteCache.Failure.unavailable }
         let current = revision
         let edge = use == .thumbnail ? 256 : 2048
-        let key = "\(PhotoByteCache.key(photoID: photo.id, url: variant.url)):\(edge)" as NSString
-        if let cached = memory.object(forKey: key) { return cached }
-        let data = try await bytes.data(photoID: photo.id, url: variant.url, revision: current)
-        try Task.checkCancellation()
+        let key = "\(current):\(PhotoByteCache.key(photoID: photo.id, url: variant.url)):\(edge)"
+        if let cached = memory.object(forKey: key as NSString) { return cached }
+        let request: Task<UIImage, Error>
+        if let pending = requests[key] {
+            request = pending
+        } else {
+            let decode = decode
+            request = Task {
+                defer { requests.removeValue(forKey: key) }
+                let data = try await bytes.data(photoID: photo.id, url: variant.url, revision: current)
+                try Task.checkCancellation()
+                let decoded: CGImage
+                do {
+                    // Explicit detached isolation: neither default MainActor
+                    // isolation nor the UI caller may run ImageIO decompression.
+                    decoded = try await Task.detached(priority: .userInitiated) {
+                        try decode(data, edge)
+                    }.value
+                } catch {
+                    try? await bytes.remove(photoID: photo.id, url: variant.url, revision: current)
+                    throw error
+                }
+                try Task.checkCancellation()
+                guard current == revision, allowed.contains(photo.id) else { throw PhotoByteCache.Failure.obsolete }
+                // Only presentation construction/publication runs on MainActor.
+                let image = UIImage(cgImage: decoded)
+                memory.setObject(image, forKey: key as NSString, cost: decoded.bytesPerRow * decoded.height)
+                return image
+            }
+            requests[key] = request
+        }
+        let image = try await request.value
         guard current == revision, allowed.contains(photo.id) else { throw PhotoByteCache.Failure.obsolete }
+        try Task.checkCancellation()
+        return image
+    }
+
+    nonisolated static func decode(_ data: Data, edge: Int) throws -> CGImage {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let decoded = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
                 kCGImageSourceThumbnailMaxPixelSize: edge,
                 kCGImageSourceCreateThumbnailWithTransform: true,
                 kCGImageSourceShouldCacheImmediately: true,
-              ] as CFDictionary) else {
-            try? await bytes.remove(photoID: photo.id, url: variant.url)
-            throw PhotoByteCache.Failure.unavailable
-        }
-        let image = UIImage(cgImage: decoded)
-        memory.setObject(image, forKey: key, cost: decoded.bytesPerRow * decoded.height)
-        return image
+              ] as CFDictionary) else { throw PhotoByteCache.Failure.unavailable }
+        return decoded
     }
 }
