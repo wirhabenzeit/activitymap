@@ -13,10 +13,17 @@ export function launchBrowser() {
   });
 }
 
-// Next's dev watcher may need a moment to discover a route created after startup.
-// Retry only the discovery 404; a compile/runtime failure must fail the scenario.
-export async function waitForFixtureRoute(url, timeoutMs = 120000) {
-  const signal = AbortSignal.timeout(timeoutMs);
+// Standalone proofs may create a route after startup; retry only discovery404.
+// Harness cold compilation runs separately, before browser assertion budgets.
+export async function waitForFixtureRoute(
+  url,
+  timeoutMs = 120000,
+  parentSignal,
+) {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const signal = parentSignal
+    ? AbortSignal.any([parentSignal, timeout])
+    : timeout;
   while (true) {
     const response = await fetch(url, { signal });
     await response.arrayBuffer();

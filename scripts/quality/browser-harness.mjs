@@ -15,6 +15,8 @@ import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
+import { browserFixtures, createBrowserFixture } from './browser-fixtures.mjs';
+import { waitForFixtureRoute } from './browser-support.mjs';
 import { runCommand, startCommand } from './process.mjs';
 
 export const browserSuites = {
@@ -69,7 +71,6 @@ export async function prepareFixtureWorkspace(root, directory) {
     'package.json',
     'pnpm-lock.yaml',
     'tsconfig.json',
-    'next.config.js',
     'postcss.config.js',
   ]) {
     await cp(join(root, path), join(directory, path), {
@@ -78,6 +79,17 @@ export async function prepareFixtureWorkspace(root, directory) {
       force: false,
     });
   }
+  // Keep Next's inferred workspace boundary inside the owned copy. A nested
+  // checkout lockfile otherwise makes Next infer the parent checkout as its root.
+  await cp(
+    join(root, 'next.config.js'),
+    join(directory, 'next.config.fixture-base.mjs'),
+  );
+  await writeFile(
+    join(directory, 'next.config.js'),
+    "import config from './next.config.fixture-base.mjs';\nexport default { ...config, outputFileTracingRoot: import.meta.dirname, onDemandEntries: { ...config.onDemandEntries, maxInactiveAge: 15 * 60 * 1000, pagesBufferLength: 3 } };\n",
+    { flag: 'wx' },
+  );
   const fixtures = 'ios/ActivityMap/ActivityMapTests/Gallery';
   await mkdir(join(directory, fixtures), { recursive: true });
   await cp(
@@ -90,6 +102,10 @@ export async function prepareFixtureWorkspace(root, directory) {
   await cp(
     join(root, 'scripts/quality/browser-support.mjs'),
     join(directory, 'scripts/quality/browser-support.mjs'),
+  );
+  await cp(
+    join(root, 'scripts/quality/browser-fixtures.mjs'),
+    join(directory, 'scripts/quality/browser-fixtures.mjs'),
   );
   await symlink(
     await realpath(join(root, 'node_modules')),
@@ -164,6 +180,7 @@ export async function runBrowserHarness({
   const summary = {
     startedAt: new Date().toISOString(),
     suites: [],
+    compilation: [],
     workspace,
     passed: false,
   };
@@ -177,7 +194,14 @@ export async function runBrowserHarness({
       marker,
       { flag: 'wx' },
     );
-    const env = fixtureEnvironment(process.env, base);
+    // Create every selected route before Next's route watcher starts. Only this
+    // run's token allows the scenario to reuse its already-written fixture.
+    for (const suite of suites)
+      await createBrowserFixture(workspace, suite, marker);
+    const env = {
+      ...fixtureEnvironment(process.env, base),
+      QUALITY_FIXTURE_OWNER: marker,
+    };
     const require = createRequire(join(root, 'package.json'));
     server = startCommand(
       process.execPath,
@@ -212,6 +236,27 @@ export async function runBrowserHarness({
     console.log(
       `Owned fixture server ready at ${base}; no migrations or external effects.`,
     );
+    // The static ownership marker proves server identity, not compiled app
+    // readiness. Cold webpack work has its own bounded phase before assertions.
+    for (const suite of suites) {
+      const started = Date.now();
+      const result = { name: suite, passed: false };
+      summary.compilation.push(result);
+      try {
+        await waitForFixtureRoute(
+          new URL('/' + browserFixtures[suite].route, base),
+          180000,
+          abort.signal,
+        );
+        result.passed = true;
+        console.log(`Compiled ${suite} fixture in ${Date.now() - started}ms.`);
+      } catch (error) {
+        result.error = error.stack ?? String(error);
+        throw error;
+      } finally {
+        result.durationMs = Date.now() - started;
+      }
+    }
     for (const suite of suites) {
       const directory = join(output, suite);
       await mkdir(directory, { recursive: true });

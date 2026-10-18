@@ -1,8 +1,12 @@
 // Fixture-only browser proof: no real account or database writes.
 import assert from 'node:assert/strict';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
+import {
+  cleanupBrowserFixture,
+  prepareBrowserFixture,
+} from './quality/browser-fixtures.mjs';
 import {
   launchBrowser,
   recordBrowserEvidence,
@@ -17,44 +21,13 @@ assert(
 const output = resolve(
   process.argv[3] || '/tmp/activitymap-account-deletion-browser',
 );
-const route = resolve(import.meta.dirname, '../src/app/account-deletion-test');
-await mkdir(route);
+const fixtureRoot = resolve(import.meta.dirname, '..');
+await prepareBrowserFixture(fixtureRoot, 'account');
 await mkdir(output, { recursive: true });
 let browser;
 let evidence;
 let failure;
 try {
-  await writeFile(
-    join(route, 'page.tsx'),
-    `
-'use client';
-import { useEffect, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SettingsDialog } from '~/components/settings/settings-dialog';
-import { OfflineSyncProvider } from '~/components/providers/offline-sync';
-import { useShallowStore } from '~/store';
-import { upsertActivityDTOs, getCachedActivityDTOs, setV1SyncState } from '~/lib/sync/v1-store';
-import { activityDTOSchema } from '~/contracts/v1/activity';
-import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
-export default function Review() {
-  const [client] = useState(() => new QueryClient());
-  const [ready, setReady] = useState(false);
-  const [open, setOpen] = useState(true);
-  useEffect(() => {
-    void (async () => {
-      const defaults = Object.fromEntries(Object.keys(activityDTOSchema.shape).filter(key => key !== 'streams').map(key => [key, null]));
-      const activity = activityDTOSchema.parse({...defaults, ...fixture.activities[0]});
-      await upsertActivityDTOs('auth:deletion-fixture', [activity]);
-      await setV1SyncState({scope:'auth:deletion-fixture',bootstrapCursor:'fixture',bootstrapComplete:true,changesCursor:'fixture',lastSyncAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
-      useShallowStore.getState().initializeAuth({currentUser:{id:'deletion-fixture',name:'Deletion fixture',email:null,image:null,athlete_id:42,stravaConnected:true}} as never);
-      (window as any).__deletionProof = { cached: () => getCachedActivityDTOs('auth:deletion-fixture'), user: () => useShallowStore.getState().user };
-      setReady(true);
-    })();
-  }, []);
-  return <QueryClientProvider client={client}>{ready && <><OfflineSyncProvider/><SettingsDialog open={open} onOpenChange={setOpen}/></>}</QueryClientProvider>;
-}
-`,
-  );
   await waitForFixtureRoute(new URL('/account-deletion-test', base));
   browser = await launchBrowser();
   const context = await browser.newContext({
@@ -196,12 +169,5 @@ export default function Review() {
 } finally {
   await evidence?.finish(failure);
   await browser?.close();
-  await rm(route, { recursive: true, force: true });
-  await rm(
-    resolve(
-      import.meta.dirname,
-      '../.next/dev/types/app/account-deletion-test',
-    ),
-    { recursive: true, force: true },
-  );
+  await cleanupBrowserFixture(fixtureRoot, 'account');
 }

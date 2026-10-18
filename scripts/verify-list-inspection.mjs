@@ -1,9 +1,13 @@
 // Run against this checkout's local Next dev server. Uses the real list, detail,
 // sidebar and URL hook with fixture DTOs; creates/removes only its own test route.
 import assert from 'node:assert/strict';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
+import {
+  cleanupBrowserFixture,
+  prepareBrowserFixture,
+} from './quality/browser-fixtures.mjs';
 import {
   launchBrowser,
   recordBrowserEvidence,
@@ -16,45 +20,13 @@ assert(
   'Use a local dev server',
 );
 const output = resolve(process.argv[3] || '/tmp/activitymap-list-inspection');
-const route = resolve(import.meta.dirname, '../src/app/list-inspection-test');
-await mkdir(route); // Refuse to overwrite any existing route.
+const fixtureRoot = resolve(import.meta.dirname, '..');
+await prepareBrowserFixture(fixtureRoot, 'list');
 await mkdir(output, { recursive: true });
 let browser;
 let evidence;
 let failure;
 try {
-  await writeFile(
-    join(route, 'page.tsx'),
-    `
-'use client';
-import { Suspense, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ActivityListView } from '~/components/list/activity-list';
-import { AppSidebar } from '~/components/layout/app-sidebar';
-import { AppHeader } from '~/components/layout/app-header';
-import { SidebarProvider } from '~/components/ui/sidebar';
-import { useFilteredActivities } from '~/hooks/use-filtered-activities';
-import { activityDTOSchema } from '~/contracts/v1/activity';
-import { dtoToActivity } from '~/lib/sync/v1-mappers';
-import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
-const defaults = Object.fromEntries(Object.keys(activityDTOSchema.shape).filter(key => key !== 'streams').map(key => [key, null]));
-function FixtureList() {
-  const dense = useSearchParams().has('dense');
-  const activities = useMemo(() => {
-    const raw = dense ? Array.from({length:205}, (_, index) => ({...fixture.activities[0], id:String(index+1), name:'Activity '+String(index+1).padStart(3,'0')})) : fixture.activities;
-    return raw.map(item => dtoToActivity(activityDTOSchema.parse({...defaults, ...item})));
-  }, [dense]);
-  const { filterIDs } = useFilteredActivities(activities);
-  return <ActivityListView activities={activities} filterIDs={filterIDs} />;
-}
-export default function Review() {
-  const [client] = useState(() => new QueryClient());
-  const [shown, setShown] = useState(true);
-  return <Suspense><QueryClientProvider client={client}><SidebarProvider className="flex h-dvh flex-col"><AppHeader /><div className="flex min-h-0 flex-1 overflow-hidden"><AppSidebar /><main className="flex min-w-0 flex-1 flex-col overflow-hidden"><div className="h-14 w-full shrink-0"/><div className="min-h-0 w-full flex-1 overflow-hidden"><button id="test-peer-destination" className="sr-only" onClick={() => setShown(value => !value)}>Switch destination</button>{shown ? <FixtureList /> : <div>Map destination</div>}</div></main></div></SidebarProvider></QueryClientProvider></Suspense>;
-}
-`,
-  );
   await waitForFixtureRoute(new URL('/list-inspection-test', base));
   browser = await launchBrowser();
   const errors = [];
@@ -792,9 +764,5 @@ export default function Review() {
 } finally {
   await evidence?.finish(failure);
   await browser?.close();
-  await rm(route, { recursive: true, force: true });
-  await rm(
-    resolve(import.meta.dirname, '../.next/dev/types/app/list-inspection-test'),
-    { recursive: true, force: true },
-  );
+  await cleanupBrowserFixture(fixtureRoot, 'list');
 }

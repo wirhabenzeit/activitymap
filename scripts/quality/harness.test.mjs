@@ -16,6 +16,12 @@ import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 
 import {
+  browserFixtures,
+  cleanupBrowserFixture,
+  createBrowserFixture,
+  prepareBrowserFixture,
+} from './browser-fixtures.mjs';
+import {
   fixtureEnvironment,
   prepareFixtureWorkspace,
   runBrowserHarness,
@@ -83,6 +89,7 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
     'scripts/verify-stats-focus.mjs',
     'scripts/verify-account-deletion.mjs',
     'scripts/quality/browser-support.mjs',
+    'scripts/quality/browser-fixtures.mjs',
     'ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json',
   ])
     await writeFile(join(root, file), '{}');
@@ -93,6 +100,14 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
   );
   await prepareFixtureWorkspace(root, destination);
   await assert.rejects(access(join(destination, '.env.local')));
+  assert.equal(
+    await readFile(join(destination, 'next.config.fixture-base.mjs'), 'utf8'),
+    '{}',
+  );
+  assert.match(
+    await readFile(join(destination, 'next.config.js'), 'utf8'),
+    /outputFileTracingRoot: import\.meta\.dirname/,
+  );
   await assert.rejects(
     mkdir(join(destination, 'src/app/list-inspection-test')),
     { code: 'EEXIST' },
@@ -274,3 +289,82 @@ test(
     );
   },
 );
+
+test('precreated routes require this run owner and unchanged shared source', async (t) => {
+  const root = await temporary(t);
+  await mkdir(join(root, 'src/app'), { recursive: true });
+  const route = await createBrowserFixture(root, 'list', 'owned-run');
+  assert.equal(
+    await readFile(join(route, 'page.tsx'), 'utf8'),
+    browserFixtures.list.source,
+  );
+  await assert.rejects(createBrowserFixture(root, 'list', 'another-run'), {
+    code: 'EEXIST',
+  });
+  const previous = process.env.QUALITY_FIXTURE_OWNER;
+  t.after(() => {
+    if (previous === undefined) delete process.env.QUALITY_FIXTURE_OWNER;
+    else process.env.QUALITY_FIXTURE_OWNER = previous;
+  });
+  process.env.QUALITY_FIXTURE_OWNER = 'owned-run';
+  assert.equal(await prepareBrowserFixture(root, 'list'), route);
+  await cleanupBrowserFixture(root, 'list');
+  await access(join(route, 'page.tsx')); // Harness retains routes through all scenarios.
+  process.env.QUALITY_FIXTURE_OWNER = 'different-run';
+  await assert.rejects(
+    prepareBrowserFixture(root, 'list'),
+    /not created by this harness/,
+  );
+  process.env.QUALITY_FIXTURE_OWNER = 'owned-run';
+  await writeFile(join(route, 'page.tsx'), 'developer edit');
+  await assert.rejects(
+    prepareBrowserFixture(root, 'list'),
+    /modified prepared fixture/,
+  );
+  assert.equal(
+    await readFile(join(route, 'page.tsx'), 'utf8'),
+    'developer edit',
+  );
+  delete process.env.QUALITY_FIXTURE_OWNER;
+  await cleanupBrowserFixture(root, 'list');
+  await assert.rejects(access(route));
+});
+
+test('cold fixture readiness is cancelled by its harness owner', async (t) => {
+  const controller = new AbortController();
+  const server = createServer(() =>
+    controller.abort(new Error('harness cancelled')),
+  );
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => {
+    server.closeAllConnections();
+    return new Promise((resolve) => server.close(resolve));
+  });
+  await assert.rejects(
+    waitForFixtureRoute(
+      `http://127.0.0.1:${server.address().port}/fixture`,
+      1000,
+      controller.signal,
+    ),
+    /harness cancelled/,
+  );
+});
+
+test('fixture write failure removes only its newly created partial route', async (t) => {
+  const root = await temporary(t);
+  await mkdir(join(root, 'src/app'), { recursive: true });
+  // A deterministic failed owner-file write after the page has been created.
+  await assert.rejects(createBrowserFixture(root, 'list', {}), {
+    code: 'ERR_INVALID_ARG_TYPE',
+  });
+  await assert.rejects(access(join(root, 'src/app/list-inspection-test')));
+  const route = await createBrowserFixture(root, 'list', 'retry');
+  await writeFile(join(route, 'page.tsx'), 'developer fixture');
+  await assert.rejects(createBrowserFixture(root, 'list', 'another'), {
+    code: 'EEXIST',
+  });
+  assert.equal(
+    await readFile(join(route, 'page.tsx'), 'utf8'),
+    'developer fixture',
+  );
+});
