@@ -1,8 +1,13 @@
 // Fixture-only browser proof: no real account or database writes.
 import assert from 'node:assert/strict';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+
+import {
+  launchBrowser,
+  recordBrowserEvidence,
+  waitForFixtureRoute,
+} from './quality/browser-support.mjs';
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:3018');
 assert(
@@ -16,6 +21,8 @@ const route = resolve(import.meta.dirname, '../src/app/account-deletion-test');
 await mkdir(route);
 await mkdir(output, { recursive: true });
 let browser;
+let evidence;
+let failure;
 try {
   await writeFile(
     join(route, 'page.tsx'),
@@ -48,15 +55,13 @@ export default function Review() {
 }
 `,
   );
-  browser = await chromium.launch({
-    executablePath:
-      process.env.CHROME_PATH ||
-      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  });
+  await waitForFixtureRoute(new URL('/account-deletion-test', base));
+  browser = await launchBrowser();
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     serviceWorkers: 'block',
   });
+  evidence = await recordBrowserEvidence(context, { base, output });
   let deletionRequests = 0;
   let shouldFail = true;
   let releaseSync;
@@ -185,8 +190,18 @@ export default function Review() {
     ),
   );
   console.log('Account deletion browser proof passed.');
+} catch (error) {
+  failure = error;
+  throw error;
 } finally {
+  await evidence?.finish(failure);
   await browser?.close();
   await rm(route, { recursive: true, force: true });
-  await rm(resolve(import.meta.dirname, '../.next/dev/types/app/account-deletion-test'), { recursive: true, force: true });
+  await rm(
+    resolve(
+      import.meta.dirname,
+      '../.next/dev/types/app/account-deletion-test',
+    ),
+    { recursive: true, force: true },
+  );
 }

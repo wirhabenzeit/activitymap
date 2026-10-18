@@ -51,7 +51,15 @@
     "benchmark:compact-streams": "tsx scripts/benchmark-compact-streams.ts",
     "test:compact-stream-swift": "bash scripts/verify-compact-stream-codec.sh",
     "db:test-photo-backfill": "tsx --conditions=react-server scripts/database/test-photo-backfill.ts",
-    "db:test-strava-import": "tsx --conditions=react-server scripts/database/test-strava-import.ts"
+    "db:test-strava-import": "tsx --conditions=react-server scripts/database/test-strava-import.ts",
+    "typecheck": "tsc --noEmit",
+    "check:generated": "pnpm map-catalog:check && pnpm stats-tiles:check && pnpm api-dtos:check",
+    "check": "pnpm typecheck && pnpm lint && pnpm check:generated && pnpm test && pnpm test:stats-ui && pnpm test:settings-ui && pnpm test:quality-harness",
+    "test:quality-harness": "node --test scripts/quality/*.test.mjs",
+    "test:browser:install": "playwright-core install chromium",
+    "test:browser": "node scripts/quality/browser-harness.mjs",
+    "test:ios": "node scripts/quality/native-harness.mjs",
+    "format:check": "node scripts/quality/format-check.mjs"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",

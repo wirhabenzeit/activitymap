@@ -13,11 +13,7 @@
     "noUncheckedIndexedAccess": true,
     "checkJs": true,
     /* Bundled projects */
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "ES2022"
-    ],
+    "lib": ["dom", "dom.iterable", "ES2022"],
     "noEmit": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
@@ -31,16 +27,11 @@
     "incremental": true,
     /* Path Aliases */
     "paths": {
-      "~/*": [
-        "./src/*"
-      ],
-      "drizzle/*": [
-        "./drizzle/*"
-      ]
+      "~/*": ["./src/*"],
+      "drizzle/*": ["./drizzle/*"]
     }
   },
   "include": [
-    ".eslintrc.cjs",
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
@@ -49,8 +40,5 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "public/sw.js"
-  ]
+  "exclude": ["node_modules", ".quality", "output", "public/sw.js"]
 }

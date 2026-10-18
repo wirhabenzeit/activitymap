@@ -1,8 +1,13 @@
 // Real shell, charts, URL/history and adaptive activity inspection against local DTOs.
 import assert from 'node:assert/strict';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { chromium } from 'playwright-core';
+
+import {
+  launchBrowser,
+  recordBrowserEvidence,
+  waitForFixtureRoute,
+} from './quality/browser-support.mjs';
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:3000');
 assert(
@@ -14,6 +19,8 @@ const route = resolve(import.meta.dirname, '../src/app/stats-focus-test');
 await mkdir(route); // Refuse to replace an existing route.
 await mkdir(output, { recursive: true });
 let browser;
+let evidence;
+let failure;
 try {
   await writeFile(
     join(route, 'page.tsx'),
@@ -44,17 +51,15 @@ export default function Review() {
 }
 `,
   );
-  browser = await chromium.launch({
-    executablePath:
-      process.env.CHROME_PATH ||
-      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  });
+  await waitForFixtureRoute(new URL('/stats-focus-test', base));
+  browser = await launchBrowser();
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     reducedMotion: 'reduce',
     serviceWorkers: 'block',
     locale: 'en-US',
   });
+  evidence = await recordBrowserEvidence(context, { base, output });
   await context.addInitScript(() => {
     localStorage.setItem('theme', 'light');
     // Count native transitions; reduced-motion runs should never invoke one.
@@ -482,7 +487,7 @@ export default function Review() {
     const initialID = new URL(activityURL).searchParams.get('activity');
     await focus
       .locator(
-        `[data-stats-activity-id]:not([data-stats-activity-id="${initialID}"])`,
+        `[data-stats-activity-id]:visible:not([data-stats-activity-id="${initialID}"])`,
       )
       .first()
       .click();
@@ -756,12 +761,11 @@ export default function Review() {
     await focus.getByRole('combobox', { name: 'Volume grouping' }).innerText(),
     'By month',
   );
+  // Other tile focus surfaces stay mounted but hidden. Bind to the visible
+  // scroller after remount, rather than the first hidden tile in document order.
   await page.waitForFunction(
-    (top) =>
-      Math.abs(
-        document.querySelector('[data-stats-focus-scroll]').scrollTop - top,
-      ) < 2,
-    savedFocusScroll,
+    ({ element, top }) => Math.abs(element.scrollTop - top) < 2,
+    { element: await focusScroller.elementHandle(), top: savedFocusScroll },
   );
   await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
   await active(null);
@@ -804,7 +808,11 @@ export default function Review() {
       2,
     ),
   );
+} catch (error) {
+  failure = error;
+  throw error;
 } finally {
+  await evidence?.finish(failure);
   await browser?.close();
   await rm(route, { recursive: true, force: true });
   await rm(

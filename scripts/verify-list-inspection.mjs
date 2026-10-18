@@ -1,9 +1,14 @@
 // Run against this checkout's local Next dev server. Uses the real list, detail,
 // sidebar and URL hook with fixture DTOs; creates/removes only its own test route.
 import assert from 'node:assert/strict';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { chromium } from 'playwright-core';
+
+import {
+  launchBrowser,
+  recordBrowserEvidence,
+  waitForFixtureRoute,
+} from './quality/browser-support.mjs';
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:3000');
 assert(
@@ -15,6 +20,8 @@ const route = resolve(import.meta.dirname, '../src/app/list-inspection-test');
 await mkdir(route); // Refuse to overwrite any existing route.
 await mkdir(output, { recursive: true });
 let browser;
+let evidence;
+let failure;
 try {
   await writeFile(
     join(route, 'page.tsx'),
@@ -48,11 +55,8 @@ export default function Review() {
 }
 `,
   );
-  browser = await chromium.launch({
-    executablePath:
-      process.env.CHROME_PATH ||
-      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  });
+  await waitForFixtureRoute(new URL('/list-inspection-test', base));
+  browser = await launchBrowser();
   const errors = [];
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
@@ -61,6 +65,7 @@ export default function Review() {
     locale: 'en-US',
     timezoneId: 'Europe/Zurich',
   });
+  evidence = await recordBrowserEvidence(context, { base, output });
   await context.addInitScript(() => {
     localStorage.setItem('theme', 'light');
     localStorage.removeItem('activitymap-ui-state');
@@ -730,6 +735,7 @@ export default function Review() {
   );
   console.log(`Evidence: ${output}`);
 } catch (error) {
+  failure = error;
   const page = browser?.contexts()[0]?.pages()[0];
   if (page) {
     console.error(
@@ -748,6 +754,7 @@ export default function Review() {
   }
   throw error;
 } finally {
+  await evidence?.finish(failure);
   await browser?.close();
   await rm(route, { recursive: true, force: true });
   await rm(

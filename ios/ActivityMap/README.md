@@ -68,15 +68,15 @@ check TestFlight before rerunning: the upload may have succeeded already.
 One-time setup uses a GitHub environment named `testflight`, restricted to
 release tags matching `ios/v*`, with these environment secrets:
 
-| Secret | Value |
-| --- | --- |
-| `IOS_DISTRIBUTION_P12_BASE64` | Base64-encoded Apple Distribution identity, including its private key |
-| `IOS_DISTRIBUTION_P12_PASSWORD` | Password protecting that P12 |
-| `IOS_PROVISION_PROFILE_BASE64` | Base64-encoded App Store profile for `page.dominik.activitymap`, containing the same certificate |
-| `APP_STORE_CONNECT_KEY_ID` | Dedicated App Store Connect team API key ID |
-| `APP_STORE_CONNECT_ISSUER_ID` | Team API issuer ID |
-| `APP_STORE_CONNECT_PRIVATE_KEY` | The downloaded `.p8` key, including PEM headers and newlines |
-| `MAPBOX_ACCESS_TOKEN` | Public Mapbox `pk.` token for the native app |
+| Secret                          | Value                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `IOS_DISTRIBUTION_P12_BASE64`   | Base64-encoded Apple Distribution identity, including its private key                            |
+| `IOS_DISTRIBUTION_P12_PASSWORD` | Password protecting that P12                                                                     |
+| `IOS_PROVISION_PROFILE_BASE64`  | Base64-encoded App Store profile for `page.dominik.activitymap`, containing the same certificate |
+| `APP_STORE_CONNECT_KEY_ID`      | Dedicated App Store Connect team API key ID                                                      |
+| `APP_STORE_CONNECT_ISSUER_ID`   | Team API issuer ID                                                                               |
+| `APP_STORE_CONNECT_PRIVATE_KEY` | The downloaded `.p8` key, including PEM headers and newlines                                     |
+| `MAPBOX_ACCESS_TOKEN`           | Public Mapbox `pk.` token for the native app                                                     |
 
 The API key needs the **Developer** role for uploads and beta-build metadata.
 Team API keys apply across the team's apps; they cannot be restricted to one app.
@@ -115,11 +115,11 @@ The app talks to an ActivityMap deployment over `/api/v1`. It never holds a data
 
 `Config/Base.xcconfig` declares the values, `Config/Local.xcconfig` overrides them locally, and `Info.plist` surfaces them to `Networking/APIConfiguration.swift`:
 
-| xcconfig value | Default | Purpose |
-| --- | --- | --- |
-| `ACTIVITYMAP_API_BASE_URL` | Simulator: `http://localhost:3000`; device: `https://activitymap.cc` | The deployment to call |
-| `ACTIVITYMAP_AUTH_CALLBACK_SCHEME` | `activitymap` | Registered in `CFBundleURLTypes`; what `ASWebAuthenticationSession` watches for |
-| `ACTIVITYMAP_AUTH_REDIRECT_URI` | `activitymap://auth/callback` | Where mobile sign-in returns its one-time code |
+| xcconfig value                     | Default                                                              | Purpose                                                                         |
+| ---------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `ACTIVITYMAP_API_BASE_URL`         | Simulator: `http://localhost:3000`; device: `https://activitymap.cc` | The deployment to call                                                          |
+| `ACTIVITYMAP_AUTH_CALLBACK_SCHEME` | `activitymap`                                                        | Registered in `CFBundleURLTypes`; what `ASWebAuthenticationSession` watches for |
+| `ACTIVITYMAP_AUTH_REDIRECT_URI`    | `activitymap://auth/callback`                                        | Where mobile sign-in returns its one-time code                                  |
 
 Note that `//` starts a comment in xcconfig, so URL separators are composed from `$(SLASH)` rather than written literally.
 
@@ -183,12 +183,12 @@ Native sign-in works against an explicitly configured local server. Preview sign
 
 Set these in the repository's `.env` or `.env.local`. `.env.example` is documentation only, so uncommenting a line there configures nothing:
 
-| Variable | Why |
-| --- | --- |
+| Variable                                                     | Why                                                                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback` | Must match the app's `ACTIVITYMAP_AUTH_REDIRECT_URI`; matched on exact protocol, host, and path prefix |
-| `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled` | Without this the Strava OAuth provider is never registered and sign-in cannot start |
-| `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET` | The Strava OAuth application credentials |
-| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Session signing, and the trusted-origin fallback |
+| `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`                       | Without this the Strava OAuth provider is never registered and sign-in cannot start                    |
+| `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET`                       | The Strava OAuth application credentials                                                               |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`                      | Session signing, and the trusted-origin fallback                                                       |
 
 Be aware of what the second one turns on: with external effects enabled, the local server makes real Strava API calls and real Strava writes, and any webhook or cron route you invoke acts against live data. That is why the default everywhere except production is `disabled`. Enable it deliberately, for a sign-in session you are actually testing.
 
@@ -441,3 +441,7 @@ On portrait phones, the middle map sheet shows the activity title/date, a compac
 Swift Charts chooses round distance ticks automatically. Native chart selection drives a short distance/altitude readout in a reserved row above the plot, with opaque background and primary text. Web uses the same layout, units, rounding and light/dark accent colors. Drag across the plot to inspect a recorded distance/elevation pair. In Map detail, the corresponding aligned GPS sample moves a contrasting dot without refitting the camera or rebuilding routes. The cursor uses full emissive strength, matching the route layers so Standard night lighting does not dim it. Releasing the drag clears it. Missing GPS never produces an estimated position. VoiceOver exposes the range/distance description, adjustable sample selection and a clear-selection action. The native activity pager yields while a sample is selected.
 
 `ElevationProfileTests` and `ElevationLifecycleTests` cover sample validation, short/flat/repeated-distance routes, GPS alignment, time-only summaries, retry states, old offline caches and invalidation. The rendered detail tests cover phone/tablet/large text, visible demand, detail switching and map cursor/pager integration. A native phone-sheet regression checks that the complete chart and unobscured map cursor are visible together for single and multiple selected activities. Physical-device touch and VoiceOver certification remains part of #228.
+
+## Bounded runtime regression command
+
+Run `pnpm test:ios` (or `node scripts/quality/native-harness.mjs` without web dependencies) from the repository root with Xcode 27. It owns a fresh simulator, executes six selected suites, requires nonzero passing results with no skipped tests, and saves logs plus an xcresult bundle. See [Quality checks](../../docs/quality-checks.md) for suite boundaries, timeouts, artifacts, and explicit existing-simulator reuse. Broader rendered and physical-device acceptance remains separate.
