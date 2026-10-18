@@ -77,8 +77,8 @@ allow-list is enforced server-side in `src/contracts/share/activity.ts`.
 A private share must:
 
 - contain only activities explicitly selected by the athlete;
-- require a separate confirmation before creation that restates what will be
-  shown;
+- show the exact activity scope, disclosed fields, expiry and route privacy
+  alongside an explicit **Create link** action before creation;
 - hide the first and last 200 m of each route and elevation profile by
   default, trimmed before they leave the server; showing the full route is an
   explicit opt-in;

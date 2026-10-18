@@ -190,13 +190,16 @@ Issues #391–#393 still require physical-device acceptance: grant and deny the 
 
 **Share activity** in the bottom detail actions opens a draft for that activity.
 The share icon beside Clear in the List footer and beside Fit/Clear in the Map
-results header opens a draft for the complete selection, including filter-hidden
-members. Opening a draft never changes selection, inspection or map framing.
+results header in Combine mode opens a draft for the complete selection, including
+filter-hidden members. In Map detail, the header shares only the open activity.
+Ordinary map hit results have no group share button. Tapping a result row always
+opens its details; the sport icon/checkmark changes selection in Combine mode.
+Opening a draft never changes selection, inspection or map framing.
 
 Choose an expiry (1 hour to 30 days; 7 days by default) and whether to show route
-ends. Continue reviews the exact activities and disclosed fields before **Create
-link** makes a request. The first/last 200 m remain hidden by default. The created
-URL can be sent or copied with the native share sheet; it stays in memory only.
+ends. The same screen shows the exact activities and disclosed fields; **Create
+link** creates the link directly. The first/last 200 m remain hidden by default.
+The created URL can be sent or copied with the native share sheet; it stays in memory only.
 **Your links** lists existing links and supports immediate revocation. Private
 Strava activities are omitted by the existing recipient view.
 
@@ -207,9 +210,11 @@ is needed. Failed or uncertain creation keeps the draft and offers the link list
 account/deployment changes discard late responses and dismiss the sharing flow.
 
 Verification: `ActivitySharingTests`, `ShareLinksAPITests` and
-`RenderedActivitySharingTests` pass on the iPhone 18 Pro / iOS 27 simulator (7 tests,
-13 parameterized runs). Captures cover 320–820pt group controls, phone/tablet forms,
-dark mode and accessibility text. Real recipient delivery through installed share
+`RenderedActivitySharingTests`, plus the Map row activation regression, pass on
+the iPhone 18 Pro / iOS 27 simulator (10 test methods, 22 runs). Captures cover
+320–820pt group controls, phone/tablet forms, dark mode and accessibility text.
+`node scripts/verify-share-creation.mjs` checks direct web creation and failed
+requests at phone and desktop widths using mocked API responses. Real recipient delivery through installed share
 extensions and physical-device review remain release checks.
 
 ## Local persistence and tests

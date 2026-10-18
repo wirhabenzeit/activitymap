@@ -39,16 +39,14 @@ struct ActivitySharingTests {
         return service
     }
 
-    @Test func creationRequiresReviewAndPreservesExactScopeAndPrivacyDefaults() async throws {
+    @Test func creationDirectlyPreservesExactScopeAndPrivacyDefaults() async throws {
         let store = ActivityStore(activities: try [activity(1), activity(2), activity(3)])
         store.replaceSelection(with: [1, 2])
         let model = ActivityShareModel(activities: store.activities.filter { store.selectedActivityIDs.contains($0.id) })
         store.replaceSelection(with: [3])
         let source = ScriptedShareLinksSource()
         let service = service(source)
-        await model.create(using: service)
         #expect(await source.requests.isEmpty && model.url == nil)
-        model.step = .review
         await model.create(using: service)
         let request = try #require(await source.requests.first)
         #expect(request.activityIds == ["1", "2"])
@@ -62,7 +60,6 @@ struct ActivitySharingTests {
 
     @Test func duplicateCreationAndLateAccountResponseAreFenced() async throws {
         let model = ActivityShareModel(activities: try [activity(1)])
-        model.step = .review
         let source = ScriptedShareLinksSource(gated: true)
         let service = service(source)
         let task = Task { await model.create(using: service) }
@@ -76,6 +73,29 @@ struct ActivitySharingTests {
         #expect(model.url == nil && model.created == nil && !model.isBusy)
     }
 
+    @Test func mapSharingFollowsDetailAndExplicitSelectionMode() {
+        let store = ActivityStore(activities: (1...3).map { ActivityStoreSelectionTests.activity($0) })
+        let picker = RoutePicker()
+        picker.apply(ids: [1, 2], adding: false, request: picker.invalidateQuery(), store: store)
+        #expect(store.selectedActivityIDs == [1, 2] && picker.detailID == nil)
+        #expect(picker.activitiesToShare(in: store).isEmpty, "A map hit list alone must not expose group sharing")
+        store.setCombine(true)
+        #expect(Set(picker.activitiesToShare(in: store).map(\.id)) == [1, 2])
+        picker.showDetail(2, store: store)
+        #expect(picker.activitiesToShare(in: store).map(\.id) == [2], "An open detail narrows even a multi-selection share")
+        store.setCombine(false)
+        #expect(picker.activitiesToShare(in: store).map(\.id) == [2])
+        picker.showResults()
+        #expect(picker.activitiesToShare(in: store).isEmpty)
+        store.clearSelection(); picker.reconcile(with: store); store.setCombine(true)
+        #expect(picker.activitiesToShare(in: store).isEmpty)
+        picker.apply(ids: [3], adding: true, request: picker.invalidateQuery(), store: store)
+        #expect(picker.activitiesToShare(in: store).map(\.id) == [3])
+        store.setCombine(false)
+        picker.apply(ids: [1], adding: false, request: picker.invalidateQuery(), store: store)
+        #expect(picker.detailID == 1 && picker.activitiesToShare(in: store).map(\.id) == [1])
+    }
+
     @Test func scopeLimitsSignInAndRateLimitKeepDraftAvailable() async throws {
         let source = ScriptedShareLinksSource(failure: .rateLimited(retryAfter: 60, requestID: nil))
         let service = service(source)
@@ -83,9 +103,9 @@ struct ActivitySharingTests {
         let oversized = ActivityShareModel(activities: try (1...201).map(activity))
         #expect(empty.scopeError != nil && oversized.scopeError != nil)
         let model = ActivityShareModel(activities: try [activity(1)])
-        model.step = .review; model.showRouteEnds = true; model.expiresInHours = 24
+        model.showRouteEnds = true; model.expiresInHours = 24
         await model.create(using: service)
-        #expect(model.errorMessage != nil && model.retryAt != nil && model.step == .review && model.showRouteEnds)
+        #expect(model.errorMessage != nil && model.retryAt != nil && model.step == .configure && model.showRouteEnds)
         await model.create(using: service)
         #expect(await source.requests.count == 1)
         let request = try #require(await source.requests.first)

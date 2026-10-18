@@ -48,21 +48,18 @@ const EXPIRY_OPTIONS = [
   { label: '30 days', ms: 30 * DAY_MS },
 ] as const;
 
-type Step = 'configure' | 'confirm' | 'created';
+type Step = 'configure' | 'created';
 
 function pluralizeTracks(count: number) {
   return `${count} ${count === 1 ? 'track' : 'tracks'}`;
 }
 
-/**
- * Create-share flow (issue #132): configure -> confirm -> created-link
- * display. The "confirm" step is a deliberate, separate screen - not folded
- * into the same click as "configure" - that restates exactly which tracks,
- * what is shown of them, and which expiry were chosen, and that anyone with
- * the link can view them until it expires or is revoked. Only that screen's
- * own button actually creates the link.
- */
-export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) {
+/** The configuration screen discloses the exact scope and privacy before Create link. */
+export function CreateShareDialog({
+  onShowLinks,
+}: {
+  onShowLinks: () => void;
+}) {
   const dateFormat = useDateFormat();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -85,7 +82,8 @@ export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) 
 
   const selectionLabel = pluralizeTracks(selectedActivities.length);
 
-  async function handleConfirmCreate() {
+  async function handleCreate() {
+    if (isCreating) return;
     setIsCreating(true);
     try {
       const result = await createShareLink({
@@ -93,14 +91,20 @@ export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) 
         expiresInMs,
         fields,
       });
-      const url = new URL(`/share/${result.token}`, window.location.origin).toString();
+      const url = new URL(
+        `/share/${result.token}`,
+        window.location.origin,
+      ).toString();
       setCreatedUrl(url);
       setStep('created');
-      void queryClient.invalidateQueries({ queryKey: MY_SHARE_LINKS_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: MY_SHARE_LINKS_QUERY_KEY,
+      });
     } catch (error) {
       toast({
         title: 'Could not create share link',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description:
+          error instanceof Error ? error.message : 'Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -134,7 +138,12 @@ export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) 
             className="flex-1 font-mono text-xs"
             onFocus={(event) => event.currentTarget.select()}
           />
-          <Button type="button" variant="secondary" className="w-24" onClick={handleCopy}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-24"
+            onClick={handleCopy}
+          >
             {copied ? <Check /> : <Copy />}
             {copied ? 'Copied' : 'Copy'}
           </Button>
@@ -146,67 +155,6 @@ export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) 
           <DialogClose asChild>
             <Button>Done</Button>
           </DialogClose>
-        </DialogFooter>
-      </>
-    );
-  }
-
-  if (step === 'confirm') {
-    const expiryLabel =
-      EXPIRY_OPTIONS.find((option) => option.ms === expiresInMs)?.label ??
-      `${Math.round(expiresInMs / HOUR_MS)} hours`;
-
-    return (
-      <>
-        <DialogHeader className="text-left">
-          <DialogTitle>Create this link?</DialogTitle>
-          <DialogDescription>
-            Anyone with the link can view these tracks on a map until it
-            expires or you revoke it.
-          </DialogDescription>
-        </DialogHeader>
-        <dl className="divide-y rounded-md border text-sm">
-          <div className="grid gap-2 px-3 py-2.5">
-            <dt className="font-medium">{selectionLabel}</dt>
-            <dd>
-              <ul className="max-h-32 space-y-1 overflow-y-auto text-xs text-muted-foreground">
-                {selectedActivities.map((activity) => (
-                  <li key={activity.id} className="flex justify-between gap-3">
-                    <span className="truncate">{activity.name}</span>
-                    <span className="shrink-0 tabular-nums">
-                      {formatPreferredDate(activity.start_date_local, dateFormat)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </dd>
-          </div>
-          <div className="grid gap-1 px-3 py-2.5">
-            <dt className="font-medium">Shown</dt>
-            <dd className="text-muted-foreground">
-              Route, elevation profile, name, date, distance, moving time,
-              elevation gain and average speed. No heart rate, power, kudos,
-              comments or photos.
-            </dd>
-          </div>
-          <div className="flex items-center justify-between gap-4 px-3 py-2.5">
-            <dt className="font-medium">Start and finish</dt>
-            <dd className="text-muted-foreground">
-              {fields.showRouteEnds ? 'Shown' : `Hidden (${SHARED_ROUTE_END_TRIM_METERS} m)`}
-            </dd>
-          </div>
-          <div className="flex items-center justify-between gap-4 px-3 py-2.5">
-            <dt className="font-medium">Expires in</dt>
-            <dd className="text-muted-foreground">{expiryLabel}</dd>
-          </div>
-        </dl>
-        <DialogFooter className="gap-2 sm:space-x-0">
-          <Button variant="outline" onClick={() => setStep('configure')} disabled={isCreating}>
-            Back
-          </Button>
-          <Button onClick={handleConfirmCreate} disabled={isCreating}>
-            {isCreating ? 'Creating…' : 'Create link'}
-          </Button>
         </DialogFooter>
       </>
     );
@@ -239,15 +187,36 @@ export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) 
       <DialogHeader className="text-left">
         <DialogTitle>Share {selectionLabel}</DialogTitle>
         <DialogDescription>
-          Create a private link to view these tracks on a map. It expires
-          automatically, and you can revoke it at any time.
+          Anyone with this link can view these tracks on a map until it expires
+          or you revoke it.
         </DialogDescription>
       </DialogHeader>
+
+      <ul
+        className="max-h-32 space-y-1 overflow-y-auto text-xs text-muted-foreground"
+        aria-label="Activities to share"
+      >
+        {selectedActivities.map((activity) => (
+          <li key={activity.id} className="flex justify-between gap-3">
+            <span className="truncate">{activity.name}</span>
+            <span className="shrink-0 tabular-nums">
+              {formatPreferredDate(activity.start_date_local, dateFormat)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-muted-foreground">
+        Shares route, elevation profile, name, sport, date and time, distance,
+        moving time, elevation gain and average speed. Heart rate, power,
+        calories, social information, descriptions and photos are excluded.
+        Private Strava activities are omitted from the shared map.
+      </p>
 
       <div className="divide-y rounded-md border">
         <div className="flex items-center justify-between gap-4 px-3 py-2">
           <Label htmlFor="share-expiry">Expires after</Label>
           <Select
+            disabled={isCreating}
             value={String(expiresInMs)}
             onValueChange={(value) => setExpiresInMs(Number(value))}
           >
@@ -269,7 +238,9 @@ export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) 
           className="flex cursor-pointer items-center justify-between gap-4 px-3 py-2.5"
         >
           <span className="grid gap-1">
-            <span className="text-sm font-medium leading-none">Show start and finish</span>
+            <span className="text-sm font-medium leading-none">
+              Show start and finish
+            </span>
             <span className="text-xs text-muted-foreground">
               Otherwise the first and last {SHARED_ROUTE_END_TRIM_METERS} m are
               hidden.
@@ -277,6 +248,7 @@ export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) 
           </span>
           <Switch
             id="share-route-ends"
+            disabled={isCreating}
             checked={fields.showRouteEnds}
             onCheckedChange={(checked) =>
               setFields((current) => ({ ...current, showRouteEnds: checked }))
@@ -286,10 +258,12 @@ export function CreateShareDialog({ onShowLinks }: { onShowLinks: () => void }) 
       </div>
 
       <DialogFooter className="gap-2 sm:justify-between sm:space-x-0">
-        <Button variant="outline" onClick={onShowLinks}>
+        <Button variant="outline" onClick={onShowLinks} disabled={isCreating}>
           Your links
         </Button>
-        <Button onClick={() => setStep('confirm')}>Continue</Button>
+        <Button onClick={handleCreate} disabled={isCreating}>
+          {isCreating ? 'Creating…' : 'Create link'}
+        </Button>
       </DialogFooter>
     </>
   );

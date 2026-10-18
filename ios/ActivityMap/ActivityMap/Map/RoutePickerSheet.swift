@@ -115,7 +115,7 @@ struct RoutePickerSheet: View {
                 .accessibilityIdentifier("map-results-fit")
                 .disabled(fitActivityID.map { !store.routableActivityIDs.contains($0) }
                     ?? !candidates.contains { store.routableActivityIDs.contains($0.id) })
-            SelectionShareButton(store: store)
+            MapActivityShareButton(picker: picker, store: store)
             Button { store.clearSelection() } label: {
                 Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
             }.accessibilityLabel("Clear selection")
@@ -166,11 +166,7 @@ struct RoutePickerSheet: View {
         return HStack(spacing: 0) {
             ActivitySelectionSymbol(store: store, activity: activity)
             Button {
-                if store.isCombining {
-                    store.toggleMember(activity.id)
-                } else {
-                    picker.showDetail(activity.id, store: store)
-                }
+                picker.showDetail(activity.id, store: store)
             } label: {
                 VStack(alignment: .leading, spacing: 4) {
                     BrowseActivityHeading(activity: activity)
@@ -189,9 +185,9 @@ struct RoutePickerSheet: View {
             }.buttonStyle(.plain)
                 .padding(.leading, 8)
                 .padding(.trailing, 4)
-                .accessibilityLabel(store.isCombining ? "Remove \(activity.name) from selection" : "Details for \(activity.name)")
+                .accessibilityLabel("Details for \(activity.name)")
                 .accessibilityValue(isActive ? "Selected. Active on map" : "Selected")
-                .accessibilityHint(store.isCombining ? "Removes this activity from the selection" : "Activates this activity and opens its details")
+                .accessibilityHint("Activates this activity and opens its details without changing selection")
                 .accessibilityIdentifier("map-result-open-\(activity.id)")
                 .modifier(ActivityRowContextMenu(activity: activity, store: store))
             Button { store.toggleActive(activity.id) } label: {
