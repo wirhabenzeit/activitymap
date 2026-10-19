@@ -105,13 +105,24 @@ struct MapActivityPager: UIViewControllerRepresentable {
         }
 
         private func content(_ id: Int, expansion: MapActivityExpansion) -> AnyView {
-            AnyView(ActivityDetailPanel(store: parent.store, activityID: id,
+            let picker = parent.picker
+            let store = parent.store
+            let paging = ActivityDetailPaging(position: { id in
+                guard picker.candidateIDs.count > 1, let index = picker.candidateIDs.firstIndex(of: id) else { return nil }
+                return "\(index + 1) of \(picker.candidateIDs.count)"
+            }, previous: {
+                if !picker.isPaging { picker.step(-1, store: store) }
+            }, next: {
+                if !picker.isPaging { picker.step(1, store: store) }
+            })
+            return AnyView(ActivityDetailPanel(store: parent.store, activityID: id,
                 mapExpansion: expansion, compactMapProfile: parent.compactProfile, scrollsMapHeading: parent.scrollsHeading,
                 mapBottomContentInset: parent.bottomContentInset) { [weak self] id in
                     guard let self else { return }
                     self.parent.store.mapContext.request(.fitActivity(id))
                 }
                 .environment(\.activityDetailOverMap, true)
+                .environment(\.activityDetailPaging, paging)
                 .environment(\.colorScheme, parent.colorScheme)
                 .environment(\.dynamicTypeSize, parent.typeSize)
                 .environment(\.horizontalSizeClass, parent.sizeClass))

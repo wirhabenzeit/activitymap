@@ -131,33 +131,15 @@ struct RoutePickerSheet: View {
     }
 
     private var sidePanelHeader: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) { groupHeader; panelHandle }
-            if let detail, !collapsed, candidates.count > 1 { detailNavigation(detail) }
-        }.padding(.horizontal, 12)
+        HStack(spacing: 0) { groupHeader; panelHandle }
+            .padding(.horizontal, 12)
     }
 
     private var header: some View {
         VStack(spacing: 0) {
             Color.clear.frame(height: 13).allowsHitTesting(false)
             groupHeader
-            if let detail, !collapsed, candidates.count > 1 { detailNavigation(detail) }
         }.padding(.horizontal, 12)
-    }
-
-    private func detailNavigation(_ activity: Activity) -> some View {
-        HStack(spacing: 4) {
-            Spacer(minLength: 0)
-            Button { if !picker.isPaging { picker.step(-1, store: store) } } label: {
-                Image(systemName: "chevron.left").frame(width: 44, height: 44)
-            }.accessibilityLabel("Previous activity")
-            Text("\((picker.candidateIDs.firstIndex(of: activity.id) ?? 0) + 1) of \(candidates.count)")
-                .font(.caption).monospacedDigit().foregroundStyle(AppTheme.secondaryText).fixedSize()
-            Button { if !picker.isPaging { picker.step(1, store: store) } } label: {
-                Image(systemName: "chevron.right").frame(width: 44, height: 44)
-            }.accessibilityLabel("Next activity")
-        }
-        .font(.system(size: 18, weight: .semibold))
     }
 
     private func resultRow(_ activity: Activity) -> some View {

@@ -125,8 +125,21 @@ struct ActivityHeadlineStats: View {
     }
 }
 
+/// Optional navigation supplied by a paged detail host. Closures read the live
+/// selection so cached pages keep their accessibility actions up to date.
+struct ActivityDetailPaging {
+    let position: (Int) -> String?
+    let previous: () -> Void
+    let next: () -> Void
+}
+
+extension EnvironmentValues {
+    @Entry var activityDetailPaging: ActivityDetailPaging? = nil
+}
+
 /// Shared identity stays in one place while Map summary grows into detail.
 struct ActivityDetailIdentity: View {
+    @Environment(\.activityDetailPaging) private var paging
     let activity: Activity
     var trailingInset: CGFloat = 0
     var titleLineLimit: Int? = nil
@@ -143,6 +156,13 @@ struct ActivityDetailIdentity: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("activity-detail-name")
+                    .accessibilityValue(paging?.position(activity.id) ?? "")
+                    .accessibilityActions {
+                        if let paging, paging.position(activity.id) != nil {
+                            Button("Previous activity", action: paging.previous)
+                            Button("Next activity", action: paging.next)
+                        }
+                    }
                 Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
                     .font(.caption).foregroundStyle(onNavigationBar ? Color.white.opacity(0.8) : AppTheme.secondaryText)
                     .lineLimit(titleLineLimit == 1 ? 1 : nil)

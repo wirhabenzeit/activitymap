@@ -241,6 +241,33 @@ extension RenderedRoutePickingTests {
                 "Distance, elapsed time and elevation are visibly rendered: \(text)")
     }
 
+    @Test(arguments: [false, true])
+    func mapDetailHeaderHeightDoesNotGrowWithSelection(isSidePanel: Bool) async throws {
+        let store = ActivityStore(activities: (1...3).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: [1])
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let size = isSidePanel ? CGSize(width: 354, height: 320) : CGSize(width: 375, height: 500)
+        let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: isSidePanel), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(250))
+        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
+        let page = try #require(pager.viewControllers?.first as? MapActivityPager.Page)
+        let initialTop = pager.view.convert(pager.view.bounds, to: host.window).minY
+        let contentUpdates = page.contentUpdateCount
+        try host.save(host.snapshot(), name: "header-single-\(isSidePanel ? "landscape" : "phone")")
+        store.addToSelection([2, 3])
+        picker.reconcile(with: store)
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(host.controllers(of: UIPageViewController.self).first === pager)
+        #expect(pager.viewControllers?.first === page && page.contentUpdateCount == contentUpdates)
+        #expect(abs(pager.view.convert(pager.view.bounds, to: host.window).minY - initialTop) < 1,
+                "Opening one of several selected activities must not add another header row")
+        #expect(picker.detailID == 1 && store.activeActivityID == 1 && store.selectedActivityIDs == [1, 2, 3])
+        #expect(store.mapContext.pendingRequest == nil)
+        try host.save(host.snapshot(), name: "header-multiple-\(isSidePanel ? "landscape" : "phone")")
+    }
+
     @Test(arguments: [2, 60]) func nativeMapPagerDragsBeforeCommittingAndCancelsWithoutChangingFocus(count: Int) async throws {
         let store = ActivityStore(activities: (1...count).map { ActivityStoreSelectionTests.activity($0) })
         store.replaceSelection(with: Array(1...count))
@@ -270,7 +297,7 @@ extension RenderedRoutePickingTests {
         #expect(picker.isPaging)
         try await Task.sleep(for: .milliseconds(50))
         #expect(host.snapshotRegion(CGRect(x: 0, y: 18, width: 375, height: 52)) == headerBefore,
-                "Paging arrows keep their appearance during a native drag")
+                "The persistent header keeps its appearance during a native drag")
         pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [initial], transitionCompleted: false)
         #expect(!picker.isPaging && picker.detailID == start && store.activeActivityID == start)
         pager.delegate?.pageViewController?(pager, willTransitionTo: [next])
