@@ -4,6 +4,11 @@ import { join } from 'node:path';
 
 // Shared by standalone proofs and the owned harness: source is identical in both.
 export const browserFixtures = {
+  reconciliation: {
+    route: 'react-ui-reconciliation-test',
+    source:
+      "export { default } from '../../../scripts/fixtures/react-ui-reconciliation';\n",
+  },
   presentation: {
     route: 'presentation-test',
     source: `

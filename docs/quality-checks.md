@@ -5,18 +5,18 @@ Use Node 22+ and the repository's pinned pnpm version. Install dependencies with
 a database. Database integration checks remain in the separate CI job with its
 explicit disposable Postgres service.
 
-| Command                                | Boundary                                                                                                                 |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm check`                           | TypeScript, ESLint, generated catalogs/DTOs, TypeScript unit suites, stats/settings UI unit suites, harness safety tests |
-| `pnpm typecheck` / `pnpm lint`         | Static checks only                                                                                                       |
-| `pnpm check:generated`                 | Map catalog, stats tile catalog and Swift DTO drift                                                                      |
-| `pnpm test:browser:install`            | Provision the lockfile-matched Playwright Chromium; append `--with-deps` on Linux                                        |
-| `pnpm test:browser`                    | Start an owned Next server and run list, stats and account fixture scenarios in Chromium                                 |
-| `pnpm test:browser account`            | Run one named browser scenario (`list`, `stats`, `account`)                                                              |
-| `pnpm test:ios`                        | Build and run the six selected iOS suites on an owned simulator                                                          |
-| `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                        |
-| `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                       |
-| `pnpm format:check src/path.ts`        | Check explicit files                                                                                                     |
+| Command                                | Boundary                                                                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check`                           | TypeScript, ESLint, generated catalogs/DTOs, TypeScript unit suites, browsing/stats/settings UI unit suites, harness safety tests |
+| `pnpm typecheck` / `pnpm lint`         | Static checks only                                                                                                                |
+| `pnpm check:generated`                 | Map, stats and presentation catalogs, plus Swift DTO drift                                                                        |
+| `pnpm test:browser:install`            | Provision the lockfile-matched Playwright Chromium; append `--with-deps` on Linux                                                 |
+| `pnpm test:browser`                    | Start an owned Next server and run reconciliation, list, stats, account and presentation fixture scenarios in Chromium            |
+| `pnpm test:browser account`            | Run one named browser scenario (`reconciliation`, `list`, `stats`, `account`, `presentation`)                                     |
+| `pnpm test:ios`                        | Build and run the sixteen selected iOS suites on an owned simulator                                                               |
+| `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                                 |
+| `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                                |
+| `pnpm format:check src/path.ts`        | Check explicit files                                                                                                              |
 
 ## Browser runtime
 
@@ -33,7 +33,7 @@ response from this server, so an occupied port or unrelated server cannot pass.
 The wrapper creates all selected routes before starting Next. Their shared source
 is also used by standalone scripts, which continue to create routes only if
 absent. A per-run ownership token and exact source check permit reuse only inside
-the harness. Prepared routes/types remain until wrapper cleanup, and the three
+the harness. Prepared routes/types remain until wrapper cleanup, and all selected
 fixture entries stay warm for the fifteen-minute server budget; removing one
 scenario or evicting its dev entry must not Fast Refresh another tab mid-test.
 Fixtures and generated Next files live in the owned copy; startup
@@ -41,10 +41,12 @@ failure, test failure, timeout and SIGINT/SIGTERM clean that copy. A preexisting
 developer fixture remains untouched and causes the scenario to fail safely. The checkout's environment and source
 files are never used as scratch storage.
 
-The CI smoke boundary runs the **full existing three scripts**, not all app
+The CI smoke boundary runs the **five complete fixture scripts**, not all app
 features: list inspection at desktop/tablet/phone widths (keyboard, history,
 selection and paging), stats focus/drilldown across widths with dark/reduced-motion
-cases, and mocked account deletion failure/success with cache and sync fencing.
+cases, mocked account deletion failure/success with cache and sync fencing,
+presentation/authentication states, and shared dialog/control behavior including
+nested popup interaction, keyboard menus and React Activity hide/reveal.
 This reuses their assertions and result lists. Each script's assertions are
 limited to four minutes, server identity readiness to two minutes, and each
 fixture's cold compilation to three minutes before the assertion processes
@@ -79,6 +81,11 @@ an existing device; supplied devices are never shut down or deleted. Do not run
 multiple harnesses against the same simulator or DerivedData directory.
 
 The bounded suite is:
+
+- `AdaptiveInspectionTests`: native push/panel transitions and retained hidden List details.
+- `BrowsingReconciliationTests`: cached-empty recovery, route eligibility and shared browsing actions.
+- `PresentationTests`, `DisplayPreferencesTests`, `StravaConnectTests`: semantic catalog, preference and connection policies.
+- `StatsPresentationPolicyTests`, `StatsScopeTests`, `StatsDashboardTests`, `StatsFixtureTests`, `StatsCalendarLayoutTests`: comparison/formatting parity, scope, chart identities and keyboard/calendar layout.
 
 - `ActivityFilterTests`: filtering, date/locale parsing and reset behavior.
 - `ActivityStoreSelectionTests`: selection/reconciliation contracts.

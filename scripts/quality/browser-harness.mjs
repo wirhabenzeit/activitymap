@@ -20,6 +20,7 @@ import { waitForFixtureRoute } from './browser-support.mjs';
 import { runCommand, startCommand } from './process.mjs';
 
 export const browserSuites = {
+  reconciliation: 'verify-react-ui-reconciliation.mjs',
   list: 'verify-list-inspection.mjs',
   stats: 'verify-stats-focus.mjs',
   account: 'verify-account-deletion.mjs',
@@ -68,6 +69,7 @@ export async function prepareFixtureWorkspace(root, directory) {
   for (const path of [
     'src',
     'shared',
+    'scripts/fixtures',
     'public',
     'package.json',
     'pnpm-lock.yaml',
@@ -164,7 +166,7 @@ export async function runBrowserHarness({
 }) {
   assert(
     suites.length > 0 && suites.every((suite) => browserSuites[suite]),
-    'Choose list, stats, account, and/or presentation',
+    'Choose reconciliation, list, stats, account, and/or presentation',
   );
   await mkdir(output, { recursive: true });
   await mkdir(join(root, '.quality'), { recursive: true });

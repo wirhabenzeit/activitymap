@@ -75,6 +75,7 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
     'public',
     'node_modules',
     'scripts/quality',
+    'scripts/fixtures',
     'ios/ActivityMap/ActivityMapTests/Gallery',
   ])
     await mkdir(join(root, directory), { recursive: true });
@@ -89,6 +90,8 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
     'scripts/verify-stats-focus.mjs',
     'scripts/verify-account-deletion.mjs',
     'scripts/verify-presentation.mjs',
+    'scripts/verify-react-ui-reconciliation.mjs',
+    'scripts/fixtures/react-ui-reconciliation.tsx',
     'scripts/quality/browser-support.mjs',
     'scripts/quality/browser-fixtures.mjs',
     'ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json',
@@ -101,6 +104,13 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
   );
   await prepareFixtureWorkspace(root, destination);
   await assert.rejects(access(join(destination, '.env.local')));
+  assert.equal(
+    await readFile(
+      join(destination, 'scripts/fixtures/react-ui-reconciliation.tsx'),
+      'utf8',
+    ),
+    '{}',
+  );
   assert.equal(
     await readFile(join(destination, 'next.config.fixture-base.mjs'), 'utf8'),
     '{}',
