@@ -44,6 +44,10 @@ Map, list, and analyze all your Strava activities.
 - `src/store` — client-side state (Zustand)
 - `src/cron` — scheduled sync jobs
 
+## Quality checks
+
+Run `pnpm check` for static, generated-file and unit checks. Browser and native runtime checks have explicit isolated startup and evidence: see [Quality checks](docs/quality-checks.md). Use `pnpm format:check` for a nonmutating check of changed files.
+
 ## Local database
 
 ```bash

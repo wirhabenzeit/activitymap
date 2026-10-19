@@ -12,6 +12,8 @@ Applies to web Map/List cards and iOS Map/List detail panels. Native controls ma
 6. Photos, when present.
 7. On native iOS, **Open in Strava** and **Export GPX** rows at the bottom of the scrolling detail, without an actions heading or explanatory paragraph below the rows. Availability and route quality stay in the GPX row’s subtitle. GPX includes elevation when the current cache contains paired GPS/altitude summary values, exporting a labelled sampled route with averaged elevation. These are the chart cache’s bucket averages, not raw per-point readings. Otherwise it preserves the chosen detailed/simplified cached route with elevation unavailable. There is no further interpolation, invented altitude or recorded timestamp output. Activities without any cached GPS have a disabled export row and an explanation in its subtitle. Sharing uses the native sheet on iPhone and a popover anchored to the export row on iPad.
 
+Web **Download GPX** downloads a file; native **Share GPX** opens the system share sheet (the detail row remains labelled **Export GPX**). Native row menus and detail rows share one offline availability/export workflow. A current paired GPS/elevation summary can supply a route even when there is no activity polyline. The first menu opening uses a cheap availability preflight; detached validation chooses valid sampled data or the cached polyline fallback before writing. Invalid samples with no fallback produce the same explicit no-GPS explanation. Account scope, activity revision and summary freshness fence both successful and failed work. Temporary files remain leased by the native presenter until sharing/dismissal finishes.
+
 Collapsed map details reuse the same sport icon, title typography, subtitle spacing and content padding in portrait and landscape. They use a single-line, tail-truncated title with the sport and activity-local date/time beneath it. The full title remains available in the open detail.
 
 In pushed native List detail, the icon-only Show on map button occupies the trailing navigation-toolbar slot, independently of the title's width. It switches directly to Map and closes List inspection in one transaction without a Back animation; the retained Map results sheet must not appear over an outgoing List page. Failed/missing-route actions leave List detail open. Other Map/tab actions keep their existing behavior.
@@ -28,15 +30,15 @@ On web, keep the chart, description and headline row visible when a table row op
 
 Groups have one small neutral icon beside the group title. Substats have no icons. Every substat uses the same compact value-over-label treatment, with two columns in a narrow panel and a single column at accessibility text sizes. Web can put whole groups side by side in a wide card. Group headings and subtle separators establish hierarchy; there are no nested cards or repeated measurements.
 
-| Group | Icon meaning | Fields, in order |
-| --- | --- | --- |
-| Time & speed (Time & pace for runs/swims) | Speedometer | Best pace for runs/swims, Elapsed time, Average speed, Maximum speed |
-| Elevation | Mountain | Minimum, Maximum |
-| Power | Bolt | Average, Maximum, Weighted average, Work |
-| Heart rate | Heart | Average, Maximum |
-| Energy | Flame | Calories |
-| Social | People | Kudos, Achievements, Comments, Photos |
-| Activity | Information | Commute, Private, Indoor, Manual, Flagged, Geometry status |
+| Group                                     | Icon meaning | Fields, in order                                                     |
+| ----------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| Time & speed (Time & pace for runs/swims) | Speedometer  | Best pace for runs/swims, Elapsed time, Average speed, Maximum speed |
+| Elevation                                 | Mountain     | Minimum, Maximum                                                     |
+| Power                                     | Bolt         | Average, Maximum, Weighted average, Work                             |
+| Heart rate                                | Heart        | Average, Maximum                                                     |
+| Energy                                    | Flame        | Calories                                                             |
+| Social                                    | People       | Kudos, Achievements, Comments, Photos                                |
+| Activity                                  | Information  | Commute, Private, Indoor, Manual, Flagged, Geometry status           |
 
 Short labels are scoped by their visible group heading. Accessibility combines the group and label where necessary. “Weighted average” refers to the recorded `weighted_average_watts`; do not relabel it “Normalized power” or calculate a replacement.
 

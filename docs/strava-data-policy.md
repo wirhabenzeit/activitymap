@@ -10,6 +10,30 @@ Status: **Accepted**
 - ActivityMap does not expose Strava data through feeds, search, discovery, or
   a general public API.
 
+Account resolution requires an explicit user or Strava account identity. The
+read-only repository lookup is separate from credential normalization,
+reconnection and refresh in `server/application/account-credentials.ts`.
+Optional request-global session lookup lives in the transport adapter
+`server/auth/request-account.ts`; raw Strava credentials remain server-only.
+
+Better Auth-native token columns take precedence, with legacy columns retained
+as a fallback and mirrored on normalization/refresh. Reconnection clears the
+revocation/erasure markers only while the same grant contains a live OAuth
+access token. Every credential or reconnection write locks the linked user
+before the Strava account and compares both token representations, expiry,
+account identity, update version and revocation markers. A deleted, revoked or
+reauthorized grant rejects late work rather than accepting an older refresh.
+The refresh callback persists before the Strava client accepts new tokens.
+
+The credential service injects its clock, client and persistence. It propagates
+upstream typed errors and retry metadata; local write failures keep their
+original cause and whether refresh already succeeded upstream. Activity
+application boundaries classify credential failures before making activity
+requests. Deterministic service/repository tests cover freshness, compatibility,
+reconnection, failed persistence, 429/401/5xx and controlled revoke/reconnect or
+delete/recreate races; these tests use fake transactions and clients, not live
+Postgres or Strava accounts.
+
 ## 2. Retention and freshness
 
 - Cached Strava data must be revalidated within seven days. The server

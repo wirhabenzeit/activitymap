@@ -11,17 +11,17 @@
  * (`~/server/db/schema`) and is not itself responsible for persisting
  * anything into IndexedDB; callers apply the pages it returns.
  */
-
-import { retryDeadline } from './retry-deadline';
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
 import {
-  syncBootstrapPageDTOSchema,
-  syncChangesPageDTOSchema,
   type SyncBootstrapPageDTO,
   type SyncChangesPageDTO,
   type SyncResource,
+  syncBootstrapPageDTOSchema,
+  syncChangesPageDTOSchema,
 } from '~/contracts/v1/sync';
+
+import { retryDeadline } from './retry-deadline';
 
 /** Injectable so tests never touch the real network or `globalThis.fetch`. */
 export type FetchLike = (
@@ -69,8 +69,8 @@ export class SyncApiError extends Error {
  * `~/app/api/v1/sync/changes/handler.ts`'s doc comment): the caller's cursor
  * is malformed, from a different athlete, past the retention window, or
  * beyond the current high-water mark. There is exactly one correct
- * response: discard the local store's cursor and re-run
- * `runV1SyncBootstrap` from scratch.
+ * response: bootstrap a fresh snapshot, catch up, then atomically replace
+ * the completed cache and its cursor.
  */
 export class SyncRebootstrapRequiredError extends SyncApiError {
   constructor(options: { requestId: string | null; details?: unknown }) {
@@ -99,7 +99,9 @@ async function requestJson(
     signal,
     headers: { Accept: 'application/json' },
   });
+  signal?.throwIfAborted();
   const body: unknown = await response.json().catch(() => null);
+  signal?.throwIfAborted();
   if (response.status === 429 || response.status === 503) {
     try {
       throwForErrorBody(response.status, body);
@@ -228,13 +230,29 @@ export async function drainSyncBootstrap(
   let cursor: string | undefined;
   let snapshotCursor: string | null = null;
 
+  const seen = new Set<string>();
   for (;;) {
+    options.signal?.throwIfAborted();
     const page = await fetchSyncBootstrapPage(
       { resource, cursor, limit: options.limit },
       options,
     );
+    if (page.resource !== resource)
+      throw new Error('Invalid bootstrap resource');
+    if (resource === 'activities' && cursor === undefined) {
+      if (!page.snapshotCursor)
+        throw new Error('Missing bootstrap snapshot cursor');
+      snapshotCursor = page.snapshotCursor;
+    } else if (page.snapshotCursor !== null) {
+      throw new Error('Unexpected bootstrap snapshot cursor');
+    }
+    if (page.nextCursor !== null) {
+      if (!page.nextCursor || seen.has(page.nextCursor)) {
+        throw new Error('Sync bootstrap cursor did not advance');
+      }
+      seen.add(page.nextCursor);
+    }
     await onPage(page);
-    if (page.snapshotCursor) snapshotCursor = page.snapshotCursor;
     if (page.nextCursor === null) break;
     cursor = page.nextCursor;
   }
@@ -243,11 +261,10 @@ export async function drainSyncBootstrap(
 }
 
 /**
- * Drains every currently-available `/sync/changes` page from `cursor`,
- * invoking `onPage` for each non-empty page. Stops as soon as a page comes
- * back with no items (caught up) rather than polling in a tight loop, and
- * always returns the latest cursor the caller should persist — even when
- * nothing changed.
+ * Empty advancing pages can contain superseded upserts filtered by the server.
+ * Only an empty page at the current cursor is caught up. Validate progress
+ * before applying a page; a stalled/cyclic nonterminal feed is an error.
+ * Every page reaches onPage so its checkpoint can commit with its mutations.
  */
 export async function drainSyncChanges(
   cursor: string,
@@ -256,23 +273,21 @@ export async function drainSyncChanges(
 ): Promise<{ nextCursor: string; pagesApplied: number }> {
   let current = cursor;
   let pagesApplied = 0;
-
+  const seen = new Set([cursor]);
   for (;;) {
+    options.signal?.throwIfAborted();
     const page = await fetchSyncChangesPage(
       { cursor: current, limit: options.limit },
       options,
     );
-    if (page.items.length === 0) {
-      return { nextCursor: page.nextCursor, pagesApplied };
+    const caughtUp = page.items.length === 0 && page.nextCursor === current;
+    if (!page.nextCursor || (!caughtUp && seen.has(page.nextCursor))) {
+      throw new Error('Sync changes cursor did not advance');
     }
     await onPage(page);
-    pagesApplied += 1;
-    if (page.nextCursor === current) {
-      // Defensive: a non-advancing cursor on a non-empty page would loop
-      // forever. The server contract guarantees this never happens, but a
-      // client must never spin regardless.
-      return { nextCursor: page.nextCursor, pagesApplied };
-    }
+    if (page.items.length > 0) pagesApplied += 1;
+    if (caughtUp) return { nextCursor: page.nextCursor, pagesApplied };
     current = page.nextCursor;
+    seen.add(current);
   }
 }

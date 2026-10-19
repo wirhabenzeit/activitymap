@@ -29,6 +29,44 @@ polylines. Full-resolution raw streams remain server-side; native raw persistenc
 (#216) is deferred until a feature needs it. Offline basemap and photo-byte
 availability are separate concerns.
 
+## Authenticated web library ownership
+
+`OfflineSyncProvider` registers the sole activity/photo network writer for the
+signed-in account. Startup, Sync now, reconnect, edits, activity refresh and import
+progress all request that writer through `requestLibrarySync`. Requests received
+during a pass wait for a subsequent pass, so a response begun before an edit cannot
+satisfy that edit's refresh. Profile catch-up stays an independently cancellable
+follow-up and does not delay the visible library refresh.
+
+`LibraryOwner` reads activities, photos and their checkpoint in one IndexedDB
+transaction. Committed writes notify this owner; failed or aborted writes do not.
+It publishes one structurally shared snapshot under `libraryQueryKeys.snapshot`
+and exposes it to the activity/photo hooks through `useSyncExternalStore`.
+Authenticated hooks neither fetch Server Action pages nor write their own caches.
+Legacy guest and development-gallery observers remain separate.
+
+The snapshot distinguishes an unhydrated cache, a partial bootstrap, and a
+completed library (including a genuinely empty library). Partial cached rows are
+usable offline, but selection pruning and the first-import prompt wait for
+completeness. Browser origins isolate deployments; `auth:<user-id>` isolates
+accounts within each origin. Account transitions abort and drain prior writes,
+clear the departing snapshot and disk scope, and serialize cleanup before new
+network work. Sign-out buttons await this cleanup before reloading. Cross-tab
+commit notifications invalidate local reads without broadcasting activity or
+photo payloads, even when the writing tab has no mounted owner. Provider/view
+leases release listeners on unmount; remounts reconcile missed disk changes.
+
+Run `pnpm exec playwright-core install chromium` once, then
+`pnpm test:library-owner` for the composed browser proof. The runner creates and
+removes its own temporary Next workspace without running migrations or loading
+application credentials. It mounts the production provider, hooks and activity
+list, intercepts only sync API responses, and uses real Chromium IndexedDB.
+Evidence (traces, request logs, failure captures and server logs) is written to
+`output/library-owner/`; `LIBRARY_OWNER_OUTPUT` overrides the destination. CI runs
+the same command with lockfile-pinned Chromium. These checks exercise client-side
+commit/rendering boundaries; database API behavior is covered separately by the
+sync contract and database suites.
+
 ## Freshness and recovery
 
 Stream generation/revision/state arrive through ordinary activity sync. A server
@@ -54,10 +92,10 @@ Run `node --import tsx scripts/benchmark-summary-sync.ts` to regenerate
 [`summary-sync-payload-budget.json`](summary-sync-payload-budget.json). The script
 validates 5,000 synthetic compact DTOs with the production schema:
 
-| Scenario | Encoded DTO total | Largest 100-entry batch |
-| --- | ---: | ---: |
-| Mixed existing corpus | 14,529,893 bytes (13.9 MiB) | 290,735 bytes |
-| Largest corpus fixture repeated | 23,893,893 bytes (22.8 MiB) | 478,015 bytes |
+| Scenario                        |           Encoded DTO total | Largest 100-entry batch |
+| ------------------------------- | --------------------------: | ----------------------: |
+| Mixed existing corpus           | 14,529,893 bytes (13.9 MiB) |           290,735 bytes |
+| Largest corpus fixture repeated | 23,893,893 bytes (22.8 MiB) |           478,015 bytes |
 
 A fully uncached 5,000-entry library takes 50 batch requests. Subsequent passes
 skip current persisted summaries. These figures describe JSON payloads, excluding

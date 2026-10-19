@@ -11,6 +11,38 @@ The SwiftUI client supports mobile sign-in and local-first activity synchronizat
 
 Swift Package Manager pins the Mapbox dependency in `Package.resolved`. Local Xcode state and credentials are intentionally ignored.
 
+## Map photo UI tests
+
+The three map-photo interaction journeys run in `ActivityMapUITests/MapPhotoUITests`
+through XCTest's UI automation runner. They cover the layers toggle, pin-to-thumbnail
+zoom, gallery paging and nearby activities, native viewer presentation/dismissal,
+results preservation, filtering/deletion, and the activity handoff without changing
+route selection. The app-hosted cache and map-policy unit tests remain separate.
+
+Run from the repository root using a simulator UUID from `xcrun simctl list devices`:
+
+```sh
+xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj -scheme ActivityMap \
+  -configuration Debug -destination 'platform=iOS Simulator,id=<SIMULATOR_UDID>' \
+  -parallel-testing-enabled NO -only-testing:ActivityMapUITests/MapPhotoUITests \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+The runner launches a DEBUG-only fixture with generated photo bytes and an inline
+map style. It bypasses authentication/sync, uses in-memory persistence, and clears
+only its dedicated temporary image-cache directory at startup. No real account,
+Mapbox token, or backend is needed. The placeholder token can produce Mapbox billing
+warnings; it does not prevent the inline style from rendering. The fixture and its
+launch argument are absent from Release builds.
+
+These scenarios previously traversed SwiftUI's accessibility objects from hosted
+unit tests. On the iOS 27 simulator that run exposed no accessibility children or
+frames, despite visibly rendering the controls. A real UI automation session
+initializes and queries that tree. Do not restore the traversal, enable private
+accessibility APIs, or skip the interactions when discovery fails. Verify that the
+result actually contains three executed tests; an invalid Swift Testing method
+filter can report success with zero tests.
+
 ## TestFlight releases
 
 Publish a GitHub Release with a tag such as `ios/v1.0.0` or
@@ -36,15 +68,15 @@ check TestFlight before rerunning: the upload may have succeeded already.
 One-time setup uses a GitHub environment named `testflight`, restricted to
 release tags matching `ios/v*`, with these environment secrets:
 
-| Secret | Value |
-| --- | --- |
-| `IOS_DISTRIBUTION_P12_BASE64` | Base64-encoded Apple Distribution identity, including its private key |
-| `IOS_DISTRIBUTION_P12_PASSWORD` | Password protecting that P12 |
-| `IOS_PROVISION_PROFILE_BASE64` | Base64-encoded App Store profile for `page.dominik.activitymap`, containing the same certificate |
-| `APP_STORE_CONNECT_KEY_ID` | Dedicated App Store Connect team API key ID |
-| `APP_STORE_CONNECT_ISSUER_ID` | Team API issuer ID |
-| `APP_STORE_CONNECT_PRIVATE_KEY` | The downloaded `.p8` key, including PEM headers and newlines |
-| `MAPBOX_ACCESS_TOKEN` | Public Mapbox `pk.` token for the native app |
+| Secret                          | Value                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `IOS_DISTRIBUTION_P12_BASE64`   | Base64-encoded Apple Distribution identity, including its private key                            |
+| `IOS_DISTRIBUTION_P12_PASSWORD` | Password protecting that P12                                                                     |
+| `IOS_PROVISION_PROFILE_BASE64`  | Base64-encoded App Store profile for `page.dominik.activitymap`, containing the same certificate |
+| `APP_STORE_CONNECT_KEY_ID`      | Dedicated App Store Connect team API key ID                                                      |
+| `APP_STORE_CONNECT_ISSUER_ID`   | Team API issuer ID                                                                               |
+| `APP_STORE_CONNECT_PRIVATE_KEY` | The downloaded `.p8` key, including PEM headers and newlines                                     |
+| `MAPBOX_ACCESS_TOKEN`           | Public Mapbox `pk.` token for the native app                                                     |
 
 The API key needs the **Developer** role for uploads and beta-build metadata.
 Team API keys apply across the team's apps; they cannot be restricted to one app.
@@ -83,11 +115,11 @@ The app talks to an ActivityMap deployment over `/api/v1`. It never holds a data
 
 `Config/Base.xcconfig` declares the values, `Config/Local.xcconfig` overrides them locally, and `Info.plist` surfaces them to `Networking/APIConfiguration.swift`:
 
-| xcconfig value | Default | Purpose |
-| --- | --- | --- |
-| `ACTIVITYMAP_API_BASE_URL` | Simulator: `http://localhost:3000`; device: `https://activitymap.cc` | The deployment to call |
-| `ACTIVITYMAP_AUTH_CALLBACK_SCHEME` | `activitymap` | Registered in `CFBundleURLTypes`; what `ASWebAuthenticationSession` watches for |
-| `ACTIVITYMAP_AUTH_REDIRECT_URI` | `activitymap://auth/callback` | Where mobile sign-in returns its one-time code |
+| xcconfig value                     | Default                                                              | Purpose                                                                         |
+| ---------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `ACTIVITYMAP_API_BASE_URL`         | Simulator: `http://localhost:3000`; device: `https://activitymap.cc` | The deployment to call                                                          |
+| `ACTIVITYMAP_AUTH_CALLBACK_SCHEME` | `activitymap`                                                        | Registered in `CFBundleURLTypes`; what `ASWebAuthenticationSession` watches for |
+| `ACTIVITYMAP_AUTH_REDIRECT_URI`    | `activitymap://auth/callback`                                        | Where mobile sign-in returns its one-time code                                  |
 
 Note that `//` starts a comment in xcconfig, so URL separators are composed from `$(SLASH)` rather than written literally.
 
@@ -151,12 +183,12 @@ Native sign-in works against an explicitly configured local server. Preview sign
 
 Set these in the repository's `.env` or `.env.local`. `.env.example` is documentation only, so uncommenting a line there configures nothing:
 
-| Variable | Why |
-| --- | --- |
+| Variable                                                     | Why                                                                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback` | Must match the app's `ACTIVITYMAP_AUTH_REDIRECT_URI`; matched on exact protocol, host, and path prefix |
-| `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled` | Without this the Strava OAuth provider is never registered and sign-in cannot start |
-| `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET` | The Strava OAuth application credentials |
-| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Session signing, and the trusted-origin fallback |
+| `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`                       | Without this the Strava OAuth provider is never registered and sign-in cannot start                    |
+| `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET`                       | The Strava OAuth application credentials                                                               |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`                      | Session signing, and the trusted-origin fallback                                                       |
 
 Be aware of what the second one turns on: with external effects enabled, the local server makes real Strava API calls and real Strava writes, and any webhook or cron route you invoke acts against live data. That is why the default everywhere except production is `disabled`. Enable it deliberately, for a sign-in session you are actually testing.
 
@@ -346,6 +378,8 @@ Show on map is functional, with an explicit explanation when there is no GPS rou
 
 GPX export reads only the existing cache, entirely offline. When a current compact summary has paired GPS and altitude summary values, it exports that sampled track with `<ele>` values in metres and labels the row **Sampled route with elevation**. The summary has up to 300 points, so this export can have less route detail than the activity polyline. The elevations are bucket averages from the chart cache, not raw per-point readings, and are labelled as sampled in the row and as averaged in the GPX source. They stay paired with their corresponding sampled GPS points; they are never assigned by index to unrelated polyline vertices or further interpolated. Missing, malformed, stale, unsupported or mismatched elevation data falls back to the best route already chosen by the cache mapper, without elevation. The row labels detailed versus simplified fallback geometry and explains when there is no GPS route to export. Files preserve coordinate order and escaped activity name/description; no recording timestamps are invented. Source invalidation immediately removes elevation availability and fences an in-flight export. Export runs off the main actor, uses a bounded safe filename and a unique temporary directory, and presents the native share sheet directly. On iPad the popover is anchored to the GPX row. Cancellation, share completion/errors and detail dismissal remove the temporary file. `ActivityActionTests` covers serialization, cached elevation pairing, fallback geometry, Unicode, short/no-GPS/invalid routes, cancellation, disk errors, cleanup and exact Strava URLs. Rendered action tests exercise offline elevation export/invalidation without network requests, real sharing and repeat cancellation, plus bottom-row ordering, absent actions heading, phone/tablet, large text, dark and simplified/no-GPS rows. Activity-link sharing and map-image export remain separate features (#307/#225).
 
+`ActivityGPXExportController` shares availability, detached sample validation/writing, cancellation, errors and temporary-file ownership between the row context menu and detail action. Render identity uses a compact revision key, so selection redraws do not copy/hash full route coordinates. Row menus prepare lazily and offer sampled-only export on their first opening; direct accessibility activation follows the same validation path. Freshness includes the account scope epoch, activity revision/current snapshot and cached-summary/session revision, including nil-summary exports across logout or deletion/recreation. Superseded success cleans only its own unpublished file; superseded errors stay silent and cannot reset a newer export. Published files retain the existing presenter's independent lease through dismissal. `ActivityGPXWorkflowTests` exercises sampled-only availability, fallback/no-GPS explanations, first activation, independent stale scope/activity/summary success and failure, cancellation with overlapping newer work, failure/retry, and lease ownership. These are deterministic synthetic simulator tests, not a physical-device share-extension or performance certification.
+
 `RenderedActivityDetailTests` hosts the production views in the simulator and checks redraw after same-ID updates/deletion, independent inspection and scrolling across compact, regular-width, landscape, accessibility-text and dark GPS-less fixtures. It writes synthetic review captures to `/tmp/activitymap-detail-preview`; these are visual-review artifacts, not pixel-golden assertions or physical-iPad/VoiceOver certification.
 
 ## Map context and navigation
@@ -409,3 +443,48 @@ On portrait phones, the middle map sheet shows the activity title/date, a compac
 Swift Charts chooses round distance ticks automatically. Native chart selection drives a short distance/altitude readout in a reserved row above the plot, with opaque background and primary text. Web uses the same layout, units, rounding and light/dark accent colors. Drag across the plot to inspect a recorded distance/elevation pair. In Map detail, the corresponding aligned GPS sample moves a contrasting dot without refitting the camera or rebuilding routes. The cursor uses full emissive strength, matching the route layers so Standard night lighting does not dim it. Releasing the drag clears it. Missing GPS never produces an estimated position. VoiceOver exposes the range/distance description, adjustable sample selection and a clear-selection action. The native activity pager yields while a sample is selected.
 
 `ElevationProfileTests` and `ElevationLifecycleTests` cover sample validation, short/flat/repeated-distance routes, GPS alignment, time-only summaries, retry states, old offline caches and invalidation. The rendered detail tests cover phone/tablet/large text, visible demand, detail switching and map cursor/pager integration. A native phone-sheet regression checks that the complete chart and unobscured map cursor are visible together for single and multiple selected activities. Physical-device touch and VoiceOver certification remains part of #228.
+
+## Bounded runtime regression command
+
+Run `pnpm test:ios` (or `node scripts/quality/native-harness.mjs` without web dependencies) from the repository root with Xcode 27. It owns a fresh simulator, executes six selected suites, requires nonzero passing results with no skipped tests, and saves logs plus an xcresult bundle. See [Quality checks](../../docs/quality-checks.md) for suite boundaries, timeouts, artifacts, and explicit existing-simulator reuse. Broader rendered and physical-device acceptance remains separate.
+
+## Photo request and decode pipeline
+
+`PhotoImageCache` coalesces gallery demand and adjacent-page prefetch for the same
+photo URL, revision and decoded size (256 or 2048 pixels). `PhotoByteCache` also
+shares downloads between sizes. Work belongs to the cache: cancelling a consumer
+rejects its result after shared work completes, without cancelling another
+consumer's download or decode. If all consumers leave, work completes for reuse;
+network resources retain their 45-second timeout. Scope/metadata reconciliation
+cancels and fences obsolete work. In-flight entries retire on both success and
+failure, so Retry starts a fresh attempt. Invalid-image cleanup includes the
+revision fence, including a failed old decode arriving after replacement bytes.
+
+ImageIO thumbnail creation and immediate decompression run in a detached task.
+UIImage construction and the 16 MiB decoded-image cache remain on MainActor.
+The byte cache retains its 64 MiB disk budget, 12 MiB file limit, protected atomic
+writes, backup exclusion, offline reopen and metadata pruning.
+
+`PhotoPipelineTests` gates downloads and decodes to cover shared work, different
+sizes, cancellation, network/invalid-image retry, suspended decode invalidation
+on logout/account/metadata changes, and old invalid-image cleanup. The existing
+`PhotoGalleryTests` exercise adjacent-page demand and rendered viewer behavior.
+
+Representative synthetic evidence, 18 October 2026, Xcode 27.1 Debug,
+iPhone 18 Pro / iOS 27.0 simulator: five concurrent 2048-pixel consumers of one
+2400×1600 JPEG produced **5 downloads / 5 decodes / 5 main-thread decodes** in a
+reconstruction of the old cache-miss path and **1 / 1 / 0** through the shared
+pipeline. Aggregate time inside ImageIO was **114.52 ms before / 21.64 ms after**
+in that sample. The baseline omits disk bookkeeping, so these are decode-work
+measurements rather than total request latency. The mixed-size regression
+produces one download and one decode per requested size. Reproduce the synthetic
+measurement with `PhotoPipelineTests/syntheticBeforeAfterDemandAndMainThreadEvidence`;
+it prints `PHOTO_PIPELINE_SYNTHETIC` and asserts counts, never timing thresholds.
+These are synthetic simulator measurements, not physical-device frame-time or
+Instruments results. Named-device gallery scrolling, memory pressure and frame
+budgets remain #229; no physical-device performance claim is made here.
+
+The focused pipeline/gallery/map-policy suites passed 21 test methods on that
+simulator. All three broader `RenderedMapPhotoTests` timed out discovering map
+pins or the layers menu before photo demand; the unchanged pre-#414 photo cache
+reproduced those same failures. This rendering limitation needs separate review.

@@ -1,8 +1,11 @@
-import { queryOptions, type QueryClient } from '@tanstack/react-query';
+import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
 import { activitySummaryFetchResultSchema } from '~/contracts/v1/activity-mutations';
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
+import type { BrowserSyncStatus } from '~/lib/sync/browser-status';
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { requestLibrarySync } from '~/lib/sync/library-sync';
 import { retryDeadline } from '~/lib/sync/retry-deadline';
 
 export class FirstSummaryFetchError extends Error {
@@ -59,6 +62,26 @@ async function fetchSummaries(signal: AbortSignal): Promise<number> {
   return parsed.data.data;
 }
 
+/** Wait for this session's initial reconciliation, including cached-empty
+ * reopen, before deciding whether Strava summaries need to be imported. */
+export function shouldFetchFirstSummaries(
+  activities: {
+    isSuccess: boolean;
+    isFetching: boolean;
+    hasNextPage: boolean;
+    data?: readonly unknown[];
+  },
+  syncPhase: BrowserSyncStatus['phase'] | undefined,
+) {
+  return (
+    syncPhase === 'ready' &&
+    activities.isSuccess &&
+    !activities.isFetching &&
+    !activities.hasNextPage &&
+    activities.data?.length === 0
+  );
+}
+
 /** Keep a successful import separate from the download, so recovery only repeats failed work. */
 export function firstSummaryFetchOptions(
   client: QueryClient,
@@ -93,31 +116,15 @@ export function firstSummaryFetchOptions(
         gcTime: Infinity,
       });
       signal.throwIfAborted();
-      const predicate = (query: { queryKey: readonly unknown[] }) =>
-        query.queryKey[0] === 'activities' &&
-        query.queryKey[1] === 'auth' &&
-        query.queryKey[2] === userId;
       try {
-        await client.invalidateQueries({ predicate });
-        // Invalidation resolves on failed or paused refetches, too.
-        if (
-          client
-            .getQueryCache()
-            .findAll({ predicate, type: 'active' })
-            .some(
-              (query) =>
-                query.state.status !== 'success' ||
-                query.state.fetchStatus === 'paused',
-            )
-        )
-          throw new Error('Activity download is paused');
-      } catch {
+        await requestLibrarySync(client, authenticatedLibraryScope(userId!));
+        signal.throwIfAborted();
+      } catch (error) {
+        if (signal.aborted) throw error;
         throw new FirstSummaryFetchError(
           'Your activities were saved, but could not be downloaded. Check your connection and retry.',
         );
       }
-      if (typeof window !== 'undefined')
-        window.dispatchEvent(new Event('activitymap:retry-browser-sync'));
       return count;
     },
   });

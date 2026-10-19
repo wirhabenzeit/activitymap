@@ -13,6 +13,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     var showOnMap: ((Int) -> Void)? = nil
     var editing: ActivityEditingService? = nil
     var streamSummaries: StreamSummaryLoader? = nil
+    var exportStore: ActivityStore? = nil
     @ViewBuilder var profile: (Activity) -> Profile
     @ViewBuilder var photos: (Activity) -> Photos
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -58,7 +59,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                 }
                 .accessibilityIdentifier("activity-metric-group-\(group.id)")
             }
-            ActivityDetailActions(activity: activity, summaries: streamSummaries).id(activity.id)
+            ActivityDetailActions(activity: activity, summaries: streamSummaries, exportStore: exportStore).id(activity.id)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, AppTheme.Spacing.large)

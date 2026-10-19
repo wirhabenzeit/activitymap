@@ -13,27 +13,70 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-      - run: pnpm test:stats-ui
-      - run: pnpm test:settings-ui
-      - run: pnpm exec tsc --noEmit
-      - run: pnpm lint
-      - name: Validate shared map catalogue and generated Swift
-        run: pnpm map-catalog:check
-      - name: Validate shared stats tiles and fixtures, and generated Swift and TypeScript
-        run: pnpm stats-tiles:check
-      - name: Check the generated Swift API DTOs match the Zod contracts
-        run: pnpm api-dtos:check
+      - run: pnpm check
+      - name: Check formatting of this change only
+        env:
+          FORMAT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: pnpm format:check --base "$FORMAT_BASE"
       - name: Fetch main for the OpenAPI breaking-change comparison
         run: git fetch origin +refs/heads/main:refs/remotes/origin/main --depth=1
       - name: Check for breaking OpenAPI changes vs main
         run: pnpm openapi:check-breaking -- --base=origin/main
+
+  browser-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Provision the pinned Chromium and Linux libraries
+        run: pnpm test:browser:install --with-deps
+      - name: Run fixture-only composed browser regressions
+        run: pnpm test:browser
+      - name: Upload browser logs, traces, screenshots and result counts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-runtime-${{ github.run_attempt }}
+          path: output/quality/browser/
+          if-no-files-found: warn
+          retention-days: 7
+
+  library-owner-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install lockfile-pinned Chromium
+        run: pnpm exec playwright-core install --with-deps chromium
+      - name: Verify committed library updates, offline recovery and account cleanup
+        run: pnpm test:library-owner
+      - name: Preserve browser traces, requests and server logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: library-owner-browser
+          path: output/library-owner/
+          if-no-files-found: warn
 
   swift-client:
     runs-on: macos-15
@@ -45,18 +88,22 @@ jobs:
       - name: Generate and compile the Swift client
         run: bash scripts/verify-swift-client.sh
 
-  # Compiles the generated wire types inside the real app target. The
+  # Builds the real app and runs six bounded test suites on an owned simulator. The
   # api-dtos:check step in `quality` only compares generated text, and
   # `swift-client` above compiles a separate OpenAPI-generated package, so
-  # without this job invalid generated Swift could pass CI.
+  # this job additionally catches runtime failures and requires nonzero tests.
   #
   # The minimum deployment target is iOS 26. The iOS 27 SDK is still needed
   # to compile optional, availability-guarded APIs such as cross-fade navigation.
   # Keep the Xcode 27 runner for that SDK.
   ios-app:
     runs-on: xcode-27
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
       - name: Record the toolchain
         run: |
           xcodebuild -version
@@ -67,18 +114,16 @@ jobs:
           bash scripts/verify-stream-dtos.sh origin/main
       - name: Verify compact summary codecs and encoded cache round trips
         run: bash scripts/verify-compact-stream-codec.sh
-      # Compile the app and its test target without starting a simulator. Native
-      # rendering and app-hosted runtime tests are run locally before review;
-      # simulator startup on this preview runner can take several minutes.
-      - name: Compile iOS app and tests (no simulator)
-        timeout-minutes: 8
-        run: |
-          xcodebuild build-for-testing \
-            -project ios/ActivityMap/ActivityMap.xcodeproj \
-            -scheme ActivityMap \
-            -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
-            ARCHS=arm64 CODE_SIGNING_ALLOWED=NO
+      - name: Run bounded iOS runtime regressions on an owned simulator
+        run: node scripts/quality/native-harness.mjs
+      - name: Upload native result bundle and test summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-runtime-${{ github.run_attempt }}
+          path: output/quality/ios/
+          if-no-files-found: warn
+          retention-days: 7
 
   migrations:
     runs-on: ubuntu-24.04

@@ -1,17 +1,20 @@
 'use server';
 
-import { inArray, desc, eq } from 'drizzle-orm';
-import { activities } from './schema';
-import { db } from './index';
+import { desc, eq, inArray } from 'drizzle-orm';
 import { headers } from 'next/headers';
-import { getUserInternal } from './internal';
-import { requireActor } from '~/server/auth/actor';
-import * as activitiesService from '~/server/application/activities';
+
 import { assertLegacySharingEnabled } from '~/lib/legacy-sharing';
+import * as activitiesService from '~/server/application/activities';
+import { requireActor } from '~/server/auth/actor';
+import { getRequestUserInternal } from '~/server/auth/request-account';
+
+import { db } from './index';
+import { getUserInternal } from './internal';
+import { activities } from './schema';
 
 // Safe wrapper for getUser
 export const getUser = async (id?: string) => {
-  return getUserInternal(id);
+  return getRequestUserInternal(id);
 };
 
 /**

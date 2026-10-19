@@ -30,6 +30,20 @@ nonisolated struct NumericFilter: Hashable, Sendable {
     var maximum: Double? { operatorType == .lte ? value : upperLimit }
 }
 
+/// Ordinary browsing filters are one value so a user intent can publish and
+/// reconcile its final predicates once. Selected-only scope stays in the reducer.
+struct ActivityFilterState: Equatable {
+    var searchText = ""
+    var activeSportTypes = Set(SportType.allCases)
+    var dateDayRange: ActivityDayRange?
+    var distanceFilter: NumericFilter?
+    var elevationFilter: NumericFilter?
+    var durationFilter: NumericFilter?
+    var commuteOnly: Bool?
+    var privateFilter: Bool?
+    var flaggedFilter: Bool?
+}
+
 @Observable
 final class ActivityStore {
     var activities: [Activity] {
@@ -47,21 +61,29 @@ final class ActivityStore {
     @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, selected: Set<Int>?, restricted: Bool, activities: [Activity])?
     @ObservationIgnored private(set) var filterBuildCount = 0
     @ObservationIgnored private(set) var sortBuildCount = 0
+    @ObservationIgnored private(set) var selectionReconciliationCount = 0
+    @ObservationIgnored private(set) var activityLookupBuildCount = 0
 
     @ObservationIgnored let routeGeometry = RouteGeometryCache()
     @ObservationIgnored let summaryCache = ActivitySummaryCache()
     let stats: StatsController
     @ObservationIgnored private var activityLookupRevision: Int?
     @ObservationIgnored private var activityLookup: [Int: Activity] = [:]
+    @ObservationIgnored private var activityLookupIDs: Set<Int> = []
 
     /// Identity lookup does not filter or scan the library during sheet frames.
     /// Read the observable revision even on a cache hit so open details stay live.
     func activity(id: Int) -> Activity? {
-        if activityLookupRevision != activitiesRevision {
-            activityLookup = Dictionary(uniqueKeysWithValues: activities.map { ($0.id, $0) })
-            activityLookupRevision = activitiesRevision
-        }
+        refreshActivityLookup()
         return activityLookup[id]
+    }
+
+    private func refreshActivityLookup() {
+        guard activityLookupRevision != activitiesRevision else { return }
+        activityLookup = Dictionary(uniqueKeysWithValues: activities.map { ($0.id, $0) })
+        activityLookupIDs = Set(activityLookup.keys)
+        activityLookupRevision = activitiesRevision
+        activityLookupBuildCount += 1
     }
     @ObservationIgnored private var routeAvailabilityRevision: Int?
     @ObservationIgnored private var routeAvailabilityIDs: Set<Int> = []
@@ -116,15 +138,21 @@ final class ActivityStore {
         get { Set(activeSportTypes.map(\.category)) }
         set { activeSportTypes = Set(newValue.flatMap(\.sportTypes)) }
     }
-    var searchText = "" {
-        didSet { reconcileSelectionVisibility() }
-    }
-    var activeSportTypes: Set<SportType> = Set(SportType.allCases) {
-        didSet { reconcileSelectionVisibility() }
-    }
+    private var filters = ActivityFilterState()
 
-    var dateDayRange: ActivityDayRange? = nil {
-        didSet { reconcileSelectionVisibility() }
+    // Keep the existing SwiftUI bindings. Equality is checked before the single
+    // observable value is assigned, including mutations via Set insert/remove.
+    var searchText: String {
+        get { filters.searchText }
+        set { updateFilters { $0.searchText = newValue } }
+    }
+    var activeSportTypes: Set<SportType> {
+        get { filters.activeSportTypes }
+        set { updateFilters { $0.activeSportTypes = newValue } }
+    }
+    var dateDayRange: ActivityDayRange? {
+        get { filters.dateDayRange }
+        set { updateFilters { $0.dateDayRange = newValue } }
     }
     /// Compatibility for DatePicker callers. Convert at assignment time so a
     /// later timezone change cannot move the chosen calendar-day boundaries.
@@ -137,23 +165,37 @@ final class ActivityStore {
             }
         }
     }
-    var distanceFilter: NumericFilter? = nil {
-        didSet { reconcileSelectionVisibility() }
+    var distanceFilter: NumericFilter? {
+        get { filters.distanceFilter }
+        set { updateFilters { $0.distanceFilter = newValue } }
     }
-    var elevationFilter: NumericFilter? = nil {
-        didSet { reconcileSelectionVisibility() }
+    var elevationFilter: NumericFilter? {
+        get { filters.elevationFilter }
+        set { updateFilters { $0.elevationFilter = newValue } }
     }
-    var durationFilter: NumericFilter? = nil {
-        didSet { reconcileSelectionVisibility() }
+    var durationFilter: NumericFilter? {
+        get { filters.durationFilter }
+        set { updateFilters { $0.durationFilter = newValue } }
     }
-    var commuteOnly: Bool? = nil {
-        didSet { reconcileSelectionVisibility() }
+    var commuteOnly: Bool? {
+        get { filters.commuteOnly }
+        set { updateFilters { $0.commuteOnly = newValue } }
     }
-    var privateFilter: Bool? = nil {
-        didSet { reconcileSelectionVisibility() }
+    var privateFilter: Bool? {
+        get { filters.privateFilter }
+        set { updateFilters { $0.privateFilter = newValue } }
     }
-    var flaggedFilter: Bool? = nil {
-        didSet { reconcileSelectionVisibility() }
+    var flaggedFilter: Bool? {
+        get { filters.flaggedFilter }
+        set { updateFilters { $0.flaggedFilter = newValue } }
+    }
+
+    /// Edit a copy and publish only the final value. No-op edits neither notify
+    /// filter observers nor invalidate the library/selection snapshots.
+    func updateFilters(_ update: (inout ActivityFilterState) throws -> Void) rethrows {
+        var next = filters
+        try update(&next)
+        applyFilters(next)
     }
 
     /// Stats ends Combine; tab changes preserve the group, scope and inspection.
@@ -312,22 +354,20 @@ final class ActivityStore {
     private(set) var filterResetRevision = 0
 
     func resetFilters() {
-        selection.setOnlySelected(false)
-        dateDayRange = nil
-        resetStatsActivityFilters()
+        // Reset commands must still discard unapplied numeric/date drafts when
+        // all committed predicates are already clear. This UI-only revision is
+        // intentionally independent of filtering and selection reconciliation.
+        filterResetRevision &+= 1
+        applyFilters(ActivityFilterState(), resetSelectedOnly: true)
     }
 
-    /// Preserve saved browsing dates, selected IDs, camera and list context.
+    /// Preserve saved browsing dates, selected-only scope, Combine, selected
+    /// IDs, inspection, camera and list context; clear only Stats predicates.
     func resetStatsActivityFilters() {
         filterResetRevision &+= 1
-        searchText = ""
-        activeSportTypes = Set(SportType.allCases)
-        distanceFilter = nil
-        elevationFilter = nil
-        durationFilter = nil
-        commuteOnly = nil
-        privateFilter = nil
-        flaggedFilter = nil
+        var next = ActivityFilterState()
+        next.dateDayRange = filters.dateDayRange
+        applyFilters(next)
     }
 
     func toggleSportType(_ sportType: SportType) {
@@ -382,7 +422,7 @@ final class ActivityStore {
     /// GPS-less and filter-hidden activities leave all state unchanged.
     @discardableResult
     func showOnMap(_ activityID: Int) -> SelectionState.ShowOnMapOutcome {
-        guard let activity = activities.first(where: { $0.id == activityID }) else {
+        guard let activity = activity(id: activityID) else {
             return .notFound
         }
         let hasGeometry = RouteExtent(coordinates: activity.coordinates) != nil
@@ -399,7 +439,7 @@ final class ActivityStore {
 
     func clearFiltersAndShowOnMap(_ activityID: Int) {
         mapContext.hiddenTargetID = nil
-        guard let activity = activities.first(where: { $0.id == activityID }),
+        guard let activity = activity(id: activityID),
               RouteExtent(coordinates: activity.coordinates) != nil else { return }
         resetFilters()
         showOnMap(activityID)
@@ -416,6 +456,7 @@ final class ActivityStore {
         filteredSnapshot = nil
         listedSnapshot = nil
         activityLookup = [:]
+        activityLookupIDs = []
         activityLookupRevision = nil
         activities = []
         routeGeometry.update(activities: [], revision: activitiesRevision)
@@ -423,23 +464,42 @@ final class ActivityStore {
         mapContext.clearScope()
     }
 
-    private var activityIndex: Set<Int> { Set(activities.map(\.id)) }
+    private var activityIndex: Set<Int> {
+        refreshActivityLookup()
+        return activityLookupIDs
+    }
 
     private func existing(_ activityIDs: some Sequence<Int>) -> [Int] {
         let known = activityIndex
         return activityIDs.filter { known.contains($0) }
     }
 
-    private func reconcileSelectionVisibility() {
-        filterRevision &+= 1
-        selection.setVisible(Set(filteredActivities.map(\.id)))
+    private func applyFilters(_ next: ActivityFilterState, resetSelectedOnly: Bool = false) {
+        let changed = filters != next
+        guard changed || (resetSelectedOnly && selection.onlySelected) else { return }
+        if changed {
+            filters = next
+            filterRevision &+= 1
+        }
+        // Reset scope before validating inspection against the final visibility.
+        // Work on a copy so one reset publishes one reducer snapshot.
+        var nextSelection = selection
+        if resetSelectedOnly { nextSelection.setOnlySelected(false) }
+        if changed {
+            selectionReconciliationCount += 1
+            nextSelection.setVisible(Set(filteredActivities.map(\.id)))
+        }
+        if nextSelection != selection { selection = nextSelection }
     }
 
     /// Reconcile removals and filter eligibility as one committed snapshot.
     private func reconcileSelectionWithActivities() {
-        selection.reconcileActivities(
+        selectionReconciliationCount += 1
+        var next = selection
+        next.reconcileActivities(
             existingIDs: activityIndex,
             visibleIDs: Set(filteredActivities.map(\.id))
         )
+        if next != selection { selection = next }
     }
 }

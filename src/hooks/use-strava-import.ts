@@ -1,20 +1,22 @@
 'use client';
-import { useEffect, useRef } from 'react';
 import {
+  type QueryClient,
   useMutation,
   useQuery,
   useQueryClient,
-  type QueryClient,
 } from '@tanstack/react-query';
-import {
-  stravaImportDTOSchema,
-  type StravaImportDTO,
-} from '~/contracts/v1/strava-import';
+import { useEffect, useRef } from 'react';
+
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
+import {
+  type StravaImportDTO,
+  stravaImportDTOSchema,
+} from '~/contracts/v1/strava-import';
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { requestLibrarySync } from '~/lib/sync/library-sync';
 import { retryDeadline } from '~/lib/sync/retry-deadline';
 import { useShallowStore } from '~/store';
-import { requestBrowserSync } from '~/lib/sync/browser-status';
 
 const cooldowns = new WeakMap<QueryClient, Map<string, number>>();
 function cooldown(client: QueryClient, owner: string) {
@@ -138,17 +140,15 @@ export function useStravaImport(userId: string | undefined, visible: boolean) {
   }, [userId, reset]);
   useEffect(() => {
     if (!userId || !visible || !query.data?.runId) return;
-    // Fetches publish normal changes; refresh both the device cache and views.
-    requestBrowserSync();
-    void client
-      .invalidateQueries({
-        predicate: ({ queryKey }) =>
-          (queryKey[0] === 'activities' &&
-            queryKey[1] === 'auth' &&
-            queryKey[2] === userId) ||
-          (queryKey[0] === 'photos' && queryKey[1] === userId),
-      })
-      .catch(() => undefined);
+    // Import progress is reconciled through the same committed library view.
+    if (
+      useShallowStore.getState().user?.id !== userId ||
+      useShallowStore.getState().isGuest
+    )
+      return;
+    void requestLibrarySync(client, authenticatedLibraryScope(userId)).catch(
+      () => undefined,
+    );
   }, [
     client,
     userId,

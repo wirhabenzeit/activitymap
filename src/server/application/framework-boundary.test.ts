@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import test from 'node:test';
 
 /**
@@ -12,21 +13,33 @@ import test from 'node:test';
  * This is a plain source-text scan, not a bundler/type-level check - that is
  * enough to catch a service reaching for a request-global or a framework
  * directive directly, which is the mistake this rule guards against. It
- * intentionally does not chase transitive dependencies (e.g. calling
- * `getAccountInternal`, which itself imports `next/headers` for its own
- * optional session-fallback branch): the rule is about what application
- * services *do themselves*, not their full module graph.
+ * also checks the legacy internal account/user facade: request-global
+ * fallback belongs in transport adapters, never in credential resolution.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 
 const FORBIDDEN_PATTERNS: { label: string; pattern: RegExp }[] = [
+  {
+    label: 'request-global auth/session import',
+    pattern: /from ['"]~\/lib\/auth['"]/,
+  },
+  {
+    label: 'request account adapter import',
+    pattern: /from ['"]~\/server\/auth\/request-account['"]/,
+  },
   { label: '"use server" directive', pattern: /['"]use server['"]/ },
   { label: '"use client" directive', pattern: /['"]use client['"]/ },
-  { label: "import from 'next/headers'", pattern: /from ['"]next\/headers['"]/ },
+  {
+    label: "import from 'next/headers'",
+    pattern: /from ['"]next\/headers['"]/,
+  },
   { label: "import from 'next/server'", pattern: /from ['"]next\/server['"]/ },
-  { label: "import from 'next/navigation'", pattern: /from ['"]next\/navigation['"]/ },
+  {
+    label: "import from 'next/navigation'",
+    pattern: /from ['"]next\/navigation['"]/,
+  },
   { label: "import from 'react'", pattern: /from ['"]react['"]/ },
   { label: "import from 'react-dom'", pattern: /from ['"]react-dom['"]/ },
 ];
@@ -52,8 +65,13 @@ const applicationDir = path.join(repoRoot, 'src/server/application');
 const repositoriesDir = path.join(repoRoot, 'src/server/repositories');
 
 const filesToCheck = [
-  ...listSourceFiles(applicationDir).map((name) => path.join(applicationDir, name)),
-  ...listSourceFiles(repositoriesDir).map((name) => path.join(repositoriesDir, name)),
+  path.join(repoRoot, 'src/server/db/internal.ts'),
+  ...listSourceFiles(applicationDir).map((name) =>
+    path.join(applicationDir, name),
+  ),
+  ...listSourceFiles(repositoriesDir).map((name) =>
+    path.join(repositoriesDir, name),
+  ),
 ];
 
 void test('application services and repositories have no framework-layer imports', () => {

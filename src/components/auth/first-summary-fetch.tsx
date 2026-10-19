@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import {
   DialogDescription,
   DialogOverlay,
@@ -11,11 +12,15 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog';
 import { useActivities } from '~/hooks/use-activities';
-import { useShallowStore } from '~/store';
 import {
   FirstSummaryFetchError,
   firstSummaryFetchOptions,
+  shouldFetchFirstSummaries,
 } from '~/lib/first-summary-fetch';
+import { useBrowserSyncStatus } from '~/lib/sync/browser-status';
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { requestLibrarySync } from '~/lib/sync/library-sync';
+import { useShallowStore } from '~/store';
 
 export function FirstSummaryFetch() {
   const client = useQueryClient();
@@ -27,7 +32,10 @@ export function FirstSummaryFetch() {
   }));
   const activities = useActivities();
   const [dismissed, setDismissed] = useState<string | null>(null);
-  const empty = activities.isSuccess && activities.data?.length === 0;
+  const syncPhase = useBrowserSyncStatus((state) =>
+    userId ? state.byUser[userId]?.phase : undefined,
+  );
+  const empty = shouldFetchFirstSummaries(activities, syncPhase);
   const fetch = useQuery(
     firstSummaryFetchOptions(client, userId, Boolean(connected && empty)),
   );
@@ -39,16 +47,11 @@ export function FirstSummaryFetch() {
       window.setTimeout(() => {
         if (useShallowStore.getState().user?.id !== userId || !navigator.onLine)
           return;
-        window.dispatchEvent(new Event('activitymap:retry-browser-sync'));
-        void client
-          .invalidateQueries({
-            predicate: ({ queryKey }) =>
-              (queryKey[0] === 'activities' &&
-                queryKey[1] === 'auth' &&
-                queryKey[2] === userId) ||
-              (queryKey[0] === 'photos' && queryKey[1] === userId),
-          })
-          .catch(() => undefined);
+        if (useShallowStore.getState().isGuest) return;
+        void requestLibrarySync(
+          client,
+          authenticatedLibraryScope(userId),
+        ).catch(() => undefined);
       }, delay),
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));

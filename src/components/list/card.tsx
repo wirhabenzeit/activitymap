@@ -1,53 +1,59 @@
 'use client';
 
+import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
+import { decode } from '@mapbox/polyline';
+import { ReloadIcon } from '@radix-ui/react-icons';
+import { useQueryClient } from '@tanstack/react-query';
+import { type Row } from '@tanstack/react-table';
+import type { Feature, LineString } from 'geojson';
 import {
-  Map,
-  Route,
-  Minus,
   Download,
-  MoreHorizontal,
   ExternalLink,
+  Map,
+  Minus,
+  MoreHorizontal,
   Pencil,
   Image as PhotosIcon,
+  Route,
 } from 'lucide-react';
-import { decode } from '@mapbox/polyline';
-import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
-import type { Feature, LineString } from 'geojson';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useCallback, useState } from 'react';
 
 import { ActivitySelectionSymbol } from '~/components/activity-selection-controls';
-import { type Activity } from '~/server/db/schema';
-import { categorySettings } from '~/settings/category';
 import { Button } from '~/components/ui/button';
-import { aliasMap } from '~/settings/category';
-import Link from 'next/link';
-import { ReloadIcon } from '@radix-ui/react-icons';
-
-import { type Row } from '@tanstack/react-table';
-import { type Features } from './table-extensions';
-
 import { Card, CardHeader, CardTitle } from '~/components/ui/card';
-import { ActivityDetailStats } from './activity-detail-stats';
-import { useDateFormat } from '~/hooks/use-display-preferences';
-
-import { EditActivity } from './edit';
-import { useCallback, useState } from 'react';
-import { cn } from '~/lib/utils';
-import { formatPreferredDate } from '~/lib/date-preferences';
-import { formatLocalTime } from '~/lib/local-date-time';
-import { store, useShallowStore } from '~/store';
-import { applyFilters } from '~/store/filter';
-import { useActivities } from '~/hooks/use-activities';
-import { showActivityOnMap } from '~/lib/show-on-map';
-import { PhotoLightbox } from './photo';
-import { ElevationChart } from './elevation-chart';
-import { RouteDetailsContent } from './route-details-content';
-import { useRouter, usePathname } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
+import { useActivities } from '~/hooks/use-activities';
+import { useDateFormat } from '~/hooks/use-display-preferences';
+import { usePhotos } from '~/hooks/use-photos';
+import { useToast } from '~/hooks/use-toast';
+import { reloadStreamSummaryActivity } from '~/lib/activity-stream-summary';
+import { formatPreferredDate } from '~/lib/date-preferences';
+import { formatLocalTime } from '~/lib/local-date-time';
+import { showActivityOnMap } from '~/lib/show-on-map';
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { requestLibrarySync } from '~/lib/sync/library-sync';
+import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
+import { cn } from '~/lib/utils';
+import { type Activity } from '~/server/db/schema';
+import { refreshActivity } from '~/server/strava/actions';
+import { categorySettings } from '~/settings/category';
+import { aliasMap } from '~/settings/category';
+import { store, useShallowStore } from '~/store';
+import { applyFilters } from '~/store/filter';
+
+import { ActivityDetailStats } from './activity-detail-stats';
+import { EditActivity } from './edit';
+import { ElevationChart } from './elevation-chart';
+import { PhotoLightbox } from './photo';
+import { RouteDetailsContent } from './route-details-content';
+import { type Features } from './table-extensions';
 
 interface ActivityCardContentProps {
   row: Row<Features, Activity>;
@@ -120,7 +126,7 @@ export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
   return (
     <>
       <div
-        className="w-full truncate italic h-full flex items-center"
+        className="flex h-full w-full items-center truncate italic"
         onDoubleClick={() => !isGuest && setOpen(true)}
       >
         {row.original.description}
@@ -129,13 +135,6 @@ export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
     </>
   );
 }
-
-import { usePhotos } from '~/hooks/use-photos';
-import { useQueryClient } from '@tanstack/react-query';
-import { refreshActivity } from '~/server/strava/actions';
-import { useToast } from '~/hooks/use-toast';
-import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
-import { reloadStreamSummaryActivity } from '~/lib/activity-stream-summary';
 
 /** Route details shown in place of a table row (map panel and list). */
 export function ActivityCardContent({
@@ -175,10 +174,16 @@ export function ActivityCardContent({
 
   const date = row.original.start_date_local;
   const handleRefresh = async () => {
+    const isCurrent = () => {
+      const state = useShallowStore.getState();
+      return !!userId && state.user?.id === userId && !state.isGuest;
+    };
+    if (!isCurrent()) return;
     if (!stravaConnected) return;
     setLoading(true);
     try {
       await refreshActivity(row.original.id);
+      if (!userId || !isCurrent()) return;
 
       if (userId) {
         await reloadStreamSummaryActivity(
@@ -188,14 +193,19 @@ export function ActivityCardContent({
         );
       }
 
-      await queryClient.invalidateQueries({ queryKey: ['activities'] });
-      await queryClient.invalidateQueries({ queryKey: ['photos'] });
+      if (userId)
+        await requestLibrarySync(
+          queryClient,
+          authenticatedLibraryScope(userId),
+        );
+      if (!isCurrent()) return;
 
       toast({
         title: 'Activity Refreshed',
         description: 'Successfully refreshed activity data from Strava.',
       });
     } catch (error) {
+      if (!isCurrent()) return;
       console.error(error);
       toast({
         title: 'Error',
@@ -270,7 +280,7 @@ export function ActivityCardContent({
       <Card ref={cardRef} className="@container w-full border-none shadow-none">
         <CardHeader
           className={cn(
-            'space-y-1 px-4 pb-3 pt-3',
+            'space-y-1 px-4 pt-3 pb-3',
             stickyHeader && 'sticky top-0 z-10 bg-background',
           )}
         >
@@ -419,7 +429,7 @@ export function ActivityCardContent({
                   <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                     <PhotosIcon className="h-4 w-4" aria-hidden="true" />
                     Photos
-                    <span className="text-xs font-normal tabular-nums text-muted-foreground">
+                    <span className="text-xs font-normal text-muted-foreground tabular-nums">
                       {photos.length}
                     </span>
                   </h3>
@@ -476,7 +486,7 @@ export function ActivityCard({
   return (
     <>
       <div
-        className="flex min-w-0 items-center space-x-2 w-full"
+        className="flex w-full min-w-0 items-center space-x-2"
         onDoubleClick={() => !isGuest && setOpen(true)}
       >
         <ActivitySelectionSymbol
@@ -521,7 +531,7 @@ export function ActivityCard({
         {showMapButton && (
           <Button
             variant="ghost"
-            className="px-0 h-4"
+            className="h-4 px-0"
             size="sm"
             onClick={handleMapClick}
             aria-label={

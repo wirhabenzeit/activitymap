@@ -5,7 +5,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['.claude/**'],
+    ignores: ['.claude/**', '.quality/**', 'output/**'],
   },
   ...nextVitals,
   ...tseslint.configs.recommendedTypeChecked,

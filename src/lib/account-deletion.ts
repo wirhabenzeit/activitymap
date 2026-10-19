@@ -1,8 +1,8 @@
 'use client';
 
-import { clearV1Scope, deleteLegacyOfflineDatabase } from '~/lib/sync/v1-store';
-import { responseEnvelope } from '~/contracts/v1/envelope';
 import { deleteAccountResultSchema } from '~/contracts/v1/account-deletion';
+import { responseEnvelope } from '~/contracts/v1/envelope';
+import { clearV1Scope, deleteLegacyOfflineDatabase } from '~/lib/sync/v1-store';
 
 export const ACCOUNT_DELETED_STORAGE_KEY = 'activitymap:account-deleted';
 let cleanup: ((userId: string) => Promise<void>) | undefined;
@@ -16,7 +16,8 @@ export function registerAccountDeletionCleanup(
   };
 }
 
-export async function clearDeletedAccountData(userId: string) {
+/** Clear this device after successful sign-out or account deletion. */
+export async function clearLocalAccountData(userId: string) {
   if (cleanup) await cleanup(userId);
   else await clearV1Scope(`auth:${userId}`);
   await deleteLegacyOfflineDatabase();
@@ -46,6 +47,9 @@ export async function clearDeletedAccountData(userId: string) {
     );
   }
 }
+
+// Existing deletion callers use exactly the same scoped cleanup boundary.
+export const clearDeletedAccountData = clearLocalAccountData;
 
 export async function deleteAccount() {
   const response = await fetch('/api/v1/account/delete', {

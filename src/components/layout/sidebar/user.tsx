@@ -1,34 +1,31 @@
 'use client';
 
-import { ChevronsUpDown, LogOut, Loader2, Info, Settings2 } from 'lucide-react';
+import { ChevronsUpDown, Info, Loader2, LogOut, Settings2 } from 'lucide-react';
+import * as React from 'react';
 
-import { signOut } from '~/lib/auth-client';
-import { displayEmail, safeReturnPath } from '~/lib/auth-return';
-
-import { useShallowStore } from '~/store';
-
-import { SidebarMenuButton, SidebarMenuItem } from '~/components/ui/sidebar';
+import { SettingsDialog } from '~/components/settings/settings-dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 import {
   DropdownMenu,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
-
-import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
-
-import * as React from 'react';
+import { SidebarMenuButton, SidebarMenuItem } from '~/components/ui/sidebar';
+import { env } from '~/env';
+import { useActivityLoadIndicator } from '~/hooks/use-activity-load-indicator';
+import { useToast } from '~/hooks/use-toast';
+import { clearLocalAccountData } from '~/lib/account-deletion';
+import { signOut } from '~/lib/auth-client';
+import { displayEmail, safeReturnPath } from '~/lib/auth-return';
 import { cn } from '~/lib/utils';
 import {
   checkWebhookStatus,
   createWebhookSubscription,
 } from '~/server/strava/actions';
-import { env } from '~/env';
-import { useToast } from '~/hooks/use-toast';
-import { useActivityLoadIndicator } from '~/hooks/use-activity-load-indicator';
-import { SettingsDialog } from '~/components/settings/settings-dialog';
+import { useShallowStore } from '~/store';
 
 export function UserSettings() {
   const { user, isInitialized } = useShallowStore((state) => ({
@@ -132,18 +129,21 @@ export function UserSettings() {
   // brings every store and query back in the signed-out state; it keeps the
   // current view rather than jumping elsewhere.
   const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (error) {
+    const departingUserId = user?.id;
+    try {
+      const { error } = await signOut();
+      if (error) throw new Error('Sign-out failed');
+      if (departingUserId) await clearLocalAccountData(departingUserId);
+      window.location.assign(
+        safeReturnPath(`${window.location.pathname}${window.location.search}`),
+      );
+    } catch {
       toast({
         title: 'Couldn’t sign out',
         description: 'Please try again.',
         variant: 'destructive',
       });
-      return;
     }
-    window.location.assign(
-      safeReturnPath(`${window.location.pathname}${window.location.search}`),
-    );
   };
 
   // Signed out, the connect dialog over the app is the account entry point.
@@ -167,7 +167,7 @@ export function UserSettings() {
                 <Loader2
                   aria-hidden
                   className={cn(
-                    'absolute inset-0 m-auto size-8 text-white animate-spin motion-reduce:animate-none transition-opacity duration-300',
+                    'absolute inset-0 m-auto size-8 animate-spin text-white transition-opacity duration-300 motion-reduce:animate-none',
                     isLoadingActivities ? 'opacity-100' : 'opacity-0',
                   )}
                 />
@@ -193,7 +193,7 @@ export function UserSettings() {
           >
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user?.name}</p>
+                <p className="text-sm leading-none font-medium">{user?.name}</p>
                 {email && (
                   <p className="text-xs leading-none text-muted-foreground">
                     {email}

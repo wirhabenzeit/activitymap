@@ -1,48 +1,20 @@
 'use client';
 
-/**
- * Orchestrates the v1 sync protocol end to end for one auth scope: full
- * bootstrap the first time, then `/sync/changes` catch-up on every later
- * call, automatically re-bootstrapping on `409 sync_rebootstrap_required`.
- *
- * This ties together `~/lib/sync/v1-client.ts` (the network calls) and
- * `~/lib/sync/v1-store.ts` (the DTO-typed local cache); nothing here is
- * wired into the app yet — issue #126 phase 1 is additive-only. Phase 2
- * calls `runV1Sync` from `~/components/providers/offline-sync.tsx` in place
- * of the legacy `syncOfflineData`.
- */
-
+/** Ordered, page-atomic v1 synchronization for one account/deployment scope. */
+import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import {
+  type FetchLike,
+  SyncRebootstrapRequiredError,
   drainSyncBootstrap,
   drainSyncChanges,
-  SyncRebootstrapRequiredError,
-  type FetchLike,
 } from '~/lib/sync/v1-client';
 import * as v1Store from '~/lib/sync/v1-store';
-import type { V1SyncState } from '~/lib/sync/v1-store';
-import type { SyncChangeItemDTO } from '~/contracts/v1/sync';
-import type { StreamMetadata } from '~/contracts/v1/activity-streams';
+import type { V1SyncMutation, V1SyncState } from '~/lib/sync/v1-store';
 
-/**
- * The subset of `~/lib/sync/v1-store.ts` this module depends on, as an
- * injectable object — defaulting to the real IndexedDB-backed module, but
- * swappable for an in-memory fake in tests (see `v1-sync.test.ts`), the
- * same dependency-injection shape used across this codebase's server-side
- * application services (e.g. `~/server/application/activities.ts`).
- */
 export type V1SyncStoreDeps = Pick<
   typeof v1Store,
-  | 'getV1SyncState'
-  | 'setV1SyncState'
-  | 'upsertActivityDTOs'
-  | 'upsertPhotoDTOs'
-  | 'deleteActivityDTOsByIds'
-  | 'deletePhotoDTOsByActivityIds'
-  | 'deletePhotoDTOsByIds'
-  | 'clearV1Scope'
+  'getV1SyncState' | 'applyV1SyncPage' | 'clearV1Scope'
 >;
-
-const defaultStoreDeps: V1SyncStoreDeps = v1Store;
 
 export type V1SyncResult = {
   mode: 'bootstrap' | 'changes';
@@ -56,12 +28,12 @@ export type V1SyncResult = {
 export type V1SyncOptions = {
   scope: string;
   signal?: AbortSignal;
-  /** Test-only overrides; production callers omit both. */
+  /** Test overrides; production uses the real network and IndexedDB adapter. */
   store?: V1SyncStoreDeps;
   fetchImpl?: FetchLike;
-  /** Called before a bootstrap clears/replaces the local scope. */
+  /** Fence dependent caches when a new library has replaced the old one. */
   onScopeReset?: () => void | Promise<void>;
-  /** Ordered activity lifecycle/metadata observations for client caches. */
+  /** Observations are published only after the corresponding data commits. */
   onActivityChanges?: (
     changes: V1ActivityStreamChange[],
   ) => void | Promise<void>;
@@ -74,287 +46,178 @@ export type V1ActivityStreamChange = {
 };
 
 const nowIso = (): string => new Date().toISOString();
+const observations = (items: V1SyncMutation[]): V1ActivityStreamChange[] =>
+  items.flatMap((item) =>
+    item.entityType === 'activity'
+      ? [
+          {
+            activityId: item.id,
+            operation: item.operation,
+            metadata: item.activity?.streams,
+          },
+        ]
+      : [],
+  );
 
-async function runBootstrap(
-  scope: string,
-  signal: AbortSignal | undefined,
+const emptyResult = (
+  mode: V1SyncResult['mode'],
+  cursor = '',
+): V1SyncResult => ({
+  mode,
+  cursor,
+  activityUpserts: 0,
+  photoUpserts: 0,
+  activityDeletes: 0,
+  photoDeletes: 0,
+});
+
+function count(result: V1SyncResult, items: V1SyncMutation[]) {
+  for (const item of items) {
+    if (item.entityType === 'activity') {
+      if (item.operation === 'upsert') result.activityUpserts++;
+      else result.activityDeletes++;
+    } else if (item.operation === 'upsert') result.photoUpserts++;
+    else result.photoDeletes++;
+  }
+}
+
+type Commit = (items: V1SyncMutation[], state: V1SyncState) => Promise<void>;
+
+async function catchUp(
+  initial: V1SyncState,
+  result: V1SyncResult,
+  commit: Commit,
+  options: V1SyncOptions,
+): Promise<V1SyncState> {
+  let state = initial;
+  await drainSyncChanges(
+    initial.changesCursor!,
+    async (page) => {
+      const caughtUp =
+        page.items.length === 0 && page.nextCursor === state.changesCursor;
+      state = {
+        ...state,
+        changesCursor: page.nextCursor,
+        bootstrapComplete: caughtUp || state.bootstrapComplete,
+        lastSyncAt: caughtUp ? nowIso() : state.lastSyncAt,
+        updatedAt: nowIso(),
+      };
+      await commit(page.items, state);
+      count(result, page.items);
+      result.cursor = page.nextCursor;
+    },
+    options,
+  );
+  return state;
+}
+
+async function bootstrap(
+  options: V1SyncOptions,
   store: V1SyncStoreDeps,
-  fetchImpl: FetchLike | undefined,
-  onActivityChanges: V1SyncOptions['onActivityChanges'],
 ): Promise<V1SyncResult> {
-  let activityUpserts = 0;
-  let photoUpserts = 0;
-
-  const activitiesResult = await drainSyncBootstrap(
-    'activities',
-    async (page) => {
-      if (page.resource !== 'activities') return;
-      activityUpserts += page.items.length;
-      await store.upsertActivityDTOs(scope, page.items);
-      await onActivityChanges?.(
-        page.items.map((activity) => ({
-          activityId: activity.id,
-          operation: 'upsert' as const,
-          metadata: activity.streams,
-        })),
-      );
-    },
-    { signal, fetchImpl },
-  );
-
-  await drainSyncBootstrap(
-    'photos',
-    async (page) => {
-      if (page.resource !== 'photos') return;
-      photoUpserts += page.items.length;
-      await store.upsertPhotoDTOs(scope, page.items);
-    },
-    { signal, fetchImpl },
-  );
-
-  const snapshotCursor = activitiesResult.snapshotCursor;
-  if (!snapshotCursor) {
-    throw new Error(
-      'v1 sync bootstrap did not yield a snapshotCursor from resource=activities',
+  const { scope, signal, onScopeReset, onActivityChanges } = options;
+  signal?.throwIfAborted();
+  const previous = await store.getV1SyncState(scope);
+  // Initial/interrupted bootstraps persist partial pages, explicitly incomplete.
+  // Completed libraries stay usable until their entire replacement is ready.
+  const replacing =
+    previous?.bootstrapComplete === true && previous.lastSyncAt !== null;
+  const staged: V1SyncMutation[] = [];
+  const result = emptyResult('bootstrap');
+  let state: V1SyncState = {
+    scope,
+    bootstrapCursor: null,
+    bootstrapComplete: false,
+    changesCursor: null,
+    lastSyncAt: null,
+    updatedAt: nowIso(),
+  };
+  const commit: Commit = async (items, checkpoint) => {
+    signal?.throwIfAborted();
+    if (replacing) {
+      staged.push(...items);
+    } else {
+      await store.applyV1SyncPage(scope, items, checkpoint, { signal });
+      await onActivityChanges?.(observations(items));
+    }
+  };
+  if (!replacing) {
+    await onScopeReset?.();
+    signal?.throwIfAborted();
+    await store.clearV1Scope(scope);
+  }
+  for (const resource of ['activities', 'photos'] as const) {
+    await drainSyncBootstrap(
+      resource,
+      async (page) => {
+        if (page.snapshotCursor) state.bootstrapCursor = page.snapshotCursor;
+        const items: V1SyncMutation[] =
+          page.resource === 'activities'
+            ? page.items.map((activity) => ({
+                sequence: '0',
+                entityType: 'activity',
+                operation: 'upsert',
+                id: activity.id,
+                activity,
+              }))
+            : page.items.map((photo) => ({
+                sequence: '0',
+                entityType: 'photo',
+                operation: 'upsert',
+                id: photo.unique_id,
+                photo,
+              }));
+        state = { ...state, updatedAt: nowIso() };
+        await commit(items, state);
+        count(result, items);
+      },
+      options,
     );
   }
-
-  const state: V1SyncState = {
-    scope,
-    bootstrapCursor: snapshotCursor,
-    bootstrapComplete: true,
-    changesCursor: snapshotCursor,
-    lastSyncAt: nowIso(),
-    updatedAt: nowIso(),
-  };
-  await store.setV1SyncState(state);
-
-  return {
-    mode: 'bootstrap',
-    activityUpserts,
-    photoUpserts,
-    activityDeletes: 0,
-    photoDeletes: 0,
-    cursor: snapshotCursor,
-  };
-}
-
-async function applyChangesPage(
-  scope: string,
-  items: SyncChangeItemDTO[],
-  store: V1SyncStoreDeps,
-  onActivityChanges: V1SyncOptions['onActivityChanges'],
-): Promise<{
-  activityUpserts: number;
-  photoUpserts: number;
-  activityDeletes: number;
-  photoDeletes: number;
-}> {
-  const activityUpsertItems = items.filter(
-    (item) =>
-      item.entityType === 'activity' &&
-      item.operation === 'upsert' &&
-      item.activity,
-  );
-  const photoUpsertItems = items.filter(
-    (item) =>
-      item.entityType === 'photo' && item.operation === 'upsert' && item.photo,
-  );
-  const activityDeleteIds = items
-    .filter(
-      (item) => item.entityType === 'activity' && item.operation === 'delete',
-    )
-    .map((item) => item.id);
-  const photoDeleteIds = items
-    .filter(
-      (item) => item.entityType === 'photo' && item.operation === 'delete',
-    )
-    .map((item) => item.id);
-
-  await Promise.all([
-    store.upsertActivityDTOs(
-      scope,
-      activityUpsertItems.map((item) => item.activity!),
-    ),
-    store.upsertPhotoDTOs(
-      scope,
-      photoUpsertItems.map((item) => item.photo!),
-    ),
-    store.deleteActivityDTOsByIds(scope, activityDeleteIds),
-    store.deletePhotoDTOsByActivityIds(scope, activityDeleteIds),
-    store.deletePhotoDTOsByIds(scope, photoDeleteIds),
-  ]);
-
-  await onActivityChanges?.(
-    items.flatMap((item): V1ActivityStreamChange[] => {
-      if (item.entityType !== 'activity') return [];
-      if (item.operation === 'delete') {
-        return [{ activityId: item.id, operation: 'delete' }];
-      }
-      if (!item.activity) return [];
-      return [
-        {
-          activityId: item.id,
-          operation: 'upsert',
-          metadata: item.activity.streams,
-        },
-      ];
-    }),
-  );
-
-  return {
-    activityUpserts: activityUpsertItems.length,
-    photoUpserts: photoUpsertItems.length,
-    activityDeletes: activityDeleteIds.length,
-    photoDeletes: photoDeleteIds.length,
-  };
-}
-
-async function runChangesCatchup(
-  scope: string,
-  bootstrapCursor: string,
-  cursor: string,
-  signal: AbortSignal | undefined,
-  store: V1SyncStoreDeps,
-  fetchImpl: FetchLike | undefined,
-  onActivityChanges: V1SyncOptions['onActivityChanges'],
-): Promise<V1SyncResult> {
-  let activityUpserts = 0;
-  let photoUpserts = 0;
-  let activityDeletes = 0;
-  let photoDeletes = 0;
-
-  const { nextCursor } = await drainSyncChanges(
-    cursor,
-    async (page) => {
-      const applied = await applyChangesPage(
-        scope,
-        page.items,
-        store,
-        onActivityChanges,
-      );
-      activityUpserts += applied.activityUpserts;
-      photoUpserts += applied.photoUpserts;
-      activityDeletes += applied.activityDeletes;
-      photoDeletes += applied.photoDeletes;
-    },
-    { signal, fetchImpl },
-  );
-
-  await store.setV1SyncState({
-    scope,
-    bootstrapCursor,
-    bootstrapComplete: true,
-    changesCursor: nextCursor,
-    lastSyncAt: nowIso(),
-    updatedAt: nowIso(),
-  });
-
-  return {
-    mode: 'changes',
-    activityUpserts,
-    photoUpserts,
-    activityDeletes,
-    photoDeletes,
-    cursor: nextCursor,
-  };
-}
-
-async function runFreshBootstrap(
-  scope: string,
-  signal: AbortSignal | undefined,
-  store: V1SyncStoreDeps,
-  fetchImpl: FetchLike | undefined,
-  onScopeReset: V1SyncOptions['onScopeReset'],
-  onActivityChanges: V1SyncOptions['onActivityChanges'],
-): Promise<V1SyncResult> {
-  // A failed bootstrap can leave pages in IndexedDB without a completed
-  // state record. Always restart from a clean scope so rows deleted between
-  // attempts cannot survive as ghosts in the local cache.
-  await onScopeReset?.();
-  await store.clearV1Scope(scope);
-
-  const bootstrap = await runBootstrap(
-    scope,
-    signal,
-    store,
-    fetchImpl,
-    onActivityChanges,
-  );
-
-  // The snapshot cursor is captured before all bootstrap pages have been
-  // read. Drain changes immediately so mutations concurrent with bootstrap
-  // are visible before this sync pass reports success.
-  const catchup = await runChangesCatchup(
-    scope,
-    bootstrap.cursor,
-    bootstrap.cursor,
-    signal,
-    store,
-    fetchImpl,
-    onActivityChanges,
-  );
-
-  return {
-    mode: 'bootstrap',
-    activityUpserts: bootstrap.activityUpserts + catchup.activityUpserts,
-    photoUpserts: bootstrap.photoUpserts + catchup.photoUpserts,
-    activityDeletes: catchup.activityDeletes,
-    photoDeletes: catchup.photoDeletes,
-    cursor: catchup.cursor,
-  };
+  if (!state.bootstrapCursor)
+    throw new Error('Missing bootstrap snapshot cursor');
+  state.changesCursor = state.bootstrapCursor;
+  state = await catchUp(state, result, commit, options);
+  if (replacing) {
+    signal?.throwIfAborted();
+    await store.applyV1SyncPage(scope, staged, state, {
+      replace: true,
+      signal,
+    });
+    await onScopeReset?.();
+    await onActivityChanges?.(observations(staged));
+  }
+  return result;
 }
 
 /**
- * Runs one sync pass for `scope` (e.g. `auth:<userId>`): bootstraps from
- * scratch if this scope has never finished a bootstrap, otherwise catches
- * up via `/sync/changes`. On `409 sync_rebootstrap_required` the local
- * scope is cleared and bootstrap is retried exactly once — a second
- * rebootstrap request in the same call would indicate a server-side bug,
- * not a transient client state, so it is left to surface as an error
- * rather than looping.
+ * A rejected cursor triggers exactly one replacement attempt. Failed staging,
+ * cancellation, or IDB save leaves the completed library/checkpoint intact.
+ * Initial partial bootstraps restart from a clean scope on the next attempt.
  */
-export async function runV1Sync({
-  scope,
-  signal,
-  store = defaultStoreDeps,
-  fetchImpl,
-  onScopeReset,
-  onActivityChanges,
-}: V1SyncOptions): Promise<V1SyncResult> {
+export async function runV1Sync(options: V1SyncOptions): Promise<V1SyncResult> {
+  const { scope, signal, onActivityChanges } = options;
+  const store = options.store ?? v1Store;
+  signal?.throwIfAborted();
   const state = await store.getV1SyncState(scope);
-
   try {
-    if (!state?.bootstrapComplete || !state.changesCursor) {
-      return await runFreshBootstrap(
-        scope,
-        signal,
-        store,
-        fetchImpl,
-        onScopeReset,
-        onActivityChanges,
-      );
-    }
-    return await runChangesCatchup(
-      scope,
-      state.bootstrapCursor ?? state.changesCursor,
-      state.changesCursor,
-      signal,
-      store,
-      fetchImpl,
-      onActivityChanges,
+    if (!state?.bootstrapComplete || !state.changesCursor)
+      return await bootstrap(options, store);
+    const result = emptyResult('changes', state.changesCursor);
+    await catchUp(
+      state,
+      result,
+      async (items, checkpoint) => {
+        signal?.throwIfAborted();
+        await store.applyV1SyncPage(scope, items, checkpoint, { signal });
+        await onActivityChanges?.(observations(items));
+      },
+      options,
     );
+    return result;
   } catch (error) {
-    if (error instanceof SyncRebootstrapRequiredError) {
-      return runFreshBootstrap(
-        scope,
-        signal,
-        store,
-        fetchImpl,
-        onScopeReset,
-        onActivityChanges,
-      );
-    }
+    if (error instanceof SyncRebootstrapRequiredError)
+      return bootstrap(options, store);
     throw error;
   }
 }

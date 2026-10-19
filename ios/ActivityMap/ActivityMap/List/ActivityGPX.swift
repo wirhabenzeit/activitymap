@@ -3,8 +3,8 @@ import Foundation
 
 /// A detached snapshot of cached geometry. The optional sampled track retains
 /// the cache’s paired GPS/bucket-mean elevation values without interpolation.
-nonisolated struct ActivityGPX: Sendable {
-    struct Point: Sendable {
+nonisolated struct ActivityGPX: Hashable, Sendable {
+    struct Point: Hashable, Sendable {
         let latitude: Double
         let longitude: Double
         var altitude: Double? = nil

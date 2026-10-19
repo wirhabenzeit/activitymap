@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import {
-  onlineManager,
-  QueryClient,
-  QueryObserver,
-} from '@tanstack/react-query';
 
-import { errorEnvelope } from '~/contracts/v1/error';
+import { QueryClient, onlineManager } from '@tanstack/react-query';
+import test from 'node:test';
+
 import { makeEnvelope } from '~/contracts/v1/envelope';
+import { errorEnvelope } from '~/contracts/v1/error';
+import { libraryQueryKeys } from '~/lib/sync/library-owner';
+import { registerLibrarySync } from '~/lib/sync/library-sync';
+
 import {
   FirstSummaryFetchError,
   firstSummaryFetchOptions,
+  shouldFetchFirstSummaries,
 } from './first-summary-fetch';
 
 void test('a failed activity download is surfaced and recovery does not repeat a successful import', async (t) => {
@@ -18,19 +19,15 @@ void test('a failed activity download is surfaced and recovery does not repeat a
     Response.json(makeEnvelope(200)),
   );
   const client = new QueryClient();
-  const key = ['activities', 'auth', 'alice'];
+  const key = libraryQueryKeys.snapshot('auth:alice');
   client.setQueryData(key, []);
   let fail = true;
-  const observer = new QueryObserver(client, {
-    queryKey: key,
-    queryFn: async () => {
-      if (fail) throw new Error('Download unavailable');
-      return [{ id: 1 }];
-    },
-    retry: false,
-    staleTime: Infinity,
+  let downloads = 0;
+  const stop = registerLibrarySync(client, 'auth:alice', async () => {
+    downloads++;
+    if (fail) throw new Error('Download unavailable');
+    client.setQueryData(key, [{ id: 1 }]);
   });
-  const stop = observer.subscribe(() => undefined);
   try {
     const options = firstSummaryFetchOptions(client, 'alice', true);
     await assert.rejects(
@@ -43,6 +40,7 @@ void test('a failed activity download is surfaced and recovery does not repeat a
     assert.equal(await client.fetchQuery(options), 200);
     assert.deepEqual(client.getQueryData(key), [{ id: 1 }]);
     assert.equal(request.mock.callCount(), 1);
+    assert.equal(downloads, 2, 'Retry reconciles through the sole owner again');
   } finally {
     stop();
     client.clear();
@@ -118,6 +116,7 @@ void test('an empty Strava library completes once, with no repeat import on a re
     Response.json(makeEnvelope(0)),
   );
   const client = new QueryClient();
+  const stop = registerLibrarySync(client, 'auth:alice', async () => undefined);
   try {
     const options = firstSummaryFetchOptions(client, 'alice', true);
     assert.equal(await client.fetchQuery(options), 0);
@@ -125,6 +124,7 @@ void test('an empty Strava library completes once, with no repeat import on a re
     assert.equal(await client.fetchQuery(options), 0);
     assert.equal(request.mock.callCount(), 1);
   } finally {
+    stop();
     client.clear();
   }
 });
@@ -160,24 +160,89 @@ void test('an offline activity download cannot turn a persisted import into visi
     Response.json(makeEnvelope(1)),
   );
   const client = new QueryClient();
-  const key = ['activities', 'auth', 'alice'];
+  const key = libraryQueryKeys.snapshot('auth:alice');
   client.setQueryData(key, []);
-  const observer = new QueryObserver(client, {
-    queryKey: key,
-    queryFn: async () => [{ id: 1 }],
-    staleTime: Infinity,
+  const stop = registerLibrarySync(client, 'auth:alice', async () => {
+    if (!onlineManager.isOnline()) throw new Error('The browser is offline');
+    client.setQueryData(key, [{ id: 1 }]);
   });
-  const stop = observer.subscribe(() => undefined);
   onlineManager.setOnline(false);
   try {
     await assert.rejects(
       client.fetchQuery(firstSummaryFetchOptions(client, 'alice', true)),
       /saved, but could not be downloaded/,
     );
-    assert.equal(client.getQueryState(key)?.fetchStatus, 'paused');
+    assert.deepEqual(client.getQueryData(key), []);
+    assert.equal(
+      client.getQueryState(['first-summary-fetch', 'alice'])?.status,
+      'error',
+    );
   } finally {
     onlineManager.setOnline(true);
     stop();
     client.clear();
   }
+});
+
+void test('a cancelled old-account import cannot request reconciliation after its late response', async (t) => {
+  let release!: (response: Response) => void;
+  const response = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  const request = t.mock.method(globalThis, 'fetch', async () => response);
+  const client = new QueryClient();
+  let downloads = 0;
+  const stop = registerLibrarySync(client, 'auth:alice', async () => {
+    downloads++;
+  });
+  const options = firstSummaryFetchOptions(client, 'alice', true);
+  const pending = client.fetchQuery(options);
+  const cancelled = assert.rejects(pending);
+  try {
+    assert.equal(request.mock.callCount(), 1);
+    await client.cancelQueries({ queryKey: options.queryKey });
+    release(Response.json(makeEnvelope(20)));
+    await cancelled;
+    // Let the separately cached import finish despite the aborted consumer.
+    await client.fetchQuery({
+      queryKey: ['first-summary-import', 'alice'],
+      staleTime: Infinity,
+    });
+    assert.equal(downloads, 0);
+    assert.equal(client.getQueryData(options.queryKey), undefined);
+  } finally {
+    release(Response.json(makeEnvelope(20)));
+    stop();
+    client.clear();
+  }
+});
+
+void test('cached-empty and partial startup never import before successful reconciliation', () => {
+  const empty = {
+    data: [],
+    isSuccess: true,
+    isFetching: false,
+    hasNextPage: false,
+  };
+  for (const phase of [
+    undefined,
+    'idle',
+    'syncing',
+    'offline',
+    'error',
+  ] as const)
+    assert.equal(shouldFetchFirstSummaries(empty, phase), false);
+  assert.equal(shouldFetchFirstSummaries(empty, 'ready'), true);
+  assert.equal(
+    shouldFetchFirstSummaries({ ...empty, hasNextPage: true }, 'ready'),
+    false,
+  );
+  assert.equal(
+    shouldFetchFirstSummaries({ ...empty, isFetching: true }, 'ready'),
+    false,
+  );
+  assert.equal(
+    shouldFetchFirstSummaries({ ...empty, data: [{ id: 1 }] }, 'ready'),
+    false,
+  );
 });

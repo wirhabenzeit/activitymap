@@ -1,7 +1,8 @@
 import { z } from 'zod';
+
 import { activityDTOSchema } from './activity';
-import { photoDTOSchema } from './photo';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './pagination';
+import { photoDTOSchema } from './photo';
 import { idString, isoDateTime } from './primitives';
 
 /**
@@ -117,16 +118,22 @@ export const syncChangeItemDTOSchema = z
       }
       return;
     }
-    if (value.entityType === 'activity' && !value.activity) {
+    if (
+      value.entityType === 'activity' &&
+      (value.activity?.id !== value.id || value.photo)
+    ) {
       ctx.addIssue({
         code: 'custom',
-        message: 'an activity upsert must include `activity`',
+        message: 'an activity upsert must include only its matching `activity`',
       });
     }
-    if (value.entityType === 'photo' && !value.photo) {
+    if (
+      value.entityType === 'photo' &&
+      (value.photo?.unique_id !== value.id || value.activity)
+    ) {
       ctx.addIssue({
         code: 'custom',
-        message: 'a photo upsert must include `photo`',
+        message: 'a photo upsert must include only its matching `photo`',
       });
     }
   });

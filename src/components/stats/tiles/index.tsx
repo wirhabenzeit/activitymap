@@ -9,56 +9,54 @@
 //
 // Expandable tiles open a URL-backed focus surface. The dashboard keeps its
 // layout, scroll position and mounted controls underneath that surface.
-
-import {
-  useDisplayUnits,
-  useDateFormat,
-} from '~/hooks/use-display-preferences';
-import { statsFormat } from './format';
+import { ArrowLeft, Maximize2 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import {
   Activity,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useMemo,
-  useState,
   type CSSProperties,
   type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
-import { useTheme } from 'next-themes';
-import { ArrowLeft, Maximize2 } from 'lucide-react';
-import { useStatsFocus } from '~/hooks/use-stats-focus';
+
 import {
   useBrowsingState,
   useRetainedScrollRef,
 } from '~/hooks/use-browsing-context';
-
-import { FilterScope, useStatsActivities } from './scope';
 import {
+  useDateFormat,
+  useDisplayUnits,
+} from '~/hooks/use-display-preferences';
+import { useStatsFocus } from '~/hooks/use-stats-focus';
+import { bentoRowMinimums, placeBento } from '~/lib/stats/bento';
+import { isStatsHistoryLoading } from '~/lib/stats/loading';
+import { type StatsActivity } from '~/lib/stats/tile-data';
+import { localToday } from '~/lib/stats/tile-series';
+import { cn } from '~/lib/utils';
+import {
+  type StatsTile,
+  type StatsTileID,
   statsTileGroups,
   statsTileLayout,
   statsTiles,
-  type StatsTile,
-  type StatsTileID,
 } from '~/settings/stats-tiles.generated';
-import { type StatsActivity } from '~/lib/stats/tile-data';
-import { placeBento, bentoRowMinimums } from '~/lib/stats/bento';
-import { isStatsHistoryLoading } from '~/lib/stats/loading';
-import { localToday } from '~/lib/stats/tile-series';
-import { cn } from '~/lib/utils';
 
+import { StatsActivityInspector } from './activity-inspector';
 import { Measure } from './charts';
+import { statsFormat } from './format';
 import { tilePalette } from './format';
+import { FilterScope, useStatsActivities } from './scope';
 import {
-  faceOptionLabels,
-  optionLabels,
-  tileView,
   type TileContext,
   type TileSummary,
   type TileView,
+  faceOptionLabels,
+  optionLabels,
+  tileView,
 } from './tiles';
-
-import { StatsActivityInspector } from './activity-inspector';
 
 type ShownTile = { tile: StatsTile; view: TileView };
 
@@ -82,7 +80,7 @@ export default function StatsTiles() {
           <button
             type="button"
             className="underline"
-            onClick={() => void query.refetch()}
+            onClick={() => void query.refetch().catch(() => undefined)}
           >
             Retry
           </button>
@@ -374,7 +372,7 @@ function BentoGroup({
   if (tiles.length === 0) return null;
   return (
     <section aria-label={title}>
-      <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {title}
       </h2>
       <div
@@ -429,7 +427,7 @@ function Headline({
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div
           className={cn(
-            'min-w-0 max-w-full shrink-0 font-mono font-medium tabular-nums leading-tight tracking-tight',
+            'max-w-full min-w-0 shrink-0 font-mono leading-tight font-medium tracking-tight tabular-nums',
             size === 'tile' && 'mt-1 text-[20px]',
             size === 'large' && 'mt-1 text-[32px]',
           )}
@@ -500,7 +498,7 @@ function TileCard({
               aria-label={`Expand ${tile.title}`}
               title={`Expand ${tile.title}`}
               onClick={onExpand}
-              className="-mr-2 flex size-11 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+              className="-mr-2 flex size-11 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
             >
               <Maximize2 aria-hidden="true" className="size-3.5" />
             </button>
@@ -575,7 +573,7 @@ export function TileFocusView({
             ref={backRef}
             type="button"
             onClick={onBack}
-            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
             aria-label={
               context.selectedActivityId
                 ? `Back to ${tile.title}`
@@ -676,7 +674,7 @@ function FaceSwitch({
           title={optionLabels[option] ?? option}
           onClick={() => onChange(option)}
           className={cn(
-            'min-h-7 min-w-7 rounded-[5px] px-1.5 py-1 text-[11px] font-medium leading-none text-muted-foreground hover:text-foreground',
+            'min-h-7 min-w-7 rounded-[5px] px-1.5 py-1 text-[11px] leading-none font-medium text-muted-foreground hover:text-foreground',
             option === value && 'bg-background text-foreground shadow-xs',
           )}
         >

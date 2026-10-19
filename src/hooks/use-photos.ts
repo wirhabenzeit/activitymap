@@ -1,99 +1,34 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getPhotos } from '~/server/db/actions';
-import { useShallowStore } from '~/store';
-import type { Photo } from '~/server/db/schema';
-import { toPhotoDTO } from '~/contracts/v1/photo';
-import { getCachedPhotoDTOs, upsertPhotoDTOs } from '~/lib/sync/v1-store';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+
+import { libraryQueryState } from '~/lib/sync/library-query-state';
 import { dtoToPhoto } from '~/lib/sync/v1-mappers';
 
-// Issue #126 (phase 2): see the matching comment in `~/hooks/use-activities.ts` -
-// the local cache backing this hook is now the v1 sync adapters' DTO-typed
-// store, converted at this boundary, not `~/lib/offline/db.ts`'s
-// Drizzle-shaped `Photo` rows.
-const getCachedPhotos = async (scope: string): Promise<Photo[]> =>
-    (await getCachedPhotoDTOs(scope)).map(dtoToPhoto);
-const upsertCachedPhotos = (scope: string, photos: Photo[]): Promise<void> =>
-    upsertPhotoDTOs(scope, photos.map(toPhotoDTO));
-
-const memoryPhotosByScope = new Map<string, Photo[]>();
+import { useLibrarySnapshot } from './use-library-snapshot';
 
 export function usePhotos() {
-    const queryClient = useQueryClient();
-    const { userId, isInitialized, isGuest } = useShallowStore((state) => ({
-        userId: state.user?.id,
-        isInitialized: state.isInitialized,
-        isGuest: state.isGuest,
-    }));
-    const canFetchUserData = isInitialized && !!userId && !isGuest;
-    const cacheScope = useMemo(() => {
-        if (!isGuest && userId) {
-            return `auth:${userId}`;
-        }
-        return null;
-    }, [isGuest, userId]);
-    const queryKey = useMemo(() => ['photos', userId ?? null] as const, [userId]);
-    const initialData = useMemo(() => {
-        if (!cacheScope) return undefined;
-        const seed = memoryPhotosByScope.get(cacheScope);
-        return seed && seed.length > 0 ? seed : undefined;
-    }, [cacheScope]);
-
-    const query = useQuery({
-        queryKey,
-        queryFn: () => getPhotos(),
-        enabled: canFetchUserData,
-        staleTime: Infinity,
-        gcTime: Infinity,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        initialData,
-    });
-
-    const cacheQuery = useQuery({
-        queryKey: ['photos-cache', cacheScope],
-        queryFn: () => {
-            if (!cacheScope) return Promise.resolve([]);
-            return getCachedPhotos(cacheScope);
-        },
-        enabled: !!cacheScope,
-        staleTime: Infinity,
-        gcTime: Infinity,
-        refetchOnMount: false,
-        refetchOnReconnect: false,
-        refetchOnWindowFocus: false,
-    });
-
-    useEffect(() => {
-        if (!cacheScope || !cacheQuery.data || cacheQuery.data.length === 0) {
-            return;
-        }
-
-        memoryPhotosByScope.set(cacheScope, cacheQuery.data);
-        queryClient.setQueryData<Photo[]>(
-            queryKey,
-            (current) => current ?? cacheQuery.data,
-        );
-    }, [cacheQuery.data, cacheScope, queryClient, queryKey]);
-
-    useEffect(() => {
-        if (!cacheScope || !query.data || query.data.length === 0) {
-            return;
-        }
-
-        memoryPhotosByScope.set(cacheScope, query.data);
-        void upsertCachedPhotos(cacheScope, query.data).catch((error: unknown) => {
-            console.error('Failed to persist photos in IndexedDB cache:', error);
-        });
-    }, [cacheScope, query.data]);
-
-    const data = query.data ?? cacheQuery.data ?? (cacheScope ? memoryPhotosByScope.get(cacheScope) : undefined);
-
-    return {
-        ...query,
-        data,
-    };
+  const library = useLibrarySnapshot();
+  // Public/guest content supplies its own data. Preserve the existing disabled
+  // unauthenticated gallery observer without touching authenticated storage.
+  const guest = useQuery({
+    queryKey: ['photos', null],
+    queryFn: () => Promise.resolve([]),
+    enabled: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  const photoDTOs = library.snapshot?.photos;
+  const loaded = library.snapshot?.loaded;
+  const data = useMemo(
+    () => (loaded && photoDTOs ? photoDTOs.map(dtoToPhoto) : undefined),
+    [loaded, photoDTOs],
+  );
+  const state = useMemo(
+    () => libraryQueryState(library.snapshot, library.sync, data?.length ?? 0),
+    [library.snapshot, library.sync, data?.length],
+  );
+  if (!library.scope) return guest;
+  return { ...state, data, refetch: library.refetch };
 }

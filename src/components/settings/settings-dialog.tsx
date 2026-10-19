@@ -1,47 +1,50 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import {
+  STRAVA_CONNECT_PERMISSIONS,
+  StravaConnectButton,
+  StravaConnectFailure,
+} from '~/components/auth/strava-connect';
+import { Button } from '~/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '~/components/ui/dialog';
-import { Button } from '~/components/ui/button';
-import { signOut } from '~/lib/auth-client';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
+import { useIngestionStatus } from '~/hooks/use-ingestion-status';
+import { useStravaImport } from '~/hooks/use-strava-import';
 import {
   clearDeletedAccountData,
+  clearLocalAccountData,
   deleteAccount,
   notifyAccountDeleted,
 } from '~/lib/account-deletion';
+import { signOut } from '~/lib/auth-client';
 import { displayEmail, safeReturnPath } from '~/lib/auth-return';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
-import { DisplaySettings } from './display-settings';
-import { useShallowStore } from '~/store';
-import { useIngestionStatus } from '~/hooks/use-ingestion-status';
-import { useStravaImport } from '~/hooks/use-strava-import';
-import { stravaImportMessage } from '~/lib/ingestion/strava-import';
 import {
   coverageProgress,
   snapshotIsStale,
 } from '~/lib/ingestion/presentation';
-import {
-  emptyBrowserStatus,
-  requestBrowserSync,
-  useBrowserSyncStatus,
-} from '~/lib/sync/browser-status';
-import {
-  StravaConnectButton,
-  StravaConnectFailure,
-  STRAVA_CONNECT_PERMISSIONS,
-} from '~/components/auth/strava-connect';
+import { stravaImportMessage } from '~/lib/ingestion/strava-import';
 import {
   STRAVA_PERMISSIONS_RECONNECT,
   stravaPermissionNotes,
   stravaPermissionsLimited,
 } from '~/lib/strava-permissions';
+import {
+  emptyBrowserStatus,
+  requestBrowserSync,
+  useBrowserSyncStatus,
+} from '~/lib/sync/browser-status';
+import { useShallowStore } from '~/store';
+
+import { DisplaySettings } from './display-settings';
 
 const date = (value: string) =>
   new Date(value).toLocaleString(undefined, {
@@ -146,11 +149,13 @@ export function SettingsDialog({
   const email = userId ? displayEmail(user?.email) : null;
 
   const handleSignOut = async () => {
+    const departingUserId = userId;
     setSigningOut(true);
     setSignOutFailed(false);
     try {
       const result = await signOut();
       if (result.error) throw new Error('Sign-out failed');
+      if (departingUserId) await clearLocalAccountData(departingUserId);
       window.location.assign(
         safeReturnPath(`${window.location.pathname}${window.location.search}`),
       );
@@ -205,7 +210,7 @@ export function SettingsDialog({
     >
       <DialogContent
         overlayClassName="z-[70]"
-        className="z-[70] flex h-[min(30rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-md flex-col gap-0 overflow-hidden rounded-xl p-0 [@media(min-width:640px)_and_(max-height:500px)]:h-[calc(100dvh-2rem)] [@media(min-width:640px)_and_(max-height:500px)]:max-w-2xl [&>button]:right-2 [&>button]:top-2 [&>button]:flex [&>button]:size-11 [&>button]:items-center [&>button]:justify-center"
+        className="z-[70] flex h-[min(30rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-md flex-col gap-0 overflow-hidden rounded-xl p-0 [&>button]:top-2 [&>button]:right-2 [&>button]:flex [&>button]:size-11 [&>button]:items-center [&>button]:justify-center [@media(min-width:640px)_and_(max-height:500px)]:h-[calc(100dvh-2rem)] [@media(min-width:640px)_and_(max-height:500px)]:max-w-2xl"
       >
         <DialogHeader className="shrink-0 px-5 py-4 text-left">
           <DialogTitle>Settings</DialogTitle>
@@ -388,7 +393,7 @@ export function SettingsDialog({
                           {progress && (
                             <dd>
                               <progress
-                                className="block h-1.5 w-full overflow-hidden rounded-full accent-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary"
+                                className="block h-1.5 w-full overflow-hidden rounded-full accent-primary [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
                                 value={progress.value}
                                 max={progress.total}
                                 aria-label={`${title} fetched`}
@@ -464,13 +469,13 @@ export function SettingsDialog({
                 <h2 id="account-heading" className="text-sm font-semibold">
                   Account
                 </h2>
-                <p className="break-words text-sm text-muted-foreground">
+                <p className="text-sm break-words text-muted-foreground">
                   {userId
                     ? (user?.name ?? 'Your account')
                     : 'Connect Strava to see your activities.'}
                 </p>
                 {email && (
-                  <p className="break-words text-xs text-muted-foreground">
+                  <p className="text-xs break-words text-muted-foreground">
                     {email}
                   </p>
                 )}
