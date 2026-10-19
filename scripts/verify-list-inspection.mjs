@@ -597,7 +597,7 @@ try {
   assert.equal(id(), '205', 'Escape in Edit only dismisses the dialog');
   assert(
     await detail
-      .getByRole('button', { name: 'Show Activity 205 on map', exact: true })
+      .getByRole('button', { name: 'Show on map: Activity 205', exact: true })
       .isEnabled(),
   );
   console.log('PASS actions menu and Edit keep their own keyboard handling');
