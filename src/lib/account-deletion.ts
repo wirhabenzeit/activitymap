@@ -16,7 +16,8 @@ export function registerAccountDeletionCleanup(
   };
 }
 
-export async function clearDeletedAccountData(userId: string) {
+/** Clear this device after successful sign-out or account deletion. */
+export async function clearLocalAccountData(userId: string) {
   if (cleanup) await cleanup(userId);
   else await clearV1Scope(`auth:${userId}`);
   await deleteLegacyOfflineDatabase();
@@ -46,6 +47,9 @@ export async function clearDeletedAccountData(userId: string) {
     );
   }
 }
+
+// Existing deletion callers use exactly the same scoped cleanup boundary.
+export const clearDeletedAccountData = clearLocalAccountData;
 
 export async function deleteAccount() {
   const response = await fetch('/api/v1/account/delete', {

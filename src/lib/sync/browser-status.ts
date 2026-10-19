@@ -26,5 +26,12 @@ export function updateBrowserSyncStatus(
     },
   }));
 }
+export function clearBrowserSyncStatus(userId: string) {
+  useBrowserSyncStatus.setState(({ byUser }) => ({
+    byUser: Object.fromEntries(
+      Object.entries(byUser).filter(([id]) => id !== userId),
+    ),
+  }));
+}
 export const requestBrowserSync = () =>
   window.dispatchEvent(new Event('activitymap:retry-browser-sync'));

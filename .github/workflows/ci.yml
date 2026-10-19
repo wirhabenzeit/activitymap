@@ -55,6 +55,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  library-owner-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install lockfile-pinned Chromium
+        run: pnpm exec playwright-core install --with-deps chromium
+      - name: Verify committed library updates, offline recovery and account cleanup
+        run: pnpm test:library-owner
+      - name: Preserve browser traces, requests and server logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: library-owner-browser
+          path: output/library-owner/
+          if-no-files-found: warn
+
   swift-client:
     runs-on: macos-15
     steps:
