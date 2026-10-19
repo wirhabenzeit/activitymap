@@ -1,17 +1,19 @@
+import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
+import type { Feature, GeoJsonProperties, Geometry } from 'geojson';
+import { Download } from 'lucide-react';
+import Image from 'next/image';
 import React from 'react';
+import Markdown from 'react-markdown';
+
+import { DismissButton } from '~/components/dismiss-button';
+import { Button } from '~/components/ui/button';
 import {
   Card,
-  CardHeader,
-  CardTitle,
   CardContent,
   CardFooter,
+  CardHeader,
+  CardTitle,
 } from '~/components/ui/card';
-import { Button } from '~/components/ui/button';
-import Image from 'next/image';
-import type { Feature, GeoJsonProperties, Geometry } from 'geojson';
-import { X, Download } from 'lucide-react';
-import Markdown from 'react-markdown';
-import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
 
 interface FeatureInfoCardProps {
   feature: Feature<Geometry, GeoJsonProperties> | null;
@@ -115,25 +117,20 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
   };
 
   return (
-    <Card className="bg-white/90 backdrop-blur-sm absolute bottom-4 right-4 z-10 w-[min(500px,80dvw)] h-[50dvh] flex flex-col">
-      <div className="overflow-auto flex-grow">
+    <Card className="absolute right-4 bottom-4 z-10 flex h-[50dvh] w-[min(500px,80dvw)] flex-col bg-white/90 backdrop-blur-sm">
+      <div className="flex-grow overflow-auto">
         <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <CardTitle className="text-lg">{title}</CardTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 -mr-2"
+            <DismissButton
+              label="Close map feature details"
               onClick={onClose}
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            />
           </div>
         </CardHeader>
         <CardContent className="pb-4">
           {imageUrl && (
-            <div className="mb-3 overflow-hidden rounded-md h-60">
+            <div className="mb-3 h-60 overflow-hidden rounded-md">
               <Image
                 src={imageUrl}
                 alt={displayTitle ?? 'Feature image'}
@@ -145,19 +142,19 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
             </div>
           )}
           {description && (
-            <div className="text-sm text-gray-700 p-1 rounded bg-gray-50/50">
+            <div className="rounded bg-gray-50/50 p-1 text-sm text-gray-700">
               <Markdown
                 components={{
                   h1: ({ children }) => (
-                    <h1 className="text-lg font-bold mb-2">{children}</h1>
+                    <h1 className="mb-2 text-lg font-bold">{children}</h1>
                   ),
                   h2: ({ children }) => (
-                    <h2 className="text-base font-semibold mb-1.5">
+                    <h2 className="mb-1.5 text-base font-semibold">
                       {children}
                     </h2>
                   ),
                   h3: ({ children }) => (
-                    <h3 className="text-sm font-medium mb-1">{children}</h3>
+                    <h3 className="mb-1 text-sm font-medium">{children}</h3>
                   ),
                   p: ({ children }) => <p className="mb-2">{children}</p>,
                   a: ({ href, children }) => (
@@ -171,10 +168,10 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
                     </a>
                   ),
                   ul: ({ children }) => (
-                    <ul className="list-disc pl-5 mb-2">{children}</ul>
+                    <ul className="mb-2 list-disc pl-5">{children}</ul>
                   ),
                   ol: ({ children }) => (
-                    <ol className="list-decimal pl-5 mb-2">{children}</ol>
+                    <ol className="mb-2 list-decimal pl-5">{children}</ol>
                   ),
                   li: ({ children }) => <li className="mb-1">{children}</li>,
                 }}
@@ -195,15 +192,13 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
           )}
         </CardContent>
       </div>
-      <CardFooter className="pt-0 flex-shrink-0 flex gap-2">
+      <CardFooter className="flex flex-shrink-0 gap-2 pt-0">
         {originalUrl && (
           <Button
             variant="outline"
             size="sm"
             className="flex-1"
-            onClick={() =>
-              window.open(originalUrl, '_blank')
-            }
+            onClick={() => window.open(originalUrl, '_blank')}
           >
             View Details
           </Button>
@@ -215,7 +210,7 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
             className={originalUrl ? 'w-auto' : 'flex-1'}
             onClick={handleGpxClick}
           >
-            <Download className="h-4 w-4 mr-2" />
+            <Download className="mr-2 h-4 w-4" />
             GPX
           </Button>
         )}

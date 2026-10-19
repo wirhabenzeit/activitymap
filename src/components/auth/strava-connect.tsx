@@ -5,12 +5,8 @@ import Image from 'next/image';
 import { usePathname, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 
-import {
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-} from '~/components/ui/dialog';
+import { AppDialogContent } from '~/components/app-dialog';
+import { DialogDescription, DialogTitle } from '~/components/ui/dialog';
 import { signIn } from '~/lib/auth-client';
 import {
   type ConnectFailure,
@@ -190,30 +186,30 @@ export function SignedOutConnectPanel() {
   const keepOpen = (event: Event) => event.preventDefault();
   return (
     <DialogPrimitive.Root open={signedOut && !gallery}>
-      <DialogPortal>
-        {/* Above the app header (z-[60]) so the whole app sits behind the glass. */}
-        <DialogOverlay className="z-[70] bg-background/20 backdrop-blur-md" />
-        <DialogPrimitive.Content
-          onEscapeKeyDown={keepOpen}
-          onPointerDownOutside={keepOpen}
-          onInteractOutside={keepOpen}
-          className="fixed top-1/2 left-1/2 z-[70] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 space-y-4 overflow-y-auto rounded-2xl border border-white/20 bg-card/75 p-6 text-card-foreground shadow-2xl ring-1 ring-black/5 backdrop-blur-xl duration-200 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-white/10"
-        >
-          <div className="space-y-2">
-            <DialogTitle className="text-lg leading-tight font-semibold">
-              {message('connect.title')}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              {STRAVA_CONNECT_PURPOSE}
-            </DialogDescription>
-          </div>
-          <StravaConnectButton />
-          <StravaConnectFailure />
-          <p className="text-xs text-muted-foreground">
-            {STRAVA_CONNECT_PERMISSIONS}
-          </p>
-        </DialogPrimitive.Content>
-      </DialogPortal>
+      <AppDialogContent
+        onEscapeKeyDown={keepOpen}
+        onPointerDownOutside={keepOpen}
+        onInteractOutside={keepOpen}
+        closeLabel="Close Connect with Strava"
+        showClose={false}
+        appearance="glass"
+        overlayClassName="z-[70] bg-background/20 backdrop-blur-md"
+        className="z-[70] max-w-sm"
+      >
+        <div className="space-y-2">
+          <DialogTitle className="text-lg leading-tight font-semibold">
+            {message('connect.title')}
+          </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {STRAVA_CONNECT_PURPOSE}
+          </DialogDescription>
+        </div>
+        <StravaConnectButton />
+        <StravaConnectFailure />
+        <p className="text-xs text-muted-foreground">
+          {STRAVA_CONNECT_PERMISSIONS}
+        </p>
+      </AppDialogContent>
     </DialogPrimitive.Root>
   );
 }

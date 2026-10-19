@@ -1,14 +1,14 @@
 'use client';
 
+import { Copy, Share as ShareIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { Share as ShareIcon, Copy } from 'lucide-react';
-
-import { useShallowStore } from '~/store';
+import { AppDialogContent } from '~/components/app-dialog';
+import { CreateShareDialog } from '~/components/share/create-share-dialog';
+import { ManageSharesDialog } from '~/components/share/manage-shares-dialog';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -17,14 +17,12 @@ import {
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
-import { useToast } from '~/hooks/use-toast';
-
 import { useActivities } from '~/hooks/use-activities';
+import { useToast } from '~/hooks/use-toast';
+import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { appendMapShareParams } from '~/lib/map-share';
 import { defaultMapPosition } from '~/settings/map';
-import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
-import { CreateShareDialog } from '~/components/share/create-share-dialog';
-import { ManageSharesDialog } from '~/components/share/manage-shares-dialog';
+import { useShallowStore } from '~/store';
 
 /**
  * The real replacement for the retired legacy sharing flow (issue #132; see
@@ -59,13 +57,13 @@ function ShareLinksDialog() {
           <span className="sr-only">Share</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[calc(100%-2rem)] rounded-lg sm:max-w-md">
+      <AppDialogContent closeLabel="Close Share tracks" layout="sections">
         {view === 'create' ? (
           <CreateShareDialog onShowLinks={() => setView('manage')} />
         ) : (
           <ManageSharesDialog onBack={() => setView('create')} />
         )}
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   );
 }
@@ -101,18 +99,16 @@ function LegacyShareButton() {
     position,
     threeDim,
     showPhotos,
-  } = useShallowStore(
-    (state) => ({
-      selected: state.selected,
-      user: state.user,
-      isGuest: state.isGuest,
-      baseMap: state.baseMap,
-      overlayMaps: state.overlayMaps,
-      position: state.position,
-      threeDim: state.threeDim,
-      showPhotos: state.showPhotos,
-    }),
-  );
+  } = useShallowStore((state) => ({
+    selected: state.selected,
+    user: state.user,
+    isGuest: state.isGuest,
+    baseMap: state.baseMap,
+    overlayMaps: state.overlayMaps,
+    position: state.position,
+    threeDim: state.threeDim,
+    showPhotos: state.showPhotos,
+  }));
 
   const { data: activities = [] } = useActivities();
 
@@ -182,7 +178,7 @@ function LegacyShareButton() {
             <span className="sr-only">Share</span>
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px]">
+        <AppDialogContent closeLabel="Close Share link">
           <DialogHeader>
             <DialogTitle>Share Link</DialogTitle>
             <DialogDescription>
@@ -258,7 +254,7 @@ function LegacyShareButton() {
               </Button>
             </div>
           </div>
-        </DialogContent>
+        </AppDialogContent>
       </Dialog>
     )
   );

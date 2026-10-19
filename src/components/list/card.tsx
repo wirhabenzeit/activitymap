@@ -9,17 +9,16 @@ import type { Feature, LineString } from 'geojson';
 import {
   Download,
   ExternalLink,
-  Map,
-  Minus,
   MoreHorizontal,
   Pencil,
   Image as PhotosIcon,
   Route,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 
 import { ActivitySelectionSymbol } from '~/components/activity-selection-controls';
+import { DismissButton } from '~/components/dismiss-button';
 import { Button } from '~/components/ui/button';
 import { Card, CardHeader, CardTitle } from '~/components/ui/card';
 import {
@@ -29,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import { useDateFormat } from '~/hooks/use-display-preferences';
+import { useElementSize } from '~/hooks/use-element-size';
 import { usePhotos } from '~/hooks/use-photos';
 import type {
   ActivityMapCommand,
@@ -49,6 +49,7 @@ import { aliasMap } from '~/settings/category';
 import { store, useShallowStore } from '~/store';
 
 import { ActivityDetailStats } from './activity-detail-stats';
+import { ActivityMapAction } from './activity-map-action';
 import { EditActivity } from './edit';
 import { ElevationChart } from './elevation-chart';
 import { PhotoLightbox } from './photo';
@@ -68,19 +69,6 @@ interface ActivityCardContentProps {
 
 /** Cards this wide label "Show on map" and keep Edit beside it (as on iOS). */
 const LABELLED_ACTIONS_WIDTH = 520;
-
-function useElementWidth() {
-  const [width, setWidth] = useState(0);
-  const ref = useCallback((element: HTMLElement | null) => {
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(entry.contentRect.width);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-  return [ref, width] as const;
-}
 
 export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
   const [open, setOpen] = useState(false);
@@ -121,16 +109,8 @@ export function ActivityCardContent({
   const { data: allPhotos = [] } = usePhotos();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const showOnMap = () => onShowOnMap?.(row.original, mapActionVariant);
-  const showOnMapLabel =
-    mapActionVariant === 'show'
-      ? 'Show on map'
-      : 'Clear filters and show on map';
-  const [cardRef, cardWidth] = useElementWidth();
+  const [cardRef, { width: cardWidth }] = useElementSize();
   const labelled = cardWidth >= LABELLED_ACTIONS_WIDTH;
-  const hasRoute = !!(
-    row.original.map_polyline ?? row.original.map_summary_polyline
-  );
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
@@ -280,25 +260,12 @@ export function ActivityCardContent({
             </div>
             {/* The map overlay provides its fit action in the navigation header. */}
             {showMapButton && onShowOnMap && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className={cn(
-                  'h-8 shrink-0 gap-1.5 bg-header-background/10 text-header-background hover:bg-header-background/15',
-                  labelled ? 'px-3' : 'w-8 px-0',
-                )}
-                onClick={showOnMap}
-                disabled={!hasRoute}
-                aria-label={
-                  mapActionVariant === 'show'
-                    ? `Show ${String(row.getValue('name'))} on map`
-                    : `${showOnMapLabel}: ${String(row.getValue('name'))}`
-                }
-                title={hasRoute ? showOnMapLabel : 'No GPS route recorded'}
-              >
-                <Map className="h-4 w-4" aria-hidden="true" />
-                {labelled && showOnMapLabel}
-              </Button>
+              <ActivityMapAction
+                activity={row.original}
+                onShowOnMap={onShowOnMap}
+                variant={mapActionVariant}
+                labelled={labelled}
+              />
             )}
             {labelled && (
               <Button
@@ -358,16 +325,11 @@ export function ActivityCardContent({
               </DropdownMenuContent>
             </DropdownMenu>
             {onCollapse && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 shrink-0"
+              <DismissButton
+                intent="collapse"
+                label="Collapse route details"
                 onClick={onCollapse}
-                aria-label="Collapse route details"
-                title="Collapse route details"
-              >
-                <Minus className="h-4 w-4" aria-hidden="true" />
-              </Button>
+              />
             )}
             {onClearSelection && (
               <Button
@@ -437,11 +399,6 @@ export function ActivityCard({
     isHighlighted: state.highlighted === row.original.id,
     isGuest: state.isGuest,
   }));
-  const handleMapClick = () => onShowOnMap?.(row.original, mapActionVariant);
-  const showOnMapLabel =
-    mapActionVariant === 'show'
-      ? 'Show on map'
-      : 'Clear filters and show on map';
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
@@ -505,20 +462,12 @@ export function ActivityCard({
           </Button>
         )}
         {showMapButton && onShowOnMap && (
-          <Button
-            variant="ghost"
-            className="h-4 px-0"
-            size="sm"
-            onClick={handleMapClick}
-            aria-label={
-              mapActionVariant === 'show'
-                ? `Show ${String(row.getValue('name'))} on map`
-                : `${showOnMapLabel}: ${String(row.getValue('name'))}`
-            }
-            title={showOnMapLabel}
-          >
-            <Map className="h-4 w-4" />
-          </Button>
+          <ActivityMapAction
+            activity={row.original}
+            onShowOnMap={onShowOnMap}
+            variant={mapActionVariant}
+            compact
+          />
         )}
       </div>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />

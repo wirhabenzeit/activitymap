@@ -34,6 +34,7 @@ import {
   useDateFormat,
   useDisplayUnits,
 } from '~/hooks/use-display-preferences';
+import { useElementSize } from '~/hooks/use-element-size';
 import { sortActivities } from '~/lib/activity-presentation';
 import { speedDisplayForSports } from '~/lib/speed-display';
 import { cn } from '~/lib/utils';
@@ -272,17 +273,15 @@ export const DataTable = React.memo(function DataTable<
   // at their natural width, instead of scrolling sideways. Natural widths come
   // from a hidden sizing row (header and summary at max-content), so they
   // follow each column's real content rather than a guessed minimum.
-  const [availableWidth, setAvailableWidth] = React.useState(0);
-  React.useEffect(() => {
-    const scroller =
-      containerRef.current?.querySelector('#table-main')?.parentElement;
-    if (!fitWidth || !scroller) return;
-    const observer = new ResizeObserver(() =>
-      setAvailableWidth(scroller.clientWidth),
-    );
-    observer.observe(scroller);
-    return () => observer.disconnect();
-  }, [fitWidth]);
+  const [measureScroller, { width: availableWidth }] =
+    useElementSize<HTMLElement>({
+      box: 'client',
+    });
+  const measureTable = React.useCallback(
+    (element: HTMLTableElement | null) =>
+      measureScroller(element?.parentElement ?? null),
+    [measureScroller],
+  );
   const visibleColumns = table.getVisibleFlatColumns();
   const sizerRef = React.useRef<HTMLTableRowElement>(null);
   const [naturalWidths, setNaturalWidths] = React.useState<
@@ -291,11 +290,6 @@ export const DataTable = React.memo(function DataTable<
   React.useLayoutEffect(() => {
     const cells = sizerRef.current?.children;
     if (!fitWidth || !cells) return;
-    // The observer below only reports later resizes; read the current width
-    // too, since the table can mount before it has its final layout.
-    const scroller =
-      containerRef.current?.querySelector('#table-main')?.parentElement;
-    if (scroller) setAvailableWidth(scroller.clientWidth);
     const measured: Record<string, number> = {};
     visibleColumns.forEach((column, index) => {
       const cell = cells[index];
@@ -546,6 +540,7 @@ export const DataTable = React.memo(function DataTable<
       >
         {listHeader}
         <Table
+          ref={fitWidth ? measureTable : undefined}
           id="table-main"
           className="grid text-xs"
           // An inline-size container lets expanded cards match the visible

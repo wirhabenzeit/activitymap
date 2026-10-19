@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import {
   detailPresentation,
@@ -20,6 +14,8 @@ import {
   subscribeBrowsingHistory,
 } from '~/lib/browsing-history';
 
+import { useElementSize } from './use-element-size';
+
 export function useListInspection() {
   const href = useSyncExternalStore(
     subscribeBrowsingHistory,
@@ -27,24 +23,11 @@ export function useListInspection() {
     browsingHistoryServerSnapshot,
   );
   const activeId = inspectedActivity(href ? new URL(href).search : '');
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState<number | null>(null);
-
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const measure = () => setWidth(container.clientWidth);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
+  const [containerRef, { width, ready }] = useElementSize({ box: 'client' });
 
   // Web resizing restores the split view as soon as the list has room.
   // Presentation follows width; the original history entry still owns Back.
-  const presentation = detailPresentation(width ?? 0);
+  const presentation = detailPresentation(width);
 
   const open = useCallback(
     (id: number) => openActivityInspection('list', id),
@@ -56,7 +39,7 @@ export function useListInspection() {
     containerRef,
     activeId,
     presentation,
-    ready: width !== null,
+    ready,
     open,
     close,
   };

@@ -307,7 +307,7 @@ try {
   await page.getByRole('menuitem', { name: 'Scrolling', exact: true }).hover();
   assert.equal(
     await page
-      .getByRole('menuitemcheckbox', {
+      .getByRole('menuitemradio', {
         name: 'Fit to width',
         exact: true,
       })
@@ -315,7 +315,7 @@ try {
     'true',
   );
   await page
-    .getByRole('menuitemcheckbox', {
+    .getByRole('menuitemradio', {
       name: 'Scroll freely',
       exact: true,
     })

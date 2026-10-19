@@ -1,51 +1,29 @@
 'use client';
 
-import { useEffect } from 'react';
+import { format } from 'date-fns/format';
+import { FunnelX, ListFilter, MoreHorizontal, Search } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-
-import { MoreHorizontal, Search, FunnelX, ListFilter } from 'lucide-react';
-import { Switch } from '~/components/ui/switch';
-
-import { useShallowStore } from '~/store';
-
+import { useEffect } from 'react';
 import * as React from 'react';
-import { categorySettings } from '~/settings/category';
+import { useState } from 'react';
 
 import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuAction,
-  useSidebar,
-} from '~/components/ui/sidebar';
-
+  PreferenceMenuCheckboxItem,
+  PreferenceMenuContent,
+} from '~/components/preference-menu';
+import { Button } from '~/components/ui/button';
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
-  DropdownMenuContent,
 } from '~/components/ui/dropdown-menu';
-
+import { Input } from '~/components/ui/input';
 import { MonthRangePicker } from '~/components/ui/monthrangepicker';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '~/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
-
-import { Button } from '~/components/ui/button';
-import { Input } from '~/components/ui/input';
-
-import { format } from 'date-fns/format';
-
-import { useState } from 'react';
-import { cn } from '~/lib/utils';
-
-import { useDisplayUnits } from '~/hooks/use-display-preferences';
-import { measurementScale, measurementUnit } from '~/lib/units';
-import { binaryFilters, inequalityFilters } from '~/settings/filter';
-import { type SportType } from '~/server/db/schema';
 import {
   Select,
   SelectContent,
@@ -54,12 +32,27 @@ import {
   SelectValue,
 } from '~/components/ui/select';
 import {
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from '~/components/ui/sidebar';
+import { Switch } from '~/components/ui/switch';
+import { useDisplayUnits } from '~/hooks/use-display-preferences';
+import { measurementScale, measurementUnit } from '~/lib/units';
+import { cn } from '~/lib/utils';
+import { type SportType } from '~/server/db/schema';
+import { categorySettings } from '~/settings/category';
+import { binaryFilters, inequalityFilters } from '~/settings/filter';
+import { useShallowStore } from '~/store';
+import {
+  type BinaryFilterMode,
   calendarDateFromLocalDate,
   calendarDateToLocalDate,
   normalizeDateRange,
   parseValueFilterInput,
   toggleSportGroupState,
-  type BinaryFilterMode,
 } from '~/store/filter';
 
 export function CategoryFilter() {
@@ -153,28 +146,23 @@ export function CategoryFilter() {
                   <MoreHorizontal />
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
-                side="right"
-                align="start"
-                className="max-h-96 overflow-scroll!"
-              >
+              <PreferenceMenuContent side="right" align="start">
                 {(
                   Object.entries(
                     Object.fromEntries(alias.map((a) => [a, sportType[a]])),
                   ) as [SportType, boolean][]
                 ).map(([key, selected]) => (
-                  <DropdownMenuCheckboxItem
+                  <PreferenceMenuCheckboxItem
                     checked={selected}
                     key={key}
-                    onSelect={(event) => event.preventDefault()}
                     onCheckedChange={() =>
                       setSportType((type) => ({ ...type, [key]: !type[key] }))
                     }
                   >
                     {key}
-                  </DropdownMenuCheckboxItem>
+                  </PreferenceMenuCheckboxItem>
                 ))}
-              </DropdownMenuContent>
+              </PreferenceMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>
         ),
@@ -253,7 +241,7 @@ function InequalityFilterContent({
         aria-label={`${label} filter value in ${unit}`}
         inputMode="decimal"
         onChange={(event) => validateInput(event.target.value)}
-        className="h-8 w-full pl-8 pr-8 text-right focus-visible:bg-background focus-visible:ring-0"
+        className="h-8 w-full pr-8 pl-8 text-right focus-visible:bg-background focus-visible:ring-0"
       />
       <span className="absolute right-2 py-1 text-foreground/60">{unit}</span>
     </span>
@@ -470,7 +458,7 @@ export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
   return (
     <SidebarMenuItem className="mx-2 flex h-9 items-center gap-3">
       {binaryFilters[name].icon}
-      <label htmlFor={id} className="min-w-16 text-sm font-medium leading-none">
+      <label htmlFor={id} className="min-w-16 text-sm leading-none font-medium">
         {binaryFilters[name].label}
       </label>
       {control}
@@ -510,7 +498,7 @@ export function SearchFilter() {
 
   return (
     <SidebarMenuItem className="relative mx-2">
-      <Search className="pointer-events-none absolute left-2 top-2 size-4 text-muted-foreground" />
+      <Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" />
       {input}
     </SidebarMenuItem>
   );

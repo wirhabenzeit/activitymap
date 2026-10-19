@@ -1,16 +1,18 @@
 'use client';
 
+import { type PointerEvent, useRef, useState } from 'react';
+
 import { useDisplayUnits } from '~/hooks/use-display-preferences';
-import { measurementScale, measurementUnit } from '~/lib/units';
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { useElementSize } from '~/hooks/use-element-size';
 import type { ElevationProfile } from '~/lib/activity-stream-summary';
 import {
-  elevationDistanceLabel,
-  elevationDistanceAxis,
   elevationAxisTicks,
+  elevationDistanceAxis,
+  elevationDistanceLabel,
   elevationSelectionLabel,
   nearestElevationSample,
 } from '~/lib/elevation-profile';
+import { measurementScale, measurementUnit } from '~/lib/units';
 
 /** Linear, sample-preserving plot with one interaction surface for mouse, touch and keyboard. */
 export function ElevationPlot({
@@ -23,8 +25,10 @@ export function ElevationPlot({
   onSelection?: (index: number | null) => void;
 }) {
   const units = useDisplayUnits();
-  const container = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(304);
+  const [container, { width }] = useElementSize({
+    retainSize: true,
+    initialWidth: 304,
+  });
   // A selection belongs to the profile it was made on: the chart clears the
   // map cursor whenever its profile changes, so the readout clears with it.
   const [selection, setSelection] = useState<{
@@ -38,16 +42,6 @@ export function ElevationPlot({
     profile: ElevationProfile;
     index: number | null;
   }>({ profile, index: null });
-  useEffect(() => {
-    const element = container.current;
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry && entry.contentRect.width > 0)
-        setWidth(entry.contentRect.width);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
 
   const start = profile.distance[0]!;
   const span = profile.distance.at(-1)! - start;
@@ -189,7 +183,7 @@ export function ElevationPlot({
         <span
           data-testid="elevation-selection-readout"
           aria-hidden="true"
-          className="rounded bg-secondary px-1.5 py-0.5 font-medium tabular-nums text-foreground"
+          className="rounded bg-secondary px-1.5 py-0.5 font-medium text-foreground tabular-nums"
           style={{ visibility: selected === null ? 'hidden' : 'visible' }}
         >
           {selected === null ? '\u00a0' : value(selected)}

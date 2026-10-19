@@ -4,18 +4,17 @@ import { RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import {
+  AppDialogBody,
+  AppDialogContent,
+  AppDialogHeader,
+} from '~/components/app-dialog';
+import {
   STRAVA_CONNECT_PERMISSIONS,
   StravaConnectButton,
   StravaConnectFailure,
 } from '~/components/auth/strava-connect';
 import { Button } from '~/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog';
+import { Dialog, DialogDescription, DialogTitle } from '~/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { useIngestionStatus } from '~/hooks/use-ingestion-status';
 import { useStravaImport } from '~/hooks/use-strava-import';
@@ -208,16 +207,19 @@ export function SettingsDialog({
         onOpenChange(value);
       }}
     >
-      <DialogContent
+      <AppDialogContent
         overlayClassName="z-[70]"
-        className="z-[70] flex h-[min(30rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-md flex-col gap-0 overflow-hidden rounded-xl p-0 [&>button]:top-2 [&>button]:right-2 [&>button]:flex [&>button]:size-11 [&>button]:items-center [&>button]:justify-center [@media(min-width:640px)_and_(max-height:500px)]:h-[calc(100dvh-2rem)] [@media(min-width:640px)_and_(max-height:500px)]:max-w-2xl"
+        closeLabel="Close Settings"
+        layout="sections"
+        showClose={!deleting}
+        className="z-[70] h-[min(30rem,calc(100dvh-2rem))] [@media(min-width:640px)_and_(max-height:500px)]:max-w-2xl"
       >
-        <DialogHeader className="shrink-0 px-5 py-4 text-left">
+        <AppDialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="sr-only">
             Web sync, Strava import status and display preferences.
           </DialogDescription>
-        </DialogHeader>
+        </AppDialogHeader>
         <Tabs
           value={tab}
           onValueChange={(value) => {
@@ -253,355 +255,377 @@ export function SettingsDialog({
               </TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent
-            value="sync"
-            className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
-          >
-            <div className="grid gap-5 [@media(min-width:640px)_and_(max-height:500px)]:grid-cols-[0.85fr_1.15fr]">
-              <section aria-labelledby="web-sync-heading" className="space-y-2">
-                <div className="flex items-center justify-between gap-3 [@media(min-width:640px)_and_(max-height:500px)]:flex-col [@media(min-width:640px)_and_(max-height:500px)]:items-start">
-                  <div className="min-w-0 space-y-1">
-                    <h2 id="web-sync-heading" className="text-sm font-semibold">
-                      Last web sync
-                    </h2>
-                    <p className="text-xs text-muted-foreground">
-                      {browser.lastSuccess ? (
-                        <time dateTime={browser.lastSuccess}>
-                          {date(browser.lastSuccess)}
-                        </time>
-                      ) : (
-                        'Not yet synced'
-                      )}
-                    </p>
+          <AppDialogBody asChild>
+            <TabsContent
+              value="sync"
+              className="m-0 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
+            >
+              <div className="grid gap-5 [@media(min-width:640px)_and_(max-height:500px)]:grid-cols-[0.85fr_1.15fr]">
+                <section
+                  aria-labelledby="web-sync-heading"
+                  className="space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-3 [@media(min-width:640px)_and_(max-height:500px)]:flex-col [@media(min-width:640px)_and_(max-height:500px)]:items-start">
+                    <div className="min-w-0 space-y-1">
+                      <h2
+                        id="web-sync-heading"
+                        className="text-sm font-semibold"
+                      >
+                        Last web sync
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        {browser.lastSuccess ? (
+                          <time dateTime={browser.lastSuccess}>
+                            {date(browser.lastSuccess)}
+                          </time>
+                        ) : (
+                          'Not yet synced'
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="h-10 shrink-0"
+                      onClick={requestBrowserSync}
+                      disabled={
+                        !userId ||
+                        offline ||
+                        browser.phase === 'syncing' ||
+                        (!!browser.retryAt && clock < browser.retryAt)
+                      }
+                    >
+                      <RefreshCw
+                        aria-hidden="true"
+                        className={
+                          browser.phase === 'syncing' ? 'animate-spin' : ''
+                        }
+                      />
+                      Sync now
+                    </Button>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="h-10 shrink-0"
-                    onClick={requestBrowserSync}
-                    disabled={
-                      !userId ||
-                      offline ||
-                      browser.phase === 'syncing' ||
-                      (!!browser.retryAt && clock < browser.retryAt)
-                    }
-                  >
-                    <RefreshCw
-                      aria-hidden="true"
-                      className={
-                        browser.phase === 'syncing' ? 'animate-spin' : ''
-                      }
-                    />
-                    Sync now
-                  </Button>
-                </div>
-                {browserMessage && (
-                  <p role="status" className="text-xs text-muted-foreground">
-                    {browserMessage}
-                  </p>
-                )}
-                {userId && browser.retryAt && clock < browser.retryAt && (
-                  <p className="text-xs text-muted-foreground">
-                    Try again after{' '}
-                    {date(new Date(browser.retryAt).toISOString())}.
-                  </p>
-                )}
-              </section>
-              <section
-                aria-labelledby="import-heading"
-                className="space-y-3 border-t pt-4 [@media(min-width:640px)_and_(max-height:500px)]:space-y-2 [@media(min-width:640px)_and_(max-height:500px)]:border-t-0 [@media(min-width:640px)_and_(max-height:500px)]:border-l [@media(min-width:640px)_and_(max-height:500px)]:pt-0 [@media(min-width:640px)_and_(max-height:500px)]:pl-5"
-              >
-                <h2 id="import-heading" className="text-sm font-semibold">
-                  Strava import status
-                </h2>
-                <div className="space-y-2">
-                  <Button
-                    variant="outline"
-                    className="min-h-10"
-                    onClick={manualImport.start}
-                    disabled={
-                      !userId ||
-                      offline ||
-                      !!needsReconnect ||
-                      manualImport.starting ||
-                      !manualImport.data?.available ||
-                      manualImport.data.status === 'running' ||
-                      clock < manualImport.retryAt
-                    }
-                  >
-                    <RefreshCw
-                      aria-hidden="true"
-                      className={
-                        manualImport.starting ||
-                        manualImport.data?.status === 'running'
-                          ? 'animate-spin'
-                          : ''
-                      }
-                    />
-                    Fetch from Strava
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Fetch recent activities, missing details and photos, and
-                    more history in the background.
-                  </p>
-                  {(!!manualImport.startError || manualImport.isError) && (
+                  {browserMessage && (
                     <p role="status" className="text-xs text-muted-foreground">
-                      {manualImport.startError?.message ??
-                        'Could not check the Strava fetch. Please try again later.'}
+                      {browserMessage}
                     </p>
                   )}
-                  {manualImport.data &&
-                    stravaImportMessage(manualImport.data) && (
+                  {userId && browser.retryAt && clock < browser.retryAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Try again after{' '}
+                      {date(new Date(browser.retryAt).toISOString())}.
+                    </p>
+                  )}
+                </section>
+                <section
+                  aria-labelledby="import-heading"
+                  className="space-y-3 border-t pt-4 [@media(min-width:640px)_and_(max-height:500px)]:space-y-2 [@media(min-width:640px)_and_(max-height:500px)]:border-t-0 [@media(min-width:640px)_and_(max-height:500px)]:border-l [@media(min-width:640px)_and_(max-height:500px)]:pt-0 [@media(min-width:640px)_and_(max-height:500px)]:pl-5"
+                >
+                  <h2 id="import-heading" className="text-sm font-semibold">
+                    Strava import status
+                  </h2>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      className="min-h-10"
+                      onClick={manualImport.start}
+                      disabled={
+                        !userId ||
+                        offline ||
+                        !!needsReconnect ||
+                        manualImport.starting ||
+                        !manualImport.data?.available ||
+                        manualImport.data.status === 'running' ||
+                        clock < manualImport.retryAt
+                      }
+                    >
+                      <RefreshCw
+                        aria-hidden="true"
+                        className={
+                          manualImport.starting ||
+                          manualImport.data?.status === 'running'
+                            ? 'animate-spin'
+                            : ''
+                        }
+                      />
+                      Fetch from Strava
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Fetch recent activities, missing details and photos, and
+                      more history in the background.
+                    </p>
+                    {(!!manualImport.startError || manualImport.isError) && (
                       <p
                         role="status"
                         className="text-xs text-muted-foreground"
                       >
-                        {stravaImportMessage(manualImport.data)}
+                        {manualImport.startError?.message ??
+                          'Could not check the Strava fetch. Please try again later.'}
                       </p>
                     )}
-                  {clock < manualImport.retryAt && (
-                    <p className="text-xs text-muted-foreground">
-                      Try again after{' '}
-                      {date(new Date(manualImport.retryAt).toISOString())}.
+                    {manualImport.data &&
+                      stravaImportMessage(manualImport.data) && (
+                        <p
+                          role="status"
+                          className="text-xs text-muted-foreground"
+                        >
+                          {stravaImportMessage(manualImport.data)}
+                        </p>
+                      )}
+                    {clock < manualImport.retryAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Try again after{' '}
+                        {date(new Date(manualImport.retryAt).toISOString())}.
+                      </p>
+                    )}
+                  </div>
+                  {status ? (
+                    <>
+                      <dl className="space-y-3 text-sm [@media(min-width:640px)_and_(max-height:500px)]:space-y-2">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <dt className="text-muted-foreground">
+                            All activities imported
+                          </dt>
+                          <dd className="font-medium">
+                            {status.history.progress === 'complete'
+                              ? 'Yes'
+                              : status.history.progress === 'unknown'
+                                ? 'Unknown'
+                                : 'No'}
+                          </dd>
+                        </div>
+                        {fetched.map(({ title, progress, emptyLabel }) => (
+                          <div key={title} className="space-y-1.5">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <dt className="text-muted-foreground">{title}</dt>
+                              <dd className="font-medium tabular-nums">
+                                {progress
+                                  ? `${progress.percent.toLocaleString()}%`
+                                  : (emptyLabel ?? '—')}
+                              </dd>
+                            </div>
+                            {progress && (
+                              <dd>
+                                <progress
+                                  className="block h-1.5 w-full overflow-hidden rounded-full accent-primary [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
+                                  value={progress.value}
+                                  max={progress.total}
+                                  aria-label={`${title} fetched`}
+                                  aria-valuetext={`${progress.percent}%`}
+                                />
+                              </dd>
+                            )}
+                          </div>
+                        ))}
+                      </dl>
+                      <p className="text-xs text-muted-foreground">
+                        Fetched for imported activities. Photos count only
+                        activities with photos.
+                      </p>
+                    </>
+                  ) : (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      {!userId
+                        ? 'Sign in to see your import status.'
+                        : query.isFetching
+                          ? 'Checking your import…'
+                          : 'Import status unavailable. Please try again later.'}
+                    </p>
+                  )}
+                  {stale && status && (
+                    <p role="status" className="text-xs text-muted-foreground">
+                      {offline ? 'Offline. ' : ''}Last known status ·{' '}
+                      {date(status.observedAt)}
+                    </p>
+                  )}
+                  {needsReconnect && (
+                    <div className="space-y-2">
+                      <p
+                        role="status"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Reconnect Strava from Account to continue importing.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => setTab('account')}
+                      >
+                        Go to Account
+                      </Button>
+                    </div>
+                  )}
+                </section>
+              </div>
+            </TabsContent>
+          </AppDialogBody>
+          <AppDialogBody asChild>
+            <TabsContent
+              value="display"
+              className="m-0 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
+            >
+              <DisplaySettings />
+            </TabsContent>
+          </AppDialogBody>
+          <AppDialogBody asChild>
+            <TabsContent
+              value="account"
+              className="m-0 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
+            >
+              {accountDeleted && (
+                <div className="mb-4 space-y-3" role="status">
+                  <p className="text-sm">
+                    Your ActivityMap account has been deleted.
+                  </p>
+                  {cleanupFailed && (
+                    <p className="text-sm text-destructive">
+                      Couldn’t clear this browser’s offline data. Retry to
+                      finish.
+                    </p>
+                  )}
+                  <Button disabled={deleting} onClick={handleDeletion}>
+                    {deleting
+                      ? 'Clearing local data…'
+                      : 'Finish clearing local data'}
+                  </Button>
+                </div>
+              )}
+              <section aria-labelledby="account-heading" className="space-y-4">
+                <div className="space-y-1">
+                  <h2 id="account-heading" className="text-sm font-semibold">
+                    Account
+                  </h2>
+                  <p className="text-sm break-words text-muted-foreground">
+                    {userId
+                      ? (user?.name ?? 'Your account')
+                      : 'Connect Strava to see your activities.'}
+                  </p>
+                  {email && (
+                    <p className="text-xs break-words text-muted-foreground">
+                      {email}
                     </p>
                   )}
                 </div>
-                {status ? (
-                  <>
-                    <dl className="space-y-3 text-sm [@media(min-width:640px)_and_(max-height:500px)]:space-y-2">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <dt className="text-muted-foreground">
-                          All activities imported
-                        </dt>
-                        <dd className="font-medium">
-                          {status.history.progress === 'complete'
-                            ? 'Yes'
-                            : status.history.progress === 'unknown'
-                              ? 'Unknown'
-                              : 'No'}
-                        </dd>
-                      </div>
-                      {fetched.map(({ title, progress, emptyLabel }) => (
-                        <div key={title} className="space-y-1.5">
-                          <div className="flex items-baseline justify-between gap-3">
-                            <dt className="text-muted-foreground">{title}</dt>
-                            <dd className="font-medium tabular-nums">
-                              {progress
-                                ? `${progress.percent.toLocaleString()}%`
-                                : (emptyLabel ?? '—')}
-                            </dd>
-                          </div>
-                          {progress && (
-                            <dd>
-                              <progress
-                                className="block h-1.5 w-full overflow-hidden rounded-full accent-primary [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
-                                value={progress.value}
-                                max={progress.total}
-                                aria-label={`${title} fetched`}
-                                aria-valuetext={`${progress.percent}%`}
-                              />
-                            </dd>
-                          )}
-                        </div>
-                      ))}
-                    </dl>
-                    <p className="text-xs text-muted-foreground">
-                      Fetched for imported activities. Photos count only
-                      activities with photos.
-                    </p>
-                  </>
-                ) : (
-                  <p role="status" className="text-sm text-muted-foreground">
-                    {!userId
-                      ? 'Sign in to see your import status.'
-                      : query.isFetching
-                        ? 'Checking your import…'
-                        : 'Import status unavailable. Please try again later.'}
+                {userId && (
+                  <p className="text-xs text-muted-foreground">
+                    {!user?.stravaConnected
+                      ? 'Strava not connected'
+                      : stravaPermissionsLimited(user.stravaPermissions)
+                        ? 'Strava connected with limited access'
+                        : 'Strava connected'}
                   </p>
                 )}
-                {stale && status && (
-                  <p role="status" className="text-xs text-muted-foreground">
-                    {offline ? 'Offline. ' : ''}Last known status ·{' '}
-                    {date(status.observedAt)}
-                  </p>
+                {showConnect && !accountDeleted && (
+                  <div className="space-y-3">
+                    {permissionNotes.length > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        {permissionNotes.join(' ')}{' '}
+                        {STRAVA_PERMISSIONS_RECONNECT}
+                      </p>
+                    ) : needsReconnect || manualNeedsReconnect ? (
+                      <p className="text-xs text-muted-foreground">
+                        Connect with Strava again to restore access to your
+                        activities.
+                      </p>
+                    ) : null}
+                    <StravaConnectButton />
+                    <StravaConnectFailure />
+                    {!userId && (
+                      <p className="text-muted-foreground">
+                        {STRAVA_CONNECT_PERMISSIONS}
+                      </p>
+                    )}
+                  </div>
                 )}
-                {needsReconnect && (
-                  <div className="space-y-2">
-                    <p role="status" className="text-sm text-muted-foreground">
-                      Reconnect Strava from Account to continue importing.
-                    </p>
-                    <Button variant="outline" onClick={() => setTab('account')}>
-                      Go to Account
+                {userId && (
+                  <div className="space-y-2 border-t pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={handleSignOut}
+                      disabled={signingOut || deleting}
+                    >
+                      {signingOut ? 'Signing out…' : 'Sign out of ActivityMap'}
                     </Button>
+                    {signOutFailed && (
+                      <p role="alert" className="text-xs text-destructive">
+                        Couldn’t sign out. Please try again.
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Strava stays connected.
+                    </p>
+                  </div>
+                )}
+                {userId && !accountDeleted && (
+                  <div className="space-y-3 border-t pt-4">
+                    <h3 className="text-sm font-semibold">
+                      Delete account and data
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Permanently delete your ActivityMap account, imported
+                      activities, photos and share links. Your original Strava
+                      activities stay on Strava. Signing in again creates a new
+                      account and starts a fresh import.
+                    </p>
+                    {confirmDeletion ? (
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium">
+                          Delete your account and all ActivityMap data? This
+                          can’t be undone.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="destructive"
+                            disabled={deleting || offline}
+                            onClick={handleDeletion}
+                          >
+                            {deleting
+                              ? 'Deleting account…'
+                              : 'Permanently delete my account'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            disabled={deleting}
+                            onClick={() => setConfirmDeletion(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="destructive"
+                        disabled={signingOut || offline}
+                        onClick={() => {
+                          setConfirmDeletion(true);
+                          setDeletionFailed(false);
+                        }}
+                      >
+                        Delete account and data
+                      </Button>
+                    )}
+                    {offline && (
+                      <p className="text-xs text-muted-foreground">
+                        Go online to delete your account.
+                      </p>
+                    )}
+                    {deletionFailed && (
+                      <p role="alert" className="text-xs text-destructive">
+                        Couldn’t confirm account deletion. Please try again.
+                      </p>
+                    )}
                   </div>
                 )}
               </section>
-            </div>
-          </TabsContent>
-          <TabsContent
-            value="display"
-            className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
-          >
-            <DisplaySettings />
-          </TabsContent>
-          <TabsContent
-            value="account"
-            className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
-          >
-            {accountDeleted && (
-              <div className="mb-4 space-y-3" role="status">
-                <p className="text-sm">
-                  Your ActivityMap account has been deleted.
-                </p>
-                {cleanupFailed && (
-                  <p className="text-sm text-destructive">
-                    Couldn’t clear this browser’s offline data. Retry to finish.
-                  </p>
-                )}
-                <Button disabled={deleting} onClick={handleDeletion}>
-                  {deleting
-                    ? 'Clearing local data…'
-                    : 'Finish clearing local data'}
-                </Button>
-              </div>
-            )}
-            <section aria-labelledby="account-heading" className="space-y-4">
-              <div className="space-y-1">
-                <h2 id="account-heading" className="text-sm font-semibold">
-                  Account
-                </h2>
-                <p className="text-sm break-words text-muted-foreground">
-                  {userId
-                    ? (user?.name ?? 'Your account')
-                    : 'Connect Strava to see your activities.'}
-                </p>
-                {email && (
-                  <p className="text-xs break-words text-muted-foreground">
-                    {email}
-                  </p>
-                )}
-              </div>
-              {userId && (
-                <p className="text-xs text-muted-foreground">
-                  {!user?.stravaConnected
-                    ? 'Strava not connected'
-                    : stravaPermissionsLimited(user.stravaPermissions)
-                      ? 'Strava connected with limited access'
-                      : 'Strava connected'}
-                </p>
-              )}
-              {showConnect && !accountDeleted && (
-                <div className="space-y-3">
-                  {permissionNotes.length > 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      {permissionNotes.join(' ')} {STRAVA_PERMISSIONS_RECONNECT}
-                    </p>
-                  ) : needsReconnect || manualNeedsReconnect ? (
-                    <p className="text-xs text-muted-foreground">
-                      Connect with Strava again to restore access to your
-                      activities.
-                    </p>
-                  ) : null}
-                  <StravaConnectButton />
-                  <StravaConnectFailure />
-                  {!userId && (
-                    <p className="text-muted-foreground">
-                      {STRAVA_CONNECT_PERMISSIONS}
-                    </p>
-                  )}
-                </div>
-              )}
-              {userId && (
-                <div className="space-y-2 border-t pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={handleSignOut}
-                    disabled={signingOut || deleting}
-                  >
-                    {signingOut ? 'Signing out…' : 'Sign out of ActivityMap'}
-                  </Button>
-                  {signOutFailed && (
-                    <p role="alert" className="text-xs text-destructive">
-                      Couldn’t sign out. Please try again.
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Strava stays connected.
-                  </p>
-                </div>
-              )}
-              {userId && !accountDeleted && (
-                <div className="space-y-3 border-t pt-4">
-                  <h3 className="text-sm font-semibold">
-                    Delete account and data
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Permanently delete your ActivityMap account, imported
-                    activities, photos and share links. Your original Strava
-                    activities stay on Strava. Signing in again creates a new
-                    account and starts a fresh import.
-                  </p>
-                  {confirmDeletion ? (
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium">
-                        Delete your account and all ActivityMap data? This can’t
-                        be undone.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="destructive"
-                          disabled={deleting || offline}
-                          onClick={handleDeletion}
-                        >
-                          {deleting
-                            ? 'Deleting account…'
-                            : 'Permanently delete my account'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          disabled={deleting}
-                          onClick={() => setConfirmDeletion(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="destructive"
-                      disabled={signingOut || offline}
-                      onClick={() => {
-                        setConfirmDeletion(true);
-                        setDeletionFailed(false);
-                      }}
-                    >
-                      Delete account and data
-                    </Button>
-                  )}
-                  {offline && (
-                    <p className="text-xs text-muted-foreground">
-                      Go online to delete your account.
-                    </p>
-                  )}
-                  {deletionFailed && (
-                    <p role="alert" className="text-xs text-destructive">
-                      Couldn’t confirm account deletion. Please try again.
-                    </p>
-                  )}
-                </div>
-              )}
-            </section>
-          </TabsContent>
-          <TabsContent
-            value="about"
-            className="m-0 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5"
-          >
-            <h2 className="text-sm font-semibold">ActivityMap</h2>
-            <p className="text-sm text-muted-foreground">
-              Your activities, on a map and beyond.
-            </p>
-          </TabsContent>
+            </TabsContent>
+          </AppDialogBody>
+          <AppDialogBody asChild>
+            <TabsContent value="about" className="m-0 space-y-2">
+              <h2 className="text-sm font-semibold">ActivityMap</h2>
+              <p className="text-sm text-muted-foreground">
+                Your activities, on a map and beyond.
+              </p>
+            </TabsContent>
+          </AppDialogBody>
         </Tabs>
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   );
 }

@@ -9,12 +9,16 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import {
+  AppDialogBody,
+  AppDialogContent,
+  AppDialogFooter,
+  AppDialogHeader,
+} from '~/components/app-dialog';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '~/components/ui/dialog';
@@ -152,66 +156,73 @@ export function ProfileForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormControl>
-                <Input placeholder={row.getValue('name')} {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <Input placeholder={row.getValue('description')} {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="sportType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Sport type</FormLabel>
-              <Select
-                defaultValue={row.original.sport_type}
-                onValueChange={field.onChange}
-              >
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <AppDialogBody className="space-y-8">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <Input placeholder={row.getValue('name')} {...field} />
                 </FormControl>
-                <SelectContent>
-                  {activtyTypes.map(({ name, Icon, color }) => (
-                    <SelectItem key={name} value={name}>
-                      <div className="flex items-center space-x-2">
-                        <Icon className="size-4" style={{ color }} />
-                        <span>{name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" disabled={loading || !form.formState.isDirty}>
-          {loading ? 'Saving...' : 'Save changes'}
-        </Button>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Description</FormLabel>
+                <FormControl>
+                  <Input placeholder={row.getValue('description')} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="sportType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Sport type</FormLabel>
+                <Select
+                  defaultValue={row.original.sport_type}
+                  onValueChange={field.onChange}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {activtyTypes.map(({ name, Icon, color }) => (
+                      <SelectItem key={name} value={name}>
+                        <div className="flex items-center space-x-2">
+                          <Icon className="size-4" style={{ color }} />
+                          <span>{name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </AppDialogBody>
+        <AppDialogFooter>
+          <Button type="submit" disabled={loading || !form.formState.isDirty}>
+            {loading ? 'Saving...' : 'Save changes'}
+          </Button>
+        </AppDialogFooter>
       </form>
     </Form>
   );
@@ -244,15 +255,15 @@ export function EditActivity({
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <AppDialogContent closeLabel="Close Edit activity" layout="sections">
+        <AppDialogHeader>
           <DialogTitle>Edit activity</DialogTitle>
           <DialogDescription>
             Make changes to your activity here.
           </DialogDescription>
-        </DialogHeader>
+        </AppDialogHeader>
         <ProfileForm row={row} setOpen={setOpen} />
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   );
 }
