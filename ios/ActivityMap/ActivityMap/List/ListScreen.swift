@@ -32,8 +32,10 @@ struct ListScreen: View {
             activityList(width: layout.contentWidth, inspectedID: layout.showsPanel ? store.inspectedActivityID : nil)
         } panel: { id in
             ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: AppTheme.minimumTarget)
+                .modifier(ListActivityContinuation(store: store, activityID: id))
         } destination: { id in
             ActivityDetailView(store: store, activityID: id)
+                .modifier(ListActivityContinuation(store: store, activityID: id))
         }
         // The footer belongs to the root page, so native push/pop and
         // interactive Back carry it with the list rather than hiding it later.
@@ -176,5 +178,43 @@ struct ActivitySelectionSymbol: View {
                 .frame(width: 44, height: 44)
                 .accessibilityHidden(false).accessibilityLabel(activity.sportType.rawValue)
         }
+    }
+}
+
+/// Continue within the current sorted/filtered List, independently of map selection.
+private struct ListActivityContinuation: ViewModifier {
+    let store: ActivityStore
+    let activityID: Int
+    private var sequence: ActivityDetailSequence {
+        ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: activityID)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.activityDetailPaging, ActivityDetailPaging(position: { id in
+                ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: id).position
+            }, previous: { if let id = sequence.previousID { inspect(id) } },
+               next: { if let id = sequence.nextID { inspect(id) } },
+               canGoPrevious: { id in ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: id).previousID != nil },
+               canGoNext: { id in ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: id).nextID != nil }))
+            .environment(\.activityDetailContinuation, continuation)
+    }
+
+    private var continuation: ActivityDetailContinuation? {
+        guard let nextID = sequence.nextID, let next = store.activity(id: nextID) else { return nil }
+        return ActivityDetailContinuation(currentID: activityID, nextID: nextID, nextName: next.name,
+            isEnabled: store.selectedTab == .list) {
+                // Resolve again on release: a filter or sort change must never
+                // continue to an activity from a stale sequence.
+                guard sequence.nextID == nextID else { return }
+                inspect(nextID)
+            }
+    }
+
+    private func inspect(_ id: Int) {
+        guard store.selectedTab == .list, store.inspectedActivityID == activityID else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { store.inspect(id) }
     }
 }

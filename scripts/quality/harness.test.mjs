@@ -42,7 +42,7 @@ async function temporary(t) {
   return directory;
 }
 
-test('native runtime eligibility reports iOS 27 rotation coverage without skipping iOS 26 cases', () => {
+test('native runtime eligibility reports iOS 27 native-sheet coverage without skipping iOS 26 cases', () => {
   const older = nativeSuiteEligibility('26.2');
   assert.deepEqual(older.ineligibleSuites, [
     {
@@ -51,10 +51,20 @@ test('native runtime eligibility reports iOS 27 rotation coverage without skippi
       actual: '26.2',
       reason: 'Retained native-sheet rotation contract',
     },
+    {
+      suite: 'ActivityMapUITests/ActivityContinuationUITests',
+      requires: 'iOS 27+',
+      actual: '26.2',
+      reason: 'Retained native-sheet continuation fixture',
+    },
   ]);
-  assert.equal(older.suites.length, nativeSuites.length - 1);
+  assert.equal(older.suites.length, nativeSuites.length - 2);
   assert(older.suites.includes('ActivityMapUITests/MapPhotoUITests'));
   assert(!older.suites.includes('ActivityMapUITests/MapRotationUITests'));
+  assert(
+    !older.suites.includes('ActivityMapUITests/ActivityContinuationUITests'),
+  );
+  assert(older.suites.includes('ActivityMapTests/ActivityContinuationTests'));
   assert.deepEqual(nativeSuiteEligibility('27.0.1'), {
     suites: nativeSuites,
     ineligibleSuites: [],

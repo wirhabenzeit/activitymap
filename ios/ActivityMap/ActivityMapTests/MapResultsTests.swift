@@ -4,6 +4,17 @@ import Testing
 
 @MainActor
 struct MapResultsTests {
+    @Test func activityContinuationFollowsVisibleOrderAndStopsAtBoundaries() {
+        let first = ActivityDetailSequence(ids: [7, 2, 9], currentID: 7)
+        #expect(first.previousID == nil && first.nextID == 2 && first.position == "1 of 3")
+        let middle = ActivityDetailSequence(ids: [7, 2, 9], currentID: 2)
+        #expect(middle.previousID == 7 && middle.nextID == 9)
+        let last = ActivityDetailSequence(ids: [7, 2, 9], currentID: 9)
+        #expect(last.previousID == 2 && last.nextID == nil)
+        let missing = ActivityDetailSequence(ids: [7, 9], currentID: 2)
+        #expect(missing.previousID == nil && missing.nextID == nil && missing.position == nil)
+    }
+
     @Test func resultScopeIncludesExistingSelectionAndGPSLessActivities() {
         let store = ActivityStore(activities: (1...4).map { ActivityStoreSelectionTests.activity($0, route: $0 != 4) })
         let picker = RoutePicker()
@@ -17,7 +28,7 @@ struct MapResultsTests {
         picker.step(1, store: store)
         #expect(store.activeActivityID == 1 && picker.detailID == 1)
         picker.step(1, store: store)
-        #expect(store.activeActivityID == 3)
+        #expect(store.activeActivityID == 1, "Next stops at the last visible activity instead of wrapping")
         #expect(store.inspectedActivityID == 4)
         #expect(store.mapContext.pendingRequest == nil, "Result browsing must not issue camera fits")
     }

@@ -131,6 +131,8 @@ struct ActivityDetailPaging {
     let position: (Int) -> String?
     let previous: () -> Void
     let next: () -> Void
+    var canGoPrevious: (Int) -> Bool = { _ in true }
+    var canGoNext: (Int) -> Bool = { _ in true }
 }
 
 extension EnvironmentValues {
@@ -151,7 +153,9 @@ struct ActivityDetailIdentity: View {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
                 Text(activity.name).font(.headline)
                     .foregroundStyle(onNavigationBar ? Color.white : .primary)
-                    .lineLimit(titleLineLimit)
+                    // Native bars reserve one line for identity and one for
+                    // metadata; wrapping a long title must not grow the bar.
+                    .lineLimit(onNavigationBar ? 1 : titleLineLimit)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
@@ -159,13 +163,14 @@ struct ActivityDetailIdentity: View {
                     .accessibilityValue(paging?.position(activity.id) ?? "")
                     .accessibilityActions {
                         if let paging, paging.position(activity.id) != nil {
-                            Button("Previous activity", action: paging.previous)
-                            Button("Next activity", action: paging.next)
+                            if paging.canGoPrevious(activity.id) { Button("Previous activity", action: paging.previous) }
+                            if paging.canGoNext(activity.id) { Button("Next activity", action: paging.next) }
                         }
                     }
                 Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
                     .font(.caption).foregroundStyle(onNavigationBar ? Color.white.opacity(0.8) : AppTheme.secondaryText)
-                    .lineLimit(titleLineLimit == 1 ? 1 : nil)
+                    .lineLimit(onNavigationBar || titleLineLimit == 1 ? 1 : nil)
+                    .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -178,6 +183,7 @@ struct ActivityDetailIdentity: View {
 /// than in a footer row. Edit is a direct button beside the title.
 struct ActivityDetailHeading: View {
     @Environment(\.locale) private var locale
+    @Environment(\.activityDetailPaging) private var paging
     let activity: Activity
     var trailingInset: CGFloat = 0
     var titleLineLimit: Int? = nil
@@ -202,6 +208,11 @@ struct ActivityDetailHeading: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
             HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
                 ActivityDetailIdentity(activity: activity, titleLineLimit: titleLineLimit, onNavigationBar: onNavigationBar)
+                if !overMap, let paging, paging.position(activity.id) != nil {
+                    ActivityDetailStepButtons(previous: paging.canGoPrevious(activity.id) ? paging.previous : nil,
+                                              next: paging.canGoNext(activity.id) ? paging.next : nil,
+                                              onNavigationBar: onNavigationBar)
+                }
                 if let editing {
                     ActivityEditButton(activity: activity, service: editing, onNavigationBar: onNavigationBar, showsIcon: labelled)
                 }
@@ -243,5 +254,81 @@ extension ActivityDetailContent where Profile == EmptyView, Photos == EmptyView 
     init(activity: Activity, headerTrailingInset: CGFloat = 0, showsHeading: Bool = true, streamSummaries: StreamSummaryLoader? = nil) {
         self.init(activity: activity, headerTrailingInset: headerTrailingInset, showsHeading: showsHeading,
                   streamSummaries: streamSummaries, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
+    }
+}
+
+/// Both browsing hosts use their visible order and stop at its boundaries.
+struct ActivityDetailSequence {
+    let ids: [Int]
+    let currentID: Int
+    private var index: Int? { ids.firstIndex(of: currentID) }
+    var previousID: Int? {
+        guard let index, index > 0 else { return nil }
+        return ids[index - 1]
+    }
+    var nextID: Int? {
+        guard let index, index + 1 < ids.count else { return nil }
+        return ids[index + 1]
+    }
+    var position: String? {
+        guard ids.count > 1, let index else { return nil }
+        return String(localized: "\(index + 1) of \(ids.count)")
+    }
+}
+
+/// Visible alternatives to pulling past the end; shared by Map and List.
+struct ActivityDetailStepButtons: View {
+    let previous: (() -> Void)?
+    let next: (() -> Void)?
+    var onNavigationBar = false
+    /// Narrow navigation bars need room for the activity identity and actions.
+    /// Map's header and wide bars retain the two direct controls.
+    var compact = false
+
+    var body: some View {
+        Group {
+            if compact {
+                Menu {
+                    menuStep("Previous activity", icon: "chevron.up", identifier: "activity-previous", action: previous)
+                    menuStep("Next activity", icon: "chevron.down", identifier: "activity-next", action: next)
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.body.weight(.semibold))
+                        .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
+                        .contentShape(Rectangle())
+                }
+                .menuIndicator(.hidden)
+                .accessibilityLabel("Browse activities")
+                .accessibilityIdentifier("activity-navigation-menu")
+            } else {
+                HStack(spacing: 0) {
+                    step("Previous activity", icon: "chevron.up", identifier: "activity-previous", action: previous)
+                    step("Next activity", icon: "chevron.down", identifier: "activity-next", action: next)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(onNavigationBar ? Color.white : AppTheme.accent)
+    }
+
+    private func menuStep(_ label: LocalizedStringKey, icon: String, identifier: String,
+                          action: (() -> Void)?) -> some View {
+        Button { action?() } label: { Label(label, systemImage: icon) }
+            .disabled(action == nil)
+            .accessibilityIdentifier(identifier)
+    }
+
+    private func step(_ label: LocalizedStringKey, icon: String, identifier: String,
+                      action: (() -> Void)?) -> some View {
+        Button { action?() } label: {
+            Image(systemName: icon)
+                .font(.body.weight(.semibold))
+                .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
+                .contentShape(Rectangle())
+        }
+        .disabled(action == nil)
+        .opacity(action == nil ? 0.35 : 1)
+        .accessibilityLabel(Text(label))
+        .accessibilityIdentifier(identifier)
     }
 }

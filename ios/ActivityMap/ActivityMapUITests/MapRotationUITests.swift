@@ -131,7 +131,10 @@ final class MapRotationUITests: XCTestCase {
         XCTAssertEqual(state.presenterID, baseline.presenterID, file: file, line: line)
         XCTAssertEqual(state.presentationCount, 1, "Rotation must not present a replacement", file: file, line: line)
         XCTAssertEqual(state.scrollID, baseline.scrollID, "Results scroll view was replaced", file: file, line: line)
-        XCTAssertTrue(state.scrollAttached && state.resultsPresented, file: file, line: line)
+        XCTAssertTrue(state.resultsPresented, file: file, line: line)
+        if state.detailID == -1 {
+            XCTAssertTrue(state.scrollAttached, "Results must reattach after native Back", file: file, line: line)
+        }
         XCTAssertEqual(state.selection, baseline.selection, file: file, line: line)
         XCTAssertEqual(state.candidates, baseline.candidates, file: file, line: line)
         XCTAssertEqual(state.detent, baseline.detent, "Logical detent must survive adaptation", file: file, line: line)

@@ -21,13 +21,16 @@ export const nativeSuites = [
   'ActivityMapTests/ActivityStoreSelectionTests',
   'ActivityMapTests/SelectionFixtureTests',
   'ActivityMapTests/MapPhotoTests',
+  'ActivityMapTests/MapResultsTests',
+  'ActivityMapTests/ActivityContinuationTests',
   'ActivityMapTests/PhotoGalleryTests',
   'ActivityMapUITests/MapPhotoUITests',
   'ActivityMapUITests/MapRotationUITests',
+  'ActivityMapUITests/ActivityContinuationUITests',
   'ActivityMapUITests/ListSelectionUITests',
 ];
 
-// This regression exercises the iOS 27 retained native sheet. iOS 26 still
+// These journeys exercise the iOS 27 retained native sheet. iOS 26 still
 // runs the ordinary map/photo suites against its custom wide-panel fallback.
 export function nativeSuiteEligibility(runtimeVersion) {
   const major = Number(runtimeVersion.split('.')[0]);
@@ -43,6 +46,12 @@ export function nativeSuiteEligibility(runtimeVersion) {
             requires: 'iOS 27+',
             actual: runtimeVersion,
             reason: 'Retained native-sheet rotation contract',
+          },
+          {
+            suite: 'ActivityMapUITests/ActivityContinuationUITests',
+            requires: 'iOS 27+',
+            actual: runtimeVersion,
+            reason: 'Retained native-sheet continuation fixture',
           },
         ]
       : [];

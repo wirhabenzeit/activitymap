@@ -12,16 +12,38 @@ struct MapRotationUITestFixture: View {
     init(expanded: Bool = false) {
         MapboxOptions.accessToken = "pk.offline-test"
         let date = Date(timeIntervalSince1970: 1_700_000_000)
-        let activities = (1...30).map { id in
-            Activity(id: id, name: "Rotation activity \(id)", sportType: .ride,
+        let continuation = ProcessInfo.processInfo.arguments.contains("--activity-continuation-ui-testing")
+        let count = continuation ? 3 : 30
+        let activities = (1...count).map { id in
+            var activity = Activity(id: id, name: "Rotation activity \(id)", sportType: .ride,
                      startDate: date, startDateLocal: date, timezone: "UTC",
                      distance: 1000, movingTime: 600, elapsedTime: 600,
                      totalElevationGain: 10, averageSpeed: 2, commute: false,
                      coordinates: [.init(latitude: 46, longitude: 8), .init(latitude: 46.01, longitude: 8.01)])
+            if continuation {
+                activity.elevLow = 680
+                activity.elevHigh = 1420
+                activity.maxSpeed = 14.2
+                activity.averageHeartrate = 142
+                activity.maxHeartrate = 176
+                activity.averageWatts = 185
+                activity.maxWatts = 620
+                activity.weightedAverageWatts = 198
+                activity.calories = 680
+                activity.kilojoules = 720
+                activity.kudosCount = 12
+                activity.achievementCount = 3
+                activity.commentCount = 2
+                activity.isPrivate = false
+                activity.flagged = false
+                activity.trainer = false
+                activity.manual = false
+            }
+            return activity
         }
         let store = ActivityStore(activities: activities, listPresentation: ActivityListPresentation(defaults: nil))
-        store.selectedTab = .map
-        store.replaceSelection(with: Set(1...30))
+        store.selectedTab = ProcessInfo.processInfo.arguments.contains("--activity-continuation-list") ? .list : .map
+        store.replaceSelection(with: Set(1...count))
         let picker = RoutePicker()
         picker.reconcile(with: store)
         picker.detent = expanded ? .expanded : .medium
@@ -110,13 +132,20 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
             let panel = controllers.first { controller in
                 guard controller.presentingViewController != nil,
                       controller.presentationController is UISheetPresentationController,
-                      let view = controller.viewIfLoaded else { return false }
-                return findResultsScroll(in: view) != nil
+                      controller.viewIfLoaded != nil else { return false }
+                return findResultsScroll(in: controller) != nil
             }
-            let scroll = panel?.viewIfLoaded.flatMap(findResultsScroll)
+            let scroll = panel.flatMap(findResultsScroll)
             if let scroll { resultsScroll = scroll }
             if let panel { presentations.insert(ObjectIdentifier(panel)) }
             let map = descendants(window).first { $0 is MapView }
+            let visibleDetailID = store.selectedTab == .list ? store.inspectedActivityID : picker.detailID
+            let detailScroll = visibleDetailID == nil ? nil : findDetailScroll(in: panel ?? root)
+            let navigation = panel.flatMap { allControllers($0).compactMap { $0 as? UINavigationController }.first }
+            let detailOffset = detailScroll?.contentOffset.y ?? 0
+            let detailMaximum = detailScroll.map {
+                max(-$0.adjustedContentInset.top, $0.contentSize.height - $0.bounds.height + $0.adjustedContentInset.bottom)
+            } ?? 0
             let sheet = panel?.sheetPresentationController
             var depth = 0
             var presented = panel
@@ -128,18 +157,30 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
             let frame = panel?.viewIfLoaded.map { $0.convert($0.bounds, to: window) } ?? .zero
             let scrollFrame = scroll.map { $0.convert($0.bounds, to: window) } ?? .zero
             let orientation = window.windowScene?.effectiveGeometry.interfaceOrientation.rawValue ?? 0
-            let geometry = "\(orientation)|\(window.bounds)|\(frame)|\(scrollFrame)|\(scroll?.contentOffset ?? .zero)|\(picker.detailID ?? -1)"
+            let geometry = "\(orientation)|\(window.bounds)|\(frame)|\(scrollFrame)|\(scroll?.contentOffset ?? .zero)|\(visibleDetailID ?? -1)|\(detailOffset)|\(detailMaximum)"
             // Opposite landscape orientations have equal bounds; require a
             // fresh half-second of stable samples after either rotation.
             stableSamples = geometry == priorGeometry && !transitioning && scroll?.isDragging != true && scroll?.isDecelerating != true
+                && detailScroll?.isDragging != true && detailScroll?.isDecelerating != true
                 ? stableSamples + 1 : 0
             priorGeometry = geometry
             var values: [String: Any] = [
-                "ready": panel != nil && scroll != nil && stableSamples >= 10,
+                "ready": (store.selectedTab == .list || (panel != nil && scroll != nil)) && stableSamples >= 10,
                 "orientation": orientation,
                 "selection": store.selectedActivityIDs.sorted(),
                 "candidates": picker.candidateIDs,
                 "detent": picker.detent.rawValue, "detailID": picker.detailID ?? -1,
+                "inspectedID": store.inspectedActivityID ?? -1,
+                "listedIDs": store.listedActivities.map(\.id),
+                "detailScrollID": identity(detailScroll),
+                "detailOffset": detailOffset,
+                "detailMaximumOffset": detailMaximum,
+                "detailTopOffset": -(detailScroll?.adjustedContentInset.top ?? 0),
+                "detailFrame": rectangle(detailScroll.map { $0.convert($0.bounds, to: window) } ?? .zero),
+                "detailContentFrame": rectangle(detailScroll.map {
+                    $0.convert($0.bounds.inset(by: $0.adjustedContentInset), to: window)
+                } ?? .zero),
+                "navigationDepth": navigation?.viewControllers.count ?? 0,
                 "resultsPresented": picker.isPresented,
                 "sheetID": identity(sheet), "controllerID": identity(panel),
                 "presenterID": identity(panel?.presentingViewController),
@@ -171,11 +212,15 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
             }
         }
 
-        private func findResultsScroll(in view: UIView) -> UIScrollView? {
-            // Retain the discovered results scroller through detail navigation;
-            // it remains mounted but accessibility-hidden behind the detail page.
-            if let resultsScroll, resultsScroll.isDescendant(of: view) { return resultsScroll }
-            let views = descendants(view)
+        private func findResultsScroll(in controller: UIViewController) -> UIScrollView? {
+            // UINavigationController retains the root controller while its view
+            // is offscreen. Inspect controller containment too, so a native push
+            // doesn't look like sheet dismissal or a replaced results scroller.
+            let roots = allControllers(controller).compactMap(\.viewIfLoaded)
+            if let resultsScroll, roots.contains(where: { resultsScroll.isDescendant(of: $0) }) { return resultsScroll }
+            let navigationRoot = roots.first { $0.accessibilityIdentifier == "map-results-navigation-root" }
+            let views = (navigationRoot.map { [$0] } ?? roots).flatMap(descendants)
+            guard let view = navigationRoot ?? controller.viewIfLoaded else { return nil }
             if let marked = views.first(where: { $0.accessibilityIdentifier == "map-results-scroll" }) {
                 if let scroll = marked as? UIScrollView { return scroll }
                 if let scroll = descendants(marked).compactMap({ $0 as? UIScrollView }).first { return scroll }
@@ -190,8 +235,20 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
             // only vertical scroll view inside the native results controller.
             guard picker.detailID == nil else { return nil }
             let vertical = views.compactMap { $0 as? UIScrollView }
-                .filter { $0.contentSize.height > $0.bounds.height && $0.bounds.height > 0 }
+                .filter { $0.contentSize.height > 0 && $0.bounds.height > 0 }
             return vertical.count == 1 ? vertical.first : nil
+        }
+
+        private func findDetailScroll(in controller: UIViewController) -> UIScrollView? {
+            let views = allControllers(controller).compactMap(\.viewIfLoaded).flatMap(descendants)
+            // The detail marker is a public, app-owned UIKit root. List's
+            // destination uses SwiftUI's AX identifier, which can be virtual.
+            let detailRoot = views.first { $0.accessibilityIdentifier == "map-results-navigation-detail" }
+            let candidates = (detailRoot.map(descendants) ?? views).compactMap { $0 as? UIScrollView }
+                .filter { $0 !== resultsScroll && $0.window != nil && $0.bounds.height > 0 && $0.bounds.width > 0 }
+            if let marked = candidates.first(where: { $0.accessibilityIdentifier == "activity-detail-scroll" }) { return marked }
+            return candidates.filter { $0.contentSize.height > $0.bounds.height }
+                .max { $0.bounds.height < $1.bounds.height }
         }
 
         private func allControllers(_ root: UIViewController) -> [UIViewController] {

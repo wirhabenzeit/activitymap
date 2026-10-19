@@ -11,12 +11,10 @@ struct RoutePickerSheet: View {
     var collapsedOverride: Bool? = nil
     var panelHandle: AnyView? = nil
     private var expansion: CGFloat { collapsed ? 0 : 1 }
-    private var contentReveal: CGFloat { expansion }
     var nativePresentation = false
     private var collapsed: Bool { collapsedOverride ?? (picker.detent == .compact) }
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var panelHeaderHeight: CGFloat = 44
-    @State private var resultsViewportHeight: CGFloat = 0
     @State private var resultsScrollID: Int?
 
     private var candidates: [Activity] {
@@ -33,34 +31,17 @@ struct RoutePickerSheet: View {
                         if !collapsed { panelHeaderHeight = $0 }
                     }
             } else { header }
-            // Keep results mounted through detail and detent changes. Back
-            // restores the exact scroll position, without a second overlay.
+            // One native stack retains the results and owns push/Back. The
+            // surrounding sheet remains the same controller during navigation.
             GeometryReader { viewport in
-                ZStack {
-                    Color.clear.overlay(alignment: .top) {
-                        results.frame(height: (collapsed || detail != nil) && resultsViewportHeight > 0
-                            ? resultsViewportHeight : nil)
-                    }
-                        .opacity(detail == nil ? contentReveal : 0)
-                        .allowsHitTesting(detail == nil && expansion > 0.8)
-                        .accessibilityHidden(detail != nil || expansion < 0.8)
-                    if detail != nil {
-                        MapActivityPager(store: store, picker: picker, expansion: expansion, compactProfile: !isSidePanel,
-                                         bottomContentInset: bottomInset)
-                            .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
-                            .transition(.identity)
-                    }
-                }
-                // The two-position custom panel reveals a stable viewport.
-                // Relaying every drag frame into SwiftUI's lazy scroll layout
-                // changes its content estimates and shifts the saved offset.
-                .frame(width: viewport.size.width,
-                       height: panelExpandedHeight.map { max(0, $0 + bottomInset - panelHeaderHeight) } ?? viewport.size.height,
-                       alignment: .top)
-            }
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                // Hidden/zero-height viewports must not move the retained lazy list.
-                if !collapsed && detail == nil && height > 0 { resultsViewportHeight = height }
+                MapResultsNavigation(store: store, picker: picker, detailID: detail?.id,
+                    results: AnyView(results), expansion: expansion, compactProfile: !isSidePanel,
+                    bottomContentInset: bottomInset,
+                    allowsContinuation: !collapsed && (isSidePanel || picker.detent == .expanded))
+                    // The iOS 26 custom panel still reveals a stable viewport.
+                    .frame(width: viewport.size.width,
+                           height: panelExpandedHeight.map { max(0, $0 + bottomInset - panelHeaderHeight) } ?? viewport.size.height,
+                           alignment: .top)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .frame(height: collapsed ? 0 : nil)
@@ -117,13 +98,25 @@ struct RoutePickerSheet: View {
 
     private var groupHeader: some View {
         HStack(spacing: 0) {
-            SelectionBar(store: store, showsClear: false, expandsCount: true)
-            if detail != nil {
+            if let detail {
                 Button { picker.showResults() } label: {
                     BrowseActionIcon(.back).frame(width: 44, height: 44).contentShape(Rectangle())
                 }
                 .accessibilityLabel("Back to selected activities")
                 .accessibilityIdentifier("map-results-back")
+                let sequence = ActivityDetailSequence(ids: picker.candidateIDs, currentID: detail.id)
+                Text(sequence.position ?? "1 of 1")
+                    .font(.caption).foregroundStyle(AppTheme.secondaryText)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if picker.candidateIDs.count > 1 {
+                    ActivityDetailStepButtons(
+                        previous: sequence.previousID == nil ? nil : { picker.step(-1, store: store) },
+                        next: sequence.nextID == nil ? nil : { picker.step(1, store: store) })
+                        .disabled(picker.isPaging)
+                }
+            } else {
+                SelectionBar(store: store, showsClear: false, expandsCount: true)
             }
             Button { store.mapContext.request(fitActivityID.map { .fitActivity($0) } ?? .fitSelection) } label: {
                 Image(systemName: "viewfinder").frame(width: 44, height: 44).contentShape(Rectangle())

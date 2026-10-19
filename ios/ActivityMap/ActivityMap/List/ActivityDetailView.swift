@@ -11,7 +11,9 @@ struct ActivityDetailView: View {
     var onMapShown: (() -> Void)? = nil
     var hostTab = AppTab.list
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.activityDetailPaging) private var paging
     @AppToolbarEnvironment private var toolbarLayout
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var navigationReference = DetailNavigationReference()
 
     var body: some View {
@@ -30,6 +32,12 @@ struct ActivityDetailView: View {
                     ActivityDetailIdentity(activity: activity, titleLineLimit: toolbarLayout.titleLineLimit, onNavigationBar: true)
                 }
             }), trailing: AnyView(HStack(spacing: AppToolbarLayout.spacing) {
+                if let paging, paging.position(activityID) != nil {
+                    ActivityDetailStepButtons(
+                        previous: paging.canGoPrevious(activityID) ? paging.previous : nil,
+                        next: paging.canGoNext(activityID) ? paging.next : nil, onNavigationBar: true,
+                        compact: horizontalSizeClass != .regular && !toolbarLayout.isCompact)
+                }
                 if let editing = store.activityEditing, let activity = store.activity(id: activityID) {
                     ActivityEditButton(activity: activity, service: editing, onNavigationBar: true)
                 }
@@ -104,7 +112,7 @@ struct ActivityDetailPanel: View {
                 } else {
                     // Keep native safe-area scrolling: an extra clipping mask
                     // cuts content off above the home indicator.
-                    ScrollView {
+                    ActivityContinuationScrollView(activityID: activityID) {
                         ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset,
                                               showsHeading: showsHeading,
                                               hasRoute: store.canShowOnMap(activityID),
@@ -148,7 +156,7 @@ private struct MapActivityDetailReveal: View {
     var body: some View {
         VStack(spacing: 0) {
             heading
-            ScrollView { fullDetail.padding(.bottom, bottomContentInset) }
+            ActivityContinuationScrollView(activityID: activity.id, bottomContentInset: bottomContentInset) { fullDetail }
                 .accessibilityIdentifier("activity-detail-scroll")
                 .clipped()
                 .allowsHitTesting(progress > 0.8)

@@ -21,6 +21,8 @@ struct DetailBackGesture: UIViewControllerRepresentable {
         private weak var gesture: UIGestureRecognizer?
         private weak var previousDelegate: (any UIGestureRecognizerDelegate)?
         private var previousEnabled = false
+        private weak var contentGesture: UIGestureRecognizer?
+        private var previousContentEnabled = false
 
         override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
@@ -30,6 +32,14 @@ struct DetailBackGesture: UIViewControllerRepresentable {
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
             navigationReference?.controller = navigationController
+            // Enable UIKit's content Back gesture alongside its screen-edge
+            // gesture. Its own delegate retains horizontal-content arbitration.
+            if let recognizer = navigationController?.interactiveContentPopGestureRecognizer,
+               contentGesture !== recognizer {
+                contentGesture = recognizer
+                previousContentEnabled = recognizer.isEnabled
+                recognizer.isEnabled = true
+            }
             guard let recognizer = navigationController?.interactivePopGestureRecognizer else { return }
             guard recognizer.delegate !== self else { return }
             gesture = recognizer
@@ -45,6 +55,8 @@ struct DetailBackGesture: UIViewControllerRepresentable {
         }
 
         func restore() {
+            contentGesture?.isEnabled = previousContentEnabled
+            contentGesture = nil
             guard let gesture, gesture.delegate === self else { return }
             gesture.delegate = previousDelegate
             gesture.isEnabled = previousEnabled
