@@ -3,6 +3,29 @@ import MapboxMaps
 import SwiftUI
 import UIKit
 
+/// Measure the SwiftUI scroll engine directly: its UIKit backing view need not
+/// expose isDecelerating while SwiftUI is animating post-release movement.
+enum ActivityContinuationScrollProbe {
+    static var phase = ScrollPhase.idle
+    static var releaseOffset: CGFloat = 0
+    static var travel: CGFloat = 0
+    static var samples = 0
+    static var phases: [String] = []
+    static func phaseChanged(_ next: ScrollPhase, offset: CGFloat) {
+        if next == .tracking || (next == .interacting && phase != .tracking) {
+            travel = 0; samples = 0; phases = []
+        }
+        phase = next
+        phases.append(String(describing: next))
+        if next == .decelerating { releaseOffset = offset }
+    }
+    static func geometryChanged(_ offset: CGFloat) {
+        guard phase == .decelerating else { return }
+        samples += 1
+        travel = max(travel, abs(offset - releaseOffset))
+    }
+}
+
 /// Real shell and results presentation, with no persistent library, auth flow,
 /// remote style or photos. The launch flag also uses in-memory app persistence.
 struct MapRotationUITestFixture: View {
@@ -171,6 +194,7 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
         private var priorGeometry = ""
         private var stableSamples = 0
 
+
         init(store: ActivityStore, picker: RoutePicker, includesProfiles: Bool) {
             self.store = store
             self.picker = picker
@@ -238,6 +262,7 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
             let detailScroll = visibleDetailID == nil ? nil : findDetailScroll(in: panel ?? root)
             let navigation = panel.flatMap { allControllers($0).compactMap { $0 as? UINavigationController }.first }
             let detailOffset = detailScroll?.contentOffset.y ?? 0
+
             let detailMaximum = detailScroll.map {
                 max(-$0.adjustedContentInset.top, $0.contentSize.height - $0.bounds.height + $0.adjustedContentInset.bottom)
             } ?? 0
@@ -277,6 +302,9 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
                 "listedIDs": store.listedActivities.map(\.id),
                 "detailScrollID": identity(detailScroll),
                 "detailOffset": detailOffset,
+                "detailInertiaTravel": ActivityContinuationScrollProbe.travel,
+                "detailInertiaSamples": ActivityContinuationScrollProbe.samples,
+                "detailScrollPhases": ActivityContinuationScrollProbe.phases,
                 "detailMaximumOffset": detailMaximum,
                 "detailTopOffset": -(detailScroll?.adjustedContentInset.top ?? 0),
                 "detailRefreshAttached": detailScroll?.refreshControl != nil,

@@ -57,6 +57,7 @@ struct ActivityContinuationScrollView<Content: View>: View {
                     guard let navigation, navigation.isEnabled, navigation.destination(for: .previous) != nil else { return }
                     navigation.navigate(.previous)
                 })
+
         }
         .scrollPosition($position)
         .scrollBounceBehavior(navigation?.isEnabled == true ? .always : .basedOnSize, axes: .vertical)
@@ -66,10 +67,16 @@ struct ActivityContinuationScrollView<Content: View>: View {
         .onScrollGeometryChange(for: ActivityContinuationPull.Geometry.self) {
             .init($0)
         } action: { _, geometry in
+            #if DEBUG
+            ActivityContinuationScrollProbe.geometryChanged(geometry.offset)
+            #endif
             pull.configure(identity)
             pull.updateGeometry(geometry)
         }
         .onScrollPhaseChange { _, phase, context in
+            #if DEBUG
+            ActivityContinuationScrollProbe.phaseChanged(phase, offset: context.geometry.contentOffset.y)
+            #endif
             pull.configure(identity)
             if let direction = pull.changePhase(to: phase, geometry: .init(context.geometry)), direction == .next,
                let navigation, navigation.isEnabled, navigation.destination(for: direction) != nil {
@@ -185,13 +192,13 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
                 control.accessibilityLabel = String(localized: "Previous activity: \(destination.name)")
                 if parent.refreshControl !== control { parent.refreshControl = control }
             } else if parent.refreshControl === control {
-                control.endRefreshing()
+                if control.isRefreshing { control.endRefreshing() }
                 parent.refreshControl = nil
             }
         }
         func detach() {
             pull.cancel()
-            control.endRefreshing()
+            if control.isRefreshing { control.endRefreshing() }
             scroll?.panGestureRecognizer.removeTarget(self, action: #selector(panChanged))
             if scroll?.refreshControl === control { scroll?.refreshControl = nil }
             scroll = nil
@@ -214,8 +221,10 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
                 if pull.hapticGeneration != feedback {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.6)
                 }
-                control.attributedTitle = pull.isArmed
-                    ? NSAttributedString(string: String(localized: "Release for previous activity")) : nil
+                let title = pull.isArmed ? String(localized: "Release for previous activity") : nil
+                if control.attributedTitle?.string != title {
+                    control.attributedTitle = title.map { NSAttributedString(string: $0) }
+                }
             case .ended, .cancelled, .failed:
                 let expected = identity
                 let navigate = pan.state == .ended
@@ -225,8 +234,10 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
                 // sheet must not take over while the finger is still down.
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
-                    self.control.endRefreshing()
-                    self.control.attributedTitle = nil
+                    // Ending an idle refresh resets native scroll motion too.
+                    // Ordinary flicks must leave the scroll view untouched.
+                    if self.control.isRefreshing { self.control.endRefreshing() }
+                    if self.control.attributedTitle != nil { self.control.attributedTitle = nil }
                     if navigate, self.identity == expected { self.action?() }
                 }
             default: break

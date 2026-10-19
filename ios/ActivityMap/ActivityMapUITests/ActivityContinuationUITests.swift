@@ -7,6 +7,28 @@ import XCTest
 /// touches reach the shared interaction in Map and List.
 @MainActor
 final class ActivityContinuationUITests: XCTestCase {
+    func testListFlickRetainsNativeInertia() async throws {
+        try await inertiaJourney(list: true)
+    }
+
+    func testMapFlickRetainsNativeInertia() async throws {
+        try await inertiaJourney(list: false)
+    }
+
+    private func inertiaJourney(list: Bool) async throws {
+        let app = launch(list: list, expanded: false, profile: true)
+        defer { app.terminate() }
+        _ = try await state(in: app) { $0.ready }
+        try await open(2, app: app, list: list)
+        _ = try await state(in: app) { $0.ready && $0.currentID(list: list) == 2 }
+        detailScroll(in: app).swipeUp(velocity: 1200)
+        let settled = try await state(in: app) { $0.ready }
+        XCTAssertEqual(settled.currentID(list: list), 2, "A normal flick must not navigate")
+        XCTAssertGreaterThan(settled.detailInertiaSamples ?? 0, 2, "Scroll must keep decelerating after finger lift")
+        XCTAssertGreaterThan(settled.detailInertiaTravel ?? 0, 40, "Content must keep travelling after release")
+        capture(app, name: "\(list ? "List" : "Map") native inertia after finger lift")
+    }
+
     func testMapPushAndInteractiveBackRetainResultsAndSelection() async throws {
         let app = launch()
         defer { app.terminate() }
@@ -447,6 +469,8 @@ final class ActivityContinuationUITests: XCTestCase {
         let sheetFrame: [Double]
         let detailFrame: [Double]
         let detailContentFrame: [Double]
+        let detailInertiaTravel: Double?
+        let detailInertiaSamples: Int?
         let detailOffset: Double
         let detailMaximumOffset: Double
         let detailTopOffset: Double
