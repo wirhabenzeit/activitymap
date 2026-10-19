@@ -14,6 +14,8 @@ export const nativeSuites = [
   'ActivityMapTests/StatsDashboardTests',
   'ActivityMapTests/StatsFixtureTests',
   'ActivityMapTests/StatsCalendarLayoutTests',
+  'ActivityMapTests/StatsCalendarScrollRenderingTests',
+  'ActivityMapTests/DetailBackGestureTests',
   'ActivityMapTests/APIErrorFactsTests',
   'ActivityMapTests/AuthRecoveryTests',
   'ActivityMapTests/ActivityEditingTests',
@@ -36,14 +38,16 @@ export const nativeSuites = [
   'ActivityMapTests/ActivityContinuationTests',
   'ActivityMapTests/PhotoGalleryTests',
   'ActivityMapUITests/ActivityActionUITests',
+  'ActivityMapUITests/StatsUITests',
   'ActivityMapUITests/MapPhotoUITests',
   'ActivityMapUITests/MapRotationUITests',
   'ActivityMapUITests/ActivityContinuationUITests',
   'ActivityMapUITests/ListSelectionUITests',
 ];
 
-// These journeys exercise the iOS 27 retained native sheet. iOS 26 still
-// runs the ordinary map/photo suites against its custom wide-panel fallback.
+// Native-sheet and full-content Back contracts below target iOS 27. iOS 26
+// retains ordinary map/photo and calendar-scroll regressions. Ineligibility is
+// reported before execution, never counted as a skipped or passing test.
 export function nativeSuiteEligibility(runtimeVersion) {
   const major = Number(runtimeVersion.split('.')[0]);
   assert(
@@ -64,6 +68,18 @@ export function nativeSuiteEligibility(runtimeVersion) {
             requires: 'iOS 27+',
             actual: runtimeVersion,
             reason: 'Retained native-sheet continuation fixture',
+          },
+          {
+            suite: 'ActivityMapTests/DetailBackGestureTests',
+            requires: 'iOS 27+',
+            actual: runtimeVersion,
+            reason: 'Native content-pop recognizer delegate contract',
+          },
+          {
+            suite: 'ActivityMapUITests/StatsUITests',
+            requires: 'iOS 27+',
+            actual: runtimeVersion,
+            reason: 'Stats calendar pan and native content Back contract',
           },
         ]
       : [];

@@ -172,4 +172,40 @@ struct ActivityContinuationTests {
         let destination = pull.changePhase(to: .decelerating, geometry: released)
         #expect(destination == direction)
     }
+
+    @Test func refusedPullCleanupCannotReleaseANewerCommittedGap() {
+        var lifetime = ActivityContinuationCommitLifetime()
+        var releases = 0
+        func armCleanup() -> () -> Void {
+            let attempt = lifetime.begin()
+            return { if lifetime.finish(attempt) { releases += 1 } }
+        }
+        let refusedPullTimeout = armCleanup()
+        let newerPullTimeout = armCleanup()
+        refusedPullTimeout()
+        #expect(releases == 0, "An older refused pull must not clear the newer cue or release its gap")
+        newerPullTimeout()
+        #expect(releases == 1, "The current refused pull still releases its held gap")
+        newerPullTimeout()
+        #expect(releases == 1, "Cleanup can run only once for each committed gap")
+    }
+
+    @Test func leavingThePageInvalidatesOutstandingPullCleanup() {
+        var lifetime = ActivityContinuationCommitLifetime()
+        var releases = 0
+        func armCleanup() -> () -> Void {
+            let attempt = lifetime.begin()
+            return { if lifetime.finish(attempt) { releases += 1 } }
+        }
+        let departedPageTimeout = armCleanup()
+        lifetime.cancel()
+        departedPageTimeout()
+        #expect(releases == 0, "A departed page must not release scroll state later")
+        let returnedPageTimeout = armCleanup()
+        departedPageTimeout()
+        #expect(releases == 0, "Returning to the page must not revive a retired timeout")
+        returnedPageTimeout()
+        #expect(releases == 1, "A new attempt after returning keeps its own cleanup")
+    }
+
 }

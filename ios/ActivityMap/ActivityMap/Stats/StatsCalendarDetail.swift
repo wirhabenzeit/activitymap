@@ -112,7 +112,10 @@ struct StatsCalendarDetail: View {
             .padding(.top, header + 4)
             .accessibilityHidden(true)
             if expanded {
-                ScrollView(.horizontal) {
+                StatsCalendarHistoryScroll(restoredWeek: visibleWeek.wrappedValue,
+                    initialWeek: StatsDates.monday(layout.last), saveWeek: { week in
+                    visibleWeek.wrappedValue = week
+                }) {
                     LazyHStack(alignment: .top, spacing: 2) {
                         ForEach(layout.weeks, id: \.self) { week in
                             weekColumn(week, layout: layout, days: days, maximum: maximum, header: header)
@@ -122,9 +125,6 @@ struct StatsCalendarDetail: View {
                     .scrollTargetLayout()
                     .padding(.horizontal, 4).padding(.vertical, 4)
                 }
-                .scrollPosition(id: visibleWeek, anchor: .leading)
-                .defaultScrollAnchor(.trailing)
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                 .frame(height: header + rowsHeight + 20)
                 .accessibilityLabel("Activity calendar history")
                 .accessibilityIdentifier("stats-calendar-history")
@@ -266,6 +266,52 @@ struct StatsCalendarDetail: View {
                 }
             } else { Text("No matching activities on this day.").font(.caption) }
         }
+    }
+}
+
+/// Scroll-position updates belong to this leaf, not the calendar's history,
+/// summaries, legend and selected-day rows. Keep its content as a value so a
+/// new visible week does not rebuild those values during a drag or deceleration.
+struct StatsCalendarHistoryScroll<Content: View>: View {
+    let restoredWeek: Int?
+    let initialWeek: Int
+    var saveWeek: (Int?) -> Void
+    let content: Content
+    @State private var week: Int?
+
+    init(restoredWeek: Int?, initialWeek: Int, saveWeek: @escaping (Int?) -> Void,
+         @ViewBuilder content: () -> Content) {
+        self.restoredWeek = restoredWeek
+        self.initialWeek = initialWeek
+        self.saveWeek = saveWeek
+        self.content = content()
+        _week = State(initialValue: restoredWeek ?? initialWeek)
+    }
+
+    var body: some View {
+        ScrollView(.horizontal) { content }
+            .scrollPosition(id: $week, anchor: .leading)
+            .defaultScrollAnchor(.trailing)
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            .onAppear {
+                // The default trailing viewport does not necessarily write a
+                // scroll-position ID. Retain its explicit trailing week before
+                // a first day selection can become a fallback restore anchor.
+                if restoredWeek == nil { saveWeek(week) }
+            }
+            .onScrollPhaseChange { _, phase in
+                // Persist only a settled anchor. Observing every intermediate
+                // week on the shared inspection invalidated the whole calendar.
+                if phase == .idle, restoredWeek != week { saveWeek(week) }
+            }
+            .onDisappear {
+                // A Back action may remove the view during deceleration.
+                if restoredWeek != week { saveWeek(week) }
+            }
+            .onChange(of: restoredWeek) { _, restored in
+                let target = restored ?? initialWeek
+                if week != target { week = target }
+            }
     }
 }
 

@@ -10,6 +10,7 @@ struct ActivityMapApp: App {
     private let isMapRotationUITesting = ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing")
     private let isMapPhotoUITesting = ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
     private let isListSelectionUITesting = ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing")
+    private let isStatsUITesting = ProcessInfo.processInfo.arguments.contains("--stats-ui-testing")
     #endif
 
     init() {
@@ -24,7 +25,8 @@ struct ActivityMapApp: App {
         if ProcessInfo.processInfo.arguments.contains("--activity-actions-ui-testing")
             || ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing")
             || ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
-            || ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing") { return true }
+            || ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing")
+            || ProcessInfo.processInfo.arguments.contains("--stats-ui-testing") { return true }
         #endif
         return ProcessInfo.processInfo.arguments.contains("--unit-testing")
     }
@@ -34,6 +36,8 @@ struct ActivityMapApp: App {
             #if DEBUG
             if isActivityActionsUITesting {
                 ActivityActionsUITestFixture()
+            } else if isStatsUITesting {
+                StatsUITestFixture()
             } else if isMapRotationUITesting {
                 MapRotationUITestFixture(expanded: ProcessInfo.processInfo.arguments.contains("--map-rotation-expanded"))
             } else if isListSelectionUITesting {

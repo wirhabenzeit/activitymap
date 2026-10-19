@@ -74,35 +74,49 @@ struct DetailBackGesture: UIViewControllerRepresentable {
             guard let navigationController else { return false }
             guard navigationController.viewControllers.count > 1,
                   navigationController.transitionCoordinator == nil else { return false }
+            if gestureRecognizer === contentGesture {
+                let location = gestureRecognizer.location(in: navigationController.view)
+                if DetailBackScrollPolicy.horizontalOwner(of: navigationController.view.hitTest(location, with: nil)) != nil {
+                    return false
+                }
+            }
             return true
         }
 
-        // Keep UIKit's touch and arbitration decisions, giving horizontal Back
-        // priority over the vertical scroll pan. UIKit owns direction detection;
-        // its content recognizer may report zero velocity in shouldBegin.
+        // Keep UIKit's direction detection: its content recognizer can report
+        // zero velocity in shouldBegin. Full-content Back yields to horizontal
+        // scroll regions; the native edge gesture remains available there.
         private func contentDelegate(for recognizer: UIGestureRecognizer) -> (any UIGestureRecognizerDelegate)? {
             recognizer === contentGesture ? previousContentDelegate : nil
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-            contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer,
+            if gestureRecognizer === contentGesture,
+               DetailBackScrollPolicy.isHorizontalPan(otherGestureRecognizer) { return false }
+            return contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer,
                 shouldRecognizeSimultaneouslyWith: otherGestureRecognizer) ?? false
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-            contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer,
+            if gestureRecognizer === contentGesture,
+               DetailBackScrollPolicy.isHorizontalPan(otherGestureRecognizer) { return true }
+            return contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer,
                 shouldRequireFailureOf: otherGestureRecognizer) ?? false
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
             if gestureRecognizer === contentGesture, otherGestureRecognizer.view is UIScrollView {
-                return true
+                // A horizontal timeline must receive its pan before a full-page
+                // pop. Vertical detail scrolling retains native content Back.
+                return !DetailBackScrollPolicy.isHorizontalPan(otherGestureRecognizer)
             }
             return contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer,
                 shouldBeRequiredToFailBy: otherGestureRecognizer) ?? false
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer, shouldReceive: touch) ?? true
+            if gestureRecognizer === contentGesture,
+               DetailBackScrollPolicy.horizontalOwner(of: touch.view) != nil { return false }
+            return contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer, shouldReceive: touch) ?? true
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive press: UIPress) -> Bool {
             contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer, shouldReceive: press) ?? true
@@ -117,4 +131,31 @@ struct DetailBackGesture: UIViewControllerRepresentable {
 /// destination changes can end that stack's push before another presenter runs.
 @MainActor final class DetailNavigationReference {
     weak var controller: UINavigationController?
+}
+
+/// Ownership is based on the touched UIKit scroll hierarchy, independent of
+/// labels, layout direction and current offset. At either end of a timeline,
+/// a new drag still belongs to that timeline rather than dismissing its page.
+@MainActor enum DetailBackScrollPolicy {
+    static func ownsHorizontalScrolling(_ scroll: UIScrollView) -> Bool {
+        guard scroll.isScrollEnabled else { return false }
+        let horizontalExtent = scroll.contentSize.width
+            + scroll.adjustedContentInset.left + scroll.adjustedContentInset.right
+        return scroll.alwaysBounceHorizontal || horizontalExtent > scroll.bounds.width + 1
+    }
+
+    static func horizontalOwner(of view: UIView?) -> UIScrollView? {
+        var candidate = view
+        while let current = candidate {
+            if let scroll = current as? UIScrollView, ownsHorizontalScrolling(scroll) { return scroll }
+            candidate = current.superview
+        }
+        return nil
+    }
+
+    static func isHorizontalPan(_ recognizer: UIGestureRecognizer) -> Bool {
+        guard let scroll = recognizer.view as? UIScrollView,
+              recognizer === scroll.panGestureRecognizer else { return false }
+        return ownsHorizontalScrolling(scroll)
+    }
 }

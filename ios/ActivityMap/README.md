@@ -359,6 +359,8 @@ The native shell now exposes Map, List and Stats. Stats retains its scroll posit
 
 Stats uses non-date activity filters and tile-owned periods. Reset activity filters preserves the Map/List date range and selection. Normal dashboard entry performs metadata calculations only, without requesting streams, photos or route geometry. Expanded volume grouping, scrollable weekday-row calendar history, current/prior-period comparison bands, and record/calendar/hilliness activity drill-down are included. The compact calendar fits recent week columns to its width and text size, places the active-day count beside its colour switch, and preserves square cells and month cutouts. Expanded history uses lazy columns, retains its visible week and day, and keeps day details below the grid so selection does not shift the timeline. Final device/accessibility certification remains #228.
 
+Wide dashboards keep the same compact Sport mix summary as phones; per-sport measurements require explicit expansion. On iPad, the workspace owns the single fixed header, while expanded tile identity and Back scroll with the detail content. Calendar pans own their horizontal scroll region instead of competing with full-content Back; deliberate edge Back remains available. The calendar keeps intermediate week positions in a scrolling leaf, retaining the initial, settled and departing viewport without rebuilding all history during each pan.
+
 The retired Calendar/Timeline/Progress prototype screens have been removed. See [dashboard review](../../docs/ios-stats-dashboard-review.md) for scope, captures and validation.
 
 For a tile-only web/iOS comparison, start the local web development server and run:

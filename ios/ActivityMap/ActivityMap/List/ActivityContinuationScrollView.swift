@@ -53,6 +53,7 @@ struct ActivityContinuationScrollView<Content: View>: View {
     @State private var previousCueHeight: CGFloat?
     @State private var nextCueHeight: CGFloat?
     @State private var committed: CommittedCue?
+    @State private var commitLifetime = ActivityContinuationCommitLifetime()
     @State private var scroll = ActivityContinuationScrollHandle()
 
     /// The outgoing page keeps the armed cue in its gap while it slides away,
@@ -129,7 +130,7 @@ struct ActivityContinuationScrollView<Content: View>: View {
             transaction.disablesAnimations = true
             withTransaction(transaction) { position.scrollTo(edge: .top) }
         }
-        .onDisappear { pull.cancel(); previousIndicator = .init() }
+        .onDisappear { commitLifetime.cancel(); pull.cancel(); previousIndicator = .init() }
         .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: pull.hapticGeneration)
     }
 
@@ -143,11 +144,12 @@ struct ActivityContinuationScrollView<Content: View>: View {
         let held = scroll.freeze()
         committed = CommittedCue(direction: direction, destination: destination, state: armed,
                                  heldBottom: direction == .next ? held : 0)
+        let attempt = commitLifetime.begin()
         navigation.navigate(direction)
         // A host can still refuse a stale target. A page that remains on screen
         // after the push would have finished must not stay frozen open.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [scroll] in
-            guard scroll.isOnScreen else { return }
+            guard scroll.isOnScreen, self.commitLifetime.finish(attempt) else { return }
             self.committed = nil
             self.previousIndicator = .init()
             scroll.release()
@@ -221,6 +223,26 @@ struct ActivityContinuationScrollView<Content: View>: View {
         .accessibilityLabel(previous ? Text("Previous activity: \(destination.name)") : Text("Next activity: \(destination.name)"))
         .accessibilityValue(state.isArmed ? Text("Release to open") : Text("Keep pulling"))
         .accessibilityIdentifier(previous ? "activity-continuation-previous-cue" : "activity-continuation-cue")
+    }
+}
+
+/// A refused pull's delayed cleanup belongs only to that attempt. A later
+/// commit or disappearance retires it before it can release another page gap.
+struct ActivityContinuationCommitLifetime {
+    private var active: UUID?
+
+    mutating func begin() -> UUID {
+        let attempt = UUID()
+        active = attempt
+        return attempt
+    }
+
+    mutating func cancel() { active = nil }
+
+    mutating func finish(_ attempt: UUID) -> Bool {
+        guard active == attempt else { return false }
+        active = nil
+        return true
     }
 }
 
