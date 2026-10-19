@@ -28,17 +28,27 @@ export function routeCoordinates(
   }
 }
 
+function validRouteCoordinate([lng, lat]: readonly number[]): boolean {
+  return (
+    Number.isFinite(lng) &&
+    Number.isFinite(lat) &&
+    Math.abs(lng!) <= 180 &&
+    Math.abs(lat!) <= 90
+  );
+}
+
+/** Availability needs only one valid point; reserve bound sorting for an explicit fit. */
+export function canFrameRoute(
+  coordinates: readonly (readonly number[])[],
+): boolean {
+  return coordinates.some(validRouteCoordinate);
+}
+
 /** The shortest longitude arc also frames routes crossing the date line. */
 export function routeBounds(
   coordinates: readonly (readonly number[])[],
 ): RouteBounds | null {
-  const valid = coordinates.filter(
-    ([lng, lat]) =>
-      Number.isFinite(lng) &&
-      Number.isFinite(lat) &&
-      Math.abs(lng!) <= 180 &&
-      Math.abs(lat!) <= 90,
-  );
+  const valid = coordinates.filter(validRouteCoordinate);
   if (!valid.length) return null;
   const longitudes = valid
     .map(([lng]) => (lng! + 360) % 360)
