@@ -6,14 +6,13 @@ struct ActivityRowContextMenu: ViewModifier {
     let store: ActivityStore
     var showsMapAction = false
     @State private var showsEditor = false
-    @State private var exportTask: Task<Void, Never>?
-    @State private var file: ActivityGPXFile?
-    @State private var failure: Failure?
+    @State private var workflow = ActivityGPXExportController()
 
-    private struct Failure: Identifiable {
-        let id = UUID()
-        let title: String
-        let message: String
+    private var source: ActivityGPXExportSource { .capture(activity: activity, store: store) }
+
+    private var key: ActivityGPXExportKey { .init(activity: activity, store: store) }
+    private var availability: ActivityGPXExportAvailability {
+        workflow.prepared(for: key) ?? .preflight(activity: activity, summary: store.streamSummaries?.currentSummary(for: String(activity.id)))
     }
 
     func body(content: Content) -> some View {
@@ -25,54 +24,28 @@ struct ActivityRowContextMenu: ViewModifier {
                     ActivityEditForm(activity: store.activity(id: activity.id) ?? activity, service: service)
                 }
             }
-            .background(ActivityGPXSharePresenter(file: $file) { error in
-                failure = Failure(title: "Couldn’t share GPX", message: error.localizedDescription)
+            .background(ActivityGPXSharePresenter(file: $workflow.file) { error in
+                workflow.report(title: "Couldn’t share GPX", message: error.localizedDescription)
             })
-            .alert(item: $failure) { failure in
+            .alert(item: $workflow.failure) { failure in
                 Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text("OK")))
             }
-            .onDisappear {
-                exportTask?.cancel()
-                file = nil
-            }
+            .onDisappear { workflow.cancel() }
     }
 
     private var actions: some View {
         Group {
             Button("Edit", systemImage: "pencil") { showsEditor = true }
                 .disabled(store.activityEditing == nil)
-            Button(exportTask == nil ? "Share GPX" : "Preparing GPX…", systemImage: "square.and.arrow.up",
-                   action: exportGPX)
-                .disabled(activity.coordinates.isEmpty || exportTask != nil || file != nil)
+            Button(!workflow.isExporting ? "Share GPX" : "Preparing GPX…", systemImage: "square.and.arrow.up",
+                   action: { workflow.export(source: source, current: { source }) })
+                .disabled(!availability.canExport || workflow.isExporting || workflow.file != nil)
+                .accessibilityHint(availability.hint)
             if showsMapAction {
                 Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
                     .disabled(activity.coordinates.isEmpty)
             }
         }
-    }
-
-    private func exportGPX() {
-        guard !activity.coordinates.isEmpty, exportTask == nil, file == nil else { return }
-        let snapshot = ActivityGPX(activity: activity)
-        let cached = store.streamSummaries?.currentSummary(for: String(activity.id))
-        exportTask = Task {
-            defer { exportTask = nil }
-            let worker = Task.detached(priority: .userInitiated) {
-                try snapshot.includingSampledElevation(from: cached).write()
-            }
-            do {
-                let result = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
-                try Task.checkCancellation()
-                guard cached == store.streamSummaries?.currentSummary(for: String(activity.id)) else { return }
-                file = result
-            } catch is CancellationError { }
-            catch {
-                if !Task.isCancelled {
-                    failure = Failure(title: "Couldn’t export GPX",
-                        message: (error as? ActivityGPX.ExportError)?.localizedDescription
-                            ?? "The GPX file couldn’t be created. Please try again.")
-                }
-            }
-        }
+        .task(id: key) { await workflow.prepare(source, key: key, current: { self.source }) }
     }
 }

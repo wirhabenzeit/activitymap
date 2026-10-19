@@ -4,34 +4,18 @@ struct ActivityDetailActions: View {
     let activity: Activity
     var summaries: StreamSummaryLoader? = nil
     @Environment(\.activityDetailOverMap) private var overMap
-    @State private var exportTask: Task<Void, Never>?
+    var exportStore: ActivityStore? = nil
+    @State private var workflow = ActivityGPXExportController()
     @State private var stravaTask: Task<Void, Never>?
-    @State private var file: ActivityGPXFile?
     @State private var openingStrava = false
-    @State private var failure: Failure?
-    @State private var decodedElevation: DecodedElevation?
-
-    private struct DecodedElevation {
-        let cached: CachedStreamSummary
-        let elevation: ActivityGPX.SampledElevation?
+    private var source: ActivityGPXExportSource {
+        .capture(activity: activity, store: exportStore, summaries: summaries)
     }
 
-    private struct Failure: Identifiable {
-        let id = UUID()
-        let title: String
-        let message: String
-    }
-
-    private var cached: CachedStreamSummary? { summaries?.currentSummary(for: String(activity.id)) }
-    private var elevation: ActivityGPX.SampledElevation? {
-        decodedElevation?.cached == cached ? decodedElevation?.elevation : nil
-    }
-    private var hasGeometry: Bool { !activity.coordinates.isEmpty || elevation != nil }
-    private var quality: String {
-        elevation != nil ? "Sampled route with elevation" : activity.geometrySource == .detailed ? "Detailed route" : "Simplified route"
-    }
-    private var exportSubtitle: String {
-        hasGeometry ? "\(quality) · available offline" : "Unavailable · no GPS route"
+    private var key: ActivityGPXExportKey { .init(activity: activity, store: exportStore, summaries: summaries) }
+    private var availability: ActivityGPXExportAvailability {
+        workflow.prepared(for: key) ?? .preflight(activity: activity,
+            summary: (exportStore?.streamSummaries ?? summaries)?.currentSummary(for: String(activity.id)))
     }
 
     var body: some View {
@@ -51,17 +35,17 @@ struct ActivityDetailActions: View {
                 .disabled(openingStrava)
                 .accessibilityIdentifier("activity-open-in-strava")
                 Divider().padding(.leading, 44)
-                Button(action: exportGPX) {
-                    row(title: exportTask == nil ? "Export GPX" : "Preparing GPX…",
-                        subtitle: exportSubtitle, icon: "doc.badge.arrow.up",
-                        trailing: "square.and.arrow.up", busy: exportTask != nil)
+                Button(action: { workflow.export(source: source, current: { source }) }) {
+                    row(title: !workflow.isExporting ? "Export GPX" : "Preparing GPX…",
+                        subtitle: availability.subtitle, icon: "doc.badge.arrow.up",
+                        trailing: "square.and.arrow.up", busy: workflow.isExporting)
                 }
-                .disabled(!hasGeometry || exportTask != nil || file != nil)
-                .opacity(hasGeometry ? 1 : 0.5)
+                .disabled(!availability.canExport || workflow.isExporting || workflow.file != nil)
+                .opacity(availability.canExport ? 1 : 0.5)
                 .accessibilityIdentifier("activity-export-gpx")
-                .accessibilityHint(hasGeometry ? "Share the saved route as a GPX file" : "This activity has no GPS route to export")
-                .background(ActivityGPXSharePresenter(file: $file) { error in
-                    failure = Failure(title: "Couldn’t share GPX", message: error.localizedDescription)
+                .accessibilityHint(availability.hint)
+                .background(ActivityGPXSharePresenter(file: $workflow.file) { error in
+                    workflow.report(title: "Couldn’t share GPX", message: error.localizedDescription)
                 })
             }
             .buttonStyle(.plain)
@@ -71,21 +55,13 @@ struct ActivityDetailActions: View {
                 }
             }
         }
-        .alert(item: $failure) { failure in
+        .alert(item: $workflow.failure) { failure in
             Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text("OK")))
         }
-        .task(id: cached) {
-            guard let cached else { decodedElevation = nil; return }
-            let id = activity.id
-            let worker = Task.detached(priority: .userInitiated) { ActivityGPX.SampledElevation.decode(cached, activityID: id) }
-            let elevation = await withTaskCancellationHandler { await worker.value } onCancel: { worker.cancel() }
-            guard !Task.isCancelled, self.cached == cached else { return }
-            decodedElevation = DecodedElevation(cached: cached, elevation: elevation)
-        }
+        .task(id: key) { await workflow.prepare(source, key: key, current: { self.source }) }
         .onDisappear {
-            exportTask?.cancel()
+            workflow.cancel()
             stravaTask?.cancel()
-            file = nil
         }
     }
 
@@ -115,31 +91,8 @@ struct ActivityDetailActions: View {
             defer { openingStrava = false; stravaTask = nil }
             do { try await StravaActivityLink.open(activityID: id) }
             catch is CancellationError { }
-            catch { if !Task.isCancelled { failure = Failure(title: "Couldn’t open Strava", message: error.localizedDescription) } }
+            catch { if !Task.isCancelled { workflow.report(title: "Couldn’t open Strava", message: error.localizedDescription) } }
         }
     }
 
-    private func exportGPX() {
-        guard hasGeometry, exportTask == nil, file == nil else { return }
-        let snapshot = ActivityGPX(activity: activity)
-        let source = cached
-        exportTask = Task {
-            defer { exportTask = nil }
-            let worker = Task.detached(priority: .userInitiated) {
-                try snapshot.includingSampledElevation(from: source).write()
-            }
-            do {
-                let result = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
-                try Task.checkCancellation()
-                guard source == cached else { return }
-                file = result
-            } catch is CancellationError { }
-            catch {
-                if !Task.isCancelled {
-                    let message = (error as? ActivityGPX.ExportError)?.localizedDescription ?? "The GPX file couldn’t be created. Please try again."
-                    failure = Failure(title: "Couldn’t export GPX", message: message)
-                }
-            }
-        }
-    }
 }
