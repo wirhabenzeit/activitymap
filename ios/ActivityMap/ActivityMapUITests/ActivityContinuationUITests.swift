@@ -277,8 +277,11 @@ final class ActivityContinuationUITests: XCTestCase {
         if verifyGrabber {
             let sheet = rect(settled.sheetFrame)
             let start = coordinate(app, x: sheet.midX, y: sheet.minY + 10)
+            // A tablet's expanded detent is much taller; cross the native
+            // midpoint rather than reusing a phone-sized grabber movement.
+            let travel = max(270, sheet.height * 0.7)
             start.press(forDuration: 0.05,
-                        thenDragTo: coordinate(app, x: sheet.midX, y: min(app.frame.maxY - 40, sheet.minY + 270)),
+                        thenDragTo: coordinate(app, x: sheet.midX, y: min(app.frame.maxY - 40, sheet.minY + travel)),
                         withVelocity: .slow, thenHoldForDuration: 0.25)
             let collapsed = try await state(in: app) { $0.ready && $0.detent == 0 }
             XCTAssertEqual(collapsed.detailID, previous)
