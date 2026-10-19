@@ -102,6 +102,8 @@ struct ActivityDetailPanel: View {
                         else { store.showOnMap(id) }
                     }
                 } else {
+                    // Keep native safe-area scrolling: an extra clipping mask
+                    // cuts content off above the home indicator.
                     ScrollView {
                         ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset,
                                               showsHeading: showsHeading,
@@ -116,7 +118,6 @@ struct ActivityDetailPanel: View {
                         }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
                     }
                     .accessibilityIdentifier("activity-detail-scroll")
-                    .clipped()
                 }
             } else {
                 ContentUnavailableView("Activity unavailable", systemImage: "figure.run.circle",

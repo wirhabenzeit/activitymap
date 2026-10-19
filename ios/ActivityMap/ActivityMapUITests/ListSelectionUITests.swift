@@ -13,6 +13,57 @@ final class ListSelectionUITests: XCTestCase {
         try journey(standalone: true)
     }
 
+    func testDetailScrollReachesBottomAndKeepsLastActionVisible() throws {
+        continueAfterFailure = false
+        defer { XCUIDevice.shared.orientation = .portrait }
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            XCUIDevice.shared.orientation = orientation
+            let app = XCUIApplication()
+            app.launchArguments = ["--list-selection-ui-testing", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+            app.launch()
+            defer { app.terminate() }
+            let activity = app.buttons["Details for Activity 2"]
+            XCTAssertTrue(activity.waitForExistence(timeout: 10), app.debugDescription)
+            activity.tap()
+            // An adjacent inspector propagates its ID to the inner scroll view.
+            let scroll = app.scrollViews.matching(NSPredicate(format: "identifier IN %@",
+                ["activity-detail-scroll", "list-activity-panel"])).firstMatch
+            XCTAssertTrue(scroll.waitForExistence(timeout: 10), app.debugDescription)
+            let export = scroll.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Export GPX")).firstMatch
+            // AX frames do not describe an outer drawing mask. Position the
+            // action card across the bottom edge for a meaningful pixel capture.
+            let share = scroll.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Share activity")).firstMatch
+            let targetY = app.frame.maxY - 100
+            for _ in 0..<8 {
+                let delta = share.exists ? targetY - share.frame.minY : -250
+                if abs(delta) < 15 { break }
+                let limit = min(250, scroll.frame.intersection(app.frame).height * 0.35)
+                let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: max(-limit, min(limit, delta)))),
+                            withVelocity: .slow, thenHoldForDuration: 0.2)
+            }
+            XCTAssertTrue(share.exists, app.debugDescription)
+            let crossing = XCTAttachment(screenshot: app.screenshot())
+            crossing.name = "Detail card crossing bottom \(orientation.rawValue)"
+            crossing.lifetime = .keepAlways
+            add(crossing)
+            print("Detail mid-scroll geometry: orientation=\(orientation.rawValue), targetY=\(targetY), share=\(share.frame), app=\(app.frame)")
+            for _ in 0..<6 {
+                scroll.swipeUp()
+                if export.exists && scroll.frame.intersection(app.frame).contains(export.frame) { break }
+            }
+            let viewport = scroll.frame.intersection(app.frame)
+            let capture = XCTAttachment(screenshot: app.screenshot())
+            capture.name = "Detail bottom \(orientation.rawValue)"
+            capture.lifetime = .keepAlways
+            add(capture)
+            print("Detail bottom geometry: orientation=\(orientation.rawValue), app=\(app.frame), scroll=\(scroll.frame), export=\(export.frame)")
+            XCTAssertTrue(export.exists && export.isHittable, app.debugDescription)
+            XCTAssertTrue(viewport.insetBy(dx: -1, dy: -1).contains(export.frame),
+                          "The complete final action must fit in the visible scroll viewport: \(viewport), \(export.frame)")
+        }
+    }
+
     private func journey(standalone: Bool) throws {
         continueAfterFailure = false
         let tablet = UIDevice.current.userInterfaceIdiom == .pad
